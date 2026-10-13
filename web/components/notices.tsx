@@ -16,7 +16,7 @@ import { providerLabel, providerOrg } from "../labels";
 import { hashForCalendar, hashForPullRequests, hashForSettings } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { BrandMark, SLACK_LOGO } from "./integrations/brand-logos";
+import { BrandMark, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { toasts } from "./toaster";
 
@@ -159,8 +159,41 @@ function follow(notice: Notice): void {
 /** Whether **Update** is enabled: before the update runs, and again after it failed. */
 const updatable = (notice: UpdateNotice): boolean => notice.status.state === "available" || notice.status.state === "failed";
 
+/** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, Google Calendar or this computer's calendar, or omp. */
+function originOf(notice: Notice): { logo: ReactNode; label: string } {
+	const mark = "size-3.5 shrink-0";
+	switch (notice.kind) {
+		case "pull-request":
+			return { logo: <OrgIcon org="github" className={mark} />, label: "GitHub" };
+		case "slack":
+			return { logo: <BrandMark logo={SLACK_LOGO} className={mark} />, label: "Slack" };
+		case "plan":
+		case "credits": {
+			const Icon = notice.kind === "plan" ? Gauge : Wallet;
+			return { logo: <OrgIcon org={providerOrg(notice.provider)} className={mark} fallback={<Icon aria-hidden className={mark} />} />, label: providerLabel(notice.provider) };
+		}
+		case "event":
+			return notice.calendar === null
+				? { logo: <CalendarClock aria-hidden className={mark} />, label: "Calendar" }
+				: { logo: <BrandMark logo={GOOGLE_CALENDAR_LOGO} className={mark} />, label: "Google Calendar" };
+		default:
+			return { logo: <Sparkles aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />, label: "omp" };
+	}
+}
+
+/** A notice toast's source line: the logo and name of where it came from. */
+export function NoticeSource({ notice }: { notice: Notice }) {
+	const { logo, label } = originOf(notice);
+	return (
+		<>
+			{logo}
+			<span className="truncate">{label}</span>
+		</>
+	);
+}
+
 /**
- * Shows each notice the user has not seen as a toast; closing it marks the notice seen, so it toasts once across reloads
+ * Shows each notice the user has not seen as a toast, under the logo and name of its source; closing it marks the notice seen, so it toasts once across reloads
  * and pages. An update's toast stays until dismissed and keeps its text and **Update** in step with the notice. Any
  * other notice's toast shows only while its news is fresh and opens what it is about; an event's stays until dismissed
  * or the event ends, and any other closes itself.
@@ -188,6 +221,7 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: Sen
 				open.current.add(id);
 				toasts.add({
 					id,
+					data: { source: <NoticeSource notice={notice} /> },
 					timeout: notice.kind === "event" ? 0 : TOAST_MS,
 					onClose,
 					title: headlineOf(notice),
@@ -218,7 +252,7 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: Sen
 			if (!open.current.has(id)) {
 				if (notice.seen) continue;
 				open.current.add(id);
-				toasts.add({ id, timeout: 0, onClose, ...content });
+				toasts.add({ id, timeout: 0, onClose, data: { source: <NoticeSource notice={notice} /> }, ...content });
 			} else if (dismissedElsewhere) {
 				close(id);
 			} else {

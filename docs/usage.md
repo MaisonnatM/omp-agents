@@ -1245,6 +1245,7 @@ An action that fails shows its error, and its control becomes available again.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge on GitHub** for one ready to merge.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
+  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or **Calendar** for an event kept on this computer, or omp for an update.
   A pull request's, Slack message's, provider's, or event's toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts.
   A pull request's, Slack message's, or provider's toast closes after a few seconds; an event's stays until you dismiss it or the event ends, and an update's until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
