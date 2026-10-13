@@ -12,7 +12,7 @@ import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErr
 import { selectorOf } from "./shared/models";
 import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, UserAnswer, UserRequest, WithdrawnMessage } from "./shared/sessions";
 import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, SubagentFiles } from "./subagents";
-import { TurnGate } from "./turn-gate";
+import { SerialLane } from "./serial-lane";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
 const DISPLAY_NAME = "omp-agents";
@@ -111,7 +111,7 @@ export class SessionGuest implements LiveSession {
 	 */
 	#interrupted = false;
 	/** Prompt, promote, interrupt, and flush, so their frames follow a steer that is still being prepared. */
-	readonly #turn = new TurnGate();
+	readonly #turn = new SerialLane();
 	/** Whether this guest steered the running turn since the host last reported its queue; the host's state lags the steer. */
 	#steered = false;
 

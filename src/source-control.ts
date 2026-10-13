@@ -10,7 +10,7 @@ import { errorText, isObject } from "./json";
 import { HOME } from "./paths";
 import { run, runChecked } from "./proc";
 import { type AutoPull, type AutoPullChange, applyAutoPull, DEFAULT_AUTO_PULL, type ProviderStatus, type PullOutcome, type PullRepo, type SourceControlAnswer } from "./shared/source-control";
-import { TurnGate } from "./turn-gate";
+import { SerialLane } from "./serial-lane";
 
 const FETCH_TIMEOUT_MS = 60_000;
 
@@ -86,7 +86,7 @@ export class SourceControl {
 	readonly #file: JsonFile<AutoPull>;
 	#autoPull: AutoPull;
 	readonly #last = new Map<string, NonNullable<PullRepo["last"]>>();
-	readonly #pulls = new TurnGate();
+	readonly #pulls = new SerialLane();
 
 	constructor(path: string) {
 		this.#file = new JsonFile(path, { parse: parseAutoPull, holds: "the automatic pull setting", onInvalid: "aside", indent: "\t" });
