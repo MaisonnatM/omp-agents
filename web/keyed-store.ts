@@ -41,5 +41,5 @@ export function keyedStore<T>(empty: T) {
 		};
 		return useSyncExternalStore(watch, read, read);
 	};
-	return { get, set, use, useSelect };
+	return { get, set, keys: () => entries.keys(), use, useSelect };
 }
