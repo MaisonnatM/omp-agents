@@ -15,7 +15,7 @@ import {
 import { FileDialog } from "./components/file-dialog";
 import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
-import { useNoticeToasts } from "./components/notices";
+import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
 import { ProjectDetails } from "./components/project-details";
 import { ScheduledSends } from "./components/scheduled";

@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Notice } from "../../src/shared/notices";
-import { NoticeSource } from "./notices";
+import { NoticeOrigin } from "./notices";
 
 const base = { id: "n", at: 0, seen: false, read: false };
 const event = { ...base, kind: "event", title: "Standup", start: 0, end: 1, color: null } as const;
 
-const sourceOf = (notice: Notice) => renderToStaticMarkup(<NoticeSource notice={notice} />);
+const sourceOf = (notice: Notice) => renderToStaticMarkup(<NoticeOrigin notice={notice} />);
 
 test("a toast names the source of its notice beside that source's logo", () => {
 	const slack = sourceOf({ ...base, kind: "slack", from: "Ana", avatarUrl: null, text: "hi", permalink: "https://slack.test", type: "dm", count: 1 });
