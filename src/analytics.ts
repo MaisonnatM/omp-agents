@@ -3,6 +3,7 @@ import { basename, isAbsolute, relative, sep } from "node:path";
 import type { StatsProviderPoint, StatsUsage } from "./omp/modules";
 import type { SessionModelRow, StatsRead, StatsWindow } from "./omp/stats";
 import type { Analytics, AnalyticsProviderUsage, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared/analytics";
+import { selectorOf } from "./shared/models";
 
 /** How many sessions the page lists. */
 export const TOP_SESSIONS = 20;
@@ -161,7 +162,7 @@ export function buildAnalytics(range: AnalyticsRange, read: StatsRead, root: str
 		totals: usageOf(dashboard.overall),
 		...chartOf(read.providerSeries, read.window),
 		models: dashboard.byModel
-			.map(model => ({ selector: `${model.provider}/${model.model}`, tokensPerSecond: model.avgTokensPerSecond, ...usageOf(model) }))
+			.map(model => ({ selector: selectorOf({ provider: model.provider, id: model.model }), tokensPerSecond: model.avgTokensPerSecond, ...usageOf(model) }))
 			.filter(model => model.tokens.total > 0)
 			.sort((a, b) => b.tokens.total - a.tokens.total),
 		workspaces: workspacesOf(sessions),

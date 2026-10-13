@@ -1,5 +1,5 @@
 /** omp's config: the settings a session loads, and writing the model routing back through omp's own path. */
-import type { RetrySettings, RoutingEdit } from "../shared/models";
+import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
 import { config, dirs, extensionSettings, fallbackChains, modelSettings, type SettingHandle, sessionSettings, settingsRegistry } from "./modules";
 
@@ -8,7 +8,38 @@ export const agentDir: string = dirs.getAgentDir();
 /** Where omp keeps the images it moves out of session files, each in a file named by the SHA-256 of its bytes. */
 export const blobsDir: string = dirs.getBlobsDir();
 
-export const { expandDefaultRetryFallbackChains, parseRetryFallbackSelector } = fallbackChains;
+export const { expandDefaultRetryFallbackChains } = fallbackChains;
+
+/** A model selector as omp reads it: the model's `provider/id`, and what follows them, such as `:high` or `:auto`. */
+export interface ReadSelector {
+	provider: string;
+	id: string;
+	suffix: string;
+}
+
+/**
+ * `selector` as omp's `parseRetryFallbackSelector` reads it against `known`, the `provider/id` of each listed model:
+ * a `:level` splits off only once the id without it is listed, so an id that holds a colon stays whole.
+ * The model it names need not be listed; {@link resolveSelector} also requires that.
+ */
+export function readSelector(selector: string, known: ReadonlySet<string>): ReadSelector | null {
+	const parsed = fallbackChains.parseRetryFallbackSelector(selector, { find: (provider, id) => (known.has(selectorOf({ provider, id })) ? true : undefined) });
+	if (!parsed) return null;
+	const { provider, id } = parsed;
+	return { provider, id, suffix: selector.trim().slice(selectorOf(parsed).length) };
+}
+
+/** {@link readSelector}, when the model `selector` names is one of `known`. */
+export function resolveSelector(selector: string, known: ReadonlySet<string>): ReadSelector | null {
+	const read = readSelector(selector, known);
+	return read && known.has(selectorOf(read)) ? read : null;
+}
+
+/** Every selector the routing names: each role's, and each fallback chain's key and entries. */
+export const routedSelectors = (routing: Pick<OmpConfig, "modelRoles" | "fallbackChains">): string[] => [
+	...Object.values(routing.modelRoles),
+	...Object.entries(routing.fallbackChains).flatMap(([key, chain]) => [key, ...chain]),
+];
 
 /** omp's config as a session in `cwd` loads it: the global `config.yml`, the project's, and omp's defaults. */
 export interface OmpConfig {
