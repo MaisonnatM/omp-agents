@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test";
 import { GmailClient, mailOf, replyOf } from "./gmail";
 import { recipientsOf, type MailMessage } from "./shared/gmail";
-import type { GoogleFetch } from "./integrations";
-import { ApiError } from "./omp/mcp";
+import { ApiError, type SignedFetch } from "./signed-fetch";
 
 const PROFILE = { emailAddress: "max+work@example.com", messagesTotal: 1204, threadsTotal: 873, historyId: "9921" };
 
@@ -40,7 +39,7 @@ const INBOX = "/gmail/v1/users/me/threads";
 /** A client over `answers`, by the path of each address, with the addresses it read. */
 function clientOf(answers: Record<string, unknown>): { client: GmailClient; reads: string[] } {
 	const reads: string[] = [];
-	const fetch: GoogleFetch = async url => {
+	const fetch: SignedFetch = async url => {
 		reads.push(url);
 		const answer = answers[new URL(url).pathname];
 		if (answer instanceof Error) throw answer;
@@ -360,7 +359,7 @@ test("a reply sends to the last message other than a draft, and a trash moves th
 	const answers = twoThreads();
 	answers[`${INBOX}/18f2a`] = { id: "18f2a", messages: [ASK, headed("d", { From: "max+work@example.com", To: "alice@example.com" }, ["DRAFT"])] };
 	let reads = 0;
-	const fetch: GoogleFetch = async (url, init) => {
+	const fetch: SignedFetch = async (url, init) => {
 		if (init) {
 			writes.push({ url: new URL(url).pathname, body: init.method === "POST" ? init.body : null });
 			return {};
@@ -383,7 +382,7 @@ test("a reply sends to the last message other than a draft, and a trash moves th
 });
 
 test("Google's refusal of a read-only sign-in says to sign in again", async () => {
-	const fetch: GoogleFetch = async () => {
+	const fetch: SignedFetch = async () => {
 		throw new ApiError("Request had insufficient authentication scopes.", 403);
 	};
 	await expect(new GmailClient(fetch).trash("18f2a")).rejects.toThrow("Sign in to Gmail again");

@@ -1,10 +1,12 @@
 /**
  * omp's MCP servers: finding one by its URL's host, signing in to one as `/mcp reauth` does, removing the sign-ins omp
- * manages for one, reading and writing omp's user-level config, and listing and calling a server's tools with omp's OAuth sign-in.
+ * manages for one, reading and writing omp's user-level config, listing and calling a server's tools with omp's OAuth
+ * sign-in, and handing that sign-in to `signedFetch` for the APIs of the service behind a server.
  */
 import { createCache } from "../cache";
 import { isObject, str } from "../json";
 import { runChecked } from "../proc";
+import { ApiError, type Bearer } from "../signed-fetch";
 import { ompCommand } from "./install";
 import {
 	auth,
@@ -314,21 +316,14 @@ function toolError(text: string): string {
 /** The server refused omp's sign-in, so only a new sign-in helps. */
 export class McpRefused extends Error {}
 
-/** A server or API called with omp's sign-in answered HTTP `status`, other than 401, with its own error message when it gave one. */
-export class ApiError extends Error {
-	constructor(
-		message: string,
-		readonly status: number,
-	) {
-		super(message);
-	}
-}
-
 /** Forgets `server`'s token and tool list once a service refused the token, and the error that says so. */
 function refused(server: McpServer): McpRefused {
 	invalidateMcpSignIn(server.credentialId);
 	return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
 }
+
+/** omp's sign-in to `server`, for a `signedFetch` to the APIs of the service behind it: a 401 forgets it and throws {@link McpRefused}. */
+export const mcpBearer = async (server: McpServer): Promise<Bearer> => ({ token: await tokenOf(server.credentialId), refused: () => refused(server) });
 
 /** `method`'s result on `server`, called with omp's sign-in for it; the server's own message thrown when it answers an error. */
 async function request(server: McpServer, method: string, params: Record<string, unknown>): Promise<unknown> {
@@ -339,43 +334,6 @@ async function request(server: McpServer, method: string, params: Record<string,
 	});
 	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");
 	return response.result;
-}
-
-/** A POST of `body` as JSON, or a DELETE, for {@link callWithMcpSignIn}. */
-export type ApiWrite = { method: "POST"; body: unknown } | { method: "DELETE" };
-
-/** `init` as a request with `headers` added: a POST sends its body as JSON, and a DELETE sends nothing. */
-function requestOf(init: ApiWrite, headers: Record<string, string>): RequestInit {
-	switch (init.method) {
-		case "POST":
-			return { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(init.body) };
-		case "DELETE":
-			return { method: "DELETE", headers };
-		default: {
-			const never: never = init;
-			return never;
-		}
-	}
-}
-
-/**
- * The JSON at `url`, an API of the service behind `server` that takes the same OAuth token, called with omp's sign-in:
- * a GET, or with `init` a POST of its body as JSON or a DELETE. An empty answer, such as a 204, is `null`. Throws
- * {@link McpRefused} on 401, and {@link ApiError} on another failure.
- */
-export async function callWithMcpSignIn(server: McpServer, url: string, init?: ApiWrite): Promise<unknown> {
-	const headers: Record<string, string> = { Authorization: `Bearer ${await tokenOf(server.credentialId)}` };
-	const call: RequestInit = init ? requestOf(init, headers) : { headers };
-	const response = await fetch(url, { ...call, signal: AbortSignal.timeout(TIMEOUT_MS) });
-	if (response.status === 401) throw refused(server);
-	const text = await response.text();
-	if (response.ok) return text ? toolJson(new URL(url).host, "API", text) : null;
-	let message: string | undefined;
-	try {
-		const parsed: unknown = JSON.parse(text);
-		message = isObject(parsed) && isObject(parsed.error) ? str(parsed.error.message) : undefined;
-	} catch {}
-	throw new ApiError(message ?? `${new URL(url).host} answered HTTP ${response.status}`, response.status);
 }
 
 /** The text that `tool` answers for `args` on `server`; the server's own message thrown when the call fails. */

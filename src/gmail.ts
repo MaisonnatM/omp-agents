@@ -5,10 +5,9 @@
  * Preview Program. Reading a conversation here never marks it read.
  */
 import { createCache } from "./cache";
-import type { GoogleFetch } from "./integrations";
 import { isObject, nonEmptyStr, str } from "./json";
-import { ApiError } from "./omp/mcp";
 import { mapLimit } from "./map-limit";
+import { ApiError, type SignedFetch } from "./signed-fetch";
 import type { InboxAnswer, MailAttachment, MailBody, MailDraft, MailMessage, MailPerson, MailReply, MailThread, ThreadAnswer } from "./shared/gmail";
 import { threadUrl } from "./shared/gmail";
 
@@ -284,12 +283,12 @@ export function replyOf(message: Record<string, unknown>, me: string, draft: Omi
 
 /** Your Gmail inbox's latest conversations, and each conversation in full, each read at most once a minute. */
 export class GmailClient {
-	readonly #fetch: GoogleFetch;
+	readonly #fetch: SignedFetch;
 	readonly #inbox = createCache<InboxAnswer>(KEPT_MS);
 	readonly #address = createCache<string>(KEPT_MS);
 	readonly #threads = createCache<ReadThread>(KEPT_MS);
 
-	constructor(fetch: GoogleFetch) {
+	constructor(fetch: SignedFetch) {
 		this.#fetch = fetch;
 	}
 

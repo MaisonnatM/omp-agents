@@ -7,9 +7,8 @@ import { clientSetups, type ClientSave, planGoogleSave, planGoogleScope, planSla
 import { remoteStatusOf } from "./mcp-status";
 import {
 	addMcpServer,
-	type ApiWrite,
-	callWithMcpSignIn,
 	findMcpServer,
+	mcpBearer,
 	type McpServer,
 	mcpSignedIn,
 	signInMcp,
@@ -31,6 +30,7 @@ import {
 	type SlackClientInput,
 } from "./shared/accounts";
 import { createSignIn, type SignIn } from "./sign-in";
+import { type SignedFetch, signedFetch } from "./signed-fetch";
 
 const signIns = Object.fromEntries(
 	MCP_INTEGRATIONS.map(id => [id, createSignIn(`${MCP_SERVICES[id].label}'s sign-in page was not completed within 5 minutes. Try again.`)]),
@@ -43,14 +43,14 @@ export async function integrationServer(id: McpIntegrationId): Promise<McpServer
 	return server;
 }
 
-/**
- * Calls a Google API address with your sign-in: reads its JSON, or with `init` posts its body as JSON or deletes it, and
- * reads the answer, `null` when empty. Another failure than a refused sign-in throws `ApiError` with Google's status.
- */
-export type GoogleFetch = (url: string, init?: ApiWrite) => Promise<unknown>;
+/** Whether omp has a server for `id` and holds a sign-in to it. */
+export async function integrationSignedIn(id: McpIntegrationId): Promise<boolean> {
+	const found = await findServer(id);
+	return !!found && (await mcpSignedIn(found));
+}
 
-/** {@link GoogleFetch} with omp's sign-in to Google service `id`. */
-export const googleFetch = (id: GoogleService): GoogleFetch => async (url, init) => callWithMcpSignIn(await integrationServer(id), url, init);
+/** Calls the APIs of service `id`, such as Google's or Slack's Web API, with omp's sign-in to its server. */
+export const integrationFetch = (id: McpIntegrationId): SignedFetch => signedFetch(async () => mcpBearer(await integrationServer(id)));
 
 /**
  * `id`'s integration with `found` as its server, which every service requires a sign-in to: its status is held while a

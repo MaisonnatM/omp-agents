@@ -1,6 +1,7 @@
 /** Reads where omp stands with a remote MCP server by listing its tools, for Settings › Integrations and Settings › MCP servers. */
 import { errorText } from "./json";
-import { ApiError, listMcpTools, type McpServer, McpUnauthorized } from "./omp/mcp";
+import { listMcpTools, type McpServer, McpUnauthorized } from "./omp/mcp";
+import { ApiError } from "./signed-fetch";
 import type { McpRemoteStatus } from "./shared/mcp-status";
 
 /** What omp holds for a server: `signedIn`, a sign-in, and `signInRequired`, whether the server answers nothing without one. */

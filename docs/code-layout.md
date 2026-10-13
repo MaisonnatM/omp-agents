@@ -139,6 +139,8 @@ The server lives in `src/`:
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/mcp-clients.ts` plans a Slack, Google Calendar, or Gmail OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes.
   `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that Settings › Integrations starts; see [Integrations](architecture.md#integrations).
+  Its `integrationFetch(id)` calls a service's own API, Google's or Slack's, with omp's sign-in to the service's server.
+  `src/signed-fetch.ts` holds that HTTP call without anything of omp: `signedFetch` over a `Bearer`, `SignedFetch`, `ApiWrite`, and `ApiError`; `mcpBearer` in `src/omp/mcp.ts` supplies omp's token and its refusal.
   `src/mcp-servers.ts` lists every MCP server omp loads with where omp stands with each, and runs the adds, sign-ins, sign-outs, enables, disables, and removals that Settings › MCP servers starts; see [MCP servers](architecture.md#mcp-servers).
   `src/mcp-status.ts` has `remoteStatusOf`, the one reading of a remote server's tool list into its status that both files use.
   `src/providers.ts` lists the model providers and runs the sign-ins and sign-outs that Settings › Providers starts, with `src/provider-logins.ts` holding the one sign-in under way, and `src/omp/providers.ts` calling omp for them; `src/shared/providers.ts` holds the shapes the page shares; see [Providers](architecture.md#providers).

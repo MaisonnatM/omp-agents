@@ -551,12 +551,12 @@ The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page i
   It offers the newest revision of each line that a connected provider lists, and leaves dated snapshots out.
 - The pull requests come from `loadPullRequests` in `src/pull-requests.ts` over the known workspaces that still exist, through the pull request list's 30-second cache, so the page's polls and the check share one query.
   `moveOf` in `src/shared/moves.ts` picks each one's move, with `agentOn` over the roster, and a move in `YOUR_MOVES` is a notice.
-- `waitingOnYou` in `src/slack-messages.ts` calls Slack's Web API with omp's Slack MCP sign-in through `callWithMcpSignIn`, since the MCP server's search answers in Markdown and Slack's `search.messages` needs a scope the sign-in lacks.
+- `waitingOnYou` in `src/slack-messages.ts` calls Slack's Web API with omp's Slack MCP sign-in through `integrationFetch("slack")`, since the MCP server's search answers in Markdown and Slack's `search.messages` needs a scope the sign-in lacks.
   `auth.test` names the user, and two `assistant.search.context` searches over the last three days, newest first, read the direct and group messages (`im,mpim`) and the channel messages that mention them (`<@ID>`), each up to five pages of 20 through `next_cursor`.
   A conversation gives one notice for the messages after the user's last one there; the user's own messages, bots, Slack's system messages, and empty ones count for nothing.
   `slackText` turns Slack's markup into plain text.
   `users.info` gives each author's 72-pixel profile picture as the notice's `avatarUrl`, which the page's `img-src` allows from `avatars.slack-edge.com`, `secure.gravatar.com`, and `a.slack-edge.com`; a lookup that fails leaves it `null`, and the page shows the initial.
-  Without a Slack sign-in the check finds nothing.
+  Without a Slack sign-in, which `integrationSignedIn("slack")` reads, the check finds nothing.
 - The plan notices come from the plans of the last `omp usage` run, which `Broadcasts.refreshUsage` answers with, one per window whose `exhausted` is set; when that run failed, the check fails too and keeps its notices.
 - `readCreditRuns` in `src/omp/stats.ts` reads the last day's requests, in order, of each provider that had an error naming `402` then, aborted requests left out.
   `creditRuns` starts a run at a failure whose error names `402` and that `is402BillingCapBody` reads as a billing cap, counts each such failure after it, and ends it at the provider's next request that worked; another error neither starts nor ends a run.
@@ -867,7 +867,11 @@ A flow that stores nothing, such as Ollama's with an empty key, fails, as `omp l
 
 `src/google-calendar.ts` reads and writes Google Calendar's REST API (`https://www.googleapis.com/calendar/v3`) with the token omp holds for its Google Calendar MCP server, so the Calendar page needs no sign-in of its own.
 Google Calendar's MCP tools answer only for OAuth clients enrolled in Google's Workspace Developer Preview Program, while the API answers any client that requested the same scopes.
-`googleFetch(id)` in `src/integrations.ts` is the `GoogleFetch` both Google clients call: it finds omp's server for Google service `id` and calls `callWithMcpSignIn` in `src/omp/mcp.ts`, which sends the server's token with a GET, or, given an `ApiWrite`, with a POST of its `body` as JSON or a DELETE; a 401 forgets the token and the tool list and throws `McpRefused`, and any other failure throws an `ApiError` with the answer's status and Google's `error.message`.
+`integrationFetch(id)` in `src/integrations.ts` is the `SignedFetch` both Google clients call, and the Slack check too.
+It is `signedFetch` in `src/signed-fetch.ts`, which knows nothing of omp, over `mcpBearer` in `src/omp/mcp.ts`, the token omp holds for its server for service `id`.
+`signedFetch` sends that token with a GET, or, given an `ApiWrite`, with a POST of its `body` as JSON or a DELETE.
+A 401 throws the bearer's refusal: `mcpBearer`'s forgets the token and the tool list and throws `McpRefused`.
+Any other failure throws an `ApiError` from `src/signed-fetch.ts` with the answer's status and the API's `error.message`.
 An empty answer, such as a 204, is `null`.
 `GET /api/google` answers the calendars checked in your Google Calendar's list (`calendarList`, `selected`), each with its id, the name you gave it or else its own, its color, its `group`, its `writable` flag, its `shown` flag, and the error of its last read.
 `group` is `mine` for a calendar whose `accessRole` is `owner`, Google Calendar's **My calendars**, and `other` for the rest, its **Other calendars**.
@@ -904,7 +908,7 @@ The page owns what a write changes: it adds the kept event that `PUT /api/calend
 
 ### Gmail
 
-`GmailClient` in `src/gmail.ts` reads Gmail's REST API (`https://gmail.googleapis.com/gmail/v1/users/me`) with the token omp holds for its Gmail MCP server, through `googleFetch("gmail")` as `GoogleCalendarClient` reads through `googleFetch("google-calendar")`, so the Inbox page needs no sign-in of its own.
+`GmailClient` in `src/gmail.ts` reads Gmail's REST API (`https://gmail.googleapis.com/gmail/v1/users/me`) with the token omp holds for its Gmail MCP server, through `integrationFetch("gmail")` as `GoogleCalendarClient` reads through `integrationFetch("google-calendar")`, so the Inbox page needs no sign-in of its own.
 Gmail's MCP tools answer only for OAuth clients enrolled in Google's Workspace Developer Preview Program, while the API answers any client that requested `gmail.modify`.
 The client reads, replies, and moves conversations to Trash; it never deletes mail for good, labels it otherwise, or marks it read.
 `GET /api/gmail/inbox` answers an `InboxAnswer` from `src/shared/gmail.ts`, `{ address, threads }`: the signed-in address from `profile`, and a `MailThread` for each of the inbox's latest 50 threads (`threads?labelIds=INBOX&maxResults=50`), in Gmail's order.
