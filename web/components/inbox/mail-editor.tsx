@@ -21,13 +21,12 @@ import {
 	type TextFormatType,
 } from "lexical";
 import { Bold, Italic, Link, List, ListOrdered, Maximize2, Minimize2, Quote, Trash2, Underline, X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useState } from "react";
 import type { MailDraft, MailPerson } from "../../../src/shared/gmail";
-import { errorText } from "../../../src/json";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { type MailDocument, type MailDraftEdits, mailExtension } from "../../mail-draft";
+import { type MailDraftEdits, mailExtension, type OpenMailDraft } from "../../mail-draft";
 
 const ADDRESS = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
 
@@ -39,12 +38,12 @@ function personOf(typed: string): MailPerson | null {
 	return ADDRESS.test(address) ? { name, address } : null;
 }
 
-/** One field of people: a chip for each, removed with its × or Backspace, and a text box that adds who you type on Enter, comma, Tab, or leaving it. */
-function PeopleField({ label, people, onChange, autoFocus, trailing }: { label: string; people: MailPerson[]; onChange: (people: MailPerson[]) => void; autoFocus?: boolean; trailing?: ReactNode }) {
+/** One field of people: a chip for each, removed with its × or Backspace, and a text box that adds who you type on Enter, comma, Tab, or leaving it; none of it while `disabled`. */
+function PeopleField({ label, people, onChange, disabled, autoFocus, trailing }: { label: string; people: MailPerson[]; onChange: (people: MailPerson[]) => void; disabled: boolean; autoFocus?: boolean; trailing?: ReactNode }) {
 	const [typed, setTyped] = useState("");
 	const [invalid, setInvalid] = useState(false);
 	const commit = (): boolean => {
-		if (typed.trim() === "") return false;
+		if (disabled || typed.trim() === "") return false;
 		const added = typed.split(/[,;]/).map(personOf);
 		if (added.some(person => person === null)) {
 			setInvalid(true);
@@ -74,8 +73,9 @@ function PeopleField({ label, people, onChange, autoFocus, trailing }: { label: 
 						<button
 							type="button"
 							aria-label={`Remove ${person.name || person.address}`}
+							disabled={disabled}
 							onClick={() => onChange(people.filter(other => other !== person))}
-							className="rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+							className="rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
 						>
 							<X className="size-3.5" />
 						</button>
@@ -88,6 +88,7 @@ function PeopleField({ label, people, onChange, autoFocus, trailing }: { label: 
 						aria-label={`Add to ${label}`}
 						aria-invalid={invalid || undefined}
 						value={typed}
+						disabled={disabled}
 						onChange={event => {
 							setTyped(event.target.value);
 							setInvalid(false);
@@ -140,7 +141,7 @@ function $formats(): Formats {
 	};
 }
 
-function ToolButton({ label, keys, pressed, onClick, children }: { label: string; keys?: string[]; pressed?: boolean; onClick: () => void; children: ReactNode }) {
+function ToolButton({ label, keys, pressed, disabled, onClick, children }: { label: string; keys?: string[]; pressed?: boolean; disabled: boolean; onClick: () => void; children: ReactNode }) {
 	return (
 		<Tooltip content={label} shortcut={keys}>
 			<Button
@@ -149,6 +150,7 @@ function ToolButton({ label, keys, pressed, onClick, children }: { label: string
 				size="icon-compact"
 				aria-label={label}
 				aria-pressed={pressed}
+				disabled={disabled}
 				// Keeps the editor's selection, which a click on the button would otherwise move away from.
 				onMouseDown={event => event.preventDefault()}
 				onClick={onClick}
@@ -160,8 +162,8 @@ function ToolButton({ label, keys, pressed, onClick, children }: { label: string
 	);
 }
 
-/** Bold, italic, underline, a link, a bulleted or numbered list, and a quote, each pressed while the selection holds it. */
-function Toolbar({ editor }: { editor: LexicalEditor }) {
+/** Bold, italic, underline, a link, a bulleted or numbered list, and a quote, each pressed while the selection holds it; none while `disabled`. */
+function Toolbar({ editor, disabled }: { editor: LexicalEditor; disabled: boolean }) {
 	const [formats, setFormats] = useState(NO_FORMATS);
 	useEffect(() => editor.registerUpdateListener(({ editorState }) => setFormats(editorState.read($formats))), [editor]);
 	const format = (kind: TextFormatType) => () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, kind);
@@ -180,25 +182,25 @@ function Toolbar({ editor }: { editor: LexicalEditor }) {
 		});
 	return (
 		<div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5">
-			<ToolButton label="Bold" keys={["⌘", "B"]} pressed={formats.bold} onClick={format("bold")}>
+			<ToolButton label="Bold" keys={["⌘", "B"]} pressed={formats.bold} disabled={disabled} onClick={format("bold")}>
 				<Bold />
 			</ToolButton>
-			<ToolButton label="Italic" keys={["⌘", "I"]} pressed={formats.italic} onClick={format("italic")}>
+			<ToolButton label="Italic" keys={["⌘", "I"]} pressed={formats.italic} disabled={disabled} onClick={format("italic")}>
 				<Italic />
 			</ToolButton>
-			<ToolButton label="Underline" keys={["⌘", "U"]} pressed={formats.underline} onClick={format("underline")}>
+			<ToolButton label="Underline" keys={["⌘", "U"]} pressed={formats.underline} disabled={disabled} onClick={format("underline")}>
 				<Underline />
 			</ToolButton>
-			<ToolButton label={formats.link ? "Remove link" : "Link"} pressed={formats.link} onClick={link}>
+			<ToolButton label={formats.link ? "Remove link" : "Link"} pressed={formats.link} disabled={disabled} onClick={link}>
 				<Link />
 			</ToolButton>
-			<ToolButton label="Bulleted list" pressed={formats.bullet} onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}>
+			<ToolButton label="Bulleted list" pressed={formats.bullet} disabled={disabled} onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}>
 				<List />
 			</ToolButton>
-			<ToolButton label="Numbered list" pressed={formats.number} onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}>
+			<ToolButton label="Numbered list" pressed={formats.number} disabled={disabled} onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}>
 				<ListOrdered />
 			</ToolButton>
-			<ToolButton label="Quote" pressed={formats.quote} onClick={quote}>
+			<ToolButton label="Quote" pressed={formats.quote} disabled={disabled} onClick={quote}>
 				<Quote />
 			</ToolButton>
 		</div>
@@ -206,8 +208,8 @@ function Toolbar({ editor }: { editor: LexicalEditor }) {
 }
 
 interface MailEditorProps {
-	/** The draft it shows; `edit` changes it, and the `useMailDraft` that hands both over owns it. */
-	draft: MailDocument;
+	/** The draft it shows, frozen while it is being sent; `edit` changes and sends it, and the `useMailDraft` that hands both over owns it. */
+	draft: OpenMailDraft;
 	edit: MailDraftEdits;
 	/** Who it says it is to: `Reply to`, `Reply all`, or `To` for a new mail. */
 	toLabel: string;
@@ -221,7 +223,7 @@ interface MailEditorProps {
 	onSend: (draft: MailDraft) => Promise<void>;
 	/** Called on Esc: the editor closes and keeps the draft. */
 	onClose: () => void;
-	/** Called once the draft is sent or thrown away. */
+	/** Called once the draft is sent, even when the browser cannot forget it, or thrown away. */
 	onDone: () => void;
 }
 
@@ -237,7 +239,7 @@ export function MailEditor(props: MailEditorProps) {
 			dependencies: [mailExtension],
 			theme: THEME,
 			onError: error => console.error(error),
-			...(props.draft.body ? { $initialEditorState: (editor: LexicalEditor) => editor.setEditorState(editor.parseEditorState(props.draft.body)) } : {}),
+			...(props.draft.document.body ? { $initialEditorState: (editor: LexicalEditor) => editor.setEditorState(editor.parseEditorState(props.draft.document.body)) } : {}),
 		}),
 	);
 	return (
@@ -247,12 +249,11 @@ export function MailEditor(props: MailEditorProps) {
 	);
 }
 
-function Editor({ draft, edit, toLabel, withSubject, focusPeople, expanded, onExpand, onSend, onClose, onDone }: MailEditorProps) {
+function Editor({ draft: { document: mail, phase }, edit, toLabel, withSubject, focusPeople, expanded, onExpand, onSend, onClose, onDone }: MailEditorProps) {
 	const [editor] = useLexicalComposerContext();
 	const [revealed, setRevealed] = useState({ cc: false, bcc: false });
-	const shown = { cc: revealed.cc || draft.cc.length > 0, bcc: revealed.bcc || draft.bcc.length > 0 };
-	const [sending, setSending] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const shown = { cc: revealed.cc || mail.cc.length > 0, bcc: revealed.bcc || mail.bcc.length > 0 };
+	const sending = phase.kind === "sending";
 
 	const { editBody } = edit;
 	useEffect(
@@ -267,22 +268,23 @@ function Editor({ draft, edit, toLabel, withSubject, focusPeople, expanded, onEx
 	useEffect(() => {
 		if (!focusPeople) editor.focus();
 	}, [editor]);
+	// In the commit that starts a send, before the next key reaches the body, so what it shows stays what is sent.
+	useLayoutEffect(() => editor.setEditable(!sending), [editor, sending]);
 
-	const empty = draft.body === "";
-	const nobody = draft.to.length + draft.cc.length + draft.bcc.length === 0;
+	const empty = mail.body === "";
+	const nobody = mail.to.length + mail.cc.length + mail.bcc.length === 0;
 	const send = async (): Promise<void> => {
 		if (sending || empty || nobody) return;
-		setSending(true);
-		setError(null);
-		try {
-			const content = editor.read(() => ({ html: $generateHtmlFromNodes(editor, null).replace(/(<p><br><\/p>)+$/, ""), text: $getRoot().getTextContent().trimEnd() }));
-			await onSend({ to: draft.to, cc: draft.cc, bcc: draft.bcc, subject: draft.subject, ...content });
-			edit.discard();
-			onDone();
-		} catch (err) {
-			setError(errorText(err));
-			setSending(false);
-		}
+		const sent = await edit.send(submitted =>
+			onSend({
+				to: submitted.to,
+				cc: submitted.cc,
+				bcc: submitted.bcc,
+				subject: submitted.subject,
+				...editor.read(() => ({ html: $generateHtmlFromNodes(editor, null).replace(/(<p><br><\/p>)+$/, ""), text: $getRoot().getTextContent().trimEnd() })),
+			}),
+		);
+		if (sent) onDone();
 	};
 	const discard = (): void => {
 		edit.discard();
@@ -332,13 +334,13 @@ function Editor({ draft, edit, toLabel, withSubject, focusPeople, expanded, onEx
 			}}
 			className={cn("flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-background shadow-lg", expanded && "flex-1")}
 		>
-			<PeopleField label={toLabel} people={draft.to} onChange={to => edit.editRecipients("to", to)} autoFocus={focusPeople} trailing={toTrailing} />
-			{shown.cc && <PeopleField label="Cc" people={draft.cc} onChange={editShown("cc")} />}
-			{shown.bcc && <PeopleField label="Bcc" people={draft.bcc} onChange={editShown("bcc")} />}
+			<PeopleField label={toLabel} people={mail.to} onChange={to => edit.editRecipients("to", to)} disabled={sending} autoFocus={focusPeople} trailing={toTrailing} />
+			{shown.cc && <PeopleField label="Cc" people={mail.cc} onChange={editShown("cc")} disabled={sending} />}
+			{shown.bcc && <PeopleField label="Bcc" people={mail.bcc} onChange={editShown("bcc")} disabled={sending} />}
 			{withSubject && (
 				<label className="flex min-h-10 items-center gap-2 border-b border-border px-4 text-sm">
 					<span className="w-14 shrink-0 text-muted-foreground">Subject</span>
-					<input value={draft.subject} onChange={event => edit.editSubject(event.target.value)} className="min-w-0 flex-1 bg-transparent py-1.5 outline-none" />
+					<input value={mail.subject} disabled={sending} onChange={event => edit.editSubject(event.target.value)} className="min-w-0 flex-1 bg-transparent py-1.5 outline-none" />
 				</label>
 			)}
 			<div className={cn("relative min-h-0 overflow-y-auto", expanded ? "flex-1" : "max-h-[40vh]")}>
@@ -349,13 +351,13 @@ function Editor({ draft, edit, toLabel, withSubject, focusPeople, expanded, onEx
 					className={cn("min-h-28 space-y-2 px-4 py-3 text-sm leading-relaxed outline-none", expanded && "h-full")}
 				/>
 			</div>
-			{error && (
+			{phase.kind === "editing" && phase.failure && (
 				<p role="alert" className="px-4 pb-2 text-xs text-red-600 dark:text-red-400">
-					Cannot send: {error}
+					Cannot send: {phase.failure}
 				</p>
 			)}
 			<div className="flex items-center gap-2 border-t border-border px-2 py-1.5">
-				<Toolbar editor={editor} />
+				<Toolbar editor={editor} disabled={sending} />
 				<Tooltip content="Discard draft">
 					<Button type="button" variant="ghost" size="icon-compact" aria-label="Discard draft" disabled={sending} onClick={discard}>
 						<Trash2 />
