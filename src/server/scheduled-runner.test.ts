@@ -30,7 +30,6 @@ function harness() {
 		now: T0,
 		/** Live sessions by session id, with what each received. */
 		live: new Map<string, string[]>(),
-		instances: new Map<string, string>(),
 		requests: [] as StartRequest[],
 		failWith: null as string | null,
 		changes: 0,
@@ -39,19 +38,24 @@ function harness() {
 		const received = fake.live.get(sessionId);
 		return received ? { followUp: async (text: string) => void received.push(text) } : null;
 	};
+	const start = async (request: StartRequest): Promise<StartResult> => {
+		fake.requests.push(request);
+		if (fake.failWith !== null) return { ok: false, error: fake.failWith };
+		const instanceId = `i${fake.requests.length}`;
+		const sessionId = request.kind === "resume" ? request.sessionId : `new-${instanceId}`;
+		fake.live.set(sessionId, []);
+		return { ok: true, instanceId, cwd: "/work/webapp", prompt: null };
+	};
 	const runner = new ScheduledRunner({
 		file,
-		async start(request: StartRequest): Promise<StartResult> {
-			fake.requests.push(request);
-			if (fake.failWith !== null) return { ok: false, error: fake.failWith };
-			const instanceId = `i${fake.requests.length}`;
-			const sessionId = request.kind === "resume" ? request.sessionId : `new-${instanceId}`;
-			fake.live.set(sessionId, []);
-			fake.instances.set(instanceId, sessionId);
-			return { ok: true, instanceId, cwd: "/work/webapp", prompt: null };
+		start,
+		async reach(sessionId) {
+			if (!fake.live.has(sessionId)) {
+				const result = await start({ kind: "resume", sessionId });
+				if (!result.ok) throw new Error(`Cannot resume the session: ${result.error}`);
+			}
+			return recipient(sessionId)!;
 		},
-		bySessionId: recipient,
-		session: instanceId => recipient(fake.instances.get(instanceId) ?? ""),
 		now: () => fake.now,
 		onChange: () => void fake.changes++,
 	});

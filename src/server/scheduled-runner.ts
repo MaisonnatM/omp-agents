@@ -17,10 +17,8 @@ interface Recipient {
 export interface ScheduledRunnerDeps {
 	file: ScheduledFile;
 	start(request: StartRequest): Promise<StartResult>;
-	/** The live session with session id `sessionId`, or `null` when none runs. */
-	bySessionId(sessionId: string): Recipient | null;
-	/** Live session `instanceId`, or `null` once it is gone. */
-	session(instanceId: string): Recipient | null;
+	/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
+	reach(sessionId: string): Promise<Recipient>;
 	now(): number;
 	/** The scheduled sends changed; every socket should hear them. */
 	onChange(): void;
@@ -68,19 +66,12 @@ export class ScheduledRunner {
 	}
 
 	async #deliver(target: ScheduledTarget): Promise<void> {
-		const { start, bySessionId, session } = this.#deps;
 		if (target.kind === "start") {
-			const result = await start(target.request);
+			const result = await this.#deps.start(target.request);
 			if (!result.ok) throw new Error(result.error);
 			return;
 		}
-		let recipient = bySessionId(target.sessionId);
-		if (!recipient) {
-			const result = await start({ kind: "resume", sessionId: target.sessionId });
-			if (!result.ok) throw new Error(`Cannot resume the session: ${result.error}`);
-			recipient = session(result.instanceId);
-			if (!recipient) throw new Error("The session exited as it resumed.");
-		}
+		const recipient = await this.#deps.reach(target.sessionId);
 		await recipient.followUp(target.text);
 	}
 }

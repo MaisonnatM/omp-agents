@@ -6,6 +6,7 @@
  */
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { errorText } from "../json";
 import { agentDir } from "../omp/config";
 import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
 import type { ModelOption } from "../shared/models";
@@ -58,6 +59,8 @@ export interface ProjectRunnerDeps {
 	session(instanceId: string): RunnerSession | null;
 	/** The live session with id `sessionId`, or `null` when none runs. */
 	bySessionId(sessionId: string): RunnerSession | null;
+	/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
+	reach(sessionId: string): Promise<RunnerSession>;
 	/** Whether past session `sessionId` stopped without End session. */
 	interrupted(sessionId: string): boolean;
 	/** The `omp` arguments that load the `projects` extension when omp does not already. */
@@ -198,13 +201,9 @@ export class ProjectRunner implements ProjectControl {
 	}
 
 	async messageWorker(worker: Worker, text: string): Promise<void> {
-		let session = this.#deps.bySessionId(worker.sessionId);
-		if (!session) {
-			const result = await this.#deps.start({ kind: "resume", sessionId: worker.sessionId }, null);
-			if (!result.ok) throw new Error(`Cannot resume ${worker.id}: ${result.error}`);
-			session = this.#deps.session(result.instanceId);
-			if (!session) throw new Error(`${worker.id} exited as it resumed.`);
-		}
+		const session = await this.#deps.reach(worker.sessionId).catch((error: unknown) => {
+			throw new Error(`${worker.id}: ${errorText(error)}`);
+		});
 		await session.prompt(text);
 	}
 
