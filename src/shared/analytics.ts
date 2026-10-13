@@ -1,4 +1,5 @@
 /** The Analytics tab's ranges and token usage. */
+import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, type Shape } from "../json";
 
 /** The time ranges the Analytics tab reads, shortest first; `today` starts at local midnight and `all` has no start. */
 export const ANALYTICS_RANGES = ["today", "24h", "7d", "30d", "90d", "all"] as const;
@@ -72,3 +73,47 @@ export interface AnalyticsSession {
 	/** The last request's time in ms. */
 	lastAt: number;
 }
+
+const USAGE: Shape<Usage> = {
+	requests: isNumber,
+	failed: isNumber,
+	tokens: fields<TokenCounts>({ input: isNumber, output: isNumber, cacheRead: isNumber, cacheWrite: isNumber, total: isNumber }),
+	cost: isNumber,
+	cacheRate: isNumber,
+};
+const isUsage = fields(USAGE);
+
+const isProviderUsage = fields<AnalyticsProviderUsage>({ provider: isString, tokens: isNumber, cost: isNumber, requests: isNumber });
+
+/** A kept {@link Analytics} with every part whole, or `null`: a read an older version kept, such as a chart without provider buckets, reads omp-stats again. */
+export const decodeAnalytics = decoder(
+	fields<Analytics>({
+		range: oneOf(ANALYTICS_RANGES),
+		sync: fields<Analytics["sync"]>({
+			phase: oneOf(["idle", "syncing", "error"]),
+			current: isNumber,
+			total: isNumber,
+			lastSyncedAt: nullable(isNumber),
+			error: nullable(isString),
+		}),
+		totals: isUsage,
+		providers: arrayOf(isProviderUsage),
+		series: arrayOf(fields<Analytics["series"][number]>({ start: isNumber, tokens: isNumber, cost: isNumber, requests: isNumber, providers: arrayOf(isProviderUsage) })),
+		models: arrayOf(fields<Analytics["models"][number]>({ ...USAGE, selector: isString, tokensPerSecond: nullable(isNumber) })),
+		workspaces: arrayOf(fields<Analytics["workspaces"][number]>({ ...USAGE, cwd: isString })),
+		agents: fields<Analytics["agents"]>({ main: isNumber, subagent: isNumber, advisor: isNumber }),
+		tools: arrayOf(fields<Analytics["tools"][number]>({ name: isString, calls: isNumber, errors: isNumber, tokenShare: isNumber })),
+		sessions: arrayOf(
+			fields<AnalyticsSession>({
+				sessionId: isString,
+				title: nullable(isString),
+				listed: isBoolean,
+				cwd: isString,
+				usage: isUsage,
+				subagentTokens: isNumber,
+				models: isTexts,
+				lastAt: isNumber,
+			}),
+		),
+	}),
+);

@@ -1,4 +1,5 @@
 /** The Inbox page's mail: the latest conversations of your Gmail inbox, one conversation in full, and the mail and trashing it sends. */
+import { arrayOf, decoder, fields, isBoolean, isNumber, isString } from "../json";
 
 /** One conversation in your Gmail inbox, as the Inbox page lists it. */
 export interface MailThread {
@@ -24,6 +25,16 @@ export interface InboxAnswer {
 	address: string;
 	threads: MailThread[];
 }
+
+/** A kept {@link InboxAnswer} with every conversation whole, or `null`. */
+export const decodeInboxAnswer = decoder(
+	fields<InboxAnswer>({
+		address: isString,
+		threads: arrayOf(
+			fields<MailThread>({ id: isString, from: isString, subject: isString, snippet: isString, at: isNumber, unread: isBoolean, count: isNumber, url: isString }),
+		),
+	}),
+);
 
 /** The conversation `id` in Gmail, signed in as `address`, whichever account the browser signed in first. */
 export const threadUrl = (address: string, id: string): string => `https://mail.google.com/mail/?authuser=${encodeURIComponent(address)}#inbox/${id}`;

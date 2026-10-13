@@ -1,4 +1,5 @@
 /** The integrations: omp's MCP sign-ins and the OAuth clients they use. */
+import { decoder, fields, type Guard, isBoolean, isNumber, isString, isTexts, nullable, oneOf, tagged } from "../json";
 
 /** A sign-in that the integrations page started: waiting for the browser at the provider's authorization `url`, or why it failed. */
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
@@ -196,3 +197,41 @@ export const isGoogleIntegration = (integration: McpIntegration): integration is
 export interface IntegrationsAnswer {
 	integrations: { [K in McpIntegrationId]: McpIntegration<K> };
 }
+
+const isServerRef = fields<McpServerRef>({ name: isString, url: isString, host: isString });
+
+const isConnection = tagged<McpConnection, "kind">("kind", {
+	absent: {},
+	"signed-out": { server: isServerRef },
+	ready: { server: isServerRef, tools: isTexts },
+	refused: { server: isServerRef, error: isString },
+	failing: { server: isServerRef, error: isString, status: nullable(isNumber) },
+});
+
+const isSignIn = nullable(tagged<NonNullable<SignInState>, "phase">("phase", { waiting: { url: isString }, failed: { error: isString } }));
+
+const isSlackSetup = fields<SlackSetup>({
+	clientId: nullable(isString),
+	hasClientSecret: isBoolean,
+	redirectUri: nullable(isString),
+	callbackPort: isNumber,
+	scope: isString,
+	configured: isBoolean,
+});
+
+const isGoogleSetup = fields<GoogleSetup>({ clientId: nullable(isString), hasClientSecret: isBoolean, callbackPort: isNumber, configured: isBoolean });
+
+const integration = <K extends McpIntegrationId, S>(id: K, setup: Guard<S>) =>
+	fields<{ id: K; connection: McpConnection; signIn: SignInState; setup: S }>({ id: oneOf([id]), connection: isConnection, signIn: isSignIn, setup });
+
+/** A kept {@link IntegrationsAnswer} with every integration, its connection, sign-in, and setup whole, or `null`. */
+export const decodeIntegrationsAnswer = decoder(
+	fields<IntegrationsAnswer>({
+		integrations: fields<IntegrationsAnswer["integrations"]>({
+			linear: integration("linear", oneOf([null])),
+			slack: integration("slack", isSlackSetup),
+			"google-calendar": integration("google-calendar", isGoogleSetup),
+			gmail: integration("gmail", isGoogleSetup),
+		}),
+	}),
+);

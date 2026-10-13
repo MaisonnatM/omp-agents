@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { isObject } from "../src/json";
 import { errorText, getJson } from "./api";
 import { keyedStore } from "./keyed-store";
 
@@ -21,8 +22,8 @@ export interface PolledEntry<T> {
 interface PolledStoreOptions<T> {
 	/** The API path that reads `scope`; `fresh` makes the server skip its own cache too. */
 	url: (scope: string | null, fresh: boolean) => string;
-	/** Keeps validated reads in localStorage; omitted for memory-only stores. */
-	cache?: { key: string; isValid: (value: unknown) => value is T };
+	/** Keeps reads in localStorage, each through `decode` when the page loads, which answers `null` for a read kept in another shape; omitted for memory-only stores. */
+	cache?: { key: string; decode: (raw: unknown) => T | null };
 }
 
 /**
@@ -37,11 +38,13 @@ export function createPolledStore<T>({ url, cache }: PolledStoreOptions<T>) {
 		if (!cache) return new Map();
 		try {
 			const stored: unknown = JSON.parse(localStorage.getItem(cache.key) ?? "{}");
-			if (typeof stored !== "object" || stored === null) return new Map();
+			if (!isObject(stored)) return new Map();
 			return new Map(
-				Object.entries(stored).flatMap(([key, read]: [string, Partial<PolledRead<T>> | null]) =>
-					typeof read?.at === "number" && cache.isValid(read.data) ? [[key, read as PolledRead<T>]] : [],
-				),
+				Object.entries(stored).flatMap(([key, read]): [string, PolledRead<T>][] => {
+					if (!isObject(read) || typeof read.at !== "number") return [];
+					const data = cache.decode(read.data);
+					return data === null ? [] : [[key, { data, at: read.at }]];
+				}),
 			);
 		} catch {
 			return new Map();

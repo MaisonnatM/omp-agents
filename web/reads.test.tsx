@@ -185,6 +185,49 @@ test.each([
 	expect(result.persisted["7d"].data.totals.requests).toBe(31);
 });
 
+const integrationsScenario = String.raw`
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { signedIn } from "../src/shared/accounts.ts";
+const memory = new Map([["omp-agents.integrations-cache", process.env.INTEGRATIONS_CACHE]]);
+globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value) };
+// A static import would hydrate the cache before storage is installed in this fresh process.
+const { integrationsStore } = await import("./reads.ts");
+function Tabs() {
+	const integrations = integrationsStore.use().read?.data.integrations;
+	return createElement("span", null, integrations ? Object.values(integrations).map(integration => signedIn(integration.connection)).join(",") : "loading");
+}
+console.log(renderToStaticMarkup(createElement(Tabs)));
+`;
+
+test.each([
+	{
+		name: "a whole answer stays usable",
+		connection: { kind: "ready", server: { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" }, tools: ["list_issues"] },
+		shown: "<span>true,false,false,false</span>",
+	},
+	{ name: "integrations kept as empty records are discarded", connection: undefined, shown: "<span>loading</span>" },
+])("integrations cache: $name", async ({ connection, shown }) => {
+	const setup = { clientId: null, hasClientSecret: false, callbackPort: 3119, configured: false };
+	const integrations = connection
+		? {
+				linear: { id: "linear", connection, signIn: null, setup: null },
+				slack: { id: "slack", connection: { kind: "absent" }, signIn: null, setup: { ...setup, redirectUri: null, scope: "chat:write" } },
+				"google-calendar": { id: "google-calendar", connection: { kind: "absent" }, signIn: null, setup },
+				gmail: { id: "gmail", connection: { kind: "absent" }, signIn: null, setup },
+			}
+		: { linear: {}, slack: {}, "google-calendar": {}, gmail: {} };
+	const child = Bun.spawn([process.execPath, "--eval", integrationsScenario], {
+		cwd: import.meta.dir,
+		env: { ...process.env, INTEGRATIONS_CACHE: JSON.stringify({ "": { data: { integrations }, at: 1 } }) },
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
+	expect(stdout.trim()).toBe(shown);
+});
+
 const refreshScenario = String.raw`
 import { act, createElement } from "react";
 

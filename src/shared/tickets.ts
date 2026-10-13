@@ -1,4 +1,5 @@
 /** Linear issues: the tickets page's list, one issue in full, and its edits. */
+import { arrayOf, decoder, fields, isString, nullable, oneOf } from "../json";
 
 /** Linear's workflow state categories, in the order its My issues lists them. */
 export const TICKET_STATUS_TYPES = ["triage", "started", "unstarted", "backlog", "completed", "canceled"] as const;
@@ -45,6 +46,29 @@ export type TicketStatus = Pick<Ticket, "status" | "statusType">;
 export interface TicketsAnswer {
 	tickets: Ticket[];
 }
+
+/** A kept {@link TicketsAnswer} with every issue whole, or `null`: a read saved before tickets carried their opening date reads Linear again. */
+export const decodeTicketsAnswer = decoder(
+	fields<TicketsAnswer>({
+		tickets: arrayOf(
+			fields<Ticket>({
+				id: isString,
+				title: isString,
+				url: isString,
+				status: isString,
+				statusType: oneOf(TICKET_STATUS_TYPES),
+				priority: oneOf(TICKET_PRIORITIES),
+				labels: arrayOf(fields<TicketLabel>({ name: isString, color: isString })),
+				project: nullable(isString),
+				team: isString,
+				dueDate: nullable(isString),
+				createdAt: isString,
+				updatedAt: isString,
+				branch: isString,
+			}),
+		),
+	}),
+);
 
 /** A Linear issue's identifier as Linear shows it, `ENG-2368`: its team's key, a dash, and its number. */
 export const TICKET_ID = /^[A-Z][A-Z0-9_]*-\d+$/;
