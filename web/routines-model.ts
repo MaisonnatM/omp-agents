@@ -1,10 +1,7 @@
 /** What the Routines page says about a routine, and the editor's form and how it becomes a routine to save. */
 import { nonEmpty } from "../src/json";
-import { MAX_COMMAND_LENGTH, nextDueAt, type CommandRun, type Routine, type RoutineChange, type RoutineRun, type RoutineTask, type Schedule, type Weekday } from "../src/routines";
+import { MAX_COMMAND_LENGTH, nextDueAt, type CommandRun, type Routine, type RoutineRun, type RoutineSpec, type RoutineTask, type Schedule, type Weekday } from "../src/routines";
 import { minutesOfTimeInput, timeInputValue } from "./days";
-
-/** What the editor saves: a routine without what the server keeps. */
-export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;

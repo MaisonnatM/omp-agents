@@ -6,8 +6,7 @@
  */
 import { JsonFile } from "../fs";
 import { isObject, isTexts, parseAll } from "../json";
-import { applyRoutine, MAX_ROUTINE_RUNS, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
-import { parseRoutineSpec } from "./wire";
+import { applyRoutine, MAX_ROUTINE_RUNS, parseRoutineSpec, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
 
 interface Stored {
 	routines: Routine[];

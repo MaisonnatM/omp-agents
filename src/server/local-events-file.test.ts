@@ -45,4 +45,14 @@ describe("LocalEventsFile", () => {
 		file.add("Fresh", allDay("2026-10-05", "2026-10-05"));
 		expect(new LocalEventsFile(path).all.map(event => event.title)).toEqual(["Fresh"]);
 	});
+
+	test("an event that ends before it starts, at a time that is not a whole millisecond, or neither all-day nor timed moves the file aside", () => {
+		for (const when of [timed("2026-10-07T11:30:00Z", "2026-10-07T10:30:00Z"), { allDay: false, start: 0.5, end: 1 }, { allDay: "yes", start: 0, end: 1 }]) {
+			const path = eventsPath();
+			mkdirSync(dirname(path), { recursive: true });
+			writeFileSync(path, JSON.stringify({ events: [{ id: "a", title: "Bad", when }] }));
+			expect(new LocalEventsFile(path).all).toEqual([]);
+			expect(existsSync(`${path}.invalid`)).toBe(true);
+		}
+	});
 });

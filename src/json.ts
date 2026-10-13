@@ -1,6 +1,30 @@
-/** Narrowing helpers for untyped JSON: omp's output, `gh` answers, and wire frames. */
+/**
+ * Narrowing helpers for untyped JSON: omp's output, `gh` answers, wire frames, and the files the server keeps.
+ * It uses no Bun API, so the page and the desktop shell bundle it too.
+ */
+
+/** A checked value as `{ ok }`, or the refusal: `null`, or `{ error }` from a parser that says why. */
+export type Parsed<T, Refusal extends { error: string } | null = null> = { ok: T } | Refusal;
 
 export const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
+
+/** A string with something other than whitespace in it. */
+export const isNonEmpty = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+
+/** A number with no fraction that a double holds exactly, such as epoch milliseconds. */
+export const isSafeInteger = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A day as `YYYY-MM-DD`, as a todo's `due`, a Linear issue's `dueDate`, and an all-day Google event name one, that the calendar has. */
+export const isDay = (value: unknown): value is string => {
+	if (typeof value !== "string" || !DAY.test(value)) return false;
+	const time = Date.parse(`${value}T00:00:00Z`);
+	return Number.isFinite(time) && new Date(time).toISOString().startsWith(value);
+};
+
+/** Bytes in standard base64, as a request body carries a file or an image. */
+export const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
 /** A string, including the empty one. */
 export const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);

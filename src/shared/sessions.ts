@@ -1,7 +1,10 @@
 /** Sessions as the roster, the panes, and the new-session draft see them: live hosts, past sessions, views, requests, and starts. */
+import { BASE64, isNonEmpty, isObject, type Parsed } from "../json";
+import { isTodoId } from "../user-todos-parse";
 import type { BranchChoice } from "./git";
-import { type LinkedPullRequest, type PullRequest, samePullRequest } from "./github";
+import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
+import { TICKET_ID } from "./tickets";
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
@@ -261,6 +264,80 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	todoId: null,
 	...options,
 });
+
+/** The longest base64 of {@link MAX_PROMPT_IMAGE_BYTES}. */
+const MAX_PROMPT_IMAGE_BASE64 = Math.ceil(MAX_PROMPT_IMAGE_BYTES / 3) * 4;
+
+/** A prompt's images: `[]` when it sends none, `null` for anything but images of {@link PROMPT_IMAGE_TYPES} within the size limit. */
+export function parseImages(value: unknown): Parsed<PromptImage[]> {
+	if (value === undefined) return { ok: [] };
+	if (!Array.isArray(value)) return null;
+	const images: PromptImage[] = [];
+	let size = 0;
+	for (const image of value) {
+		if (!isObject(image) || typeof image.data !== "string" || typeof image.mimeType !== "string") return null;
+		if (!PROMPT_IMAGE_TYPES.includes(image.mimeType) || !BASE64.test(image.data)) return null;
+		size += image.data.length;
+		images.push({ data: image.data, mimeType: image.mimeType });
+	}
+	return size <= MAX_PROMPT_IMAGE_BASE64 ? { ok: images } : null;
+}
+
+export function parseModel(value: unknown): Parsed<ModelOption> {
+	return isObject(value) && isNonEmpty(value.provider) && isNonEmpty(value.id) ? { ok: { provider: value.provider, id: value.id } } : null;
+}
+
+/** `{ ok: null }` for none, which keeps omp's thinking level. */
+export function parseThinking(value: unknown): Parsed<string | null> {
+	if (value === null || value === undefined) return { ok: null };
+	return isNonEmpty(value) ? { ok: value } : null;
+}
+
+/** `{ ok: null }` for no pinned skill; only one token passes, as `/skill:<name>` takes a name. */
+export function parseSkill(value: unknown): Parsed<string | null> {
+	if (value === null || value === undefined) return { ok: null };
+	return typeof value === "string" && /^\S+$/.test(value) ? { ok: value } : null;
+}
+
+/** `{ ok: null }` for no branch. */
+function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
+	if (value === null || value === undefined) return { ok: null };
+	if (!isObject(value) || !isNonEmpty(value.name)) return null;
+	if (value.kind === "existing") return { ok: { kind: "existing", name: value.name } };
+	return value.kind === "new" && isNonEmpty(value.base) ? { ok: { kind: "new", name: value.name, base: value.base } } : null;
+}
+
+/** `{ ok: null }` for a start that works on nothing in particular. */
+function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
+	if (value === null || value === undefined) return { ok: null };
+	if (!isObject(value)) return null;
+	if (value.kind === "ticket") return typeof value.id === "string" && TICKET_ID.test(value.id) ? { ok: { kind: "ticket", id: value.id } } : null;
+	if (value.kind !== "pull-request" || !isObject(value.pr)) return null;
+	const pr = parsePullRequest(value.pr.owner, value.pr.repo, value.pr.number);
+	return pr && { ok: { kind: "pull-request", pr: pr.ok } };
+}
+
+/**
+ * A new session's start, as the socket's `start` carries one and `scheduled.json` keeps one: `null` without a `cwd`, without
+ * a prompt or an image, or when an option is of the wrong type; options left out take {@link newSessionRequest}'s defaults.
+ */
+export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest> {
+	if (!isObject(value) || value.kind !== "new") return null;
+	const { cwd, prompt, todoId = null } = value;
+	const images = parseImages(value.images);
+	const branch = parseBranchChoice(value.branch);
+	// `null` starts on omp's default model.
+	const model = value.model === null || value.model === undefined ? { ok: null } : parseModel(value.model);
+	const thinking = parseThinking(value.thinking);
+	const skill = parseSkill(value.skill);
+	const subject = parseWorkItem(value.subject);
+	if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
+	if (todoId !== null && !isTodoId(todoId)) return null;
+	return prompt.trim() || images.ok.length > 0
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId }) }
+		: null;
+}
+
 /** `GET /api/skills?cwd=<dir>`: one skill a session started in that directory can invoke as `/skill:<name>`. */
 export interface SkillOption {
 	name: string;

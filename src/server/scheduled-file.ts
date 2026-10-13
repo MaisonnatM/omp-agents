@@ -5,8 +5,7 @@
  */
 import { JsonFile } from "../fs";
 import { isObject, parseAll } from "../json";
-import { applyScheduled, type ScheduledChange, type ScheduledSend, type ScheduledState } from "../shared/scheduled";
-import { parseScheduledSpec } from "./wire";
+import { applyScheduled, parseScheduledSpec, type ScheduledChange, type ScheduledSend, type ScheduledState } from "../shared/scheduled";
 
 interface Stored {
 	sends: ScheduledSend[];

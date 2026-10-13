@@ -1,5 +1,6 @@
 /** Messages and session starts that wait for a time, such as a plan window's reset, then send with no page open. */
-import type { NewSessionRequest } from "./sessions";
+import { isNonEmpty, isObject, isSafeInteger, type Parsed } from "../json";
+import { type NewSessionRequest, parseNewSessionRequest } from "./sessions";
 
 /** What a scheduled send delivers. */
 export type ScheduledTarget =
@@ -22,9 +23,12 @@ export interface ScheduledSend {
 	state: ScheduledState;
 }
 
+/** What the page sends of a scheduled send: all but its creation time and its state, which the server keeps. */
+export type ScheduledSpec = Pick<ScheduledSend, "id" | "at" | "reset" | "target">;
+
 /** One edit of the scheduled sends; the page picks a new send's `id`, so an add sent twice adds once. */
 export type ScheduledChange =
-	| { op: "add"; send: Pick<ScheduledSend, "id" | "at" | "reset" | "target"> }
+	| { op: "add"; send: ScheduledSpec }
 	/** Cancels a waiting send, or dismisses a failed one. */
 	| { op: "remove"; id: string }
 	/** Sends a waiting send now, or tries a failed one again. */
@@ -35,6 +39,30 @@ export const RESET_MARGIN_MS = 60_000;
 
 /** The longest text a scheduled message or start may carry; the server rejects a longer one. */
 export const MAX_SCHEDULED_TEXT = 1_000_000;
+
+function parseScheduledTarget(value: unknown): Parsed<ScheduledTarget> {
+	if (!isObject(value)) return null;
+	if (value.kind === "message") {
+		const { sessionId, text } = value;
+		return isNonEmpty(sessionId) && isNonEmpty(text) && text.length <= MAX_SCHEDULED_TEXT ? { ok: { kind: "message", sessionId, text } } : null;
+	}
+	if (value.kind !== "start") return null;
+	const request = parseNewSessionRequest(value.request);
+	if (!request || request.ok.images.length > 0 || !request.ok.prompt.trim() || request.ok.prompt.length > MAX_SCHEDULED_TEXT) return null;
+	return { ok: { kind: "start", request: request.ok } };
+}
+
+/**
+ * A scheduled send as the page adds it and `scheduled.json` keeps it: a text message to a session, or a new session's
+ * start without images; other fields drop.
+ */
+export function parseScheduledSpec(value: unknown): Parsed<ScheduledSpec> {
+	if (!isObject(value)) return null;
+	const { id, at, reset } = value;
+	const target = parseScheduledTarget(value.target);
+	if (!isNonEmpty(id) || !isSafeInteger(at) || (reset !== null && !isNonEmpty(reset)) || !target) return null;
+	return { ok: { id, at, reset, target: target.ok } };
+}
 
 /** `sends` after an `add` or a `remove`, or `sends` itself when it changes nothing. The list stays ordered by `at`, soonest first. A send under way cannot be removed. */
 export function applyScheduled(sends: ScheduledSend[], change: Exclude<ScheduledChange, { op: "send-now" }>, now: number): ScheduledSend[] {

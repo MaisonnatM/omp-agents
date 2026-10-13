@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ClientFrame } from "../shared/protocol";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
-import type { RoutineChange, Schedule } from "../routines";
+import type { RoutineSpec, Schedule } from "../routines";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseMcpServerAdd, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
@@ -113,7 +113,7 @@ describe("parseClientMsg", () => {
 	describe("routine", () => {
 		const change = (value: unknown) => msg({ t: "routine", change: value });
 		const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
-		const routine: Extract<RoutineChange, { op: "save" }>["routine"] = {
+		const routine: RoutineSpec = {
 			id: "r1",
 			name: "Reviews",
 			cwd: "/work/webapp",
