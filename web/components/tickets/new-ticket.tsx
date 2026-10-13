@@ -1,20 +1,18 @@
-import { Box, ChevronRight, CircleUser, Maximize2, Minimize2, Paperclip, Tag, UsersRound, X } from "lucide-react";
+import { ChevronRight, Maximize2, Minimize2, Paperclip, UsersRound, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
 import { MAX_TICKET_ATTACHMENT_BYTES, type TicketChoice, type TicketDraft, type TicketLabel, type TicketOptions, type TicketPriority, type TicketStatus, type TicketTeam } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { putJson } from "../../api";
 import { ticketsStore, useRead } from "../../reads";
 import { hashForTickets } from "../../routing";
 import { chordLabel } from "../../shortcuts";
-import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
+import { statusOrder } from "../../tickets-model";
 import { fileBase64 } from "../prompt-attachments";
 import { DuePicker, FieldPicker } from "../field-picker";
 import { ERROR_TEXT, FormDialog, FormDialogHeader, isSubmitChord, type Submit } from "../form-dialog";
-import { PRIORITIES } from "./ticket-fields";
-import { LabelDot, PRIORITY_ICON, statusIcon } from "./ticket-row";
+import { TicketAssigneePicker, TicketLabelsPicker, TicketPriorityPicker, TicketProjectPicker, TicketStatusPicker } from "./ticket-pickers";
 import { preferredTeam, rememberTeam } from "./team-select";
 
 const MAX_ATTACHMENT_MB = MAX_TICKET_ATTACHMENT_BYTES / (1024 * 1024);
@@ -163,11 +161,7 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 		setFiles(current => [...current, ...added.filter(file => file.size <= MAX_TICKET_ATTACHMENT_BYTES)]);
 	};
 
-	const [StatusIcon, statusColor] = status ? statusIcon(status) : statusIcon({ status: "Backlog", statusType: "backlog" });
-	const [PriorityIcon, priorityColor] = PRIORITY_ICON[fields.priority];
-	const assigneeName = fields.assignee === "me" ? "Me" : (fields.assignee?.name ?? null);
-	const labelNames = fields.labels.map(label => label.name);
-	const pickersOff = creating || team === null;
+	const teamPicker = { look: "chip", options: options.data ?? null, error: options.error ?? null, disabled: creating || team === null, onOpen: openOptions } as const;
 
 	return (
 		<form
@@ -256,110 +250,11 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 				)}
 			</div>
 			<div className="flex flex-wrap items-center gap-1.5 px-4 py-3">
-				<FieldPicker
-					look="chip"
-					field="Status"
-					current={status?.status ?? "team's default"}
-					trigger={
-						<>
-							<StatusIcon aria-hidden className={cn("size-3.5", statusColor)} />
-							<span className="truncate">{status?.status ?? "Status"}</span>
-						</>
-					}
-					choices={
-						options.data?.statuses.toSorted(statusOrder).map(candidate => {
-							const [Icon, color] = statusIcon(candidate);
-							return { value: candidate.status, label: candidate.status, icon: <Icon aria-hidden className={color} /> };
-						}) ?? null
-					}
-					error={options.error}
-					selected={status ? [status.status] : []}
-					disabled={pickersOff}
-					onOpen={openOptions}
-					onPick={name => set({ state: name })}
-				/>
-				<FieldPicker
-					look="chip"
-					field="Priority"
-					current={PRIORITY_LABEL[fields.priority]}
-					trigger={
-						<>
-							<PriorityIcon aria-hidden className={cn("size-3.5", priorityColor)} />
-							<span className="truncate">{fields.priority === 0 ? "Priority" : PRIORITY_LABEL[fields.priority]}</span>
-						</>
-					}
-					choices={PRIORITIES.map(priority => {
-						const [Icon, color] = PRIORITY_ICON[priority];
-						return { value: String(priority), label: PRIORITY_LABEL[priority], icon: <Icon aria-hidden className={color} /> };
-					})}
-					selected={[String(fields.priority)]}
-					disabled={creating}
-					onPick={value => set({ priority: PRIORITIES.find(priority => String(priority) === value) ?? 0 })}
-				/>
-				<FieldPicker
-					look="chip"
-					field="Assignee"
-					current={assigneeName ?? "unassigned"}
-					trigger={
-						<>
-							<CircleUser aria-hidden className="size-3.5 text-muted-foreground" />
-							<span className="truncate">{assigneeName ?? "Assignee"}</span>
-						</>
-					}
-					choices={options.data ? [{ value: "me", label: "Me" }, { value: "", label: "No assignee" }, ...options.data.users.map(user => ({ value: user.id, label: user.name }))] : null}
-					error={options.error}
-					selected={[fields.assignee === "me" ? "me" : (fields.assignee?.id ?? "")]}
-					disabled={pickersOff}
-					onOpen={openOptions}
-					onPick={id => set({ assignee: id === "me" ? "me" : (options.data?.users.find(user => user.id === id) ?? null) })}
-				/>
-				<FieldPicker
-					look="chip"
-					field="Project"
-					current={fields.project ?? "none"}
-					trigger={
-						<>
-							<Box aria-hidden className="size-3.5 text-muted-foreground" />
-							<span className="truncate">{fields.project ?? "Project"}</span>
-						</>
-					}
-					choices={options.data ? [{ value: "", label: "No project" }, ...options.data.projects.map(name => ({ value: name, label: name }))] : null}
-					error={options.error}
-					selected={[fields.project ?? ""]}
-					disabled={pickersOff}
-					onOpen={openOptions}
-					onPick={name => set({ project: name || null })}
-				/>
-				<FieldPicker
-					look="chip"
-					field="Labels"
-					current={labelNames.join(", ") || "none"}
-					trigger={
-						<>
-							{fields.labels.length > 0 ? (
-								<span className="flex items-center -space-x-0.5">
-									{fields.labels.map(label => (
-										<LabelDot key={label.name} color={label.color} />
-									))}
-								</span>
-							) : (
-								<Tag aria-hidden className="size-3.5 text-muted-foreground" />
-							)}
-							<span className="truncate">{fields.labels.length === 0 ? "Labels" : fields.labels.length === 1 ? labelNames[0] : `${fields.labels.length} labels`}</span>
-						</>
-					}
-					choices={options.data?.labels.map(label => ({ value: label.name, label: label.name, icon: <LabelDot color={label.color} /> })) ?? null}
-					error={options.error}
-					selected={labelNames}
-					multi
-					disabled={pickersOff}
-					onOpen={openOptions}
-					onPick={name =>
-						set({
-							labels: labelNames.includes(name) ? fields.labels.filter(label => label.name !== name) : [...fields.labels, options.data?.labels.find(label => label.name === name) ?? { name, color: "" }],
-						})
-					}
-				/>
+				<TicketStatusPicker {...teamPicker} value={status ?? null} onChange={picked => set({ state: picked.status })} />
+				<TicketPriorityPicker look="chip" value={fields.priority} disabled={creating} onChange={priority => set({ priority })} />
+				<TicketAssigneePicker {...teamPicker} value={fields.assignee} offerMe onChange={assignee => set({ assignee })} />
+				<TicketProjectPicker {...teamPicker} value={fields.project} onChange={project => set({ project })} />
+				<TicketLabelsPicker {...teamPicker} value={fields.labels} onChange={labels => set({ labels })} />
 				<DuePicker look="chip" dueDate={fields.dueDate} disabled={creating} onChange={dueDate => set({ dueDate })} />
 			</div>
 			{(submit.kind === "failed" || submit.kind === "created" || fileNote) && (
