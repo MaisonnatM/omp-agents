@@ -1,8 +1,10 @@
 /**
  * GitHub on the server: the repository `origin` names, `gh api` calls, and GitHub's enum values in the dashboard's
- * terms. The repository and pull request keys, which the page uses too, live in `shared.ts`.
+ * terms. The repository and pull request keys, which the page uses too, live in `shared/github.ts`.
  */
+import { createCache } from "./cache";
 import { isObject, str } from "./json";
+import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
 import type { CheckRunState, Person, PullRequestEvent, PullRequestFile, Repo, ReviewDecision, ReviewerState } from "./shared/github";
@@ -17,39 +19,18 @@ export function parseRemote(url: string): Repo | null {
 	return match ? { owner: match[1]!, repo: match[2]! } : null;
 }
 
-/** Negative answers stay this long, so that a directory with no GitHub `origin` does not spawn `git` on every load. */
-const NO_REMOTE_TTL_MS = 10 * 60_000;
-/** Most `git` lookups running at once, however many workspaces the sessions have used. */
-const MAX_LOOKUPS = 8;
+/** How long a workspace's repository is kept, so that a directory with no GitHub `origin` does not spawn `git` on every load. */
+const REMOTE_TTL_MS = 10 * 60_000;
 
-/**
- * Workspaces' repositories, and lookups in flight. `negativeUntil` marks a workspace with no GitHub `origin`, asked
- * again after it. Not a `createCache`: that caches answers for a fixed time, while this keeps a found repository for
- * good and forgets only a missing one.
- */
-const remotes = new Map<string, { repo: Promise<Repo | null>; negativeUntil?: number }>();
-let lookups = 0;
-const waiting: (() => void)[] = [];
-
-/** Runs `task` once fewer than {@link MAX_LOOKUPS} others run; a finished task hands its slot to the longest waiter. */
-async function withLookupSlot<T>(task: () => Promise<T>): Promise<T> {
-	if (lookups >= MAX_LOOKUPS) await new Promise<void>(resolve => waiting.push(resolve));
-	else lookups++;
-	try {
-		return await task();
-	} finally {
-		const next = waiting.shift();
-		if (next) next();
-		else lookups--;
-	}
-}
+/** Workspaces' repositories, and lookups in flight. A lookup never rejects: a failed `git` reads as no repository. */
+const remotes = createCache<Repo | null>(REMOTE_TTL_MS);
+/** At most 8 `git` lookups run at once, however many workspaces the sessions have used. */
+const lookupSlot = limit(8);
 
 /** The GitHub repository that `origin` names in `cwd`. */
 export function repoOf(cwd: string): Promise<Repo | null> {
-	const known = remotes.get(cwd);
-	if (known && !(known.negativeUntil !== undefined && known.negativeUntil <= Date.now())) return known.repo;
-	const entry: { repo: Promise<Repo | null>; negativeUntil?: number } = {
-		repo: withLookupSlot(async () => {
+	return remotes.get(cwd, () =>
+		lookupSlot(async () => {
 			try {
 				const { stdout, code } = await run(["git", "-C", cwd, "remote", "get-url", "origin"]);
 				return code === 0 ? parseRemote(stdout) : null;
@@ -57,12 +38,7 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 				return null;
 			}
 		}),
-	};
-	remotes.set(cwd, entry);
-	void entry.repo.then(found => {
-		if (!found) entry.negativeUntil = Date.now() + NO_REMOTE_TTL_MS;
-	});
-	return entry.repo;
+	);
 }
 
 /**

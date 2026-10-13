@@ -14,3 +14,20 @@ export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (it
 	await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 	return results;
 }
+
+/** A gate that runs at most `most` of the tasks handed to it at once; a finished task hands its slot to the longest waiter. */
+export function limit(most: number): <T>(task: () => Promise<T>) => Promise<T> {
+	let running = 0;
+	const waiting: (() => void)[] = [];
+	return async task => {
+		if (running >= most) await new Promise<void>(resolve => waiting.push(resolve));
+		else running++;
+		try {
+			return await task();
+		} finally {
+			const next = waiting.shift();
+			if (next) next();
+			else running--;
+		}
+	};
+}
