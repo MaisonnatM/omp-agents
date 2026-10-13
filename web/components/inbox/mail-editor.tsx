@@ -1,4 +1,4 @@
-/** `MailEditor`: the Inbox's mail composer with recipient chips, subject, formatted body, and a saved draft. */
+/** `MailEditor`: the Inbox's mail composer with recipient chips, subject, and formatted body, showing the draft a `useMailDraft` owns. */
 import { $generateHtmlFromNodes } from "@lexical/html";
 import { $isLinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
 import { $isListNode, INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from "@lexical/list";
@@ -21,15 +21,13 @@ import {
 	type TextFormatType,
 } from "lexical";
 import { Bold, Italic, Link, List, ListOrdered, Maximize2, Minimize2, Quote, Trash2, Underline, X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useState } from "react";
 import type { MailDraft, MailPerson } from "../../../src/shared/gmail";
 import { errorText } from "../../../src/json";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { decodeMailDraft, type MailRecipients, mailExtension, type StoredDraft } from "../../mail-draft";
-
-const draftStorageKey = (key: string): string => `omp-agents.mail-draft.${key}`;
+import { type MailDocument, type MailDraftEdits, mailExtension } from "../../mail-draft";
 
 const ADDRESS = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
 
@@ -208,14 +206,13 @@ function Toolbar({ editor }: { editor: LexicalEditor }) {
 }
 
 interface MailEditorProps {
-	/** Where the browser keeps the unsent draft: a conversation's id, or `new`. */
-	draftKey: string;
-	/** Who it says it is to before you change anything: `Reply to`, or `To` for a new mail. */
+	/** The draft it shows; `edit` changes it, and the `useMailDraft` that hands both over owns it. */
+	draft: MailDocument;
+	edit: MailDraftEdits;
+	/** Who it says it is to: `Reply to`, `Reply all`, or `To` for a new mail. */
 	toLabel: string;
-	/** Whom it goes to when no draft is kept; a change of these, as from Reply to Reply all, replaces the kept ones. */
-	recipients: MailRecipients;
-	/** The subject row, for a new mail; `null` for a reply, which keeps the conversation's. */
-	subject: string | null;
+	/** Whether it has a subject row, as a new mail does; a reply keeps the conversation's. */
+	withSubject: boolean;
 	/** Whether the To field takes focus first, as a new mail's does; a reply's body takes it. */
 	focusPeople?: boolean;
 	/** Whether it fills the page instead of the bottom of it. */
@@ -230,11 +227,9 @@ interface MailEditorProps {
 
 /**
  * A mail being written, as Front lays one out: whom it goes to as chips, with Cc and Bcc rows a click away, the subject
- * of a new mail, the formatted body, and a bottom row of formatting and Send. ⌘Enter sends, Esc closes it, and the
- * browser keeps what you wrote until you send it or throw it away.
+ * of a new mail, the formatted body, and a bottom row of formatting and Send. ⌘Enter sends and Esc closes it.
  */
 export function MailEditor(props: MailEditorProps) {
-	const kept = useState(() => decodeMailDraft(localStorage.getItem(draftStorageKey(props.draftKey))))[0];
 	const [extension] = useState(() =>
 		defineExtension({
 			name: "[root]",
@@ -242,70 +237,47 @@ export function MailEditor(props: MailEditorProps) {
 			dependencies: [mailExtension],
 			theme: THEME,
 			onError: error => console.error(error),
-			...(kept ? { $initialEditorState: (editor: LexicalEditor) => editor.setEditorState(editor.parseEditorState(kept.body)) } : {}),
+			...(props.draft.body ? { $initialEditorState: (editor: LexicalEditor) => editor.setEditorState(editor.parseEditorState(props.draft.body)) } : {}),
 		}),
 	);
 	return (
 		<LexicalExtensionComposer extension={extension} contentEditable={null}>
-			<Editor {...props} kept={kept} />
+			<Editor {...props} />
 		</LexicalExtensionComposer>
 	);
 }
 
-function Editor({ draftKey, toLabel, recipients, subject: initialSubject, focusPeople, expanded, onExpand, onSend, onClose, onDone, kept }: MailEditorProps & { kept: StoredDraft | null }) {
+function Editor({ draft, edit, toLabel, withSubject, focusPeople, expanded, onExpand, onSend, onClose, onDone }: MailEditorProps) {
 	const [editor] = useLexicalComposerContext();
-	const [people, setPeople] = useState<MailRecipients>(() => kept ?? recipients);
-	const [subject, setSubject] = useState(kept?.subject ?? initialSubject ?? "");
-	const [shown, setShown] = useState({ cc: people.cc.length > 0, bcc: people.bcc.length > 0 });
-	const [empty, setEmpty] = useState(true);
+	const [revealed, setRevealed] = useState({ cc: false, bcc: false });
+	const shown = { cc: revealed.cc || draft.cc.length > 0, bcc: revealed.bcc || draft.bcc.length > 0 };
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	// Reply and Reply all write to different people, so switching between them takes the new ones.
-	const first = useRef(true);
-	useEffect(() => {
-		if (first.current) {
-			first.current = false;
-			return;
-		}
-		setPeople(current => ({ ...recipients, bcc: current.bcc }));
-		setShown(current => ({ ...current, cc: current.cc || recipients.cc.length > 0 }));
-	}, [recipients]);
-
-	const latest = useRef({ people, subject });
-	latest.current = { people, subject };
-	const sent = useRef(false);
-	const store = (): void => {
-		if (sent.current) return;
-		const { people: current, subject: currentSubject } = latest.current;
-		const body = editor.getEditorState();
-		const blank = body.read(() => $getRoot().getTextContent().trim() === "");
-		if (blank && currentSubject.trim() === (initialSubject ?? "")) localStorage.removeItem(draftStorageKey(draftKey));
-		else localStorage.setItem(draftStorageKey(draftKey), JSON.stringify({ ...current, subject: currentSubject, body: JSON.stringify(body.toJSON()) } satisfies StoredDraft));
-	};
+	const { editBody } = edit;
 	useEffect(
 		() =>
 			editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
-				setEmpty(editorState.read(() => $getRoot().getTextContent().trim() === ""));
-				if (dirtyElements.size > 0 || dirtyLeaves.size > 0) store();
+				if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
+				const blank = editorState.read(() => $getRoot().getTextContent().trim() === "");
+				editBody(blank ? "" : JSON.stringify(editorState.toJSON()));
 			}),
-		[editor],
+		[editor, editBody],
 	);
-	useEffect(store, [people, subject]);
 	useEffect(() => {
 		if (!focusPeople) editor.focus();
 	}, [editor]);
 
-	const nobody = people.to.length + people.cc.length + people.bcc.length === 0;
+	const empty = draft.body === "";
+	const nobody = draft.to.length + draft.cc.length + draft.bcc.length === 0;
 	const send = async (): Promise<void> => {
 		if (sending || empty || nobody) return;
 		setSending(true);
 		setError(null);
 		try {
-			const body = editor.read(() => ({ html: $generateHtmlFromNodes(editor, null).replace(/(<p><br><\/p>)+$/, ""), text: $getRoot().getTextContent().trimEnd() }));
-			await onSend({ ...people, subject, ...body });
-			sent.current = true;
-			localStorage.removeItem(draftStorageKey(draftKey));
+			const content = editor.read(() => ({ html: $generateHtmlFromNodes(editor, null).replace(/(<p><br><\/p>)+$/, ""), text: $getRoot().getTextContent().trimEnd() }));
+			await onSend({ to: draft.to, cc: draft.cc, bcc: draft.bcc, subject: draft.subject, ...content });
+			edit.discard();
 			onDone();
 		} catch (err) {
 			setError(errorText(err));
@@ -313,8 +285,7 @@ function Editor({ draftKey, toLabel, recipients, subject: initialSubject, focusP
 		}
 	};
 	const discard = (): void => {
-		sent.current = true;
-		localStorage.removeItem(draftStorageKey(draftKey));
+		edit.discard();
 		onDone();
 	};
 	const onKeyDown = (event: KeyboardEvent<HTMLFormElement>): void => {
@@ -327,9 +298,14 @@ function Editor({ draftKey, toLabel, recipients, subject: initialSubject, focusP
 			onClose();
 		}
 	};
+	// A Cc or Bcc row stays once shown, even after its last chip goes.
+	const editShown = (field: "cc" | "bcc") => (people: MailPerson[]) => {
+		setRevealed(current => ({ ...current, [field]: true }));
+		edit.editRecipients(field, people);
+	};
 
 	const reveal = (field: "cc" | "bcc") => (
-		<button type="button" onClick={() => setShown(current => ({ ...current, [field]: true }))} className="rounded-sm px-1 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+		<button type="button" onClick={() => setRevealed(current => ({ ...current, [field]: true }))} className="rounded-sm px-1 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
 			{field === "cc" ? "Cc" : "Bcc"}
 		</button>
 	);
@@ -348,7 +324,7 @@ function Editor({ draftKey, toLabel, recipients, subject: initialSubject, focusP
 	);
 	return (
 		<form
-			aria-label={initialSubject === null ? toLabel : "New mail"}
+			aria-label={withSubject ? "New mail" : toLabel}
 			onKeyDown={onKeyDown}
 			onSubmit={event => {
 				event.preventDefault();
@@ -356,13 +332,13 @@ function Editor({ draftKey, toLabel, recipients, subject: initialSubject, focusP
 			}}
 			className={cn("flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-background shadow-lg", expanded && "flex-1")}
 		>
-			<PeopleField label={toLabel} people={people.to} onChange={to => setPeople(current => ({ ...current, to }))} autoFocus={focusPeople} trailing={toTrailing} />
-			{shown.cc && <PeopleField label="Cc" people={people.cc} onChange={cc => setPeople(current => ({ ...current, cc }))} />}
-			{shown.bcc && <PeopleField label="Bcc" people={people.bcc} onChange={bcc => setPeople(current => ({ ...current, bcc }))} />}
-			{initialSubject !== null && (
+			<PeopleField label={toLabel} people={draft.to} onChange={to => edit.editRecipients("to", to)} autoFocus={focusPeople} trailing={toTrailing} />
+			{shown.cc && <PeopleField label="Cc" people={draft.cc} onChange={editShown("cc")} />}
+			{shown.bcc && <PeopleField label="Bcc" people={draft.bcc} onChange={editShown("bcc")} />}
+			{withSubject && (
 				<label className="flex min-h-10 items-center gap-2 border-b border-border px-4 text-sm">
 					<span className="w-14 shrink-0 text-muted-foreground">Subject</span>
-					<input value={subject} onChange={event => setSubject(event.target.value)} className="min-w-0 flex-1 bg-transparent py-1.5 outline-none" />
+					<input value={draft.subject} onChange={event => edit.editSubject(event.target.value)} className="min-w-0 flex-1 bg-transparent py-1.5 outline-none" />
 				</label>
 			)}
 			<div className={cn("relative min-h-0 overflow-y-auto", expanded ? "flex-1" : "max-h-[40vh]")}>

@@ -1,8 +1,7 @@
 /** The Inbox's open conversation: its action bar, subject, messages folded as Gmail folds them, and the reply. */
 import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw, Reply, ReplyAll, Trash2 } from "lucide-react";
-import { useMemo, useReducer, useState } from "react";
+import { useReducer, useState } from "react";
 import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread } from "../../../src/shared/gmail";
-import { recipientsOf } from "../../../src/shared/gmail";
 import { MailEditor } from "./mail-editor";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, personLabel, recipientsLine } from "../../inbox-model";
+import { useReplyDraft } from "../../mail-draft";
 import { formatBytes, mailTime } from "../../labels";
 import { gmailStore, mailThreadStore, useMailThread } from "../../reads";
 import { hashForInbox } from "../../routing";
@@ -204,18 +204,16 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 	const messages = thread?.messages ?? [];
 	const [folds, fold] = useReducer(foldsAfter, NO_FOLDS);
 	const url = thread?.url ?? listed?.url ?? null;
-	const [composing, setComposing] = useState<{ all: boolean } | null>(null);
 	const [expanded, setExpanded] = useState(false);
 	const [trashing, setTrashing] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const last = messages.at(-1);
 	const canReply = last !== undefined && !trashing;
-	const all = composing?.all ?? false;
-	const recipients = useMemo(() => ({ ...(last ? recipientsOf(last, address ?? "", all) : { to: [], cc: [] }), bcc: [] }), [last, address, all]);
+	const reply = useReplyDraft(id, last, address ?? "");
 
 	const compose = (all: boolean): boolean => {
 		if (!canReply) return false;
-		setComposing({ all });
+		reply.compose(all);
 		return true;
 	};
 	const trash = async (): Promise<void> => {
@@ -288,7 +286,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 					</Button>
 				</Tooltip>
 			</DetailBar>
-			<div className={cn("min-h-0 w-full flex-1 space-y-4 overflow-y-auto px-8 py-6", expanded && composing && "hidden")}>
+			<div className={cn("min-h-0 w-full flex-1 space-y-4 overflow-y-auto px-8 py-6", expanded && reply.draft && "hidden")}>
 				{subject !== null && (
 					<header className="space-y-1.5">
 						<h2 className="break-words text-2xl font-semibold leading-tight tracking-tight">{subject || "(no subject)"}</h2>
@@ -336,13 +334,13 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 				)}
 			</div>
 			{last && (
-				<div className={cn("flex shrink-0 flex-col px-6 pb-4", expanded && composing && "min-h-0 flex-1 pt-4")}>
-					{composing ? (
+				<div className={cn("flex shrink-0 flex-col px-6 pb-4", expanded && reply.draft && "min-h-0 flex-1 pt-4")}>
+					{reply.draft ? (
 						<MailEditor
-							draftKey={`thread.${id}`}
-							toLabel={composing.all ? "Reply all" : "Reply to"}
-							recipients={recipients}
-							subject={null}
+							draft={reply.draft}
+							edit={reply}
+							toLabel={reply.all ? "Reply all" : "Reply to"}
+							withSubject={false}
 							expanded={expanded}
 							onExpand={setExpanded}
 							onSend={async draft => {
@@ -350,11 +348,10 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 								await putJson<object>("/api/gmail/reply", { ...body, thread: id } satisfies MailReply);
 							}}
 							onClose={() => {
-								setComposing(null);
+								reply.close();
 								setExpanded(false);
 							}}
 							onDone={() => {
-								setComposing(null);
 								setExpanded(false);
 								void mailThreadStore.refresh(id, { fresh: true });
 								void gmailStore.refresh(null, { fresh: true });
