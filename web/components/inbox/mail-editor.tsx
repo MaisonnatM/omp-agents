@@ -1,12 +1,11 @@
 /** `MailEditor`: the Inbox's mail composer with recipient chips, subject, formatted body, and a saved draft. */
-import { HistoryExtension } from "@lexical/history";
 import { $generateHtmlFromNodes } from "@lexical/html";
-import { $isLinkNode, AutoLinkExtension, autoLinkUrlMatcher, LinkExtension, TOGGLE_LINK_COMMAND } from "@lexical/link";
-import { $isListNode, INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND, ListExtension } from "@lexical/list";
+import { $isLinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
+import { $isListNode, INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from "@lexical/list";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalExtensionComposer } from "@lexical/react/LexicalExtensionComposer";
-import { $createQuoteNode, $isQuoteNode, RichTextExtension } from "@lexical/rich-text";
+import { $createQuoteNode, $isQuoteNode } from "@lexical/rich-text";
 import { $setBlocksType } from "@lexical/selection";
 import { $findMatchingParent } from "@lexical/utils";
 import {
@@ -14,7 +13,6 @@ import {
 	$getRoot,
 	$getSelection,
 	$isRangeSelection,
-	configExtension,
 	defineExtension,
 	type ElementNode,
 	FORMAT_TEXT_COMMAND,
@@ -29,30 +27,9 @@ import { errorText } from "../../../src/json";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-
-/** Who a mail goes to, by field. */
-export interface MailRecipients {
-	to: MailPerson[];
-	cc: MailPerson[];
-	bcc: MailPerson[];
-}
-
-/** What the browser keeps of a draft you have not sent: its people, its subject, and the editor's document as JSON. */
-interface StoredDraft extends MailRecipients {
-	subject: string;
-	body: string;
-}
+import { decodeMailDraft, type MailRecipients, mailExtension, type StoredDraft } from "../../mail-draft";
 
 const draftStorageKey = (key: string): string => `omp-agents.mail-draft.${key}`;
-
-function storedDraft(key: string): StoredDraft | null {
-	try {
-		const raw = localStorage.getItem(draftStorageKey(key));
-		return raw ? (JSON.parse(raw) as StoredDraft) : null;
-	} catch {
-		return null;
-	}
-}
 
 const ADDRESS = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
 
@@ -134,11 +111,6 @@ const THEME = {
 	link: "text-blue-600 underline dark:text-blue-400",
 	text: { bold: "font-semibold", italic: "italic", underline: "underline" },
 };
-
-const mailExtension = defineExtension({
-	name: "mail/rich-text",
-	dependencies: [RichTextExtension, ListExtension, LinkExtension, configExtension(AutoLinkExtension, { matchers: [autoLinkUrlMatcher] }), HistoryExtension],
-});
 
 /** What the selection sits in, for the toolbar to show pressed. */
 interface Formats {
@@ -262,7 +234,7 @@ interface MailEditorProps {
  * browser keeps what you wrote until you send it or throw it away.
  */
 export function MailEditor(props: MailEditorProps) {
-	const kept = useState(() => storedDraft(props.draftKey))[0];
+	const kept = useState(() => decodeMailDraft(localStorage.getItem(draftStorageKey(props.draftKey))))[0];
 	const [extension] = useState(() =>
 		defineExtension({
 			name: "[root]",
@@ -270,7 +242,7 @@ export function MailEditor(props: MailEditorProps) {
 			dependencies: [mailExtension],
 			theme: THEME,
 			onError: error => console.error(error),
-			...(kept?.body ? { $initialEditorState: (editor: LexicalEditor) => editor.setEditorState(editor.parseEditorState(kept.body)) } : {}),
+			...(kept ? { $initialEditorState: (editor: LexicalEditor) => editor.setEditorState(editor.parseEditorState(kept.body)) } : {}),
 		}),
 	);
 	return (
