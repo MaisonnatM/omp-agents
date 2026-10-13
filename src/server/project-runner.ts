@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { agentDir } from "../omp/config";
 import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
+import { expandHome } from "../paths";
 import type { ModelOption } from "../shared/models";
 import { type Project, type Worker, type WorkerId, type WorkerPhase, workerPhase } from "../shared/projects";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
@@ -187,8 +188,8 @@ export class ProjectRunner implements ProjectControl {
 
 	async startWorker(project: Project, spec: { title: string; prompt: string; cwd: string | null }): Promise<{ workerId: WorkerId; cwd: string }> {
 		const { cwd } = spec;
-		// `~` stays for the starter, which reads it as the home directory; any other relative directory is the workspace's.
-		const dir = cwd === null ? project.cwd : cwd === "~" || cwd.startsWith("~/") ? cwd : resolve(project.cwd, cwd);
+		// `~` is the home directory; any other relative directory is the workspace's.
+		const dir = cwd === null ? project.cwd : resolve(project.cwd, expandHome(cwd));
 		const result = await this.#deps.start(newSessionRequest(dir, spec.prompt), { kind: "new-worker", projectId: project.id, title: spec.title });
 		if (!result.ok) throw new Error(result.error);
 		// The worker took its id as it attached, before its first prompt.

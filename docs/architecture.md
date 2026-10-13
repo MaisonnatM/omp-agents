@@ -496,7 +496,7 @@ Every spawn of a coordinator gets its tools, a resume included, since the proces
 `attach` saves what the launch makes: `create` saves the project, its workspace the session's directory, and seeds its notes, and `new-worker` applies `add-worker`, which gives the worker the project's next id and bumps `nextWorker`.
 It then flushes the file, because `JsonFile.save` writes at the end of the event-loop turn and the extension reads the file at the first prompt, and tracks the session by the role the file now gives it.
 So a coordinator that fails to start saves no project, a worker that fails to start takes no id, and workers take their ids in the order their sessions start; `startWorker` reads the id back from the tracked session.
-A worker starts in the directory `start_worker` names, resolved against the project's workspace when relative and kept for the starter when it starts with `~`, else in the workspace, on omp's default model, with no branch of its own.
+A worker starts in the directory `start_worker` names, read through `expandHome` in `src/paths.ts` and resolved against the project's workspace, else in the workspace, on omp's default model, with no branch of its own.
 
 The coordinator's tools are strict host tools, every property required, loaded as `essential`: `start_worker` (`title`, `prompt`, `cwd`), `list_workers`, `read_worker` (`worker`), and `message_worker` (`worker`, `text`).
 An error a tool throws reaches the coordinator as the tool's error, and every tool throws once the project is archived.
@@ -626,7 +626,7 @@ Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md
 `diskAvailable` and `diskTotal` come from `statfs` on the home directory: the blocks free to an unprivileged user and all the volume's blocks; on macOS the free figure leaves out purgeable space, which Finder counts.
 
 `GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
-The path is absolute or starts with `~/`; the page resolves a relative one against the session's directory first.
+The path is absolute or starts with `~`, which `expandHome` in `src/paths.ts` reads as the home directory; the page resolves a relative one against the session's directory first.
 The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
 It must also lie outside the directories that hold sign-ins and config, `DENIED_DIRS` in `src/text-file.ts`, compared by their real paths, or the route answers 403: omp-agents' own directory, which holds the access token, and omp's agent directory, but for its Markdown, such as `AGENTS.md` and skills.
 It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes are not UTF-8.

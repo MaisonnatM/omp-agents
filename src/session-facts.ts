@@ -24,7 +24,7 @@ import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
-import { HOME } from "./paths";
+import { expandHome } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo } from "./shared/github";
@@ -388,7 +388,7 @@ interface SessionScan {
 const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
 
 /** `dir` as omp resolves a bash `cwd`: from the home directory after `~`, else from `base`. */
-const absolute = (base: string, dir: string): string => (dir === "~" || dir.startsWith("~/") ? HOME + dir.slice(1) : resolve(base, dir));
+const absolute = (base: string, dir: string): string => resolve(base, expandHome(dir));
 
 /** `ask`, asking about each directory once. */
 function once<T>(ask: (dir: string) => Promise<T>): (dir: string) => Promise<T> {
