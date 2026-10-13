@@ -1,14 +1,14 @@
 /** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Timeline, and Code tabs. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
+import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { pullRequestStatus } from "../../../pull-requests-model";
+import { moveAction, pullRequestStatus, reason } from "../../../pull-requests-model";
 import { putJson } from "../../../api";
-import type { PullRequestActionId } from "../../../../src/pull-request-actions";
-import type { MoveId } from "../../../../src/shared/moves";
+import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
+import { type AgentState, actionFacts, type MoveId, moveOf } from "../../../../src/shared/moves";
 import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../../../routing";
 import { useRead, useReplaceableRead } from "../../../reads";
 import { useQueuedSave } from "../../../use-queued-save";
@@ -21,7 +21,7 @@ import { DetailHeader } from "./header";
 import { placeFixes } from "./status-view";
 import { Summary } from "./summary";
 
-/** What the pull request waits on next, as the pull request list has it. */
+/** What the pull request waits on next, from its action facts. */
 export interface NextMove {
 	move: MoveId;
 	reason: string;
@@ -31,15 +31,26 @@ export interface NextMove {
 	session: RosterHost | null;
 }
 
+/** What `facts` wait on next, given where the sessions on it stand and the running `sessions` on it. */
+function nextMove(facts: PullRequestSummary, agent: AgentState | null, sessions: RosterHost[]): NextMove {
+	const move = moveOf(facts, agent);
+	const holder = move === "answer" ? "needs-input" : move === "agent" ? "working" : null;
+	return { move, reason: reason(facts, move), action: moveAction(facts, move), session: sessions.find(host => host.status === holder) ?? null };
+}
+
 export interface DetailContentProps {
 	pr: PullRequest;
-	/** The quick actions on it; none apply when the pull request list does not hold it, since a start needs the workspace the list names. */
-	quick: QuickActionsProps;
+	/** Its pull request list entry, for who you are to it; `null` when the list does not hold it, so no move or quick action applies, since a start needs the workspace the list names. */
+	listed: PullRequestSummary | null;
+	/** Where the running sessions on it stand. */
+	agent: AgentState | null;
+	/** The quick action whose session is starting for it, if any. */
+	pending: QuickActionsProps["pending"];
+	/** Starts `action` on the pull request, as `facts` describe it. */
+	onRun: (facts: PullRequestSummary, action: PullRequestActionId) => void;
 	/** The running sessions that work on it. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
-	/** Its move; `null` when the pull request list does not hold it. */
-	next: NextMove | null;
 	/** The session's pull requests, in the session details sidebar; those outside the stack list under it. */
 	session?: LinkedPullRequest[];
 	/** Where the details show: the main area's page, whose heading takes focus, or the session details sidebar, under its own heading. */
@@ -62,7 +73,7 @@ type DetailTab = "summary" | "timeline" | "code";
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
  * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: listedNext, session = [], placement, version, files = null, onPick, onSaved }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, onSaved }: DetailContentProps) {
 	const [reads, setReads] = useState(0);
 	const readVersion = useMemo(() => [version, reads], [version, reads]);
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
@@ -90,8 +101,10 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: li
 		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
 		else if (value !== "code" && files) location.hash = hashForPullRequests(pr);
 	};
-	// GitHub's search, which the pull request list reads, can list a pull request for a while after it closes.
-	const next = detail?.state === "closed" ? null : listedNext;
+	// The list's entry says who you are to it; the details, once read, say where it stands, as the Summary shows.
+	const facts = listed && actionFacts(listed, detail);
+	const next = facts && nextMove(facts, agent, sessions);
+	const quick: QuickActionsProps = { actions: facts ? pullRequestActions(facts) : [], pending, onRun: (action: PullRequestActionId) => facts && onRun(facts, action) };
 	const offered = quick.actions.filter(action => action !== next?.action);
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
 	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];

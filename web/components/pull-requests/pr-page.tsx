@@ -1,13 +1,12 @@
 /** `PullRequestDetailPage`: one pull request in the main area, with the quick actions that start a session on it. */
 import { ArrowLeft } from "lucide-react";
-import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
-import { type PullRequestList, type PullRequestSummary, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
-import { agentOn, moveOf } from "../../../src/shared/moves";
+import { type PullRequestList, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
+import { agentOn } from "../../../src/shared/moves";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { listedPullRequest, moveAction, reason } from "../../pull-requests-model";
+import { listedPullRequest } from "../../pull-requests-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart, quickOn } from "../../quick-actions";
 import { pullRequestsStore } from "../../reads";
@@ -16,15 +15,8 @@ import { sessionsOn } from "../../sessions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Header } from "../page-header";
 import { QuickStartNotice } from "../quick-actions";
-import { type NextMove, type Placement, PullRequestDetailContent } from "./pr-details";
+import { type Placement, PullRequestDetailContent } from "./pr-details";
 import { rowId } from "./pr-row";
-
-/** What `pr` waits on next, given the running sessions `sessions` on it. */
-function nextMove(pr: PullRequestSummary, hosts: RosterHost[], sessions: RosterHost[]): NextMove {
-	const move = moveOf(pr, agentOn(hosts)(pr));
-	const holder = move === "answer" ? "needs-input" : move === "agent" ? "working" : null;
-	return { move, reason: reason(pr, move), action: moveAction(pr, move), session: sessions.find(host => host.status === holder) ?? null };
-}
 
 /** Why the pull request list does not hold the PR a link named. `allWorkspaces`: the sidebar shows every workspace. */
 function whyMissing(target: PullRequest, list: PullRequestList, allWorkspaces: boolean): string {
@@ -82,14 +74,12 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 			<PullRequestDetailContent
 				key={rowId(target)}
 				pr={target}
-				quick={{
-					actions: listed ? pullRequestActions(listed.pr) : [],
-					pending: pendingOf(quick, item),
-					onRun: (action: PullRequestActionId) => listed && start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill())),
-				}}
+				listed={listed ? listed.pr : null}
+				agent={agentOn(hosts)(target)}
+				pending={pendingOf(quick, item)}
+				onRun={(facts, action) => listed && start(pullRequestStart(facts, action, listed.cwd, readPinnedSkill()))}
 				sessions={sessions}
 				onOpen={open}
-				next={listed ? nextMove(listed.pr, hosts, sessions) : null}
 				session={session}
 				placement={placement}
 				version={version}

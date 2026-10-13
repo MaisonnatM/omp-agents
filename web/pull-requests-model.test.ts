@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { PullRequestSummary, PullRequestCheck, PullRequestDetail, RepoPullRequests } from "../src/shared/github";
-import { type AgentOn, agentOn, moveOf } from "../src/shared/moves";
+import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
+import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
 import {
 	DEFAULT_ORDER,
@@ -376,5 +377,20 @@ describe("pull request status", () => {
 		]);
 		expect(pullRequestStatus(detail({ state: "merged" }))).toEqual([]);
 		expect(pullRequestStatus(detail({ state: "closed", conflicts: true }))).toEqual([]);
+	});
+
+	test("the details' facts, not the list's older ones, decide the move and quick actions", () => {
+		const ready = pr(7, { review: "approved", checks: "passing" });
+		expect(moveOf(ready, null)).toBe("merge");
+		const drafted = actionFacts(ready, detail({ state: "draft", review: "approved", checks: "passing" }));
+		expect(drafted && moveOf(drafted, null)).toBe("draft");
+		const failing = actionFacts(ready, detail({ review: "approved", checks: "failing" }));
+		expect(failing && moveOf(failing, null)).toBe("fix-ci");
+		expect(failing && pullRequestActions(failing)).toContain("fix-ci");
+		expect(pullRequestActions(ready)).not.toContain("fix-ci");
+		const merged = actionFacts(ready, detail({ state: "merged" }));
+		expect(merged && moveOf(merged, null)).toBe("merged");
+		expect(actionFacts(ready, detail({ state: "closed" }))).toBeNull();
+		expect(actionFacts(ready, null)).toBe(ready);
 	});
 });

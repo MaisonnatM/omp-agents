@@ -30,6 +30,18 @@ export const hasOpenThreads = ({ unresolved }: Pick<MergeFacts, "unresolved">): 
 export const readyToMerge = (facts: MergeFacts): boolean =>
 	facts.state === "open" && (facts.review === "approved" || facts.review === "none") && !facts.conflicts && (facts.checks === "passing" || facts.checks === "none") && !hasOpenThreads(facts);
 
+/**
+ * The facts a pull request's moves and quick actions follow on its details page: who you are to it from the list entry `listed`,
+ * and its state, review, checks, conflicts, and threads from `detail` once read, so the header and the Summary agree.
+ * `null` when the details found it closed, which no move or quick action applies to.
+ */
+export function actionFacts(listed: PullRequestSummary, detail: PullRequestDetail | null): PullRequestSummary | null {
+	if (!detail) return listed;
+	if (detail.state === "closed") return null;
+	const { state, review, checks, conflicts, unresolved } = detail;
+	return { ...listed, state, review, checks, conflicts, unresolved };
+}
+
 /** What `pr` waits on next, given where the sessions on it stand. */
 export function moveOf(pr: PullRequestSummary, agent: AgentState | null): MoveId {
 	if (pr.state === "merged") return "merged";
