@@ -190,7 +190,8 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 					}
 				>
 					<span className="flex min-w-0 items-center gap-1.5">
-						<span className="max-w-56 truncate">{current ? <Model selector={current} titled={false} /> : unset}</span>
+						{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping descenders such as Opus's p. */}
+						<span className="max-w-56 truncate py-1 -my-1">{current ? <Model selector={current} titled={false} /> : unset}</span>
 						{effort.current && <span className="shrink-0 text-muted-foreground">{levelLabel(effort.current)}</span>}
 					</span>
 				</DropdownMenuTrigger>

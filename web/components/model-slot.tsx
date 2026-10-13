@@ -33,7 +33,7 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 		<Tooltip content={`${[model, thinking].filter(Boolean).join(" · ")}. Switch this session's model and thinking level from its omp terminal.`}>
 			<span className="flex min-w-0 items-center gap-3 px-2 text-xs text-muted-foreground">
 				{model && (
-					<span className="truncate">
+					<span className="truncate py-1 -my-1">
 						<Model selector={model} />
 					</span>
 				)}
