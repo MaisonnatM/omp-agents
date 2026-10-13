@@ -27,6 +27,8 @@ export type ScheduledChange =
 	| { op: "add"; send: Pick<ScheduledSend, "id" | "at" | "reset" | "target"> }
 	/** Cancels a waiting send, or dismisses a failed one. */
 	| { op: "remove"; id: string }
+	/** Takes a waiting or failed send off the schedule for **Edit**, which puts its text back in the composer only once this succeeds. */
+	| { op: "take"; id: string }
 	/** Sends a waiting send now, or tries a failed one again. */
 	| { op: "send-now"; id: string };
 
@@ -36,7 +38,11 @@ export const RESET_MARGIN_MS = 60_000;
 /** The longest text a scheduled message or start may carry; the server rejects a longer one. */
 export const MAX_SCHEDULED_TEXT = 1_000_000;
 
-/** `sends` after an `add` or a `remove`, or `sends` itself when it changes nothing. The list stays ordered by `at`, soonest first. A send under way cannot be removed. */
+/**
+ * `sends` after an `add`, a `remove`, or a `take`, or `sends` itself when it changes nothing. The list stays ordered by `at`, soonest first.
+ * A send under way cannot be removed. A `take` that takes nothing throws instead: a send under way may already have reached
+ * its session, and one that is gone was sent or canceled, so its text must not go back to the composer.
+ */
 export function applyScheduled(sends: ScheduledSend[], change: Exclude<ScheduledChange, { op: "send-now" }>, now: number): ScheduledSend[] {
 	switch (change.op) {
 		case "add": {
@@ -47,6 +53,12 @@ export function applyScheduled(sends: ScheduledSend[], change: Exclude<Scheduled
 		case "remove": {
 			const next = sends.filter(send => send.id !== change.id || send.state.phase === "sending");
 			return next.length === sends.length ? sends : next;
+		}
+		case "take": {
+			const taken = sends.find(send => send.id === change.id);
+			if (!taken) throw new Error("It is no longer scheduled.");
+			if (taken.state.phase === "sending") throw new Error("It is already sending.");
+			return sends.filter(send => send !== taken);
 		}
 	}
 }

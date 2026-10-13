@@ -51,10 +51,15 @@ export class ScheduledFile {
 		this.#sends = this.#file.load()?.sends ?? this.#sends;
 	}
 
-	/** Applies `change` at time `now` and saves; whether it changed anything. */
+	/**
+	 * Applies `change` at time `now` and saves; whether it changed anything. A refused take throws and saves nothing.
+	 * A take writes at once, as a claim does, so a server that claims next reads the send gone before the page restores its text.
+	 */
 	apply(change: Exclude<ScheduledChange, { op: "send-now" }>, now: number): boolean {
 		this.reload();
-		return this.#replace(applyScheduled(this.#sends, change, now));
+		const changed = this.#replace(applyScheduled(this.#sends, change, now));
+		if (change.op === "take") this.#file.flush();
+		return changed;
 	}
 
 	/** Marks send `id` as sending and saves, before anything sends it; the send, or `null` when it is gone or already sending. */

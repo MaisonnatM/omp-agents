@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { folderName } from "../labels";
 import { whenWords } from "../routines-model";
 import { dateTimeInputValue, resetChoices, type ScheduleWhen, tomorrowMorning } from "../scheduled-model";
-import { useAction } from "../use-action";
+import { type Action, useAction } from "../use-action";
 import { useMinute } from "../use-minute";
 import { useDashboardActions } from "./dashboard-context";
 import { Plans } from "./plan-usage";
@@ -32,6 +32,18 @@ export function useScheduleSend(): (target: ScheduledTarget, when: ScheduleWhen)
 function useScheduledChange(failureTitle: string) {
 	const { request } = useDashboardActions();
 	return useAction((change: ScheduledChange) => request({ t: "schedule", change }), failureTitle);
+}
+
+/**
+ * **Edit**: takes send `id` off the schedule, and only once the server confirms it hands `text` to `restore`.
+ * The server refuses a send under way or gone, which then stays as it is while the refusal toasts.
+ */
+function useScheduledEdit(restore: (text: string) => void): Action<[id: string, text: string]> {
+	const { request } = useDashboardActions();
+	return useAction(async (id: string, text: string) => {
+		await request({ t: "schedule", change: { op: "take", id } });
+		restore(text);
+	}, "Could not edit the scheduled message");
 }
 
 interface ScheduleButtonProps {
@@ -145,25 +157,19 @@ interface ScheduledRowProps {
 	send: ScheduledSend;
 	text: string;
 	now: number;
-	/** Back to the composer to change it; it leaves the schedule. */
-	onEdit: (text: string) => void;
+	/** An **Edit** in this composer waits on the server. */
+	editing: boolean;
+	onEdit: () => void;
 }
 
-function ScheduledRow({ send, text, now, onEdit }: ScheduledRowProps) {
+function ScheduledRow({ send, text, now, editing, onEdit }: ScheduledRowProps) {
 	const change = useScheduledChange("Could not change the scheduled message");
 	const label = promptLabel(text);
 	const failed = send.state.phase === "failed";
-	const busy = send.state.phase === "sending" || change.pending;
+	const busy = send.state.phase === "sending" || change.pending || editing;
 	const actions = [
 		{ name: failed ? "Try again" : "Send now", icon: <Send aria-hidden="true" />, run: () => change.run({ op: "send-now", id: send.id }) },
-		{
-			name: "Edit",
-			icon: <Pencil aria-hidden="true" />,
-			run: () => {
-				onEdit(text);
-				change.run({ op: "remove", id: send.id });
-			},
-		},
+		{ name: "Edit", icon: <Pencil aria-hidden="true" />, run: onEdit },
 		{ name: failed ? "Dismiss" : "Cancel", icon: <X aria-hidden="true" />, run: () => change.run({ op: "remove", id: send.id }) },
 	];
 	return (
@@ -184,15 +190,17 @@ function ScheduledRow({ send, text, now, onEdit }: ScheduledRowProps) {
 	);
 }
 
-/** The messages scheduled for session `sessionId`, above its composer. */
+/** The messages scheduled for session `sessionId`, above its composer; `onEdit` gets the text of one **Edit** took off the schedule. */
 export function ScheduledMessages({ sessionId, onEdit }: { sessionId: string | null; onEdit: (text: string) => void }) {
 	const sends = useContext(ScheduledSends).flatMap(send => (send.target.kind === "message" && send.target.sessionId === sessionId ? [{ send, text: send.target.text }] : []));
 	const now = useMinute();
+	// Held here rather than in a row: a send that goes during the take leaves its row, and the refusal still has to toast.
+	const edit = useScheduledEdit(onEdit);
 	if (sends.length === 0) return null;
 	return (
 		<ul aria-label="Scheduled messages" data-im-queue className="flex flex-col gap-1 pb-1">
 			{sends.map(({ send, text }) => (
-				<ScheduledRow key={send.id} send={send} text={text} now={now} onEdit={onEdit} />
+				<ScheduledRow key={send.id} send={send} text={text} now={now} editing={edit.pending} onEdit={() => edit.run(send.id, text)} />
 			))}
 		</ul>
 	);

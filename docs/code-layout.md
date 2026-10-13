@@ -196,7 +196,7 @@ The server lives in `src/`:
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
 - `src/shared/scheduled.ts`: the scheduled send shapes and `applyScheduled`; see [Scheduled sends](architecture.md#scheduled-sends).
   `src/server/scheduled-file.ts` keeps them in `scheduled.json`, and `src/server/scheduled-runner.ts` claims and delivers them.
-  `web/scheduled-model.ts` lists the times the **Send later** menu offers, and `web/components/scheduled.tsx` holds the menu, the rows above the composer, and the sidebar's group.
+  `web/scheduled-model.ts` lists the times the **Send later** menu offers, and `web/components/scheduled.tsx` holds the menu, the rows above the composer with `useScheduledEdit`, which restores a message to the composer once the server took it off the schedule, and the sidebar's group.
 - `src/shared/projects.ts`: the project shapes the page reads, `ProjectEdit`, and `workerPhase`; see [Projects](architecture.md#projects).
   `src/server/projects-file.ts` holds the server's rules, `ProjectChange` and `applyProject`, and keeps the projects in `projects.json`, `src/server/project-runner.ts` starts the coordinators and workers through `ProjectLaunch`, follows their sessions, and delivers the workers' updates, `src/server/project-tools.ts` holds the coordinator's host tools and the update message, and `src/server/project-notes.ts` seeds and lists a project's notes for `GET /api/project-notes`.
   `templates/omp/agent/extensions/projects.ts` is the omp extension that tells a project's session its role and keeps the coordinator's edits to the notes.

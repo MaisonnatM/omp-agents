@@ -288,7 +288,7 @@ function parseScheduledChange(value: unknown): Parsed<ScheduledChange> {
 		const send = parseScheduledSpec(value.send);
 		return send && { ok: { op, send: send.ok } };
 	}
-	return (op === "remove" || op === "send-now") && isNonEmpty(value.id) ? { ok: { op, id: value.id } } : null;
+	return (op === "remove" || op === "take" || op === "send-now") && isNonEmpty(value.id) ? { ok: { op, id: value.id } } : null;
 }
 
 /** Each socket message's parser, by its `t`. */

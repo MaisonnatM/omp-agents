@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ScheduledTarget } from "../shared/scheduled";
@@ -106,6 +106,17 @@ describe("ScheduledRunner", () => {
 		expect(fake.live.get("s1")).toEqual(["once"]);
 	});
 
+	test("a take refused while the send is under way leaves it to go once", async () => {
+		const { file, fake, runner, add } = harness();
+		fake.live.set("s1", []);
+		add("m", T0, message("s1", "already going"));
+		const sending = runner.sendNow("m");
+		expect(() => file.apply({ op: "take", id: "m" }, T0)).toThrow("It is already sending.");
+		await sending;
+		expect(fake.live.get("s1")).toEqual(["already going"]);
+		expect(file.sends).toEqual([]);
+	});
+
 	test("a send a stopped server left sending fails instead of going again", async () => {
 		const { file, fake, runner, add } = harness();
 		fake.live.set("s1", []);
@@ -141,5 +152,25 @@ describe("ScheduledFile", () => {
 		expect(file.apply({ op: "remove", id: "a" }, T0)).toBe(false);
 		expect(file.apply({ op: "remove", id: "b" }, T0)).toBe(true);
 		expect(file.sends.map(send => send.id)).toEqual(["a"]);
+	});
+
+	test("a take writes a waiting or failed send off at once, and refuses one under way or gone, which stays as it was", () => {
+		const path = scheduledPath();
+		const file = new ScheduledFile(path);
+		const onDisk = (): unknown => JSON.parse(readFileSync(path, "utf8"));
+		// Each send is named for the phase it ends up in.
+		const stored = (...ids: string[]) => ({ sends: ids.map(id => ({ id, state: { phase: id } })) });
+		for (const id of ["waiting", "failed", "sending"]) file.apply({ op: "add", send: { id, at: T0, reset: null, target: message("s1", id) } }, T0);
+		file.failed("failed", "Cannot resume the session: gone", T0);
+		file.claim("sending");
+		expect(file.apply({ op: "take", id: "waiting" }, T0)).toBe(true);
+		expect(onDisk()).toMatchObject(stored("failed", "sending"));
+
+		expect(() => file.apply({ op: "take", id: "sending" }, T0)).toThrow("It is already sending.");
+		expect(() => file.apply({ op: "take", id: "waiting" }, T0)).toThrow("It is no longer scheduled.");
+		expect(onDisk()).toMatchObject(stored("failed", "sending"));
+
+		expect(file.apply({ op: "take", id: "failed" }, T0)).toBe(true);
+		expect(onDisk()).toMatchObject(stored("sending"));
 	});
 });

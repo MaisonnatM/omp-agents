@@ -423,7 +423,8 @@ An action that fails shows its error, and its control becomes available again.
 - Scheduling saves the message on the server and clears the composer.
   The send goes whether or not a page is open, as long as the dashboard runs.
 - A message scheduled in a session shows above its composer, with its time, or the plan window and the time it resets.
-  **Send now** sends it at once, **Edit** puts it back in the composer and takes it off the schedule, and **Cancel** drops it.
+  **Send now** sends it at once, **Edit** takes it off the schedule and then puts it back in the composer, and **Cancel** drops it.
+  A message that is already sending stays as it is, and **Edit** says why instead.
 - When the time comes, the message goes to the session as a follow-up while a turn runs, else as a prompt.
   A session that is no longer live resumes first, as **Resume** would.
 - A scheduled new session starts as the draft's **Start session** would: in the same directory, on the same branch choice, model, thinking level, and skill, and linked to the draft's todo.
