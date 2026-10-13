@@ -342,7 +342,7 @@ Each shell keeps its last megabyte of output in `Scrollback`, which drops whole 
 - Binary frames carry the shell's bytes both ways.
   Text frames carry JSON control messages: the server sends `TerminalServerMsg`, `opened` with the `TerminalInfo` once and `exit` with the shell's code, then closes the socket; the page sends `TerminalClientMsg`, `resize` or `kill`, which `parseTerminalMsg` checks.
   The page shows **Starting shell…** until `opened` and a close spinner until the socket closes.
-  Closing the socket detaches without ending the shell.
+  Closing the socket detaches without ending the shell, so closing a tab, even one still starting, sends `kill`, which the page's `terminalSender` holds until the socket opens, and the tab stays until the socket closes.
 - `src/server.ts` serves both socket kinds from one `Bun.serve`, its data typed as the union of `SocketData` and `TerminalSocketData`, and `isTerminalSocket` routes each handler to `src/server/terminal-socket.ts` or the `Dashboard`'s session socket.
 
 ## Plan quota

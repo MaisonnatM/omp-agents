@@ -121,7 +121,7 @@ An action that fails shows its error, and its control becomes available again.
 - A shell keeps running while the panel is hidden and across a page reload: the reloaded page reopens a tab for each shell with its last megabyte of output.
   If the page cannot read which shells run, the panel says so with **Try again** and starts no shell, so a running shell is never left without its tab.
   It ends when you type `exit`, when the tab's × hangs up on it, or when the server stops; the last tab closing hides the panel.
-  The close button spins until the tab closes.
+  The close button spins until the tab closes, and closing a tab that still shows **Starting shell…** ends the shell the server opens for it.
   A tab whose server stopped reads **(disconnected)** until you close it.
 - Drag the panel's top edge, or focus it and press ↑ or ↓, to change its height; double-click the edge to reset it.
   Its height, and whether it shows, is saved in the browser's localStorage.

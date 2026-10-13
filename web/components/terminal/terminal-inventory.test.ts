@@ -23,7 +23,7 @@ test("only a successful empty read starts one new shell in the current directory
 		() => Promise.resolve([]),
 		() => "/home",
 	);
-	expect(tabs).toMatchObject({ state: "ready", tabs: [{ target: { cwd: "/home" }, terminal: null }] });
+	expect(tabs).toMatchObject({ state: "ready", tabs: [{ target: { cwd: "/home" }, state: { phase: "starting" } }] });
 });
 
 test("a read that lists shells reopens a tab for each and starts none", async () => {
@@ -31,5 +31,5 @@ test("a read that lists shells reopens a tab for each and starts none", async ()
 		() => Promise.resolve([running]),
 		() => "/home",
 	);
-	expect(tabs).toEqual({ state: "ready", tabs: [{ key: "t1", target: { id: "t1" }, terminal: running, lost: false, closing: false }] });
+	expect(tabs).toEqual({ state: "ready", tabs: [{ key: "t1", target: { id: "t1" }, state: { phase: "connected", terminal: running } }] });
 });

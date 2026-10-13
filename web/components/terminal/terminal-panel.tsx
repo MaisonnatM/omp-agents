@@ -9,7 +9,8 @@ import { getJson } from "../../api";
 import { folderName } from "../../labels";
 import { useStoredState } from "../../stored-state";
 import { Separator, useDragSeparator } from "../drag-separator";
-import { LOADING_TABS, newTab, readTerminalTabs, type Tab, type TerminalTabs } from "./terminal-inventory";
+import { LOADING_TABS, readTerminalTabs, type TerminalTabs } from "./terminal-inventory";
+import { closeEndsShell, newTab, nextTabState, type Tab, type TabEvent, tabTerminal } from "./terminal-tab";
 import { type TerminalHandle, TerminalView } from "./terminal-view";
 
 const OPEN_KEY = "omp-agents.terminal-open";
@@ -49,6 +50,7 @@ interface TerminalPanelProps {
  * The panel under the panes that holds the terminal tabs. It mounts the first time it opens and stays mounted while
  * hidden, as the shells keep running on the server; a reloaded page reopens a tab for each shell the server still runs.
  * When the server cannot list its shells, the panel says so and starts none, so a shell it could not list stays unduplicated.
+ * Closing a tab asks its shell to exit, a still-starting one's too, and keeps the tab mounted until its socket closes.
  */
 export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 	const { open, setOpen, height, setHeight } = panel;
@@ -91,19 +93,19 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		setInventory(LOADING_TABS);
 	}, [inventory, setOpen]);
 
-	const remove = (key: string): void => {
-		setTabs(current => {
-			const next = current.filter(tab => tab.key !== key);
-			setActive(shown => (shown === key ? (next.at(-1)?.key ?? null) : shown));
-			return next;
-		});
-	};
+	/** Moves the tab `key` through `event`, dropping it once it is gone. */
+	const dispatch = (key: string, event: TabEvent): void =>
+		setTabs(current =>
+			current.flatMap(tab => {
+				if (tab.key !== key) return [tab];
+				const state = nextTabState(tab.state, event);
+				return state ? [{ ...tab, state }] : [];
+			}),
+		);
 	const close = (tab: Tab): void => {
-		if (!tab.terminal || tab.lost) return remove(tab.key);
-		views.current.get(tab.key)?.kill();
-		update(tab.key, { closing: true });
+		if (closeEndsShell(tab.state)) views.current.get(tab.key)?.kill();
+		dispatch(tab.key, { t: "close" });
 	};
-	const update = (key: string, change: Partial<Tab>): void => setTabs(current => current.map(tab => (tab.key === key ? { ...tab, ...change } : tab)));
 
 	const section = useRef<HTMLElement>(null);
 	const room = (): number => (section.current?.parentElement?.clientHeight ?? window.innerHeight) - MIN_ABOVE;
@@ -124,32 +126,34 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 
 	if (inventory.state === "loading") return null;
 	const tabs = inventory.state === "ready" ? inventory.tabs : [];
-	const shown = tabs.find(tab => tab.key === active);
+	// A closed tab leaves `active` naming no tab, and the last tab shows instead.
+	const shown = tabs.find(tab => tab.key === active) ?? tabs.at(-1);
 	return (
 		<section ref={section} aria-label="Terminal" hidden={!open} style={{ height: clamp(height) }} className="relative flex shrink-0 flex-col border-t border-border bg-background">
 			<Separator {...events} axis="horizontal" label="Resize the terminal" min={MIN_HEIGHT} max={room()} now={height} className="top-0 left-0 h-3 w-full -translate-y-1/2 cursor-row-resize flex-col select-none" />
 			<div className="flex h-8 shrink-0 items-center gap-1 px-2">
 				<div role="tablist" aria-label="Terminals" className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
 					{tabs.map(tab => {
-						const dir = tab.terminal?.cwdDisplay ?? ("cwd" in tab.target ? tab.target.cwd : "");
+						const dir = tabTerminal(tab.state)?.cwdDisplay ?? ("cwd" in tab.target ? tab.target.cwd : "");
 						const name = folderName(dir) ?? dir;
-						const selected = tab.key === active;
+						const selected = tab === shown;
+						const closing = tab.state.phase === "closing";
 						return (
 							<div key={tab.key} className={cn("flex shrink-0 items-center rounded-md text-xs", selected ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60")}>
 								<button type="button" role="tab" aria-selected={selected} title={dir} onClick={() => setActive(tab.key)} className="max-w-48 truncate rounded-md py-1 pr-1 pl-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">
 									{name}
-									{tab.lost && " (disconnected)"}
+									{tab.state.phase === "disconnected" && " (disconnected)"}
 								</button>
-								<Tooltip content={tab.closing ? "Ending its shell…" : "Close the terminal, ending its shell"}>
+								<Tooltip content={closing ? "Ending its shell…" : "Close the terminal, ending its shell"}>
 									<button
 										type="button"
-										aria-label={tab.closing ? `Closing ${name}` : `Close ${name}`}
-										aria-busy={tab.closing || undefined}
-										disabled={tab.closing}
+										aria-label={closing ? `Closing ${name}` : `Close ${name}`}
+										aria-busy={closing || undefined}
+										disabled={closing}
 										onClick={() => close(tab)}
 										className="mr-1 rounded-sm p-0.5 opacity-60 outline-none hover:bg-foreground/10 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
 									>
-										{tab.closing ? <LoaderIcon aria-hidden className="size-3 animate-spin" /> : <X aria-hidden className="size-3" />}
+										{closing ? <LoaderIcon aria-hidden className="size-3 animate-spin" /> : <X aria-hidden className="size-3" />}
 									</button>
 								</Tooltip>
 							</div>
@@ -185,12 +189,12 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 						else views.current.delete(tab.key);
 					}}
 					target={tab.target}
-					active={open && tab.key === active}
-					onOpened={terminal => update(tab.key, { terminal })}
-					onClosed={exited => (exited || tab.closing ? remove(tab.key) : update(tab.key, { lost: true }))}
+					active={open && tab === shown}
+					onOpened={terminal => dispatch(tab.key, { t: "opened", terminal })}
+					onClosed={exited => dispatch(tab.key, { t: "closed", exited })}
 				/>
 			))}
-			{shown && shown.terminal === null && !shown.lost && (
+			{shown?.state.phase === "starting" && (
 				<p role="status" aria-busy className="pointer-events-none absolute inset-x-0 top-8 bg-background px-2 pt-1 font-mono text-xs text-muted-foreground">
 					Starting shell…
 				</p>
