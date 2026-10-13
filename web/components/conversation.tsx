@@ -261,7 +261,7 @@ function LiveConversation({
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} />
 			<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
-			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
+			<div className="relative mx-auto w-full max-w-3xl px-3 pb-3">
 				{requests[0] && (
 					<UserRequestCard
 						key={requests[0].id}
