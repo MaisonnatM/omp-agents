@@ -52,14 +52,16 @@ export const oldGoogleFile = join(configDir, "google.json");
 /** Names the server that runs routines and applies the todo inbox, which servers side by side share, beside {@link tokenFile}. */
 export const serverLockFile = join(configDir, "server.lock");
 
+/** `path` with a leading `~` or `~/` read as the home directory; any other path unchanged. */
+export const expandHome = (path: string): string => (path === "~" || path.startsWith("~/") ? join(HOME, path.slice(1)) : path);
+
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>
 	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;
 
 /** The directory `input` names (absolute, `~`-relative, or relative to the home directory), or `null` when it is not one; stats without blocking the event loop. */
 export async function directoryOf(input: string): Promise<string | null> {
-	const raw = input.trim();
-	const cwd = raw === "~" || raw.startsWith("~/") ? join(HOME, raw.slice(1)) : resolve(HOME, raw);
+	const cwd = resolve(HOME, expandHome(input.trim()));
 	const found = await stat(cwd).catch(() => null);
 	return found?.isDirectory() ? cwd : null;
 }

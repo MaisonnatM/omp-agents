@@ -2,7 +2,7 @@
 import { realpath, stat } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
 import { agentDir } from "./omp/config";
-import { HOME, tokenFile } from "./paths";
+import { expandHome, HOME, tokenFile } from "./paths";
 import { MAX_TEXT_FILE_BYTES, TEXT_FILE_EXTENSIONS, type TextFile } from "./shared/transcript";
 
 export type TextFileRead = { ok: true; file: TextFile } | { ok: false; status: 400 | 403 | 404 | 415; error: string };
@@ -33,12 +33,13 @@ async function within(dir: string, real: string): Promise<boolean> {
 }
 
 /**
- * The file that `path`, absolute or `~/`-relative, names. Its real path, past any symlink, must end in one of
+ * The file that `path`, absolute or `~`-relative, names. Its real path, past any symlink, must end in one of
  * `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot open a key or the access token, must lie outside `denied`
  * but for the extensions each allows, and its bytes must be UTF-8.
  */
 export async function readTextFile(path: string, denied: readonly DeniedDir[] = DENIED_DIRS): Promise<TextFileRead> {
-	const named = path.startsWith("~/") ? join(HOME, path.slice(2)) : isAbsolute(path) ? resolve(path) : null;
+	const home = expandHome(path);
+	const named = isAbsolute(home) ? resolve(home) : null;
 	if (named === null) return refuse(400, "Expected ?path= naming a file by an absolute or ~/ path");
 	const real = await realpath(named).catch(() => null);
 	const info = real === null ? null : await stat(real);

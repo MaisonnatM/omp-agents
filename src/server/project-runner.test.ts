@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RpcLaunch } from "../omp/rpc";
+import { HOME } from "../paths";
 import type { Project } from "../shared/projects";
 import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
 import { type ProjectLaunch, ProjectRunner } from "./project-runner";
@@ -159,7 +160,7 @@ describe("ProjectRunner", () => {
 		const h = harness();
 		const { projectId } = await project(h, 0);
 		expect(await startWorker(h, projectId, { title: "Copy", prompt: "Write copy.", cwd: "web" })).toStartWith('Started w1 "Copy" in /work/app/web.');
-		expect(await startWorker(h, projectId, { title: "Notes", prompt: "Read notes.", cwd: "~/notes" })).toStartWith('Started w2 "Notes" in ~/notes.');
+		expect(await startWorker(h, projectId, { title: "Notes", prompt: "Read notes.", cwd: "~/notes" })).toStartWith(`Started w2 "Notes" in ${HOME}/notes.`);
 		expect(await startWorker(h, projectId, { title: "Ops", prompt: "Check ops.", cwd: "/srv/ops" })).toStartWith('Started w3 "Ops" in /srv/ops.');
 		expect(h.file.get(projectId)?.workers.map(({ id, title }) => `${id} ${title}`)).toEqual(["w1 Copy", "w2 Notes", "w3 Ops"]);
 	});
