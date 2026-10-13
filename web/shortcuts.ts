@@ -68,6 +68,7 @@ export type ShortcutId =
 	| "moveUp"
 	| "moveDown"
 	| "terminal"
+	| "answer"
 	| TabShortcut;
 
 /**
@@ -194,6 +195,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
+	{
+		id: "answer",
+		category: "sessions",
+		label: "Answer the focused session's question with the option of that number",
+		keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key): Binding => ({ chord: { key }, scope: "outside-fields" })),
+	},
 	// No one reads these rows' labels, by design: the dialog lists each position key on the tab it goes to, and the palette lists no command for them.
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
@@ -272,6 +279,8 @@ export const modHeld = (event: { metaKey: boolean; ctrlKey: boolean }): boolean 
 export interface Match {
 	id: ShortcutId;
 	scope: Scope;
+	/** Which of the shortcut's keys was pressed: its place in the shortcut's `keys`. */
+	key: number;
 }
 
 /** Whether `event` presses `chord`. `mac` reads ⌘ as `mod` instead of Ctrl. */
@@ -296,7 +305,7 @@ export function shortcutsFor(event: KeyEvent, previous: string | null = null, ma
 	const presses = (binding: Binding): boolean =>
 		"goTo" in binding ? previous === GO && keyOf(event) === binding.goTo && plain(event) : pressesChord(event, binding.chord, mac);
 	return SHORTCUTS.flatMap(({ id, keys }) =>
-		keys.filter(presses).map((binding): Match => ({ id, scope: scopeOf(binding) })),
+		keys.flatMap((binding, key): Match[] => (presses(binding) ? [{ id, scope: scopeOf(binding), key }] : [])),
 	);
 }
 
@@ -345,8 +354,11 @@ export const shortcutKeys = (id: ShortcutId): string => EITHER.format(shortcutLa
 const typing = (target: EventTarget | null): boolean =>
 	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
-/** What one shortcut does. Returning `false` means the action does not apply now, so the key keeps its usual meaning. */
-export type ShortcutHandler = () => boolean | void;
+/**
+ * What one shortcut does, given which of its keys was pressed, its place in the shortcut's `keys`. Returning `false`
+ * means the action does not apply now, so the key keeps its usual meaning.
+ */
+export type ShortcutHandler = (key: number) => boolean | void;
 
 /** What to do for each shortcut. */
 export type ShortcutHandlers = Partial<Record<ShortcutId, ShortcutHandler>>;
@@ -356,9 +368,9 @@ type HandledEvent = KeyEvent & Pick<KeyboardEvent, "defaultPrevented" | "prevent
 /** Runs the first handler in scope that takes the key. A key something nearer already handled is left alone. */
 function dispatch(event: HandledEvent, handlers: ShortcutHandlers, inScope: (scope: Scope) => boolean, previous: string | null): void {
 	if (event.defaultPrevented) return;
-	for (const { id, scope } of shortcutsFor(event, previous)) {
+	for (const { id, scope, key } of shortcutsFor(event, previous)) {
 		const handler = handlers[id];
-		if (handler && inScope(scope) && handler() !== false) {
+		if (handler && inScope(scope) && handler(key) !== false) {
 			event.preventDefault();
 			return;
 		}

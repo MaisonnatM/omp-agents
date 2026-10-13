@@ -58,9 +58,9 @@ test("Cmd+1–7 go to the sidebar's tabs by position on macOS, Ctrl+1–7 elsewh
 		for (const [index, id] of positions.entries()) {
 			const key = String(index + 1);
 			const code = `Digit${key}`;
-			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([{ id, scope: "anywhere" }]);
+			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([{ id, scope: "anywhere", key: 0 }]);
 			expect(pressOn(mac, azerty[index]!, code, mod)).toEqual([id]);
-			expect(pressOn(mac, key, code)).toEqual([]);
+			expect(pressOn(mac, key, code)).toEqual(["answer"]);
 			expect(pressOn(mac, key, code, { ...mod, shift: true })).toEqual([]);
 			expect(pressOn(mac, key, code, { ...mod, alt: true })).toEqual([]);
 			expect(pressOn(mac, key, code, { meta: true, ctrl: true })).toEqual([]);
@@ -93,16 +93,17 @@ test("Cmd+Enter steers now, Enter queues when running, and Cmd+Shift+Backspace s
 
 test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help", () => {
 	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([
-		{ id: "restore", scope: "anywhere" },
-		{ id: "todoClose", scope: "outside-fields" },
-		{ id: "inboxClose", scope: "outside-fields" },
+		{ id: "restore", scope: "anywhere", key: 0 },
+		{ id: "todoClose", scope: "outside-fields", key: 0 },
+		{ id: "inboxClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
-	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere" }]);
+	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere", key: 0 }]);
 	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([
-		{ id: "focusComposer", scope: "outside-fields" },
-		{ id: "todoSearch", scope: "outside-fields" },
+		{ id: "focusComposer", scope: "outside-fields", key: 0 },
+		{ id: "todoSearch", scope: "outside-fields", key: 0 },
 	]);
+	expect(shortcutsFor(keyEvent("i", "KeyI", { ctrl: true }), null, false)).toEqual([{ id: "focusComposer", scope: "anywhere", key: 1 }]);
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
 });
 
@@ -135,7 +136,28 @@ test("G then R, P, W, or I goes to a page only right after a plain G, and P alon
 	expect(after("g", "p")).toEqual(["projects", "todoPriority"]);
 	expect(after(null, "p")).toEqual(["todoPriority"]);
 	expect(after("g", "i", { ctrl: true })).toEqual(["focusComposer"]);
-	expect(shortcutsFor(keyEvent("w", "KeyW"), "g", false)).toEqual([{ id: "workspace", scope: "outside-fields" }]);
+	expect(shortcutsFor(keyEvent("w", "KeyW"), "g", false)).toEqual([{ id: "workspace", scope: "outside-fields", key: 0 }]);
+});
+
+test("1 to 9 outside text fields answer the open question, and its handler learns which key was pressed", () => {
+	for (const mac of [false, true]) {
+		for (let digit = 1; digit <= 9; digit++) {
+			const key = String(digit);
+			expect(shortcutsFor(keyEvent(key, `Digit${key}`), null, mac)).toEqual([{ id: "answer", scope: "outside-fields", key: digit - 1 }]);
+			expect(pressOn(mac, key, `Digit${key}`, { shift: true })).toEqual([]);
+			expect(pressOn(mac, key, `Digit${key}`, { alt: true })).toEqual([]);
+		}
+		expect(pressOn(mac, "0", "Digit0")).toEqual([]);
+	}
+	const stack = createShortcutStack();
+	const picked: number[] = [];
+	stack.add(1, () => ({ answer: key => (key < 2 ? void picked.push(key) : false) }));
+	stack.dispatch(pressed("2", "Digit2"), true, null);
+	stack.dispatch(pressed("2", "Digit2"), false, null);
+	const declined = pressed("3", "Digit3");
+	stack.dispatch(declined, true, null);
+	expect(picked).toEqual([1]);
+	expect(declined.defaultPrevented).toBe(false);
 });
 
 test("G then P picks the priority while a todo is focused or open, and opens Projects otherwise, the Todo page included", () => {

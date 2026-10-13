@@ -1,6 +1,6 @@
 /** `QuestionCard`, a card that asks one question: rows to pick from or a text field to answer. */
 import { motion } from "framer-motion";
-import { type HTMLAttributes, type ReactNode, useEffect, useEffectEvent, useId, useRef, useState } from "react";
+import { type HTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
@@ -21,8 +21,8 @@ export type QuestionAnswer = { kind: "option"; index: number } | { kind: "text";
 
 interface QuestionCardProps extends HTMLAttributes<HTMLDivElement> {
 	question: Question;
-	/** The rows shown checked. Omitted, the card checks the row it picks. */
-	checked?: readonly number[];
+	/** The rows shown checked. */
+	checked: readonly number[];
 	/** The text field's starting text. */
 	defaultText?: string;
 	/** The line above the title. */
@@ -30,42 +30,20 @@ interface QuestionCardProps extends HTMLAttributes<HTMLDivElement> {
 	onAnswer: (answer: QuestionAnswer) => void;
 }
 
-/**
- * The cards on the page, oldest first. Only one card answers a digit: the one holding focus, else the latest mounted,
- * among those inside the focused element when it holds some.
- */
-const mountedCards: HTMLElement[] = [];
-
-function answersDigit(card: HTMLElement, target: HTMLElement): boolean {
-	if (card.contains(target)) return true;
-	if (mountedCards.some(other => other !== card && other.contains(target))) return false;
-	const wrapped = mountedCards.filter(other => target.contains(other));
-	const pool = wrapped.length > 0 ? wrapped : mountedCards;
-	return pool[pool.length - 1] === card;
-}
-
 /** The keys that send a text answer: ⌘↵ on macOS, ⌃↵ elsewhere. */
 const SUBMIT_CHORD = `${IS_MAC ? "⌘" : "⌃"}↵`;
 
 /**
- * One question, asked in Fluid's look. Option rows answer on a click, on Enter or Space, or on their number key, which
- * works from anywhere on the page outside a text field. A text question focuses its field on mount and sends with the
- * submit button, with ⌘↵ or ⌃↵, or with Enter when it is single-line.
+ * One question, asked in Fluid's look. Option rows answer on a click, or on Enter or Space; number keys are the
+ * owner's to bind. A text question focuses its field on mount and sends with the submit button, with ⌘↵ or ⌃↵, or with
+ * Enter when it is single-line.
  */
 export function QuestionCard({ question, checked, defaultText = "", header, onAnswer, className, onKeyDown, ...rest }: QuestionCardProps) {
 	const shape = useShape();
 	const size = useSize();
 	const compact = size.variant === "compact";
 	const titleId = useId();
-	const rootRef = useRef<HTMLDivElement>(null);
-	const [picked, setPicked] = useState<number | null>(null);
 	const [text, setText] = useState(defaultText);
-	const optionCount = question.kind === "options" ? question.options.length : 0;
-
-	const pick = (index: number): void => {
-		if (!checked) setPicked(index);
-		onAnswer({ kind: "option", index });
-	};
 
 	const submit = (): void => {
 		const trimmed = text.trim();
@@ -73,36 +51,6 @@ export function QuestionCard({ question, checked, defaultText = "", header, onAn
 		setText(trimmed);
 		onAnswer({ kind: "text", text: trimmed });
 	};
-
-	useEffect(() => {
-		const card = rootRef.current;
-		if (!card) return;
-		mountedCards.push(card);
-		return () => {
-			const at = mountedCards.indexOf(card);
-			if (at !== -1) mountedCards.splice(at, 1);
-		};
-	}, []);
-
-	const onDigit = useEffectEvent((event: KeyboardEvent): void => {
-		if (event.metaKey || event.ctrlKey || event.altKey) return;
-		const target = event.target as HTMLElement | null;
-		const card = rootRef.current;
-		if (!target || !card) return;
-		if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-		if (!answersDigit(card, target)) return;
-		if (event.key < "1" || event.key > "9") return;
-		const index = Number(event.key) - 1;
-		if (index >= optionCount) return;
-		event.preventDefault();
-		pick(index);
-	});
-	useEffect(() => {
-		if (optionCount === 0) return;
-		const listener = (event: KeyboardEvent): void => onDigit(event);
-		document.addEventListener("keydown", listener);
-		return () => document.removeEventListener("keydown", listener);
-	}, [optionCount]);
 
 	// The card's height springs to its content's, so the border follows a text field that grows a line.
 	const contentRef = useRef<HTMLDivElement>(null);
@@ -121,7 +69,6 @@ export function QuestionCard({ question, checked, defaultText = "", header, onAn
 
 	return (
 		<div
-			ref={rootRef}
 			className={cn("relative w-full max-w-[520px] overflow-hidden bg-card border border-border", shape.container, className)}
 			{...rest}
 			onKeyDown={event => {
@@ -153,9 +100,9 @@ export function QuestionCard({ question, checked, defaultText = "", header, onAn
 							<QuestionOptions
 								options={question.options}
 								layout={question.layout}
-								selected={checked ?? (picked === null ? [] : [picked])}
+								selected={checked}
 								labelledBy={titleId}
-								onPick={pick}
+								onPick={index => onAnswer({ kind: "option", index })}
 							/>
 						) : (
 							<TextAnswer

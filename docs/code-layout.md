@@ -304,6 +304,7 @@ The page lives in `web/`.
   The checkout, the default model, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
   One `keydown` listener on the window serves every `useShortcuts` registration, which `createShortcutStack` orders: the registration that mounted last tries a key first, and the first handler that takes it ends the press, so a page's own bindings come before `web/use-page-shortcuts.ts`'s, which `web/app.tsx` mounts first, and a handler that returns `false` lets the key fall to the one below.
+  A handler gets which of its shortcut's keys was pressed, so the focused pane's `UserRequestCard` binds the one `answer` shortcut, 1 to 9, to its question's options.
   Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it registers.
 - `web/command-palette.ts`: the command palette's model, which renders nothing: its items and their actions, the reducer over its stack of views and its action panel, and the ranking, which multiplies cmdk's match score by a frecency boost kept in localStorage.
   `SECTIONS` there says how each section lists: always, only for a search or under Suggestions with every word required, as the todos, tickets, and pull requests do, in the server's order after those, as the conversation matches do, or after every match, as what the search becomes; `web/palette-records.ts` builds the records' and the matches' items, each opening the page that shows it, a todo through the `?open=` of its list's hash.
@@ -357,7 +358,7 @@ The page lives in `web/`.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` a session header's trail and pull request menu.
   `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses.
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeEditor` and `afterActions` slots.
-  `user-request.tsx` shows the open question above the composer through `question-card.tsx`.
+  `user-request.tsx` shows the open question above the composer through `question-card.tsx`, and binds its number keys while its pane is focused; the card itself handles only its own clicks and keys.
   `prompt-attachments.tsx` holds the composer's attached files, which the new-session draft shares: it reads each as an image, as text, or as a document omp converts, and sends a prompt's text files after its text and its images apart.
 - `web/components/dashboard-context.tsx`: two contexts that `App` provides and the sidebar, the panes, and the pages read instead of taking props: the actions (`send`, `open`, `start`, `end`, …), which keep one identity for the page's life, and the status, which holds the connection, the last start of each kind, and `pullRequestsScope`; a component that reads only the actions never renders for a change of the status.
   `MentionListsContext` carries the lists of the composer's `@` menu apart from both.

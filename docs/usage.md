@@ -441,6 +441,7 @@ An action that fails shows its error, and its control becomes available again.
 
 - A question that a session asks appears above the composer: a step of omp's `ask` tool, or a dialog from an extension (a select, a yes or no confirm, a one-line input, or a text editor).
   Click an option or press its number to answer.
+  A number key outside a text field answers the focused pane's question only, so with split panes it never reaches another pane's question.
   Type into a text field and press Enter (Cmd+Enter or Ctrl+Enter in a multi-line field), or click **Send**.
   **Dismiss** or Esc cancels the question, which omp treats like Esc in its terminal.
   The session continues its turn with your answer.

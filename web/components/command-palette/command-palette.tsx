@@ -227,7 +227,8 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 					icon: COMMAND_ICON[id] ?? Command,
 					accessories: [{ kind: "keys", labels: tabShortcutLabels(id, tabs) }],
 					kind: "Command",
-					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => void handlers[id]?.() } }]],
+					// A command runs as its shortcut's first key does.
+					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => void handlers[id]?.(0) } }]],
 				}),
 			),
 			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),

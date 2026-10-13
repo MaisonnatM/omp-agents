@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UserAnswer, UserRequest } from "../../src/shared/sessions";
 import { errorText } from "../api";
+import { useShortcuts } from "../shortcuts";
 import { toasts } from "./toaster";
 
 const CONFIRM_ROWS = [{ title: "Yes" }, { title: "No" }];
@@ -62,6 +63,8 @@ interface UserRequestCardProps {
 	queued: number;
 	/** Sends the answer; a rejection lets the card take another, and shows why. */
 	onAnswer: (answer: UserAnswer) => Promise<void>;
+	/** Whether 1 to 9 pick this card's options: only in the focused pane, so a key never answers another pane's question. */
+	shortcuts: boolean;
 }
 
 /**
@@ -69,9 +72,10 @@ interface UserRequestCardProps {
  * omp sends each step of an `ask` as a new request, and a multi-select pick comes back as a fresh copy
  * with the row checked.
  */
-export function UserRequestCard({ request, queued, onAnswer }: UserRequestCardProps) {
+export function UserRequestCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps) {
 	// The roster drops an answered request a moment later; until then the card ignores more input.
 	const [sent, setSent] = useState(false);
+	const [picked, setPicked] = useState<number | null>(null);
 	const question = questionOf(request);
 	const reply = (answer: UserAnswer): void => {
 		if (sent) return;
@@ -81,6 +85,21 @@ export function UserRequestCard({ request, queued, onAnswer }: UserRequestCardPr
 			toasts.add({ title: "Could not answer", description: errorText(error) });
 		});
 	};
+	const choose = (choice: QuestionAnswer): void => {
+		if (choice.kind === "option") setPicked(choice.index);
+		const answer = answerOf(request, choice);
+		if (answer) reply(answer);
+	};
+	useShortcuts(
+		shortcuts
+			? {
+					answer: key => {
+						if (question.kind !== "options" || key >= question.options.length) return false;
+						choose({ kind: "option", index: key });
+					},
+				}
+			: {},
+	);
 
 	const status = [
 		request.deadline === null ? "Waiting for your answer" : `Answer by ${new Date(request.deadline).toLocaleTimeString()}`,
@@ -92,12 +111,10 @@ export function UserRequestCard({ request, queued, onAnswer }: UserRequestCardPr
 	return (
 		<QuestionCard
 			question={question}
-			checked={request.kind === "select" ? request.checked : undefined}
+			// A select's checked rows come from omp; any other request shows the row picked here.
+			checked={request.kind === "select" ? request.checked : picked === null ? [] : [picked]}
 			defaultText={request.kind === "text" ? request.prefill : undefined}
-			onAnswer={picked => {
-				const answer = answerOf(request, picked);
-				if (answer) reply(answer);
-			}}
+			onAnswer={choose}
 			onKeyDown={event => {
 				if (event.key !== "Escape") return;
 				event.preventDefault();
