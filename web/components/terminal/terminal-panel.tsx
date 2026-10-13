@@ -9,6 +9,7 @@ import { getJson } from "../../api";
 import { folderName } from "../../labels";
 import { useStoredState } from "../../stored-state";
 import { Separator, useDragSeparator } from "../drag-separator";
+import { LOADING_TABS, newTab, readTerminalTabs, type Tab, type TerminalTabs } from "./terminal-inventory";
 import { type TerminalHandle, TerminalView } from "./terminal-view";
 
 const OPEN_KEY = "omp-agents.terminal-open";
@@ -38,18 +39,6 @@ export function useTerminalPanel(): TerminalPanelState {
 	return { open, setOpen, toggle, height, setHeight };
 }
 
-interface Tab {
-	key: string;
-	target: { id: string } | { cwd: string };
-	/** The shell, once the server opened or found it. */
-	terminal: TerminalInfo | null;
-	/** The server hung up on the tab without its shell exiting, so only closing the tab is left. */
-	lost: boolean;
-	closing: boolean;
-}
-
-const newTab = (cwd: string): Tab => ({ key: crypto.randomUUID(), target: { cwd }, terminal: null, lost: false, closing: false });
-
 interface TerminalPanelProps {
 	panel: TerminalPanelState;
 	/** Where a new tab's shell starts: the focused session's worktree, else the sidebar's workspace, else `~`. */
@@ -59,47 +48,52 @@ interface TerminalPanelProps {
 /**
  * The panel under the panes that holds the terminal tabs. It mounts the first time it opens and stays mounted while
  * hidden, as the shells keep running on the server; a reloaded page reopens a tab for each shell the server still runs.
+ * When the server cannot list its shells, the panel says so and starts none, so a shell it could not list stays unduplicated.
  */
 export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 	const { open, setOpen, height, setHeight } = panel;
-	const [tabs, setTabs] = useState<Tab[] | null>(null);
+	const [inventory, setInventory] = useState<TerminalTabs>(LOADING_TABS);
 	const [active, setActive] = useState<string | null>(null);
 	const views = useRef(new Map<string, TerminalHandle>());
 	const latestCwd = useRef(cwd);
 	latestCwd.current = cwd;
 
-	const add = useCallback(() => {
-		const tab = newTab(latestCwd.current);
-		setTabs(current => [...(current ?? []), tab]);
-		setActive(tab.key);
+	const setTabs = useCallback((change: (tabs: Tab[]) => Tab[]): void => {
+		setInventory(current => (current.state === "ready" ? { state: "ready", tabs: change(current.tabs) } : current));
 	}, []);
 
+	const add = useCallback(() => {
+		const tab = newTab(latestCwd.current);
+		setTabs(current => [...current, tab]);
+		setActive(tab.key);
+	}, [setTabs]);
+
 	useEffect(() => {
-		if (!open || tabs !== null) return;
+		if (!open || inventory.state !== "loading") return;
 		let cancelled = false;
-		getJson<TerminalInfo[]>("/api/terminals")
-			.catch((): TerminalInfo[] => [])
-			.then(running => {
-				if (cancelled) return;
-				const restored = running.length ? running.map((terminal): Tab => ({ key: terminal.id, target: { id: terminal.id }, terminal, lost: false, closing: false })) : [newTab(latestCwd.current)];
-				setTabs(restored);
-				setActive(restored.at(-1)!.key);
-			});
+		void readTerminalTabs(
+			() => getJson<TerminalInfo[]>("/api/terminals"),
+			() => latestCwd.current,
+		).then(read => {
+			if (cancelled) return;
+			setInventory(read);
+			if (read.state === "ready") setActive(read.tabs.at(-1)!.key);
+		});
 		return () => {
 			cancelled = true;
 		};
-	}, [open, tabs]);
+	}, [open, inventory.state]);
 
 	// The last tab closing hides the panel, and the next open starts a fresh shell.
 	useEffect(() => {
-		if (tabs?.length !== 0) return;
+		if (inventory.state !== "ready" || inventory.tabs.length !== 0) return;
 		setOpen(false);
-		setTabs(null);
-	}, [tabs, setOpen]);
+		setInventory(LOADING_TABS);
+	}, [inventory, setOpen]);
 
 	const remove = (key: string): void => {
 		setTabs(current => {
-			const next = (current ?? []).filter(tab => tab.key !== key);
+			const next = current.filter(tab => tab.key !== key);
 			setActive(shown => (shown === key ? (next.at(-1)?.key ?? null) : shown));
 			return next;
 		});
@@ -109,7 +103,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		views.current.get(tab.key)?.kill();
 		update(tab.key, { closing: true });
 	};
-	const update = (key: string, change: Partial<Tab>): void => setTabs(current => current?.map(tab => (tab.key === key ? { ...tab, ...change } : tab)) ?? null);
+	const update = (key: string, change: Partial<Tab>): void => setTabs(current => current.map(tab => (tab.key === key ? { ...tab, ...change } : tab)));
 
 	const section = useRef<HTMLElement>(null);
 	const room = (): number => (section.current?.parentElement?.clientHeight ?? window.innerHeight) - MIN_ABOVE;
@@ -128,7 +122,8 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		read: (event, start) => clamp(start.value - (event.clientY - start.coordinate)),
 	});
 
-	if (tabs === null) return null;
+	if (inventory.state === "loading") return null;
+	const tabs = inventory.state === "ready" ? inventory.tabs : [];
 	const shown = tabs.find(tab => tab.key === active);
 	return (
 		<section ref={section} aria-label="Terminal" hidden={!open} style={{ height: clamp(height) }} className="relative flex shrink-0 flex-col border-t border-border bg-background">
@@ -161,17 +156,27 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 						);
 					})}
 				</div>
-				<Tooltip content="New terminal">
-					<Button variant="ghost" size="icon-compact" aria-label="New terminal" onClick={add}>
-						<Plus />
-					</Button>
-				</Tooltip>
+				{inventory.state === "ready" && (
+					<Tooltip content="New terminal">
+						<Button variant="ghost" size="icon-compact" aria-label="New terminal" onClick={add}>
+							<Plus />
+						</Button>
+					</Tooltip>
+				)}
 				<Tooltip content="Hide the terminal">
 					<Button variant="ghost" size="icon-compact" aria-label="Hide the terminal" className="ml-auto" onClick={() => setOpen(false)}>
 						<ChevronDown />
 					</Button>
 				</Tooltip>
 			</div>
+			{inventory.state === "failed" && (
+				<div role="alert" className="flex items-center gap-2 px-2 pt-1 text-xs text-red-600 dark:text-red-400">
+					<span className="min-w-0 truncate">Cannot read the running shells: {inventory.error}</span>
+					<Button variant="secondary" size="compact" onClick={() => setInventory(LOADING_TABS)}>
+						Try again
+					</Button>
+				</div>
+			)}
 			{tabs.map(tab => (
 				<TerminalView
 					key={tab.key}
