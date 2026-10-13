@@ -132,6 +132,15 @@ describe("worktree removal", () => {
 		expect(existsSync(join(path, "later.txt"))).toBe(true);
 	});
 
+	test("marks a directory that is not a registered worktree as unregistered, and any other failure as unreadable", async () => {
+		const { parent, main } = await repo();
+		const repository = await common(main);
+		const outside = join(parent, "outside");
+		mkdirSync(outside);
+		expect((await quiet.preview({ repository, path: outside })).blockers.map(blocker => blocker.code)).toEqual(["unregistered"]);
+		expect((await quiet.preview({ repository: outside, path: outside })).blockers.map(blocker => blocker.code)).toEqual(["unreadable"]);
+	});
+
 	test("forgets a missing registration and warns when its detached commit is otherwise unreachable", async () => {
 		const { parent, main } = await repo();
 		const gone = await linked(parent, main, "gone");
