@@ -13,6 +13,7 @@ import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcLaunch, type RpcSt
 import { endsMidTurn } from "./omp/sessions";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
+import { PromptTurn } from "./prompt-turn";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { isUserPrompt, type StartingPrompt, splitSuggestions } from "./transcript";
 import { TurnGate } from "./turn-gate";
@@ -103,15 +104,7 @@ export class DashboardSession implements LiveSession {
 	context: ContextUsage | null = null;
 	/** omp's own queues, from `get_state` and then each `queue_update`. */
 	queue: MessageQueue;
-	/** Whether a turn runs, from its `agent_start` to its terminal `agent_end`. */
-	#running = false;
-	#starting: StartingPrompt | null = null;
-	/** The `agent_start`s seen, so a prompt whose turn started before its ack came back is not held as starting. */
-	#turnStarts = 0;
-	/** The live user messages seen, so Stop can tell whether the starting prompt's turn showed it. */
-	#promptsShown = 0;
-	/** The ids of the `prompt_result`s that came while a main-agent prompt waited for its ack: its own may come first. */
-	#resultsBeforeAck: Set<string> | null = null;
+	readonly #prompt = new PromptTurn();
 	readonly #child: RpcChild;
 	readonly #requests: PendingRequests;
 	#agents = new Map<string, RpcAgent>();
@@ -153,14 +146,13 @@ export class DashboardSession implements LiveSession {
 		client.onSessionEvent(event => this.#onEvent(event));
 		client.onPromptResult(({ id }) => {
 			if (id === undefined) return;
-			this.#resultsBeforeAck?.add(id);
-			if (id === this.#starting?.id) this.#clearStarting();
+			this.#change(() => this.#prompt.result(id));
 		});
 		client.onSubagentLifecycle(payload => this.#onSubagent(SUBAGENT_LIFECYCLE, payload));
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
 		void child.exited.then(() => {
 			this.#exited = true;
-			this.#clearStarting();
+			this.#change(() => this.#prompt.release());
 			requests.clear();
 			emit({ kind: "exited", ended: this.#ended });
 		});
@@ -297,7 +289,7 @@ export class DashboardSession implements LiveSession {
 	/** `working` from the ack of a prompt sent while idle, through its turn; `needs-input` over that while a question waits. */
 	get status(): HostStatus {
 		if (this.#requests.list().length > 0) return "needs-input";
-		return this.#running || this.#starting ? "working" : "idle";
+		return this.#prompt.busy ? "working" : "idle";
 	}
 
 	/**
@@ -305,7 +297,7 @@ export class DashboardSession implements LiveSession {
 	 * its `prompt_result` comes, or a stop, a switch to another file, or the exit ends it.
 	 */
 	get starting(): StartingPrompt | null {
-		return this.#starting;
+		return this.#prompt.starting;
 	}
 
 	requests(): UserRequest[] {
@@ -375,15 +367,11 @@ export class DashboardSession implements LiveSession {
 	 */
 	async #promptMain(text: string, images: PromptImage[], delivery?: Delivery): Promise<void> {
 		this.#userCommand = text.startsWith("/");
-		const idle = !this.#running && !this.#starting;
-		const starts = this.#turnStarts;
-		const settled = (this.#resultsBeforeAck = new Set<string>());
+		const pending = this.#prompt.send();
 		const content = images.map(image => ({ type: "image" as const, ...image }));
-		const id = await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).finally(() => {
-			this.#resultsBeforeAck = null;
-		});
+		const id = await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).finally(() => pending.close());
 		const local = text.startsWith("/") && !text.startsWith("/skill:");
-		if (id && idle && !local && this.#turnStarts === starts && !settled.has(id)) this.#setTurn(false, { id, text, images });
+		this.#change(() => pending.acked(id && !local ? { id, text, images } : null));
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -430,13 +418,11 @@ export class DashboardSession implements LiveSession {
 	async interrupt(): Promise<WithdrawnMessage[]> {
 		return this.#turn.run(async () => {
 			try {
-				const starting = this.#starting;
-				const shown = this.#promptsShown;
+				const mark = this.#prompt.interrupt();
 				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
-				this.#clearStarting();
+				this.#change(() => this.#prompt.release());
 				// omp's restore leaves out a prompt it admitted but never ran, so the composer gets it back from here.
-				const unsent = starting && this.#promptsShown === shown ? [starting] : [];
-				return [...unsent, ...steering, ...followUp].map(({ text, images = [] }) => ({ text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) }));
+				return [...mark.unsent(), ...steering, ...followUp].map(({ text, images = [] }) => ({ text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) }));
 			} catch (err) {
 				this.#fail("Stop failed", err);
 				throw err;
@@ -463,9 +449,9 @@ export class DashboardSession implements LiveSession {
 		await this.#turn
 			.run(async () => {
 				if (text.startsWith("!")) throw new Error("an edited prompt cannot be a ! command");
-				if (this.#running || this.#starting) {
+				if (this.#prompt.busy) {
 					await client.abort();
-					this.#clearStarting();
+					this.#change(() => this.#prompt.release());
 				}
 				if ((await client.branch(entryId)).cancelled) throw new Error("an omp extension cancelled the branch");
 				const state = await client.getState();
@@ -560,15 +546,13 @@ export class DashboardSession implements LiveSession {
 		this.#emit({ kind: "event", event });
 		if (!isObject(event)) return;
 		if ((event.type === "message_start" || event.type === "message_end") && isObject(event.message) && isUserPrompt(event.message)) {
-			this.#promptsShown++;
-			this.#clearStarting();
+			this.#change(() => this.#prompt.shown());
 		}
 		if (event.type === "agent_start") {
-			this.#turnStarts++;
-			this.#setTurn(true, this.#starting);
+			this.#change(() => this.#prompt.turnStarted());
 		} else if (event.type === "agent_end" && event.isTerminal !== false) {
 			// A non-terminal end hands over to a queued follow-up.
-			this.#setTurn(false, this.#starting);
+			this.#change(() => this.#prompt.turnEnded());
 			this.#refresh();
 			this.#emit({ kind: "turn-ended", reply: lastReply(event.messages) });
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
@@ -611,7 +595,7 @@ export class DashboardSession implements LiveSession {
 			const moved = await this.#follow(state);
 			this.#applyState(state);
 			this.thinkingLevels = levels;
-			if (moved) this.#clearStarting();
+			if (moved) this.#change(() => this.#prompt.release());
 			this.#emit({ kind: moved ? "switched" : "roster" });
 		} catch (err) {
 			if (failure) this.#fail(failure, err);
@@ -635,17 +619,13 @@ export class DashboardSession implements LiveSession {
 		return true;
 	}
 
-	#setTurn(running: boolean, starting: StartingPrompt | null): void {
+	/** Runs a {@link PromptTurn} transition, then tells the page what it changed. */
+	#change(transition: () => void): void {
 		const status = this.status;
-		const changed = starting !== this.#starting;
-		this.#running = running;
-		this.#starting = starting;
-		if (changed) this.#emit({ kind: "starting" });
+		const starting = this.#prompt.starting;
+		transition();
+		if (this.#prompt.starting !== starting) this.#emit({ kind: "starting" });
 		if (this.status !== status) this.#emit({ kind: "roster" });
-	}
-
-	#clearStarting(): void {
-		this.#setTurn(this.#running, null);
 	}
 
 	#onSubagent(channel: string, payload: unknown): void {

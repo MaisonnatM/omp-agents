@@ -101,6 +101,7 @@ The server lives in `src/`:
 - `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `calendars.json`, `events.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits.
   `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
+  `src/prompt-turn.ts` holds its `PromptTurn`: whether the main agent's turn runs and which prompt omp admitted while idle has not shown yet, with one method per event that moves them.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
 - `src/turn-gate.ts`: `TurnGate`, which both transports use to run a session's prompts, aborts, and flushes in the order the page sent them.
