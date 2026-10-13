@@ -202,19 +202,6 @@
     background-position: 100% 0;
     }
   }
-  @keyframes spinner-move {
-  to {
-    stroke-dashoffset: -100;
-    }
-  }
-  @keyframes spinner-dash {
-  0%, 100% {
-    stroke-dasharray: 15 85;
-    }
-  50% {
-    stroke-dasharray: 40 60;
-    }
-  }
   @keyframes sf-reveal-start {
   from {
     --sf-start: 1;
@@ -246,6 +233,21 @@
   to {
     opacity: 0;
     }
+  }
+}
+
+/* Outside @theme: Tailwind keeps a theme keyframe only when an --animate-* token names it, and the Button spinner names these in an inline style. */
+@keyframes spinner-move {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes spinner-dash {
+  0%, 100% {
+    stroke-dasharray: 15 85;
+  }
+  50% {
+    stroke-dasharray: 40 60;
   }
 }
 
