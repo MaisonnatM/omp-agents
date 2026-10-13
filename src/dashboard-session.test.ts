@@ -540,6 +540,20 @@ describe("DashboardSession action failures", () => {
 		await expect(cancelling).rejects.toThrow("cancel unavailable");
 		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual(["Cancel failed: cancel unavailable"]);
 	});
+
+	test("a message a subagent refuses shows a note on that agent and rejects with PromptRefused", async () => {
+		const { session, client, updates } = await startSession();
+		client.steerSubagent = async () => { throw new Error("not running"); };
+		await expect(session.prompt("a1", "hi", [], "steer")).rejects.toBeInstanceOf(PromptRefused);
+		expect(updates).toContainEqual({ kind: "note", agentId: "a1", level: "error", text: "Message failed: not running" });
+	});
+
+	test("a failed edit rejects with omp's error and shows it as a note", async () => {
+		const { session, client, updates } = await startSession();
+		client.branch = async () => ({ text: "old", cancelled: true });
+		await expect(session.editPrompt("e1", "new")).rejects.toThrow("an omp extension cancelled the branch");
+		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual(["Edit failed: an omp extension cancelled the branch"]);
+	});
 });
 
 describe("DashboardSession fast mode", () => {
