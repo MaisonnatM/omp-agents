@@ -1,6 +1,6 @@
 /** Every session file on disk, newest first, with the pull requests each session worked on. */
 import { basename, dirname, join } from "node:path";
-import { searchConversations } from "../conversation-search";
+import { Conversations } from "../conversation-search";
 import { headHistory, worktreeAt } from "../git";
 import { repoOf } from "../github";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
@@ -46,7 +46,9 @@ export class SessionFiles {
 	#touched = new Set<string>();
 	/** Scans and refreshes run one after another, so a slow full scan never overwrites a newer single-file read. */
 	#chain: Promise<unknown> = Promise.resolve();
-	readonly facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory);
+	readonly #conversations = new Conversations();
+	/** Its read of each session's own file also folds that session's prompts and replies, for the conversation search. */
+	readonly facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory, [this.#conversations]);
 	/** The last past-list row of each listed file, rebuilt only when what it shows changed. */
 	readonly #rows = new Map<string, PastRow>();
 	readonly #root: string;
@@ -145,7 +147,7 @@ export class SessionFiles {
 	/** The listed conversations whose prompts or replies hold every word of `query`, the file changed last first, once the transcripts asked for are read. */
 	async searchConversations(query: string): Promise<ConversationHit[]> {
 		await this.facts.settled();
-		return searchConversations(this.#files, path => this.facts.conversationOf(path), query);
+		return this.#conversations.search(this.#files, query);
 	}
 
 	/**

@@ -109,11 +109,13 @@ The server lives in `src/`:
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, and `imagesOf`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
 - `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last.
 - `src/conversation-search.ts`: the conversation search behind `GET /api/conversations`.
-  `SessionFactsIndex` folds each session's own file, not its subagents', through `foldConversationLine` as it reads it, keeping the prompts' and replies' item ids and text: `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, and the tool-result lines go unparsed.
-  `searchConversations` then matches those with `everyWord` and reads no file.
+  `Conversations` keeps a fold of each session's own file, not its subagents', with the prompts' and replies' item ids and text: `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, and the tool-result lines go unparsed.
+  `SessionFiles` hands it to `SessionFactsIndex` as one of its `OwnFileFolds`, so the index's read of each session file feeds both folds and no file is read twice; the index starts a fresh conversation when the file shrinks and forgets it once the session leaves the list.
+  `Conversations.search` then matches those with `everyWord` and reads no file.
 - `src/work.ts`: folds session-file lines into the files changed.
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
+  Its read of a session's own file also feeds the `OwnFileFolds` it was constructed with, and it knows nothing of what those folds keep.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
   `git.ts`'s `worktreeAt`, the repository's `git remote`, and the head history each answer a directory once per refresh, and every per-session step of a refresh, transcript scans and git probes alike, runs at most `PROBE_PARALLEL` (16, from `src/map-limit.ts`) at a time, so a first scan of hundreds of sessions starts no burst of git processes.
   `factsOf` answers one shared empty `SessionFacts` for a session it does not know, and a known session's own arrays, so the facts of an unchanged session stay the same objects.

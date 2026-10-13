@@ -14,15 +14,15 @@
  * The session's own bash calls tell which linked worktree it works in: a session started in a repository's main
  * checkout often adds a worktree and runs its commands there with bash's `cwd`.
  *
- * The scan of a session's own file also keeps its prompts and replies, which the conversation search reads.
+ * The read of a session's own file also feeds the `OwnFileFolds` the index is given, so another feature that folds
+ * session files does not read them a second time.
  */
 import { access } from "node:fs/promises";
 import { resolve } from "node:path";
-import { type Conversation, foldConversationLine } from "./conversation-search";
 import { branchAt, type HeadHistory, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
-import { FoldedFile } from "./line-reader";
+import { FoldedFile, type LineFold } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { HOME } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
@@ -337,19 +337,29 @@ export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, 
 	return [...linked.values()];
 }
 
-/** A transcript's facts and, for a session's own file, its prompts and replies. */
-class TranscriptFold {
-	readonly scan = new SessionFactsScan();
-	/** `null` for a subagent's file, which the conversation search leaves out. */
-	readonly conversation: Conversation | null;
+/**
+ * Folds of each session's own file, not its subagents', that the index feeds from its own read of that file.
+ * The index starts a fresh one whenever it reads the file from its first line again.
+ */
+export interface OwnFileFolds {
+	/** An empty fold of session file `path`, in place of the one before. */
+	start(path: string): LineFold;
+	/** Session file `path` left the list. */
+	forget(path: string): void;
+}
 
-	constructor(own: boolean) {
-		this.conversation = own ? new Map() : null;
+/** A transcript's facts, and for a session's own file the other folds of it. */
+class TranscriptFold implements LineFold {
+	readonly scan = new SessionFactsScan();
+	readonly #others: readonly LineFold[];
+
+	constructor(others: readonly LineFold[]) {
+		this.#others = others;
 	}
 
 	applyLine(line: string): void {
 		this.scan.applyLine(line);
-		if (this.conversation) foldConversationLine(this.conversation, line);
+		for (const fold of this.#others) fold.applyLine(line);
 	}
 }
 
@@ -439,20 +449,24 @@ export class SessionFactsIndex {
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
 	readonly #worktreeAt: (dir: string) => Promise<WorktreeAt | null>;
 	readonly #headHistory: (dir: string) => Promise<HeadHistory | null>;
+	readonly #ownFileFolds: readonly OwnFileFolds[];
 	#chain: Promise<unknown> = Promise.resolve();
 
 	/**
 	 * `repoOf`: the GitHub repository `origin` names in a working directory. `worktreeAt`: the git worktree a directory is in.
 	 * `headHistory`: the branch and HEAD reflog checkouts of the worktree a directory is in.
+	 * `ownFileFolds`: other folds of each session's own file, fed from the index's read of it.
 	 */
 	constructor(
 		repoOf: (cwd: string) => Promise<Repo | null>,
 		worktreeAt: (dir: string) => Promise<WorktreeAt | null>,
 		headHistory: (dir: string) => Promise<HeadHistory | null>,
+		ownFileFolds: readonly OwnFileFolds[] = [],
 	) {
 		this.#repoOf = repoOf;
 		this.#worktreeAt = worktreeAt;
 		this.#headHistory = headHistory;
+		this.#ownFileFolds = ownFileFolds;
 	}
 
 	/**
@@ -464,11 +478,6 @@ export class SessionFactsIndex {
 		const session = this.#sessions.get(sessionPath);
 		if (!session) return NO_FACTS;
 		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree };
-	}
-
-	/** The prompts and replies of the session file in `sessionPath`, as read so far; `null` before its first scan. */
-	conversationOf(sessionPath: string): Conversation | null {
-		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.fold.conversation ?? null;
 	}
 
 	/** Resolves once the refreshes asked for so far are done. */
@@ -529,7 +538,11 @@ export class SessionFactsIndex {
 
 	async #refresh(sessions: readonly ListedSession[]): Promise<boolean> {
 		const listed = new Set(sessions.map(session => session.path));
-		for (const path of this.#sessions.keys()) if (!listed.has(path)) this.#sessions.delete(path);
+		for (const path of this.#sessions.keys()) {
+			if (listed.has(path)) continue;
+			this.#sessions.delete(path);
+			for (const folds of this.#ownFileFolds) folds.forget(path);
+		}
 		// A subagent's writes do not touch the session file, but its result does once it finishes.
 		const stale = sessions.filter(({ path, modifiedAt }) => this.#sessions.get(path)?.modifiedAt !== modifiedAt);
 		// The first refresh reads every transcript; a few sessions at a time keep the disk busy without opening every file at once.
@@ -577,12 +590,12 @@ export class SessionFactsIndex {
 		let session = this.#sessions.get(path);
 		const previousShip = session?.transcripts.get(path)?.fold.scan.ship;
 		session ??= {
-			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new FoldedFile(path, () => new TranscriptFold(true))]]), refs: [], submitted: new Map(),
-			repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null, branch: null,
+			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new FoldedFile(path, () => new TranscriptFold(this.#ownFileFolds.map(folds => folds.start(path))))]]),
+			refs: [], submitted: new Map(), repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null, branch: null,
 		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
-			if (!session.transcripts.has(file)) session.transcripts.set(file, new FoldedFile(file, () => new TranscriptFold(false)));
+			if (!session.transcripts.has(file)) session.transcripts.set(file, new FoldedFile(file, () => new TranscriptFold([])));
 		}
 		const reads = await Promise.all([...session.transcripts.values()].map(transcript => transcript.read()));
 		if (reads.every(read => read.readable)) session.modifiedAt = modifiedAt;
