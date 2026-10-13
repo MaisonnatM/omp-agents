@@ -1028,6 +1028,7 @@ An action that fails shows its error, and its control becomes available again.
   The editor writes rich text: its toolbar and Cmd+B, Cmd+I, and Cmd+U make bold, italic, and underline, a link, bulleted and numbered lists, and a quote, and a pasted web address becomes a link.
   The expand button grows the editor over the conversation, and shrinks it back.
   Cmd+Enter or **Send** sends the mail as HTML with a plain text copy, in the conversation, which then shows in the conversation and the list.
+  While it sends, the editor shows **Sending…** and takes no edit, so what you see is what goes; a failed send reopens it as it was, with **Cannot send** and why, and a mail Gmail took stays sent and closes the editor even when the browser cannot forget its draft.
   Esc closes the editor and keeps the draft in the browser, per conversation, until you reopen it, as long as anything in it differs from how it began, recipients included; **Discard draft** drops it.
 - **Compose**, in the header, or C outside text fields, opens a new mail at `#inbox/new` in the panel, in the same editor, with a **Subject** row, focused on **To**; it keeps its draft the same way, and sending it goes back to the list.
 - **Delete**, or #, moves the conversation to Gmail's Trash, where Gmail keeps it 30 days, with no confirmation, and opens the next conversation of the list, else the previous one.
