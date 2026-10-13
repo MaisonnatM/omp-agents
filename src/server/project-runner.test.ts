@@ -104,6 +104,13 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		start,
 		session: instanceId => live(sessions.get(instanceId)),
 		bySessionId: sessionId => live([...sessions.values()].find(session => session.alive && session.sessionId === sessionId)),
+		async reach(sessionId) {
+			const running = live([...sessions.values()].find(session => session.alive && session.sessionId === sessionId));
+			if (running) return running;
+			const result = await start({ kind: "resume", sessionId }, null);
+			if (!result.ok) throw new Error(result.error);
+			return live(sessions.get(result.instanceId))!;
+		},
 		interrupted: () => true,
 		extensionArgs: () => ["-e", "/repo/projects.ts"],
 		seedNotes: id => seeded.push(id),

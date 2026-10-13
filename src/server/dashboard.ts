@@ -211,6 +211,16 @@ export class Dashboard {
 		}));
 		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "new" && request.branch !== null);
 		const startSession = (this.#startSession = request => startWith(request, null));
+		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
+		const reach = async (sessionId: string): Promise<LiveSession> => {
+			const live = sessions.bySessionId(sessionId);
+			if (live) return live;
+			const result = await startSession({ kind: "resume", sessionId });
+			if (!result.ok) throw new Error(`Cannot resume the session: ${result.error}`);
+			const resumed = sessions.get(result.instanceId);
+			if (!resumed) throw new Error("The session exited as it resumed.");
+			return resumed;
+		};
 		this.#endInbox = new EndInbox(sessionEndInboxDir, {
 			end: async sessionId => {
 				const session = sessions.bySessionId(sessionId);
@@ -240,21 +250,21 @@ export class Dashboard {
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
 			start: startSession,
-			bySessionId: sessionId => sessions.bySessionId(sessionId) ?? null,
-			session: instanceId => sessions.get(instanceId) ?? null,
+			reach,
 			now: Date.now,
 			onChange: () => broadcasts.pushList("scheduled"),
 		}));
-		const runnerSession = (session: LiveSession | undefined): RunnerSession | null => {
-			if (!session) return null;
+		const runnerSession = (session: LiveSession): RunnerSession => {
 			const { status, requests } = session.row();
 			return { sessionId: session.sessionId, status, requests, prompt: text => session.prompt(null, text, [], "followUp") };
 		};
+		const liveRunner = (session: LiveSession | undefined): RunnerSession | null => (session ? runnerSession(session) : null);
 		const projectRunner = (this.#projectRunner = new ProjectRunner({
 			file: projects,
 			start: startWith,
-			session: instanceId => runnerSession(sessions.get(instanceId)),
-			bySessionId: sessionId => runnerSession(sessions.bySessionId(sessionId)),
+			session: instanceId => liveRunner(sessions.get(instanceId)),
+			bySessionId: sessionId => liveRunner(sessions.bySessionId(sessionId)),
+			reach: async sessionId => runnerSession(await reach(sessionId)),
 			interrupted: sessionId => interrupted.has(sessionId),
 			extensionArgs: projectsExtensionArgs,
 			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),

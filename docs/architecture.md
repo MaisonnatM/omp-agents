@@ -460,7 +460,8 @@ A send's `state` is `waiting`, `sending` from its claim until it reaches omp, or
 Its `tick` runs on the minute tick, before the routine runner's, only on the server that owns the unattended work, and sends each due waiting send in turn.
 `sendNow` sends one at once on whichever server the page talks to, a failed one too.
 Either way the runner first claims the send and writes `sending` to the file at once, so a second tick or another server never sends it twice.
-A message goes to the live session with that session id through its `prompt` as a `followUp`, a follow-up while its turn runs and a prompt otherwise, as a project's updates go; with no live session, the runner resumes it through the same `start` the page uses, then sends.
+A message goes through `reach`, which `Dashboard` builds once for this runner and the project runner: the live session with that session id, else that session resumed through the same `start` the page uses.
+The runner sends it through its `prompt` as a `followUp`, a follow-up while its turn runs and a prompt otherwise, as a project's updates go.
 A start goes through `start` as the page's would, so the todo it names is linked the same way.
 A failure, such as a session that cannot resume or a start that fails, saves the error on the send, which waits for **Try again** or **Dismiss**.
 A send that a stopped server left `sending` may have reached its session, so the owner fails it at its start or takeover (`ScheduledRunner.recover`) rather than sending it again.
@@ -508,7 +509,7 @@ A worker starts in the directory `start_worker` names, read through `expandHome`
 
 The coordinator's tools are strict host tools, every property required, loaded as `essential`: `start_worker` (`title`, `prompt`, `cwd`), `list_workers`, `read_worker` (`worker`), and `message_worker` (`worker`, `text`).
 An error a tool throws reaches the coordinator as the tool's error, and every tool throws once the project is archived.
-`message_worker` prompts the worker as a follow-up, and resumes it first through the same starter when it does not run.
+`message_worker` prompts the worker as a follow-up, reaching it through the same `reach` as a scheduled message, so a worker that does not run resumes first.
 
 A worker's session reports three kinds of news, which the runner saves as updates:
 
