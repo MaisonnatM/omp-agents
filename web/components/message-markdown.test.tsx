@@ -17,6 +17,35 @@ test("messages render GFM and refuse executable markup", () => {
 	expect(html).not.toContain('node="[object Object]"');
 });
 
+test("service links keep their titles and icons without displaying bare URLs", () => {
+	const destinations = [
+		["https://linear.app/team/issue/ENG-42/fix-login", "ENG-42"],
+		["https://github.com/org/repo/pull/42", "org/repo #42"],
+		["https://app.graphite.com/github/pr/org/repo/42", "org/repo #42"],
+		["https://team.slack.com/archives/C123/p123", "Slack message"],
+	];
+	for (const github of [false, true]) {
+		for (const [url, label] of destinations) {
+			const bare = renderToStaticMarkup(<MessageMarkdown github={github} text={url!} />);
+			expect(bare).toContain(`href="${url}"`);
+			expect(bare).toContain(`<span>${label}</span>`);
+			expect(bare).toContain('aria-hidden="true"');
+			expect(bare).not.toContain(`>${url}<`);
+			const titled = renderToStaticMarkup(<MessageMarkdown github={github} text={`[Fix **login**](${url})`} />);
+			expect(titled).toContain("<span>Fix <strong>login</strong></span>");
+			expect(titled).toContain('aria-hidden="true"');
+		}
+	}
+});
+
+test("lookalike hosts and ordinary links keep their original labels without service icons", () => {
+	for (const url of ["https://github.com.evil.example/org/repo", "https://not-slack.com/archives/C1/p1", "https://example.com"]) {
+		const html = renderToStaticMarkup(<MessageMarkdown text={url} />);
+		expect(html).toContain(`>${url}</a>`);
+		expect(html).not.toContain("<svg");
+	}
+});
+
 test("unfinished streaming fences remain code blocks", () => {
 	const html = renderToStaticMarkup(<MessageMarkdown text={"Before\n\n```ts\nconst answer = 42"} />);
 	expect(html).toContain("<pre>");

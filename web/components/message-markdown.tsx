@@ -8,6 +8,8 @@ import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { remarkFilePaths, textFilePath } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { FileLink } from "./file-link";
+import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
+import { OrgIcon } from "./org-icon";
 import { isChipKind, PromptChip } from "./prompt-chip";
 
 /** Where text written on GitHub may load images from. The page's CSP allows the same hosts. */
@@ -42,11 +44,49 @@ const imageFrom =
 		);
 	};
 
-const link: Components["a"] = ({ children, node: _node, ...props }) => (
-	<a {...props} target="_blank" rel="noopener noreferrer">
-		{children}
-	</a>
-);
+function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
+	let service: "linear" | "github" | "graphite" | "slack" | null = null;
+	let label = "";
+	try {
+		const url = new URL(href ?? "");
+		if (url.protocol === "https:" || url.protocol === "http:") {
+			const host = url.hostname;
+			if (host === "linear.app") {
+				service = "linear";
+				label = url.pathname.match(/\/issue\/([^/]+)/)?.[1] ?? "Linear";
+			} else if (host === "github.com" || host === "www.github.com") {
+				service = "github";
+				const pr = url.pathname.match(/^\/([^/]+)\/([^/]+)\/(?:pull|issues)\/(\d+)/);
+				label = pr ? `${pr[1]}/${pr[2]} #${pr[3]}` : url.pathname.split("/").filter(Boolean).slice(0, 2).join("/") || "GitHub";
+			} else if (host === "app.graphite.com" || host === "app.graphite.dev") {
+				service = "graphite";
+				const pr = url.pathname.match(/^\/github\/pr\/([^/]+)\/([^/]+)\/(\d+)/);
+				label = pr ? `${pr[1]}/${pr[2]} #${pr[3]}` : "Graphite";
+			} else if (host === "slack.com" || host.endsWith(".slack.com")) {
+				service = "slack";
+				label = url.pathname.includes("/archives/") ? "Slack message" : "Slack";
+			}
+		}
+	} catch {
+		// Relative and filtered URLs keep their original label.
+	}
+	return (
+		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
+			{service ? (
+				<span className="inline-flex max-w-full items-baseline gap-1">
+					{service === "linear" || service === "slack" ? (
+						<BrandMark logo={service === "linear" ? LINEAR_LOGO : SLACK_LOGO} className="size-3 self-center" />
+					) : (
+						<OrgIcon org={service} className="self-center" />
+					)}
+					<span>{children === href || children === href?.replace(/^https?:\/\//, "") ? props.title || label : children}</span>
+				</span>
+			) : children}
+		</a>
+	);
+}
+
+const link: Components["a"] = ({ node: _node, ...props }) => <ExternalLink {...props} />;
 
 /** A video that plays only a Linear issue's file; any other source shows as a link to it. */
 const video: Components["video"] = ({ node: _node, src }) => {
@@ -71,9 +111,7 @@ const video: Components["video"] = ({ node: _node, src }) => {
 const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) => {
 	const path = href === undefined ? null : textFilePath(href);
 	return path === null ? (
-		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
-			{children}
-		</a>
+		<ExternalLink {...props} href={href}>{children}</ExternalLink>
 	) : (
 		<FileLink path={path}>{children}</FileLink>
 	);
