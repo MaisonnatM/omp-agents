@@ -91,6 +91,7 @@ An action that fails shows its error, and its control becomes available again.
 - Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, or the left edge of the session details sidebar.
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
   Double-click the edge to reset the width.
+  Resize handles show no tooltip on hover or while dragging.
   The button at the outer corner of the sessions sidebar's header hides it and leaves a narrow strip whose button shows it again.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
