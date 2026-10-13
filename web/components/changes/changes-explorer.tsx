@@ -1,8 +1,7 @@
 import { ChevronRight } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
-import type { ChangedEntry, ChangedFileText } from "../../../src/shared/changes";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangedEntry } from "../../../src/shared/changes";
 import { fileTree, treeOrder } from "../../changes-model";
-import { useRead } from "../../reads";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
@@ -10,7 +9,7 @@ import { SizeProvider } from "@/lib/size-context";
 import { LineCounts } from "../line-counts";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { CodeView } from "./code-view";
-import { DiffStack } from "./diff-stack";
+import { DiffStack, type DiffStackHandle } from "./diff-stack";
 import { type FileOpen, FileTree, StatusLetter, statusLabel } from "./file-tree";
 
 /** Diff lists every file's changes in one scroll, unchanged runs folded; File shows the open file whole as it is now, its changes marked in the gutter. */
@@ -61,18 +60,15 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 	const order = useMemo(() => treeOrder(tree), [tree]);
 	// The file the explorer marks: the one asked for, then the one at the top of the diffs as you scroll them.
 	const [current, setCurrent] = useState(path);
-	const [target, setTarget] = useState(() => (path === null ? null : { path }));
-	const [asked, setAsked] = useState(path);
-	if (asked !== path) {
-		setAsked(path);
+	const stack = useRef<DiffStackHandle>(null);
+	useEffect(() => {
 		setCurrent(path);
-		setTarget(path === null ? null : { path });
-	}
+		if (path !== null) stack.current?.scrollTo(path);
+	}, [path]);
 	const entry = order.find(file => file.path === current) ?? order[0] ?? null;
-	const read = useRead<ChangedFileText>(mode === "file" && entry ? fileUrl(entry.path) : null, version);
 	const open = (next: string): void => {
 		setCurrent(next);
-		setTarget({ path: next });
+		stack.current?.scrollTo(next);
 		if (opener.hrefFor && !opener.onPick) location.hash = opener.hrefFor(next);
 		else opener.onPick?.(next);
 	};
@@ -118,14 +114,7 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 						</p>
 						<LineCounts added={entry.added} removed={entry.removed} />
 						<SizeProvider size="compact">
-							<Tabs
-								value={mode}
-								onValueChange={value => {
-									// Back in the diffs, the file you had open is where they start.
-									if (value === "diff" && entry) setTarget({ path: entry.path });
-									setMode(value as Mode);
-								}}
-							>
+							<Tabs value={mode} onValueChange={value => setMode(value as Mode)}>
 								<TabsList aria-label="Show">
 									<TabItem value="diff" label="Diff" tooltip="Every file's changes in one list, with unchanged lines folded" />
 									<TabItem value="file" label="File" tooltip="The whole file as it is now, its changes marked in the gutter" />
@@ -134,10 +123,10 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 						</SizeProvider>
 					</div>
 					{mode === "diff" ? (
-						<DiffStack files={order} fileUrl={fileUrl} version={version} target={target} onCurrent={setCurrent} />
+						<DiffStack ref={stack} files={order} fileUrl={fileUrl} version={version} initial={entry.path} onCurrent={setCurrent} />
 					) : (
 						// Keyed by file, so shown removals start closed in the next one.
-						<CodeView key={entry.path} file={read.data} error={read.error} />
+						<CodeView key={entry.path} url={fileUrl(entry.path)} version={version} />
 					)}
 				</section>
 			)}

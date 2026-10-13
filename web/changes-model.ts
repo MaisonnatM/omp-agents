@@ -58,6 +58,27 @@ export function foldersAbove(dir: TreeDir, path: string): string[] | null {
 /** Unchanged lines the diff keeps on each side of a change. */
 export const DIFF_CONTEXT = 3;
 
+/** A file changing more lines than this waits for a click before its diff reads, as GitHub's large diffs do. */
+export const CLICK_TO_LOAD_LINES = 2000;
+
+/** Lines added and removed; a binary file, which git does not count, changes none. */
+export const changedLines = (file: ChangedEntry): number => (file.added ?? 0) + (file.removed ?? 0);
+
+/** Rows a file's diff shows before it is read: its changed lines, a fold, and the context around them. */
+export const estimatedRows = (file: ChangedEntry): number => changedLines(file) + 2 * DIFF_CONTEXT;
+
+/** The last of `count` items laid out top to bottom whose `top(index)` is at or above `y`, by binary search; 0 when none is. */
+export function lastAtOrAbove(count: number, top: (index: number) => number, y: number): number {
+	let low = 0;
+	let high = count - 1;
+	while (low < high) {
+		const middle = Math.ceil((low + high) / 2);
+		if (top(middle) <= y) low = middle;
+		else high = middle - 1;
+	}
+	return low;
+}
+
 /** A diff row on screen, or a fold of `to - from` unchanged rows that `start` names once unfolded. */
 export type DiffItem = { kind: "row"; index: number } | { kind: "fold"; from: number; to: number; start: number };
 

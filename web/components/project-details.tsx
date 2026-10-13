@@ -103,7 +103,7 @@ export function ProjectDetails({ project, view, working, cwd, workspace, hosts, 
 					icon: GitPullRequest,
 					name: "PRs",
 					count: pullRequests.length,
-					pinned: pullRequests.length > 0,
+					pinned: true,
 					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
 				},
 			]}

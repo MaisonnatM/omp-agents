@@ -3,7 +3,11 @@ import { Fragment, useMemo, useRef, useState } from "react";
 import type { ChangedFileText, DiffRow } from "../../../src/shared/changes";
 import { type FileLine, fileLines, foldDiff } from "../../changes-model";
 import { highlightRows, type Token } from "../../code-highlight";
+import { useRead } from "../../reads";
 import { cn } from "@/lib/utils";
+
+/** One code row's height in px, `leading-5`. */
+export const ROW_HEIGHT = 20;
 
 const ROW_TONE = { "+": "bg-emerald-500/12", "-": "bg-red-500/12", " ": "" } as const;
 const NUMBER_TONE = { "+": "bg-emerald-500/20", "-": "bg-red-500/20", " ": "" } as const;
@@ -19,42 +23,44 @@ function Code({ tokens }: { tokens: readonly Token[] }) {
 }
 
 interface CodeViewProps {
-	/** `null` while it is read. */
-	file: ChangedFileText | null;
-	error: string | null;
+	/** The read of one file in full, with its diff. */
+	url: string;
+	/** A new version reads it again. */
+	version: string | number;
 }
 
-/** `file`'s rows colored, and the line that shows instead of them while it is read, when it fails, or when it has none. */
-function useHighlighted({ file, error }: CodeViewProps): { rows: readonly DiffRow[] | null; tokens: Token[][]; notice: string | null } {
+/** The file at `url`, its rows colored, and the line that shows instead of them while it is read, when it fails, or when it has none. */
+function useHighlightedRead({ url, version }: CodeViewProps): { rows: readonly DiffRow[] | null; tokens: Token[][]; notice: string | null; failed: boolean } {
+	const { data: file, error } = useRead<ChangedFileText>(url, version);
 	// Keyed on the rows' text, so a read that brings the same text again keeps its colors instead of highlighting anew.
 	const text = file?.rows?.map(row => `${row.sign}${row.text}`).join("\n") ?? null;
 	const path = file?.path ?? "";
 	const rows = file?.rows ?? null;
 	const tokens = useMemo(() => (rows ? highlightRows(rows, path) : []), [text, path]);
 	const notice = error ?? (!file ? "Reading…" : !file.rows ? file.note : file.rows.length === 0 ? "No difference from the base." : null);
-	return { rows: notice === null ? rows : null, tokens, notice };
+	return { rows: notice === null ? rows : null, tokens, notice, failed: error !== null };
 }
 
 function Notice({ text, error }: { text: string | null; error: boolean }) {
 	return <p className={cn("m-auto p-8 text-center font-sans text-sm", error ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>{text}</p>;
 }
 
-/** The open file as it is now, its changes marked in the gutter, filling the editor. */
+/** The file as it is now, its changes marked in the gutter, filling the editor. */
 export function CodeView(props: CodeViewProps) {
-	const { rows, tokens, notice } = useHighlighted(props);
+	const { rows, tokens, notice, failed } = useHighlightedRead(props);
 	return (
 		<div className="code-lines flex min-h-0 flex-1 font-mono text-xs leading-5">
-			{rows ? <FileLines rows={rows} tokens={tokens} /> : <Notice text={notice} error={props.error !== null} />}
+			{rows ? <FileLines rows={rows} tokens={tokens} /> : <Notice text={notice} error={failed} />}
 		</div>
 	);
 }
 
 /** One file's diff with unchanged runs folded, as tall as its rows, scrolling sideways on its own. */
 export function DiffView(props: CodeViewProps) {
-	const { rows, tokens, notice } = useHighlighted(props);
+	const { rows, tokens, notice, failed } = useHighlightedRead(props);
 	return (
 		<div className="code-lines overflow-x-auto font-mono text-xs leading-5">
-			{rows ? <DiffLines rows={rows} tokens={tokens} /> : <Notice text={notice} error={props.error !== null} />}
+			{rows ? <DiffLines rows={rows} tokens={tokens} /> : <Notice text={notice} error={failed} />}
 		</div>
 	);
 }

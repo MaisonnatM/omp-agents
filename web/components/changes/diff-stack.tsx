@@ -4,95 +4,107 @@
  * of files costs one placeholder each until you reach it.
  */
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ChangedEntry, ChangedFileText } from "../../../src/shared/changes";
-import { useRead } from "../../reads";
+import { memo, type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import type { ChangedEntry } from "../../../src/shared/changes";
+import { CLICK_TO_LOAD_LINES, changedLines, estimatedRows, lastAtOrAbove } from "../../changes-model";
 import { cn } from "@/lib/utils";
 import { LineCounts } from "../line-counts";
-import { DiffView } from "./code-view";
+import { DiffView, ROW_HEIGHT } from "./code-view";
 import { StatusLetter, statusLabel } from "./file-tree";
 
 /** How far beyond the view a file starts to read, so it is drawn by the time it scrolls in. */
 const READ_AHEAD = "1200px 0px";
 /** How long a file must stay near the view before it reads, so a fast scroll past hundreds of files reads none of them. */
 const SETTLE_MS = 120;
-/** A file changing more lines than this waits for a click, as GitHub's large diffs do. */
-const LARGE = 2000;
-/** One diff row's height, `leading-5`. */
-const ROW = 20;
 
-/** A file's height before it is read: its changed rows and a few around them, so the scrollbar is close from the start. */
-const estimate = (file: ChangedEntry): number => Math.min(LARGE, (file.added ?? 0) + (file.removed ?? 0) + 6) * ROW;
+type WatchNear = (element: Element, onNear: () => void) => () => void;
 
-type Watch = (element: Element, onChange: (near: boolean) => void) => () => void;
-
-/** One `IntersectionObserver` that many elements share, each with its own callback. */
-function useSharedObserver(root: HTMLElement | null, rootMargin: string): Watch | null {
-	const [watch, setWatch] = useState<Watch | null>(null);
+/** One `IntersectionObserver` for every file, calling each file's `onNear` as it comes within {@link READ_AHEAD}. */
+function useNearObserver(root: HTMLElement | null): WatchNear | null {
+	const [watch, setWatch] = useState<WatchNear | null>(null);
 	useLayoutEffect(() => {
 		if (!root) return;
-		const callbacks = new Map<Element, (near: boolean) => void>();
-		const observer = new IntersectionObserver(entries => entries.forEach(entry => callbacks.get(entry.target)?.(entry.isIntersecting)), { root, rootMargin });
-		setWatch(() => (element: Element, onChange: (near: boolean) => void) => {
-			callbacks.set(element, onChange);
+		const timers = new Map<Element, { onNear: () => void; timer?: number }>();
+		const observer = new IntersectionObserver(
+			entries => {
+				for (const { target, isIntersecting } of entries) {
+					const watched = timers.get(target);
+					if (!watched) continue;
+					window.clearTimeout(watched.timer);
+					if (isIntersecting) watched.timer = window.setTimeout(watched.onNear, SETTLE_MS);
+				}
+			},
+			{ root, rootMargin: READ_AHEAD },
+		);
+		setWatch(() => (element: Element, onNear: () => void) => {
+			timers.set(element, { onNear });
 			observer.observe(element);
 			return () => {
-				callbacks.delete(element);
+				window.clearTimeout(timers.get(element)?.timer);
+				timers.delete(element);
 				observer.unobserve(element);
 			};
 		});
-		return () => observer.disconnect();
-	}, [root, rootMargin]);
+		return () => {
+			for (const { timer } of timers.values()) window.clearTimeout(timer);
+			observer.disconnect();
+		};
+	}, [root]);
 	return watch;
 }
 
+export interface DiffStackHandle {
+	scrollTo: (path: string) => void;
+}
+
 interface DiffStackProps {
+	ref: Ref<DiffStackHandle>;
 	/** The files in the explorer's order. */
 	files: readonly ChangedEntry[];
 	fileUrl: (path: string) => string;
 	/** A new version reads the files read so far again. */
 	version: string | number;
-	/** The file to scroll to; a new object scrolls again, even to the same file. */
-	target: { path: string } | null;
+	/** The file the stack opens at. */
+	initial: string | null;
 	/** The file at the top of the view, as you scroll. */
 	onCurrent: (path: string) => void;
 }
 
-export function DiffStack({ files, fileUrl, version, target, onCurrent }: DiffStackProps) {
+export function DiffStack({ ref, files, fileUrl, version, initial, onCurrent }: DiffStackProps) {
 	const [root, setRoot] = useState<HTMLDivElement | null>(null);
-	const near = useSharedObserver(root, READ_AHEAD);
-	// A band just under the top edge: the first file crossing it is the one you are reading. It starts a pixel down,
-	// since an observer counts a file that ends exactly at the edge, as one does after a jump, as crossing it.
-	const top = useSharedObserver(root, "-1px 0px -95% 0px");
-	const sections = useRef(new Map<string, HTMLElement>());
-	const crossing = useRef(new Set<string>());
-	const positions = useMemo(() => new Map(files.map((file, at) => [file.path, at])), [files]);
-	const index = useRef(positions);
-	index.current = positions;
-	const latest = useRef(onCurrent);
-	latest.current = onCurrent;
-	const cross = useCallback((path: string, inBand: boolean) => {
-		if (inBand) crossing.current.add(path);
-		else crossing.current.delete(path);
-		let first: string | null = null;
-		for (const each of crossing.current) if (first === null || (index.current.get(each) ?? 0) < (index.current.get(first) ?? 0)) first = each;
-		if (first !== null) latest.current(first);
-	}, []);
-	const register = useCallback((path: string, element: HTMLElement | null) => {
-		if (element) sections.current.set(path, element);
-		else sections.current.delete(path);
-	}, []);
-	const ready = near !== null && top !== null;
+	const near = useNearObserver(root);
+	const latest = useRef({ files, onCurrent });
+	latest.current = { files, onCurrent };
+	// The sections are the root's children in `files` order, so a file's index finds its section.
+	const scrollTo = (path: string): void => {
+		const section = root?.children[latest.current.files.findIndex(file => file.path === path)];
+		if (root && section instanceof HTMLElement) root.scrollTop = section.offsetTop;
+	};
+	useImperativeHandle(ref, () => ({ scrollTo }), [root]);
 	useEffect(() => {
-		if (!target || !root || !ready) return;
-		const section = sections.current.get(target.path);
-		if (section) root.scrollTop = section.offsetTop;
-	}, [target, root, ready]);
+		if (near && initial !== null) scrollTo(initial);
+	}, [near]);
+	useEffect(() => {
+		if (!root) return;
+		let frame = 0;
+		const update = () => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => {
+				const { files, onCurrent } = latest.current;
+				const sections = root.children as HTMLCollectionOf<HTMLElement>;
+				const at = lastAtOrAbove(sections.length, index => sections[index]!.offsetTop, root.scrollTop);
+				if (files[at]) onCurrent(files[at].path);
+			});
+		};
+		root.addEventListener("scroll", update, { passive: true });
+		return () => {
+			cancelAnimationFrame(frame);
+			root.removeEventListener("scroll", update);
+		};
+	}, [root]);
 	return (
 		<div ref={setRoot} className="relative min-h-0 min-w-0 flex-1 overflow-y-auto">
-			{near &&
-				top &&
-				files.map(file => <FileSection key={file.path} file={file} url={fileUrl(file.path)} version={version} near={near} top={top} register={register} cross={cross} />)}
+			{near && files.map(file => <FileSection key={file.path} file={file} url={fileUrl(file.path)} version={version} watchNear={near} />)}
 		</div>
 	);
 }
@@ -101,40 +113,22 @@ interface FileSectionProps {
 	file: ChangedEntry;
 	url: string;
 	version: string | number;
-	near: Watch;
-	top: Watch;
-	register: (path: string, element: HTMLElement | null) => void;
-	cross: (path: string, inBand: boolean) => void;
+	watchNear: WatchNear;
 }
 
 /** One file: its header, sticky while its diff scrolls under it, and the diff once it neared the view. */
-const FileSection = memo(function FileSection({ file, url, version, near, top, register, cross }: FileSectionProps) {
+const FileSection = memo(function FileSection({ file, url, version, watchNear }: FileSectionProps) {
 	const ref = useRef<HTMLElement>(null);
 	const [reached, setReached] = useState(false);
 	const [folded, setFolded] = useState(false);
-	const large = (file.added ?? 0) + (file.removed ?? 0) > LARGE;
-	const [asked, setAsked] = useState(false);
+	const lines = changedLines(file);
+	const [asked, setAsked] = useState(lines <= CLICK_TO_LOAD_LINES);
 	useEffect(() => {
-		const element = ref.current;
-		if (!element) return;
-		register(file.path, element);
-		const stopTop = top(element, inBand => cross(file.path, inBand));
-		let timer: number | undefined;
-		const stopNear = reached
-			? () => {}
-			: near(element, isNear => {
-					window.clearTimeout(timer);
-					if (isNear) timer = window.setTimeout(() => setReached(true), SETTLE_MS);
-				});
-		return () => {
-			window.clearTimeout(timer);
-			stopNear();
-			stopTop();
-			cross(file.path, false);
-			register(file.path, null);
-		};
-	}, [file.path, reached, near, top, register, cross]);
+		if (reached || !ref.current) return;
+		return watchNear(ref.current, () => setReached(true));
+	}, [reached, watchNear]);
 	const Chevron = folded ? ChevronRight : ChevronDown;
+	const height = estimatedRows(file) * ROW_HEIGHT;
 	return (
 		<section ref={ref} aria-label={file.path} className="border-b border-border">
 			<div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background px-3 py-1.5">
@@ -153,26 +147,20 @@ const FileSection = memo(function FileSection({ file, url, version, near, top, r
 				</p>
 				<LineCounts added={file.added} removed={file.removed} />
 			</div>
-			{!folded &&
-				(large && !asked ? (
-					<p className="px-4 py-6 text-center text-sm text-muted-foreground">
-						{`A large diff of ${(file.added ?? 0) + (file.removed ?? 0)} lines. `}
-						<button type="button" className="text-foreground underline underline-offset-4" onClick={() => setAsked(true)}>
-							Load diff
-						</button>
-					</p>
-				) : reached ? (
-					<div className="[content-visibility:auto]" style={{ containIntrinsicSize: `auto ${estimate(file)}px` }}>
-						<FileBody url={url} version={version} />
-					</div>
-				) : (
-					<div aria-hidden style={{ height: estimate(file) }} />
-				))}
+			{folded ? null : !asked ? (
+				<p className="px-4 py-6 text-center text-sm text-muted-foreground">
+					{`A large diff of ${lines} lines. `}
+					<button type="button" className="text-foreground underline underline-offset-4" onClick={() => setAsked(true)}>
+						Load diff
+					</button>
+				</p>
+			) : reached ? (
+				<div className="[content-visibility:auto]" style={{ containIntrinsicSize: `auto ${height}px` }}>
+					<DiffView url={url} version={version} />
+				</div>
+			) : (
+				<div aria-hidden style={{ height }} />
+			)}
 		</section>
 	);
 });
-
-function FileBody({ url, version }: { url: string; version: string | number }) {
-	const read = useRead<ChangedFileText>(url, version);
-	return <DiffView file={read.data} error={read.error} />;
-}

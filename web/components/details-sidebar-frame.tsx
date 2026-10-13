@@ -23,7 +23,7 @@ export interface DetailsTab<T extends string> {
 	name: string;
 	/** Shown as a badge, which screen readers hear through the tab's name; zero shows none. */
 	count: number;
-	/** The panel pins its own header to the top edge instead of padding below the sidebar's. */
+	/** With anything to list, the panel pins its own header to the top edge instead of padding below the sidebar's; empty, it pads as every tab does. */
 	pinned?: boolean;
 	content: ReactNode;
 }
@@ -77,7 +77,7 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 				</SidebarHeader>
 				{tabs.map(each => (
 					<TabPanel key={each.value} value={each.value} asChild>
-						<SidebarContent viewportClassName={each.pinned ? PINNED_VIEWPORT : PANEL_VIEWPORT}>{each.content}</SidebarContent>
+						<SidebarContent viewportClassName={each.pinned && each.count > 0 ? PINNED_VIEWPORT : PANEL_VIEWPORT}>{each.content}</SidebarContent>
 					</TabPanel>
 				))}
 			</Tabs>

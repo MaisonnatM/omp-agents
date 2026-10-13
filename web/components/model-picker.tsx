@@ -26,6 +26,9 @@ import { ComposerEditor } from "./composer";
 import { OrgIcon } from "./org-icon";
 import { NO_PLANS, Plans } from "./plan-usage";
 
+/** Truncates a model's name without clipping descenders such as Opus's p: the padding gives `overflow:hidden` room below the line, and the negative margin takes it back. */
+export const MODEL_NAME_TRUNCATE = "truncate py-1 -my-1";
+
 /**
  * `anthropic/claude-opus-5-5` as the Anthropic logo and `Opus 5.5`, with the full selector on hover. `titled={false}`
  * drops the hover and the logo's name, for a trigger whose tooltip and aria-label already say them.
@@ -190,8 +193,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 					}
 				>
 					<span className="flex min-w-0 items-center gap-1.5">
-						{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping descenders such as Opus's p. */}
-						<span className="max-w-56 truncate py-1 -my-1">{current ? <Model selector={current} titled={false} /> : unset}</span>
+						<span className={`max-w-56 ${MODEL_NAME_TRUNCATE}`}>{current ? <Model selector={current} titled={false} /> : unset}</span>
 						{effort.current && <span className="shrink-0 text-muted-foreground">{levelLabel(effort.current)}</span>}
 					</span>
 				</DropdownMenuTrigger>

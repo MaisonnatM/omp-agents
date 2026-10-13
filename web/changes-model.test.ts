@@ -1,12 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
-import { changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, treeOrder } from "./changes-model";
+import { changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, lastAtOrAbove, treeOrder } from "./changes-model";
 
 const same = (count: number, from = 1): DiffRow[] => Array.from({ length: count }, (_, at) => ({ sign: " ", old: from + at, new: from + at, text: "" }));
 const added: DiffRow = { sign: "+", old: null, new: 0, text: "" };
 const removed: DiffRow = { sign: "-", old: 0, new: null, text: "" };
 const entry = (path: string): ChangedEntry => ({ path, status: "modified", added: 1, removed: 0, session: false });
 const shown = (items: DiffItem[]) => items.map(item => (item.kind === "row" ? item.index : `fold ${item.from}-${item.to}`));
+
+describe("lastAtOrAbove", () => {
+	const tops = [0, 100, 100, 250, 900];
+	const find = (y: number) => lastAtOrAbove(tops.length, at => tops[at]!, y);
+	test("names the item whose top is the last at or above the line, the later of two sharing a top", () => {
+		expect([find(0), find(99), find(100), find(249), find(250), find(5000)]).toEqual([0, 0, 2, 2, 3, 4]);
+	});
+	test("falls back to the first item above them all, and to 0 with none", () => {
+		expect(find(-10)).toBe(0);
+		expect(lastAtOrAbove(0, () => 0, 50)).toBe(0);
+	});
+});
 
 describe("foldDiff", () => {
 	test("keeps three lines around a change and none at the file's ends", () => {

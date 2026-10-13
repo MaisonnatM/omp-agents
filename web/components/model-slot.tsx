@@ -2,7 +2,7 @@ import { Brain } from "lucide-react";
 import type { ModelOption } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { ModelList } from "../reads";
-import { Model, type ModelMenuOpen, ModelPicker } from "./model-picker";
+import { Model, MODEL_NAME_TRUNCATE, type ModelMenuOpen, ModelPicker } from "./model-picker";
 import type { Subject } from "./subject";
 
 interface ModelSlotProps {
@@ -33,7 +33,7 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 		<Tooltip content={`${[model, thinking].filter(Boolean).join(" · ")}. Switch this session's model and thinking level from its omp terminal.`}>
 			<span className="flex min-w-0 items-center gap-3 px-2 text-xs text-muted-foreground">
 				{model && (
-					<span className="truncate py-1 -my-1">
+					<span className={MODEL_NAME_TRUNCATE}>
 						<Model selector={model} />
 					</span>
 				)}

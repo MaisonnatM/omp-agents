@@ -19,11 +19,9 @@ import { Separator, useDragSeparator } from "./drag-separator";
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 560;
 const STEP = 16;
-/** The strip a hidden left sidebar leaves, wide enough to center its toggle. */
-const RAIL = 40;
 /** The show and hide motion: a drawer's curve, fast out of the gate and settling without overshoot. */
 const MOTION_MS = 260;
-const MOTION = "duration-[260ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
+const MOTION = "ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
 interface SidebarSpec {
 	/** What the sidebar lists, as its controls name it. */
@@ -35,6 +33,14 @@ interface SidebarSpec {
 	shortcut: ShortcutId;
 	hideIcon: LucideIcon;
 	showIcon: LucideIcon;
+	/**
+	 * The strip the hidden sidebar leaves for its toggle, which then rides the sidebar's outer edge: 9 px in from it,
+	 * where the header's `px-2` and border put its last button, and centered in the strip. 0 leaves none, and the toggle
+	 * sits in the pane header instead.
+	 */
+	rail: number;
+	/** Lays the wrapper out on its side: the content stays put against the outer edge while the width slides. */
+	frame: string;
 }
 
 const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
@@ -47,6 +53,8 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		shortcut: "sessionsSidebar",
 		hideIcon: PanelLeftClose,
 		showIcon: PanelLeftOpen,
+		rail: 46,
+		frame: "",
 	},
 	right: {
 		name: "Session details",
@@ -57,6 +65,8 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		shortcut: "detailsSidebar",
 		hideIcon: PanelRightClose,
 		showIcon: PanelRightOpen,
+		rail: 0,
+		frame: "order-last justify-end",
 	},
 };
 
@@ -178,11 +188,12 @@ interface DashboardSidebarProps {
 }
 
 /**
- * A sidebar with its resize handle, sliding its width open and shut. The left one's toggle rides its edge, from the
- * header's corner to the strip a hidden sidebar leaves, so it stays where the eye followed it. The hidden sidebar stays
- * mounted, so its filter and scroll survive; the right one's toggle sits in the pane header instead (see `App`).
+ * A sidebar with its resize handle, sliding its width open and shut. A sidebar with a rail keeps its toggle on its
+ * outer edge, so the toggle glides from the header's corner to the rail with the edge and follows a resize drag. The
+ * hidden sidebar stays mounted, so its filter and scroll survive; the right one's toggle sits in the pane header (see `App`).
  */
 export function DashboardSidebar({ side, panel, onResize, onToggle, children }: DashboardSidebarProps) {
+	const { id, rail, frame } = SIDEBARS[side];
 	// While the width moves: the transition applies only then, so a resize drag follows the pointer without lag.
 	const [moving, setMoving] = useState(false);
 	const [shownOpen, setShownOpen] = useState(panel.open);
@@ -195,35 +206,24 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, children }: 
 		const timer = window.setTimeout(() => setMoving(false), MOTION_MS);
 		return () => window.clearTimeout(timer);
 	}, [moving, panel.open]);
-	const left = side === "left";
-	const closedWidth = left ? RAIL : 0;
 	return (
 		<div
 			className={cn(
-				"relative h-full shrink-0",
-				side === "right" && "order-last",
+				"relative flex h-full shrink-0",
+				frame,
 				(!panel.open || moving) && "overflow-hidden",
 				moving && cn("transition-[width]", MOTION),
-				left && !panel.open && "border-r border-border",
+				rail > 0 && !panel.open && "border-r border-border",
 			)}
-			style={{ width: panel.open ? panel.width : closedWidth }}
+			style={{ width: panel.open ? panel.width : rail, transitionDuration: `${MOTION_MS}ms` }}
 		>
-			<Sidebar
-				id={SIDEBARS[side].id}
-				side={side}
-				hidden={!panel.open && !moving}
-				inert={!panel.open}
-				className={cn("relative h-full transition-opacity duration-150 ease-out motion-reduce:transition-none", !panel.open && "opacity-0", !left && "absolute top-0 right-0")}
-				style={{ width: panel.width }}
-			>
+			{/* Closing, it turns inert at once so focus and clicks leave it, and hidden once the width has slid shut. */}
+			<Sidebar id={id} side={side} hidden={!panel.open && !moving} inert={!panel.open} className="relative h-full" style={{ width: panel.width }}>
 				{children}
 				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} />
 			</Sidebar>
-			{left && (
-				<div
-					className={cn("absolute top-[calc((var(--page-header-height)-1.75rem)/2)] z-10", moving && cn("transition-[left]", MOTION))}
-					style={{ left: panel.open ? panel.width - 37 : (RAIL - 28) / 2 - 1 }}
-				>
+			{rail > 0 && (
+				<div className="absolute top-[calc((var(--page-header-height)-1.75rem)/2)] right-[9px] z-10">
 					<SidebarToggle side={side} open={panel.open} onToggle={onToggle} />
 				</div>
 			)}
