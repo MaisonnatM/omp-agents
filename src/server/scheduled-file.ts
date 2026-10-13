@@ -4,15 +4,13 @@
  * change reads the file again before it applies, as `projects.json` does.
  */
 import { JsonFile } from "../fs";
-import { isObject, parseAll } from "../json";
+import { isObject, isTime, parseAll } from "../json";
 import { applyScheduled, type ScheduledChange, type ScheduledSend, type ScheduledState } from "../shared/scheduled";
 import { parseScheduledSpec } from "./wire";
 
 interface Stored {
 	sends: ScheduledSend[];
 }
-
-const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
 function parseState(value: unknown): ScheduledState | null {
 	if (!isObject(value)) return null;

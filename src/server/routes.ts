@@ -42,13 +42,12 @@ import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
 import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
 
@@ -659,7 +658,7 @@ function providerRoutes({ get, write }: RouteKit): Routes {
 		/** `{ prompt, value }`: answers the sign-in's open question; 409 once it no longer waits on it. */
 		"/api/providers/login/answer": { PUT: write(body => checked(parseLoginAnswer(body), "Expected { prompt, value }"), answerProviderLogin, refuse) },
 		/** Abandons the sign-in under way, or dismisses how the last one ended. */
-		"/api/providers/login/cancel": { PUT: write(() => ({ ok: null }), cancelProviderLogin) },
+		"/api/providers/login/cancel": { PUT: write(() => null, cancelProviderLogin) },
 		/** `{ provider, credentialId }`: removes that stored credential, as `/logout` does. */
 		"/api/providers/sign-out": { PUT: write(body => checked(parseProviderSignOut(body), "Expected { provider, credentialId }"), signOutProvider) },
 	};

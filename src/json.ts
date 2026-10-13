@@ -19,6 +19,9 @@ export const oneOf =
 	(value: unknown): value is T =>
 		values.includes(value as T);
 
+/** A moment as milliseconds since the epoch, as `Date.now()` gives it. */
+export const isTime = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
+
 export const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
 
 /** `list` as a tuple that has a first member, or `null` when it is empty. */

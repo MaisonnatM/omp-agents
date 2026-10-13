@@ -5,7 +5,7 @@
  * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
  */
 import { JsonFile } from "../fs";
-import { isObject, isTexts, parseAll } from "../json";
+import { isObject, isTexts, isTime, parseAll } from "../json";
 import { applyRoutine, MAX_ROUTINE_RUNS, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
 import { parseRoutineSpec } from "./wire";
 
@@ -19,8 +19,6 @@ function parseStarted(value: unknown): { instanceId: string; sessionId: string }
 	const { instanceId, sessionId } = value;
 	return typeof instanceId === "string" && typeof sessionId === "string" ? { instanceId, sessionId } : null;
 }
-
-const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
 function parseCommandRun(value: unknown): CommandRun | null {
 	if (!isObject(value) || !isTime(value.startedAt)) return null;

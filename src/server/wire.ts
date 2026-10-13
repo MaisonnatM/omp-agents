@@ -4,7 +4,7 @@
  * Every parser returns a {@link Parsed}: `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller
  * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
  */
-import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
+import { isObject, isTime, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
@@ -437,10 +437,11 @@ export function parseClientMsg(raw: string | Buffer): Parsed<ClientFrame> {
 	return { ok: { t: "resume", frames } };
 }
 
-const PAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** A UUID as `crypto.randomUUID()` writes it, lowercase. */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The `page` of a `/ws` address: the id a page load picks once, `crypto.randomUUID()`; `null` when absent or not one. */
-export const parsePageId = (value: string | null): string | null => (value !== null && PAGE_ID.test(value) ? value : null);
+export const parsePageId = (value: string | null): string | null => (value !== null && UUID.test(value) ? value : null);
 
 /** A terminal's columns or rows: xterm's own bounds. */
 const isTerminalSide = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 1000;
@@ -576,8 +577,6 @@ export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; 
 /** The body of `PUT /api/google/calendars`: `{ id, shown }`, a Google calendar's id and whether the Calendar page shows it. */
 export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
 	isObject(body) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { id: body.id, shown: body.shown } } : null;
-
-const isTime = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
 
 /** An event's days or times: all-day days that do not run backward, or a timed span that ends after it starts. */
 export function parseEventWhen(value: unknown): EventWhen | null {
