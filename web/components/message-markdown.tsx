@@ -83,7 +83,7 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 					) : (
 						<img src={favicon} alt="" className="size-3 shrink-0 self-center" loading="lazy" referrerPolicy="no-referrer" />
 					)}
-					<span className="underline">{service && (children === href || children === href?.replace(/^https?:\/\//, "")) ? props.title || label : children}</span>
+					<span className="font-semibold underline">{service && (children === href || children === href?.replace(/^https?:\/\//, "")) ? props.title || label : children}</span>
 				</span>
 			) : children}
 		</a>
