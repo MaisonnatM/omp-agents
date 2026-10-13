@@ -268,6 +268,7 @@ function LiveConversation({
 						request={requests[0]}
 						queued={requests.length - 1}
 						onAnswer={answer => request({ t: "answer", instanceId: view.instanceId, requestId: requests[0].id, answer })}
+						shortcuts={focused}
 					/>
 				)}
 				{completion.popup}

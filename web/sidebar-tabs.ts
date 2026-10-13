@@ -127,14 +127,14 @@ export const shortcutRows = (shown: readonly SidebarTab[]): ShortcutRow[] =>
 		return keys.length > 0 ? [{ id, category, label, keys }] : [];
 	});
 
-/** A handler for each position key: it runs `goTo`'s handler for the tab at that place in `shown()`, and declines past the last tab. */
+/** A handler for each position key: it runs `goTo`'s handler for the tab at that place in `shown()`, as that tab's first key does, and declines past the last tab. */
 export const positionHandlers = (shown: () => readonly SidebarTab[], goTo: Record<SidebarTab, ShortcutHandler>): Record<TabShortcut, ShortcutHandler> =>
 	Object.fromEntries(
-		TAB_SHORTCUTS.map((id, index) => [
+		TAB_SHORTCUTS.map((id, index): [TabShortcut, ShortcutHandler] => [
 			id,
-			(): boolean | void => {
+			() => {
 				const tab: SidebarTab | undefined = shown()[index];
-				return tab === undefined ? false : goTo[tab]();
+				return tab === undefined ? false : goTo[tab](0);
 			},
 		]),
 	) as Record<TabShortcut, ShortcutHandler>;
