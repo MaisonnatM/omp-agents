@@ -263,8 +263,9 @@ omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits
 ## Socket requests
 
 A page tags a message it waits on with an `ack`, counted per page load, and the server answers it with `done`, carrying the error its handler threw or `null`.
-`request` in `web/use-dashboard.ts` sends that way prompts, answers to questions, starts and **Resume all**, interrupts, ends, edited prompts, thinking and fast switches, subagent cancels, a routine's **Run now**, and each change to the scheduled sends.
-A message the page does not tag, such as a pin, a todo change, a model switch, or a queued row's **Send now**, is dropped when the socket is down, as before.
+`request` in `web/use-dashboard.ts` sends that way prompts, answers to questions, starts and **Resume all**, interrupts, ends, edited prompts, model, thinking, and fast switches, subagent cancels, a routine's **Run now**, and each change to the scheduled sends.
+A model switch's `done` comes once omp switched, or refused, and the session read its state again; the composer's picker waits on it, and a roster row's `switching` only tells other pages that a switch runs.
+A message the page does not tag, such as a pin, a todo change, or a queued row's **Send now**, is dropped when the socket is down, as before.
 
 A socket can close after the server got a request and before its answer reached the page, and the page cannot tell that from a request the server never got, so it may not simply send it again: a prompt would reach the session twice.
 So the page picks an id once per load, `crypto.randomUUID()`, and opens `/ws?page=<id>`, and `RequestLedger` in `src/server/request-ledger.ts` keeps each page's requests by `ack` across its sockets.

@@ -375,6 +375,7 @@ An action that fails shows its error, and its control becomes available again.
   Each row shows the logo of the org that makes the model, its label (`Opus 5.5`), and its id, muted, to tell apart models that share a label.
   Choosing a model, a context, or an effort closes the menu.
   While a model, Fast, or Effort change runs, the picker spins and its settings wait until the server answers.
+  A change that fails shows its error, and the picker takes another.
   Terminal sessions show their model and thinking level in the same place, but Collab has no frame that changes them, so make those changes in the terminal.
   Subagents have no pickers.
 - A strip tucked under the composer shows where the session works on the left and its context counter on the right.
