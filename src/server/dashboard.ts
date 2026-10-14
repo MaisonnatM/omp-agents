@@ -21,8 +21,11 @@ import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { connectedRoles } from "../omp/models";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
+import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, presetsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { replayComparison, replayDetail } from "../replay";
+import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
 import { SourceControl } from "../source-control";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
@@ -96,6 +99,7 @@ export class Dashboard {
 	readonly #gmail = new GmailClient(integrationFetch("gmail"));
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
+	readonly #pathFor: (view: View) => string | null;
 	readonly #notices: Notices;
 	readonly #broadcasts: Broadcasts;
 	readonly #lists: ListRegistry;
@@ -138,6 +142,7 @@ export class Dashboard {
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
+		this.#pathFor = pathFor;
 		const views = (this.#views = new Views(
 			pathFor,
 			(topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg)),
@@ -202,6 +207,12 @@ export class Dashboard {
 			sessions,
 			pathFor,
 			savedFile: files.pathOf,
+			mayDiscardReplay: async cwd => {
+				const at = await worktreeAt(cwd);
+				if (!at?.linked) return "This is not a registered linked worktree.";
+				const plan = await this.#worktrees.preview({ repository: await canonical(at.common), path: await canonical(at.top) });
+				return plan.blockers.length ? plan.blockers.map(blocker => blocker.message).join(" ") : plan.kind === "unreadable" ? "The checkout could not be inspected." : null;
+			},
 			onStarted: () => broadcasts.syncRoster(),
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
@@ -219,7 +230,7 @@ export class Dashboard {
 				}));
 			},
 		}));
-		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "new" && request.branch !== null);
+		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "replay" || request.kind === "new" && request.branch !== null);
 		const startSession = (this.#startSession = request => startWith(request, null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
 		const reach = async (sessionId: string): Promise<LiveSession> => {
@@ -373,6 +384,16 @@ export class Dashboard {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
 				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
+				replayDetail: async (view, turnId) => {
+					const file = this.#pathFor(view);
+					if (!file) throw new Error("The source session file is unavailable.");
+					return replayDetail(file, turnId);
+				},
+				replayComparison: async view => {
+					const file = this.#pathFor(view);
+					if (!file) throw new Error("The replay session file is unavailable.");
+					return replayComparison(file);
+				},
 				searchConversations: query => files.searchConversations(query),
 				sourceControl: () => this.#sourceControl.answer(this.#workspaceCwds()),
 				changeAutoPull: change => {

@@ -11,6 +11,8 @@ import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
 import { type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
+import type { PreparedReplay } from "./replay";
+import { launchForReplayResume, replayLaunch, requireReplayReady } from "./omp/replay-launch";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { PromptTurn } from "./prompt-turn";
@@ -151,6 +153,7 @@ export class DashboardSession implements LiveSession {
 		client.onSessionEvent(event => this.#onEvent(event));
 		client.onPromptResult(({ id }) => {
 			if (id === undefined) return;
+			if (this.#replayInitial === "running") this.#replayInitial = null;
 			this.#change(() => this.#prompt.result(id));
 		});
 		client.onSubagentLifecycle(payload => this.#onSubagent(SUBAGENT_LIFECYCLE, payload));
@@ -162,6 +165,10 @@ export class DashboardSession implements LiveSession {
 			emit({ kind: "exited", ended: this.#ended });
 		});
 	}
+
+	#replayInitial: "unsent" | "running" | null = null;
+	#replayExpected: PreparedReplay["first"] | null = null;
+	#protectedReplay = false;
 
 	/** Spawn omp in `cwd` with `launch`, on `model` and at `thinking` when they name one, and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
 	static start(
@@ -180,6 +187,24 @@ export class DashboardSession implements LiveSession {
 				await client.setThinkingLevel(thinking);
 			}
 		});
+	}
+
+	static async replay(instanceId: string, prepared: PreparedReplay, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		const launchWithGuard = replayLaunch(prepared.config, launch);
+		const session = await DashboardSession.#spawn(instanceId, prepared.cwd, launchWithGuard, emit, async client => {
+			if ((await client.switchSession(prepared.forkFile)).cancelled) throw new Error("An omp extension cancelled opening the replay.");
+			await client.setModel(prepared.marker.model.provider, prepared.marker.model.id);
+			if (prepared.marker.thinking) {
+				const levels = await client.getAvailableThinkingLevels();
+				if (!levels.includes(prepared.marker.thinking)) throw new Error(`This model does not support thinking level ${prepared.marker.thinking}.`);
+				await client.setThinkingLevel(prepared.marker.thinking);
+			}
+			await requireReplayReady(prepared.forkFile, prepared.marker.id, launchWithGuard.readyToken);
+		});
+		session.#replayInitial = "unsent";
+		session.#replayExpected = prepared.first;
+		session.#protectedReplay = true;
+		return session;
 	}
 
 	/**
@@ -207,9 +232,13 @@ export class DashboardSession implements LiveSession {
 
 	/** Spawn omp with `launch` holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
 	static async resume(instanceId: string, sessionFile: string, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
-		return DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), launch, emit, async client => {
+		const replay = await launchForReplayResume(sessionFile, launch);
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.launch, emit, async client => {
 			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
+			if (replay.marker && replay.readyToken) await requireReplayReady(sessionFile, replay.marker.id, replay.readyToken);
 		});
+		session.#protectedReplay = replay.marker !== null;
+		return session;
 	}
 
 	/** Listens only once `prepare` is done, so the session reports the state `prepare` left it in. Questions count from spawn. */
@@ -343,6 +372,15 @@ export class DashboardSession implements LiveSession {
 	 * rejects with {@link PromptRefused}.
 	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
+		if (this.#protectedReplay && agentId !== null) throw new PromptRefused("Subagent prompts are blocked in a replay.");
+		if (this.#protectedReplay && (text.trimStart().startsWith("!") || /^\/(?!skill:)/.test(text.trimStart()))) throw new PromptRefused("Shell and local slash commands are blocked in a replay. Use text or /skill:<name>.");
+		if (this.#replayInitial === "running") throw new PromptRefused("Wait for the first replay turn to finish before continuing.");
+		if (this.#replayInitial === "unsent") {
+			const expected = this.#replayExpected;
+			if (!expected || text !== expected.text || images.length !== expected.images.length || images.some((image, index) => image.mimeType !== expected.images[index]?.mimeType || image.data !== expected.images[index]?.data)) throw new PromptRefused("Wait for the selected first replay prompt to be sent before continuing.");
+			this.#replayInitial = "running";
+			this.#replayExpected = null;
+		}
 		if (agentId !== null && images.length > 0) throw new Error("omp sends a subagent text only.");
 		if (agentId === null && text.startsWith("!")) {
 			if (images.length > 0) throw new Error("A ! command takes no images.");
@@ -353,6 +391,7 @@ export class DashboardSession implements LiveSession {
 				? this.#noting("Message failed", () => this.#child.client.steerSubagent(agentId, text), agentId)
 				: this.#noting("Prompt failed", () => this.#send(text, images, delivery));
 		await sent.catch((err: unknown) => {
+			this.#replayInitial = null;
 			throw new PromptRefused(errorText(err));
 		});
 	}
@@ -443,6 +482,8 @@ export class DashboardSession implements LiveSession {
 	 * turn stops first. omp moves the session to a new file holding the history before that prompt; the old file stays.
 	 */
 	async editPrompt(entryId: string, text: string): Promise<void> {
+		if (this.#replayInitial !== null) throw new PromptRefused("Wait for the first replay turn to finish before editing its history.");
+		if (this.#protectedReplay && (text.trimStart().startsWith("!") || /^\/(?!skill:)/.test(text.trimStart()))) throw new PromptRefused("Shell and local slash commands are blocked in a replay. Use text or /skill:<name>.");
 		const { client } = this.#child;
 		await this.#noting("Edit failed", () =>
 			this.#turn.run(async () => {
@@ -476,6 +517,7 @@ export class DashboardSession implements LiveSession {
 
 	/** Switches serialize with state reads; the flag is set before queuing so the page can show progress immediately. Rejects when omp refuses the switch. */
 	setModel({ provider, id }: ModelOption, thinking: string | null): Promise<void> {
+		if (this.#replayInitial !== null) return Promise.reject(new PromptRefused("Wait for the first replay turn to finish before changing its model."));
 		this.switching = ++this.#switches > 0;
 		this.thinkingLevels = [];
 		this.#emit({ kind: "roster" });
@@ -496,6 +538,7 @@ export class DashboardSession implements LiveSession {
 	}
 
 	setThinking(level: string): Promise<void> {
+		if (this.#replayInitial !== null) return Promise.reject(new PromptRefused("Wait for the first replay turn to finish before changing its thinking level."));
 		return this.#modelLane.run(async () => {
 			if (!this.thinkingLevels.includes(level)) return;
 			await this.#noting("Thinking level switch failed", async () => {
@@ -540,6 +583,7 @@ export class DashboardSession implements LiveSession {
 		if (event.type === "agent_start") {
 			this.#change(() => this.#prompt.turnStarted());
 		} else if (event.type === "agent_end" && event.isTerminal !== false) {
+			this.#replayInitial = null;
 			// A non-terminal end hands over to a queued follow-up.
 			this.#change(() => this.#prompt.turnEnded());
 			this.#refresh();

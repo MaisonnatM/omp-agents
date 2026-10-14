@@ -217,6 +217,7 @@ export class ProjectRunner implements ProjectControl {
 			// Only the runner starts a new project session, and a fork belongs to no project.
 			case "new":
 			case "fork":
+			case "replay":
 				return null;
 			case "resume": {
 				const role = this.#deps.file.roleOf(request.sessionId);

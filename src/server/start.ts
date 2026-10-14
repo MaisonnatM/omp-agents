@@ -6,6 +6,7 @@ import { errorText } from "../json";
 import { skipRefused } from "../live-session";
 import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
 import { savedTools } from "../omp/tool-policy";
+import { prepareReplay } from "../replay";
 import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
 import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
@@ -18,6 +19,7 @@ interface Started {
 	prompt: string | null;
 	/** A new session's first message, sent once the session is in the registry. */
 	first?: { text: string; images: PromptImage[] };
+	discard?: () => Promise<void>;
 }
 
 type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
@@ -34,6 +36,7 @@ export interface StartEnv {
 	linkTodo(todoId: string, sessionId: string): void;
 	/** How a start joins a project: the one `project` names, else the one a resumed session belongs to, else none. */
 	projects: { launchFor(request: StartRequest, project: ProjectLaunch | null): ProjectJoin };
+	mayDiscardReplay(cwd: string): Promise<string | null>;
 }
 
 /** Starts `request`; `project` is the project runner's reason for it, which a page's start never has. */
@@ -93,6 +96,21 @@ export function createStarter(env: StartEnv): Starter {
 					return DashboardSession.fork(id, source, request.entryId, launchWith(PLAIN_LAUNCH, tools), emit);
 				});
 			}
+			case "replay": {
+				const source = env.pathFor(request.view);
+				if (!source || request.view.kind === "live" && request.view.agentId !== null) return { error: "Cannot replay: the main session's file is unavailable." };
+				if (formatOf(source).source !== "omp") return { error: "Cannot replay: this session is read-only. Only omp sessions replay here." };
+				if (await savedTools(source) !== null) return { error: "Cannot replay: this session runs with a tool allowlist, which replays do not support." };
+				return launch("Cannot replay", async (id, emit) => {
+					const prepared = await prepareReplay(request, source, env.mayDiscardReplay);
+					try {
+						return { session: await DashboardSession.replay(id, prepared, rpcLaunch, emit), prompt: null, first: prepared.first, discard: prepared.discard };
+					} catch (error) {
+						await prepared.discard();
+						throw error;
+					}
+				});
+			}
 			case "resume": {
 				const { sessionId } = request;
 				if (sessions.sessionIds().has(sessionId) || resuming.has(sessionId)) return { error: "This session is already running." };
@@ -118,7 +136,10 @@ export function createStarter(env: StartEnv): Starter {
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
-		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) return { ok: false, error: "omp exited as the session started." };
+		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) {
+			await outcome.started.discard?.();
+			return { ok: false, error: "omp exited as the session started." };
+		}
 		// The todo and the project link first, so the session's first turn already knows the todo it works on and its role.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		join.attach(session);

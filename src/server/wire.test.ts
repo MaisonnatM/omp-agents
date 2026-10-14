@@ -667,3 +667,14 @@ describe("parseMcpServerAdd", () => {
 		expect(parseMcpServerAdd({ ...server, header: { name: "X-Api-Key", value: " " } })).toEqual({ error: "Enter the header's value." });
 	});
 });
+
+describe("replay start requests", () => {
+	const start = { t: "start", reqId: 7, kind: "replay", view: { kind: "past", sessionId: "source" }, token: "pinned-source", model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinking: "low", prompt: null } as const;
+	test("keeps explicit choices and the server-owned source token", () => {
+		expect(msg(start)).toEqual(start);
+		expect(msg({ ...start, prompt: "edited" })).toEqual({ ...start, prompt: "edited" });
+	});
+	test("rejects malformed tokens, settings, and views instead of accepting a raw source path", () => {
+		for (const change of [{ token: null }, { token: "" }, { thinking: 3 }, { prompt: {} }, { model: { provider: "openai-codex" } }, { view: { file: "/arbitrary/source.jsonl" } }]) expect(msg({ ...start, ...change })).toBeNull();
+	});
+});

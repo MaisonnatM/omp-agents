@@ -16,6 +16,7 @@ import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
+import { ReplayCompareDialog } from "./replay-compare";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks } from "./transcript";
 
@@ -66,6 +67,8 @@ export const Pane = memo(function Pane({
 	// Kept by view, so a pane that switches to another session shows its transcript.
 	const [trajectoryOf, setTrajectoryOf] = useState<string | null>(null);
 	const trajectory = trajectoryOf === hashForView(view);
+	const replay = (view.kind === "past" ? session : host ?? lastHost)?.replay;
+	const [compareOf, setCompareOf] = useState<string | null>(null);
 
 	const actions = (
 		<>
@@ -77,6 +80,7 @@ export const Pane = memo(function Pane({
 					</TabsList>
 				</Tabs>
 			</SizeProvider>
+			{replay && <Button size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
 			{count > 1 && (
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
@@ -129,6 +133,7 @@ export const Pane = memo(function Pane({
 				<FileBaseContext.Provider value={(view.kind === "past" ? session : (host ?? lastHost))?.cwd ?? null}>
 					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
 						{content}
+						{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
 					</RenderBoundary>
 				</FileBaseContext.Provider>
 			</SubagentLinks.Provider>
