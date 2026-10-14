@@ -28,8 +28,8 @@ function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
 	return (
 		<span
 			className={cn(
-				"shrink-0 rounded-[4px] border px-1 text-[10px] leading-4 font-medium",
-				draft ? "border-border bg-muted text-muted-foreground" : "border-emerald-500/40 text-emerald-700 dark:text-emerald-400",
+				"shrink-0 rounded-full px-1.5 text-[10px] leading-4 font-medium",
+				draft ? "bg-muted text-muted-foreground" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
 			)}
 		>
 			{draft ? "Draft" : "Live"}
