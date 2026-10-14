@@ -77,6 +77,10 @@ An action that fails shows its error, and its control becomes available again.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
+  Claude Code's sessions in `~/.claude/projects` and Codex's in `~/.codex/sessions` list here too, among omp's, with **Claude Code** or **Codex** first among the row's details; `CLAUDE_CONFIG_DIR` and `CODEX_HOME` move those directories as they move them for their agents.
+  Their transcripts keep updating while the agent writes, and the conversation search finds their prompts and replies.
+  They are read-only: the pane's header reads `Read-only · Claude Code` or `Read-only · Codex`, and neither the header nor the row's menu offers **Resume** or **Fork from here**.
+  A line the dashboard cannot read shows in the transcript as a warning with the line's start, and their subagents' sessions are left out of the list.
   The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
 - The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
   The group shows only while it has a row.

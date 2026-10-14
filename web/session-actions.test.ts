@@ -23,7 +23,7 @@ const live = (control: ControlPhase): SessionEntry => ({
 });
 const past = (change: Partial<PastSession> = {}): SessionEntry => ({
 	kind: "past",
-	session: { sessionId: "s2", cwd: "/w", pullRequests: [], tickets: [], interrupted: false, ...change } as PastSession,
+	session: { sessionId: "s2", cwd: "/w", source: "omp", pullRequests: [], tickets: [], interrupted: false, ...change } as PastSession,
 });
 const ids = (entry: SessionEntry, change?: Partial<SessionActionContext>) => sessionActions(entry, context(change)).map(group => group.map(({ id }) => id));
 
@@ -35,10 +35,12 @@ describe("sessionActions", () => {
 		expect(ids(past()).flat()).not.toContain("end");
 	});
 
-	test("a past session resumes and an interrupted one also moves to past, while a running one does neither", () => {
+	test("a past omp session resumes and an interrupted one also moves to past, while a running one or a read-only one does neither", () => {
 		expect(ids(past())[0]).toEqual(["open", "split", "resume", "pin"]);
 		expect(ids(past({ interrupted: true }))[0]).toEqual(["open", "split", "resume", "dismiss", "pin"]);
 		expect(ids(live({ phase: "live", readOnly: false }))[0]).toEqual(["open", "split", "pin"]);
+		expect(ids(past({ source: "claude-code" }))[0]).toEqual(["open", "split", "pin"]);
+		expect(ids(past({ source: "codex" }))[0]).toEqual(["open", "split", "pin"]);
 	});
 
 	test("a session already in a pane offers no split", () => {

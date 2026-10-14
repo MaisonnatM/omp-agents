@@ -46,7 +46,7 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 	const opening: ActionGroup<SessionRun> = [
 		{ id: "open", title: "Open", icon: AppWindow, run: { kind: "do", fn: () => context.open(view, "replace") } },
 		...(context.onScreen ? [] : [{ id: "split", title: "Open in split", icon: Columns2, run: { kind: "do", fn: () => context.open(view, "split") } } as const]),
-		...(entry.kind === "past"
+		...(entry.kind === "past" && entry.session.source === "omp"
 			? [
 					{
 						id: "resume",

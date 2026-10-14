@@ -2,7 +2,7 @@
 import type { MouseEvent } from "react";
 import type { PullRequest, PullRequestLink } from "../src/shared/github";
 import type { OmpFile, OmpFileKind } from "../src/shared/models";
-import type { PastSession, RosterHost } from "../src/shared/sessions";
+import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
 import { IS_MAC, modHeld } from "./shortcuts";
 import type { OpenMode } from "./routing";
 
@@ -174,3 +174,6 @@ export const folderName = (dir: string): string | undefined => dir.split("/").fi
 export const hostLabel = (host: RosterHost): string => host.sessionName ?? folderName(host.cwdDisplay) ?? host.cwdDisplay;
 
 export const pastLabel = (session: PastSession): string => session.title ?? folderName(session.cwdDisplay) ?? "Untitled session";
+
+/** The agent that wrote a past session, as a read-only session's row and pane name it. */
+export const SOURCE_LABELS: Record<SessionSource, string> = { omp: "omp", "claude-code": "Claude Code", codex: "Codex" };

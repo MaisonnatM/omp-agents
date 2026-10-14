@@ -19,7 +19,7 @@ import {
 import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { PaletteAction } from "../command-palette";
-import { folderName, hostLabel, modeOf, pastLabel, pullRequestsLabel, SPLIT_CLICK } from "../labels";
+import { folderName, hostLabel, modeOf, pastLabel, pullRequestsLabel, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { Age } from "./age";
@@ -183,7 +183,7 @@ interface RowProps<T> {
 	roleTitle?: string;
 }
 
-/** A past session's row, with Resume, and Move to past while it is interrupted. */
+/** A past session's row, with Resume, and Move to past while it is interrupted; a Claude Code or Codex session's facts name its agent. */
 export const PastRow = memo(function PastRow({ session, pinned, open, showWorkspace, onTogglePin, role, roleTitle }: RowProps<PastSession>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "past", sessionId: session.sessionId };
@@ -196,7 +196,10 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
 				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
 				ship={session.ship}
-				facts={sessionFacts([pinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)], session.pullRequests)}
+				facts={sessionFacts(
+					[session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)],
+					session.pullRequests,
+				)}
 				when={session.modifiedAt}
 				open={open}
 				onOpen={onOpen}
