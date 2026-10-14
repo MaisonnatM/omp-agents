@@ -26,12 +26,14 @@ Open `#new/%2Ftmp` to start one in `/tmp`, use a prompt such as `Reply with just
 
 Open the page in managed headless Chromium.
 Without `relay: false`, `browser.open` tries the omp browser relay, then fails with "extension never connected" or times out after 30 seconds.
+Without `viewport`, Chromium renders at 800×600, below the layout's desktop breakpoints, so screenshots show the narrow layout.
 
 ```js
 const tab = await browser.open({
 	name: "smoke",
 	url: `http://127.0.0.1:${port}/?token=${token}`,
 	app: { relay: false, tern: false },
+	viewport: { width: 1920, height: 1080 },
 	headed: false,
 	wait_until: "domcontentloaded",
 	timeout: 60000,
