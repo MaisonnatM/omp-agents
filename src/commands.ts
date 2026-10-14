@@ -39,7 +39,8 @@ const catalogs = createCache<Catalog>(CATALOG_TTL_MS);
 
 async function buildCatalog(cwd: string): Promise<Catalog> {
 	const [{ enableSkillCommands, skills }, fileCommands] = await Promise.all([loadSessionSkills(cwd), loadSlashCommands({ cwd })]);
-	const skillMap = enableSkillCommands ? new Map(skills.map(skill => [skill.name, skill])) : null;
+	// omp reads `/skill:<name>` up to the first whitespace, so a skill whose frontmatter name has a space cannot be invoked.
+	const skillMap = enableSkillCommands ? new Map(skills.filter(skill => !/\s/.test(skill.name)).map(skill => [skill.name, skill])) : null;
 	const commands = [
 		...[...(skillMap?.values() ?? [])].map(skill => ({ name: `skill:${skill.name}`, description: skill.description })),
 		...fileCommands.map(command => ({ name: command.name, description: command.description })),

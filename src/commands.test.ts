@@ -2,9 +2,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expandPrompt, withPinnedSkill } from "./commands";
+import { complete, expandPrompt, listSkills, withPinnedSkill } from "./commands";
 
-/** A project directory with the file command `/review` and the skill `greet`; nothing else is defined in it. */
+/** A project directory with the file command `/review`, the skill `greet`, and `Make UI`, a skill no `/skill:` can name; nothing else is defined in it. */
 const cwd = mkdtempSync(join(tmpdir(), "omp-agents-commands-"));
 afterAll(() => rmSync(cwd, { recursive: true, force: true }));
 
@@ -12,6 +12,8 @@ mkdirSync(join(cwd, ".omp", "commands"), { recursive: true });
 writeFileSync(join(cwd, ".omp", "commands", "review.md"), "---\ndescription: Review\n---\nReview $1 carefully. All arguments: $ARGUMENTS\n");
 mkdirSync(join(cwd, ".omp", "skills", "greet"), { recursive: true });
 writeFileSync(join(cwd, ".omp", "skills", "greet", "SKILL.md"), "---\nname: greet\ndescription: Say hello\n---\nSay hello to the user.\n");
+mkdirSync(join(cwd, ".omp", "skills", "make-ui"), { recursive: true });
+writeFileSync(join(cwd, ".omp", "skills", "make-ui", "SKILL.md"), "---\nname: Make UI\ndescription: Build a UI\n---\nBuild it.\n");
 
 // The catalog is cached per instance id and cwd, so each test uses its own session.
 let sessions = 0;
@@ -59,5 +61,13 @@ describe("withPinnedSkill", () => {
 		expect(await withPinnedSkill(cwd, "missing", "to Ada")).toBe("to Ada");
 		expect(await withPinnedSkill(cwd, "greet", "/review src/a.ts")).toBe("/review src/a.ts");
 		expect(await withPinnedSkill(cwd, "greet", "  /skill:greet to Bo")).toBe("  /skill:greet to Bo");
+	});
+});
+
+describe("skills offered", () => {
+	test("a skill whose name has a space is neither listed nor completed, since omp's `/skill:` stops at the space", async () => {
+		expect((await listSkills(cwd)).map(({ name }) => name)).toContain("greet");
+		expect((await listSkills(cwd)).map(({ name }) => name)).not.toContain("Make UI");
+		expect((await complete("skills-offered", cwd, "/skill:", 7)).map(({ label }) => label)).not.toContain("skill:Make UI");
 	});
 });

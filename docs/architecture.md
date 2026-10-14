@@ -713,6 +713,7 @@ A dashboard session's row carries `fast`, `{ enabled, active }` from omp's state
 `set-fast` with `enabled` sends omp `set_fast_mode`, and the session then reads omp's state again; omp refuses to enable it for a model without the tier, which shows as a note.
 
 `GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `/` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off.
+Both leave out a skill whose frontmatter `name` holds whitespace, such as `Poteto Mode`: omp reads a `/skill:` name up to the first space, so no prompt can invoke it.
 The settings page lists them to pin one, and the new-session draft reads them to show whether the pinned skill exists there.
 The page keeps the pin in localStorage (`web/pinned-skill.ts`).
 A `start` of kind `new` carries a `skill`, `null` for none: the draft sends the pin unless you turned it off there, and a quick action always sends it.
