@@ -24,7 +24,8 @@ export function judgeReplayTool(toolName: string, input: Record<string, unknown>
 		});
 		return device || path.includes("?") ? "URI devices and query-bearing reads are blocked in a replay; use local file paths." : null;
 	}
-	if (toolName !== "write" && toolName !== "edit") return `${toolName} is blocked in a replay. Shell, eval, task, LSP, MCP, and unknown tools cannot run.`;
+	if (toolName === "bash") return null;
+	if (toolName !== "write" && toolName !== "edit") return `${toolName} is blocked in a replay. Eval, task, LSP, MCP, and unknown tools cannot run.`;
 	const paths: string[] = [];
 	if (toolName === "write" && typeof input.path === "string") paths.push(input.path);
 	if (toolName === "edit" && inspect) {

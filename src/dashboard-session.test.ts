@@ -654,9 +654,7 @@ describe("DashboardSession replay admission", () => {
 		expect(client.calls).toEqual(["prompt first"]);
 		client.settlePrompt("req_1");
 		await settle();
-		await expect(session.prompt(null, "!touch outside", [], "followUp")).rejects.toThrow("Shell");
 		await expect(session.prompt(null, "/new", [], "followUp")).rejects.toThrow("slash");
-		await expect(session.prompt(null, "  !touch outside", [], "followUp")).rejects.toThrow("Shell");
 		await expect(session.editPrompt("prompt-id", "  /new")).rejects.toThrow("slash");
 		await session.prompt(null, "second", [], "followUp");
 		expect(client.calls).toEqual(["prompt first", "prompt second"]);

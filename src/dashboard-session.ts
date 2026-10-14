@@ -373,7 +373,7 @@ export class DashboardSession implements LiveSession {
 	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
 		if (this.#protectedReplay && agentId !== null) throw new PromptRefused("Subagent prompts are blocked in a replay.");
-		if (this.#protectedReplay && (text.trimStart().startsWith("!") || /^\/(?!skill:)/.test(text.trimStart()))) throw new PromptRefused("Shell and local slash commands are blocked in a replay. Use text or /skill:<name>.");
+		if (this.#protectedReplay && /^\/(?!skill:)/.test(text.trimStart())) throw new PromptRefused("Local slash commands are blocked in a replay. Use text, !<command>, or /skill:<name>.");
 		if (this.#replayInitial === "running") throw new PromptRefused("Wait for the first replay turn to finish before continuing.");
 		if (this.#replayInitial === "unsent") {
 			const expected = this.#replayExpected;
@@ -483,7 +483,7 @@ export class DashboardSession implements LiveSession {
 	 */
 	async editPrompt(entryId: string, text: string): Promise<void> {
 		if (this.#replayInitial !== null) throw new PromptRefused("Wait for the first replay turn to finish before editing its history.");
-		if (this.#protectedReplay && (text.trimStart().startsWith("!") || /^\/(?!skill:)/.test(text.trimStart()))) throw new PromptRefused("Shell and local slash commands are blocked in a replay. Use text or /skill:<name>.");
+		if (this.#protectedReplay && /^\/(?!skill:)/.test(text.trimStart())) throw new PromptRefused("Local slash commands are blocked in a replay. Use text, !<command>, or /skill:<name>.");
 		const { client } = this.#child;
 		await this.#noting("Edit failed", () =>
 			this.#turn.run(async () => {

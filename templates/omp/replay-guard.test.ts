@@ -30,9 +30,13 @@ describe("replay fail-closed tool policy", () => {
 		expect(judge("write", { path: "new/deep/file.ts", content: "new" })).toBeNull();
 		expect(judge("edit", { path: "inside.ts", edits: [{ op: "update", diff: "@@\n-before\n+after\n" }] })).toBeNull();
 	});
-	test("shell, eval, task, direct LSP, MCP, and every unknown tool are blocked even when arguments look harmless", () => {
+	test("shell commands run, unguarded by the file checks", () => {
 		const { judge } = fixture();
-		for (const tool of ["bash", "eval", "task", "lsp", "mcp__slack_send_message", "mcp__gmail_create_draft", "unknown", "ship_stage", "user_todo"]) expect(judge(tool, { command: "pwd", action: "list" })).toContain("blocked");
+		expect(judge("bash", { command: "rm -rf ../original" })).toBeNull();
+	});
+	test("eval, task, direct LSP, MCP, and every unknown tool are blocked even when arguments look harmless", () => {
+		const { judge } = fixture();
+		for (const tool of ["eval", "task", "lsp", "mcp__slack_send_message", "mcp__gmail_create_draft", "unknown", "ship_stage", "user_todo"]) expect(judge(tool, { command: "pwd", action: "list" })).toContain("blocked");
 	});
 	test("URI devices, database mutation queries, archive targets, and aliases cannot hide inside file tools", () => {
 		const { judge } = fixture();

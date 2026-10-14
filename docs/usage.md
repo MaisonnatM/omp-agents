@@ -581,10 +581,11 @@ An action that fails shows its error, and its control becomes available again.
   An unavailable source repository is an error, not a request to choose an unrelated repository.
 - The replay opens beside its source. At the four-pane limit it replaces another pane, never its source. The first prompt is sent once after omp accepts the fork and the selected settings.
   Further prompts, history edits, and settings switches wait until that first turn finishes. A page reload or server restart never automatically resends it.
-- Replay has a fail-closed model tool policy. Local `read`, `grep`, and `glob` remain available. Normal `edit` and `write` targets must resolve inside the replay worktree.
-  Shell, eval, task, direct LSP, MCP, and unknown tools are blocked. URI devices, Git metadata, runtime configuration, source paths, symlink escapes, and hard-linked write targets are blocked too.
+- Replay has a model tool policy. Local `read`, `grep`, and `glob` remain available. Normal `edit` and `write` targets must resolve inside the replay worktree.
+  Shell commands run for real in the replay worktree, unchecked, so a command can still change files outside it or reach the network.
+  Eval, task, direct LSP, MCP, and unknown tools are blocked. URI devices, Git metadata, runtime configuration, source paths, symlink escapes, and hard-linked write targets are blocked for `edit` and `write`.
   A blocked source path suggests its equivalent inside the replay worktree; Replay never silently rewrites a tool call.
-  Human `!` and local slash commands are also blocked in the replay composer. Text and `/skill:` prompts remain available.
+  Human `!` commands run in the replay composer, and local slash commands are blocked. Text and `/skill:` prompts remain available.
   This is not an OS sandbox. Reads can reach outside the worktree. Your installed extensions, startup configuration, credentials, and local dependencies must still be trusted. The dashboard's separate terminal panel is not covered by this policy.
 - The replay pane's **Compare replay** remains available while it runs, after it ends, and after a page or dashboard restart. **Open original session** returns to the source even after you close its pane.
   The comparison freezes the original turn at launch and follows the replay's first prompt by entry id, not its row number. A source that was still running may have an incomplete frozen result.

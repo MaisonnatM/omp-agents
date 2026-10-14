@@ -74,7 +74,7 @@ function ReplayForm({ view, turnId, detail, onClose }: { view: View; turnId: str
 					{command && <p className="text-xs text-muted-foreground">Shell and local slash commands cannot be replay prompts. Use text or /skill:&lt;name&gt;.</p>}
 					{detail.images.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Original images retained in order">{detail.images.map((image, index) => <img key={index} alt={`Original attachment ${index + 1}`} src={`data:${image.mimeType};base64,${image.data}`} className="max-h-20 max-w-28 rounded border object-contain" />)}</div>}
 				</div>
-				<p className="rounded-md bg-muted p-3 text-xs">Shell, eval, task, direct LSP calls, MCP tools, and unknown executable devices are blocked. Local reads and audited in-checkout edits are allowed. This is a tool guard, not an OS sandbox: dependencies and startup extensions remain trusted, and outside reads may affect results. The separate terminal panel is not guarded.</p>
+				<p className="rounded-md bg-muted p-3 text-xs">Shell commands run for real in the replay worktree and can change anything your user can reach. Eval, task, direct LSP calls, MCP tools, and unknown executable devices are blocked. Local reads and audited in-checkout edits are allowed. This is a tool guard, not an OS sandbox: dependencies and startup extensions remain trusted, and outside reads may affect results. The separate terminal panel is not guarded.</p>
 				{matching?.phase === "failed" && <p role="alert" className={ERROR_TEXT}>{matching.error}</p>}
 				<div className="flex justify-end gap-2"><Button type="button" variant="ghost" disabled={busy} onClick={onClose}>Cancel</Button><Button type="submit" disabled={!canStart}>{busy ? "Starting replay…" : "Start replay"}</Button></div>
 			</form>

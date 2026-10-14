@@ -326,11 +326,11 @@ Before admission, only the selected first text and exact ordered images are acce
 
 `src/omp/replay-launch.ts` keeps advertised tools intact. It adds the guard and request-log extensions when absent and launches with an atomically regenerated private LSP overlay outside the writable checkout.
 The overlay disables format-on-write and edit/write diagnostics and enables lazy LSP startup. Before prompting, the server waits for `omp-agents-replay-ready` with this launch's random nonce, so a stale acknowledgment cannot authorize an unprotected resumed process.
-`replay-guard.ts` blocks model shell, eval, task, direct LSP, MCP, and unknown tool calls. Only audited local reads and checked in-root writes run.
+`replay-guard.ts` lets model `bash` calls run unchecked and blocks eval, task, direct LSP, MCP, and unknown tool calls. Only audited local reads and checked in-root writes run among the file tools.
 Its pure policy uses omp's native edit inspector across supported grammars, including delete and move destinations. It rejects URI, database and archive mutations, lexical and canonical metadata paths, outside targets, symlink escapes, and hard links.
 Blocked calls add `omp-agents-replay-block` so the ordinary tool trajectory can distinguish a policy block from another error.
 This policy is not an OS sandbox or a confidentiality guarantee. Installed startup code and dependencies remain trusted, outside reads remain possible, and another process can race filesystem checks.
-The dashboard rejects human shell and local slash commands, including history edits, and subagent steering prompts in a replay too; the independent terminal panel is not restricted. Dashboard resumes restore the policy and its safe-launch overlay. A direct terminal resume cannot promise the same launch configuration.
+The dashboard rejects local slash commands, including history edits, and subagent steering prompts in a replay; human `!` commands run, and the independent terminal panel is not restricted. Dashboard resumes restore the policy and its safe-launch overlay. A direct terminal resume cannot promise the same launch configuration.
 
 At `before_provider_request`, the guard correlates the chosen model and final user text and images with the native first prompt. A classifier that quotes that prompt is not sufficient.
 The same request-log reconstruction exported by `request-log.ts` verifies the complete original body against its logged SHA-256.

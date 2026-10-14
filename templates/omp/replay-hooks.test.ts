@@ -38,7 +38,7 @@ const unchanged = JSON.stringify(payload);
 await handlers.get("before_provider_request")({ payload }, ctx);
 const check = checks()[0]?.data;
 await handlers.get("before_provider_request")({ payload: { ...payload, stream: false } }, ctx);
-const blocked = await handlers.get("tool_call")({ toolName: "bash", toolCallId: "external", input: { command: "touch /outside" } }, ctx);
+const blocked = await handlers.get("tool_call")({ toolName: "eval", toolCallId: "external", input: { code: "1" } }, ctx);
 const local = await handlers.get("tool_call")({ toolName: "write", toolCallId: "local", input: { path: "inside.txt", content: "allowed" } }, ctx);
 await manager.flush();
 const ready = manager.getEntries().find(entry => entry.customType === "omp-agents-replay-ready")?.data;
