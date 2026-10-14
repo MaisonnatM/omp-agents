@@ -50,7 +50,7 @@ function parseLiveView(value: unknown): Parsed<LiveView> {
 	return { ok: { kind: "live", instanceId, agentId } };
 }
 
-function parseView(value: unknown): Parsed<View> {
+export function parseView(value: unknown): Parsed<View> {
 	if (isObject(value) && value.kind === "past") {
 		return typeof value.sessionId === "string" ? { ok: { kind: "past", sessionId: value.sessionId } } : null;
 	}
@@ -124,6 +124,13 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			const view = parseView(value.view);
 			const { entryId } = value;
 			return view && typeof entryId === "string" && entryId ? { ok: { kind: "fork", view: view.ok, entryId } } : null;
+		}
+		case "replay": {
+			const view = parseView(value.view);
+			const model = value.model === null ? { ok: null } : parseModel(value.model);
+			const thinking = parseThinking(value.thinking);
+			const { token, prompt } = value;
+			return view && isNonEmpty(token) && model && thinking && (prompt === null || typeof prompt === "string") ? { ok: { kind: "replay", view: view.ok, token, prompt, model: model.ok, thinking: thinking.ok } } : null;
 		}
 		case "resume": {
 			const { sessionId } = value;

@@ -28,6 +28,7 @@ import { expandHome } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo } from "./shared/github";
+import { ReplayFold } from "./replay";
 import { SHIP_STAGES, SHIP_WORK, type SessionFacts, type ShipProgress } from "./shared/sessions";
 import { TICKET_ID } from "./shared/tickets";
 
@@ -187,11 +188,12 @@ export class SessionFactsScan {
 	ship: ShipProgress | null = null;
 	/** The `cwd` arguments of bash calls as written, each once, the most recently used last. */
 	readonly workDirs = new Set<string>();
+	readonly replay = new ReplayFold();
 
 	applyLine(line: string): void {
 		const backgrounding = this.#pending.size > 0 && line.includes('"jobId"');
 		const opened = this.#opening.size > 0 && line.includes('"toolResult"');
-		if (!backgrounding && !opened && !MARKERS.some(marker => line.includes(marker))) return;
+		if (!backgrounding && !opened && !MARKERS.some(marker => line.includes(marker)) && !line.includes("omp-agents-replay") && !line.includes('"role":"user"') && !line.includes("skill-prompt")) return;
 		let entry: unknown;
 		try {
 			entry = JSON.parse(line);
@@ -199,6 +201,7 @@ export class SessionFactsScan {
 			return;
 		}
 		if (!isObject(entry)) return;
+		this.replay.applyEntry(entry);
 		if (entry.type === "custom" && entry.customType === "omp-ship.state") {
 			const ship = parseShipProgress(entry.data);
 			if (ship) {
@@ -477,7 +480,8 @@ export class SessionFactsIndex {
 	factsOf(sessionPath: string): SessionFacts {
 		const session = this.#sessions.get(sessionPath);
 		if (!session) return NO_FACTS;
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree };
+		const replay = session.transcripts.get(sessionPath)?.fold.scan.replay.facts();
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree, ...(replay ? { replay } : {}) };
 	}
 
 	/** Resolves once the refreshes asked for so far are done. */

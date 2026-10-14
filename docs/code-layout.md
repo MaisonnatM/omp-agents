@@ -27,6 +27,8 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from `outline` in `web/transcript-view.ts`.
 - Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the **Transcript**/**Trajectory** tabs in `web/components/pane.tsx` swap for the transcript.
+- Replay from here: the sibling prompt-row action in `web/components/trajectory.tsx` opens `ReplayDialog` in `web/components/replay-dialog.tsx`; `FormDialog` provides its focus, escape, and pending-submit behavior.
+- Replay comparison: **Compare replay** in `web/components/pane.tsx` opens `ReplayCompareDialog` in `web/components/replay-compare.tsx`, with ordered tools, complete final text, request hashes and bodies, tokens, and cost.
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts; a project's coordinator shows `web/components/project-details.tsx` instead.
@@ -80,7 +82,7 @@ The server lives in `src/`:
   A shape the server also keeps in a file is parsed by its domain module, which `wire.ts` imports, so a file store never imports the transport: `parseRoutineSpec` in `src/routines.ts`, `parseScheduledSpec` in `src/shared/scheduled.ts`, `parseEventWhen` in `src/shared/calendar.ts`, and `parseNewSessionRequest`, the new-session start that a scheduled start keeps, in `src/shared/sessions.ts`.
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
 - `src/server/socket.ts`: handles each socket message, answering through a `Peer` from `src/server/request-ledger.ts`; see [Socket requests](architecture.md#socket-requests).
-  `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests, and refuses to fork or resume a Claude Code or Codex session before it starts omp.
+  `src/server/start.ts` starts, forks, resumes, and replays dashboard sessions for the page's `start` and `resume-all` requests, and refuses to fork or resume a Claude Code or Codex session before it starts omp.
   `src/omp/tool-policy.ts` resolves saved tool restrictions on the resumed or forked branch.
   `src/omp/restricted-rpc.ts` creates a native SDK-restricted session and runs omp's RPC mode; `src/omp/rpc.ts` selects that entrypoint for an allowlist.
   `src/server/session-end.ts` ends a session for the page's `end` message and for the end inbox: `endSession` stops it, then calls `Worktrees.removeCheckout` on its worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
@@ -154,6 +156,12 @@ The server lives in `src/`:
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
 - `src/trajectory.ts`: folds a transcript's entries into turns, with their injections, requests, tool calls, and usage, for the `turns` message; `TrajectoryTail` reads the file through `FoldedFile` and `ReadQueue`.
   `src/shared/trajectory.ts` holds `Turn`, its steps, and `TokenUsage`.
+- `src/replay.ts`: source pinning, original request correlation and settings, detached checkout preparation, owned failure cleanup, immutable original native blobs, `ReplayFold`, and full replay comparison.
+  `src/omp/replay-fork.ts` is the installed native prompt-cut and private-fork adapter, including images, skills, unresolved calls, relocation, and additional-directory clearing.
+  `src/omp/replay-launch.ts` supplies the private safe LSP overlay, protected RPC launch, resume preparation, and nonce-bound guard readiness.
+  `src/shared/replay.ts` defines replay details, markers, check evidence and comparison data, plus ordered tool and complete final-text comparison.
+  `templates/omp/agent/extensions/replay-guard.ts` installs the persistent model tool policy and the pre-send check.
+  Its `replay/` helpers contain pure local target policy, narrow root normalization, metadata validation, complete-envelope checking, and the request-log reader that `request-log.ts` also exports.
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
   Its read of a session's own file also feeds the `OwnFileFolds` it was constructed with, and it knows nothing of what those folds keep.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.

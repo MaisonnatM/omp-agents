@@ -38,6 +38,9 @@ import { type PullRequest, prKey, type Repo } from "../shared/github";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
+import type { ReplayComparison, ReplayDetail } from "../shared/replay";
+import type { View } from "../shared/sessions";
+import { parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
@@ -79,6 +82,8 @@ export interface SessionRoutesEnv {
 	sourceControl(): Promise<SourceControlAnswer>;
 	/** Apply `change` to the automatic pulls, and pull again when it changed them. */
 	changeAutoPull(change: AutoPullChange): void;
+	replayDetail(view: View, turnId: string): Promise<ReplayDetail>;
+	replayComparison(view: View): Promise<ReplayComparison>;
 }
 
 /** What the calendar routes read: Google Calendar, the calendars it shows, and the events kept on this computer. */
@@ -158,6 +163,15 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		const cwd = params.get("cwd");
 		return cwd === null || env.knownCwds().includes(cwd) || env.addedCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
 	}
+
+	const replayRead = (compare: boolean) => get(params => answer(async () => {
+		const parsed = parseView(JSON.parse(params.get("view") ?? "null"));
+		if (!parsed || parsed.ok.kind === "live" && parsed.ok.agentId !== null) throw new Error("Replay requires a main session.");
+		const turnId = params.get("turnId");
+		if (compare) return env.replayComparison(parsed.ok);
+		if (!turnId) throw new Error("Choose a prompt turn to replay.");
+		return env.replayDetail(parsed.ok, turnId);
+	}));
 
 	/** `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. */
 	const settings = get(params => {
@@ -312,6 +326,8 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models/connected": { GET: connected },
 		"/api/models/roles": { GET: roles },
 		"/api/tools": { GET: tools },
+		"/api/replay/detail": { GET: replayRead(false) },
+		"/api/replay/compare": { GET: replayRead(true) },
 		"/api/analytics": { GET: analytics },
 		"/api/analytics/context": { GET: contextReport },
 		"/api/skills": { GET: skills },

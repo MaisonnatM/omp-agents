@@ -51,6 +51,8 @@ export type TurnStep =
 			name: string;
 			args: Clipped;
 			status: "running" | "ok" | "error";
+			blocked?: boolean;
+			result?: Clipped;
 			resultBytes: number | null;
 			resultImages: number;
 			durationMs: number | null;

@@ -429,6 +429,13 @@ export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string
 		case "fork":
 		case "project":
 			return openView(layout, live, "replace");
+		case "replay": {
+			const visible = layout.panes.some(view => sameView(view, op.view)) ? layout : openView(layout, op.view, "split");
+			const source = visible.panes.findIndex(view => sameView(view, op.view));
+			if (visible.panes.length < MAX_PANES) return openView(visible, live, "split");
+			const focus = visible.focus === source ? (source + 1) % visible.panes.length : visible.focus;
+			return openView({ ...visible, focus, maximized: false }, live, "replace");
+		}
 		case "quick":
 		case "resume-all":
 			return null;

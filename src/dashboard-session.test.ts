@@ -14,6 +14,8 @@ import { RequestLedger } from "./server/request-ledger";
 import { createClientHandler, type SocketEnv } from "./server/socket";
 import type { Socket } from "./server/views";
 import type { ServerMsg } from "./shared/protocol";
+import * as replayLaunch from "./omp/replay-launch";
+import type { PreparedReplay } from "./replay";
 
 const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, queuedMessages: { steering: [], followUp: [] } };
 
@@ -611,5 +613,72 @@ describe("DashboardSession start", () => {
 
 		// The question arrived (a roster change), the process stopped, and only then was the question dropped (another).
 		expect(order).toEqual(["roster", "stop", "roster"]);
+	});
+});
+
+describe("DashboardSession replay admission", () => {
+	function preparedReplay(): PreparedReplay {
+		return {
+			forkFile: "/tmp/replay.jsonl", cwd: "/tmp/replay", config: "/tmp/replay.jsonl.replay.yml",
+			first: { text: "first", images: [] }, discard: async () => {},
+			marker: {
+				v: 1, id: "replay-id", source: { sessionId: "original", file: "/tmp/original.jsonl", turnId: "prompt-id", at: 1 },
+				roots: { original: ["/tmp/original"], replay: "/tmp/replay" }, base: { sha: "a".repeat(40), how: "head-now" },
+				model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinking: "low",
+				repaired: false, promptEdited: false, modelChanged: false, original: null, originalTurnRef: `blob:sha256:${"b".repeat(64)}`,
+			},
+		};
+	}
+
+	test("opens the native fork before applying settings and admits exactly one initial prompt", async () => {
+		const client = new FakeClient();
+		fakeOmp(client);
+		const order: string[] = [];
+		spyOn(client, "switchSession").mockImplementation(async () => { order.push("switch"); return { cancelled: false }; });
+		const model = spyOn(client, "setModel").mockImplementation(async (provider, id) => { order.push("model"); return { provider, id }; });
+		const thinking = spyOn(client, "setThinkingLevel").mockImplementation(async () => { order.push("thinking"); });
+		const ready = spyOn(replayLaunch, "requireReplayReady").mockImplementation(async () => { order.push("guard"); });
+		const prepared = preparedReplay();
+		const session = await DashboardSession.replay("replay-instance", prepared, PLAIN_LAUNCH, () => {});
+		expect(order).toEqual(["switch", "model", "thinking", "guard"]);
+		expect(model).toHaveBeenCalledWith("openai-codex", "gpt-5.6-sol");
+		expect(thinking).toHaveBeenCalledWith("low");
+		expect(ready).toHaveBeenCalledWith(prepared.forkFile, prepared.marker.id, expect.any(String));
+		await expect(session.setModel(prepared.marker.model, "low")).rejects.toThrow("first replay turn");
+		await expect(session.setThinking("low")).rejects.toThrow("first replay turn");
+		await expect(session.editPrompt("prompt-id", "changed")).rejects.toThrow("first replay turn");
+		await expect(session.prompt(null, "interleaved before send", [], "followUp")).rejects.toThrow("selected first replay prompt");
+		await expect(session.prompt("old-task", "steer", [], "followUp")).rejects.toThrow("Subagent");
+		await session.prompt(null, prepared.first.text, [], "followUp");
+		await expect(session.prompt(null, "interleaved", [], "followUp")).rejects.toThrow("first replay turn");
+		expect(client.calls).toEqual(["prompt first"]);
+		client.settlePrompt("req_1");
+		await settle();
+		await expect(session.prompt(null, "/new", [], "followUp")).rejects.toThrow("slash");
+		await expect(session.editPrompt("prompt-id", "  /new")).rejects.toThrow("slash");
+		await session.prompt(null, "second", [], "followUp");
+		expect(client.calls).toEqual(["prompt first", "prompt second"]);
+	});
+
+	test("a refused first send releases admission without resending it automatically", async () => {
+		const client = new FakeClient();
+		fakeOmp(client);
+		spyOn(replayLaunch, "requireReplayReady").mockResolvedValue(undefined);
+		const send = spyOn(client, "prompt").mockRejectedValueOnce(new Error("quota exhausted"));
+		const session = await DashboardSession.replay("replay-instance", preparedReplay(), PLAIN_LAUNCH, () => {});
+		await expect(session.prompt(null, "first", [], "followUp")).rejects.toThrow("quota exhausted");
+		await settle();
+		expect(send).toHaveBeenCalledTimes(1);
+		await session.prompt(null, "manual retry", [], "followUp");
+		expect(send).toHaveBeenCalledTimes(2);
+	});
+
+	test("cancelled opening stops the native child before failing replay startup", async () => {
+		const client = new FakeClient();
+		fakeOmp(client);
+		spyOn(client, "switchSession").mockResolvedValue({ cancelled: true });
+		const stopped = spyOn(client, "stop");
+		await expect(DashboardSession.replay("replay-instance", preparedReplay(), PLAIN_LAUNCH, () => {})).rejects.toThrow("cancelled");
+		expect(stopped).toHaveBeenCalledTimes(1);
 	});
 });

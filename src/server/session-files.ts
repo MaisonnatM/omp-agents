@@ -12,7 +12,7 @@ const sameSession = (a: SavedSession, b: SavedSession): boolean =>
 
 /** Whether two answers of `factsOf` are the same facts: each field keeps its identity until it changes. */
 const sameFacts = (a: SessionFacts, b: SessionFacts): boolean =>
-	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree;
+	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree && a.replay === b.replay;
 
 /** A past-list row and what it was built from. */
 interface PastRow {
