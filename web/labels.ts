@@ -175,5 +175,4 @@ export const hostLabel = (host: RosterHost): string => host.sessionName ?? folde
 
 export const pastLabel = (session: PastSession): string => session.title ?? folderName(session.cwdDisplay) ?? "Untitled session";
 
-/** The agent that wrote a past session, as a read-only session's row and pane name it. */
 export const SOURCE_LABELS: Record<SessionSource, string> = { omp: "omp", "claude-code": "Claude Code", codex: "Codex" };

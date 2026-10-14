@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildAnalytics, chartOf, foldSessions, sessionOfFile } from "./analytics";
+import { buildAnalytics, chartOf, foldSessions, sessionOfFile, withForeignUsage } from "./analytics";
 import type { StatsRead, SessionModelRow } from "./omp/stats";
 
 const root = "/home/me/.omp/agent/sessions";
@@ -185,4 +185,91 @@ describe("analytics provider buckets", () => {
 			],
 		});
 	});
+});
+
+test("foreign requests merge into the same totals, models, providers, buckets, workspaces, sessions, and agent split without mutating omp's read", () => {
+	const usage = {
+		totalRequests: 1, failedRequests: 0, totalInputTokens: 10, totalOutputTokens: 5, totalCacheReadTokens: 5,
+		totalCacheWriteTokens: 0, cacheRate: 1 / 3, totalCost: 1, avgTokensPerSecond: 20,
+	};
+	const read: StatsRead = {
+		window: { cutoff: 1_000, bucketMs: 1_000, now: 2_500 },
+		dashboard: {
+			overall: { ...usage },
+			byModel: [{ provider: "openai", model: "gpt-a", ...usage }],
+			byAgentType: [{ agentType: "main", totalInputTokens: 10, totalOutputTokens: 5, totalCacheReadTokens: 5, totalCacheWriteTokens: 0 }],
+		},
+		tools: { byTool: [{ tool: "read", calls: 2, errors: 1, totalTokensShare: 20 }] },
+		sync: { phase: "idle", current: 1, total: 1, lastSyncedAt: 1_000, error: null },
+		rows: [{ ...row(`${parent}.jsonl`, "openai/gpt-a", 20, 1_000), input: 10, output: 5, cacheRead: 5, cost: 1 }],
+		providerSeries: [{ timestamp: 1_000, provider: "openai", totalTokens: 20, cost: 1, requests: 1 }],
+	};
+	const merged = withForeignUsage(read, [
+		{ path: "/claude/project/alpha.jsonl", sessionId: "alpha", subagent: false, cwd: "/work/app", requests: [
+			{ provider: "anthropic", model: "claude-c", timestamp: 999, failed: false, input: 100, output: 100, cacheRead: 100, cacheWrite: 100, cost: 100 },
+			{ provider: "anthropic", model: "claude-c", timestamp: 1_000, failed: false, input: 4, output: 2, cacheRead: 6, cacheWrite: 8, cost: 2 },
+		] },
+		{ path: "/claude/project/alpha/subagents/child.jsonl", sessionId: "alpha", subagent: true, cwd: "/work/app", requests: [
+			{ provider: "anthropic", model: "claude-c", timestamp: 1_500, failed: true, input: 1, output: 3, cacheRead: 2, cacheWrite: 4, cost: 3 },
+		] },
+		{ path: "/codex/2026/10/01/rollout-beta.jsonl", sessionId: "beta", subagent: false, cwd: "/work/codex", requests: [
+			{ provider: "openai", model: "gpt-a", timestamp: 2_100, failed: false, input: 3, output: 2, cacheRead: 5, cacheWrite: 0, cost: 4 },
+		] },
+	]);
+	const answer = buildAnalytics("7d", merged, root, id => id === "alpha" ? facts(id) : id === "beta" ? { title: "Codex fix", cwd: "/work/codex" } : null);
+	expect(answer.totals).toEqual({ requests: 4, failed: 1, tokens: { input: 18, output: 12, cacheRead: 18, cacheWrite: 12, total: 60 }, cost: 10, cacheRate: 0.5 });
+	expect(answer.models).toEqual([
+		{ selector: "openai/gpt-a", tokensPerSecond: 20, requests: 2, failed: 0, tokens: { input: 13, output: 7, cacheRead: 10, cacheWrite: 0, total: 30 }, cost: 5, cacheRate: 10 / 23 },
+		{ selector: "anthropic/claude-c", tokensPerSecond: null, requests: 2, failed: 1, tokens: { input: 5, output: 5, cacheRead: 8, cacheWrite: 12, total: 30 }, cost: 5, cacheRate: 8 / 13 },
+	]);
+	expect(answer.providers).toEqual([
+		{ provider: "anthropic", tokens: 30, cost: 5, requests: 2 }, { provider: "openai", tokens: 30, cost: 5, requests: 2 },
+	]);
+	expect(answer.series).toEqual([
+		{ start: 1_000, tokens: 50, cost: 6, requests: 3, providers: [
+			{ provider: "openai", tokens: 20, cost: 1, requests: 1 }, { provider: "anthropic", tokens: 30, cost: 5, requests: 2 },
+		] },
+		{ start: 2_000, tokens: 10, cost: 4, requests: 1, providers: [{ provider: "openai", tokens: 10, cost: 4, requests: 1 }] },
+	]);
+	expect(answer.workspaces).toEqual([
+		{ cwd: "/work/app", requests: 3, failed: 1, tokens: { input: 15, output: 10, cacheRead: 13, cacheWrite: 12, total: 50 }, cost: 6, cacheRate: 13 / 28 },
+		{ cwd: "/work/codex", requests: 1, failed: 0, tokens: { input: 3, output: 2, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 4, cacheRate: 5 / 8 },
+	]);
+	expect(answer.agents).toEqual({ main: 50, subagent: 10, advisor: 0 });
+	expect(answer.sessions).toEqual([
+		{ sessionId: "alpha", title: "Fix billing", listed: true, cwd: "/work/app",
+			usage: { requests: 3, failed: 1, tokens: { input: 15, output: 10, cacheRead: 13, cacheWrite: 12, total: 50 }, cost: 6, cacheRate: 13 / 28 },
+			subagentTokens: 10, models: ["anthropic/claude-c", "openai/gpt-a"], lastAt: 1_500 },
+		{ sessionId: "beta", title: "Codex fix", listed: true, cwd: "/work/codex",
+			usage: { requests: 1, failed: 0, tokens: { input: 3, output: 2, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 4, cacheRate: 5 / 8 },
+			subagentTokens: 0, models: ["openai/gpt-a"], lastAt: 2_100 },
+	]);
+	expect(answer.tools).toEqual([{ name: "read", calls: 2, errors: 1, tokenShare: 20 }]);
+	expect(read.dashboard.overall).toEqual(usage);
+	expect(read.rows).toEqual([{ ...row(`${parent}.jsonl`, "openai/gpt-a", 20, 1_000), input: 10, output: 5, cacheRead: 5, cost: 1 }]);
+	expect(read.providerSeries).toEqual([{ timestamp: 1_000, provider: "openai", totalTokens: 20, cost: 1, requests: 1 }]);
+});
+
+test("all time includes old foreign usage and an unknown model's tokens, even for an unlisted subagent", () => {
+	const empty = { totalRequests: 0, failedRequests: 0, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheWriteTokens: 0, totalCost: 0, cacheRate: 0, avgTokensPerSecond: null };
+	const read: StatsRead = {
+		window: { cutoff: null, bucketMs: 1_000, now: 2_500 },
+		dashboard: { overall: empty, byModel: [], byAgentType: [] }, tools: { byTool: [] },
+		sync: { phase: "idle", current: 0, total: 0, lastSyncedAt: null, error: null }, rows: [], providerSeries: [],
+	};
+	const answer = buildAnalytics("all", withForeignUsage(read, [{
+		path: "/codex/2026/10/01/rollout-orphan.jsonl", sessionId: "orphan", subagent: true, cwd: "/work/review",
+		requests: [{ provider: "openai", model: "unknown", timestamp: 999, failed: false, input: 4, output: 1, cacheRead: 5, cacheWrite: 0, cost: 0 }],
+	}]), root, () => null);
+	expect(answer.totals).toEqual({ requests: 1, failed: 0, tokens: { input: 4, output: 1, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 0, cacheRate: 5 / 9 });
+	expect(answer.sessions).toEqual([{
+		sessionId: "orphan", listed: false, title: null, cwd: "/work/review",
+		usage: { requests: 1, failed: 0, tokens: { input: 4, output: 1, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 0, cacheRate: 5 / 9 },
+		subagentTokens: 10, models: ["openai/unknown"], lastAt: 999,
+	}]);
+	expect(answer.models).toEqual([{ selector: "openai/unknown", tokensPerSecond: null, requests: 1, failed: 0, tokens: { input: 4, output: 1, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 0, cacheRate: 5 / 9 }]);
+	expect(answer.agents).toEqual({ main: 0, subagent: 10, advisor: 0 });
+	expect(answer.series.map(({ start, tokens, requests }) => ({ start, tokens, requests }))).toEqual([
+		{ start: 0, tokens: 10, requests: 1 }, { start: 1_000, tokens: 0, requests: 0 }, { start: 2_000, tokens: 0, requests: 0 },
+	]);
 });

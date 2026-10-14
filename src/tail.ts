@@ -16,7 +16,6 @@ const PUBLISH_WINDOW_MS = 50;
 const inFlux = (item: Item): boolean =>
 	((item.kind === "assistant" || item.kind === "thinking") && item.streaming) || (item.kind === "tool" && item.status === "running");
 
-/** A transcript's entries folded into its display items and its changed files, each line decoded once for both. */
 class TailFold {
 	readonly transcript = new Transcript();
 	readonly work = new Work();
@@ -24,7 +23,6 @@ class TailFold {
 	#changed: Item[] = [];
 	readonly #decode: (line: string) => unknown[];
 
-	/** `decode`: the file's format's, which skips an omp line that does not parse. */
 	constructor(decode: (line: string) => unknown[]) {
 		this.#decode = decode;
 	}

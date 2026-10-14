@@ -1,21 +1,21 @@
-/**
- * Codex's session files, read-only: `<CODEX_HOME>/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl`, each line one
- * record. `decode` turns a record into the omp entries the transcript folds already read. A renamed session's title
- * lives outside its file, in `<CODEX_HOME>/session_index.jsonl`.
- */
 import { homedir } from "node:os";
 import { basename, dirname, join, relative, sep } from "node:path";
-import { isObject, nonEmptyStr, parseJson, str } from "../json";
+import { isObject, nonEmptyStr, num, parseJson, str } from "../json";
 import type { SessionFormat } from "../session-formats";
 import { lineId, oneLine, textOf, unreadLine } from "../session-entries";
 import { type FileEdges, ForeignFiles, type SessionSummary } from "./files";
+import type { ForeignRequest, Pricer, RequestTokens, UsageFold } from "./usage";
 
 type Json = Record<string, unknown>;
+
+interface DecodedBlocks {
+	content: Json[];
+	unread: boolean;
+}
 
 /** Codex's home directory, `CODEX_HOME` when set. */
 export const codexHome = (): string => process.env.CODEX_HOME ?? join(homedir(), ".codex");
 
-/** Records that hold nothing a transcript shows; `event_msg` repeats what the response items hold. */
 const SKIPPED: Record<string, true> = {
 	session_meta: true,
 	turn_context: true,
@@ -45,36 +45,45 @@ export function codexFileOf(changedPath: string, root: string): string | null {
 	return parts.length === 4 && parts[0] !== ".." && name.startsWith("rollout-") && name.endsWith(".jsonl") ? changedPath : null;
 }
 
-/** A message's text and image blocks in omp's vocabulary; a user's injected context blocks are left out. */
-function blocksOf(content: unknown, role: "user" | "assistant"): Json[] {
-	if (!Array.isArray(content)) return [];
-	return content.flatMap((block): Json[] => {
-		if (!isObject(block) || typeof block.text !== "string") {
-			const url = isObject(block) && block.type === "input_image" ? str(block.image_url) : undefined;
-			const image = url?.match(/^data:([^;]+);base64,(.+)$/s);
-			return image ? [{ type: "image", mimeType: image[1], data: image[2] }] : [];
-		}
-		if (block.type !== (role === "user" ? "input_text" : "output_text")) return [];
-		if (role === "user" && INJECTED.test(block.text.trimStart())) return [];
-		return block.text ? [{ type: "text", text: block.text }] : [];
-	});
-}
-
-/** A tool's output as a result's text blocks, and whether it failed. */
-function outputOf(output: unknown): { content: Json[]; isError: boolean } {
-	if (typeof output === "string") return { content: [{ type: "text", text: output }], isError: FAILED_EXIT.test(output.split("\nOutput:")[0]) };
-	if (Array.isArray(output)) {
-		return { content: output.flatMap(block => (isObject(block) && typeof block.text === "string" ? [{ type: "text", text: block.text }] : [])), isError: false };
+function blockOf(block: unknown, role: "user" | "assistant" | "toolResult"): Json[] | null {
+	if (!isObject(block)) return null;
+	if (block.type === "input_image") {
+		const image = str(block.image_url)?.match(/^data:([^;]+);base64,(.+)$/s);
+		return image ? [{ type: "image", mimeType: image[1], data: image[2] }] : null;
 	}
-	if (isObject(output)) return { content: outputOf(output.content).content, isError: output.success === false };
-	return { content: [], isError: false };
+	const textType = role === "toolResult"
+		? block.type === "input_text" || block.type === "output_text" || block.type === "text"
+		: block.type === (role === "user" ? "input_text" : "output_text");
+	if (!textType || typeof block.text !== "string") return null;
+	if (role === "user" && INJECTED.test(block.text.trimStart())) return [];
+	return block.text ? [{ type: "text", text: block.text }] : [];
 }
 
-/** A function call's arguments, which Codex writes as a JSON string: an object as it is, anything else as the call's input. */
-function argumentsOf(raw: unknown): Json {
+function blocksOf(content: unknown, role: "user" | "assistant" | "toolResult"): DecodedBlocks {
+	const decoded: DecodedBlocks = { content: [], unread: !Array.isArray(content) };
+	if (!Array.isArray(content)) return decoded;
+	for (const block of content) {
+		const parsed = blockOf(block, role);
+		if (parsed === null) decoded.unread = true;
+		else decoded.content.push(...parsed);
+	}
+	return decoded;
+}
+
+function outputOf(output: unknown): DecodedBlocks & { isError: boolean } {
+	if (typeof output === "string") return { content: output ? [{ type: "text", text: output }] : [], unread: false, isError: FAILED_EXIT.test(output.split("\nOutput:")[0]) };
+	if (Array.isArray(output)) return { ...blocksOf(output, "toolResult"), isError: false };
+	if (isObject(output)) {
+		const decoded = outputOf(output.content);
+		return { ...decoded, unread: decoded.unread || (output.success !== undefined && typeof output.success !== "boolean"), isError: decoded.isError || output.success === false };
+	}
+	return { content: [], unread: true, isError: false };
+}
+
+function argumentsOf(raw: unknown): Json | null {
 	const parsed = typeof raw === "string" ? parseJson(raw) : raw;
-	if (isObject(parsed)) return Array.isArray(parsed.command) ? { ...parsed, command: parsed.command.at(-1) } : parsed;
-	return typeof raw === "string" && raw ? { input: raw } : {};
+	if (isObject(parsed) && !Array.isArray(parsed)) return Array.isArray(parsed.command) ? { ...parsed, command: parsed.command.at(-1) } : parsed;
+	return typeof raw === "string" && raw ? { input: raw } : null;
 }
 
 const message = (id: string, timestamp: unknown, role: string, content: Json[], extra: Json = {}): Json => ({
@@ -84,7 +93,6 @@ const message = (id: string, timestamp: unknown, role: string, content: Json[], 
 	message: { role, content, ...extra },
 });
 
-/** A tool call, settled at once with an empty result when `settled`, for the searches Codex records as one item. */
 const toolCall = (id: string, timestamp: unknown, call: Json, settled: boolean): Json[] => [
 	message(id, timestamp, "assistant", [{ type: "toolCall", ...call }]),
 	...(settled ? [message(`${id}:result`, timestamp, "toolResult", [], { toolCallId: call.id, isError: false })] : []),
@@ -92,33 +100,73 @@ const toolCall = (id: string, timestamp: unknown, call: Json, settled: boolean):
 
 function decodeItem(item: Json, id: string, timestamp: unknown, line: string): unknown[] {
 	const type = str(item.type) ?? "";
-	if (SKIPPED_ITEMS[type]) return [];
+	if (Object.hasOwn(SKIPPED_ITEMS, type)) return [];
 	switch (type) {
 		case "message": {
 			if (item.role !== "user" && item.role !== "assistant") return item.role === "developer" || item.role === "system" ? [] : [unreadLine(line, timestamp)];
-			const content = blocksOf(item.content, item.role);
-			return content.length > 0 ? [message(id, timestamp, item.role, content)] : [];
+			const decoded = blocksOf(item.content, item.role);
+			const entries: unknown[] = decoded.content.length > 0 ? [message(id, timestamp, item.role, decoded.content)] : [];
+			if (decoded.unread) entries.push(unreadLine(line, timestamp));
+			return entries;
 		}
 		case "reasoning": {
-			const summary = Array.isArray(item.summary) ? item.summary : [];
-			const thinking = summary.flatMap(part => (isObject(part) && typeof part.text === "string" && part.text ? [part.text] : [])).join("\n\n");
-			return thinking ? [message(id, timestamp, "assistant", [{ type: "thinking", thinking }])] : [];
+			const parts: string[] = [];
+			let unread = false;
+			for (const [field, textType] of [["summary", "summary_text"], ["content", "reasoning_text"]] as const) {
+				const value = item[field];
+				if (value === undefined || (field === "content" && value === null)) continue;
+				if (!Array.isArray(value)) {
+					unread = true;
+					continue;
+				}
+				for (const part of value) {
+					if (!isObject(part) || part.type !== textType || typeof part.text !== "string") unread = true;
+					else if (part.text) parts.push(part.text);
+				}
+			}
+			if (item.summary === undefined && item.content === undefined && typeof item.encrypted_content !== "string") unread = true;
+			const thinking = parts.join("\n\n");
+			const entries: unknown[] = thinking ? [message(id, timestamp, "assistant", [{ type: "thinking", thinking }])] : [];
+			if (unread) entries.push(unreadLine(line, timestamp));
+			return entries;
 		}
 		case "function_call":
-			return toolCall(id, timestamp, { id: str(item.call_id), name: str(item.name), arguments: argumentsOf(item.arguments) }, false);
-		case "custom_tool_call":
-			return toolCall(id, timestamp, { id: str(item.call_id), name: str(item.name), arguments: { input: str(item.input) ?? "" } }, false);
+		case "custom_tool_call": {
+			const callId = nonEmptyStr(item.call_id);
+			const name = nonEmptyStr(item.name);
+			const namespace = item.namespace === undefined || item.namespace === null ? undefined : nonEmptyStr(item.namespace);
+			const args = type === "function_call" ? argumentsOf(item.arguments) : typeof item.input === "string" ? { input: item.input } : null;
+			if (!callId || !name || !args || (item.namespace !== undefined && item.namespace !== null && !namespace)) return [unreadLine(line, timestamp)];
+			return toolCall(id, timestamp, { id: callId, name: namespace ? `${namespace}.${name}` : name, arguments: args }, false);
+		}
 		case "function_call_output":
 		case "custom_tool_call_output": {
-			const { content, isError } = outputOf(item.output);
-			return [message(id, timestamp, "toolResult", content, { toolCallId: str(item.call_id), isError })];
+			const callId = nonEmptyStr(item.call_id);
+			if (!callId) return [unreadLine(line, timestamp)];
+			const decoded = outputOf(item.output);
+			const entries: unknown[] = [message(id, timestamp, "toolResult", decoded.content, { toolCallId: callId, isError: decoded.isError })];
+			if (decoded.unread) entries.push(unreadLine(line, timestamp));
+			return entries;
 		}
 		case "web_search_call":
-			return toolCall(id, timestamp, { id, name: "web_search", arguments: isObject(item.action) ? item.action : {} }, item.status === "completed");
-		case "tool_search_call":
-			return toolCall(id, timestamp, { id: str(item.call_id) ?? id, name: "tool_search", arguments: argumentsOf(item.arguments) }, item.status === "completed");
-		case "tool_search_output":
-			return [message(id, timestamp, "toolResult", [], { toolCallId: str(item.call_id), isError: item.status === "failed" })];
+			return isObject(item.action) && !Array.isArray(item.action)
+				? toolCall(id, timestamp, { id, name: "web_search", arguments: item.action }, item.status === "completed")
+				: [unreadLine(line, timestamp)];
+		case "tool_search_call": {
+			const callId = item.call_id === undefined ? id : nonEmptyStr(item.call_id);
+			const args = argumentsOf(item.arguments);
+			return callId && args ? toolCall(id, timestamp, { id: callId, name: "tool_search", arguments: args }, item.status === "completed") : [unreadLine(line, timestamp)];
+		}
+		case "tool_search_output": {
+			const callId = nonEmptyStr(item.call_id);
+			if (!callId) return [unreadLine(line, timestamp)];
+			const decoded = Array.isArray(item.tools)
+				? { content: [{ type: "text", text: JSON.stringify(item.tools) }], unread: item.tools.some(tool => !isObject(tool) || Array.isArray(tool)), isError: false }
+				: outputOf(item.output);
+			const entries: unknown[] = [message(id, timestamp, "toolResult", decoded.content, { toolCallId: callId, isError: decoded.isError || item.status === "failed" })];
+			if (decoded.unread) entries.push(unreadLine(line, timestamp));
+			return entries;
+		}
 		case "compaction":
 			return [{ type: "compaction", id, timestamp }];
 		default:
@@ -129,7 +177,7 @@ function decodeItem(item: Json, id: string, timestamp: unknown, line: string): u
 function decodeRecord(record: unknown, line: string): unknown[] {
 	if (!isObject(record)) return [unreadLine(line, undefined)];
 	const type = str(record.type) ?? "";
-	if (SKIPPED[type]) return [];
+	if (Object.hasOwn(SKIPPED, type)) return [];
 	const id = lineId("codex", line);
 	if (type === "compacted") return [{ type: "compaction", id, timestamp: record.timestamp }];
 	if (type !== "response_item" || !isObject(record.payload)) return [unreadLine(line, record.timestamp)];
@@ -139,7 +187,6 @@ function decodeRecord(record: unknown, line: string): unknown[] {
 /** One line of a Codex session file as omp entries. */
 export const decodeCodexLine = (line: string): unknown[] => decodeRecord(parseJson(line), line);
 
-/** A session's id, working directory, first prompt, and whether it holds a turn, from its file's edges; `null` for a subagent's file, which its parent's transcript covers. */
 function summarize({ head, tail }: FileEdges, path: string): SessionSummary | null {
 	const first = parseJson(head[0] ?? "");
 	const meta = isObject(first) && first.type === "session_meta" && isObject(first.payload) ? first.payload : {};
@@ -162,7 +209,6 @@ function summarize({ head, tail }: FileEdges, path: string): SessionSummary | nu
 	};
 }
 
-/** The titles sessions were renamed to, by id; the newest line for an id wins. */
 async function readTitles(indexPath: string): Promise<Map<string, string>> {
 	const titles = new Map<string, string>();
 	const text = await Bun.file(indexPath)
@@ -176,6 +222,94 @@ async function readTitles(indexPath: string): Promise<Map<string, string>> {
 		if (id && title) titles.set(id, oneLine(title));
 	}
 	return titles;
+}
+
+const USAGE_LINE = /"type"\s*:\s*"(?:session_meta|turn_context|token_count|token_usage_record|thread_settings_applied)"/;
+
+/** The requests in a rollout, pairing response-id usage with its following token summary and counting event-only requests by growing totals. */
+export class CodexUsage implements UsageFold {
+	readonly path: string;
+	sessionId: string;
+	subagent = false;
+	cwd = "";
+	readonly requests: ForeignRequest[] = [];
+	readonly #price: Pricer;
+	#meta = false;
+	#model = "";
+	#total = 0;
+	readonly #responses = new Set<string>();
+	#pending: Json | null = null;
+
+	constructor(path: string, price: Pricer) {
+		this.path = path;
+		this.sessionId = path.match(UUID)?.[1] ?? basename(path, ".jsonl");
+		this.#price = price;
+	}
+
+	applyLine(line: string): void {
+		if (!USAGE_LINE.test(line)) return;
+		const record = parseJson(line);
+		if (!isObject(record) || !isObject(record.payload)) return;
+		const { payload } = record;
+		switch (record.type) {
+			case "session_meta":
+				this.#applyMeta(payload);
+				return;
+			case "turn_context":
+				this.#model = nonEmptyStr(payload.model) ?? this.#model;
+				return;
+			case "token_usage_record":
+				this.#countResponse(payload, Date.parse(str(record.timestamp) ?? ""));
+				return;
+			case "event_msg":
+				if (payload.type === "thread_settings_applied" && isObject(payload.thread_settings)) this.#model = nonEmptyStr(payload.thread_settings.model) ?? this.#model;
+				if (payload.type === "token_count" && isObject(payload.info)) this.#count(payload.info, Date.parse(str(record.timestamp) ?? ""));
+		}
+	}
+
+	#applyMeta(meta: Json): void {
+		if (this.#meta) return;
+		this.#meta = true;
+		this.cwd = str(meta.cwd) ?? "";
+		const id = nonEmptyStr(meta.id) ?? this.sessionId;
+		const source = isObject(meta.source) ? meta.source : {};
+		if (!("subagent" in source)) {
+			this.sessionId = id;
+			return;
+		}
+		const spawn = isObject(source.subagent) && isObject(source.subagent.thread_spawn) ? source.subagent.thread_spawn : {};
+		this.subagent = true;
+		this.sessionId = nonEmptyStr(spawn.parent_thread_id) ?? nonEmptyStr(meta.parent_thread_id) ?? id;
+	}
+
+	#countResponse(payload: Json, timestamp: number): void {
+		const responseId = nonEmptyStr(payload.response_id);
+		const usage = payload.usage;
+		if (!responseId || this.#responses.has(responseId) || !isObject(usage) || Number.isNaN(timestamp)) return;
+		this.#responses.add(responseId);
+		this.#pending = usage;
+		this.#addRequest(usage, timestamp);
+	}
+
+	#count(info: Json, timestamp: number): void {
+		const total = isObject(info.total_token_usage) ? num(info.total_token_usage.total_tokens) : undefined;
+		const last = info.last_token_usage;
+		if (total === undefined || !isObject(last) || Number.isNaN(timestamp)) return;
+		const pending = this.#pending;
+		this.#pending = null;
+		if (total <= this.#total) return;
+		this.#total = total;
+		if (pending && ["input_tokens", "cached_input_tokens", "output_tokens", "total_tokens"].every(key => num(pending[key]) === num(last[key]))) return;
+		this.#addRequest(last, timestamp);
+	}
+
+	/** Cached and cache-written input are included in `input_tokens`; reasoning is included in output. */
+	#addRequest(usage: Json, timestamp: number): void {
+		const cacheRead = num(usage.cached_input_tokens) ?? 0;
+		const cacheWrite = num(usage.cache_write_input_tokens) ?? 0;
+		const tokens: RequestTokens = { input: (num(usage.input_tokens) ?? 0) - cacheRead - cacheWrite, output: num(usage.output_tokens) ?? 0, cacheRead, cacheWrite };
+		this.requests.push({ provider: "openai", model: this.#model, timestamp, failed: false, ...tokens, cost: this.#price("openai", this.#model, tokens, timestamp) });
+	}
 }
 
 /** Codex's sessions under `root`, its `sessions` directory, titled from the index beside it. */
@@ -197,5 +331,6 @@ export function codexFormat(root: string = join(codexHome(), "sessions")): Sessi
 		},
 		decode: decodeCodexLine,
 		messageLine: /"type":"message"/,
+		usage: { patterns: ["*/*/*/rollout-*.jsonl"], fold: (path, price) => new CodexUsage(path, price) },
 	};
 }

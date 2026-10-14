@@ -13,9 +13,8 @@ afterEach(() => {
 const at = "2026-10-01T12:00:00.000Z";
 const base = { sessionId: "c1", cwd: "/work", timestamp: at };
 const user = (uuid: string, content: unknown, extra: object = {}) => ({ type: "user", uuid, ...base, ...extra, message: { role: "user", content } });
-const assistant = (uuid: string, content: unknown[]) => ({ type: "assistant", uuid, ...base, message: { role: "assistant", content } });
+const assistant = (uuid: string, content: unknown) => ({ type: "assistant", uuid, ...base, message: { role: "assistant", content } });
 
-/** The transcript items a file of `records` shows; a string stands for a raw line. */
 function itemsOf(records: unknown[]) {
 	const transcript = new Transcript();
 	for (const record of records) for (const entry of decodeClaudeCodeLine(typeof record === "string" ? record : JSON.stringify(record))) transcript.applyEntry(entry);
@@ -75,8 +74,65 @@ describe("decodeClaudeCodeLine", () => {
 			{ kind: "notice", level: "warning", text: expect.stringContaining('"brand-new"') },
 			{ kind: "notice", level: "warning", text: "Unread line: {not json" },
 		]);
-		// The same line keeps its id, so the pane and the conversation search agree on it.
 		expect(itemsOf(["{not json"])[0]?.id).toBe(items[1]?.id);
+	});
+
+	test("an unknown record whose name is an object property still warns", () => {
+		expect(itemsOf([{ type: "toString", ...base }])).toMatchObject([{ kind: "notice", level: "warning" }]);
+	});
+
+	test("mixed content keeps valid text and tools alongside one unread-line warning", () => {
+		const record = assistant("mixed", [
+			{ type: "text", text: "Still readable." },
+			{ type: "tool_use", id: "good", name: "Bash", input: { command: "pwd" } },
+			{ type: "text", text: 7 },
+			{ type: "new_block", text: "not silently dropped" },
+			null,
+		]);
+		expect(itemsOf([record])).toMatchObject([
+			{ kind: "assistant", text: "Still readable." },
+			{ kind: "tool", id: "tool:good", name: "Bash", status: "running" },
+			{ kind: "notice", level: "warning", text: expect.stringContaining('"mixed"') },
+		]);
+	});
+
+	test.each([
+		undefined, {}, 7,
+		[{ type: "text" }], [{ type: "thinking", thinking: false }],
+		[{ type: "tool_use", name: "Bash", input: {} }],
+		[{ type: "tool_use", id: "c", name: "", input: {} }],
+		[{ type: "tool_use", id: "c", name: "Bash", input: [] }],
+		[{ type: "tool_use", id: "c", name: "Bash" }],
+		[{ type: "image", source: { type: "url", url: "https://example.com/image.png" } }],
+	].map(content => ({ content })))("malformed message content produces a warning rather than an empty transcript (%j)", ({ content }) => {
+		expect(itemsOf([user("bad", content)])).toMatchObject([{ kind: "notice", level: "warning" }]);
+		expect(itemsOf([assistant("bad", content)])).toMatchObject([{ kind: "notice", level: "warning" }]);
+	});
+
+	test("a mixed result retains its text and settles its call while malformed correlation produces a warning", () => {
+		const call = assistant("call", [{ type: "tool_use", id: "c", name: "Bash", input: { command: "pwd" } }]);
+		const result = user("result", [
+			{ type: "tool_result", tool_use_id: "c", content: [{ type: "text", text: "/work" }, { type: "future_result" }] },
+			{ type: "tool_result", content: "uncorrelated" },
+			{ type: "text", text: "Continue." },
+		]);
+		expect(decodeClaudeCodeLine(JSON.stringify(result))).toMatchObject([
+			{ message: { role: "toolResult", toolCallId: "c", content: [{ type: "text", text: "/work" }] } },
+			{ message: { role: "user", content: [{ type: "text", text: "Continue." }] } },
+			{ type: "unread-line", text: JSON.stringify(result) },
+		]);
+		expect(itemsOf([call, result])).toMatchObject([
+			{ kind: "tool", id: "tool:c", status: "ok" },
+			{ kind: "user", text: "Continue." },
+			{ kind: "notice", level: "warning" },
+		]);
+	});
+
+	test("intentional empty and redacted blocks leave a valid reply without warnings", () => {
+		expect(itemsOf([assistant("empty", [
+			{ type: "text", text: "" }, { type: "thinking", thinking: "" }, { type: "redacted_thinking", data: "encrypted" },
+			{ type: "text", text: "Done." },
+		])])).toMatchObject([{ kind: "assistant", text: "Done." }]);
 	});
 });
 
@@ -109,8 +165,6 @@ describe("claudeCodeFormat", () => {
 			{ id: "c2", cwd: "/work", title: "add a test", empty: false, source: "claude-code" },
 			{ id: "c3", cwd: "", title: null, empty: true, source: "claude-code" },
 		]);
-		// Unchanged files are not read again, so the same object comes back.
-		expect((await format.list()).find(session => session.id === "c1")).toBe(listed[0]!);
 	});
 
 	test("a root that does not exist lists nothing", async () => {

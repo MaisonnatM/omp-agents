@@ -8,6 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import type { Server } from "bun";
+import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
 import { GmailClient } from "../gmail";
 import { GoogleCalendarClient } from "../google-calendar";
@@ -17,7 +18,7 @@ import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
-import { readCreditRuns, stopStats } from "../omp/stats";
+import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
 import { SourceControl } from "../source-control";
@@ -68,6 +69,7 @@ type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 /** Everything the server serves, built once at startup; {@link Dashboard.start} sets it going and {@link Dashboard.stop} stops it. */
 export class Dashboard {
 	readonly #files = new SessionFiles();
+	readonly #foreignUsage = new ForeignUsage(SESSION_FORMATS, listPrice);
 	readonly #interrupted = new InterruptedSessions(interruptedFile);
 	readonly #todos = new UserTodosFile(userTodosFile);
 	readonly #routines = new RoutinesFile(routinesFile);
@@ -342,6 +344,7 @@ export class Dashboard {
 				addedCwds: () => this.#workspaces.value.added,
 				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
 				savedOf: files.savedOf,
+				foreignUsage: () => this.#foreignUsage.read(),
 				placeOf(sessionId) {
 					const file = files.pathOf(sessionId);
 					const saved = files.savedOf(sessionId);

@@ -4,10 +4,11 @@
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
-import { buildAnalytics, type SessionSummary } from "../analytics";
+import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { errorText, type Parsed } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
+import type { FileUsage } from "../foreign/usage";
 import { gitCheckout } from "../git";
 import type { GoogleCalendarClient } from "../google-calendar";
 import type { GmailClient } from "../gmail";
@@ -62,6 +63,8 @@ export interface SessionRoutesEnv {
 	changeWorkspaces(change: WorkspaceChange): void;
 	/** The listed file of a session, for Analytics' title and working directory. */
 	savedOf(sessionId: string): SessionSummary | null;
+	/** The requests Claude Code's and Codex's transcripts record, each transcript read past what earlier reads folded. */
+	foreignUsage(): Promise<FileUsage[]>;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
 	/** The pull request list loaded `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
@@ -188,12 +191,14 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return cwd instanceof Response ? cwd : answer(async () => ({ roles: await connectedRoles(cwd) }));
 	});
 
-	/** `GET /api/analytics?range=`: omp-stats' request usage and live sync state. */
+	/** `GET /api/analytics?range=`: omp-stats' request usage and live sync state, with Claude Code's and Codex's requests. */
 	const analytics = get(params => {
 		const value = params.get("range") ?? "24h";
-		return isAnalyticsRange(value)
-			? answer(async () => buildAnalytics(value, await readStats(value), sessionsDir, env.savedOf))
-			: fail(400, "Unknown analytics range");
+		if (!isAnalyticsRange(value)) return fail(400, "Unknown analytics range");
+		return answer(async () => {
+			const [read, foreign] = await Promise.all([readStats(value), env.foreignUsage()]);
+			return buildAnalytics(value, withForeignUsage(read, foreign), sessionsDir, env.savedOf);
+		});
 	});
 
 	/** `GET /api/skills?cwd=<dir>`: the skills a session started in that directory can invoke. */

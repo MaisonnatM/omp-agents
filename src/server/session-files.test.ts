@@ -28,7 +28,6 @@ function writeSession(path: string, id: string, title: string, mtime: number): v
 
 const writeLines = (path: string, lines: unknown[]): void => writeFileSync(path, `${lines.map(line => JSON.stringify(line)).join("\n")}\n`);
 
-/** A temporary root for each agent, and the files of all three. */
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-session-files-"));
 	roots.push(root);

@@ -1,4 +1,3 @@
-/** Every session file on disk, omp's and the other agents' it reads, newest first, with the pull requests each session worked on. */
 import { Conversations } from "../conversation-search";
 import { headHistory, worktreeAt } from "../git";
 import { repoOf } from "../github";

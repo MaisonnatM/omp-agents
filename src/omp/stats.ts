@@ -3,10 +3,11 @@
  * ingest, which syncs every session file and then watches them.
  */
 import type { Database } from "bun:sqlite";
+import type { Pricer } from "../foreign/usage";
 import type { AnalyticsRange } from "../shared/analytics";
 import type { CreditsSubject } from "../shared/notices";
 import type { StatsDashboard, StatsProviderPoint, StatsSync, StatsToolDashboard } from "./modules";
-import { rateLimit, statsAggregator, statsDb, statsLive, statsRollup } from "./modules";
+import { catalog, rateLimit, statsAggregator, statsDb, statsLive, statsRollup } from "./modules";
 
 /** What one model used in one session file over the range. */
 export interface SessionModelRow {
@@ -24,6 +25,8 @@ export interface SessionModelRow {
 	subagentTokens: number;
 	cost: number;
 	lastAt: number;
+	/** The session the row counts toward when its file's path does not say, as for another agent's transcript. */
+	session?: { sessionId: string; subagent: boolean };
 }
 
 /** omp-stats' series window: buckets of `bucketMs` from `cutoff` (null for all time) to `now`. */
@@ -104,6 +107,14 @@ export async function readStats(range: AnalyticsRange): Promise<StatsRead> {
 	const window = { cutoff, bucketMs, now };
 	return { window, dashboard, tools, sync: statsLive.statsLive().status().sync, rows, providerSeries: statsRollup.getProviderTimeSeries(window) };
 }
+
+/** omp's list price from its bundled model catalog, as omp prices its own requests; 0 for a model the catalog does not list. */
+export const listPrice: Pricer = (provider, model, { input, output, cacheRead, cacheWrite, cttl }, timestamp) => {
+	const known = catalog.getBundledModel(provider, model);
+	if (!known) return 0;
+	const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+	return catalog.calculateCost(known, { input, output, cacheRead, cacheWrite, totalTokens: input + output + cacheRead + cacheWrite, cttl, cost }, timestamp).total;
+};
 
 const isBillingCap = (error: string | null): boolean => error !== null && /\b402\b/.test(error) && rateLimit.is402BillingCapBody(error);
 

@@ -23,10 +23,6 @@ interface PastConversationProps {
 	actions?: ReactNode;
 }
 
-/**
- * A past session's saved transcript under its title. It follows the file; **Resume** continues it in a session this dashboard starts.
- * A Claude Code or Codex session neither resumes nor forks here: the dashboard only reads its file.
- */
 export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const title = session ? pastLabel(session) : "Past session";

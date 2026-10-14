@@ -35,7 +35,6 @@ export const SKILL_PROMPT = "skill-prompt";
 const SKILL_INVOCATION =
 	/^\[IMPORTANT: User invoked the "([^"]+)" skill; follow its instructions\. Full skill below\.\]\n[\s\S]*\n\[Skill directory: [^\n]*\]\n[^\n]*(?:\nUser: ([\s\S]*))?$/;
 
-/** How much of an unread line its notice shows; a whole line can be megabytes of tool output. */
 const UNREAD_SHOWN = 500;
 
 /** The key a message shares between its live events and its file entry. */

@@ -15,7 +15,6 @@ const item = (payload: object) => ({ type: "response_item", timestamp: at, paylo
 const say = (role: string, text: string) => item({ type: "message", role, content: [{ type: role === "assistant" ? "output_text" : "input_text", text }] });
 const meta = (id: string, source: unknown = "vscode") => ({ type: "session_meta", timestamp: at, payload: { id, cwd: "/work", source } });
 
-/** The transcript items a file of `records` shows; a string stands for a raw line. */
 function itemsOf(records: unknown[]) {
 	const transcript = new Transcript();
 	for (const record of records) for (const entry of decodeCodexLine(typeof record === "string" ? record : JSON.stringify(record))) transcript.applyEntry(entry);
@@ -62,6 +61,81 @@ describe("decodeCodexLine", () => {
 			{ kind: "notice", level: "warning", text: expect.stringContaining('"brand_new_item"') },
 			{ kind: "notice", level: "warning", text: "Unread line: {not json" },
 		]);
+	});
+
+	test("mixed message and reasoning blocks keep known content with one warning per line", () => {
+		expect(itemsOf([
+			item({ type: "message", role: "assistant", content: [{ type: "output_text", text: "Readable." }, { type: "output_text", text: 7 }, { type: "new_block" }] }),
+			item({ type: "reasoning", summary: [{ type: "summary_text", text: "Think." }, { type: "new_summary", text: "unknown" }] }),
+		])).toMatchObject([
+			{ kind: "assistant", text: "Readable." }, { kind: "notice", level: "warning" },
+			{ kind: "thinking", text: "Think." }, { kind: "notice", level: "warning" },
+		]);
+	});
+
+	test.each([
+		{ type: "message", role: "user" },
+		{ type: "message", role: "assistant", content: {} },
+		{ type: "message", role: "assistant", content: [{ type: "output_text" }] },
+		{ type: "function_call", name: "exec", arguments: "{}" },
+		{ type: "function_call", call_id: "c", name: "", arguments: "{}" },
+		{ type: "function_call", call_id: "c", name: "exec" },
+		{ type: "function_call", call_id: "c", name: "exec", arguments: 7 },
+		{ type: "custom_tool_call", call_id: "c", name: "patch", input: false },
+		{ type: "function_call_output", output: "uncorrelated" },
+		{ type: "custom_tool_call_output", call_id: "", output: "uncorrelated" },
+		{ type: "web_search_call", status: "completed" },
+		{ type: "tool_search_call", call_id: "", arguments: "{}" },
+		{ type: "tool_search_output", output: "uncorrelated" },
+		{ type: "reasoning", summary: {} },
+		{ type: "reasoning", summary: null, encrypted_content: "encrypted" },
+		{ type: "toString" },
+	])("malformed known items produce a warning (%j)", payload => {
+		expect(itemsOf([item(payload)])).toMatchObject([{ kind: "notice", level: "warning" }]);
+	});
+
+	test("a tool search output retains its discovered tools", () => {
+		const result = item({ type: "tool_search_output", call_id: "search", tools: [{ type: "function", name: "exec", description: "Run a command" }] });
+		expect(decodeCodexLine(JSON.stringify(result))).toMatchObject([
+			{ message: { role: "toolResult", toolCallId: "search", content: [{ type: "text", text: '[{"type":"function","name":"exec","description":"Run a command"}]' }] } },
+		]);
+		expect(itemsOf([
+			item({ type: "tool_search_call", call_id: "search", arguments: "{\"query\":\"exec\"}", status: "completed" }), result,
+		])).toMatchObject([{ kind: "tool", id: "tool:search", name: "tool_search", status: "ok" }]);
+	});
+
+	test("namespaces qualify function names and mixed outputs preserve text and images with a warning", () => {
+		const call = item({ type: "function_call", call_id: "c", namespace: "functions", name: "exec_command", arguments: "{\"cmd\":\"pwd\"}" });
+		const result = item({ type: "function_call_output", call_id: "c", output: { success: false, content: [
+			{ type: "input_text", text: "/work" },
+			{ type: "input_image", image_url: "data:image/png;base64,aGVsbG8=" },
+			{ type: "unknown_output", text: "unknown" },
+		] } });
+		expect(decodeCodexLine(JSON.stringify(result))).toMatchObject([
+			{ message: { role: "toolResult", toolCallId: "c", isError: true, content: [
+				{ type: "text", text: "/work" }, { type: "image", mimeType: "image/png", data: "aGVsbG8=" },
+			] } },
+			{ type: "unread-line", text: JSON.stringify(result) },
+		]);
+		expect(itemsOf([call, result])).toMatchObject([
+			{ kind: "tool", id: "tool:c", name: "functions.exec_command", status: "error" },
+			{ kind: "notice", level: "warning" },
+		]);
+	});
+
+	test("unknown output warns without losing the correlated tool", () => {
+		expect(itemsOf([
+			item({ type: "custom_tool_call", call_id: "c", name: "patch", input: "" }),
+			item({ type: "custom_tool_call_output", call_id: "c", output: { future_output: "unknown" } }),
+		])).toMatchObject([{ kind: "tool", id: "tool:c", status: "ok" }, { kind: "notice", level: "warning" }]);
+	});
+
+	test("empty text, injected context, and encrypted reasoning do not warn on a readable turn", () => {
+		expect(itemsOf([
+			item({ type: "reasoning", summary: [], content: null, encrypted_content: "encrypted" }),
+			item({ type: "message", role: "user", content: [{ type: "input_text", text: "" }, { type: "input_text", text: "<environment_context>injected</environment_context>" }] }),
+			say("assistant", "Done."),
+		])).toMatchObject([{ kind: "assistant", text: "Done." }]);
 	});
 });
 

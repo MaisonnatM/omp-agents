@@ -1,18 +1,10 @@
-/**
- * Listing the session files of an agent other than omp, Claude Code or Codex, as {@link SavedSession}s. A session's
- * summary comes from the start and the end of its file alone, and is read again only when the file's size or
- * modification time changed, since the rescan lists every file each minute and a transcript can be many megabytes.
- */
 import { existsSync, type Stats } from "node:fs";
 import { stat } from "node:fs/promises";
 import type { SavedSession } from "../omp/sessions";
 import type { SessionSource } from "../shared/sessions";
 
-/** The id, prompt, and title a file's start names; a long session's first lines are mostly instructions and context. */
 const HEAD_BYTES = 256 * 1024;
-/** Where a renamed session's newest title line lands. */
 const TAIL_BYTES = 64 * 1024;
-/** Files read at once by a listing, as the facts index reads them. */
 const READ_BATCH = 16;
 
 /** The complete lines in the first {@link HEAD_BYTES} and in the last {@link TAIL_BYTES} after those of a file. */
@@ -21,7 +13,6 @@ export interface FileEdges {
 	tail: string[];
 }
 
-/** What a reader makes of a session file's edges. */
 export interface SessionSummary {
 	id: string;
 	cwd: string;
@@ -33,7 +24,6 @@ export interface SessionSummary {
 
 const completeLines = (text: string, fromLineStart: boolean): string[] => {
 	const lines = text.split("\n");
-	// The last piece is a line still being written, or one cut by the read.
 	lines.pop();
 	if (!fromLineStart) lines.shift();
 	return lines.filter(Boolean);
@@ -101,7 +91,6 @@ export class ForeignFiles {
 		const { summary } = cached;
 		if (!summary) return null;
 		const title = titleOf(summary.id) ?? summary.title;
-		// The same object while nothing changed, so the past list keeps the session's row.
 		if (cached.saved?.title !== title) {
 			cached.saved = { id: summary.id, path, source: this.#source, cwd: summary.cwd, title, modifiedAt: stats.mtimeMs, empty: summary.empty };
 		}

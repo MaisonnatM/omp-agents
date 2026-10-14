@@ -1,10 +1,6 @@
-/**
- * The agents whose session files the dashboard lists: omp's, which it resumes and forks, and Claude Code's and
- * Codex's, which it only reads. A format names where an agent keeps its files, lists them, and decodes each line into
- * the omp entries the transcript folds read, so everything past the reader sees omp's shape.
- */
 import { claudeCodeFormat } from "./foreign/claude-code";
 import { codexFormat } from "./foreign/codex";
+import type { UsageFiles } from "./foreign/usage";
 import { parseJson } from "./json";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionFileOf, sessionsDir } from "./omp/sessions";
 import type { SessionSource } from "./shared/sessions";
@@ -25,6 +21,8 @@ export interface SessionFormat {
 	decode(line: string): unknown[];
 	/** The lines that can hold a prompt or a reply, so conversation search leaves the rest, most of a file's bytes, unparsed. */
 	messageLine: RegExp;
+	/** The transcripts that record the agent's requests; omp's have none here, since omp-stats indexes them. */
+	usage?: UsageFiles;
 }
 
 /** omp's sessions under `root`, its sessions directory, one directory per working directory. */

@@ -15,7 +15,6 @@ async function settle(): Promise<void> {
 	for (let turn = 0; turn < 20; turn++) await Promise.resolve();
 }
 
-/** Handlers that note each call in `calls`, and ask for a re-read on every file change. */
 function recording(calls: string[]): LoopHandlers {
 	const tick = (name: string) => async () => void calls.push(name);
 	return {
