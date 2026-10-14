@@ -56,6 +56,8 @@ interface ConversationProps {
 	onEnd: (instanceId: string) => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
+	/** A control the page puts right after the title, such as the trajectory switch. */
+	titleAction?: ReactNode;
 	/** Show its turns in place of its transcript; the composer stays. */
 	trajectory: boolean;
 	/** Whether this is the focused pane, the one session shortcuts act on. */
@@ -94,6 +96,7 @@ function LiveConversation({
 	send,
 	onEnd,
 	actions,
+	titleAction,
 	trajectory,
 	focused,
 	workspaces,
@@ -263,7 +266,7 @@ function LiveConversation({
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} />
+			<ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} titleAction={titleAction} />
 			{trajectory ? (
 				<Trajectory view={view} />
 			) : (

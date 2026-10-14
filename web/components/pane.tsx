@@ -1,11 +1,9 @@
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Maximize2, Minimize2, Route, X } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
-import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import type { ModelList } from "../reads";
 import { hashForView } from "../routing";
@@ -67,16 +65,22 @@ export const Pane = memo(function Pane({
 	const [trajectoryOf, setTrajectoryOf] = useState<string | null>(null);
 	const trajectory = trajectoryOf === hashForView(view);
 
+	const trajectoryToggle = (
+		<Tooltip content={trajectory ? "Show the transcript" : "Show the trajectory: each turn's injected context, model requests, tool calls, and token usage"} side="bottom">
+			<Button
+				variant="ghost"
+				size="icon-compact"
+				aria-label="Trajectory"
+				aria-pressed={trajectory}
+				className={cn(trajectory && "bg-muted text-foreground")}
+				onClick={() => setTrajectoryOf(trajectory ? null : hashForView(view))}
+			>
+				<Route />
+			</Button>
+		</Tooltip>
+	);
 	const actions = (
 		<>
-			<SizeProvider size="compact">
-				<Tabs value={trajectory ? "trajectory" : "transcript"} onValueChange={value => setTrajectoryOf(value === "trajectory" ? hashForView(view) : null)}>
-					<TabsList aria-label="Show">
-						<TabItem value="transcript" label="Transcript" tooltip="The conversation as you read it" />
-						<TabItem value="trajectory" label="Trajectory" tooltip="Each turn's injected context, model requests, tool calls, and token usage" />
-					</TabsList>
-				</Tabs>
-			</SizeProvider>
 			{count > 1 && (
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
@@ -95,7 +99,7 @@ export const Pane = memo(function Pane({
 		</>
 	);
 	const content = view.kind === "past" ? (
-		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} trajectory={trajectory} />
+		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} titleAction={trajectoryToggle} trajectory={trajectory} />
 	) : (
 		<Conversation
 			view={view}
@@ -108,6 +112,7 @@ export const Pane = memo(function Pane({
 			send={send}
 			onEnd={end}
 			actions={actions}
+			titleAction={trajectoryToggle}
 			trajectory={trajectory}
 			focused={focused}
 			workspaces={workspaces}

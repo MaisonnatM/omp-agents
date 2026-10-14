@@ -9,11 +9,13 @@ interface HeaderProps {
 	alert?: boolean;
 	/** A control before the title, such as a subagent's way back to its session. */
 	leading?: ReactNode;
+	/** A control right after the title, such as the switch to a session's trajectory. */
+	trailing?: ReactNode;
 	children?: ReactNode;
 }
 
 /** The title, an optional meta line, and controls that head a pane or a page. */
-export function Header({ title, meta, status, alert = false, leading, children }: HeaderProps) {
+export function Header({ title, meta, status, alert = false, leading, trailing, children }: HeaderProps) {
 	return (
 		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6">
 			<div className="flex min-w-0 items-center gap-2">
@@ -22,6 +24,7 @@ export function Header({ title, meta, status, alert = false, leading, children }
 					<h2 className="truncate text-sm font-semibold">{title}</h2>
 					{meta !== undefined && <p className="truncate text-xs text-muted-foreground">{meta}</p>}
 				</div>
+				{trailing}
 			</div>
 			<div className="flex shrink-0 items-center gap-3">
 				{status !== undefined && (
