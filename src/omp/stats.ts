@@ -86,7 +86,7 @@ async function openLiveStats(): Promise<Database> {
 const HOUR_MS = 60 * 60_000;
 
 /** The range's cutoff and series bucket; `today` starts at local midnight with hourly buckets. */
-function windowOf(range: AnalyticsRange, now: number): { cutoff: number | null; bucketMs: number } {
+export function windowOf(range: AnalyticsRange, now: number): { cutoff: number | null; bucketMs: number } {
 	if (range !== "today") return statsAggregator.getTimeRangeConfig(range);
 	const midnight = new Date(now);
 	midnight.setHours(0, 0, 0, 0);

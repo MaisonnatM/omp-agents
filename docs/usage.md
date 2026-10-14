@@ -1192,6 +1192,14 @@ An action that fails shows its error, and its control becomes available again.
   It covers every session whatever workspace the header picks.
   omp indexes session files when you first open **Analytics** and updates the tab while indexing continues.
   New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
+  **Context sources**, below the usage, ranks what fills each request's input over the same range: instruction files such as `AGENTS.md`, skills, rules, MCP servers, system prompt sections, injected messages such as reminders, each tool's results, and the conversation itself.
+  Each row shows the source, its kind, its average tokens per request that carried it, those requests, its total tokens, its estimated cost, and its share of input.
+  Tokens count cache reads and writes as input, so the rows add up to the requests' input tokens.
+  The cost splits each request's input, cache read, and cache write cost by each source's tokens, so a source sent mostly from cache costs less per token.
+  Choose a workspace to narrow the report to its sessions and their subagents, and a session to see that session's top sources.
+  A main session's transcript records neither its system prompt nor its tool definitions, so their tokens show together as **System prompt and tool definitions**, under **Not in transcript**; a subagent's transcript records its system prompt, so its files, skills, rules, and MCP servers show by name, and only **Tool definitions** stay unrecorded.
+  Tokens come from omp's tokenizer for each model, or about four characters a token for a model omp has none for.
+  The report reads every session file once, then only the files that changed, and shows how far it has read while it catches up.
 - **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
   Each row shows the branch and path, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
   No omp session reads as no omp session, not as unused.

@@ -14,6 +14,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Terminal panel](#terminal-panel)
 - [Plan quota](#plan-quota)
 - [Analytics](#analytics)
+  - [Context sources](#context-sources)
 - [Routines](#routines)
   - [One server runs the unattended work](#one-server-runs-the-unattended-work)
 - [Scheduled sends](#scheduled-sends)
@@ -70,6 +71,7 @@ The main ones:
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
   `src/omp/stats.ts` reads omp-stats' database and starts its live sync on its first read, which the provider check makes at startup.
+- Request context: `buildSessionContext` in `pi-coding-agent/src/session/session-context.ts`, the messages a request on a branch sends, `Tokenizer` in `pi-agent-core/src/tokenizer.ts`, and `resolveModelTokenizer` in `pi-catalog/src/model-tokenizer.ts`, which `src/omp/context-index.ts` uses to count each request's context sources; `getStatsDbPath` in `pi-utils/src/dirs.ts` places its index beside omp-stats' database.
 - Request errors: `is402BillingCapBody` in `pi-ai/src/error/rate-limit.ts`, the test omp's credential rotation applies to a 402, which `creditRuns` in `src/omp/stats.ts` uses to tell a provider out of prepaid credits from a 402 that asks for a smaller request.
 - Updates: `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts`, the `startup.checkUpdate` and `update.channel` readers in `pi-coding-agent/src/modes/settings.ts`, and `classifyModel` in `pi-catalog/src/identity/index.ts`, which `src/omp/release.ts` and `src/omp/model-updates.ts` use; see [Notifications](#notifications).
 
@@ -379,6 +381,21 @@ When the page loads, `decode` turns each kept read back into the store's answer,
 A failed refresh keeps the last successful answer and reports its error without replacing another range's data.
 The displayed cost is omp's API-equivalent list price, not the user's subscription bill.
 
+### Context sources
+
+`src/omp/context-index.ts` keeps its own index, `context-sources.db` beside `stats.db`, and never writes omp-stats' database.
+A sync walks omp's sessions directory and re-reads only the files whose size or modification time changed; a file it cannot read is recorded with no requests until it changes.
+For each request, the assistant entry or `model_usage` entry whose usage carries input, `attributeTurns` in `src/context-sources.ts` splits the input, cache reads and writes included, by source.
+It rebuilds the request's context with omp's `buildSessionContext` from the entry's parent, counts each message with omp's `Tokenizer` for the request's model, and credits it by role: a tool result to its tool, a `skill-prompt` custom message to its skill, a rule reminder to its rule, other custom messages and reminders to injections, and the rest to the conversation.
+A subagent's `session_init` records its system prompt, which `splitSystemPrompt` splits into `<file path>` blocks, the skills and rules its lists name, each MCP server's tool routes, devices, and instructions, and the remaining `§` sections.
+A main session's file records only a digest of its system prompt, so the request's input left after its measured messages is credited to the system prompt and tool definitions together; a subagent's residual is its tool definitions.
+Measured tokens above the billed input scale down to it, so a request's sources always add up to its input, and a `model_usage` side request is one source named by its purpose.
+A fork copies its parent's entries; omp-stats counts each copied request once, for the parent, so `attributeTurns` skips a fork's requests older than its header.
+The index stores one row per request and one per request and source, by integer file and source ids, so `read(cutoff)` sums exactly the requests at or after the range's cutoff, which `windowOf` in `src/omp/stats.ts` gives as for usage.
+`buildContextReport` folds subagent files into their session, takes the working directory from the saved-session index or the session's own file, and narrows the sums to the chosen workspace or session.
+Each request with a report starts a background sync unless one ran in the last 15 seconds; the answer carries its progress, and `ContextSources` in `web/components/settings/context-sources.tsx` reads every two seconds while it runs and every 30 seconds otherwise.
+A report's totals match omp-stats' input tokens for the same files, cache reads and writes included, apart from requests either side has not synced yet.
+
 ## Routines
 
 A routine starts dashboard sessions, or runs a shell command, on one or more schedules. A schedule is every so many minutes, counted from the last run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST. The routine is due at the earliest of them. Two intervals share that last run, so the shorter one decides.
@@ -607,6 +624,9 @@ Each file carries the SHA-256 of its text.
 `GET /api/analytics?range=<range>` answers `Analytics` from omp-stats, defaulting to `7d`.
 The accepted ranges are `today`, `24h`, `7d`, `30d`, `90d`, and `all`; an unknown range returns 400.
 The answer includes totals, time buckets with per-provider usage, provider totals, models, workspaces, agent types, tools, the 20 sessions with the most tokens, and live indexing status.
+
+`GET /api/analytics/context?range=<range>[&cwd=<directory>][&session=<id>]` answers `ContextReport`, the context sources over the range, defaulting to `24h`, for every workspace, one working directory, or one session; an unknown range returns 400.
+It includes the requests, their input tokens and input cost, the sources by tokens, the workspaces with input in the range, the 20 sessions with the most input in the chosen workspace, and the index's progress while it syncs.
 
 Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 

@@ -12,7 +12,7 @@ import {
 	type LocalEventsAnswer,
 } from "../src/shared/calendar";
 import { decodeInboxAnswer, type InboxAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
-import { type Analytics, decodeAnalytics } from "../src/shared/analytics";
+import { type Analytics, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
 import { decodePullRequestList, type PullRequestList, type RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
@@ -160,6 +160,9 @@ export const analyticsStore = createPolledStore<Analytics>({
 	url: range => `/api/analytics?range=${range ?? "24h"}`,
 	cache: { key: "omp-agents.analytics-cache", decode: decodeAnalytics },
 });
+
+/** The context sources of Settings › Analytics; the scope is the request's query (range, workspace, session), so reads stay in memory. */
+export const contextStore = createPolledStore<ContextReport>({ url: scope => `/api/analytics/context?${scope ?? ""}` });
 
 /** Where omp stands with each MCP integration, which the sidebar's tabs, the tickets page, and the integrations page share. */
 export const integrationsStore = createPolledStore<IntegrationsAnswer>({
