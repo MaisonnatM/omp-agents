@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import type { PromptImage } from "../shared/sessions";
 import { isObject } from "../json";
 import { exitDiagnostics, sessionManager, transcriptEntry } from "./modules";
@@ -36,14 +37,21 @@ export async function openPromptCut(file: string, entryId: string): Promise<Prom
 export async function writePromptFork(manager: OmpSessionManager, parentId: string | null, cwd: string, marker: unknown): Promise<{ file: string; repaired: boolean }> {
 	if (parentId) manager.createBranchedSession(parentId, { copyArtifacts: true });
 	else await manager.newSession();
-	const repairs = exitDiagnostics.createInterruptedToolResults(manager.getEntries(), "fork");
-	for (const result of repairs) manager.appendMessage(result);
-	await manager.moveTo(cwd);
-	await manager.setAdditionalDirectories([]);
-	manager.appendCustomEntry("omp-agents-replay", marker);
-	await manager.flush();
-	const file = manager.getSessionFile();
-	if (!file) throw new Error("omp did not create a replay session file.");
-	await manager.close();
-	return { file, repaired: repairs.length !== 0 };
+	const created = manager.getSessionFile();
+	try {
+		const repairs = exitDiagnostics.createInterruptedToolResults(manager.getEntries(), "fork");
+		for (const result of repairs) manager.appendMessage(result);
+		await manager.moveTo(cwd);
+		await manager.setAdditionalDirectories([]);
+		manager.appendCustomEntry("omp-agents-replay", marker);
+		await manager.flush();
+		const file = manager.getSessionFile();
+		if (!file) throw new Error("omp did not create a replay session file.");
+		await manager.close();
+		return { file, repaired: repairs.length !== 0 };
+	} catch (error) {
+		// A half-written fork would otherwise appear among past sessions.
+		for (const file of new Set([created, manager.getSessionFile()])) if (file) await rm(file, { force: true });
+		throw error;
+	}
 }

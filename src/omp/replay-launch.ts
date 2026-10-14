@@ -11,7 +11,7 @@ import type { ReplayMarker } from "../shared/replay";
 import { packageDir } from "./install";
 
 export interface ReplayLaunch extends RpcLaunch { readyToken: string }
-export interface ReplayResume { launch: RpcLaunch; marker: ReplayMarker | null; readyToken: string | null }
+export type ReplayResume = { launch: RpcLaunch; marker: null } | { launch: ReplayLaunch; marker: ReplayMarker };
 export async function writeReplayConfig(file: string): Promise<string> {
 	const config = `${file}.replay.yml`;
 	const temporary = `${config}.${randomUUID()}.tmp`;
@@ -40,9 +40,8 @@ export async function launchForReplayResume(file: string, launch: RpcLaunch): Pr
 	const entry = entries.findLast(entry => entry.type === "custom" && entry.customType === REPLAY_MARKER);
 	const marker = replayMarkerOf(entry?.data);
 	if (entry && !marker) throw new Error("Replay protection metadata is invalid. This file cannot be safely resumed.");
-	if (!marker) return { launch, marker: null, readyToken: null };
-	const protectedLaunch = replayLaunch(await writeReplayConfig(file), launch);
-	return { launch: protectedLaunch, marker, readyToken: protectedLaunch.readyToken };
+	if (!marker) return { launch, marker: null };
+	return { launch: replayLaunch(await writeReplayConfig(file), launch), marker };
 }
 export async function requireReplayReady(file: string, id: string, readyToken: string): Promise<void> {
 	const until = Date.now() + 2000;

@@ -67,7 +67,7 @@ export const Pane = memo(function Pane({
 	// Kept by view, so a pane that switches to another session shows its transcript.
 	const [trajectoryOf, setTrajectoryOf] = useState<string | null>(null);
 	const trajectory = trajectoryOf === hashForView(view);
-	const replay = (view.kind === "past" ? session : host ?? lastHost)?.replay;
+	const replay = view.kind === "past" ? session?.replay : view.agentId === null ? (host ?? lastHost)?.replay : undefined;
 	const [compareOf, setCompareOf] = useState<string | null>(null);
 
 	const actions = (

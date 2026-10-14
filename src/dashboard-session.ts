@@ -235,7 +235,7 @@ export class DashboardSession implements LiveSession {
 		const replay = await launchForReplayResume(sessionFile, launch);
 		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.launch, emit, async client => {
 			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
-			if (replay.marker && replay.readyToken) await requireReplayReady(sessionFile, replay.marker.id, replay.readyToken);
+			if (replay.marker) await requireReplayReady(sessionFile, replay.marker.id, replay.launch.readyToken);
 		});
 		session.#protectedReplay = replay.marker !== null;
 		return session;

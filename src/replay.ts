@@ -149,8 +149,11 @@ export async function prepareReplay(choice: { token: string; model: ModelOption 
 		config = await writeReplayConfig(forkFile);
 		return { marker, forkFile, cwd, config, first: { text: choice.prompt ?? cut.text, images: cut.images }, discard };
 	} catch (error) {
-		await cut.manager.close();
-		await discard();
+		try {
+			await cut.manager.close();
+		} finally {
+			await discard();
+		}
 		throw error;
 	}
 }

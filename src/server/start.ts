@@ -106,7 +106,7 @@ export function createStarter(env: StartEnv): Starter {
 					try {
 						return { session: await DashboardSession.replay(id, prepared, rpcLaunch, emit), prompt: null, first: prepared.first, discard: prepared.discard };
 					} catch (error) {
-						await prepared.discard();
+						await prepared.discard().catch(cleanup => { throw new Error(`${errorText(error)}; ${errorText(cleanup)}`); });
 						throw error;
 					}
 				});
@@ -137,8 +137,8 @@ export function createStarter(env: StartEnv): Starter {
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
 		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) {
-			await outcome.started.discard?.();
-			return { ok: false, error: "omp exited as the session started." };
+			const cleanup = await Promise.resolve(outcome.started.discard?.()).then(() => "", error => `; ${errorText(error)}`);
+			return { ok: false, error: `omp exited as the session started.${cleanup}` };
 		}
 		// The todo and the project link first, so the session's first turn already knows the todo it works on and its role.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);

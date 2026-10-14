@@ -643,7 +643,6 @@ export const sessionManager = await load<{
 	SessionManager: {
 		create(cwd: string, dir?: string): OmpSessionManager;
 		open(file: string, dir?: string, storage?: undefined, options?: { suppressBreadcrumb?: boolean; throwIfMissing?: boolean }): Promise<OmpSessionManager>;
-		getDefaultSessionDir(cwd: string): string;
 	};
 }>(join(srcDir, "session", "session-manager.ts"), { SessionManager: "function" });
 export const transcriptEntry = await load<{

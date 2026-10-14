@@ -6,6 +6,7 @@ import { isNonEmpty, isObject, num, str } from "./json";
 import { FoldedFile, ReadQueue } from "./line-reader";
 import { entryTime, textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { addUsage, type Clipped, NO_USAGE, type TokenUsage, type Turn, type TurnStep } from "./shared/trajectory";
+import { REPLAY_BLOCK } from "./shared/replay";
 import { messageItemsOf } from "./transcript";
 
 const TEXT_MAX = 16_000;
@@ -63,7 +64,7 @@ export class Trajectory {
 				this.#customMessage(entry);
 				return;
 			case "custom":
-				if (entry.customType === "omp-agents-replay-block" && isObject(entry.data)) {
+				if (entry.customType === REPLAY_BLOCK && isObject(entry.data)) {
 					const call = this.#tools.get(String(entry.data.toolCallId));
 					if (call) {
 						call.step.blocked = true;
