@@ -397,6 +397,9 @@ omp can exit non-zero after it prints the reports it did get, so the server read
 When the output is not a usage report, the footer shows the last line omp wrote to stderr.
 `parsePlanUsage` keeps each limit's omp id and whether omp reports it `exhausted`, which, when omp gives no status, means nothing is left; a window omp lets run past its limit, as Codex's does, is not used up.
 It keeps a report's `resetCredits` as omp's `availableCount`, which counts banked credits whether or not one can be redeemed now, and the soonest expiry among the credits omp counts, those neither `expired` nor `redeemed` with some left, or `null` when it is 0.
+A limit in `usd` without a window, such as omp's `anthropic:extra` when Claude extra usage is on, becomes the plan's `extra`: the dollars spent, the monthly cap or `null`, and whether it is used up; a plan with only extra usage still counts.
+A window omp meters in `usd`, such as Cursor's `Other Models`, also keeps its dollars as `usd`.
+omp reports no dollars for a Codex account's credit balance, so a Codex plan never has `extra`.
 
 ## Analytics
 

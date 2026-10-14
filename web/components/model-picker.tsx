@@ -24,7 +24,8 @@ import { shortcutLabels } from "../shortcuts";
 import { CommandResults, type PickerGroup, type PickerList } from "./command-picker";
 import { ComposerEditor } from "./composer";
 import { OrgIcon } from "./org-icon";
-import { NO_PLANS, Plans } from "./plan-usage";
+import { NO_PLANS, Plans, spendLabel } from "./plan-usage";
+import { dollars } from "./settings/analytics-format";
 
 /** Truncates a model's name without clipping descenders such as Opus's p: the padding gives `overflow:hidden` room below the line, and the negative margin takes it back. */
 export const MODEL_NAME_TRUNCATE = "truncate py-1 -my-1";
@@ -57,16 +58,26 @@ export function Model({ selector, titled = true }: { selector: string; titled?: 
 export const modelDescription = (selector: string): string =>
 	`${modelLabel(selector)} from ${providerLabel(selector.slice(0, selector.indexOf("/")))}`;
 
-/** A provider's group heading in a model list: its logo and its name, then how much of its plan is used, when `plans` has it. */
+/** A provider's group heading in a model list: its logo and its name, then how much of its plan is used and what it spent past the plan, when `plans` has it. */
 function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; plans?: readonly PlanUsage[] }) {
 	const quota = providerQuota(plans, provider);
+	const parts = quota && [
+		...(quota.used === null ? [] : [`${Math.round(quota.used * 100)}% used`]),
+		...(quota.extra ? [`${dollars(quota.extra.used)} extra`] : []),
+	];
 	return (
 		<span className="flex w-full items-center gap-1.5">
 			<OrgIcon org={providerOrg(provider)} />
 			{providerLabel(provider)}
-			{quota && (
-				<span className="ml-auto tabular-nums" title={quota.windows.map(window => `${quota.account}: ${window.title}: ${Math.round((1 - window.remaining) * 100)}% used`).join("\n")}>
-					{Math.round(quota.used * 100)}% used
+			{quota && parts && (
+				<span
+					className="ml-auto tabular-nums"
+					title={[
+						...quota.windows.map(window => `${quota.account}: ${window.title}: ${Math.round((1 - window.remaining) * 100)}% used`),
+						...(quota.extra ? [`${quota.account}: ${quota.extra.title}: ${spendLabel(quota.extra)} spent`] : []),
+					].join("\n")}
+				>
+					{parts.join(" · ")}
 				</span>
 			)}
 		</span>

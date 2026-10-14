@@ -7,7 +7,7 @@ const NOW = new Date(2026, 9, 5, 14, 30).getTime();
 const HOUR = 3_600_000;
 
 const window = (label: string, resetsAt: number | null, exhausted = false): PlanWindow => ({ id: label, label, title: label, remaining: exhausted ? 0 : 0.5, resetsAt, exhausted });
-const plan = (name: string, account: string | null, windows: PlanWindow[]): PlanUsage => ({ provider: name.toLowerCase(), name, account, windows, resetCredits: null });
+const plan = (name: string, account: string | null, windows: PlanWindow[]): PlanUsage => ({ provider: name.toLowerCase(), name, account, windows, extra: null, resetCredits: null });
 
 describe("resetChoices", () => {
 	test("offers used-up windows first, then the soonest reset, each a margin after it resets", () => {

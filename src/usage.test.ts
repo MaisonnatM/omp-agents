@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { parsePlanUsage } from "./usage";
 
-const limit = (label: string, window: string, amount: Record<string, number>, extra: Record<string, unknown> = {}) => ({
+const limit = (label: string, window: string, amount: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
 	label,
 	window: { id: window, resetsAt: 1790870400000 },
 	amount,
@@ -38,6 +38,7 @@ describe("parsePlanUsage", () => {
 					{ id: "anthropic:5h", label: "5h", title: "Claude 5 Hour", remaining: 0.69, resetsAt: 1790870400000, exhausted: false },
 					{ id: "anthropic:7d:fable", label: "7d fable", title: "Claude 7 Day (Fable)", remaining: 1, resetsAt: 1790870400000, exhausted: false },
 				],
+				extra: null,
 				resetCredits: null,
 			},
 			{
@@ -48,6 +49,7 @@ describe("parsePlanUsage", () => {
 					{ id: "monthly", label: "Cursor Models", title: "Cursor Models", remaining: 0.6, resetsAt: 1790870400000, exhausted: false },
 					{ id: "monthly", label: "Other Models", title: "Other Models", remaining: 0, resetsAt: 1790870400000, exhausted: true },
 				],
+				extra: null,
 				resetCredits: null,
 			},
 		]);
@@ -113,9 +115,31 @@ describe("parsePlanUsage", () => {
 				name: "Kimi Code",
 				account: null,
 				windows: [{ id: "7d", label: "7d", title: "Weekly", remaining: 0, resetsAt: 1790870400000, exhausted: true }],
+				extra: null,
 				resetCredits: null,
 			},
 		]);
+	});
+
+	test("reads a windowless USD limit as extra usage, and keeps the dollars of a USD window", () => {
+		const extra = (amount: Record<string, unknown>, status?: string) => ({ id: "anthropic:extra", label: "Claude Extra Usage", amount: { unit: "usd", ...amount }, ...(status && { status }) });
+		const stdout = JSON.stringify({
+			reports: [
+				{ provider: "anthropic", limits: [limit("Claude 5 Hour", "5h", { remainingFraction: 0.5 }), extra({ used: 12.4, limit: 50 })] },
+				{ provider: "anthropic", limits: [extra({ used: 3 })] },
+				{ provider: "anthropic", limits: [extra({ used: 50, limit: 50 }, "exhausted")] },
+				{ provider: "cursor", limits: [limit("Other Models", "monthly", { used: 5, limit: 20, remaining: 15, unit: "usd" })] },
+			],
+		});
+		const plans = parsePlanUsage(stdout);
+		expect(plans.map(plan => [plan.windows.length, plan.extra])).toEqual([
+			[1, { used: 12.4, limit: 50, title: "Claude Extra Usage", exhausted: false }],
+			[0, { used: 3, limit: null, title: "Claude Extra Usage", exhausted: false }],
+			[0, { used: 50, limit: 50, title: "Claude Extra Usage", exhausted: true }],
+			[1, null],
+		]);
+		expect(plans[3]?.windows[0]).toMatchObject({ remaining: 0.75, usd: { used: 5, limit: 20 } });
+		expect(plans[0]?.windows[0]?.usd).toBeUndefined();
 	});
 
 	test("rejects output that is not a usage report", () => {

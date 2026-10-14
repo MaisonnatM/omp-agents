@@ -112,6 +112,8 @@ An action that fails shows its error, and its control becomes available again.
   Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
   Amber means less than 20% is left, and red means the window is used up, as omp reports it.
   Hover or focus a window to see omp's full limit name and when it resets.
+  After the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
+  A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` at startup and every minute after that.
 - The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
   The strip reads them again every five seconds while the page is visible.
@@ -402,7 +404,7 @@ An action that fails shows its error, and its control becomes available again.
   A name counts as the model omp runs for it, so a fallback of `cursor/grok-4.7-high` lists `cursor/grok-4.7`.
   The providers that `modelProviderOrder` names come first, in that order.
   Typing searches every connected model, and every word typed must appear in the model's selector, label, or name, in any order.
-  Each provider's heading shows how much of its plan is used, by the tightest window of the account with the most left, since omp moves to that account; hover the number for that account's windows.
+  Each provider's heading shows how much of its plan is used, by the tightest window of the account with the most left, since omp moves to that account, then the dollars that account spent on extra usage, as `77% used · $12.40 extra`; hover it for that account's windows and the extra usage cap.
   The list contains models that the session's omp RPC process offers from providers you are connected to, the ones omp's `/login` marks as signed in or given a key.
   Models that omp finds without a login, such as Apple's on-device model or a local Ollama, stay out of the list.
   A login made in a terminal shows the next time the menu opens.

@@ -13,6 +13,21 @@ export interface PlanWindow {
 	resetsAt: number | null;
 	/** Whether the window is used up: omp's `exhausted` status, else nothing left when omp's status is missing or `unknown`. */
 	exhausted: boolean;
+	/** The dollars behind {@link remaining}, when omp meters the window in USD, as Cursor's `Other Models`. */
+	usd?: UsdAmount;
+}
+
+/** Dollars spent, and the cap on them; `limit` is `null` when the provider sets none. */
+export interface UsdAmount {
+	used: number;
+	limit: number | null;
+}
+
+/** Pay-as-you-go spend past the plan's windows, such as Claude's extra usage: a USD limit without a window. */
+export interface ExtraUsage extends UsdAmount {
+	/** omp's name for the limit, e.g. `Claude Extra Usage`. */
+	title: string;
+	exhausted: boolean;
 }
 
 /** The reset credits a plan can redeem to clear a used-up window; `nextExpiresAt` is the soonest one's expiry. */
@@ -27,6 +42,8 @@ export interface PlanUsage {
 	name: string;
 	account: string | null;
 	windows: PlanWindow[];
+	/** `null` when the plan reports no extra usage, or has it turned off. */
+	extra: ExtraUsage | null;
 	/** `null` when the plan has no credit to redeem. */
 	resetCredits: ResetCredits | null;
 }

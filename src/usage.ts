@@ -2,7 +2,7 @@
 import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
 import { run } from "./proc";
-import type { PlanUsage, PlanWindow, ResetCredits } from "./shared/models";
+import type { ExtraUsage, PlanUsage, PlanWindow, ResetCredits, UsdAmount } from "./shared/models";
 
 const TIMEOUT_MS = 30_000;
 
@@ -23,6 +23,13 @@ function remainingOf(amount: Record<string, unknown>): number | undefined {
 	return used === undefined ? undefined : 1 - used;
 }
 
+/** The dollars of a USD amount; `null` for any other unit or without a spend. */
+function usdOf(amount: Record<string, unknown>): UsdAmount | null {
+	const used = num(amount.used);
+	if (str(amount.unit) !== "usd" || used === undefined) return null;
+	return { used, limit: num(amount.limit) ?? null };
+}
+
 function parseLimit(raw: unknown): PlanWindow | null {
 	if (!isObject(raw) || !isObject(raw.window) || !isObject(raw.amount)) return null;
 	const remaining = remainingOf(raw.amount);
@@ -31,6 +38,7 @@ function parseLimit(raw: unknown): PlanWindow | null {
 	const tier = isObject(raw.scope) ? str(raw.scope.tier) : undefined;
 	const left = Math.min(1, Math.max(0, remaining));
 	const status = str(raw.status);
+	const usd = usdOf(raw.amount);
 	return {
 		id: str(raw.id) || window,
 		label: tier ? `${window} ${tier}` : window,
@@ -38,6 +46,19 @@ function parseLimit(raw: unknown): PlanWindow | null {
 		remaining: left,
 		resetsAt: num(raw.window.resetsAt) ?? null,
 		exhausted: status === "exhausted" || ((!status || status === "unknown") && left <= 0),
+		...(usd && { usd }),
+	};
+}
+
+/** A USD limit without a window is spend past the plan, such as omp's `anthropic:extra`. */
+function parseExtra(raw: unknown): ExtraUsage | null {
+	if (!isObject(raw) || isObject(raw.window) || !isObject(raw.amount)) return null;
+	const usd = usdOf(raw.amount);
+	if (!usd) return null;
+	return {
+		...usd,
+		title: str(raw.label) || "Extra usage",
+		exhausted: str(raw.status) === "exhausted" || (usd.limit !== null && usd.used >= usd.limit),
 	};
 }
 
@@ -54,7 +75,7 @@ function parseResetCredits(raw: unknown): ResetCredits | null {
 }
 
 /**
- * Plans with at least one quota window, in omp's order. A window is named by its id (`5h`, `7d`),
+ * Plans with at least one quota window or extra usage, in omp's order. A window is named by its id (`5h`, `7d`),
  * plus its model tier when it meters one model. Limits that would share a name keep omp's label.
  */
 export function parsePlanUsage(stdout: string): PlanUsage[] {
@@ -65,7 +86,8 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 		if (!isObject(report) || !Array.isArray(report.limits)) continue;
 		const provider = str(report.provider);
 		const windows = (report.limits as unknown[]).map(parseLimit).filter(window => window !== null);
-		if (!provider || windows.length === 0) continue;
+		const extra = (report.limits as unknown[]).map(parseExtra).find(found => found !== null) ?? null;
+		if (!provider || (windows.length === 0 && extra === null)) continue;
 		const metadata = isObject(report.metadata) ? report.metadata : {};
 		plans.push({
 			provider,
@@ -79,6 +101,7 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 			windows: windows.map(window =>
 				windows.some(other => other !== window && other.label === window.label) ? { ...window, label: window.title } : window,
 			),
+			extra,
 			resetCredits: parseResetCredits(report.resetCredits),
 		});
 	}

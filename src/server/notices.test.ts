@@ -308,6 +308,7 @@ describe("Notices", () => {
 			name: "Cursor",
 			account: "me@example.com",
 			windows: [window("cursor:usd:individual-auto", false), window("cursor:usd:individual-api", exhausted)],
+			extra: null,
 			resetCredits: { count: 2, nextExpiresAt: null },
 		});
 		const run = { provider: "openrouter", model: "openai/gpt-5.5", failures: 3, since: 7 * MINUTE, error: "402 Insufficient credits" };

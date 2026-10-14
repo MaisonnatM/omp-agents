@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ModelEntry, PlanUsage } from "../src/shared/models";
+import type { ExtraUsage, ModelEntry, PlanUsage } from "../src/shared/models";
 import { contextVariants, modelMatch, providerQuota } from "./model-menu";
 
 const entry = (provider: string, id: string, contextWindow: number | null): ModelEntry => ({ provider, id, name: id, contextWindow, curated: false });
@@ -29,21 +29,28 @@ describe("contextVariants", () => {
 });
 
 describe("providerQuota", () => {
-	const plan = (provider: string, remaining: number[], account: string | null = null): PlanUsage => ({
+	const plan = (provider: string, remaining: number[], account: string | null = null, extra: ExtraUsage | null = null): PlanUsage => ({
 		provider,
 		name: provider,
 		account,
 		windows: remaining.map((left, index) => ({ id: `w${index}`, label: `w${index}`, title: `Window ${index}`, remaining: left, resetsAt: null, exhausted: left <= 0 })),
+		extra,
 		resetCredits: null,
 	});
+	const spent: ExtraUsage = { used: 12.4, limit: 50, title: "Claude Extra Usage", exhausted: false };
 
-	test("the tightest window of the account with the most left, and that account's windows", () => {
-		const work = plan("anthropic", [0.8, 0.25], "work");
-		const personal = plan("anthropic", [0.5, 0.6], "personal");
-		expect(providerQuota([work, personal, plan("cursor", [0], "cursor")], "anthropic")).toEqual({ used: 0.5, account: "personal", windows: personal.windows });
+	test("the tightest window of the account with the most left, with that account's windows and extra usage", () => {
+		const work = plan("anthropic", [0.8, 0.25], "work", spent);
+		const personal = plan("anthropic", [0.5, 0.6], "personal", { ...spent, used: 1 });
+		expect(providerQuota([work, personal, plan("cursor", [0], "cursor")], "anthropic")).toEqual({ used: 0.5, account: "personal", windows: personal.windows, extra: personal.extra });
 	});
 
-	test("null for a provider without a plan or windows", () => {
+	test("an account with only extra usage counts when no account has a window", () => {
+		expect(providerQuota([plan("anthropic", [], "extra-only", spent), plan("anthropic", [0.9], "plan")], "anthropic")?.account).toBe("plan");
+		expect(providerQuota([plan("anthropic", [], "extra-only", spent)], "anthropic")).toEqual({ used: null, account: "extra-only", windows: [], extra: spent });
+	});
+
+	test("null for a provider without a plan, windows, or extra usage", () => {
 		expect(providerQuota([plan("anthropic", [0.5]), plan("cursor", [])], "openrouter")).toBeNull();
 		expect(providerQuota([plan("cursor", [])], "cursor")).toBeNull();
 	});
