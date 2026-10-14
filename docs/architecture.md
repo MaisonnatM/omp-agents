@@ -80,6 +80,8 @@ The main ones:
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
   `src/omp/stats.ts` reads omp-stats' database and starts its live sync on its first read, which the provider check makes at startup.
+  `pi-catalog/src/models.ts` provides `getBundledModel` and `calculateCost`, which `listPrice` in `src/omp/stats.ts` uses to price Claude Code and Codex requests.
+  `pi-catalog/src/types.ts` defines their model and usage arguments, including Anthropic's cache-write lifetimes.
 - Request context: `buildSessionContext` in `pi-coding-agent/src/session/session-context.ts`, the messages a request on a branch sends, `Tokenizer` in `pi-agent-core/src/tokenizer.ts`, and `resolveModelTokenizer` in `pi-catalog/src/model-tokenizer.ts`, which `src/omp/context-index.ts` uses to count each request's context sources; `getStatsDbPath` in `pi-utils/src/dirs.ts` places its index beside omp-stats' database.
 - Request errors: `is402BillingCapBody` in `pi-ai/src/error/rate-limit.ts`, the test omp's credential rotation applies to a 402, which `creditRuns` in `src/omp/stats.ts` uses to tell a provider out of prepaid credits from a 402 that asks for a smaller request.
 - Updates: `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts`, the `startup.checkUpdate` and `update.channel` readers in `pi-coding-agent/src/modes/settings.ts`, and `classifyModel` in `pi-catalog/src/identity/index.ts`, which `src/omp/release.ts` and `src/omp/model-updates.ts` use; see [Notifications](#notifications).
@@ -88,13 +90,24 @@ The main ones:
 
 Every transcript comes from the session files on this machine, not from a network connection:
 
-- One recursive file watcher covers omp's sessions directory.
+- One recursive file watcher covers each session format's root: omp's sessions directory, Claude Code's `projects` directory under `CLAUDE_CONFIG_DIR` (else `~/.claude`), and Codex's `sessions` directory under `CODEX_HOME` (else `~/.codex`).
+  The server makes omp's directory when it is missing; a missing Claude Code or Codex directory is left alone and watched from the first rescan that finds it.
   When a file changes, every open transcript in that directory reads the bytes appended since its last read and folds the complete JSONL lines into display items.
   On macOS a burst of appends can surface only as events for omp's `.<file>.lock` sidecar, which is why a change anywhere in a directory re-reads every open transcript in it.
 - A session's transcript is its `<time>_<session id>.jsonl` file.
   A subagent's transcript is `<id>.jsonl` in its parent's artifacts directory, which is the parent's transcript path without `.jsonl`.
   A subagent that outlived a `/new` or `/resume` wrote beside the session it started in, so when the expected file is missing the server looks for the newest `<id>.jsonl` in the project's sessions that changed after the subagent registered.
 - A past session reads the same way, so a session that runs without publishing itself keeps updating.
+- A Claude Code or Codex session reads the same way, read-only.
+  `src/session-formats.ts` holds one `SessionFormat` per agent, and the format whose root holds a file decodes each of its lines into the omp entries the transcript already folds, so the tail, the conversation search, and the past list need no other path.
+  A Claude Code session is `<project>/<session id>.jsonl`; its `isMeta` and sidechain records, its bookkeeping records, and its system records other than a compaction are left out, and its tool results become `toolResult` entries.
+  A Codex session is `<year>/<month>/<day>/rollout-<time>-<session id>.jsonl`; its developer messages, the context Codex injects as a user message, its events, and its turn context are left out, and a renamed session takes its title from `session_index.jsonl`, the last line for an id winning.
+  A Codex session whose `session_meta` names a parent agent is a subagent's, and the past list leaves it out; so does Claude Code's `subagents` directory, which sits one level deeper than a session.
+  An unknown or malformed record or content block shows as one warning notice per line with the line's start, alongside any recognized content.
+  Intentional empty blocks, injected context, ignored metadata, and encrypted reasoning without readable text do not warn.
+  Correlated tool calls require call ids, names, and input; tool results require their call ids, and Codex function namespaces qualify tool names.
+  The past row and the pane name the agent, the pane reads `Read-only`, and neither offers **Resume** nor fork buttons; `src/server/start.ts` refuses a fork or a resume of such a file before it starts omp.
+  Listing reads only each file's first 256 KB and last 64 KB, and a file whose size and modification time are unchanged keeps its row.
 - Live agent events only add what the file does not hold yet: the reply as it streams, and the running state of tool calls.
   omp keeps a message's `timestamp` when it writes the message, so the file's copy replaces the streamed copy in place, and a late event cannot undo it.
   omp writes a fresh session's file only with its first reply.
@@ -126,9 +139,9 @@ Every transcript comes from the session files on this machine, not from a networ
   `watch` lists those views in `trajectories`, and the watcher's changes poke the tail as they poke the transcript.
   The socket topic `turns:<view>` carries `turns` messages: every turn once the file is read, then only the turns each later read changed, which the page puts in place by id.
   A page that stops showing the Trajectory leaves the topic, and the tail closes when no socket shows it.
-- The server lists the session files through omp's session listing, the code behind omp's session picker, at startup and then once a minute, in case the watcher missed a change.
+- The server lists the session files through each format's listing at startup and then once a minute, in case a watcher missed a change; omp's is omp's session listing, the code behind omp's session picker.
   Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session.
-  The past list skips the empty sessions that omp's picker hides.
+  The past list skips the empty sessions that omp's picker hides, and a Claude Code or Codex session with no prompt and no reply.
   The server looks up files by session id in this listing, so the page never sends a path.
   While no page is connected, it skips building the roster and the past list.
   The past list goes out whole when a page connects; after that the server compares each session with what it last sent and sends only the sessions that changed, joined, or left, so an untouched row keeps its object on the page and skips its render.
@@ -387,10 +400,31 @@ It keeps a report's `resetCredits` as omp's `availableCount`, which counts banke
 
 ## Analytics
 
-omp-stats owns the request history in `~/.omp/stats.db`, under omp's config root.
+omp-stats owns omp's request history in `~/.omp/stats.db`, under omp's config root.
 `src/omp/stats.ts` starts `statsLive()` on its first read, which the provider check (see [Notifications](#notifications)) makes at startup; it syncs every session transcript, watches for changes, and resyncs every five minutes until the server stops it on shutdown.
 The dashboard calls omp-stats' rollup-aware total, model, agent-type, and tool reads from the selected range's cutoff, then groups request rows by session file for the top sessions.
 omp-stats' `getTimeRangeConfig` gives each range's cutoff and bucket, except `today`, which starts at the server's local midnight with hourly buckets.
+`Dashboard` owns a `ForeignUsage` index in `src/foreign/usage.ts`, which refreshes Claude Code's and Codex's transcripts on each Analytics read.
+Each format names its usage files, including subagents, and folds each file through `FoldedFile`, reading only appended complete lines and restarting after truncation.
+Claude Code requests come from assistant records with a real model and usage.
+Repeated `message.id` records count once, with the last record's usage, because content blocks repeat the request while its output grows.
+Synthetic replies and `cost-state` bookkeeping do not count.
+Codex requests use `token_usage_record.payload.usage` once per `response_id`, with the latest preceding model from `turn_context` or `thread_settings_applied`.
+The reader assumes an ordinary response record precedes its next valid `token_count` summary, with unrelated non-usage records allowed between them.
+That summary consumes the pending record and advances the event cumulative total, but adds no request when its input, cached input, output, and per-request total match the record.
+An unchanged cumulative summary also consumes the pending record, so a record-only compaction still counts and cannot suppress a later event-only request.
+Duplicate response ids neither count again nor re-arm a consumed pair, and equal token values alone never deduplicate separate response records or growing event-only summaries.
+Unpaired `event_msg` records with `payload.type: "token_count"` and non-null `info` count when `total_token_usage.total_tokens` grows, using `last_token_usage`.
+The response records' `thread_token_usage` and the events' cumulative usage can start at different points and are never compared.
+Codex input excludes cached and cache-written input, which count in their own buckets, and output already includes reasoning.
+Claude Code subagent files count toward the session directory that holds them.
+Codex subagents count toward `thread_spawn.parent_thread_id`, else the first session metadata's `parent_thread_id`, including guardian reviewers.
+A Codex subagent without either parent id counts toward its own unlisted session.
+`withForeignUsage` in `src/analytics.ts` filters requests by the same cutoff and adds them to `StatsRead` totals, models, agents, per-session rows, and provider buckets.
+Foreign rows carry their session id and subagent flag rather than using omp's filename convention.
+Listed sessions take their title and working directory from the existing saved-session index and can open their read-only transcripts.
+Cache rates are recomputed after merging, and model output rates remain omp's measurement or `null` for foreign-only models.
+Tool statistics remain omp-only.
 `src/analytics.ts` folds nested subagent and advisor files into their top-level session, assigns the session's working directory from the saved-session index, and orders models, workspaces, and sessions by token usage.
 `src/omp/stats.ts` reads time buckets by recorded provider through omp-stats' rollup-aware `getProviderTimeSeries`, using the same source as the totals cards.
 `src/analytics.ts` derives chart totals and provider totals from those rows, fills missing buckets with zeros, and starts all time at the first request.
@@ -402,6 +436,8 @@ When the page loads, `decode` turns each kept read back into the store's answer,
 `AnalyticsTab` shows that answer while refreshing on activation or a range change, and every two seconds during indexing or 30 seconds otherwise while active.
 A failed refresh keeps the last successful answer and reports its error without replacing another range's data.
 The displayed cost is omp's API-equivalent list price, not the user's subscription bill.
+Foreign requests use omp's bundled `pi-catalog` model prices at each request's timestamp, including long-context tiers and Claude's five-minute and one-hour cache writes.
+An unknown model costs zero but still counts requests and tokens.
 
 ### Context sources
 
@@ -656,7 +692,7 @@ It finds the files through omp's capability discovery (`pi-coding-agent/src/disc
 Each file carries the SHA-256 of its text.
 `GET /api/models` runs `omp models --json` for the pickers.
 
-`GET /api/analytics?range=<range>` answers `Analytics` from omp-stats, defaulting to `7d`.
+`GET /api/analytics?range=<range>` answers `Analytics` from omp-stats and Claude Code's and Codex's recorded requests, defaulting to `24h`.
 The accepted ranges are `today`, `24h`, `7d`, `30d`, `90d`, and `all`; an unknown range returns 400.
 The answer includes totals, time buckets with per-provider usage, provider totals, models, workspaces, agent types, tools, the 20 sessions with the most tokens, and live indexing status.
 

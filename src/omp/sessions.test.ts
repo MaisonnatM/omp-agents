@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { endsMidTurn } from "./sessions";
+import { endsMidTurn, sessionFileOf } from "./sessions";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -51,5 +51,22 @@ describe("endsMidTurn", () => {
 			message: { role: "assistant", ...model, content: [], stopReason: "aborted", timestamp: 3 },
 		};
 		expect(await endsMidTurn(sessionFile([header, prompt, toolCall, killed, abort]))).toBe(false);
+	});
+});
+
+describe("sessionFileOf", () => {
+	const root = "/sessions";
+
+	test("a session file, and the lock sidecars omp writes beside it, name the session file", () => {
+		expect(sessionFileOf("/sessions/p/a.jsonl", root)).toBe("/sessions/p/a.jsonl");
+		expect(sessionFileOf("/sessions/p/.a.jsonl.lock", root)).toBe("/sessions/p/a.jsonl");
+		expect(sessionFileOf("/sessions/p/.a.jsonl.lock.os", root)).toBe("/sessions/p/a.jsonl");
+	});
+
+	test("subagent files, other files, and files elsewhere name no session file", () => {
+		expect(sessionFileOf("/sessions/p/a/sub.jsonl", root)).toBeNull();
+		expect(sessionFileOf("/sessions/p/a.jsonl.1.bak", root)).toBeNull();
+		expect(sessionFileOf("/sessions/p", root)).toBeNull();
+		expect(sessionFileOf("/elsewhere/p/a.jsonl", root)).toBeNull();
 	});
 });

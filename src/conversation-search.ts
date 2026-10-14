@@ -4,6 +4,7 @@
  * time and the search itself reads none.
  */
 import type { LineFold } from "./line-reader";
+import { formatOf, SESSION_FORMATS, type SessionFormat } from "./session-formats";
 import { everyWord, searchWords } from "./shared/every-word";
 import type { ConversationHit } from "./shared/sessions";
 import { messageItemsOf } from "./transcript";
@@ -15,22 +16,20 @@ interface ConversationMessage {
 	text: string;
 }
 
-/** The lines that can hold a prompt or a reply. Tool results, most of a file's bytes, go unparsed. */
-const CONVERSATION_LINE = /"role":"(?:user|assistant)"|"type":"custom_message"/;
-
 /** A session file's prompts and replies in file order, by item id, so a message omp writes again keeps its place. */
 class ConversationFold implements LineFold {
 	readonly messages = new Map<string, ConversationMessage>();
+	readonly #format: SessionFormat;
+
+	constructor(format: SessionFormat) {
+		this.#format = format;
+	}
 
 	applyLine(line: string): void {
-		if (!CONVERSATION_LINE.test(line)) return;
-		let entry: unknown;
-		try {
-			entry = JSON.parse(line);
-		} catch {
-			return;
+		if (!this.#format.messageLine.test(line)) return;
+		for (const entry of this.#format.decode(line)) {
+			for (const item of messageItemsOf(entry)) this.messages.set(item.id, { id: item.id, role: item.kind, text: item.text });
 		}
-		for (const item of messageItemsOf(entry)) this.messages.set(item.id, { id: item.id, role: item.kind, text: item.text });
 	}
 }
 
@@ -50,10 +49,16 @@ export function snippetOf(text: string, query: string): string {
 /** The prompts and replies of each listed session's own file, not its subagents', as far as its reader folded them. */
 export class Conversations {
 	readonly #byPath = new Map<string, ConversationFold>();
+	readonly #formats: readonly SessionFormat[];
+
+	/** `formats`: the agents whose files it may be given, each read in its own format. */
+	constructor(formats: readonly SessionFormat[] = SESSION_FORMATS) {
+		this.#formats = formats;
+	}
 
 	/** An empty fold of session file `path`, in place of the one before: for its first read, and for each read that starts the file over. */
 	start(path: string): LineFold {
-		const fold = new ConversationFold();
+		const fold = new ConversationFold(formatOf(path, this.#formats));
 		this.#byPath.set(path, fold);
 		return fold;
 	}

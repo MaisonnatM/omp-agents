@@ -8,7 +8,7 @@
  * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
 import { isObject, str } from "./json";
-import { imagesOf, oneLine, textOf, toolSummary } from "./session-entries";
+import { imagesOf, oneLine, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
 import { splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import type { Item } from "./shared/transcript";
@@ -34,6 +34,8 @@ export const SKILL_PROMPT = "skill-prompt";
  */
 const SKILL_INVOCATION =
 	/^\[IMPORTANT: User invoked the "([^"]+)" skill; follow its instructions\. Full skill below\.\]\n[\s\S]*\n\[Skill directory: [^\n]*\]\n[^\n]*(?:\nUser: ([\s\S]*))?$/;
+
+const UNREAD_SHOWN = 500;
 
 /** The key a message shares between its live events and its file entry. */
 const messageKey = (message: Json): string | undefined =>
@@ -222,6 +224,10 @@ export class Transcript {
 			}
 			case "compaction":
 				return this.#upsert({ id, kind: "notice", level: "info", text: "Earlier context was compacted." });
+			case UNREAD_LINE: {
+				const line = str(entry.text) ?? "";
+				return this.#upsert({ id, kind: "notice", level: "warning", text: `Unread line: ${line.length > UNREAD_SHOWN ? `${line.slice(0, UNREAD_SHOWN)}…` : line}` });
+			}
 			default:
 				return [];
 		}

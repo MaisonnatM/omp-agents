@@ -384,7 +384,8 @@ interface TranscriptProps {
 	view: View;
 	working: boolean;
 	fork: StartOf<"fork"> | null;
-	onFork: (itemId: string, point: ForkPoint) => void;
+	/** Starts a fork at a message; omitted where the session cannot fork, which leaves out the fork buttons. */
+	onFork?: (itemId: string, point: ForkPoint) => void;
 	/** Replaces the last prompt with `text` and runs it again; omitted where the session cannot rewind. */
 	onEdit?: (entryId: string, text: string) => Promise<void>;
 	/** Shown in place of the transcript, once it loaded, until its first item or turn. */
@@ -414,7 +415,7 @@ interface MessageRowProps {
 	editor?: ReactNode;
 	/** It took the place of a pending prompt already on screen, so it shows at once without its entrance motion. */
 	replacing: boolean;
-	onFork: (itemId: string, point: ForkPoint) => void;
+	onFork?: (itemId: string, point: ForkPoint) => void;
 	onEditing: (item: Extract<Item, { kind: "user" }>, entryId: string) => void;
 }
 
@@ -423,7 +424,7 @@ const MessageRow = memo(function MessageRow({
 	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, replacing, onFork, onEditing,
 }: MessageRowProps) {
 	const copied = copyText(item);
-	const point = forkAt === null ? null : { entryId: forkAt, prefill };
+	const point = forkAt === null || !onFork ? null : { entryId: forkAt, prefill };
 	const edit = editAt !== null && item.kind === "user" ? () => onEditing(item, editAt) : undefined;
 	const pending = item.kind === "user" && item.pending === true;
 	return (
@@ -440,7 +441,7 @@ const MessageRow = memo(function MessageRow({
 						<>
 							{copyable && <CopyButton text={copied} />}
 							{edit && <EditButton onEdit={edit} />}
-							{point && <ForkButton point={point} forking={forking} disabled={forkDisabled} onFork={() => onFork(item.id, point)} />}
+							{point && onFork && <ForkButton point={point} forking={forking} disabled={forkDisabled} onFork={() => onFork(item.id, point)} />}
 						</>
 					) : undefined
 				}

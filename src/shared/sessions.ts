@@ -117,12 +117,18 @@ export interface ContextUsage {
 	window: number;
 }
 
+/** The agent that wrote a session file: omp, or Claude Code and Codex, whose sessions the dashboard only reads. */
+export const SESSION_SOURCES = ["omp", "claude-code", "codex"] as const;
+export type SessionSource = (typeof SESSION_SOURCES)[number];
+
 /** A session that has no live host, read from its file on disk. */
 export interface PastSession extends SessionFacts {
 	sessionId: string;
 	/** Its title, else its first prompt as one line; `null` when it has neither. */
 	title: string | null;
 	cwd: string;
+	/** Only an omp session resumes or forks; the others are read-only. */
+	source: SessionSource;
 	cwdDisplay: string;
 	/** Last write to the session file, in ms since the epoch. */
 	modifiedAt: number;

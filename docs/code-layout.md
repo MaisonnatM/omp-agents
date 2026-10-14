@@ -63,6 +63,7 @@ The server lives in `src/`:
   It checks the Bun version and loads `src/omp/install.ts`, so a missing requirement, such as `omp` absent from `PATH`, prints one `omp-agents:` line saying how to fix it and exits 1 instead of a stack trace.
 - `src/server/dashboard.ts`: `Dashboard`, the composition root: it builds the stores, `LiveSessions`, `Views`, `Notices`, `ListRegistry`, `Broadcasts`, the inboxes, `Worktrees`, the starter, `RoutineRunner`, `ProjectRunner`, `Loops`, and the socket handler in dependency order, each handed the parts above it, and owns the live-update switch, the registry listing, the file rescans, the activity check, and the owner lock's takeover.
   Two edges point down, closing the only cycles: a live session's update reaches the parts built after `LiveSessions`, and a notice change reaches the `Broadcasts` that reads the notices; no constructor calls either.
+  It also owns the `ForeignUsage` index that each Analytics read refreshes.
   Nothing follows the registry, watches a directory, or publishes before `start(server)`; `stop()` first stops the loops and both inboxes, so no tick publishes while the rest shuts down, then ends the sessions started here, hangs up on the shells, stops omp-stats, flushes the stores, and aborts the routine commands still running.
 - `src/server/list-registry.ts`: `ListRegistry`, the authoritative builders for the eight whole-list socket messages, registered beside their store apply functions in `Dashboard`.
   An edit publishes its list when it changes; a no-op resends the current list only to its requesting peer.
@@ -78,7 +79,7 @@ The server lives in `src/`:
   A shape the server also keeps in a file is parsed by its domain module, which `wire.ts` imports, so a file store never imports the transport: `parseRoutineSpec` in `src/routines.ts`, `parseScheduledSpec` in `src/shared/scheduled.ts`, `parseEventWhen` in `src/shared/calendar.ts`, and `parseNewSessionRequest`, the new-session start that a scheduled start keeps, in `src/shared/sessions.ts`.
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
 - `src/server/socket.ts`: handles each socket message, answering through a `Peer` from `src/server/request-ledger.ts`; see [Socket requests](architecture.md#socket-requests).
-  `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
+  `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests, and refuses to fork or resume a Claude Code or Codex session before it starts omp.
   `src/omp/tool-policy.ts` resolves saved tool restrictions on the resumed or forked branch.
   `src/omp/restricted-rpc.ts` creates a native SDK-restricted session and runs omp's RPC mode; `src/omp/rpc.ts` selects that entrypoint for an allowlist.
   `src/server/session-end.ts` ends a session for the page's `end` message and for the end inbox: `endSession` stops it, then calls `Worktrees.removeCheckout` on its worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
@@ -88,8 +89,10 @@ The server lives in `src/`:
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
 - `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, activity, and pull loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
-  `Loops.stop` stops every loop, closes the recursive watcher, and drops a pending re-read; a file change reported after it is ignored.
-- `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
+  It keeps one recursive watcher per session format's root: it makes omp's when missing, and watches Claude Code's and Codex's only once they exist, trying a missing one again on each rescan.
+  `Loops.stop` stops every loop, closes the watchers, and drops a pending re-read; a file change reported after it is ignored.
+- `src/server/session-files.ts`: the session files on disk, omp's, Claude Code's, and Codex's, re-read file by file as the watchers report them, and the past list, each row with its `source`.
+  It asks each format in `src/session-formats.ts` whether a changed path is its session file, and lists and reads through the format that owns the file.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
   It applies a session's starting prompt to that session's main view with each of its live events, so a live user message and the removal of the prompt it replaces go out together.
@@ -110,7 +113,8 @@ The server lives in `src/`:
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `tool-policy.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
   `restricted-rpc.ts` is the SDK-backed RPC entrypoint for sessions with an allowlist, bundled separately as `restricted-rpc.js` in the desktop app.
   `context-index.ts` keeps the context-source index beside omp-stats' database: each request of each session file split by source, re-read only for files that changed.
-- `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and workspaces, joining each saved session's `SessionSummary`, its title and working directory, without reading transcripts.
+- `src/analytics.ts`: merges Claude Code's and Codex's requests into omp-stats' `StatsRead` with `withForeignUsage`, then folds per-file rows into sessions and workspaces.
+  It joins each saved session's `SessionSummary`, its title and working directory, without reading transcripts.
 - `src/context-sources.ts`: splits a request's input by source, from its context messages and a subagent's recorded system prompt, and folds the index's rows into the Analytics tab's context-source report.
 - `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `isNonEmpty`, `isSafeInteger`, `isDay`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `events.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits.
   `ReducerFile` wraps `JsonFile` for the lists the server changes through a reducer, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `events.json`, and `projects.json`: it loads the value or an empty one, applies a change through its `reduce`, saves only when the change gives a new value, and, for a `shared` file another server also writes, reads the file again before each change.
@@ -124,12 +128,25 @@ The server lives in `src/`:
 - `src/serial-lane.ts`: `SerialLane`, which runs work one call at a time in arrival order; both transports order a session's prompts, aborts, and flushes with it, and the routine runner serializes ticks and run-now claims.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
-- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below.
-  `src/line-reader.ts` holds `FoldedFile`, which keeps a fold of a file's lines (any `LineFold`) up to date, applying only the complete lines appended since its last read and starting a fresh fold when the file shrinks; `src/tail.ts`, `src/media.ts`, `src/changes.ts`, and `src/session-facts.ts` each fold their transcripts through it, and the first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
-- `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, and `imagesOf`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
-- `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last.
+- `src/tail.ts`: reads one transcript file incrementally, decodes each line through its format's `decode` from `src/session-formats.ts`, and feeds each entry to both folds below.
+  `src/line-reader.ts` holds `FoldedFile`, which keeps a fold of a file's lines up to date, applying only appended complete lines and starting a fresh fold when the file shrinks.
+  `src/tail.ts`, `src/media.ts`, `src/changes.ts`, `src/session-facts.ts`, and `src/foreign/usage.ts` each fold transcripts through it.
+  The first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
+- `src/session-formats.ts`: the registry of agents whose session files the dashboard lists, `SESSION_FORMATS`, each a `SessionFormat` with its root, its `fileOf`, `list`, and `read`, its line `decode`, and the `messageLine` conversation search parses.
+  Formats other than omp also name the usage-file patterns and per-file folds for Analytics.
+  `ompFormat` wraps omp's own listing in `src/omp/sessions.ts`, which also holds `sessionFileOf`; `formatOf` names the format of a file by the root that holds it, else omp's.
+- `src/foreign/claude-code.ts` and `src/foreign/codex.ts`: the read-only readers of Claude Code's sessions under `CLAUDE_CONFIG_DIR` (else `~/.claude`) `/projects` and Codex's under `CODEX_HOME` (else `~/.codex`) `/sessions`.
+  Each decodes one line into the omp entries the transcript already folds, preserving recognized blocks alongside one unread-line entry for unknown or malformed content.
+  Codex titles a renamed session from `session_index.jsonl`.
+  `src/foreign/files.ts` holds `ForeignFiles`, which lists both readers' files from each file's first 256 KB and last 64 KB, and reads a file again only when its size or modification time changed.
+  `ClaudeCodeUsage` and `CodexUsage` in their readers fold model requests, with each format's deduplication and session attribution.
+  Codex pairs response-id usage records with the following event summary and retains event-only requests and record-only compactions.
+- `src/foreign/usage.ts`: `ForeignUsage`, the incremental request index for Analytics, and the request, per-file usage, fold, and pricing interfaces the readers share.
+  `src/omp/stats.ts` provides its `listPrice` callback through the bundled `pi-catalog` exports loaded in `src/omp/modules.ts`.
+- `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, `imagesOf`, and `UNREAD_LINE` with `unreadLine`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
+- `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last; an unread line shows as a warning notice with the line's start.
 - `src/conversation-search.ts`: the conversation search behind `GET /api/conversations`.
-  `Conversations` keeps a fold of each session's own file, not its subagents', with the prompts' and replies' item ids and text: `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, and the tool-result lines go unparsed.
+  `Conversations` keeps a fold of each session's own file, not its subagents', with the prompts' and replies' item ids and text: `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, decoded by the file's format, and lines that fail the format's `messageLine` go unparsed.
   `SessionFiles` hands it to `SessionFactsIndex` as one of its `OwnFileFolds`, so the index's read of each session file feeds both folds and no file is read twice; the index starts a fresh conversation when the file shrinks and forgets it once the session leaves the list.
   `Conversations.search` then matches those with `everyWord` and reads no file.
 - `src/work.ts`: folds session-file lines into the files changed.
@@ -239,8 +256,8 @@ The server lives in `src/`:
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
-- `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory.
-  `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
+- `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist.
+  `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.
 
 ## Page
 
@@ -357,7 +374,7 @@ The page lives in `web/`.
   A match opens its session through `web/message-reveal.ts`, a `keyedStore` by view, which the pane's `Transcript` reads to scroll once to the message after the transcript has loaded.
   `web/components/command-palette/` draws it, opened from the sidebar header or with Cmd+K: `command-palette.tsx` the dialog and its list, `action-panel.tsx` the action panel that Cmd+K opens on the highlighted entry, and `palette-footer.tsx` the footer.
   It mounts only while open, so a closed palette builds no list and polls nothing; it asks for the Linear tickets while Linear answers.
-  `web/session-actions.ts` lists what can be done to a session, which both a sidebar row's menu and the palette offer.
+  `web/session-actions.ts` lists what can be done to a session, which both a sidebar row's menu and the palette offer; only an omp past session offers **Resume**.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the sidebar's tab layout, the split ratios, the session details tab, the sidebar's workspace, the pinned skill, the pull request list's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the Pull requests and tickets pages' folded sections.
@@ -369,7 +386,9 @@ The page lives in `web/`.
 - `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the workspace picker; `web/components/pull-requests/pull-requests-nav.tsx` is its Pull requests tab, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more, and `web/components/project-group.tsx` the group of one project in it, each worker's row named by the title its coordinator gave it.
   `web/components/sidebar-search.tsx` is the search field that the Sessions tab and the right sidebar's Files tab share.
-  `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; the row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
+  `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed.
+  Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace or role badge.
+  The row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.
   `web/components/inbox/inbox-nav.tsx` is its Inbox tab: the Gmail address over one **Inbox** row with its unread count.
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, its `ToastData`, a toast's optional source line, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
@@ -403,7 +422,7 @@ The page lives in `web/`.
   `web/mail-draft.ts` holds the draft's one owner, `useMailDraft`, a reducer over a `MailDocument` that changes only on a person's events and freezes while `sendMailDraft` sends it, and `useReplyDraft`, which captures a reply's people when it begins and again only when you choose the other of Reply and Reply all; `MailEditor` shows the document and its phase and sends its edits back.
   It also holds the editor's nodes and `decodeMailDraft`, which reads a kept draft back only when its people, subject, and body have their shape and the body restores into those nodes; any other kept draft reads as none, so the editor opens empty instead of failing.
 - `web/components/pane.tsx`: a pane, whose view renders inside a `RenderBoundary` from `web/components/render-boundary.tsx`, so a view that throws shows its error in that pane and the rest of the page stays; `web/app.tsx` puts one around the page too, and both clear when the hash names another view.
-  `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
+  `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button, `past-conversation.tsx` a past session's view, which for a Claude Code or Codex session reads `Read-only · <agent>` and offers neither **Resume** nor fork buttons, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` a session header's trail, its ticket menu, and its pull request button with its popover.
   `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses.
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeEditor` and `afterActions` slots.

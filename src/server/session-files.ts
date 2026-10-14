@@ -1,26 +1,11 @@
-/** Every session file on disk, newest first, with the pull requests each session worked on. */
-import { basename, dirname, join } from "node:path";
 import { Conversations } from "../conversation-search";
 import { headHistory, worktreeAt } from "../git";
 import { repoOf } from "../github";
-import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
+import type { SavedSession } from "../omp/sessions";
 import { displayPath } from "../paths";
 import { SessionFactsIndex } from "../session-facts";
+import { formatOf, SESSION_FORMATS, type SessionFormat } from "../session-formats";
 import type { ConversationHit, PastSession, SessionFacts } from "../shared/sessions";
-
-/** omp's `.<file>.jsonl.lock` sidecars: on macOS a burst of writes to a session file can surface only as events for these. */
-const SIDECAR = /^\.(.+\.jsonl)\.lock(?:\.os)?$/;
-
-/**
- * The session file a watcher event at `changedPath` is about, or `null` for anything else.
- * Session files sit one directory below `root`; deeper files belong to subagents.
- */
-export function sessionFileOf(changedPath: string, root: string): string | null {
-	if (dirname(dirname(changedPath)) !== root) return null;
-	const name = basename(changedPath);
-	const file = name.startsWith(".") ? SIDECAR.exec(name)?.[1] : name;
-	return file?.endsWith(".jsonl") ? join(dirname(changedPath), file) : null;
-}
 
 const sameSession = (a: SavedSession, b: SavedSession): boolean =>
 	a.id === b.id && a.cwd === b.cwd && a.title === b.title && a.modifiedAt === b.modifiedAt && a.empty === b.empty;
@@ -46,16 +31,18 @@ export class SessionFiles {
 	#touched = new Set<string>();
 	/** Scans and refreshes run one after another, so a slow full scan never overwrites a newer single-file read. */
 	#chain: Promise<unknown> = Promise.resolve();
-	readonly #conversations = new Conversations();
+	readonly #conversations: Conversations;
 	/** Its read of each session's own file also folds that session's prompts and replies, for the conversation search. */
-	readonly facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory, [this.#conversations]);
+	readonly facts: SessionFactsIndex;
 	/** The last past-list row of each listed file, rebuilt only when what it shows changed. */
 	readonly #rows = new Map<string, PastRow>();
-	readonly #root: string;
+	readonly #formats: readonly SessionFormat[];
 
-	/** `root`: omp's sessions directory, one directory per working directory. */
-	constructor(root: string = sessionsDir) {
-		this.#root = root;
+	/** `formats`: the agents whose session files it lists, omp's first. */
+	constructor(formats: readonly SessionFormat[] = SESSION_FORMATS) {
+		this.#formats = formats;
+		this.#conversations = new Conversations(formats);
+		this.facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory, [this.#conversations]);
 	}
 
 	/** The file of session `sessionId`, or `null` while it is not listed. */
@@ -82,16 +69,21 @@ export class SessionFiles {
 
 	/** Note that the watcher reported a change at `changedPath`; whether it concerns a session file. {@link refresh} reads it. */
 	touch(changedPath: string): boolean {
-		const file = sessionFileOf(changedPath, this.#root);
-		if (file) this.#touched.add(file);
-		return file !== null;
+		for (const format of this.#formats) {
+			const file = format.fileOf(changedPath);
+			if (file) {
+				this.#touched.add(file);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** List every file again; whether the list changed. The safety net for changes the watcher missed. */
 	scan(): Promise<boolean> {
 		return this.#queue(async () => {
 			this.#touched.clear();
-			const listed = await listSessionFiles(this.#root);
+			const listed = (await Promise.all(this.#formats.map(format => format.list()))).flat();
 			const next = new Map(listed.map(session => [session.path, session]));
 			const changed = next.size !== this.#byPath.size || listed.some(session => !this.#same(session));
 			if (changed) this.#adopt(next);
@@ -107,7 +99,7 @@ export class SessionFiles {
 			const next = new Map(this.#byPath);
 			let changed = false;
 			for (const path of paths) {
-				const session = await readSessionFile(path);
+				const session = await formatOf(path, this.#formats).read(path);
 				const known = next.get(path);
 				if (!session) {
 					if (next.delete(path)) changed = true;
@@ -151,7 +143,7 @@ export class SessionFiles {
 	}
 
 	/**
-	 * The saved sessions that no live session continues, newest first. `interrupted` names those that stopped without End session.
+	 * The saved sessions that no live session continues, newest first. `interrupted` names the omp sessions that stopped without End session.
 	 * A row whose file, facts, and interruption did not change since the last call is the same object, so a caller can skip it by identity.
 	 */
 	past(liveSessionIds: ReadonlySet<string>, interrupted: (sessionId: string) => boolean): PastSession[] {
@@ -159,13 +151,14 @@ export class SessionFiles {
 			.filter(session => !session.empty && !liveSessionIds.has(session.id))
 			.map(session => {
 				const facts = this.facts.factsOf(session.path);
-				const stopped = interrupted(session.id);
+				const stopped = session.source === "omp" && interrupted(session.id);
 				const kept = this.#rows.get(session.path);
 				if (kept && kept.saved === session && kept.interrupted === stopped && sameFacts(kept.facts, facts)) return kept.row;
 				const row: PastSession = {
 					sessionId: session.id,
 					title: session.title,
 					cwd: session.cwd,
+					source: session.source,
 					cwdDisplay: displayPath(session.cwd),
 					modifiedAt: session.modifiedAt,
 					...facts,

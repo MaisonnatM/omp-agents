@@ -4,6 +4,7 @@
  * server pokes it when its file changes.
  */
 import { FoldedFile, ReadQueue } from "./line-reader";
+import { formatOf } from "./session-formats";
 import type { ChangedFile, Item } from "./shared/transcript";
 import { Transcript } from "./transcript";
 import { Work } from "./work";
@@ -15,23 +16,22 @@ const PUBLISH_WINDOW_MS = 50;
 const inFlux = (item: Item): boolean =>
 	((item.kind === "assistant" || item.kind === "thinking") && item.streaming) || (item.kind === "tool" && item.status === "running");
 
-/** A transcript's entries folded into its display items and its changed files, each line parsed once for both. */
 class TailFold {
 	readonly transcript = new Transcript();
 	readonly work = new Work();
 	/** The items the lines applied since the last {@link takeChanged} touched. */
 	#changed: Item[] = [];
+	readonly #decode: (line: string) => unknown[];
+
+	constructor(decode: (line: string) => unknown[]) {
+		this.#decode = decode;
+	}
 
 	applyLine(line: string): void {
-		let entry: unknown;
-		try {
-			entry = JSON.parse(line);
-		} catch {
-			// A line that does not parse is skipped.
-			return;
+		for (const entry of this.#decode(line)) {
+			this.#changed.push(...this.transcript.applyEntry(entry));
+			this.work.applyEntry(entry);
 		}
-		this.#changed.push(...this.transcript.applyEntry(entry));
-		this.work.applyEntry(entry);
 	}
 
 	takeChanged(): Item[] {
@@ -58,7 +58,8 @@ export class FileTail {
 	/** `emit` gets the items each change touched and the ids of those it removed. `emitWork` gets every changed file once the first read finishes, then the files each later read changed. */
 	constructor(path: string, emit: (reset: boolean, items: Item[], removed: string[]) => void, emitWork: (reset: boolean, files: ChangedFile[]) => void) {
 		this.path = path;
-		this.#file = new FoldedFile(path, () => new TailFold());
+		const { decode } = formatOf(path);
+		this.#file = new FoldedFile(path, () => new TailFold(decode));
 		this.#emit = emit;
 		this.#emitWork = emitWork;
 	}

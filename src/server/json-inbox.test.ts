@@ -87,16 +87,19 @@ describe("JsonInboxDir", () => {
 		const dir = inboxDir();
 		writeFileSync(join(dir, "a.json"), "1");
 		const release = Promise.withResolvers<void>();
+		const entered = Promise.withResolvers<void>();
 		let applied = 0;
 		const inbox = new JsonInboxDir(dir, {
 			parse: parseNumber,
 			async apply() {
 				applied++;
+				entered.resolve();
 				await release.promise;
 				return true;
 			},
 		});
 		const first = inbox.drain();
+		await entered.promise;
 		await inbox.drain();
 		release.resolve();
 		await first;
