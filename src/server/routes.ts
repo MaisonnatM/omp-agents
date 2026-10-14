@@ -5,6 +5,7 @@
  */
 import { join } from "node:path";
 import { buildAnalytics, type SessionSummary } from "../analytics";
+import { buildContextReport } from "../context-sources";
 import { errorText, type Parsed } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
@@ -18,8 +19,9 @@ import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvide
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { builtinTools } from "../omp/modules";
+import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
-import { readStats } from "../omp/stats";
+import { readStats, windowOf } from "../omp/stats";
 import { directoryOf } from "../paths";
 import { loadPullRequestOptions, savePullRequest } from "../pull-request-edit";
 import { listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
@@ -200,6 +202,21 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			: fail(400, "Unknown analytics range");
 	});
 
+	/**
+	 * `GET /api/analytics/context?range=[&cwd=<dir>][&session=<id>]`: the context sources over the range, one workspace's or
+	 * one session's when named, from the index, which syncs in the background as it answers.
+	 */
+	const contextReport = get(params => {
+		const range = params.get("range") ?? "24h";
+		if (!isAnalyticsRange(range)) return fail(400, "Unknown analytics range");
+		return answer(async () => {
+			const index = contextIndex();
+			index.refresh();
+			const rows = index.read(windowOf(range, Date.now()).cutoff);
+			return buildContextReport({ range, cwd: params.get("cwd"), sessionId: params.get("session"), indexing: index.progress, ...rows, root: sessionsDir, factsOf: env.savedOf });
+		});
+	});
+
 	/** `GET /api/skills?cwd=<dir>`: the skills a session started in that directory can invoke. */
 	const skills = get(async params => {
 		const cwd = await dirParam(params);
@@ -291,6 +308,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models/roles": { GET: roles },
 		"/api/tools": { GET: tools },
 		"/api/analytics": { GET: analytics },
+		"/api/analytics/context": { GET: contextReport },
 		"/api/skills": { GET: skills },
 		"/api/pull-requests": { GET: pullRequests },
 		"/api/workspaces": { PUT: workspaceChange },

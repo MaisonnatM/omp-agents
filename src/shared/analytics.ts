@@ -117,3 +117,43 @@ export const decodeAnalytics = decoder(
 		),
 	}),
 );
+
+/**
+ * What a context source is: an instruction file, a skill (its line in the skill list and its body once invoked), an MCP server
+ * (its tool routes, devices, and instructions), a rule, a system prompt section, an injected message, a tool's results, the
+ * conversation itself, a side request outside the conversation, or the part of a request no transcript records.
+ */
+export const CONTEXT_SOURCE_KINDS = ["file", "skill", "mcp", "rule", "prompt", "injection", "tool", "conversation", "side", "unrecorded"] as const;
+
+export type ContextSourceKind = (typeof CONTEXT_SOURCE_KINDS)[number];
+
+/** One source's share of the input over the report's requests. */
+export interface ContextSource {
+	kind: ContextSourceKind;
+	name: string;
+	/** The requests whose input held it. */
+	turns: number;
+	/** Its input tokens over those requests, cached or not. */
+	tokens: number;
+	/** Its part of those requests' input cost: each request's input, cache read, and cache write cost split by token share. */
+	cost: number;
+}
+
+/** The context sources over one range, optionally one workspace's or one session's, from the dashboard's index of the session files. */
+export interface ContextReport {
+	range: AnalyticsRange;
+	cwd: string | null;
+	sessionId: string | null;
+	/** How far the index has read the session files, `null` once it caught up; numbers grow while it reads. */
+	indexing: { current: number; total: number } | null;
+	/** The requests counted, their input tokens with cache reads and writes, and its cost; `sources` add up to `input`. */
+	turns: number;
+	input: number;
+	cost: number;
+	/** Most tokens first. */
+	sources: ContextSource[];
+	/** Every workspace over the range, most input first, for the workspace filter. */
+	workspaces: { cwd: string; input: number }[];
+	/** The 20 sessions with the most input in the chosen workspace, else over the range, for the session filter. */
+	sessions: { sessionId: string; title: string | null; input: number }[];
+}

@@ -9,6 +9,7 @@ import type { ForkPoint } from "../transcript-view";
 import { pastLabel } from "../labels";
 import { Header } from "./page-header";
 import { PullRequestButton, TicketMenu } from "./session-meta";
+import { Trajectory } from "./trajectory";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
 interface PastConversationProps {
@@ -21,10 +22,12 @@ interface PastConversationProps {
 	onResume: () => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
+	/** Show its turns in place of its transcript. */
+	trajectory: boolean;
 }
 
 /** A past session's saved transcript under its title. It follows the file; **Resume** continues it in a session this dashboard starts. */
-export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions }: PastConversationProps) {
+export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, trajectory }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
@@ -56,7 +59,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						{failed}
 					</p>
 				)}
-				<Transcript view={view} working={false} fork={fork} onFork={onFork} />
+				{trajectory ? <Trajectory view={view} /> : <Transcript view={view} working={false} fork={fork} onFork={onFork} />}
 			</div>
 		</MessageScrollerProvider>
 	);

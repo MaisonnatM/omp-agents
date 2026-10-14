@@ -25,6 +25,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx`.
+- Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the **Transcript**/**Trajectory** tabs in `web/components/pane.tsx` swap for the transcript.
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts; a project's coordinator shows `web/components/project-details.tsx` instead.
@@ -46,6 +47,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Routines: `web/components/routines/routines-page.tsx`.
   - Projects: `web/components/projects/projects-page.tsx`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
+    Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry; change them only as `web/components/ui/PATCHES.md` describes.
 
@@ -107,7 +109,9 @@ The server lives in `src/`:
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `tool-policy.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
   `restricted-rpc.ts` is the SDK-backed RPC entrypoint for sessions with an allowlist, bundled separately as `restricted-rpc.js` in the desktop app.
+  `context-index.ts` keeps the context-source index beside omp-stats' database: each request of each session file split by source, re-read only for files that changed.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and workspaces, joining each saved session's `SessionSummary`, its title and working directory, without reading transcripts.
+- `src/context-sources.ts`: splits a request's input by source, from its context messages and a subagent's recorded system prompt, and folds the index's rows into the Analytics tab's context-source report.
 - `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `isNonEmpty`, `isSafeInteger`, `isDay`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `events.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits.
   `ReducerFile` wraps `JsonFile` for the lists the server changes through a reducer, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `events.json`, and `projects.json`: it loads the value or an empty one, applies a change through its `reduce`, saves only when the change gives a new value, and, for a `shared` file another server also writes, reads the file again before each change.
   `src/json.ts` also holds `Parsed<T>`, the `{ ok }` or refusal every parser returns, and `BASE64`, which the socket's parsers and the domain parsers share.
@@ -130,6 +134,8 @@ The server lives in `src/`:
   `Conversations.search` then matches those with `everyWord` and reads no file.
 - `src/work.ts`: folds session-file lines into the files changed.
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
+- `src/trajectory.ts`: folds a transcript's entries into turns, with their injections, requests, tool calls, and usage, for the `turns` message; `TrajectoryTail` reads the file through `FoldedFile` and `ReadQueue`.
+  `src/shared/trajectory.ts` holds `Turn`, its steps, and `TokenUsage`.
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
   Its read of a session's own file also feeds the `OwnFileFolds` it was constructed with, and it knows nothing of what those folds keep.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
@@ -256,7 +262,8 @@ The page lives in `web/`.
   `request` resolves or rejects on `done` and keeps waiting across a reconnect, whose `resume` hands the server every request still waiting.
   Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
 - `web/use-action.ts`: guards a control against repeated activation, exposes its pending state, and shows failures through the toast manager.
-- `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state.
+- `web/pane-store.ts`: each open view's transcript, changed files, images, turns, and completions, outside the page state.
+  `useShowTrajectory` registers a view whose Trajectory a component shows, and `web/use-dashboard.ts` sends those views in `watch`; `retainTrajectories` drops the turns of a view no longer shown.
   A component reads one field through a selector hook (`useTranscript`, `useChangedFiles`, `useMedia`, `useComposerData`, `useTurnCount`, …), built on `useSelect` in `web/keyed-store.ts`, which `web/polled-store.ts` shares, one snapshot and subscription per key, and renders again only when that field changes, so a streamed token renders the transcript and what reads `items`, and not the pane, the composer, or the details.
   `toBlocks` in `web/transcript-view.ts` keeps the blocks that a token leaves alone as the same objects, and the transcript's rows are memoized on them.
   It and the page state apply the server's list updates, the roster's and the past sessions', through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
@@ -287,7 +294,7 @@ The page lives in `web/`.
   `source-control-tab.tsx` shows the `gh` and `gt` rows, the automatic pull switch, each repository's override with its last pull, and the default merge method, which `web/merge-method.ts` keeps in localStorage with the method last picked on a merge button.
   `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each, and removes them.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
-  `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section.
+  `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section; `context-sources.tsx` renders the context-source table with its workspace and session filters.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
   `web/components/org-icon.tsx` draws a model maker's logo, such as Anthropic's, from svgl.
@@ -454,6 +461,8 @@ The page lives in `web/`.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are the default kit.
+`templates/omp/README.md` lists what each of its extensions does.
+`agent/extensions/request-log.ts` both records each provider request and, run with Bun, rebuilds the requests a session file records and checks their hashes; `templates/omp/request-log.test.ts` records requests through omp's own blob store and checks every rebuilt body against the one sent.
 `maintainer/` is the maintainer git profile, `AGENTS.md` and `templates/omp/maintainer/docs/git-workflow.md`, copied only when you pass `--maintainer`, and a file there replaces the `agent/` file with the same path.
 [Template sync](../CODING_STANDARDS.md#template-sync) says how to copy an edited live file back.
 The default `agent/AGENTS.md` keeps worktree and force-push safety inline and links to the model and review references under `agent/docs/`.

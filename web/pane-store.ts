@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { CompletionItem, View, WithdrawnMessage } from "../src/shared/sessions";
+import type { Turn } from "../src/shared/trajectory";
 import { type AgentMedia, type ChangedFile, type Item, newestMediaFirst } from "../src/shared/transcript";
 import { applyDelta } from "./keyed-list";
 import { keyedStore } from "./keyed-store";
@@ -25,16 +26,18 @@ export interface PaneData {
 	files: ChangedFile[] | null;
 	/** The images its agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
 	media: AgentMedia[] | null;
+	/** The view's turns while its Trajectory shows; `null` until the server sends them. */
+	turns: Turn[] | null;
 }
 
 /** The part of a view's data its composer reads: the server's last answers to its `complete`, `dequeue`, and `interrupt`. */
 export type ComposerData = Pick<PaneData, "completions" | "withdrawn">;
 
-export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, withdrawn: null, files: null, media: null };
+export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, withdrawn: null, files: null, media: null, turns: null };
 
-/** The server messages that belong to one open view: its transcript, its changed files, its images, its composer's suggestions, and the queued messages it took back. */
+/** The server messages that belong to one open view: its transcript, its changed files, its images, its turns, its composer's suggestions, and the queued messages it took back. */
 export type PaneMsg =
-	| Extract<ServerMsg, { t: "items" | "work" | "media" | "withdrawn" }>
+	| Extract<ServerMsg, { t: "items" | "work" | "media" | "turns" | "withdrawn" }>
 	| (Extract<ServerMsg, { t: "completions" }> & { scope: { kind: "live" } });
 
 /**
@@ -49,6 +52,15 @@ export function retainPanes(views: View[]): void {
 	const next = new Set(views.map(hashForView));
 	for (const key of open) if (!next.has(key)) panes.set(key, EMPTY_PANE);
 	open = next;
+}
+
+let trajectories = new Set<string>();
+
+/** Keeps the turns of `views` and drops the rest's, so a Trajectory shown again waits for fresh turns instead of showing stale ones. */
+export function retainTrajectories(views: View[]): void {
+	const next = new Set(views.map(hashForView));
+	for (const key of trajectories) if (!next.has(key) && panes.get(key).turns !== null) panes.set(key, { ...panes.get(key), turns: null });
+	trajectories = next;
 }
 
 /** Applies a message to its view's entry. Views the page does not show ignore it. */
@@ -66,6 +78,9 @@ export function applyPaneMessage(msg: PaneMsg): void {
 			break;
 		case "media":
 			panes.set(key, { ...pane, media: msg.reset ? msg.media : [...(pane.media ?? []), ...msg.media].sort(newestMediaFirst) });
+			break;
+		case "turns":
+			if (trajectories.has(key)) panes.set(key, { ...pane, turns: applyDelta(pane.turns ?? [], msg.reset, msg.turns, turn => turn.id, []) });
 			break;
 		case "completions":
 			panes.set(key, { ...pane, completions: { reqId: msg.reqId, items: msg.items, error: msg.error } });
@@ -92,6 +107,7 @@ const itemsOf = (pane: PaneData): Item[] => pane.items;
 const loadedOf = (pane: PaneData): boolean => pane.loaded;
 const filesOf = (pane: PaneData): ChangedFile[] | null => pane.files;
 const mediaOf = (pane: PaneData): AgentMedia[] | null => pane.media;
+const turnsOf = (pane: PaneData): Turn[] | null => pane.turns;
 const turnCountOf = (pane: PaneData): number => turnCount(pane.items);
 const composerOf = ({ completions, withdrawn }: PaneData): ComposerData => ({ completions, withdrawn });
 const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.withdrawn === b.withdrawn;
@@ -108,6 +124,39 @@ export const useChangedFiles = (view: View): ChangedFile[] | null => usePaneSele
 
 /** The images `view`'s agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
 export const useMedia = (view: View): AgentMedia[] | null => usePaneSelect(view, mediaOf);
+
+/** `view`'s turns, in order; `null` until the server sends them. */
+export const useTurns = (view: View): Turn[] | null => usePaneSelect(view, turnsOf);
+
+/** The views whose Trajectory some mounted component shows, by {@link hashForView}, with how many components show each. */
+const shownTrajectories = new Map<string, { view: View; count: number }>();
+let shownList: View[] = [];
+const shownListeners = new Set<() => void>();
+
+function setShown(view: View, delta: 1 | -1): void {
+	const key = hashForView(view);
+	const count = (shownTrajectories.get(key)?.count ?? 0) + delta;
+	if (count > 0) shownTrajectories.set(key, { view, count });
+	else shownTrajectories.delete(key);
+	shownList = [...shownTrajectories.values()].map(entry => entry.view);
+	for (const listener of shownListeners) listener();
+}
+
+/** Asks the server for `view`'s turns while the calling component is mounted. */
+export function useShowTrajectory(view: View): void {
+	useEffect(() => {
+		setShown(view, 1);
+		return () => setShown(view, -1);
+	}, [view]);
+}
+
+const subscribeShown = (listener: () => void): (() => void) => {
+	shownListeners.add(listener);
+	return () => shownListeners.delete(listener);
+};
+
+/** The views whose Trajectory the page shows, which it asks the server to stream. */
+export const useShownTrajectories = (): View[] => useSyncExternalStore(subscribeShown, () => shownList, () => shownList);
 
 /** What the server answered `view`'s composer: its last `complete` and its last `dequeue`. */
 export const useComposerData = (view: View): ComposerData => usePaneSelect(view, composerOf, sameComposer);

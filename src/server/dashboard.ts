@@ -450,7 +450,7 @@ export class Dashboard {
 
 	/** A dashboard socket closed: it watches no view any more, and its page's requests wait for its next socket. */
 	close(ws: Socket): void {
-		this.#views.watch(ws, []);
+		this.#views.watch(ws, [], []);
 		this.#requests.close(ws);
 	}
 

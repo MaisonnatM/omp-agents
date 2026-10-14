@@ -1,9 +1,11 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
+import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
+import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import type { ModelList } from "../reads";
 import { hashForView } from "../routing";
@@ -61,9 +63,20 @@ export const Pane = memo(function Pane({
 	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
 	const onClose = useCallback(() => onLayout(index, "close"), [index, onLayout]);
 	const onFocus = useCallback(() => !focused && focus(index), [focus, focused, index]);
+	// Kept by view, so a pane that switches to another session shows its transcript.
+	const [trajectoryOf, setTrajectoryOf] = useState<string | null>(null);
+	const trajectory = trajectoryOf === hashForView(view);
 
 	const actions = (
 		<>
+			<SizeProvider size="compact">
+				<Tabs value={trajectory ? "trajectory" : "transcript"} onValueChange={value => setTrajectoryOf(value === "trajectory" ? hashForView(view) : null)}>
+					<TabsList aria-label="Show">
+						<TabItem value="transcript" label="Transcript" tooltip="The conversation as you read it" />
+						<TabItem value="trajectory" label="Trajectory" tooltip="Each turn's injected context, model requests, tool calls, and token usage" />
+					</TabsList>
+				</Tabs>
+			</SizeProvider>
 			{count > 1 && (
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
@@ -82,7 +95,7 @@ export const Pane = memo(function Pane({
 		</>
 	);
 	const content = view.kind === "past" ? (
-		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} />
+		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} trajectory={trajectory} />
 	) : (
 		<Conversation
 			view={view}
@@ -95,6 +108,7 @@ export const Pane = memo(function Pane({
 			send={send}
 			onEnd={end}
 			actions={actions}
+			trajectory={trajectory}
 			focused={focused}
 			workspaces={workspaces}
 		/>

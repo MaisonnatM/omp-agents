@@ -28,7 +28,7 @@ function socket() {
 	const sent: ServerMsg[] = [];
 	const topics = new Set<string>();
 	const ws = {
-		data: { views: new Map() } as SocketData,
+		data: { views: new Map(), trajectories: new Map() } as SocketData,
 		send: (raw: string) => {
 			const msg: ServerMsg = JSON.parse(raw);
 			if (msg.t !== "work" && msg.t !== "media") sent.push(msg);
@@ -79,7 +79,7 @@ describe("Views", () => {
 		paths.set("a:", file);
 		const { ws } = socket();
 
-		views.watch(ws, [main("a")]);
+		views.watch(ws, [main("a")], []);
 		await untilPublished(1);
 		expect(itemsOf(0)).toEqual({
 			reset: true,
@@ -108,7 +108,7 @@ describe("Views", () => {
 		paths.set("a:", file);
 		const { ws } = socket();
 
-		views.watch(ws, [main("a")]);
+		views.watch(ws, [main("a")], []);
 		await untilPublished(1);
 		expect(itemsOf(0)).toEqual({ reset: true, items: [] });
 
@@ -137,12 +137,12 @@ describe("Views", () => {
 		starting.set("a", { id: "req_1", text: "say pong", images: [{ data: "aGk=", mimeType: "image/png" }] });
 		const pending: Item = { id: "starting:req_1", kind: "user", text: "say pong", skill: null, from: null, entryId: null, images: ["data:image/png;base64,aGk="], pending: true };
 
-		views.watch(socket().ws, [main("a")]);
+		views.watch(socket().ws, [main("a")], []);
 		await untilPublished(2);
 		expect([itemsOf(0), itemsOf(1)].flatMap(({ items }) => items.map(item => item.id))).toEqual(["m100", "starting:req_1"]);
 		expect(itemsOf(1).items).toEqual([pending]);
 		const late = socket();
-		views.watch(late.ws, [main("a")]);
+		views.watch(late.ws, [main("a")], []);
 		expect(late.sent).toEqual([
 			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }, pending], removed: [] },
 		]);
@@ -169,7 +169,7 @@ describe("Views", () => {
 		const file = join(root, "session.jsonl");
 		writeFileSync(file, "");
 		paths.set("a:", file);
-		views.watch(socket().ws, [main("a")]);
+		views.watch(socket().ws, [main("a")], []);
 		await untilPublished(1);
 
 		starting.set("a", { id: "req_2", text: "/skill:review the diff", images: [] });
@@ -194,7 +194,7 @@ describe("Views", () => {
 		paths.set("a:", mainFile);
 		paths.set("a:s1", subFile);
 		const { ws } = socket();
-		views.watch(ws, [main("a"), sub("a", "s1")]);
+		views.watch(ws, [main("a"), sub("a", "s1")], []);
 		await untilPublished(2);
 
 		// The host's agent events are the main agent's; a subagent's pane takes none of them.
@@ -215,7 +215,7 @@ describe("Views", () => {
 		views.applyEvent("nobody", { type: "message_end", message: { role: "user", timestamp: 5, content: "hi" } });
 
 		paths.set("a:", null);
-		views.watch(ws, [main("a")]);
+		views.watch(ws, [main("a")], []);
 		expect(sent).toEqual([{ t: "items", view: main("a"), reset: true, items: [], removed: [] }]);
 		views.applyEvent("a", { type: "message_end", message: { role: "user", timestamp: 5, content: "hi" } });
 		views.note("a", null, "error", "lost");
@@ -226,7 +226,7 @@ describe("Views", () => {
 		const { root, paths, views, untilPublished, itemsOf, published } = setup();
 		const { ws, sent } = socket();
 		paths.set("a:", null);
-		views.watch(ws, [main("a")]);
+		views.watch(ws, [main("a")], []);
 		expect(sent).toHaveLength(1);
 
 		const first = join(root, "first.jsonl");
@@ -261,9 +261,9 @@ describe("Views", () => {
 		const first = socket();
 		const second = socket();
 
-		views.watch(first.ws, [main("a")]);
+		views.watch(first.ws, [main("a")], []);
 		await untilPublished(1);
-		views.watch(second.ws, [main("a")]);
+		views.watch(second.ws, [main("a")], []);
 		expect(second.sent).toEqual([
 			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }], removed: [] },
 		]);
@@ -271,16 +271,51 @@ describe("Views", () => {
 		expect(published).toHaveLength(1);
 
 		// One socket leaving keeps the view going for the other.
-		views.watch(first.ws, []);
+		views.watch(first.ws, [], []);
 		expect(first.topics.size).toBe(0);
 		views.note("a", null, "warning", "still here");
 		await untilPublished(2);
 
-		views.watch(second.ws, []);
+		views.watch(second.ws, [], []);
 		views.note("a", null, "warning", "nobody home");
 		views.poke(file);
 		await Promise.resolve();
 		expect(published).toHaveLength(2);
+	});
+
+	test("a view's turns stream only while some socket shows its Trajectory, to every socket showing it", async () => {
+		const { root, paths, views, untilPublished, published } = setup();
+		const file = join(root, "session.jsonl");
+		writeFileSync(file, userEntry("e1", 100, "hello"));
+		paths.set("a:", file);
+		const first = socket();
+		const second = socket();
+		const turnIds = (msg: ServerMsg | undefined) => (msg?.t === "turns" ? { reset: msg.reset, ids: msg.turns.map(turn => turn.id) } : null);
+
+		views.watch(first.ws, [main("a")], []);
+		await untilPublished(1);
+		expect(first.topics).toEqual(new Set(["view:live:a:"]));
+
+		views.watch(first.ws, [main("a")], [main("a")]);
+		await untilPublished(2);
+		expect(turnIds(published[1]?.msg)).toEqual({ reset: true, ids: ["e1"] });
+		expect(published[1]?.topic).toBe("turns:live:a:");
+		views.watch(second.ws, [], [main("a")]);
+		expect(second.sent.map(turnIds)).toEqual([{ reset: true, ids: ["e1"] }]);
+
+		appendFileSync(file, userEntry("e2", 200, "again"));
+		views.poke(file);
+		await untilPublished(4);
+		expect(published.slice(2).map(entry => turnIds(entry.msg)).filter(Boolean)).toEqual([{ reset: false, ids: ["e2"] }]);
+
+		views.watch(first.ws, [main("a")], []);
+		views.watch(second.ws, [], []);
+		expect(first.topics).toEqual(new Set(["view:live:a:"]));
+		appendFileSync(file, userEntry("e3", 300, "once more"));
+		views.poke(file);
+		await untilPublished(5);
+		await Promise.resolve();
+		expect(published.slice(4).map(entry => entry.msg.t)).toEqual(["items"]);
 	});
 
 	test("a change reported only for omp's lock sidecar re-reads every open transcript in that directory", async () => {
@@ -293,7 +328,7 @@ describe("Views", () => {
 		paths.set("a:", one);
 		paths.set("b:", two);
 		const { ws } = socket();
-		views.watch(ws, [main("a"), main("b")]);
+		views.watch(ws, [main("a"), main("b")], []);
 		await untilPublished(2);
 
 		appendFileSync(one, userEntry("e3", 300, "c"));
@@ -336,7 +371,7 @@ describe("Views", () => {
 		};
 
 		const loaded = nextList();
-		views.watch(socket().ws, [main("a")]);
+		views.watch(socket().ws, [main("a")], []);
 		await loaded;
 		expect(lists).toEqual([[]]);
 
@@ -348,12 +383,12 @@ describe("Views", () => {
 
 		const late: ServerMsg[] = [];
 		const joiner = {
-			data: { views: new Map() } as SocketData,
+			data: { views: new Map(), trajectories: new Map() } as SocketData,
 			send: (raw: string) => void late.push(JSON.parse(raw)),
 			subscribe: () => {},
 			unsubscribe: () => {},
 		} as unknown as Socket;
-		views.watch(joiner, [main("a")]);
+		views.watch(joiner, [main("a")], []);
 		expect(late.find(msg => msg.t === "media")).toEqual({ t: "media", view: main("a"), reset: true, media: [{ src: srcOf("a".repeat(64)), agentId: "Smoke", tool: "eval", summary: "", at: 1 }] });
 
 		path = null;

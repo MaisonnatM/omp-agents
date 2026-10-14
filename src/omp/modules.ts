@@ -60,6 +60,8 @@ export interface DirsModule {
 	/** omp's user-level MCP config, `mcp.json` in the agent directory. */
 	getMCPConfigPath(scope: "user"): string;
 	getBlobsDir(): string;
+	/** omp-stats' database, `stats.db` in omp's data root. */
+	getStatsDbPath(): string;
 }
 /** Subset of omp's `SessionEntry` (src/session/session-entries.ts); the header has `type: "session"`. */
 export interface FileEntry {
@@ -69,6 +71,21 @@ export interface FileEntry {
 }
 export interface LoaderModule {
 	loadEntriesFromFile(filePath: string): Promise<FileEntry[]>;
+}
+/** omp's session context (src/session/session-context.ts): the messages a request on the branch ending at `leafId` sends. */
+export interface SessionContextModule {
+	buildSessionContext(entries: FileEntry[], leafId: string | null, byId: Map<string, FileEntry>): { messages: object[] };
+}
+/** omp's tokenizer (pi-agent-core src/tokenizer.ts): exact counts for the catalog's tokenizer families, else about 4 bytes a token. */
+export interface TokenizerModule {
+	Tokenizer: new (model: { tokenizer?: string; api: string; provider: string; id: string }) => {
+		countMessage(message: object): number;
+		countTokens(text: string, mode: "approximate"): number;
+	};
+}
+export interface ModelTokenizerModule {
+	/** The tokenizer family pi-catalog knows `modelId` by, `undefined` when it knows none. */
+	resolveModelTokenizer(modelId: string, provider: string): string | undefined;
 }
 export interface ExitDiagnosticsModule {
 	createInterruptedTurnAbortMessage(
@@ -580,6 +597,11 @@ export const listing = await load<ListingModule>(join(srcDir, "session", "sessio
 });
 export const storage = await load<StorageModule>(join(srcDir, "session", "session-storage.ts"), { FileSessionStorage: "function" });
 export const loader = await load<LoaderModule>(join(srcDir, "session", "session-loader.ts"), { loadEntriesFromFile: "function" });
+export const sessionContext = await load<SessionContextModule>(join(srcDir, "session", "session-context.ts"), { buildSessionContext: "function" });
+export const tokenizer = await load<TokenizerModule>(join(dirname(packageDir), "pi-agent-core", "src", "tokenizer.ts"), { Tokenizer: "function" });
+export const modelTokenizer = await load<ModelTokenizerModule>(join(dirname(packageDir), "pi-catalog", "src", "model-tokenizer.ts"), {
+	resolveModelTokenizer: "function",
+});
 export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "session", "exit-diagnostics.ts"), {
 	createInterruptedTurnAbortMessage: "function",
 });
@@ -588,6 +610,7 @@ export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getAgentDir: "function",
 	getMCPConfigPath: "function",
 	getBlobsDir: "function",
+	getStatsDbPath: "function",
 });
 
 export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc-client.ts"), {

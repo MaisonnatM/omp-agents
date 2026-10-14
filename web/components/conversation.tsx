@@ -29,6 +29,7 @@ import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
 import { ScheduleButton, ScheduledMessages, useScheduleSend } from "./scheduled";
 import { type Subject, subjectOf } from "./subject";
+import { Trajectory } from "./trajectory";
 import { Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
 import { DirectoryPicker } from "./workspace-picker";
@@ -55,6 +56,8 @@ interface ConversationProps {
 	onEnd: (instanceId: string) => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
+	/** Show its turns in place of its transcript; the composer stays. */
+	trajectory: boolean;
 	/** Whether this is the focused pane, the one session shortcuts act on. */
 	focused: boolean;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the directory picker offers. */
@@ -91,6 +94,7 @@ function LiveConversation({
 	send,
 	onEnd,
 	actions,
+	trajectory,
 	focused,
 	workspaces,
 }: ConversationProps) {
@@ -260,7 +264,11 @@ function LiveConversation({
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} />
-			<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
+			{trajectory ? (
+				<Trajectory view={view} />
+			) : (
+				<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
+			)}
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-3">
 				{requests[0] && (
 					<UserRequestCard

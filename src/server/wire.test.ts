@@ -39,14 +39,17 @@ describe("parseClientMsg", () => {
 		expect(parseClientMsg(JSON.stringify({ t: "resume" }))).toBeNull();
 	});
 
-	test("watch takes only well-formed views, and one bad view rejects the whole set", () => {
-		expect(msg({ t: "watch", views: [live, { kind: "past", sessionId: "s1" }] })).toEqual({
+	test("watch takes only well-formed views and trajectories, and one bad view rejects the whole set", () => {
+		expect(msg({ t: "watch", views: [live, { kind: "past", sessionId: "s1" }], trajectories: [{ kind: "past", sessionId: "s1" }] })).toEqual({
 			t: "watch",
 			views: [{ kind: "live", instanceId: "i1", agentId: null }, { kind: "past", sessionId: "s1" }],
+			trajectories: [{ kind: "past", sessionId: "s1" }],
 		});
-		expect(msg({ t: "watch", views: [live, { kind: "live", instanceId: 7, agentId: null }] })).toBeNull();
-		expect(msg({ t: "watch", views: [{ kind: "live", instanceId: "i1" }] })).toBeNull();
-		expect(msg({ t: "watch", views: "all" })).toBeNull();
+		expect(msg({ t: "watch", views: [live] })).toEqual({ t: "watch", views: [{ kind: "live", instanceId: "i1", agentId: null }], trajectories: [] });
+		expect(msg({ t: "watch", views: [live, { kind: "live", instanceId: 7, agentId: null }], trajectories: [] })).toBeNull();
+		expect(msg({ t: "watch", views: [live], trajectories: [{ kind: "live", instanceId: "i1" }] })).toBeNull();
+		expect(msg({ t: "watch", views: [live], trajectories: "all" })).toBeNull();
+		expect(msg({ t: "watch", views: "all", trajectories: [] })).toBeNull();
 	});
 
 	test("prompt needs a live view, non-blank text or images, and a known delivery", () => {

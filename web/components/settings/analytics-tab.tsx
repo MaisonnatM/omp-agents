@@ -1,4 +1,4 @@
-/** The settings tab for omp's request usage by time, model, workspace, agent, tool, and session. */
+/** The settings tab for omp's request usage by time, model, workspace, agent, tool, and session, and the context sources that fill it. */
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
@@ -10,6 +10,7 @@ import { analyticsStore } from "../../reads";
 import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
 import { compact, dollars, full } from "./analytics-format";
+import { ContextSources } from "./context-sources";
 import { ProviderTrend } from "./provider-trend";
 
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
@@ -200,6 +201,7 @@ export function AnalyticsTab({ active }: { active: boolean }) {
 					<div className="py-12 text-center text-sm text-muted-foreground">{data.sync.phase === "syncing" ? "Your session history is still being indexed." : "No requests in this time range."}</div>
 				) : <UsageBody data={data} />}
 			</div>
+			<ContextSources range={range} active={active} />
 		</div>
 	);
 }

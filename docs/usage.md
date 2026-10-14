@@ -263,6 +263,13 @@ An action that fails shows its error, and its control becomes available again.
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
+- **Transcript** and **Trajectory** in a pane's header switch what the pane shows; a live session keeps its composer under either.
+  **Trajectory** is a ledger of the conversation's turns, one row per prompt you or a skill sent, with a row first for what came before your first prompt.
+  Its columns are the prompt's first line with its skill, the turn's model requests and tool calls, its input, output, cache-read, and cache-write tokens, and its cost, underlined by the turn's share of the session's cost; a last row adds up every turn.
+  Open a row for each step in order, its tokens in the same columns: what omp injected before or during the turn, such as a skill's body, a system reminder, or a rule, each named by its source; model and thinking-level changes; each model request with its model, time, and stop reason; the thinking and the reply; each tool call with its result size and time; side calls such as auto-thinking; and compactions.
+  A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
+  A subagent's turns show in the subagent's own pane, not its parent's.
+  The pane goes back to **Transcript** when it opens another conversation.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group shows an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   The icon of a call that failed is red, and the group's heading counts the failures.
@@ -1206,6 +1213,14 @@ An action that fails shows its error, and its control becomes available again.
   It covers every session whatever workspace the header picks.
   omp indexes session files when you first open **Analytics** and updates the tab while indexing continues.
   New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
+  **Context sources**, below the usage, ranks what fills each request's input over the same range: instruction files such as `AGENTS.md`, skills, rules, MCP servers, system prompt sections, injected messages such as reminders, each tool's results, and the conversation itself.
+  Each row shows the source, its kind, its average tokens per request that carried it, those requests, its total tokens, its estimated cost, and its share of input.
+  Tokens count cache reads and writes as input, so the rows add up to the requests' input tokens.
+  The cost splits each request's input, cache read, and cache write cost by each source's tokens, so a source sent mostly from cache costs less per token.
+  Choose a workspace to narrow the report to its sessions and their subagents, and a session to see that session's top sources.
+  A main session's transcript records neither its system prompt nor its tool definitions, so their tokens show together as **System prompt and tool definitions**, under **Not in transcript**; a subagent's transcript records its system prompt, so its files, skills, rules, and MCP servers show by name, and only **Tool definitions** stay unrecorded.
+  Tokens come from omp's tokenizer for each model, or about four characters a token for a model omp has none for.
+  The report reads every session file once, then only the files that changed, and shows how far it has read while it catches up.
 - **Session presets** lists the saved bundles and lets you create, edit, or remove one.
   Choose a model and thinking level, every tool or selected built-in tools, a skill, and this directory or a new-branch worktree.
   The first startup seeds **Minimal**, **Review**, and **Ship**; removing all presets leaves the list empty.

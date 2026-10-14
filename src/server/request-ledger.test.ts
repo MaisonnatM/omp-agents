@@ -9,7 +9,7 @@ const view: LiveView = { kind: "live", instanceId: "i1", agentId: null };
 
 function socket(watched: LiveView[] = []) {
 	const sent: ServerMsg[] = [];
-	const data: SocketData = { views: new Map(watched.map(v => [v.instanceId, v])), pageId: PAGE };
+	const data: SocketData = { views: new Map(watched.map(v => [v.instanceId, v])), trajectories: new Map(), pageId: PAGE };
 	const ws = { data, send: (raw: string) => void sent.push(JSON.parse(raw)) } as unknown as Socket;
 	return { ws, sent };
 }
