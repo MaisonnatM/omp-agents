@@ -593,7 +593,7 @@ An action that fails shows its error, and its control becomes available again.
   They sort by whose move it is: **Your move**, **Agent on it**, **Approved**, **Waiting on others**, **Drafts**, and **Recently merged**.
   A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, which counts up each minute without a reload, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
-  The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and quick actions at the far right.
+  The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and quick actions at the far right.
   A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.

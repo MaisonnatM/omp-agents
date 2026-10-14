@@ -19,7 +19,7 @@ import { BranchLabel } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
-import { IconTip, Reviewers } from "./avatars";
+import { Avatar, IconTip, Reviewers } from "./avatars";
 
 /** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
 function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
@@ -420,6 +420,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			<div className="min-w-0">
 				<TitleLink pr={pr} targeted={targeted} className="block truncate" />
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
+					<Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="size-4 ring-0" />
 					<span className="shrink-0">{pr.author.login}</span>
 					<span aria-hidden>·</span>
 					<StateTag pr={pr} move={move} />
