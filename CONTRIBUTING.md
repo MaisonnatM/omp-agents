@@ -20,6 +20,7 @@ bun start
 ```
 
 The server does not reload on change; restart `bun start` after editing `src/` or `web/`.
+`bun install` also installs a pre-push hook that runs the CI checks.
 
 ## Pull requests
 

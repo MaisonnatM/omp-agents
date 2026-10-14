@@ -259,6 +259,7 @@ The server lives in `src/`:
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist.
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.
+- `.githooks/pre-push`: runs the checks `.github/workflows/checks.yml` runs before a push; the `prepare` script points `core.hooksPath` at `.githooks/` on `bun install`.
 
 ## Page
 
