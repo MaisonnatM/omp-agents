@@ -10,6 +10,9 @@ import { STATE_ICON } from "./avatars";
 /** A pick's change, sent to GitHub, and what the details show until GitHub answers. */
 export type SavePullRequest = (change: PullRequestChange, shown: Partial<PullRequestDetail>) => void;
 
+/** Sends a reply or a comment and settles once GitHub took it, or rejects with why it did not. */
+export type SendPullRequest = (change: PullRequestChange) => Promise<void>;
+
 const STATE_LABEL: Record<PullRequestDetail["state"], string> = { open: "Open", draft: "Draft", closed: "Closed", merged: "Merged" };
 
 /** A picker's button laid in a property row: its text lines up with the row's, and it spans the row. */

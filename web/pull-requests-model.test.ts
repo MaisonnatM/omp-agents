@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LinkedPullRequest, PullRequestSummary, PullRequestCheck, PullRequestDetail, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
+import type { LinkedPullRequest, PullRequestSummary, PullRequestCheck, PullRequestDetail, PullRequestThread, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
@@ -12,6 +12,7 @@ import {
 	moveAction,
 	moveKey,
 	movesSummary,
+	openThreads,
 	orderedRepos,
 	placedManual,
 	pullRequestStatus,
@@ -20,6 +21,7 @@ import {
 	shownPullRequests,
 	sessionStack,
 	stepTarget,
+	withThreadResolved,
 	yourMoveCount,
 } from "./pull-requests-model";
 
@@ -337,6 +339,7 @@ describe("pull request status", () => {
 		commits: [],
 		headOid: "",
 		mergeMethods: [],
+		canComment: false,
 		...fields,
 	});
 	const check = (state: PullRequestCheck["state"]) => ({ name: state, state, url: null });
@@ -393,6 +396,25 @@ describe("pull request status", () => {
 		expect(merged && moveOf(merged, null)).toBe("merged");
 		expect(actionFacts(ready, detail({ state: "closed" }))).toBeNull();
 		expect(actionFacts(ready, null)).toBe(ready);
+	});
+
+	const thread = (id: string, resolved: boolean): PullRequestThread => ({ id, path: "a.ts", line: 1, resolved, can: { reply: true, resolve: true, unresolve: true }, comments: [] });
+
+	test("open threads are the unresolved ones, in GitHub's order", () => {
+		const threads = [thread("PRRT_a", false), thread("PRRT_b", true), thread("PRRT_c", false)];
+		expect(openThreads(detail({ threads })).map(({ id }) => id)).toEqual(["PRRT_a", "PRRT_c"]);
+	});
+
+	test("resolving or unresolving a thread moves the unresolved count with it, and keeps whether GitHub listed every thread", () => {
+		const before = detail({ threads: [thread("PRRT_a", false), thread("PRRT_b", false)], unresolved: { count: 2, exact: false } });
+		const resolved = withThreadResolved(before, "PRRT_a", true);
+		expect(resolved).toEqual({ threads: [thread("PRRT_a", true), thread("PRRT_b", false)], unresolved: { count: 1, exact: false } });
+		expect(pullRequestStatus({ ...before, ...resolved })).toContainEqual({ kind: "threads", count: 1, exact: false });
+		expect(withThreadResolved({ ...before, ...resolved }, "PRRT_a", false)).toEqual({ threads: before.threads, unresolved: { count: 2, exact: false } });
+		const lastOpen = detail({ threads: [thread("PRRT_a", false)], unresolved: { count: 1, exact: true } });
+		const kinds = (shown: PullRequestDetail) => pullRequestStatus(shown).map(({ kind }) => kind);
+		expect(kinds(lastOpen)).toEqual(["threads", "review-required"]);
+		expect(kinds({ ...lastOpen, ...withThreadResolved(lastOpen, "PRRT_a", true) })).toEqual(["review-required"]);
 	});
 });
 

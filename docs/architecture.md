@@ -764,7 +764,15 @@ A removed file's patch holds every line, so it reads no blob; a file GitHub send
 `PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
 A `merge` change, `{ method, head }`, runs GraphQL's `mergePullRequest` with that method and `expectedHeadOid: head`, so GitHub refuses the merge once the branch moved past the commit the page showed.
 The pull request's answer carries that commit as `headOid` and the methods its repository allows as `mergeMethods`.
-It answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
+A `thread` change, `{ id, resolved }`, runs GraphQL's `resolveReviewThread` or `unresolveReviewThread` on the review thread with that node id, which `parsePullRequestEdit` takes only as letters, digits, `_`, `-`, and the `=` an older base64 id ends with, at most 100.
+A `reply` change, `{ thread, body }`, runs `addPullRequestReviewThreadReply` on that thread.
+A `comment` change, `{ body }`, posts to REST's `repos/<o>/<r>/issues/<n>/comments`, the pull request's number naming it, with the body as a `-f` field, which `gh` sends as written, never as a number, a file, or a placeholder.
+A reply's or comment's body is not blank and at most 65536 characters, GitHub's limit.
+The pull request's answer lists every review thread among the first 100, resolved ones too, each with its node id and whether the viewer may reply, resolve, and unresolve it, from `viewerCanReply`, `viewerCanResolve`, and `viewerCanUnresolve`, so the button a resolve or unresolve shows at once stays right.
+Its `unresolved` counts the open threads among those it lists, with `exact` false when GitHub has more than it listed, so the details' counts agree with their threads.
+GitHub's GraphQL has no `viewerCanComment` on a pull request, so its `canComment` is true unless the repository is archived, or the conversation is locked and the viewer's `viewerPermission` is below `WRITE`, as GitHub lets only people who can write comment on a locked conversation.
+Every mutation goes through `ghMutation` in `src/github.ts`, which throws GitHub's errors even when its answer carries `data`, since a refused mutation answers its field as `null` beside them.
+`PUT /api/pull-request` answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
 One change goes per call, so two changes made at once each keep the other.
 The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
 Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.

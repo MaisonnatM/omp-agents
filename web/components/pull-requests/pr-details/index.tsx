@@ -1,11 +1,12 @@
-/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Timeline, and Code tabs. */
+/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, and Code tabs. */
+import { FileDiff, FileText, History, MessageSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { moveAction, pullRequestStatus, reason } from "../../../pull-requests-model";
+import { moveAction, openThreads, pullRequestStatus, reason } from "../../../pull-requests-model";
 import { putJson } from "../../../api";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { type AgentState, actionFacts, type MoveId, moveOf } from "../../../../src/shared/moves";
@@ -13,10 +14,12 @@ import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../
 import { useEditableRead } from "../../../editable-read";
 import { useRead } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
+import { ERROR_TEXT } from "../../form-dialog";
 import { LoadNote } from "../../sheet-details";
 import { Timeline } from "../pr-timeline";
 import { ChecksSummary } from "./checks";
 import { Code } from "./code";
+import { Comments } from "./comments";
 import { DetailHeader } from "./header";
 import { placeFixes } from "./status-view";
 import { Summary } from "./summary";
@@ -67,26 +70,36 @@ export interface DetailContentProps {
 
 export type Placement = "page" | "sidebar";
 
-type DetailTab = "summary" | "timeline" | "code";
+type DetailTab = "summary" | "comments" | "timeline" | "code";
+
+/**
+ * The four labels and their counts outgrow the sidebar's default width, with or without the checks beside them, so
+ * below 30rem the tabs show their icons alone, which the tooltip and screen readers still name.
+ */
+const TAB_CLASS = "@min-[30rem]/pr:[&>svg]:hidden @max-[30rem]/pr:px-1.5";
+const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
 
 /**
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
- * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
+ * of the other actions; then Summary, Comments, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
 export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, onSaved }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
-	const { data: detail, error, saveError, edit } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, version);
+	const { data: detail, error, saveError, edit, write } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, version);
 	const stackRead = useRead<StackedPullRequest[]>(`/api/pull-request/stack?${query}`, version);
 	const stack = stackRead.data ?? [];
 	// Until the stack is read, its members would flash in the list of the others.
 	const others = stackRead.data || stackRead.error ? session.filter(other => !samePullRequest(other, pr) && !stack.some(member => samePullRequest(member, other))) : [];
+	const put = async (change: PullRequestChange): Promise<PullRequestDetail> => {
+		const answer = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change });
+		onSaved?.();
+		return answer;
+	};
 	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
-		if (!detail) return;
-		edit(shown, async () => {
-			const answer = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change });
-			onSaved?.();
-			return answer;
-		});
+		if (detail) edit(shown, () => put(change));
+	};
+	const send = async (change: PullRequestChange): Promise<void> => {
+		await write(() => put(change));
 	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	const [tab, setTab] = useState<DetailTab>(files ? "code" : "summary");
@@ -111,18 +124,20 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
 	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	const page = placement === "page";
-	const comments = detail ? detail.conversation.length + detail.threads.length : 0;
+	const unresolved = detail?.unresolved.count ?? 0;
+	const comments = detail ? detail.conversation.length + openThreads(detail).length : 0;
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} next={next} actions={otherActions} quick={quick} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
-				<div className={cn("flex items-center gap-2 border-b border-border py-2", page && "px-6")}>
+				<div className={cn("flex flex-wrap items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
 						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
 							<TabsList aria-label="Show">
-								<TabItem value="summary" label="Summary" />
-								<TabItem value="timeline" label="Timeline" badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
-								<TabItem value="code" label="Code" />
+								<TabItem value="summary" label="Summary" icon={FileText} tooltip="Summary" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
+								<TabItem value="comments" label="Comments" icon={MessageSquare} tooltip="Comments" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={unresolved || undefined} aria-label={`Comments, ${unresolved} unresolved threads`} />
+								<TabItem value="timeline" label="Timeline" icon={History} tooltip="Timeline" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
+								<TabItem value="code" label="Code" icon={FileDiff} tooltip="Code" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
 							</TabsList>
 						</Tabs>
 					</SizeProvider>
@@ -139,8 +154,19 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 				</div>
 			) : (
 				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
-					<div className="py-4">
-						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={saveError} /> : <Timeline detail={detail} />}
+					<div className="space-y-6 py-4">
+						{saveError && (
+							<p role="alert" className={ERROR_TEXT}>
+								GitHub did not take the change: {saveError}
+							</p>
+						)}
+						{tab === "summary" ? (
+							<Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
+						) : tab === "comments" ? (
+							<Comments detail={detail} save={save} send={send} />
+						) : (
+							<Timeline detail={detail} />
+						)}
 					</div>
 				</div>
 			)}

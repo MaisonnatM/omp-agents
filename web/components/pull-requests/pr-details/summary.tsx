@@ -90,21 +90,14 @@ interface SummaryProps {
 	onOpen: DetailContentProps["onOpen"];
 	onPick: DetailContentProps["onPick"];
 	save: SavePullRequest;
-	/** Why GitHub refused the last change; `null` when it took them all. */
-	saveError: string | null;
 }
 
-export function Summary({ pr, detail, placed, quick, stack, others, sessions, onOpen, onPick, save, saveError }: SummaryProps) {
+export function Summary({ pr, detail, placed, quick, stack, others, sessions, onOpen, onPick, save }: SummaryProps) {
 	const options = usePullRequestOptions(detail);
 	// The state picker says it is a draft already.
 	const blockers = placed.filter(({ item, fix }) => item.kind !== "draft" || fix);
 	return (
 		<div className="space-y-6">
-			{saveError && (
-				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-					GitHub did not take the change: {saveError}
-				</p>
-			)}
 			<dl className="grid grid-cols-1 items-start gap-x-4 text-sm @sm/pr:grid-cols-[8rem_minmax(0,1fr)] @sm/pr:gap-y-1">
 				<Property icon={CircleDot} label="Status">
 					<div className="space-y-1.5">

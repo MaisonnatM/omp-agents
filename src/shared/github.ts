@@ -201,10 +201,15 @@ export interface PullRequestEvent extends PullRequestComment {
 	review: "approved" | "changes-requested" | "commented" | "dismissed" | null;
 }
 
-/** An unresolved review thread on a line of a file; `line` is `null` once the line no longer exists in the diff. */
+/** A review thread on a line of a file; `line` is `null` once the line no longer exists in the diff. */
 export interface PullRequestThread {
+	/** GitHub's node id, which resolving and replying name. */
+	id: string;
 	path: string;
 	line: number | null;
+	resolved: boolean;
+	/** Whether GitHub lets you reply to it, resolve it, and unresolve it, so the button a resolve or unresolve shows at once stays right. */
+	can: { reply: boolean; resolve: boolean; unresolve: boolean };
 	comments: PullRequestComment[];
 }
 
@@ -246,9 +251,9 @@ export interface PullRequestDetail extends PullRequest {
 	checks: CheckState;
 	/** The head commit's checks, failing first, then pending, passing, and skipped. */
 	checkRuns: PullRequestCheck[];
-	/** Review threads not yet resolved, as on {@link PullRequestSummary}. */
+	/** Review threads not yet resolved: those of `threads`, with `exact` as on {@link PullRequestSummary}. */
 	unresolved: PullRequestSummary["unresolved"];
-	/** The unresolved threads in full: those among the first 100 that GitHub lists. */
+	/** The review threads in full, resolved ones too: those among the first 100 that GitHub lists. */
 	threads: PullRequestThread[];
 	/** Comments and reviews, oldest first: the latest 50 of each. */
 	conversation: PullRequestEvent[];
@@ -262,6 +267,8 @@ export interface PullRequestDetail extends PullRequest {
 	headOid: string;
 	/** The merge methods the repository allows, in GitHub's order. */
 	mergeMethods: MergeMethod[];
+	/** Whether you may comment on it: its repository is not archived, and its conversation is not locked or you can write to the repository. */
+	canComment: boolean;
 }
 
 /** The states the details can set; merging is a change of its own. */
@@ -273,7 +280,13 @@ export type PullRequestChange =
 	| { field: "label"; name: string; on: boolean }
 	| { field: "reviewer"; login: string; on: boolean }
 	| { field: "state"; state: SettableState }
-	| { field: "merge"; method: MergeMethod; head: string };
+	| { field: "merge"; method: MergeMethod; head: string }
+	| { field: "thread"; id: string; resolved: boolean }
+	| { field: "reply"; thread: string; body: string }
+	| { field: "comment"; body: string };
+
+/** The longest reply or comment the details send, GitHub's own limit on a comment's body. */
+export const MAX_COMMENT_BODY = 65_536;
 
 /** The body of `PUT /api/pull-request`. */
 export interface PullRequestEdit extends PullRequest {

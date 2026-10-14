@@ -14,7 +14,7 @@ import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type Ma
 import { parseImages, parseModel, parseNewSessionRequest, parseThinking } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
-import { GITHUB_NAME, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
+import { GITHUB_NAME, MAX_COMMENT_BODY, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import { type PresetChange, parsePreset } from "../shared/presets";
@@ -343,6 +343,10 @@ export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullReque
 const isSettableState = oneOf(SETTABLE_STATES);
 const isMergeMethod = oneOf(MERGE_METHODS);
 const COMMIT = /^[0-9a-f]{40,64}$/;
+/** A GitHub node id: a review thread's `PRRT_…` id, or an older id's base64 with its `=` padding. */
+const NODE_ID = /^[A-Za-z0-9_=-]{1,100}$/;
+const isNodeId = (value: unknown): value is string => typeof value === "string" && NODE_ID.test(value);
+const isCommentBody = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_COMMENT_BODY;
 
 function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (!isObject(change)) return null;
@@ -350,6 +354,9 @@ function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (change.field === "reviewer" && typeof change.login === "string" && GITHUB_NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
 	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };
 	if (change.field === "merge" && isMergeMethod(change.method) && typeof change.head === "string" && COMMIT.test(change.head)) return { ok: { field: "merge", method: change.method, head: change.head } };
+	if (change.field === "thread" && isNodeId(change.id) && typeof change.resolved === "boolean") return { ok: { field: "thread", id: change.id, resolved: change.resolved } };
+	if (change.field === "reply" && isNodeId(change.thread) && isCommentBody(change.body)) return { ok: { field: "reply", thread: change.thread, body: change.body } };
+	if (change.field === "comment" && isCommentBody(change.body)) return { ok: { field: "comment", body: change.body } };
 	return null;
 }
 

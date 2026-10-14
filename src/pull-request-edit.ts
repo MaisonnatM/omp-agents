@@ -1,6 +1,6 @@
-/** A pull request's labels, review requests, and state, changed from its details through `gh`, and the choices its pickers offer. */
+/** A pull request's labels, review requests, state, review threads, and comments, changed from its details through `gh`, and the choices its pickers offer. */
 import { createCache } from "./cache";
-import { dataOf, ghGraphql, ghRest, ghRestWrite, parsePerson } from "./github";
+import { dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
 import { loadPullRequestDetail } from "./pull-requests";
 import { isObject, str } from "./json";
 import { type Person, type PullRequest, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
@@ -57,7 +57,7 @@ async function nodeOf(pr: PullRequest): Promise<{ id: string; state: unknown; is
 async function setState(pr: PullRequest, target: SettableState): Promise<void> {
 	const node = await nodeOf(pr);
 	if (node.state === "MERGED") throw new Error("A merged pull request keeps its state");
-	for (const step of stateSteps({ open: node.state === "OPEN", draft: node.isDraft === true }, target)) dataOf(await ghGraphql(mutation(step), { id: node.id }));
+	for (const step of stateSteps({ open: node.state === "OPEN", draft: node.isDraft === true }, target)) await ghMutation(mutation(step), { id: node.id });
 }
 
 const MERGE_MUTATION = `mutation($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
@@ -67,8 +67,15 @@ const MERGE_MUTATION = `mutation($id: ID!, $method: PullRequestMergeMethod!, $he
 async function merge(pr: PullRequest, method: MergeMethod, head: string): Promise<void> {
 	const { id, state } = await nodeOf(pr);
 	if (state !== "OPEN") throw new Error(`${pullRequestName(pr)} is ${String(state).toLowerCase()}, not open`);
-	dataOf(await ghGraphql(MERGE_MUTATION, { id, method: method.toUpperCase(), head }));
+	await ghMutation(MERGE_MUTATION, { id, method: method.toUpperCase(), head });
 }
+
+/** A mutation that takes only a review thread's node id. */
+const threadMutation = (name: string): string => `mutation($id: ID!) { ${name}(input: { threadId: $id }) { clientMutationId } }`;
+
+const REPLY_MUTATION = `mutation($thread: ID!, $body: String!) {
+	addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $thread, body: $body }) { clientMutationId }
+}`;
 
 /** Makes `edit`'s change on GitHub, then answers the pull request as GitHub has it after. */
 export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promise<PullRequestDetail> {
@@ -86,6 +93,15 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 			break;
 		case "merge":
 			await merge(pr, change.method, change.head);
+			break;
+		case "thread":
+			await ghMutation(threadMutation(change.resolved ? "resolveReviewThread" : "unresolveReviewThread"), { id: change.id });
+			break;
+		case "reply":
+			await ghMutation(REPLY_MUTATION, { thread: change.thread, body: change.body });
+			break;
+		case "comment":
+			await ghRestWrite("POST", `${base}/issues/${pr.number}/comments`, [["body", change.body]]);
 			break;
 	}
 	return loadPullRequestDetail(pr, true);
