@@ -283,6 +283,7 @@ export function App() {
 											sessionId={focused.sessionId}
 											cwd={focused.cwd ?? null}
 											pullRequests={focused.row?.pullRequests ?? []}
+											tickets={focused.row?.tickets ?? []}
 											workspace={workspace}
 											hosts={visible.hosts}
 										/>

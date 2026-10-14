@@ -8,7 +8,7 @@ import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { pastLabel } from "../labels";
 import { Header } from "./page-header";
-import { PullRequestMenu } from "./session-meta";
+import { PullRequestMenu, TicketMenu } from "./session-meta";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
 interface PastConversationProps {
@@ -35,6 +35,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 				<Header title={title} status="Read-only" alert={false}>
 					{session && (
 						<>
+							<TicketMenu tickets={session.tickets} />
 							<PullRequestMenu pullRequests={session.pullRequests} />
 							<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 								<Button

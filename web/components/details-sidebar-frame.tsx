@@ -8,8 +8,12 @@ import { SizeProvider } from "@/lib/size-context";
 import { useStoredState } from "../stored-state";
 import { FileBaseContext } from "./file-link";
 
-/** The labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
+/** Four labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
 const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
+
+/** Five tabs fit it only as icons, whose labels the screen reader and the tooltip still name, until the sidebar is widened past them. */
+const CROWDED_TAB_CLASS = "px-2";
+const CROWDED_LABEL_CLASS = "@max-[30rem]/sidebar:sr-only";
 
 /** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
 const PANEL_VIEWPORT = "pt-2";
@@ -61,16 +65,26 @@ export function DetailsEmpty({ icon: Icon, title, description }: { icon: LucideI
 }
 
 export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs }: DetailsSidebarFrameProps<T>) {
-	const [tab, setTab] = useStoredState<T>(storageKey, raw => tabs.find(each => each.value === raw)?.value ?? defaultTab);
+	// Resolved each render, not when read: a tab that shows only once its items arrive, such as Tickets, takes the stored choice then.
+	const [stored, setTab] = useStoredState<string>(storageKey, raw => raw ?? defaultTab);
+	const tab = tabs.find(each => each.value === stored)?.value ?? defaultTab;
+	const crowded = tabs.length > 4;
 	return (
 		<FileBaseContext.Provider value={cwd}>
-			<Tabs value={tab} onValueChange={value => setTab(value as T)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
+			<Tabs value={tab} onValueChange={value => setTab(String(value))} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 				<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-2 border-b border-border px-2 py-0">
 					<h2 className="sr-only">{label}</h2>
 					<SizeProvider size="compact">
 						<TabsList aria-label={label}>
 							{tabs.map(each => (
-								<TabItem key={each.value} value={each.value} icon={each.icon} className={TAB_CLASS} {...tabLabel(each.name, each.count)} />
+								<TabItem
+									key={each.value}
+									value={each.value}
+									icon={each.icon}
+									className={crowded ? CROWDED_TAB_CLASS : TAB_CLASS}
+									labelClassName={crowded ? CROWDED_LABEL_CLASS : undefined}
+									{...tabLabel(each.name, each.count)}
+								/>
 							))}
 						</TabsList>
 					</SizeProvider>

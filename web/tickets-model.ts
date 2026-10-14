@@ -46,3 +46,17 @@ export function ticketGroups(tickets: Ticket[]): TicketGroup[] {
 
 /** A status group of the tickets page, which a sidebar link scrolls to. */
 export const ticketSection = (status: string): SectionTarget => ({ id: sectionId("tickets", status), folds: [status] });
+
+/**
+ * Issue `id`'s Linear address: the listed issue's own, else one in the workspace of any listed issue, which Linear opens by
+ * identifier; `null` when nothing is listed to name the workspace.
+ */
+export function linearUrlOf(id: string, listed: readonly Ticket[]): string | null {
+	const own = listed.find(ticket => ticket.id === id);
+	if (own) return own.url;
+	for (const { url } of listed) {
+		const workspace = url.match(/^https:\/\/linear\.app\/[^/]+\/issue\//)?.[0];
+		if (workspace) return `${workspace}${id}`;
+	}
+	return null;
+}

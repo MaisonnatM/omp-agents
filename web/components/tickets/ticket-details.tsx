@@ -2,6 +2,7 @@ import { GitPullRequest, Link2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { pullRequestOfUrl } from "../../../src/shared/github";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
+import { cn } from "@/lib/utils";
 import type { Editable } from "../../editable-read";
 import { age } from "../../labels";
 import { BranchName } from "../git";
@@ -15,31 +16,39 @@ interface TicketDetailContentProps {
 	/** Linear's answer for the issue, which the page also heads with its title, and which the fields edit. */
 	read: Editable<TicketDetail>;
 	actions?: (ticket: Ticket) => ReactNode;
+	/** The tickets page lays the issue out in two columns and focuses its title; the session details sidebar stacks them and leaves focus where it is. */
+	placement?: "page" | "sidebar";
 }
 
 /**
  * A Linear issue laid out as Linear lays it out: the title, description, and comments in a wide column, and beside it
- * {@link TicketSide}. On a narrow page the side column follows the title.
+ * {@link TicketSide}. On a narrow page, and in the sidebar, the side column follows the title.
  */
-export function TicketDetailContent({ id, listed, read, actions }: TicketDetailContentProps) {
+export function TicketDetailContent({ id, listed, read, actions, placement = "page" }: TicketDetailContentProps) {
 	const { data: detail, error } = read;
 	const ticket = detail ?? listed;
+	const page = placement === "page";
+	/** The page's title is its `h1`; the sidebar's tabs sit under its `h2`. */
+	const Heading = page ? "h1" : "h3";
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	useEffect(() => {
-		headingRef.current?.focus({ preventScroll: true });
-	}, []);
+		if (page) headingRef.current?.focus({ preventScroll: true });
+	}, [page]);
 	return (
-		<div className="grid gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_1fr]">
-			<h1
+		<div className={page ? "grid gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_1fr]" : "grid grid-cols-[minmax(0,1fr)] gap-y-6"}>
+			<Heading
 				ref={headingRef}
 				tabIndex={-1}
-				className="rounded-md text-2xl leading-tight font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring lg:col-start-1 lg:row-start-1"
+				className={cn(
+					"rounded-md leading-tight font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring",
+					page ? "text-2xl lg:col-start-1 lg:row-start-1" : "text-base",
+				)}
 			>
 				{ticket?.title ?? id}
-			</h1>
-			{ticket && <TicketSide ticket={ticket} read={read} actions={actions} />}
-			<div className="min-w-0 space-y-10 lg:col-start-1 lg:row-start-2">
-				{detail ? <TicketBody detail={detail} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />}
+			</Heading>
+			{ticket && <TicketSide ticket={ticket} read={read} actions={actions} page={page} />}
+			<div className={cn("min-w-0", page ? "space-y-10 lg:col-start-1 lg:row-start-2" : "space-y-6")}>
+				{detail ? <TicketBody detail={detail} page={page} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />}
 			</div>
 		</div>
 	);
@@ -47,13 +56,14 @@ export function TicketDetailContent({ id, listed, read, actions }: TicketDetailC
 
 interface TicketSideProps extends Pick<TicketDetailContentProps, "actions" | "read"> {
 	ticket: Ticket;
+	page: boolean;
 }
 
 /** The side column: the quick actions, the editable fields, the branch, the links, and who opened the issue. */
-function TicketSide({ ticket, read, actions }: TicketSideProps) {
+function TicketSide({ ticket, read, actions, page }: TicketSideProps) {
 	const detail = read.data;
 	return (
-		<aside aria-label="Issue properties" className="space-y-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+		<aside aria-label="Issue properties" className={cn("space-y-6", page && "lg:col-start-2 lg:row-span-2 lg:row-start-1")}>
 			{actions?.(ticket)}
 			<TicketFields ticket={ticket} detail={detail} edit={read.edit} saveError={read.saveError} />
 			{detail && <TicketLinks detail={detail} />}
@@ -72,11 +82,11 @@ function TicketSide({ ticket, read, actions }: TicketSideProps) {
 	);
 }
 
-/** An issue's description, then its comment threads. */
-function TicketBody({ detail: { description, threads } }: { detail: TicketDetail }) {
+/** An issue's description, then its comment threads; the sidebar sets the description at its own text size. */
+function TicketBody({ detail: { description, threads }, page }: { detail: TicketDetail; page: boolean }) {
 	return (
 		<>
-			{description.trim() ? <Markdown text={description} className="text-[15px] leading-relaxed" /> : <p className="text-sm text-muted-foreground">No description.</p>}
+			{description.trim() ? <Markdown text={description} className={cn("leading-relaxed", page ? "text-[15px]" : "text-sm")} /> : <p className="text-sm text-muted-foreground">No description.</p>}
 			{threads.length > 0 && (
 				<section className="space-y-4 border-t border-border pt-6">
 					<h2 className="flex items-baseline gap-2 text-sm font-medium">

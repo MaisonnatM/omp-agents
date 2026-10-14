@@ -1,13 +1,15 @@
-/** The right sidebar for a session: tabs for its outline, files, media, and pull requests. */
+/** The right sidebar for a session: tabs for its outline, files, media, pull requests, and, once it has any, Linear issues. */
 import { FileDiff, GitPullRequest, Images, TableOfContents } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";
+import { PAGE_ICON } from "../page-icons";
 import { useChangedFiles, useMedia, useTurnCount } from "../pane-store";
 import { DetailsSidebarFrame } from "./details-sidebar-frame";
 import { FilesTab } from "./files-tab";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
+import { SessionTicketsTab } from "./session-tickets-tab";
 
 /** The right sidebar's tab, which localStorage keeps across views. The key keeps its old name, and a tab that no longer exists reads as the outline. */
 const TAB_KEY = "omp-agents.plan-tab";
@@ -22,6 +24,8 @@ interface SessionDetailsProps {
 	cwd: string | null;
 	/** What the view's session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
+	/** The Linear issues the session and its subagents worked on, by identifier, the session's own first. */
+	tickets: string[];
 	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
 	workspace: string | null;
 	hosts: RosterHost[];
@@ -29,9 +33,9 @@ interface SessionDetailsProps {
 
 /**
  * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
- * the images its agents' tools returned, and its session's pull requests, each tab apart.
+ * the images its agents' tools returned, its session's pull requests, and its Linear issues when it has any, each tab apart.
  */
-export function SessionDetails({ view, working, sessionId, cwd, pullRequests, workspace, hosts }: SessionDetailsProps) {
+export function SessionDetails({ view, working, sessionId, cwd, pullRequests, tickets, workspace, hosts }: SessionDetailsProps) {
 	const files = useChangedFiles(view);
 	const media = useMedia(view);
 	const turnCount = useTurnCount(view);
@@ -53,6 +57,9 @@ export function SessionDetails({ view, working, sessionId, cwd, pullRequests, wo
 					pinned: true,
 					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
 				},
+				...(tickets.length > 0
+					? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", count: tickets.length, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
+					: []),
 			]}
 		/>
 	);

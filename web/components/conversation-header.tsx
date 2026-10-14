@@ -8,7 +8,7 @@ import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
-import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestMenu } from "./session-meta";
+import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestMenu, TicketMenu } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -29,7 +29,7 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's title, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
- * the connection status; a session's pull requests, its directory in Cursor, and End session, which shows it is
+ * the connection status; a session's Linear issues and pull requests, its directory in Cursor, and End session, which shows it is
  * ending until the server answers, though the session may leave the roster before then.
  */
 export function ConversationHeader({ view, subject, onEnd, actions }: ConversationHeaderProps) {
@@ -69,6 +69,7 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 		);
 	return (
 		<Header title={title} status={status} alert={!ending && phase.phase === "ended"}>
+			{subject.kind === "session" && shown && <TicketMenu tickets={shown.tickets} />}
 			{subject.kind === "session" && shown && <PullRequestMenu pullRequests={shown.pullRequests} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip

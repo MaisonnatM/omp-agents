@@ -132,9 +132,9 @@ An action that fails shows its error, and its control becomes available again.
 
 - The right sidebar shows the focused pane's conversation at a glance, and what its agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Outline**, **Files**, **Media**, and **PRs**.
+- Tabs split it: **Outline**, **Files**, **Media**, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
-  When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
+  When the sidebar is too narrow for every tab's icon, the tabs show their names alone; with **Tickets** among them, they show their icons alone until you widen the sidebar past 30rem, and hovering one names it.
   The sidebar remembers the tab you chose, for every view.
 - A project's coordinator, which changes no code itself, gets other tabs instead: **Outline**, **Workers**, **Notes**, and **PRs**; see [Projects](#projects).
   It remembers its own tab, **Workers** at first, apart from a session's.
@@ -183,6 +183,10 @@ An action that fails shows its error, and its control becomes available again.
   The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
   The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
+- **Tickets** shows the Linear issues the session and its subagents worked on, as its header lists them, the session's own first.
+  The first one shows until you click another identifier above it.
+  The issue shows as on the tickets page, stacked in one column: its title, its status, priority, assignee, due date, labels, and project, which you can edit there, then its branch, its links, who opened it, **Open in Linear**, its description, and its comments.
+  Opening the tab, picking another issue, and each start and end of the view's turn read it from Linear.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
 
 ## Session changes
@@ -321,9 +325,11 @@ An action that fails shows its error, and its control becomes available again.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
   The outline's **Request** shows the first prompt the same way.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
-- On the right of a session's header, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
+- On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
+  Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
+- Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
   Its menu opens each one on GitHub, on Graphite, or in its details on the Pull requests page; the button shows only for a session with a pull request.
-  Past sessions show it before **Resume**.
+  Past sessions show both before **Resume**.
 - The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
   The label leaves out the provider, the vendor prefix, and a release date, joins version parts with dots, and puts a `:` suffix such as a thinking level in parentheses (`Sonnet 5.5 (high)`).
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
@@ -561,7 +567,7 @@ An action that fails shows its error, and its control becomes available again.
   A PR the session only quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count, unless it heads the session's worktree branch.
   A PR that a session submitted counts as submitted, even when it also worked on it.
 - In a session's header, the pull request button's menu opens each pull request on GitHub, on Graphite, or in its details on the Pull requests page.
-- A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier.
+- A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier, and so does the ticket button in its header.
   It opens the issue's details in the tickets page's main content (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
   An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
   An issue that a `list_issues` search only listed does not count.
