@@ -1,4 +1,4 @@
-/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Timeline, and Code tabs. */
+/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, and Code tabs. */
 import { useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
@@ -17,6 +17,7 @@ import { LoadNote } from "../../sheet-details";
 import { Timeline } from "../pr-timeline";
 import { ChecksSummary } from "./checks";
 import { Code } from "./code";
+import { Comments } from "./comments";
 import { DetailHeader } from "./header";
 import { placeFixes } from "./status-view";
 import { Summary } from "./summary";
@@ -67,27 +68,28 @@ export interface DetailContentProps {
 
 export type Placement = "page" | "sidebar";
 
-type DetailTab = "summary" | "timeline" | "code";
+type DetailTab = "summary" | "comments" | "timeline" | "code";
 
 /**
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
- * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
+ * of the other actions; then Summary, Comments, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
 export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, onSaved }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
-	const { data: detail, error, saveError, edit } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, version);
+	const { data: detail, error, saveError, edit, write } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, version);
 	const stackRead = useRead<StackedPullRequest[]>(`/api/pull-request/stack?${query}`, version);
 	const stack = stackRead.data ?? [];
 	// Until the stack is read, its members would flash in the list of the others.
 	const others = stackRead.data || stackRead.error ? session.filter(other => !samePullRequest(other, pr) && !stack.some(member => samePullRequest(member, other))) : [];
-	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
-		if (!detail) return;
-		edit(shown, async () => {
-			const answer = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change });
-			onSaved?.();
-			return answer;
-		});
+	const put = async (change: PullRequestChange): Promise<PullRequestDetail> => {
+		const answer = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change });
+		onSaved?.();
+		return answer;
 	};
+	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
+		if (detail) edit(shown, () => put(change));
+	};
+	const send = (change: PullRequestChange): Promise<PullRequestDetail> => write(() => put(change));
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	const [tab, setTab] = useState<DetailTab>(files ? "code" : "summary");
 	useEffect(() => {
@@ -111,16 +113,18 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
 	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	const page = placement === "page";
-	const comments = detail ? detail.conversation.length + detail.threads.length : 0;
+	const openThreads = detail ? detail.threads.filter(thread => !thread.resolved).length : 0;
+	const comments = detail ? detail.conversation.length + openThreads : 0;
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} next={next} actions={otherActions} quick={quick} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
 				<div className={cn("flex items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
-						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
+						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)} className="min-w-0">
 							<TabsList aria-label="Show">
 								<TabItem value="summary" label="Summary" />
+								<TabItem value="comments" label="Comments" badge={openThreads || undefined} aria-label={`Comments, ${openThreads} unresolved threads`} />
 								<TabItem value="timeline" label="Timeline" badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
 								<TabItem value="code" label="Code" />
 							</TabsList>
@@ -140,7 +144,13 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 			) : (
 				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
 					<div className="py-4">
-						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={saveError} /> : <Timeline detail={detail} />}
+						{tab === "summary" ? (
+							<Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={saveError} />
+						) : tab === "comments" ? (
+							<Comments detail={detail} save={save} saveError={saveError} send={send} />
+						) : (
+							<Timeline detail={detail} />
+						)}
 					</div>
 				</div>
 			)}

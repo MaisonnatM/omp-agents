@@ -315,7 +315,7 @@ describe("parseDetailAnswer", () => {
 		]);
 	});
 
-	test("merges comments and reviews by time, leaves out bare comment reviews and resolved threads", () => {
+	test("merges comments and reviews by time, leaves out bare comment reviews, and keeps resolved threads beside what the viewer may do to each", () => {
 		const detail = parseDetailAnswer(
 			answer({
 				state: "CLOSED",
@@ -330,22 +330,53 @@ describe("parseDetailAnswer", () => {
 				},
 				reviewThreads: {
 					nodes: [
-						{ isResolved: true, path: "a.ts", line: 1, comments: { nodes: [] } },
-						{ isResolved: false, path: "b.ts", line: null, comments: { nodes: [{ author: null, body: "Gone line", createdAt: "2026-09-30T09:00:00Z", url: null }] } },
+						{ id: "PRRT_a", isResolved: true, viewerCanReply: true, viewerCanResolve: false, viewerCanUnresolve: true, path: "a.ts", line: 1, comments: { nodes: [] } },
+						{
+							id: "PRRT_b",
+							isResolved: false,
+							viewerCanReply: false,
+							viewerCanResolve: false,
+							viewerCanUnresolve: true,
+							path: "b.ts",
+							line: null,
+							comments: { nodes: [{ author: null, body: "Gone line", createdAt: "2026-09-30T09:00:00Z", url: null }] },
+						},
+						{ isResolved: false, path: "c.ts", line: 2, comments: { nodes: [] } },
 					],
 				},
 			}),
 			pr,
 		);
 		expect(detail.state).toBe("closed");
+		expect(detail.unresolved).toEqual({ count: 2, exact: true });
 		expect(detail.conversation.map(event => [event.review, event.body])).toEqual([
 			["changes-requested", "Not yet"],
 			[null, "Why?"],
 			["approved", ""],
 		]);
 		expect(detail.threads).toEqual([
-			{ path: "b.ts", line: null, comments: [{ author: { login: "ghost", avatarUrl: null }, body: "Gone line", at: Date.parse("2026-09-30T09:00:00Z"), url: null }] },
+			{ id: "PRRT_a", path: "a.ts", line: 1, resolved: true, can: { reply: true, resolve: true }, comments: [] },
+			{
+				id: "PRRT_b",
+				path: "b.ts",
+				line: null,
+				resolved: false,
+				can: { reply: false, resolve: false },
+				comments: [{ author: { login: "ghost", avatarUrl: null }, body: "Gone line", at: Date.parse("2026-09-30T09:00:00Z"), url: null }],
+			},
 		]);
+	});
+
+	test("lets you comment unless the repository is archived, or the conversation is locked and you cannot write to the repository", () => {
+		const canComment = (repository: Record<string, unknown>, fields: Record<string, unknown> = {}) =>
+			parseDetailAnswer({ data: { repository: { ...answer(fields).data.repository, ...repository } } }, pr).canComment;
+		expect([
+			canComment({ viewerPermission: "READ" }),
+			canComment({ viewerPermission: "READ" }, { locked: true }),
+			canComment({ viewerPermission: "TRIAGE" }, { locked: true }),
+			canComment({ viewerPermission: "WRITE" }, { locked: true }),
+			canComment({ viewerPermission: "ADMIN", isArchived: true }),
+		]).toEqual([true, false, false, true, false]);
 	});
 
 	test("reports conflicts only on an open or draft PR that GitHub finds CONFLICTING", () => {

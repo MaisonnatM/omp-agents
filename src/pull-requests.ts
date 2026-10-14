@@ -155,9 +155,12 @@ const loaded = createCache<PullRequestSummary[]>();
 
 const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
+/** The repository permissions that may still comment once a pull request's conversation is locked. */
+const LOCKED_COMMENTERS: Record<string, true> = { ADMIN: true, MAINTAIN: true, WRITE: true };
+
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
-	repository(owner: $owner, name: $repo) { mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed pullRequest(number: $number) {
-		number title body isDraft state reviewDecision mergeable headRefName headRefOid baseRefName createdAt updatedAt additions deletions changedFiles
+	repository(owner: $owner, name: $repo) { mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed isArchived viewerPermission pullRequest(number: $number) {
+		number title body isDraft state reviewDecision mergeable headRefName headRefOid baseRefName createdAt updatedAt additions deletions changedFiles locked
 		labels(first: 20) { nodes { name color } }
 		history: commits(last: 100) { nodes { commit {
 			abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
@@ -171,7 +174,9 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 		files(first: 100) { nodes { path additions deletions changeType } }
 		comments(last: 50) { nodes { ${COMMENT_FIELDS} } }
 		reviews(last: 50) { nodes { state submittedAt author { login ${AVATAR} } body url } }
-		reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved path line comments(first: 20) { nodes { ${COMMENT_FIELDS} } } } }
+		reviewThreads(first: ${THREADS}) { totalCount nodes {
+			id isResolved viewerCanReply viewerCanResolve viewerCanUnresolve path line comments(first: 20) { nodes { ${COMMENT_FIELDS} } }
+		} }
 	} }
 }`;
 
@@ -231,9 +236,11 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		return state && parsed && (parsed.body.trim() || state !== "commented") ? [{ ...parsed, review: state }] : [];
 	});
 	const threads = nodesOf(node.reviewThreads).flatMap((thread): PullRequestThread[] => {
-		if (!isObject(thread) || thread.isResolved !== false || typeof thread.path !== "string") return [];
+		if (!isObject(thread) || typeof thread.id !== "string" || typeof thread.isResolved !== "boolean" || typeof thread.path !== "string") return [];
 		const threadComments = nodesOf(thread.comments).flatMap(comment => parseComment(comment, isObject(comment) ? comment.createdAt : null) ?? []);
-		return [{ path: thread.path, line: typeof thread.line === "number" ? thread.line : null, comments: threadComments }];
+		const resolved = thread.isResolved;
+		const can = { reply: thread.viewerCanReply === true, resolve: (resolved ? thread.viewerCanUnresolve : thread.viewerCanResolve) === true };
+		return [{ id: thread.id, path: thread.path, line: typeof thread.line === "number" ? thread.line : null, resolved, can, comments: threadComments }];
 	});
 	// A branch that took in its trunk lists the trunk's commits too; each belongs to another, merged pull request.
 	const commitList = nodesOf(node.history).flatMap((entry): PullRequestCommit[] => {
@@ -265,6 +272,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		commits: commitList,
 		headOid: str(node.headRefOid) ?? "",
 		mergeMethods: MERGE_METHODS.filter(method => repository[MERGE_ALLOWED[method]] === true),
+		canComment: repository.isArchived !== true && (node.locked !== true || LOCKED_COMMENTERS[str(repository.viewerPermission) ?? ""] === true),
 	};
 }
 

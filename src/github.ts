@@ -42,7 +42,7 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 }
 
 /**
- * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}.
+ * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}, or {@link mutationOf} for a mutation.
  * `paginate` follows the query's `$endCursor` through every page, answering an array of the pages.
  */
 export function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
@@ -60,12 +60,23 @@ export async function ghRestWrite(method: "POST" | "PATCH" | "DELETE", path: str
 	await runChecked(["gh", "api", "-X", method, path, ...fields.flatMap(([name, value]) => ["-f", `${name}=${value}`])], { timeoutMs: GH_TIMEOUT_MS });
 }
 
+/** GitHub's error messages in a `gh api graphql` answer, joined; empty when it reports none. */
+function errorsOf(answer: unknown): string {
+	const errors = isObject(answer) && Array.isArray(answer.errors) ? answer.errors : [];
+	return errors.map(error => (isObject(error) ? str(error.message) : undefined)).filter(Boolean).join("; ");
+}
+
 /** The data of a `gh api graphql` answer, or GitHub's errors thrown. */
 export function dataOf(answer: unknown): Record<string, unknown> {
 	if (isObject(answer) && isObject(answer.data)) return answer.data;
-	const errors = isObject(answer) && Array.isArray(answer.errors) ? answer.errors : [];
-	const message = errors.map(error => (isObject(error) ? str(error.message) : undefined)).filter(Boolean).join("; ");
-	throw new Error(message || "GitHub answered without data");
+	throw new Error(errorsOf(answer) || "GitHub answered without data");
+}
+
+/** The data of a `gh api graphql` answer to a mutation, or GitHub's errors thrown: a refused mutation answers its field as `null` beside them, which {@link dataOf} takes as data. */
+export function mutationOf(answer: unknown): Record<string, unknown> {
+	const refused = errorsOf(answer);
+	if (refused) throw new Error(refused);
+	return dataOf(answer);
 }
 
 /** A user, bot, or mannequin by `login`, a team by `slug`. */

@@ -188,7 +188,7 @@ An action that fails shows its error, and its control becomes available again.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   The first one shows until you pick another: click another pull request of its **Stack**, or of **Other pull requests of the session** under it, to show it in place.
   **Other pull requests of the session** lists the session's pull requests that the stack does not show, each with whether the session submitted or worked on it.
-  The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
+  The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Comments**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
   The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
   The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
@@ -684,7 +684,7 @@ An action that fails shows its error, and its control becomes available again.
   **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
   The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; a pull request not yet read offers **Merge on GitHub**.
   The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**, each with its logo.
-- Under the header, tabs split the details: **Summary**, **Timeline**, with the count of its comments, reviews, and review threads, and **Code**.
+- Under the header, tabs split the details: **Summary**, **Comments**, with the count of its unresolved review threads, **Timeline**, with the count of its comments, reviews, and unresolved review threads, and **Code**.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
 - **Summary** lists the pull request's properties.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
@@ -698,10 +698,16 @@ An action that fails shows its error, and its control becomes available again.
   When another open pull request of its repository stacks with it by base branch, whoever opened it, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, as Graphite does, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
   The server reads the repository's open pull requests for it and keeps them for 30 seconds.
   Then comes the description in full.
+- **Comments** lists the pull request's review threads, unresolved ones first, each under the file and line it is on, which link to the file on the **Code** tab, with every comment in it.
+  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; the change shows at once and the details undo it and say why when GitHub refuses it.
+  Resolved threads fold behind a line with their count, such as **2 resolved**.
+  A thread you can reply to has a reply box under it: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and the box keeps your words and says why when GitHub refuses them.
+  Under the threads, **Conversation** lists the comments and reviews with words on the pull request, oldest first, then a box to comment that works as the reply box does, shown when GitHub lets you comment.
+  Replies and comments go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
 - **Timeline** lists what happened on the pull request as a chat does, newest first, with a line for each day that stays on top while you scroll its entries.
   Each entry shows its author's avatar, name, and time: a push lists its commits, one author's commits within an hour as one entry, with each commit's short hash and lines added and removed; a review shows its verdict and words; a comment shows its words.
   The pull request's own commits show, not those of its trunk that its branch took in; a commit counts as its own unless GitHub links it only to other pull requests.
-  An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came.
+  An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came; resolved threads show only on **Comments**.
   A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
   Above the list, the counts of comments and commits, and **Newest first**, which flips the order.
 - **Code** shows the pull request's files as the [session changes](#session-changes) dialog shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and every file's diff in one scroll, or the open file in **File**, with ↓ and ↑ to step through them.

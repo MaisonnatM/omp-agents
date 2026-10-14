@@ -410,6 +410,24 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "x" } })).toBeNull();
 		expect(parsePullRequestEdit({ owner: "a", repo: "b", change: { field: "state", state: "open" } })).toBeNull();
 	});
+
+	test("takes a review thread to resolve or unresolve, a reply to a thread, and a comment on the pull request", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "PRRT_kwDOA-b_1", resolved: true } })?.ok).toEqual({ ...pr, change: { field: "thread", id: "PRRT_kwDOA-b_1", resolved: true } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reply", thread: "PRRT_kwDOA", body: "Done in a1b2c3." } })?.ok).toEqual({ ...pr, change: { field: "reply", thread: "PRRT_kwDOA", body: "Done in a1b2c3." } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "x".repeat(65_536) } })?.ok).toEqual({ ...pr, change: { field: "comment", body: "x".repeat(65_536) } });
+	});
+
+	test("rejects a thread id with other characters or over 100, a thread change without its direction, a blank body, and a body over 65536 characters", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "PRRT/../x", resolved: true } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "a".repeat(101), resolved: false } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "", resolved: false } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "PRRT_a" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reply", thread: "PRRT a", body: "ok" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reply", thread: "PRRT_a", body: " \n\t" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "x".repeat(65_537) } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: 42 } })).toBeNull();
+	});
 });
 
 describe("parseRepoQuery", () => {

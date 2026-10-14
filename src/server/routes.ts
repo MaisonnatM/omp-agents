@@ -590,7 +590,11 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
-		body => checked(parsePullRequestEdit(body), "Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, or a merge method and head commit"),
+		body =>
+			checked(
+				parsePullRequestEdit(body),
+				"Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, a merge method and head commit, a review thread to resolve or unresolve, or a reply or comment of at most 65536 characters",
+			),
 		savePullRequest,
 	);
 
