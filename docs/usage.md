@@ -77,6 +77,13 @@ An action that fails shows its error, and its control becomes available again.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
+  Claude Code's sessions in `~/.claude/projects` and Codex's in `~/.codex/sessions` list here too, among omp's.
+  `CLAUDE_CONFIG_DIR` and `CODEX_HOME` move those directories as they move them for their agents.
+  Every session row names its source first among its details, **omp**, **Claude Code**, or **Codex**, including running omp sessions.
+  Their transcripts keep updating while the agent writes, and the conversation search finds their prompts and replies.
+  They are read-only: the pane's header reads `Read-only · Claude Code` or `Read-only · Codex`, and neither the header nor the row's menu offers **Resume** or **Fork from here**.
+  An unknown or malformed line shows in the transcript as one warning with the line's start, alongside any text or tools the reader understood.
+  Their subagents' sessions are left out of the list.
   The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
 - The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
   The group shows only while it has a row.
@@ -1188,17 +1195,21 @@ An action that fails shows its error, and its control becomes available again.
   While a range with no cached result loads, the previous range's numbers remain visible but dimmed.
   It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
   The cost is omp's API-equivalent list price, not what your subscription bills.
+  It counts requests recorded by omp, Claude Code, and Codex, including their subagents.
+  Claude Code and Codex costs use omp's model catalog, and a model it does not know costs zero while its tokens still count.
   The chart stacks token usage by the provider that handled each request, with a fixed color and a legend entry for each provider.
   Hover or tap a time bucket to see its total and each provider's tokens, estimated cost, and requests.
   Focus the chart and use Left or Right to move between buckets; Escape closes the details.
   **View bucket data** shows the same numbers in a table, including empty buckets and requests that recorded no tokens.
   The **Today** and **24h** charts label local hours; daily charts label UTC dates.
   Models and workspaces that used tokens in the range are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
+  Tool calls remain omp-only.
   The top 20 sessions include their subagents' usage; select a session to open it.
   omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
   It covers every session whatever workspace the header picks.
   omp indexes session files when you first open **Analytics** and updates the tab while indexing continues.
-  New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
+  New omp requests appear as omp syncs them, including requests from sessions started outside the dashboard.
+  Claude Code and Codex transcripts refresh on each Analytics read.
   **Context sources**, below the usage, ranks what fills each request's input over the same range: instruction files such as `AGENTS.md`, skills, rules, MCP servers, system prompt sections, injected messages such as reminders, each tool's results, and the conversation itself.
   Each row shows the source, its kind, its average tokens per request that carried it, those requests, its total tokens, its estimated cost, and its share of input.
   Tokens count cache reads and writes as input, so the rows add up to the requests' input tokens.

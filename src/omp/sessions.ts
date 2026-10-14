@@ -1,15 +1,17 @@
 /** omp's session files: listing them and reading whether a process left one mid-turn. */
-import { dirname } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { oneLine } from "../session-entries";
+import type { SessionSource } from "../shared/sessions";
 import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, storage } from "./modules";
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
 export const sessionsDir: string = dirs.getSessionsDir();
 
-/** A session file on disk, newest first in {@link listSessionFiles}. */
+/** A session file on disk, newest first in {@link listSessionFiles}. Claude Code's and Codex's readers list theirs in this shape too. */
 export interface SavedSession {
 	id: string;
 	path: string;
+	source: SessionSource;
 	cwd: string;
 	/** The session's title, else its first prompt as one line. */
 	title: string | null;
@@ -22,6 +24,7 @@ function saved(session: SessionInfo): SavedSession {
 	return {
 		id: session.id,
 		path: session.path,
+		source: "omp",
 		cwd: session.cwd,
 		// omp writes this placeholder when the prefix it scans holds no user text.
 		title:
@@ -35,6 +38,20 @@ function saved(session: SessionInfo): SavedSession {
 /** Every session file under omp's sessions directory (or `root`, one directory per working directory), newest first. */
 export async function listSessionFiles(root: string = sessionsDir): Promise<SavedSession[]> {
 	return (await listing.listAllSessions(new storage.FileSessionStorage(), root)).map(saved);
+}
+
+/** omp's `.<file>.jsonl.lock` sidecars: on macOS a burst of writes to a session file can surface only as events for these. */
+const SIDECAR = /^\.(.+\.jsonl)\.lock(?:\.os)?$/;
+
+/**
+ * The session file a watcher event at `changedPath` is about, or `null` for anything else.
+ * Session files sit one directory below `root`; deeper files belong to subagents.
+ */
+export function sessionFileOf(changedPath: string, root: string): string | null {
+	if (dirname(dirname(changedPath)) !== root) return null;
+	const name = basename(changedPath);
+	const file = name.startsWith(".") ? SIDECAR.exec(name)?.[1] : name;
+	return file?.endsWith(".jsonl") ? join(dirname(changedPath), file) : null;
 }
 
 /** omp's file storage that sees one file in a directory, so that omp's own scan (and its cache) reads just that file. */

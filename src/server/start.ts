@@ -6,6 +6,7 @@ import { errorText } from "../json";
 import { skipRefused } from "../live-session";
 import type { RpcLaunch } from "../omp/rpc";
 import { directoryOf } from "../paths";
+import { formatOf } from "../session-formats";
 import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
 import type { ProjectJoin, ProjectLaunch } from "./project-runner";
@@ -84,6 +85,7 @@ export function createStarter(env: StartEnv): Starter {
 			case "fork": {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
+				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
 				return launch("Cannot fork", (id, emit) => DashboardSession.fork(id, source, request.entryId, emit));
 			}
 			case "resume": {
@@ -91,6 +93,7 @@ export function createStarter(env: StartEnv): Starter {
 				if (sessions.sessionIds().has(sessionId) || resuming.has(sessionId)) return { error: "This session is already running." };
 				const path = env.savedFile(sessionId);
 				if (!path) return { error: "Cannot resume: this session's file is not known." };
+				if (formatOf(path).source !== "omp") return { error: "Cannot resume: this session is read-only. Only omp sessions resume here." };
 				resuming.add(sessionId);
 				try {
 					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }));

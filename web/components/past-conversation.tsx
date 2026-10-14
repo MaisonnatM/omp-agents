@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
-import { pastLabel } from "../labels";
+import { pastLabel, SOURCE_LABELS } from "../labels";
 import { Header } from "./page-header";
 import { PullRequestButton, TicketMenu } from "./session-meta";
 import { Trajectory } from "./trajectory";
@@ -26,30 +26,32 @@ interface PastConversationProps {
 	trajectory: boolean;
 }
 
-/** A past session's saved transcript under its title. It follows the file; **Resume** continues it in a session this dashboard starts. */
 export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, trajectory }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
 	const failed = resume?.phase === "failed" && resume.op.sessionId === sessionId ? resume.error : null;
+	const foreign = session !== null && session.source !== "omp";
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
-				<Header title={title} status="Read-only" alert={false}>
+				<Header title={title} status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"} alert={false}>
 					{session && (
 						<>
 							<TicketMenu tickets={session.tickets} />
 							<PullRequestButton pullRequests={session.pullRequests} />
-							<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
-								<Button
-									size="compact"
-									onClick={onResume}
-									disabled={resume?.phase === "starting"}
-									aria-busy={resuming || undefined}
-								>
-									{resuming ? "Resuming…" : "Resume"}
-								</Button>
-							</Tooltip>
+							{!foreign && (
+								<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
+									<Button
+										size="compact"
+										onClick={onResume}
+										disabled={resume?.phase === "starting"}
+										aria-busy={resuming || undefined}
+									>
+										{resuming ? "Resuming…" : "Resume"}
+									</Button>
+								</Tooltip>
+							)}
 						</>
 					)}
 					{actions}
@@ -59,7 +61,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						{failed}
 					</p>
 				)}
-				{trajectory ? <Trajectory view={view} /> : <Transcript view={view} working={false} fork={fork} onFork={onFork} />}
+				{trajectory && !foreign ? <Trajectory view={view} /> : <Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} />}
 			</div>
 		</MessageScrollerProvider>
 	);

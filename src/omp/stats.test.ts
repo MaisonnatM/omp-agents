@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { creditRuns, type ProviderRequest } from "./stats";
+import { creditRuns, listPrice, type ProviderRequest } from "./stats";
 
 const INSUFFICIENT = "402 Insufficient credits. Add more using https://openrouter.ai/settings/credits";
 
@@ -33,4 +33,12 @@ describe("creditRuns", () => {
 		]);
 		expect(runs).toEqual([]);
 	});
+});
+
+test("listPrice uses omp's bundled API rates with Claude's cache lifetimes, and an unknown model costs zero", () => {
+	const timestamp = Date.parse("2026-10-01T12:00:00Z");
+	const tokens = { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 };
+	expect(listPrice("anthropic", "claude-haiku-4-5-20251001", tokens, timestamp)).toBeCloseTo(7.35, 10);
+	expect(listPrice("anthropic", "claude-haiku-4-5-20251001", { ...tokens, cttl: { ephemeral5m: 500_000, ephemeral1h: 500_000 } }, timestamp)).toBeCloseTo(7.725, 10);
+	expect(listPrice("anthropic", "not-a-catalog-model", tokens, timestamp)).toBe(0);
 });

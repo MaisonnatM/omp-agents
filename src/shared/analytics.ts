@@ -36,7 +36,7 @@ export interface AnalyticsProviderUsage {
 	requests: number;
 }
 
-/** omp's request stats over one time range, from its stats database. */
+/** Request usage over one time range, from omp-stats and Claude Code's and Codex's transcripts. */
 export interface Analytics {
 	range: AnalyticsRange;
 	/** How far omp-stats has indexed the session files; numbers grow while it syncs. */
@@ -52,7 +52,7 @@ export interface Analytics {
 	workspaces: (Usage & { cwd: string })[];
 	/** Total tokens by who sent the request. */
 	agents: Record<"main" | "subagent" | "advisor", number>;
-	/** Most calls first. `tokenShare` is the tokens of the requests that called the tool, split among their calls. */
+	/** omp-only tool calls, most calls first. `tokenShare` is the tokens of the requests that called the tool, split among their calls. */
 	tools: { name: string; calls: number; errors: number; tokenShare: number }[];
 	/** The 20 sessions that used the most tokens, most first, each with its subagents folded in. */
 	sessions: AnalyticsSession[];

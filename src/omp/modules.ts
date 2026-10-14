@@ -298,6 +298,28 @@ export interface UpdateSettingsModule {
 export interface ModelIdentityModule {
 	classifyModel(provider: string, modelId: string, options: { lenient: true }): { class: string; family?: string; revision?: string };
 }
+/** pi-catalog's `Model` (src/types.ts), opaque here: what `calculateCost` prices with. */
+export interface CatalogModel {
+	cost: object;
+}
+/** The fields of pi-catalog's `Usage` (src/types.ts) that `calculateCost` reads; it writes the prices into `cost`. */
+export interface CatalogUsage {
+	input: number;
+	output: number;
+	cacheRead: number;
+	cacheWrite: number;
+	totalTokens: number;
+	/** Anthropic's cache writes by lifetime, each billed at its own rate. */
+	cttl?: { ephemeral5m: number; ephemeral1h: number };
+	cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+}
+/** pi-catalog's bundled models (src/models.ts), with the list prices omp records on its own requests. */
+export interface CatalogModule {
+	/** `undefined` for a provider or model the bundle does not list. */
+	getBundledModel(provider: string, modelId: string): CatalogModel | undefined;
+	/** Prices `usage` at `timestamp` (ms), with the rate card and long-context tier in force then. */
+	calculateCost(model: CatalogModel, usage: CatalogUsage, timestamp: number): CatalogUsage["cost"];
+}
 
 /** Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. */
 export interface CapabilityItem {
@@ -653,6 +675,10 @@ export const updateSettings = await load<UpdateSettingsModule>(join(srcDir, "mod
 });
 export const modelIdentity = await load<ModelIdentityModule>(join(dirname(packageDir), "pi-catalog", "src", "identity", "index.ts"), {
 	classifyModel: "function",
+});
+export const catalog = await load<CatalogModule>(join(dirname(packageDir), "pi-catalog", "src", "models.ts"), {
+	getBundledModel: "function",
+	calculateCost: "function",
 });
 
 export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function" });

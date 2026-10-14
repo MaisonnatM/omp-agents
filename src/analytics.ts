@@ -1,6 +1,6 @@
-/** The Analytics tab's numbers: omp-stats' reads, with each session's subagents folded into it. */
 import { basename, isAbsolute, relative, sep } from "node:path";
-import type { StatsProviderPoint, StatsUsage } from "./omp/modules";
+import type { FileUsage, ForeignRequest } from "./foreign/usage";
+import type { StatsDashboard, StatsProviderPoint, StatsUsage } from "./omp/modules";
 import type { SessionModelRow, StatsRead, StatsWindow } from "./omp/stats";
 import type { Analytics, AnalyticsProviderUsage, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared/analytics";
 import { selectorOf } from "./shared/models";
@@ -19,7 +19,7 @@ function tokenCounts(input: number, output: number, cacheRead: number, cacheWrit
 }
 
 /** omp-stats' cache rate: cache reads over all input read. */
-const cacheRate = ({ input, cacheRead }: TokenCounts): number => (input + cacheRead > 0 ? cacheRead / (input + cacheRead) : 0);
+const cacheRate = (input: number, cacheRead: number): number => (input + cacheRead > 0 ? cacheRead / (input + cacheRead) : 0);
 
 function usageOf(stats: StatsUsage): Usage {
 	return {
@@ -36,7 +36,7 @@ function addUsage(into: Usage, requests: number, failed: number, tokens: TokenCo
 	into.failed += failed;
 	into.tokens = tokenCounts(into.tokens.input + tokens.input, into.tokens.output + tokens.output, into.tokens.cacheRead + tokens.cacheRead, into.tokens.cacheWrite + tokens.cacheWrite);
 	into.cost += cost;
-	into.cacheRate = cacheRate(into.tokens);
+	into.cacheRate = cacheRate(into.tokens.input, into.tokens.cacheRead);
 }
 
 const emptyUsage = (): Usage => ({ requests: 0, failed: 0, tokens: tokenCounts(0, 0, 0, 0), cost: 0, cacheRate: 0 });
@@ -66,7 +66,7 @@ export function foldSessions(rows: readonly SessionModelRow[], root: string, fac
 	}
 	const folds = new Map<string, Fold>();
 	for (const row of rows) {
-		const { sessionId, subagent } = sessionOfFile(row.sessionFile, root);
+		const { sessionId, subagent } = row.session ?? sessionOfFile(row.sessionFile, root);
 		let fold = folds.get(sessionId);
 		if (!fold) {
 			fold = { facts: factsOf(sessionId), folder: row.folder, usage: emptyUsage(), subagentTokens: 0, lastAt: 0, modelTokens: new Map() };
@@ -146,6 +146,75 @@ export function chartOf(points: readonly StatsProviderPoint[], { cutoff, bucketM
 		series.push(point);
 	}
 	return { providers, series };
+}
+
+function addRequest(stats: StatsUsage, { input, output, cacheRead, cacheWrite, failed, cost }: ForeignRequest): void {
+	stats.totalRequests += 1;
+	stats.failedRequests += failed ? 1 : 0;
+	stats.totalInputTokens += input;
+	stats.totalOutputTokens += output;
+	stats.totalCacheReadTokens += cacheRead;
+	stats.totalCacheWriteTokens += cacheWrite;
+	stats.totalCost += cost;
+	stats.cacheRate = cacheRate(stats.totalInputTokens, stats.totalCacheReadTokens);
+}
+
+/**
+ * `read` with the requests other agents' transcripts in `files` record since its cutoff, counted as omp-stats counts
+ * omp's: a row per transcript and model, the provider series' buckets, and the dashboard's totals, models, and agents.
+ */
+export function withForeignUsage(read: StatsRead, files: Iterable<FileUsage>): StatsRead {
+	const { cutoff, bucketMs } = read.window;
+	const overall = { ...read.dashboard.overall };
+	const byModel = new Map(read.dashboard.byModel.map(model => [`${model.provider}/${model.model}`, { ...model }]));
+	const byAgentType = new Map(read.dashboard.byAgentType.map(agent => [agent.agentType, { ...agent }]));
+	const points = new Map(read.providerSeries.map(point => [`${point.timestamp}/${point.provider}`, { ...point }]));
+	const rows = [...read.rows];
+	for (const { path, sessionId, subagent, cwd, requests } of files) {
+		const fileRows = new Map<string, SessionModelRow>();
+		for (const request of requests) {
+			const { provider, model, timestamp, failed, input, output, cacheRead, cacheWrite, cost } = request;
+			if (cutoff !== null && timestamp < cutoff) continue;
+			const tokens = input + output + cacheRead + cacheWrite;
+			const selector = selectorOf({ provider, id: model });
+			const row = fileRows.get(selector) ?? {
+				sessionFile: path, session: { sessionId, subagent }, folder: cwd, selector,
+				requests: 0, failed: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, subagentTokens: 0, cost: 0, lastAt: 0,
+			};
+			row.requests += 1;
+			row.failed += failed ? 1 : 0;
+			row.input += input;
+			row.output += output;
+			row.cacheRead += cacheRead;
+			row.cacheWrite += cacheWrite;
+			row.subagentTokens += subagent ? tokens : 0;
+			row.cost += cost;
+			row.lastAt = Math.max(row.lastAt, timestamp);
+			fileRows.set(selector, row);
+			addRequest(overall, request);
+			const byThisModel = byModel.get(selector) ?? {
+				provider, model, totalRequests: 0, failedRequests: 0, totalInputTokens: 0, totalOutputTokens: 0,
+				totalCacheReadTokens: 0, totalCacheWriteTokens: 0, cacheRate: 0, totalCost: 0, avgTokensPerSecond: null,
+			};
+			addRequest(byThisModel, request);
+			byModel.set(selector, byThisModel);
+			const agentType = subagent ? "subagent" : "main";
+			const agent: StatsDashboard["byAgentType"][number] = byAgentType.get(agentType) ?? { agentType, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheWriteTokens: 0 };
+			agent.totalInputTokens += input;
+			agent.totalOutputTokens += output;
+			agent.totalCacheReadTokens += cacheRead;
+			agent.totalCacheWriteTokens += cacheWrite;
+			byAgentType.set(agentType, agent);
+			const start = Math.floor(timestamp / bucketMs) * bucketMs;
+			const point = points.get(`${start}/${provider}`) ?? { timestamp: start, provider, totalTokens: 0, cost: 0, requests: 0 };
+			point.totalTokens += tokens;
+			point.cost += cost;
+			point.requests += 1;
+			points.set(`${start}/${provider}`, point);
+		}
+		rows.push(...fileRows.values());
+	}
+	return { ...read, dashboard: { overall, byModel: [...byModel.values()], byAgentType: [...byAgentType.values()] }, rows, providerSeries: [...points.values()] };
 }
 
 /** The page's payload from one omp-stats read over `range`. */
