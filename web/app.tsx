@@ -269,7 +269,6 @@ export function App() {
 										<ProjectDetails
 											key={hashForView(detailsView)}
 											project={coordinated}
-											view={detailsView}
 											working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 											cwd={focused.cwd ?? null}
 											workspace={workspace}

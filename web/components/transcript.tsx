@@ -70,6 +70,7 @@ import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
+import { TranscriptMinimap } from "./transcript-minimap";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
 const TOOL_ICON: Record<string, LucideIcon> = {
@@ -538,7 +539,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	}, [revealId, loaded, items, view, scrollToMessage]);
 
 	return (
-		<MessageScroller className="flex-1">
+		<MessageScroller className="@container flex-1">
 			<MessageScrollerViewport>
 				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 p-3" aria-relevant="additions text" data-transcript>
 					{visibleBlocks.map(block => {
@@ -598,6 +599,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					)}
 				</MessageScrollerContent>
 			</MessageScrollerViewport>
+			<TranscriptMinimap items={items} working={working} />
 			<MessageScrollerButton />
 		</MessageScroller>
 	);

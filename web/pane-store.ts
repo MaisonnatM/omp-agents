@@ -6,7 +6,7 @@ import { type AgentMedia, type ChangedFile, type Item, newestMediaFirst } from "
 import { applyDelta } from "./keyed-list";
 import { keyedStore } from "./keyed-store";
 import { hashForView } from "./routing";
-import { nextSuggestions, turnCount } from "./transcript-view";
+import { nextSuggestions } from "./transcript-view";
 
 export interface Completions {
 	reqId: number;
@@ -108,7 +108,6 @@ const loadedOf = (pane: PaneData): boolean => pane.loaded;
 const filesOf = (pane: PaneData): ChangedFile[] | null => pane.files;
 const mediaOf = (pane: PaneData): AgentMedia[] | null => pane.media;
 const turnsOf = (pane: PaneData): Turn[] | null => pane.turns;
-const turnCountOf = (pane: PaneData): number => turnCount(pane.items);
 const composerOf = ({ completions, withdrawn }: PaneData): ComposerData => ({ completions, withdrawn });
 const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.withdrawn === b.withdrawn;
 const sameStrings = (a: string[], b: string[]): boolean => a.length === b.length && a.every((text, index) => text === b[index]);
@@ -160,9 +159,6 @@ export const useShownTrajectories = (): View[] => useSyncExternalStore(subscribe
 
 /** What the server answered `view`'s composer: its last `complete` and its last `dequeue`. */
 export const useComposerData = (view: View): ComposerData => usePaneSelect(view, composerOf, sameComposer);
-
-/** How many turns `view`'s transcript holds, so a tab can count them without reading the transcript. */
-export const useTurnCount = (view: View): number => usePaneSelect(view, turnCountOf);
 
 /** What the last turn of `view`'s transcript suggests sending next, as {@link nextSuggestions} reads it. */
 export function useNextSuggestions(view: View, working: boolean): string[] {

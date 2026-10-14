@@ -139,31 +139,14 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Session details sidebar
 
-- The right sidebar shows the focused pane's conversation at a glance, and what its agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
+- The right sidebar shows what the focused pane's agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Outline**, **Files**, **Media**, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
+- Tabs split it: **Files**, **Media**, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone; with **Tickets** among them, they show their icons alone until you widen the sidebar past 30rem, and hovering one names it.
   The sidebar remembers the tab you chose, for every view.
-- A project's coordinator, which changes no code itself, gets other tabs instead: **Outline**, **Workers**, **Notes**, and **PRs**; see [Projects](#projects).
+- A project's coordinator, which changes no code itself, gets other tabs instead: **Workers**, **Notes**, and **PRs**; see [Projects](#projects).
   It remembers its own tab, **Workers** at first, apart from a session's.
-- **Outline** shows the conversation's turns in order, each weighted by how much it matters.
-  Your first prompt opens the list whole, under **Request**, rendered as the transcript renders it, with its skill's chip first.
-  The turns after it hang from a rail of icons: a person for your prompt, a bot for the reply a turn ended on.
-  A prompt shows in bold on up to three lines, and a reply muted on up to three lines; hover either to read the whole message.
-  A bold label that opens a reply, such as **Résumé**, is left out, so the line starts with what the reply says.
-  A prompt led by `go`, or of approval words alone such as `yes`, `lgtm`, or `fix all then push`, reads as one line, **Approved**, with its words after it, such as `Approved · go all don't commit`.
-  The reply such an approval follows is the agent's plan: it shows under **Plan**, rendered whole up to about twelve lines, and **Show more** opens the rest.
-  A prompt of `continue` alone reads as **Continued**, and the reply before it stays a reply, since it reports work in progress rather than a plan.
-  `ok` with more words, and `push` or `ship it` alone, read as prompts.
-  A line under a reply counts the turn's tool calls and, in red, those that failed, such as `14 tools · 2 failed`.
-  A later prompt that invoked a skill shows the skill's name in an outlined chip first, a prompt of files alone reads as their names, and a prompt of images alone reads as how many it holds, such as `2 images`.
-  The turn still running shows **Working…** where its reply will go.
-  Click a prompt, a reply, **Request**, or **Plan** to scroll the pane's transcript to that message; the page stays where it is.
-  A file's path in the **Request** or a **Plan**, relative to the session's directory or not, opens the file in the file dialog.
-  The turn you are reading carries a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
-  After you click a turn it stays marked until you scroll the transcript yourself, since the last turns may never reach the top of the transcript.
-  The list follows the conversation as it goes.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
   As in the session's changes, a count of zero is left out, so a file the agent only added to shows `+12` alone.
@@ -197,7 +180,7 @@ An action that fails shows its error, and its control becomes available again.
   The issue shows as on the tickets page, stacked in one column: its title, its status, priority, assignee, due date, labels, and project, which you can edit there, then its **Sub-issues**, its branch, its links, who opened it, **Open in Linear**, its description, and its comments.
   **Sub-issues** draws them as a pull request's **Stack** draws its pull requests, on a rail in a box, under how many are done of those not canceled: each row shows the state, identifier, title, and priority, and the rail ends at the issue's own identifier, as a stack's ends at its base branch.
   Opening the tab, picking another issue, and each start and end of the view's turn read it from Linear.
-- A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
+- A tab with nothing to show says so.
 
 ## Session changes
 
@@ -289,7 +272,6 @@ An action that fails shows its error, and its control becomes available again.
   The choice is saved in this browser.
   Cmd+Shift+E shows or hides the tool rows, and Alt+T (Option+T on macOS) shows or hides the thinking.
   Cmd+E still opens or closes the group.
-  Hiding either leaves the outline's tool count as it was.
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
   A tool group that spawned subagents stays open.
   In a live session or subagent, each id is a link with the subagent's status dot (green running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
@@ -308,6 +290,10 @@ An action that fails shows its error, and its control becomes available again.
   It is offered in every room that the dashboard can write to.
 - The conversation follows new output while you are at the bottom.
   Scrolling up pauses that follow; the down-arrow button jumps back to the latest message.
+- A minimap on the conversation's left edge draws one short line per turn, once there are two, when the pane is wide enough to leave room beside the messages.
+  Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
+  Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
+  The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
 - In a session the dashboard started, a prompt sent to an idle session shows at once, dimmed, at the end of the conversation, and the session shows as working.
   That covers a new session's first message, a suggested prompt, and an edited prompt.
   omp takes up to a few seconds before its turn starts, and the prompt shows in full once it does.
@@ -340,7 +326,6 @@ An action that fails shows its error, and its control becomes available again.
   File commands show their expanded text, because omp records only that.
 - A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
-  The outline's **Request** shows the first prompt the same way.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
@@ -1169,7 +1154,7 @@ An action that fails shows its error, and its control becomes available again.
   A worker's phase is working, asking while it waits on a question, idle, interrupted when it stopped without **End session**, or ended.
   Click a notes file to open it in the file dialog.
   **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, and its coordinator's tools refuse to start, list, read, or message workers.
-- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Outline** follows the coordinator's conversation, **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** lists the notes files, and **PRs** the pull requests its workers submitted or worked on, each once.
+- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** lists the notes files, and **PRs** the pull requests its workers submitted or worked on, each once.
 - Workers report back on their own, so the coordinator never polls.
   Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
   Once the coordinator runs and is idle, every waiting update reaches it as one message that starts with `[omp-agents] Project update.`, quoting each finished worker's last reply up to 2,000 characters.
