@@ -558,7 +558,8 @@ A start goes through `start` as the page's would, so the todo it names is linked
 A failure, such as a session that cannot resume or a start that fails, saves the error on the send, which waits for **Try again** or **Dismiss**.
 A send that a stopped server left `sending` may have reached its session, so the owner fails it at its start or takeover (`ScheduledRunner.recover`) rather than sending it again.
 
-A `schedule` socket message carries one `ScheduledChange`: `add`, whose `id` the page picks so an add sent twice adds once, `remove`, which cancels a waiting send or dismisses a failed one and leaves one under way, `take`, or `send-now`, which answers once the send went or failed.
+A `schedule` socket message carries one `ScheduledChange`: `add`, whose `id` the page picks so an add sent twice adds once, `remove`, which cancels a waiting send or dismisses a failed one and leaves one under way, `take`, `update`, or `send-now`, which answers once the send went or failed.
+`update` is the scheduled-session page's save: it replaces a waiting or failed send's time and target in place, keeps its `createdAt`, sets it waiting again, and, like `take`, refuses one under way or gone, so the page never believes an edit saved.
 `take` is **Edit**'s: it takes a waiting or failed send off the schedule and writes the file at once, as a claim does, so the server that sends reads it gone.
 `applyScheduled` throws for a `take` of a send that is gone or under way, which may already have reached its session; the request's `done` carries that error, and the page puts the text back in the composer only after a `done` without one.
 `parseScheduledSpec` in `src/shared/scheduled.ts`, which `parseScheduledChange` in `src/server/wire.ts` and `src/server/scheduled-file.ts` share, holds a message's text and a start's prompt to `MAX_SCHEDULED_TEXT`, a million characters, and refuses images, an empty text, and a start that resumes.

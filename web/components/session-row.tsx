@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/menu";
 import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
 import { folderName, hostLabel, modeOf, pastLabel, pullRequestsLabel, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
@@ -49,29 +50,52 @@ interface SessionButtonProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
+interface RowLineProps {
+	dot?: ReactNode;
+	badge?: ReactNode;
+	label: string;
+	/** Shown right after the label, such as the /ship step. */
+	after?: ReactNode;
+	facts: { text: string; title?: string; alert?: boolean } | null;
+	/** Pinned to the row's right end with {@link ROW_END}, such as its age. */
+	end: ReactNode;
+}
+
+/** The look of what ends a session row: muted, small, and pushed right. */
+export const ROW_END = "ml-auto shrink-0 text-xs tabular-nums text-muted-foreground";
+
+/** A sidebar session row's one line: its dot, badge, label, muted facts, and what ends it. Scheduled sends share it. */
+export function RowLine({ dot, badge, label, after, facts, end }: RowLineProps) {
+	return (
+		<>
+			{dot}
+			<span className="flex min-w-0 flex-1 items-baseline gap-2">
+				{badge}
+				<span className="truncate font-medium text-foreground">{label}</span>
+				{after}
+				{facts && (
+					<span className={cn("shrink-0 text-xs", facts.alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} title={facts.title}>
+						{facts.text}
+					</span>
+				)}
+				{end}
+			</span>
+		</>
+	);
+}
+
 function SessionButton({ view, label, title, badge, ship, facts, when, dot, open, onOpen }: SessionButtonProps) {
 	return (
 		<Tooltip content={`${label}. ${title}. ${SPLIT_CLICK} to open in a split`} side="right">
 			<SidebarMenuButton isActive={open} onClick={event => onOpen(view, modeOf(event))}>
-				{dot}
-				<span className="flex min-w-0 flex-1 items-baseline gap-2">
-					{badge}
-					<span className="truncate font-medium text-foreground">{label}</span>
-					<ShipStep ship={ship} />
-					{facts && (
-						<span className="shrink-0 text-xs text-muted-foreground" title={facts.title}>
-							{facts.text}
-						</span>
-					)}
-					<Age at={when} className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground" />
-				</span>
+				<RowLine dot={dot} badge={badge} label={label} after={<ShipStep ship={ship} />} facts={facts} end={<Age at={when} className={ROW_END} />} />
 			</SidebarMenuButton>
 		</Tooltip>
 	);
 }
 
 /** The workspace a titled row ran in, before its title, shown only under all workspaces. An untitled row's label is already the workspace's name. */
-function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
+export function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
 	const name = folderName(cwdDisplay);
 	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
 }

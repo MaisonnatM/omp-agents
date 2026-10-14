@@ -160,6 +160,8 @@ interface RosterProps {
 	open: View[];
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
+	/** The scheduled send whose page is open, `null` for none. */
+	scheduledOpen: string | null;
 	/** The tabs the bar shows, in order. */
 	tabs: readonly SidebarTab[];
 	/** The sidebar's tab, selected by the page or kept over the panes. */
@@ -201,6 +203,7 @@ export function Roster({
 	onTogglePin,
 	open,
 	newSessionOpen,
+	scheduledOpen,
 	tabs,
 	tab,
 	onTab,
@@ -286,6 +289,7 @@ export function Roster({
 					open={open}
 					showWorkspace={workspace === null}
 					newSessionOpen={newSessionOpen}
+					scheduledOpen={scheduledOpen}
 					newSessionLabel={newSessionLabel}
 				/>
 			</TabPanel>

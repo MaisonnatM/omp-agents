@@ -467,8 +467,12 @@ An action that fails shows its error, and its control becomes available again.
   A session that is no longer live resumes first, as **Resume** would.
 - A scheduled new session starts as the draft's **Start session** would: in the same directory, on the same branch choice, model, thinking level, and skill, and linked to the draft's todo.
   It opens in no pane; it shows in the sidebar once it starts.
-- The sidebar's **Scheduled** group, such as **2 scheduled**, sits above the projects and lists every scheduled send, new sessions too, with its time; it hides while nothing is scheduled.
-  A message's row opens its session, and each row's menu has **Send now** and **Cancel**.
+- The sidebar's **Scheduled** group, such as **2 scheduled**, sits above the projects and lists every scheduled send, new sessions too, in the session rows' look: the message and its time on the right; under all workspaces a new session's row also shows its workspace badge. It hides while nothing is scheduled.
+  Each sessions-sidebar group title starts with its own icon: an alarm clock for scheduled, then projects, pinned, idle, running, interrupted, and past.
+  A message's row opens its session, and each row's menu has **Send now**, **Edit**, and **Cancel**.
+- A scheduled new session's row, or its **Edit**, opens it as the new-session draft it was scheduled from, at `#scheduled/<id>`: its message, directory, branch, model, thinking level, and skill.
+  The header shows its time, with **Start now** and **Cancel**. Sending the message saves the edits and keeps the time, and the clock button moves it to another time.
+  **Start now** saves the edits, then starts it at once. A send that is already sending refuses edits.
 - A send that fails, such as a session that cannot resume, stays listed in red with the error, and **Try again** or **Dismiss** in place of **Send now** and **Cancel**.
   It never tries again on its own.
 - A scheduled message carries text only: the clock button is off while the draft holds attached files or starts with a `!` or `$` command.

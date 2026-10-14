@@ -51,8 +51,13 @@ Besides a live session's own hash, the routes are:
 - `#inbox`, `#inbox/<thread id>`;
 - `#todo`, `#todo/today`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
 - `#calendar`, `#routines`, `#routines/<id>`, `#projects`, `#projects/new`, `#projects/<id>`;
+<<<<<<< HEAD
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`;
 - `#settings`, `#settings/<section>`, `#settings/<section>/<encoded cwd>`, where `<section>` is `analytics`, `preferences`, `presets`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `models`, `files`, or `worktrees`.
+=======
+- `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
+- `#settings`, `#settings/<section>`, `#settings/<section>/<encoded cwd>`, where `<section>` is `analytics`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `models`, `files`, or `worktrees`.
+>>>>>>> 81f8dfe (Edit scheduled new sessions; session-row look and section icons in the sidebar)
 
 ## Desktop smoke
 

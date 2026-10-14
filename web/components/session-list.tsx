@@ -1,4 +1,4 @@
-import { ListRestart, Loader, Plus } from "lucide-react";
+import { Activity, CircleAlert, CirclePause, FolderKanban, History, ListRestart, Loader, Pin, Plus } from "lucide-react";
 import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -31,12 +31,14 @@ interface SessionListProps {
 	showWorkspace: boolean;
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
+	/** The scheduled send whose page is open, highlighted in its group; `null` for none. */
+	scheduledOpen: string | null;
 	/** The New session button's label, naming the selected workspace. */
 	newSessionLabel: string;
 }
 
 /** The Sessions tab: New session, the search field, then the scheduled sends, the projects, and the pinned, idle, running, interrupted, and past groups. */
-export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, newSessionLabel }: SessionListProps) {
+export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
@@ -72,7 +74,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				{filtering && projects.length + pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
 					<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
 				)}
-				{!filtering && <ScheduledGroup open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
+				{!filtering && <ScheduledGroup openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
 				{(!filtering || projects.length > 0) && (
 					<SidebarGroup
 						collapsible
@@ -90,7 +92,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 							</SidebarGroupActions>
 						}
 					>
-						<SidebarGroupLabel>{projects.length === 0 ? "No projects" : projects.length === 1 ? "1 project" : `${projects.length} projects`}</SidebarGroupLabel>
+						<SidebarGroupLabel icon={FolderKanban}>{projects.length === 0 ? "No projects" : projects.length === 1 ? "1 project" : `${projects.length} projects`}</SidebarGroupLabel>
 						{projects.map(group => (
 							<ProjectSessions
 								key={group.project.id}
@@ -105,7 +107,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				)}
 				{pinned.hosts.length + pinned.past.length > 0 && (
 					<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
-						<SidebarGroupLabel>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
+						<SidebarGroupLabel icon={Pin}>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
 						<SidebarMenu aria-label="Pinned omp sessions">
 							{hostRows(pinned.hosts, true)}
 							{pastRows(pinned.past, true)}
@@ -114,13 +116,13 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				)}
 				{idle.length > 0 && (
 					<SidebarGroup collapsible open={!collapsed.has("idle")} onOpenChange={() => toggleGroup("idle")}>
-						<SidebarGroupLabel>{`${idle.length} idle`}</SidebarGroupLabel>
+						<SidebarGroupLabel icon={CirclePause}>{`${idle.length} idle`}</SidebarGroupLabel>
 						<SidebarMenu aria-label="Idle omp sessions">{hostRows(idle, false)}</SidebarMenu>
 					</SidebarGroup>
 				)}
 				{(!filtering || running.length > 0) && (
 					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
-						<SidebarGroupLabel>
+						<SidebarGroupLabel icon={Activity}>
 							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length + projectHosts(projects).length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
 						<SidebarMenu aria-label="Running omp sessions">{hostRows(running, false)}</SidebarMenu>
@@ -148,7 +150,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 							</SidebarGroupActions>
 						}
 					>
-						<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
+						<SidebarGroupLabel icon={CircleAlert}>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
 						{resumeAll?.phase === "failed" && (
 							<p role="alert" className="mx-2 mb-1 flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
 								<span className="min-w-0 flex-1">{resumeAll.error}</span>
@@ -162,7 +164,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				)}
 				{(!filtering || ended.length > 0) && (
 					<SidebarGroup collapsible open={!collapsed.has("past")} onOpenChange={() => toggleGroup("past")}>
-						<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
+						<SidebarGroupLabel icon={History}>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
 						<SidebarMenu aria-label="Past omp sessions">
 							{pastRows(ended.slice(0, pastShown), false)}
 							{hidden > 0 && (

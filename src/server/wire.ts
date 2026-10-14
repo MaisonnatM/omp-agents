@@ -137,7 +137,7 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 function parseScheduledChange(value: unknown): Parsed<ScheduledChange> {
 	if (!isObject(value)) return null;
 	const { op } = value;
-	if (op === "add") {
+	if (op === "add" || op === "update") {
 		const send = parseScheduledSpec(value.send);
 		return send && { ok: { op, send: send.ok } };
 	}

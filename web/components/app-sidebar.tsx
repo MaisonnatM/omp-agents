@@ -95,6 +95,7 @@ export const AppSidebar = memo(function AppSidebar({
 			onTogglePin={togglePin}
 			open={page ? NO_VIEWS : panes}
 			newSessionOpen={page?.kind === "new"}
+			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
 			tabs={tabs}
 			tab={tab}
 			onTab={onTab}

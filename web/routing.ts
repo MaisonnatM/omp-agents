@@ -100,6 +100,11 @@ export interface NewSessionRoute {
 	todoId: string | null;
 }
 
+/** A scheduled new session's start, `id` of the scheduled sends, opened to view and edit; `null` names none. */
+export interface ScheduledRoute {
+	id: string | null;
+}
+
 /** A page that covers the panes. */
 export type Page =
 	| ({ kind: "settings" } & SettingsRoute)
@@ -110,7 +115,8 @@ export type Page =
 	| ({ kind: "projects" } & ProjectsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "inbox" } & InboxRoute)
-	| ({ kind: "new" } & NewSessionRoute);
+	| ({ kind: "new" } & NewSessionRoute)
+	| ({ kind: "scheduled" } & ScheduledRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
 export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
@@ -144,6 +150,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   `#settings` and an unknown section open Analytics; a segment after the section is ignored.
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
+ * - `#scheduled/<id>` opens scheduled send `id`, a new session's start, as an editable draft.
  * - `#pull-requests` shows the sidebar's Pull requests tab, which lists the pull requests of the sidebar's workspace, beside the panes,
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
@@ -166,6 +173,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "settings", section: isSettingsSection(section) ? section : "analytics" };
 	},
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
+	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
 	"pull-requests": rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
 		if (!match) return { kind: "pull-requests", target: null };
@@ -211,6 +219,8 @@ function restOfPage(page: Page): string | null {
 		case "routines":
 		case "inbox":
 			return page.target === null ? null : encodeURIComponent(page.target);
+		case "scheduled":
+			return page.id === null ? null : encodeURIComponent(page.id);
 		case "projects":
 			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
 		case "calendar":
@@ -236,6 +246,7 @@ function queryOfPage(page: Page): string | null {
 		case "projects":
 		case "calendar":
 		case "inbox":
+		case "scheduled":
 			return null;
 		default: {
 			const never: never = page;
@@ -262,6 +273,7 @@ export const hashForProjects = (target: ProjectsTarget): string => hashForPage({
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
+export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

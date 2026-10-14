@@ -195,6 +195,9 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "send-now", id: "a" })).toEqual({ t: "schedule", change: { op: "send-now", id: "a" } });
 		expect(change({ op: "remove", id: "a" })).toEqual({ t: "schedule", change: { op: "remove", id: "a" } });
 		expect(change({ op: "take", id: "a" })).toEqual({ t: "schedule", change: { op: "take", id: "a" } });
+		const spec = { id: "a", at: 1_800_000_000_000, reset: null, target: { kind: "start" as const, request } };
+		expect(change({ op: "update", send: { ...spec, state: { phase: "waiting" } } })).toEqual({ t: "schedule", change: { op: "update", send: spec } });
+		expect(change({ op: "update", send: { ...spec, target: { kind: "start", request: { ...request, prompt: " " } } } })).toBeNull();
 
 		expect(add({ target: { kind: "start", request: { ...request, images: [{ data: "aGVsbG8=", mimeType: "image/png" }] } } })).toBeNull();
 		expect(add({ target: { kind: "start", request: { ...request, prompt: " " } } })).toBeNull();

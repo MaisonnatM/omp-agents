@@ -18,6 +18,7 @@ import {
   type CSSProperties,
   type HTMLAttributes,
   type Ref,
+  type ComponentType,
 } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -197,10 +198,12 @@ SidebarGroup.displayName = "SidebarGroup";
 interface SidebarGroupLabelProps extends HTMLAttributes<HTMLDivElement> {
   render?: ReactElement;
   asChild?: boolean;
+  /** Drawn before the label's text, such as the section's kind. */
+  icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 }
 
 const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(
-  ({ className, render, asChild, children, ...props }, ref) => {
+  ({ className, render, asChild, icon: Icon, children, ...props }, ref) => {
     const sizeVariant = useSizeVariant();
     const sizeClasses = useSize();
     const group = useContext(SidebarGroupContext);
@@ -220,13 +223,18 @@ const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(
       textEnd++;
     }
     const leadingText = nodes.slice(0, textEnd).join("");
-    const labelContent = leadingText ? (
+    const labelContent = (
       <>
-        <span className="min-w-0 truncate">{leadingText}</span>
-        {nodes.slice(textEnd)}
+        {Icon && <Icon aria-hidden className="size-3.5 shrink-0" />}
+        {leadingText ? (
+          <>
+            <span className="min-w-0 truncate">{leadingText}</span>
+            {nodes.slice(textEnd)}
+          </>
+        ) : (
+          content
+        )}
       </>
-    ) : (
-      content
     );
 
     // Inside a collapsible group the label becomes the toggle. Design

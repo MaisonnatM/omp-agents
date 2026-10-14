@@ -10,6 +10,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 	switch (page?.kind) {
 		case "new":
 			return "New session";
+		case "scheduled":
+			return "Scheduled session";
 		case "settings":
 			return "Settings";
 		case "pull-requests":

@@ -33,6 +33,8 @@ export type ScheduledChange =
 	| { op: "remove"; id: string }
 	/** Takes a waiting or failed send off the schedule for **Edit**, which puts its text back in the composer only once this succeeds. */
 	| { op: "take"; id: string }
+	/** Replaces a waiting or failed send's time and target, keeping its id and creation time; it waits again. */
+	| { op: "update"; send: ScheduledSpec }
 	/** Sends a waiting send now, or tries a failed one again. */
 	| { op: "send-now"; id: string };
 
@@ -66,10 +68,18 @@ export function parseScheduledSpec(value: unknown): Parsed<ScheduledSpec> {
 	return { ok: { id, at, reset, target: target.ok } };
 }
 
+/** The send `id` that an edit may change: one that waits or failed. A send under way may already have reached its session, and one that is gone was sent or canceled. */
+function editable(sends: ScheduledSend[], id: string): ScheduledSend {
+	const send = sends.find(candidate => candidate.id === id);
+	if (!send) throw new Error("It is no longer scheduled.");
+	if (send.state.phase === "sending") throw new Error("It is already sending.");
+	return send;
+}
+
 /**
- * `sends` after an `add`, a `remove`, or a `take`, or `sends` itself when it changes nothing. The list stays ordered by `at`, soonest first.
- * A send under way cannot be removed. A `take` that takes nothing throws instead: a send under way may already have reached
- * its session, and one that is gone was sent or canceled, so its text must not go back to the composer.
+ * `sends` after an `add`, a `remove`, a `take`, or an `update`, or `sends` itself when it changes nothing. The list stays ordered by `at`, soonest first.
+ * A send under way cannot be removed. A `take` or an `update` that finds no editable send throws instead, so the page
+ * neither puts back the text of a send that went nor believes an edit was saved.
  */
 export function applyScheduled(sends: ScheduledSend[], change: Exclude<ScheduledChange, { op: "send-now" }>, now: number): ScheduledSend[] {
 	switch (change.op) {
@@ -83,10 +93,13 @@ export function applyScheduled(sends: ScheduledSend[], change: Exclude<Scheduled
 			return next.length === sends.length ? sends : next;
 		}
 		case "take": {
-			const taken = sends.find(send => send.id === change.id);
-			if (!taken) throw new Error("It is no longer scheduled.");
-			if (taken.state.phase === "sending") throw new Error("It is already sending.");
+			const taken = editable(sends, change.id);
 			return sends.filter(send => send !== taken);
+		}
+		case "update": {
+			const old = editable(sends, change.send.id);
+			const updated: ScheduledSend = { ...change.send, createdAt: old.createdAt, state: { phase: "waiting" } };
+			return sends.map(send => (send === old ? updated : send)).sort((a, b) => a.at - b.at);
 		}
 	}
 }

@@ -20,6 +20,7 @@ import { PaneGrid } from "./pane-grid";
 import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
 import { SettingsPage } from "./settings/settings-page";
+import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
@@ -148,6 +149,8 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		}
+		case "scheduled":
+			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} presets={presets} todoOf={todoId => todoSeed(userTodos, todoId)} />;
 		case "settings":
 			return (
 				<SettingsPage
