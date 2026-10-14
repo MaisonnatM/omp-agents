@@ -1,22 +1,20 @@
 /** A pull request's Comments tab: its review threads, open ones first, to reply to and resolve, then its conversation and a box to comment. */
 import { Check, RotateCcw } from "lucide-react";
 import { useId, useState } from "react";
-import { MAX_COMMENT_BODY, type PullRequestChange, type PullRequestDetail, type PullRequestThread } from "../../../../src/shared/github";
+import { MAX_COMMENT_BODY, type PullRequestDetail, type PullRequestThread } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { errorText } from "../../../api";
+import { openThreads, withThreadResolved } from "../../../pull-requests-model";
 import { chordLabel } from "../../../shortcuts";
 import { FoldButton } from "../../fold";
 import { ERROR_TEXT, isSubmitChord, type Submit } from "../../form-dialog";
 import { DetailSection, Markdown } from "../../sheet-details";
 import { EventBody, Message, ThreadPlace } from "../pr-timeline";
-import type { SavePullRequest } from "../pr-fields";
-
-/** Sends a reply or a comment and settles once GitHub took it, or rejects with why it did not. */
-export type SendPullRequest = (change: PullRequestChange) => Promise<unknown>;
+import type { SavePullRequest, SendPullRequest } from "../pr-fields";
 
 /** A text box that sends its draft with its button or Cmd+Enter, and keeps the draft, with the reason, when GitHub refuses it. */
-function Composer({ label, placeholder, onSend }: { label: string; placeholder: string; onSend: (body: string) => Promise<unknown> }) {
+function Composer({ label, placeholder, onSend }: { label: string; placeholder: string; onSend: (body: string) => Promise<void> }) {
 	const [draft, setDraft] = useState("");
 	const [submit, setSubmit] = useState<Submit>({ kind: "writing" });
 	const sending = submit.kind === "creating";
@@ -74,16 +72,12 @@ interface ThreadProps {
 
 /** A review thread: where it sits, Resolve or Unresolve, every comment, and a reply box. */
 function ThreadCard({ detail, thread, save, send }: ThreadProps) {
-	const toggle = (): void =>
-		save(
-			{ field: "thread", id: thread.id, resolved: !thread.resolved },
-			{ threads: detail.threads.map(other => (other.id === thread.id ? { ...other, resolved: !other.resolved } : other)) },
-		);
+	const toggle = (): void => save({ field: "thread", id: thread.id, resolved: !thread.resolved }, withThreadResolved(detail, thread.id, !thread.resolved));
 	return (
 		<li className="rounded-md border border-border">
 			<div className="flex min-h-9 items-center gap-2 border-b border-border px-2 py-1 text-xs text-muted-foreground">
 				<ThreadPlace detail={detail} thread={thread} />
-				{thread.can.resolve && (
+				{(thread.resolved ? thread.can.unresolve : thread.can.resolve) && (
 					<Button variant="ghost" size="compact" className="ml-auto shrink-0" leadingIcon={thread.resolved ? RotateCcw : Check} onClick={toggle}>
 						{thread.resolved ? "Unresolve" : "Resolve"}
 					</Button>
@@ -108,25 +102,18 @@ function ThreadCard({ detail, thread, save, send }: ThreadProps) {
 interface CommentsProps {
 	detail: PullRequestDetail;
 	save: SavePullRequest;
-	/** Why GitHub refused the last resolve or unresolve; `null` when it took them all. */
-	saveError: string | null;
 	send: SendPullRequest;
 }
 
-export function Comments({ detail, save, saveError, send }: CommentsProps) {
+export function Comments({ detail, save, send }: CommentsProps) {
 	const [resolvedOpen, setResolvedOpen] = useState(false);
 	const resolvedId = useId();
-	const open = detail.threads.filter(thread => !thread.resolved);
+	const open = openThreads(detail);
 	const resolved = detail.threads.filter(thread => thread.resolved);
 	const conversation = detail.conversation.filter(event => event.body.trim() !== "");
 	const card = (thread: PullRequestThread) => <ThreadCard key={thread.id} detail={detail} thread={thread} save={save} send={send} />;
 	return (
 		<div className="space-y-6">
-			{saveError && (
-				<p role="alert" className={ERROR_TEXT}>
-					GitHub did not take the change: {saveError}
-				</p>
-			)}
 			<DetailSection
 				title={
 					<>
@@ -140,9 +127,11 @@ export function Comments({ detail, save, saveError, send }: CommentsProps) {
 						<FoldButton open={resolvedOpen} onToggle={() => setResolvedOpen(value => !value)} controls={resolvedId} className="text-xs text-muted-foreground">
 							{resolved.length} resolved
 						</FoldButton>
-						<ul id={resolvedId} hidden={!resolvedOpen} className="space-y-3">
-							{resolvedOpen && resolved.map(card)}
-						</ul>
+						{resolvedOpen && (
+							<ul id={resolvedId} className="space-y-3">
+								{resolved.map(card)}
+							</ul>
+						)}
 					</div>
 				)}
 			</DetailSection>

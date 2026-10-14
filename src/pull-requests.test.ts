@@ -348,23 +348,30 @@ describe("parseDetailAnswer", () => {
 			pr,
 		);
 		expect(detail.state).toBe("closed");
-		expect(detail.unresolved).toEqual({ count: 2, exact: true });
+		expect(detail.unresolved).toEqual({ count: 1, exact: true });
 		expect(detail.conversation.map(event => [event.review, event.body])).toEqual([
 			["changes-requested", "Not yet"],
 			[null, "Why?"],
 			["approved", ""],
 		]);
 		expect(detail.threads).toEqual([
-			{ id: "PRRT_a", path: "a.ts", line: 1, resolved: true, can: { reply: true, resolve: true }, comments: [] },
+			{ id: "PRRT_a", path: "a.ts", line: 1, resolved: true, can: { reply: true, resolve: false, unresolve: true }, comments: [] },
 			{
 				id: "PRRT_b",
 				path: "b.ts",
 				line: null,
 				resolved: false,
-				can: { reply: false, resolve: false },
+				can: { reply: false, resolve: false, unresolve: true },
 				comments: [{ author: { login: "ghost", avatarUrl: null }, body: "Gone line", at: Date.parse("2026-09-30T09:00:00Z"), url: null }],
 			},
 		]);
+	});
+
+	test("counts the unresolved threads among those it lists, as a floor when GitHub lists only the first page", () => {
+		const thread = (id: string, isResolved: boolean) => ({ id, isResolved, path: "a.ts", line: 1, comments: { nodes: [] } });
+		const unresolved = (reviewThreads: unknown) => parseDetailAnswer(answer({ reviewThreads }), pr).unresolved;
+		expect(unresolved({ totalCount: 3, nodes: [thread("PRRT_a", false), thread("PRRT_b", true), thread("PRRT_c", false)] })).toEqual({ count: 2, exact: true });
+		expect(unresolved({ totalCount: 150, nodes: [thread("PRRT_a", false), thread("PRRT_b", true)] })).toEqual({ count: 1, exact: false });
 	});
 
 	test("lets you comment unless the repository is archived, or the conversation is locked and you cannot write to the repository", () => {

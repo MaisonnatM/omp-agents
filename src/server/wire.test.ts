@@ -411,8 +411,12 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ owner: "a", repo: "b", change: { field: "state", state: "open" } })).toBeNull();
 	});
 
-	test("takes a review thread to resolve or unresolve, a reply to a thread, and a comment on the pull request", () => {
+	test("takes a review thread to resolve or unresolve by its new or older node id, a reply to a thread, and a comment on the pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "PRRT_kwDOA-b_1", resolved: true } })?.ok).toEqual({ ...pr, change: { field: "thread", id: "PRRT_kwDOA-b_1", resolved: true } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "MDIzOlB1bGxSZXF1ZXN0UmV2aWV3VGhyZWFkMQ==", resolved: false } })?.ok).toEqual({
+			...pr,
+			change: { field: "thread", id: "MDIzOlB1bGxSZXF1ZXN0UmV2aWV3VGhyZWFkMQ==", resolved: false },
+		});
 		expect(parsePullRequestEdit({ ...pr, change: { field: "reply", thread: "PRRT_kwDOA", body: "Done in a1b2c3." } })?.ok).toEqual({ ...pr, change: { field: "reply", thread: "PRRT_kwDOA", body: "Done in a1b2c3." } });
 		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "x".repeat(65_536) } })?.ok).toEqual({ ...pr, change: { field: "comment", body: "x".repeat(65_536) } });
 	});

@@ -343,8 +343,8 @@ export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullReque
 const isSettableState = oneOf(SETTABLE_STATES);
 const isMergeMethod = oneOf(MERGE_METHODS);
 const COMMIT = /^[0-9a-f]{40,64}$/;
-/** A GitHub node id, as a review thread's `PRRT_…` id is spelled. */
-const NODE_ID = /^[A-Za-z0-9_-]{1,100}$/;
+/** A GitHub node id: a review thread's `PRRT_…` id, or an older id's base64 with its `=` padding. */
+const NODE_ID = /^[A-Za-z0-9_=-]{1,100}$/;
 const isNodeId = (value: unknown): value is string => typeof value === "string" && NODE_ID.test(value);
 const isCommentBody = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_COMMENT_BODY;
 

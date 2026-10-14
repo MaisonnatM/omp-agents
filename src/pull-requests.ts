@@ -238,9 +238,8 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	const threads = nodesOf(node.reviewThreads).flatMap((thread): PullRequestThread[] => {
 		if (!isObject(thread) || typeof thread.id !== "string" || typeof thread.isResolved !== "boolean" || typeof thread.path !== "string") return [];
 		const threadComments = nodesOf(thread.comments).flatMap(comment => parseComment(comment, isObject(comment) ? comment.createdAt : null) ?? []);
-		const resolved = thread.isResolved;
-		const can = { reply: thread.viewerCanReply === true, resolve: (resolved ? thread.viewerCanUnresolve : thread.viewerCanResolve) === true };
-		return [{ id: thread.id, path: thread.path, line: typeof thread.line === "number" ? thread.line : null, resolved, can, comments: threadComments }];
+		const can = { reply: thread.viewerCanReply === true, resolve: thread.viewerCanResolve === true, unresolve: thread.viewerCanUnresolve === true };
+		return [{ id: thread.id, path: thread.path, line: typeof thread.line === "number" ? thread.line : null, resolved: thread.isResolved, can, comments: threadComments }];
 	});
 	// A branch that took in its trunk lists the trunk's commits too; each belongs to another, merged pull request.
 	const commitList = nodesOf(node.history).flatMap((entry): PullRequestCommit[] => {
@@ -264,6 +263,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		changedFiles: num(node.changedFiles) ?? 0,
 		files,
 		checkRuns,
+		unresolved: { count: threads.filter(thread => !thread.resolved).length, exact: head.unresolved.exact },
 		threads,
 		conversation: [...comments, ...reviews].toSorted((a, b) => a.at - b.at),
 		createdAt,

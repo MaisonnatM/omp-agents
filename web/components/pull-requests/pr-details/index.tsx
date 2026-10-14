@@ -5,7 +5,7 @@ import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { moveAction, pullRequestStatus, reason } from "../../../pull-requests-model";
+import { moveAction, openThreads, pullRequestStatus, reason } from "../../../pull-requests-model";
 import { putJson } from "../../../api";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { type AgentState, actionFacts, type MoveId, moveOf } from "../../../../src/shared/moves";
@@ -13,6 +13,7 @@ import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../
 import { useEditableRead } from "../../../editable-read";
 import { useRead } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
+import { ERROR_TEXT } from "../../form-dialog";
 import { LoadNote } from "../../sheet-details";
 import { Timeline } from "../pr-timeline";
 import { ChecksSummary } from "./checks";
@@ -89,7 +90,9 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
 		if (detail) edit(shown, () => put(change));
 	};
-	const send = (change: PullRequestChange): Promise<PullRequestDetail> => write(() => put(change));
+	const send = async (change: PullRequestChange): Promise<void> => {
+		await write(() => put(change));
+	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	const [tab, setTab] = useState<DetailTab>(files ? "code" : "summary");
 	useEffect(() => {
@@ -113,8 +116,8 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
 	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	const page = placement === "page";
-	const openThreads = detail ? detail.threads.filter(thread => !thread.resolved).length : 0;
-	const comments = detail ? detail.conversation.length + openThreads : 0;
+	const unresolved = detail?.unresolved.count ?? 0;
+	const comments = detail ? detail.conversation.length + openThreads(detail).length : 0;
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
@@ -124,7 +127,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)} className="min-w-0">
 							<TabsList aria-label="Show">
 								<TabItem value="summary" label="Summary" />
-								<TabItem value="comments" label="Comments" badge={openThreads || undefined} aria-label={`Comments, ${openThreads} unresolved threads`} />
+								<TabItem value="comments" label="Comments" badge={unresolved || undefined} aria-label={`Comments, ${unresolved} unresolved threads`} />
 								<TabItem value="timeline" label="Timeline" badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
 								<TabItem value="code" label="Code" />
 							</TabsList>
@@ -143,11 +146,16 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 				</div>
 			) : (
 				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
-					<div className="py-4">
+					<div className="space-y-6 py-4">
+						{saveError && (
+							<p role="alert" className={ERROR_TEXT}>
+								GitHub did not take the change: {saveError}
+							</p>
+						)}
 						{tab === "summary" ? (
-							<Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={saveError} />
+							<Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
 						) : tab === "comments" ? (
-							<Comments detail={detail} save={save} saveError={saveError} send={send} />
+							<Comments detail={detail} save={save} send={send} />
 						) : (
 							<Timeline detail={detail} />
 						)}

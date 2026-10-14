@@ -42,7 +42,7 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 }
 
 /**
- * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}, or {@link mutationOf} for a mutation.
+ * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}; a mutation goes through {@link ghMutation}.
  * `paginate` follows the query's `$endCursor` through every page, answering an array of the pages.
  */
 export function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
@@ -72,8 +72,12 @@ export function dataOf(answer: unknown): Record<string, unknown> {
 	throw new Error(errorsOf(answer) || "GitHub answered without data");
 }
 
-/** The data of a `gh api graphql` answer to a mutation, or GitHub's errors thrown: a refused mutation answers its field as `null` beside them, which {@link dataOf} takes as data. */
-export function mutationOf(answer: unknown): Record<string, unknown> {
+/**
+ * Runs `mutation` through `gh api graphql` and answers its data, or throws GitHub's errors even beside data: a refused
+ * mutation answers its field as `null` next to them, which {@link dataOf} takes as data.
+ */
+export async function ghMutation(mutation: string, vars: Record<string, string | number>): Promise<Record<string, unknown>> {
+	const answer = await ghGraphql(mutation, vars);
 	const refused = errorsOf(answer);
 	if (refused) throw new Error(refused);
 	return dataOf(answer);

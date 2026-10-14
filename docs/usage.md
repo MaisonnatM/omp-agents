@@ -693,13 +693,13 @@ An action that fails shows its error, and its control becomes available again.
   Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
   **Labels** shows the labels in their GitHub colors; click them for the repository's labels, and pick one to add or remove it.
   The lists of reviewers and labels come from GitHub on the first click, and the server keeps them for 5 minutes.
-  A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why.
+  A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why above the tab.
   **Sessions** shows the running sessions on the pull request.
   When another open pull request of its repository stacks with it by base branch, whoever opened it, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, as Graphite does, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
   The server reads the repository's open pull requests for it and keeps them for 30 seconds.
   Then comes the description in full.
 - **Comments** lists the pull request's review threads, unresolved ones first, each under the file and line it is on, which link to the file on the **Code** tab, with every comment in it.
-  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; the change shows at once and the details undo it and say why when GitHub refuses it.
+  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; the change shows at once, with the **Comments** count and the **Summary**'s unresolved review threads, and the details undo it and say why when GitHub refuses it.
   Resolved threads fold behind a line with their count, such as **2 resolved**.
   A thread you can reply to has a reply box under it: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and the box keeps your words and says why when GitHub refuses them.
   Under the threads, **Conversation** lists the comments and reviews with words on the pull request, oldest first, then a box to comment that works as the reply box does, shown when GitHub lets you comment.

@@ -6,6 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
 import { hashForPullRequestFiles } from "../../routing";
+import { openThreads } from "../../pull-requests-model";
 import { Markdown } from "../sheet-details";
 import { Avatar } from "./avatars";
 
@@ -27,8 +28,7 @@ function entriesOf(detail: PullRequestDetail): Entry[] {
 		} else entries.push({ kind: "commits", at: commit.at, author: commit.author, commits: [commit] });
 	}
 	for (const event of detail.conversation) entries.push({ kind: "event", at: event.at, author: event.author, event });
-	for (const thread of detail.threads) {
-		if (thread.resolved) continue;
+	for (const thread of openThreads(detail)) {
 		const first = thread.comments[0];
 		if (first) entries.push({ kind: "thread", at: first.at, author: first.author, thread });
 	}
@@ -234,7 +234,7 @@ export function Timeline({ detail }: { detail: PullRequestDetail }) {
 	const seen = useLastSeen(prKey(detail));
 	const sorted = entriesOf(detail);
 	const entries = newestFirst ? sorted.toReversed() : sorted;
-	const comments = detail.conversation.length + detail.threads.reduce((sum, thread) => sum + (thread.resolved ? 0 : thread.comments.length), 0);
+	const comments = detail.conversation.length + openThreads(detail).reduce((sum, thread) => sum + thread.comments.length, 0);
 	let day: string | null = null;
 	let newShown = false;
 	return (

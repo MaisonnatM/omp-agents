@@ -208,8 +208,8 @@ export interface PullRequestThread {
 	path: string;
 	line: number | null;
 	resolved: boolean;
-	/** Whether GitHub lets you reply, and resolve or unresolve it in its current state. */
-	can: { reply: boolean; resolve: boolean };
+	/** Whether GitHub lets you reply to it, resolve it, and unresolve it, so the button a resolve or unresolve shows at once stays right. */
+	can: { reply: boolean; resolve: boolean; unresolve: boolean };
 	comments: PullRequestComment[];
 }
 
@@ -251,7 +251,7 @@ export interface PullRequestDetail extends PullRequest {
 	checks: CheckState;
 	/** The head commit's checks, failing first, then pending, passing, and skipped. */
 	checkRuns: PullRequestCheck[];
-	/** Review threads not yet resolved, as on {@link PullRequestSummary}. */
+	/** Review threads not yet resolved: those of `threads`, with `exact` as on {@link PullRequestSummary}. */
 	unresolved: PullRequestSummary["unresolved"];
 	/** The review threads in full, resolved ones too: those among the first 100 that GitHub lists. */
 	threads: PullRequestThread[];
