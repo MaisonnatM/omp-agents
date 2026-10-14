@@ -263,6 +263,13 @@ An action that fails shows its error, and its control becomes available again.
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
+- **Transcript** and **Trajectory** in a pane's header switch what the pane shows; a live session keeps its composer under either.
+  **Trajectory** lists the conversation's turns, one row per prompt you or a skill sent, with a row first for what came before your first prompt.
+  A row shows the prompt's first line, its skill, how many model requests and tool calls the turn made, and its tokens and cost; hover the numbers for input, output, cache read, and cache write.
+  Open a row for each step in order: what omp injected before or during the turn, such as a skill's body, a system reminder, or a rule, each named by its source; model and thinking-level changes; each model request with its model, tokens, cost, time, and stop reason; the thinking and the reply; each tool call with its arguments, result size, images, and time; side calls such as auto-thinking; and compactions.
+  A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
+  A subagent's turns show in the subagent's own pane, not its parent's.
+  The pane goes back to **Transcript** when it opens another conversation.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group shows an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   The icon of a call that failed is red, and the group's heading counts the failures.

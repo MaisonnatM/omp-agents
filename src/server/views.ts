@@ -1,11 +1,13 @@
 /**
  * What each socket watches: the views it shows, and for each watched view one tail that streams the view's file and one
- * media tree that collects its images and its subagents', both shared by every socket showing it.
+ * media tree that collects its images and its subagents', both shared by every socket showing it. A view whose
+ * Trajectory tab some socket shows also gets one trajectory tail, shared the same way.
  */
 import { dirname } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { MediaTree } from "../media";
 import { FileTail } from "../tail";
+import { TrajectoryTail } from "../trajectory";
 import type { StartingPrompt } from "../transcript";
 import type { ServerMsg } from "../shared/protocol";
 import type { View } from "../shared/sessions";
@@ -13,6 +15,8 @@ import type { View } from "../shared/sessions";
 export interface SocketData {
 	/** The views this socket shows, by {@link viewKey}. */
 	views: Map<string, View>;
+	/** The views whose Trajectory this socket shows, by {@link viewKey}. */
+	trajectories: Map<string, View>;
 	/** The id of the page load this socket belongs to, the same across its reconnects. */
 	pageId: string;
 }
@@ -24,6 +28,38 @@ export const viewKey = (view: View): string =>
 	view.kind === "past" ? `past:${view.sessionId}` : `live:${view.instanceId}:${view.agentId ?? ""}`;
 /** Where a view's `items`, `work`, and `media` go. */
 const viewTopic = (key: string): string => `view:${key}`;
+/** Where a view's `turns` go. */
+const turnsTopic = (key: string): string => `turns:${key}`;
+
+/** The views some socket watches, by {@link viewKey}, with how many sockets watch each. */
+type Watchers = Map<string, { view: View; sockets: number }>;
+
+/**
+ * Make `views` the socket's whole set in `field`: it follows each new view's `topic` and leaves the dropped ones', and a
+ * view no socket watches any more is handed to `drop`. Returns the views it added.
+ */
+function rejoin(ws: Socket, field: "views" | "trajectories", views: View[], watchers: Watchers, topic: (key: string) => string, drop: (key: string) => void): [string, View][] {
+	const next = new Map(views.map(view => [viewKey(view), view]));
+	const prev = ws.data[field];
+	ws.data[field] = next;
+	for (const key of prev.keys()) {
+		if (next.has(key)) continue;
+		ws.unsubscribe(topic(key));
+		const entry = watchers.get(key);
+		if (entry && --entry.sockets === 0) {
+			watchers.delete(key);
+			drop(key);
+		}
+	}
+	const added = [...next].filter(([key]) => !prev.has(key));
+	for (const [key, view] of added) {
+		ws.subscribe(topic(key));
+		const entry = watchers.get(key);
+		if (entry) entry.sockets++;
+		else watchers.set(key, { view, sockets: 1 });
+	}
+	return added;
+}
 
 /** Whether the socket shows a view of live session `instanceId`, or of one of its subagents. */
 export const watching = (ws: Socket, instanceId: string): boolean =>
@@ -55,8 +91,11 @@ function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | 
 
 export class Views {
 	/** Views some socket shows, with how many sockets show each; each has a tail and a media tree while its file is known. */
-	readonly #watched = new Map<string, { view: View; sockets: number }>();
+	readonly #watched: Watchers = new Map();
 	readonly #resources = new Map<string, { tail: FileTail; media: MediaTree }>();
+	/** Views some socket shows the Trajectory of; each has a trajectory tail while its file is known. */
+	readonly #trajectoryWatched: Watchers = new Map();
+	readonly #trajectories = new Map<string, TrajectoryTail>();
 	readonly #pathFor: (view: View) => string | null;
 	readonly #publish: (topic: string, msg: ServerMsg) => void;
 	readonly #startingFor: (instanceId: string) => StartingPrompt | null;
@@ -71,29 +110,23 @@ export class Views {
 		this.#startingFor = startingFor;
 	}
 
-	/** Make `views` the socket's whole watch set. Views it already shows keep streaming without a fresh transcript. */
-	watch(ws: Socket, views: View[]): void {
-		const next = new Map(views.map(view => [viewKey(view), view]));
-		const prev = ws.data.views;
-		ws.data.views = next;
-		for (const key of prev.keys()) {
-			if (next.has(key)) continue;
-			ws.unsubscribe(viewTopic(key));
-			const entry = this.#watched.get(key);
-			if (entry && --entry.sockets === 0) {
-				this.#watched.delete(key);
-				this.#drop(key);
-			}
-		}
-		const added = [...next].filter(([key]) => !prev.has(key));
-		for (const [key, view] of added) {
-			ws.subscribe(viewTopic(key));
-			const entry = this.#watched.get(key);
-			if (entry) entry.sockets++;
-			else this.#watched.set(key, { view, sockets: 1 });
-		}
+	/**
+	 * Make `views` the socket's whole watch set, and `trajectories` the views whose turns it shows. Views it already shows
+	 * keep streaming without a fresh transcript or fresh turns.
+	 */
+	watch(ws: Socket, views: View[], trajectories: View[]): void {
+		const added = rejoin(ws, "views", views, this.#watched, viewTopic, key => this.#drop(key));
+		const addedTrajectories = rejoin(ws, "trajectories", trajectories, this.#trajectoryWatched, turnsTopic, key => {
+			this.#trajectories.get(key)?.close();
+			this.#trajectories.delete(key);
+		});
 		this.sync();
 		for (const [key, view] of added) for (const msg of snapshot(view, this.#resources.get(key))) send(ws, msg);
+		for (const [key, view] of addedTrajectories) {
+			const tail = this.#trajectories.get(key);
+			// A tail still loading gives none: its first read publishes to every subscriber.
+			if (!tail || tail.loaded) send(ws, { t: "turns", view, reset: true, turns: tail?.turns() ?? [] });
+		}
 	}
 
 	/** Forget the tail and media tree of view `key`, and stop them publishing. */
@@ -105,7 +138,7 @@ export class Views {
 		resources.media.close();
 	}
 
-	/** Point every watched view's tail and media tree at its current file: the file shows up, the host switches sessions, a subagent registers. */
+	/** Point every watched view's tail, media tree, and trajectory tail at its current file: the file shows up, the host switches sessions, a subagent registers. */
 	sync(): void {
 		for (const [key, { view }] of this.#watched) {
 			const path = this.#pathFor(view);
@@ -127,6 +160,20 @@ export class Views {
 			media.poke(path);
 			if (view.kind === "live" && view.agentId === null) this.starting(view.instanceId);
 		}
+		for (const [key, { view }] of this.#trajectoryWatched) {
+			const path = this.#pathFor(view);
+			const previous = this.#trajectories.get(key);
+			if (previous?.path === path) continue;
+			previous?.close();
+			this.#trajectories.delete(key);
+			if (!path) {
+				if (previous) this.#publish(turnsTopic(key), { t: "turns", view, reset: true, turns: [] });
+				continue;
+			}
+			const tail = new TrajectoryTail(path, (reset, turns) => this.#publish(turnsTopic(key), { t: "turns", view, reset, turns }));
+			this.#trajectories.set(key, tail);
+			tail.poke();
+		}
 	}
 
 	/**
@@ -140,6 +187,7 @@ export class Views {
 			if (dirname(tail.path) === dir) tail.poke();
 			if (media.covers(changedPath)) media.poke(changedPath);
 		}
+		for (const tail of this.#trajectories.values()) if (dirname(tail.path) === dir) tail.poke();
 	}
 
 	/** A live agent event of session `instanceId`'s main agent. */

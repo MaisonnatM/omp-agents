@@ -23,6 +23,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx`.
+- Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the **Transcript**/**Trajectory** tabs in `web/components/pane.tsx` swap for the transcript.
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts; a project's coordinator shows `web/components/project-details.tsx` instead.
@@ -126,6 +127,8 @@ The server lives in `src/`:
   `Conversations.search` then matches those with `everyWord` and reads no file.
 - `src/work.ts`: folds session-file lines into the files changed.
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
+- `src/trajectory.ts`: folds a transcript's entries into turns, with their injections, requests, tool calls, and usage, for the `turns` message; `TrajectoryTail` reads the file through `FoldedFile` and `ReadQueue`.
+  `src/shared/trajectory.ts` holds `Turn`, its steps, and `TokenUsage`.
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
   Its read of a session's own file also feeds the `OwnFileFolds` it was constructed with, and it knows nothing of what those folds keep.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
@@ -251,7 +254,8 @@ The page lives in `web/`.
   `request` resolves or rejects on `done` and keeps waiting across a reconnect, whose `resume` hands the server every request still waiting.
   Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
 - `web/use-action.ts`: guards a control against repeated activation, exposes its pending state, and shows failures through the toast manager.
-- `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state.
+- `web/pane-store.ts`: each open view's transcript, changed files, images, turns, and completions, outside the page state.
+  `useShowTrajectory` registers a view whose Trajectory a component shows, and `web/use-dashboard.ts` sends those views in `watch`; `retainTrajectories` drops the turns of a view no longer shown.
   A component reads one field through a selector hook (`useTranscript`, `useChangedFiles`, `useMedia`, `useComposerData`, `useTurnCount`, …), built on `useSelect` in `web/keyed-store.ts`, which `web/polled-store.ts` shares, one snapshot and subscription per key, and renders again only when that field changes, so a streamed token renders the transcript and what reads `items`, and not the pane, the composer, or the details.
   `toBlocks` in `web/transcript-view.ts` keeps the blocks that a token leaves alone as the same objects, and the transcript's rows are memoized on them.
   It and the page state apply the server's list updates, the roster's and the past sessions', through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.

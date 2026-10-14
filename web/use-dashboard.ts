@@ -5,10 +5,11 @@ import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText, socketUrl } from "./api";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
-import { applyPaneMessage, retainPanes } from "./pane-store";
+import { applyPaneMessage, retainPanes, retainTrajectories, useShownTrajectories } from "./pane-store";
 import {
 	hashForLayout,
 	hashForPage,
+	hashForView,
 	type Layout,
 	layoutAfterResumeAll,
 	layoutAfterStart,
@@ -91,6 +92,14 @@ export function useDashboard(): Dashboard {
 	const watched = useMemo<View[]>(() => (page ? NO_VIEWS : state.layout.panes), [page, state.layout.panes]);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
+	const shownTrajectories = useShownTrajectories();
+	// A Trajectory streams only while its pane does.
+	const trajectories = useMemo(() => {
+		const shown = new Set(watched.map(hashForView));
+		return shownTrajectories.filter(view => shown.has(hashForView(view)));
+	}, [watched, shownTrajectories]);
+	const trajectoriesRef = useRef(trajectories);
+	trajectoriesRef.current = trajectories;
 
 	const send = useCallback((msg: ClientMsg) => {
 		const ws = socketRef.current;
@@ -159,7 +168,7 @@ export function useDashboard(): Dashboard {
 			ws.onopen = () => {
 				retryMs = 500;
 				dispatch({ t: "connected", connected: true });
-				ws.send(JSON.stringify({ t: "watch", views: watchedRef.current } satisfies ClientMsg));
+				ws.send(JSON.stringify({ t: "watch", views: watchedRef.current, trajectories: trajectoriesRef.current } satisfies ClientMsg));
 				ws.send(JSON.stringify({ t: "resume", frames: [...outbox.current.values()].map(entry => entry.frame) } satisfies ResumeFrame));
 			};
 			ws.onmessage = event => {
@@ -168,6 +177,7 @@ export function useDashboard(): Dashboard {
 					case "items":
 					case "work":
 					case "media":
+					case "turns":
 					case "withdrawn":
 						applyPaneMessage(msg);
 						return;
@@ -242,10 +252,11 @@ export function useDashboard(): Dashboard {
 
 	// Declared before the watch, so a view's data is kept when its transcript arrives.
 	useEffect(() => retainPanes([...state.layout.panes, ...watched]), [watched, state.layout.panes]);
+	useEffect(() => retainTrajectories(trajectories), [trajectories]);
 
 	useEffect(() => {
-		send({ t: "watch", views: watched });
-	}, [send, watched]);
+		send({ t: "watch", views: watched, trajectories });
+	}, [send, watched, trajectories]);
 
 	const dismissStart = useCallback((kind: StartKind) => dispatch({ t: "dismiss-start", kind }), []);
 

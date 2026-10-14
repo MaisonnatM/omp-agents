@@ -8,6 +8,7 @@ import type { Project, ProjectEdit } from "./projects";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
+import type { Turn } from "./trajectory";
 import type { Workspace, WorkspaceList } from "./workspaces";
 
 export type ServerMsg =
@@ -21,6 +22,8 @@ export type ServerMsg =
 	| { t: "work"; view: View; reset: boolean; files: ChangedFile[] }
 	/** The images the view's agent and its subagents' tools returned: `reset` replaces them; otherwise `media` joins them. The page orders them with {@link newestMediaFirst}. */
 	| { t: "media"; view: View; reset: boolean; media: AgentMedia[] }
+	/** The turns of a view whose Trajectory the socket watches: `reset` replaces them; otherwise `turns` replace or join by `id`, new ids appended. */
+	| { t: "turns"; view: View; reset: boolean; turns: Turn[] }
 	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */
 	| { t: "started"; reqId: number; result: StartResult }
 	/** Answers this socket's `resume-all` with `reqId` once every session is ready or failed to start. */
@@ -51,8 +54,11 @@ export type ServerMsg =
 	| { t: "done"; ack: number; error: string | null };
 
 export type ClientMsg =
-	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
-	| { t: "watch"; views: View[] }
+	/**
+	 * The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming.
+	 * `trajectories` are the views whose turns it shows, which stream as `turns` the same way.
+	 */
+	| { t: "watch"; views: View[]; trajectories: View[] }
 	/**
 	 * A prompt to the session, or chat to the subagent (prompt if idle, revive if parked); `delivery` applies while a turn
 	 * runs. Only the session's own agent takes `images`.

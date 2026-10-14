@@ -30,7 +30,7 @@ function upgrade(req: Request, srv: Server<AnySocketData>): Response | undefined
 	if (refused) return refused;
 	// A page loaded before page ids connects with none; its views still update, and its tagged requests, which carry no `floor`, are dropped until it reloads.
 	const pageId = parsePageId(new URL(req.url).searchParams.get("page")) ?? crypto.randomUUID();
-	return srv.upgrade(req, { data: { views: new Map(), pageId } }) ? undefined : NOT_A_WEBSOCKET();
+	return srv.upgrade(req, { data: { views: new Map(), trajectories: new Map(), pageId } }) ? undefined : NOT_A_WEBSOCKET();
 }
 
 async function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Promise<Response | undefined> {

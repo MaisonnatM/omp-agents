@@ -114,6 +114,12 @@ Every transcript comes from the session files on this machine, not from a networ
   The watcher's changes poke it only for its own file, that file's `.<file>.lock` sidecar, and anything under its artifacts directory, since a subagent's appends do not touch the session file, and a sibling session's writes leave it alone.
   The view's socket topic carries them as `media` messages: the whole list once the files are read, then only the images each later read added, which the page sorts in newest first.
   A file rewritten shorter, or the first read, sends the whole list again.
+- A view whose **Trajectory** a socket shows also gets a trajectory tail (`src/trajectory.ts`), which folds the view's own file into turns: a turn opens at each user message or `custom_message` that the transcript shows as a prompt, so the turns match the Outline's.
+  Entries that wait for the model, such as a model change, a `model_usage` side call, a `ttsr_injection`, or a hidden `custom_message`, join the turn in which the next assistant message reads them, and are left out until one does.
+  Each assistant message is a request with the `usage` omp recorded on it; `model_usage` entries are only side calls such as auto-thinking and cache warming, so a turn's usage adds both.
+  `watch` lists those views in `trajectories`, and the watcher's changes poke the tail as they poke the transcript.
+  The socket topic `turns:<view>` carries `turns` messages: every turn once the file is read, then only the turns each later read changed, which the page puts in place by id.
+  A page that stops showing the Trajectory leaves the topic, and the tail closes when no socket shows it.
 - The server lists the session files through omp's session listing, the code behind omp's session picker, at startup and then once a minute, in case the watcher missed a change.
   Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session.
   The past list skips the empty sessions that omp's picker hides.

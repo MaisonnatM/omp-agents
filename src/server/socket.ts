@@ -36,7 +36,7 @@ export interface SocketEnv {
 
 /** Each socket message's handler, by its `t`, so a {@link ClientMsg} variant without one does not compile. A message naming a session that is gone does nothing. */
 const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg: MsgOf<T>) => Promise<void> | void } = {
-	watch: ({ views }, peer, msg) => views.watch(peer.socket, msg.views),
+	watch: ({ views }, peer, msg) => views.watch(peer.socket, msg.views, msg.trajectories),
 	async prompt({ sessions }, peer, { view, text, images, delivery }) {
 		try {
 			await sessions.get(view.instanceId)?.prompt(view.agentId, text, images, delivery);

@@ -136,17 +136,25 @@ function parseScheduledChange(value: unknown): Parsed<ScheduledChange> {
 	return (op === "remove" || op === "take" || op === "send-now") && isNonEmpty(value.id) ? { ok: { op, id: value.id } } : null;
 }
 
+/** A list of views, or `null` when it is not a list or one of them is malformed. */
+function parseViews(value: unknown): View[] | null {
+	if (!Array.isArray(value)) return null;
+	const views: View[] = [];
+	for (const raw of value) {
+		const view = parseView(raw);
+		if (!view) return null;
+		views.push(view.ok);
+	}
+	return views;
+}
+
 /** Each socket message's parser, by its `t`. */
 const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) => Parsed<MsgOf<T>> } = {
 	watch(value) {
-		if (!Array.isArray(value.views)) return null;
-		const views: View[] = [];
-		for (const raw of value.views) {
-			const view = parseView(raw);
-			if (!view) return null;
-			views.push(view.ok);
-		}
-		return { ok: { t: "watch", views } };
+		const views = parseViews(value.views);
+		// A page loaded before the Trajectory tab existed sends no `trajectories` until it reloads.
+		const trajectories = value.trajectories === undefined ? [] : parseViews(value.trajectories);
+		return views && trajectories && { ok: { t: "watch", views, trajectories } };
 	},
 	prompt(value) {
 		const view = parseLiveView(value.view);
