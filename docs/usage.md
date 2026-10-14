@@ -566,7 +566,9 @@ An action that fails shows its error, and its control becomes available again.
   A submit links only while the directory it ran in exists.
   A PR the session only quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count, unless it heads the session's worktree branch.
   A PR that a session submitted counts as submitted, even when it also worked on it.
-- In a session's header, the pull request button's menu opens each pull request on GitHub, on Graphite, or in its details on the Pull requests page.
+- In a session's header, the pull request button opens a popover with one row per pull request: the row opens its details on the Pull requests page, and the GitHub and Graphite icons at its end open it there.
+  When two or more of the session's open pull requests stack on each other, as a ticket's `gt submit` stack does, the button reads **Stack · 3** and the popover draws the stack on a rail, top first, down to the branch it merges into, as a pull request's **Stack** does.
+  The session's other pull requests follow under **Also on this session**, and **Open stack on Graphite** ends the popover.
 - A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier, and so does the ticket button in its header.
   It opens the issue's details in the tickets page's main content (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
   An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.

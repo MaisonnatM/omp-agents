@@ -1,5 +1,6 @@
-/** A pull request's stack on a rail (`StackSection`), and the session's other pull requests outside it. */
+/** A pull request's stack on a rail (`StackSection`, `StackRail`), and the session's other pull requests outside it. */
 import { GitPullRequest, Layers } from "lucide-react";
+import type { ReactNode } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { cn } from "@/lib/utils";
 import { age, LINK_VERB } from "../../../labels";
@@ -14,7 +15,6 @@ const RAIL_DOT = "absolute top-1/2 left-[10.5px] size-2 -translate-y-1/2 rounded
 /** The pull requests stacked with this one, top first, on a rail down to the branch the bottom one merges into; each other one links to its details, or `onPick` shows it in place. */
 export function StackSection({ stack, current, onPick }: { stack: StackedPullRequest[]; current: PullRequest; onPick?: (pr: PullRequest) => void }) {
 	const at = stack.findIndex(pr => samePullRequest(pr, current));
-	const bottom = stack[stack.length - 1];
 	return (
 		<DetailSection
 			title={
@@ -24,40 +24,61 @@ export function StackSection({ stack, current, onPick }: { stack: StackedPullReq
 				</>
 			}
 		>
-			<ol className="rounded-md border border-border py-1">
-				{stack.map((pr, index) => {
-					const here = index === at;
-					const label = `#${pr.number} ${pr.title}`;
-					return (
-						<li key={pr.number} className={cn("relative flex items-center gap-2 py-1.5 pr-3 pl-8 text-sm", here && "bg-muted/60")}>
-							<span aria-hidden className={cn(RAIL, index === 0 ? "top-1/2" : "top-0", "bottom-0")} />
-							<span aria-hidden className={cn(RAIL_DOT, here ? "bg-primary" : "bg-muted-foreground/60")} />
-							<Avatar person={pr.author} label={pr.author.login} />
-							{here ? (
-								<span aria-current="page" className="min-w-0 flex-1 truncate font-medium">
-									{label}
-								</span>
-							) : onPick ? (
-								<button type="button" onClick={() => onPick(pr)} className="min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline">
-									{label}
-								</button>
-							) : (
-								<a href={hashForPullRequests(pr)} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
-									{label}
-								</a>
-							)}
-							<ChecksIcon checks={pr.checks} />
-							<span className="w-7 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{age(pr.updatedAt, { compact: true })}</span>
-						</li>
-					);
-				})}
+			<StackRail stack={stack} current={current} onPick={onPick} className="rounded-md border border-border" />
+		</DetailSection>
+	);
+}
+
+interface StackRailProps {
+	stack: StackedPullRequest[];
+	/** The one marked as here, which links nowhere. */
+	current?: PullRequest;
+	onPick?: (pr: PullRequest) => void;
+	/** What ends each row, after its checks and age. */
+	trailing?: (pr: StackedPullRequest) => ReactNode;
+	className?: string;
+}
+
+/** `stack`, top first, on a rail down to the branch the bottom one merges into; each one but `current` links to its details, or `onPick` shows it in place. */
+export function StackRail({ stack, current, onPick, trailing, className }: StackRailProps) {
+	const bottom = stack[stack.length - 1];
+	return (
+		<ol className={cn("py-1", className)}>
+			{stack.map((pr, index) => {
+				const here = current !== undefined && samePullRequest(pr, current);
+				const label = `#${pr.number} ${pr.title}`;
+				return (
+					<li key={pr.number} className={cn("relative flex items-center gap-2 py-1.5 pr-3 pl-8 text-sm", here && "bg-muted/60")}>
+						<span aria-hidden className={cn(RAIL, index === 0 ? "top-1/2" : "top-0", "bottom-0")} />
+						<span aria-hidden className={cn(RAIL_DOT, here ? "bg-primary" : "bg-muted-foreground/60")} />
+						<Avatar person={pr.author} label={pr.author.login} />
+						{here ? (
+							<span aria-current="page" className="min-w-0 flex-1 truncate font-medium">
+								{label}
+							</span>
+						) : onPick ? (
+							<button type="button" onClick={() => onPick(pr)} className="min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline">
+								{label}
+							</button>
+						) : (
+							<a href={hashForPullRequests(pr)} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
+								{label}
+							</a>
+						)}
+						<ChecksIcon checks={pr.checks} />
+						<span className="w-7 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{age(pr.updatedAt, { compact: true })}</span>
+						{trailing?.(pr)}
+					</li>
+				);
+			})}
+			{bottom && (
 				<li className="relative py-1.5 pr-3 pl-8 font-mono text-xs text-muted-foreground">
 					<span aria-hidden className={cn(RAIL, "top-0 bottom-1/2")} />
 					<span aria-hidden className={cn(RAIL_DOT, "bg-background ring-muted-foreground/60")} />
 					{bottom.base}
 				</li>
-			</ol>
-		</DetailSection>
+			)}
+		</ol>
 	);
 }
 

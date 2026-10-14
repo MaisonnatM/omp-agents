@@ -1,59 +1,106 @@
-/** The subagent header's crumb styles, and the menus of a session's pull requests and Linear issues. */
-import { ChevronDown, GitPullRequest } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
-import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared/github";
+/** The subagent header's crumb styles, the button of a session's pull requests, and the menu of its Linear issues. */
+import { ChevronDown, GitPullRequest, Layers } from "lucide-react";
+import { Fragment, type MouseEvent, useEffect, useState } from "react";
+import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest } from "../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
-import { graphiteUrl } from "../pull-requests-model";
+import { LINK_VERB } from "../labels";
+import { graphiteUrl, sessionStack } from "../pull-requests-model";
 import { PAGE_ICON } from "../page-icons";
-import { ticketsStore } from "../reads";
+import { ticketsStore, useRead } from "../reads";
 import { hashForPullRequests, hashForTickets } from "../routing";
 import { linearUrlOf } from "../tickets-model";
 import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
+import { StackRail } from "./pull-requests/pr-details/stack";
 import { OrgIcon } from "./org-icon";
 
 export const PARENT_CRUMB = "font-normal text-muted-foreground";
 export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
-const PullRequestsIcon = PAGE_ICON["pull-requests"];
 const TicketsIcon = PAGE_ICON.tickets;
 const NO_TICKETS: never[] = [];
 
-/** The PRs a session submitted or worked on, behind one button: each opens on GitHub, on Graphite, or in its details on the Pull requests page. */
-export function PullRequestMenu({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
+/**
+ * The PRs a session submitted or worked on, behind one button whose popover lists them, each opening in its details on the Pull requests page, on GitHub,
+ * or on Graphite. When two or more of them stack, the button says so and the popover shows the stack on its rail, the session's other PRs below it.
+ */
+export function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	const [open, setOpen] = useState(false);
 	const [first] = pullRequests;
+	const query = first && pullRequests.length > 1 ? new URLSearchParams({ owner: first.owner, repo: first.repo, number: String(first.number) }) : null;
+	// Read again when the session links another PR, which may join the stack.
+	const stackRead = useRead<StackedPullRequest[]>(query && `/api/pull-request/stack?${query}`, pullRequests.map(prKey).join());
 	if (!first) return null;
-	const more = pullRequests.length - 1;
+	const stacked = sessionStack(pullRequests, stackRead.data ?? []);
+	const others = stacked?.others ?? pullRequests;
+	const top = stacked?.stack[0];
+	// A link in the popover leaves the page or opens a tab; either way the popover is done.
+	const closeOnLink = (event: MouseEvent): void => {
+		if (event.target instanceof Element && event.target.closest("a")) setOpen(false);
+	};
 	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
-			<Tooltip
-				content={more > 0 ? `This session's ${pullRequests.length} pull requests` : `${first.owner}/${first.repo}#${first.number}`}
-				forceOpen={open ? false : undefined}
-				side="bottom"
-			>
-				<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={GitPullRequest} trailingIcon={ChevronDown} active={open} />}>
-					#{first.number}
-					{more > 0 && <span className="text-muted-foreground">+{more}</span>}
-				</DropdownMenuTrigger>
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button variant="secondary" size="compact" leadingIcon={stacked ? Layers : GitPullRequest} trailingIcon={ChevronDown} active={open}>
+					{stacked ? (
+						<>
+							Stack <span className="text-muted-foreground tabular-nums">· {stacked.stack.length}</span>
+						</>
+					) : (
+						<>
+							#{first.number}
+							{others.length > 1 && <span className="text-muted-foreground">+{others.length - 1}</span>}
+						</>
+					)}
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent align="end" className="w-[28rem] p-0" onClick={closeOnLink}>
+				{stacked && <StackRail stack={stacked.stack} trailing={pr => <ExternalLinks pr={pr} />} />}
+				{others.length > 0 && (
+					<div className={stacked ? "border-t border-border py-1" : "py-1"}>
+						{stacked && <p className="px-3 pt-1 pb-0.5 text-xs text-muted-foreground">Also on this session</p>}
+						<ul>
+							{others.map(pr => (
+								<li key={prKey(pr)} className="flex items-center gap-2 py-1.5 pr-3 pl-3 text-sm">
+									<GitPullRequest aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+									<a href={hashForPullRequests(pr)} className="min-w-0 flex-1 truncate tabular-nums underline-offset-2 hover:underline">
+										{pr.repo} #{pr.number}
+									</a>
+									<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[pr.link]}</span>
+									<ExternalLinks pr={pr} />
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+				{top && (
+					<a href={graphiteUrl(top)} target="_blank" rel="noreferrer" className="flex items-center gap-2 border-t border-border px-3 py-2 text-sm hover:bg-muted">
+						<OrgIcon org="graphite" className="size-4" />
+						Open stack on Graphite
+					</a>
+				)}
+			</PopoverContent>
+		</Popover>
+	);
+}
+
+/** A pull request's GitHub and Graphite pages, as icon links at the end of its row. */
+function ExternalLinks({ pr }: { pr: PullRequest }) {
+	const link = "rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground";
+	return (
+		<span className="flex shrink-0 items-center">
+			<Tooltip content={`#${pr.number} on GitHub`}>
+				<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" aria-label={`#${pr.number} on GitHub`} className={link}>
+					<OrgIcon org="github" className="size-3.5" />
+				</a>
 			</Tooltip>
-			<DropdownMenuContent align="end">
-				{pullRequests.map((pr, index) => (
-					<Fragment key={pullRequestUrl(pr)}>
-						{index > 0 && <MenuSeparator />}
-						<MenuLinkItem href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
-							<OrgIcon org="github" className="size-4" />#{pr.number} on GitHub
-						</MenuLinkItem>
-						<MenuLinkItem href={graphiteUrl(pr)} target="_blank" rel="noreferrer">
-							<OrgIcon org="graphite" className="size-4" />#{pr.number} on Graphite
-						</MenuLinkItem>
-						<MenuLinkItem href={hashForPullRequests(pr)}>
-							<PullRequestsIcon />#{pr.number} in Pull requests
-						</MenuLinkItem>
-					</Fragment>
-				))}
-			</DropdownMenuContent>
-		</DropdownMenu>
+			<Tooltip content={`#${pr.number} on Graphite`}>
+				<a href={graphiteUrl(pr)} target="_blank" rel="noreferrer" aria-label={`#${pr.number} on Graphite`} className={link}>
+					<OrgIcon org="graphite" className="size-3.5" />
+				</a>
+			</Tooltip>
+		</span>
 	);
 }
 

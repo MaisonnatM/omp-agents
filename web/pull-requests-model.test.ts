@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { PullRequestSummary, PullRequestCheck, PullRequestDetail, RepoPullRequests } from "../src/shared/github";
+import type { LinkedPullRequest, PullRequestSummary, PullRequestCheck, PullRequestDetail, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
@@ -18,6 +18,7 @@ import {
 	reason,
 	sectionTitles,
 	shownPullRequests,
+	sessionStack,
 	stepTarget,
 	yourMoveCount,
 } from "./pull-requests-model";
@@ -392,5 +393,31 @@ describe("pull request status", () => {
 		expect(merged && moveOf(merged, null)).toBe("merged");
 		expect(actionFacts(ready, detail({ state: "closed" }))).toBeNull();
 		expect(actionFacts(ready, null)).toBe(ready);
+	});
+});
+
+describe("session stack", () => {
+	const linked = (number: number): LinkedPullRequest => ({ owner: "acme", repo: "webapp", number, link: "submitted" });
+	const member = (number: number): StackedPullRequest => ({
+		owner: "acme",
+		repo: "webapp",
+		number,
+		title: `PR ${number}`,
+		author: { login: "me", avatarUrl: null },
+		state: "open",
+		checks: "passing",
+		head: `me/branch-${number}`,
+		base: `me/branch-${number - 1}`,
+		updatedAt: number,
+	});
+
+	test("two or more of the session's pull requests in one stack show as the stack, the rest after it", () => {
+		const stack = [member(3), member(2), member(1)];
+		expect(sessionStack([linked(1), linked(9), linked(2)], stack)).toEqual({ stack, others: [linked(9)] });
+	});
+
+	test("a stack holding one of the session's pull requests, or none read yet, leaves the list as it is", () => {
+		expect(sessionStack([linked(1), linked(9)], [member(2), member(1)])).toBeNull();
+		expect(sessionStack([linked(1), linked(2)], [])).toBeNull();
 	});
 });

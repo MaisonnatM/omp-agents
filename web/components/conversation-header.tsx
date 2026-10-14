@@ -8,7 +8,7 @@ import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
-import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestMenu, TicketMenu } from "./session-meta";
+import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestButton, TicketMenu } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -70,7 +70,7 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 	return (
 		<Header title={title} status={status} alert={!ending && phase.phase === "ended"}>
 			{subject.kind === "session" && shown && <TicketMenu tickets={shown.tickets} />}
-			{subject.kind === "session" && shown && <PullRequestMenu pullRequests={shown.pullRequests} />}
+			{subject.kind === "session" && shown && <PullRequestButton pullRequests={shown.pullRequests} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={

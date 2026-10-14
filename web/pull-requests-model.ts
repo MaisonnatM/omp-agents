@@ -1,9 +1,16 @@
 /** Pull request links, what each pull request waits on next, the list's sections and stacks, and what stands between a pull request and its merge. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
+
+/** A session's pull requests split into the stack two or more of them share, top first, and the rest; `null` when fewer than two sit in `stack`. */
+export function sessionStack(pullRequests: LinkedPullRequest[], stack: StackedPullRequest[]): { stack: StackedPullRequest[]; others: LinkedPullRequest[] } | null {
+	const inStack = (pr: PullRequest): boolean => stack.some(member => samePullRequest(member, pr));
+	const others = pullRequests.filter(pr => !inStack(pr));
+	return pullRequests.length - others.length >= 2 ? { stack, others } : null;
+}
 
 /** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the list's sections, in page order. */
 export type MoveGroup = "Your move" | "Agent on it" | "Approved" | "Waiting on others" | "Drafts" | "Recently merged";
