@@ -2,7 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SessionFiles, sessionFileOf } from "./session-files";
+import { claudeCodeFormat } from "../foreign/claude-code";
+import { codexFormat } from "../foreign/codex";
+import { ompFormat } from "../session-formats";
+import { SessionFiles } from "./session-files";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -23,32 +26,20 @@ function writeSession(path: string, id: string, title: string, mtime: number): v
 	utimesSync(path, mtime / 1000, mtime / 1000);
 }
 
+const writeLines = (path: string, lines: unknown[]): void => writeFileSync(path, `${lines.map(line => JSON.stringify(line)).join("\n")}\n`);
+
+/** A temporary root for each agent, and the files of all three. */
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-session-files-"));
 	roots.push(root);
-	const project = join(root, "project");
-	mkdirSync(project);
-	return { root, project, files: new SessionFiles(root) };
+	const project = join(root, "omp", "project");
+	mkdirSync(project, { recursive: true });
+	const claude = join(root, "claude");
+	const codex = join(root, "codex", "sessions");
+	return { root, project, claude, codex, files: new SessionFiles([ompFormat(join(root, "omp")), claudeCodeFormat(claude), codexFormat(codex)]) };
 }
 
 const titles = (files: SessionFiles): (string | null)[] => files.past(new Set(), () => false).map(session => session.title);
-
-describe("sessionFileOf", () => {
-	const root = "/sessions";
-
-	test("a session file, and the lock sidecars omp writes beside it, name the session file", () => {
-		expect(sessionFileOf("/sessions/p/a.jsonl", root)).toBe("/sessions/p/a.jsonl");
-		expect(sessionFileOf("/sessions/p/.a.jsonl.lock", root)).toBe("/sessions/p/a.jsonl");
-		expect(sessionFileOf("/sessions/p/.a.jsonl.lock.os", root)).toBe("/sessions/p/a.jsonl");
-	});
-
-	test("subagent files, other files, and files elsewhere name no session file", () => {
-		expect(sessionFileOf("/sessions/p/a/sub.jsonl", root)).toBeNull();
-		expect(sessionFileOf("/sessions/p/a.jsonl.1.bak", root)).toBeNull();
-		expect(sessionFileOf("/sessions/p", root)).toBeNull();
-		expect(sessionFileOf("/elsewhere/p/a.jsonl", root)).toBeNull();
-	});
-});
 
 describe("SessionFiles", () => {
 	test("a refresh reads only the files the watcher reported", async () => {
@@ -122,5 +113,36 @@ describe("SessionFiles", () => {
 		const [a4, b4] = files.past(new Set(), id => id === "a");
 		expect(b4).toBe(b1!);
 		expect(a4!.title).toBe("first, renamed");
+	});
+
+	test("Claude Code and Codex sessions list beside omp's, never interrupted, and their files' changes are touches", async () => {
+		const { project, claude, codex, files } = setup();
+		writeSession(join(project, "a.jsonl"), "a", "omp session", 1_000_000);
+		mkdirSync(join(claude, "-tmp"), { recursive: true });
+		const claudeFile = join(claude, "-tmp", "c1.jsonl");
+		writeLines(claudeFile, [
+			{ type: "user", uuid: "u1", sessionId: "c1", cwd: "/tmp", timestamp: at, message: { role: "user", content: "fix the login" } },
+			{ type: "assistant", uuid: "a1", sessionId: "c1", cwd: "/tmp", timestamp: at, message: { role: "assistant", content: [{ type: "text", text: "done" }] } },
+		]);
+		utimesSync(claudeFile, 2_000, 2_000);
+		mkdirSync(join(codex, "2026", "10", "01"), { recursive: true });
+		const codexFile = join(codex, "2026", "10", "01", "rollout-2026-10-01T12-00-00-0199a000-0000-7000-8000-000000000001.jsonl");
+		writeLines(codexFile, [
+			{ type: "session_meta", timestamp: at, payload: { id: "x1", cwd: "/tmp", source: "vscode" } },
+			{ type: "response_item", timestamp: at, payload: { type: "message", role: "user", content: [{ type: "input_text", text: "add a test" }] } },
+		]);
+		utimesSync(codexFile, 3_000, 3_000);
+
+		expect(await files.scan()).toBe(true);
+		const rows = files.past(new Set(), () => true);
+		expect(rows.map(row => [row.title, row.source, row.interrupted])).toEqual([
+			["add a test", "codex", false],
+			["fix the login", "claude-code", false],
+			["omp session", "omp", true],
+		]);
+		expect(files.pathOf("c1")).toBe(claudeFile);
+		expect(files.touch(claudeFile)).toBe(true);
+		expect(files.touch(codexFile)).toBe(true);
+		expect(files.touch(join(claude, "-tmp", "c1", "subagents", "agent-1.jsonl"))).toBe(false);
 	});
 });

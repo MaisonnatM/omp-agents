@@ -103,3 +103,12 @@ export function parseAll<T>(values: unknown, parse: (value: unknown) => T | null
 	}
 	return parsed;
 }
+
+/** `text` as JSON, or `undefined` when it does not parse, such as a line a writer has not finished. */
+export function parseJson(text: string): unknown {
+	try {
+		return JSON.parse(text);
+	} catch {
+		return undefined;
+	}
+}

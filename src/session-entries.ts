@@ -59,6 +59,17 @@ export function entryTime(entry: Record<string, unknown>): number | null {
 	return Number.isFinite(at) ? at : null;
 }
 
+/** The entry a Claude Code or Codex reader makes of a line it does not know, which the transcript shows as a warning. */
+export const UNREAD_LINE = "unread-line";
+
+/** A stable id from a line's own bytes, for a line that carries none: conversation search skips lines, so a line counter would not match the pane's. */
+export const lineId = (prefix: string, line: string): string => `${prefix}:${Bun.hash(line).toString(36)}`;
+
+/** `line` as an {@link UNREAD_LINE} entry, at `timestamp` when the line names one. */
+export function unreadLine(line: string, timestamp: unknown): Record<string, unknown> {
+	return { type: UNREAD_LINE, id: lineId("unread", line), ...(typeof timestamp === "string" ? { timestamp } : {}), text: line };
+}
+
 export interface ToolCall {
 	id: string;
 	/** Empty when the block names no tool. */

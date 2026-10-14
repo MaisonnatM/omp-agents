@@ -17,12 +17,12 @@ import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
-import { sessionsDir } from "../omp/sessions";
 import { readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
 import { SourceControl } from "../source-control";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
+import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { agentOn } from "../shared/moves";
 import type { ServerMsg } from "../shared/protocol";
@@ -272,7 +272,7 @@ export class Dashboard {
 			newId: randomUUID,
 			onChange: () => broadcasts.pushList("projects"),
 		}));
-		this.#loops = new Loops(sessionsDir, {
+		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
 				if (broadcasts.listening()) await this.#listRegistry();
 				else this.#registryFresh = false;

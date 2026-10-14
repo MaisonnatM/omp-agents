@@ -3,7 +3,9 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Conversations, snippetOf } from "./conversation-search";
+import { claudeCodeFormat } from "./foreign/claude-code";
 import { type ListedSession, SessionFactsIndex } from "./session-facts";
+import { ompFormat } from "./session-formats";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -49,6 +51,21 @@ test("finds each session by its latest prompt or reply holding every word, not t
 
 	await index.refresh([listed(2)[0]!]);
 	expect(search(listed(2)).map(hit => hit.sessionId)).toEqual(["b"]);
+});
+
+test("finds a Claude Code session by its prompt, under the item id its pane shows, and not by a tool's output", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-convo-"));
+	dirs.push(dir);
+	const root = join(dir, "claude");
+	mkdirSync(join(root, "-work"), { recursive: true });
+	const path = join(root, "-work", "c1.jsonl");
+	const record = (uuid: string, role: "user" | "assistant", content: unknown) => `${JSON.stringify({ type: role, uuid, sessionId: "c1", timestamp: "2026-10-01T12:00:00.000Z", message: { role, content } })}\n`;
+	writeFileSync(path, record("u1", "user", "Fix the login redirect") + record("u2", "user", [{ type: "tool_result", tool_use_id: "t1", content: "fix login in the logs" }]));
+	const conversations = new Conversations([ompFormat(join(dir, "omp")), claudeCodeFormat(root)]);
+	const index = new SessionFactsIndex(async () => null, async () => null, async () => null, [conversations]);
+	const sessions = [{ id: "c1", path, cwd: dir, modifiedAt: 1 }];
+	await index.refresh(sessions);
+	expect(conversations.search(sessions, "fix login")).toEqual([{ sessionId: "c1", messageId: "u1", role: "user", snippet: "Fix the login redirect", matches: 1 }]);
 });
 
 test("a snippet is one line that starts on a word a little before the first word searched", () => {

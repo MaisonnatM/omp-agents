@@ -1,19 +1,20 @@
 /**
- * Every recurring job of the server, with its cadence: the registry poll, the watcher on omp's sessions
- * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, the routine tick, the
+ * Every recurring job of the server, with its cadence: the registry poll, the watchers on each agent's sessions
+ * directory and the throttled re-read they ask for, the full rescan, the `omp usage` poll, the routine tick, the
  * update check, the activity check, and the automatic pulls. The handlers do the work. Every loop schedules its next tick once the last one
  * finished, so ticks never overlap, and one that fails is logged and tried again at the next turn.
  * The routine tick runs whether or not a page is connected, since routines start sessions on their own.
  */
-import { type FSWatcher, mkdirSync, watch } from "node:fs";
+import { existsSync, type FSWatcher, mkdirSync, watch } from "node:fs";
 import { join } from "node:path";
 import { errorText } from "../json";
+import type { SessionFormat } from "../session-formats";
 
 /** The registry has no change feed; listing it is one local IPC round trip per host. */
 const POLL_MS = 1500;
 /** Re-read the session files the watcher reported at most this often while sessions write. */
 const LIST_THROTTLE_MS = 500;
-/** List every session file this often, in case the watcher missed a change. */
+/** List every session file this often, in case the watcher missed a change, and watch a sessions directory made since. */
 const RESCAN_MS = 60_000;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
@@ -29,7 +30,7 @@ const PULL_MS = 5 * 60_000;
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
 	onRegistryTick(): Promise<void>;
-	/** A file under the watched directory changed; returns whether to read the session files again. */
+	/** A file under a watched directory changed; returns whether to read the session files again. */
 	onFileChange(path: string): boolean;
 	/** The re-read {@link onFileChange} asked for, at most every {@link LIST_THROTTLE_MS}. */
 	onListRefresh(): Promise<void>;
@@ -70,32 +71,50 @@ export function repeat(name: string, tick: () => Promise<void>, ms: number, firs
 }
 
 export class Loops {
-	readonly #dir: string;
+	readonly #roots: readonly Pick<SessionFormat, "root" | "createRoot">[];
 	readonly #on: LoopHandlers;
 	#listTimer: NodeJS.Timeout | undefined;
-	#watcher: FSWatcher | undefined;
+	/** By root; a root missing at {@link watch} joins once a rescan finds it. */
+	readonly #watchers = new Map<string, FSWatcher>();
+	#watching = false;
 	/** Stops each loop {@link start} started. */
 	#stops: (() => void)[] = [];
 	#stopped = false;
 
-	constructor(dir: string, handlers: LoopHandlers) {
-		this.#dir = dir;
+	/** `roots`: the agents' sessions directories; one with `createRoot` is made when missing, any other waits until its agent makes it. */
+	constructor(roots: readonly Pick<SessionFormat, "root" | "createRoot">[], handlers: LoopHandlers) {
+		this.#roots = roots;
 		this.#on = handlers;
 	}
 
-	/** One recursive watcher on the directory drives every tail and the session list. */
+	/** One recursive watcher per sessions directory drives every tail and the session list. */
 	watch(): void {
-		mkdirSync(this.#dir, { recursive: true });
-		this.#watcher = watch(this.#dir, { recursive: true }, (_event, name) => {
-			if (name) this.fileChanged(join(this.#dir, String(name)));
-		});
+		this.#watching = true;
+		for (const { root, createRoot } of this.#roots) {
+			if (this.#watchers.has(root)) continue;
+			if (createRoot) mkdirSync(root, { recursive: true });
+			else if (!existsSync(root)) continue;
+			this.#watchers.set(
+				root,
+				watch(root, { recursive: true }, (_event, name) => {
+					if (name) this.fileChanged(join(root, String(name)));
+				}),
+			);
+		}
 	}
 
 	/** Start every loop. */
 	start(): void {
 		this.#stops = [
 			repeat("registry", this.#on.onRegistryTick, POLL_MS),
-			repeat("rescan", this.#on.onRescanTick, RESCAN_MS),
+			repeat(
+				"rescan",
+				async () => {
+					if (this.#watching && !this.#stopped) this.watch();
+					await this.#on.onRescanTick();
+				},
+				RESCAN_MS,
+			),
 			repeat("usage", this.#on.onUsageTick, USAGE_POLL_MS, 0),
 			repeat("routine", this.#on.onMinuteTick, MINUTE_TICK_MS),
 			repeat("update check", this.#on.onNoticeTick, NOTICE_CHECK_MS, 0),
@@ -104,13 +123,13 @@ export class Loops {
 		];
 	}
 
-	/** Stops every loop, the watcher, and a pending re-read, as the server stops; a tick already running finishes but schedules no other. */
+	/** Stops every loop, the watchers, and a pending re-read, as the server stops; a tick already running finishes but schedules no other. */
 	stop(): void {
 		this.#stopped = true;
 		for (const stop of this.#stops) stop();
 		this.#stops = [];
-		this.#watcher?.close();
-		this.#watcher = undefined;
+		for (const watcher of this.#watchers.values()) watcher.close();
+		this.#watchers.clear();
 		clearTimeout(this.#listTimer);
 		this.#listTimer = undefined;
 	}

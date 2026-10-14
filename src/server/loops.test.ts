@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, jest, spyOn, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type LoopHandlers, Loops, repeat } from "./loops";
@@ -13,6 +13,25 @@ afterEach(() => {
 /** Lets every promise reaction that is already queued, and the ones it queues in turn, run. */
 async function settle(): Promise<void> {
 	for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+}
+
+/** Handlers that note each call in `calls`, and ask for a re-read on every file change. */
+function recording(calls: string[]): LoopHandlers {
+	const tick = (name: string) => async () => void calls.push(name);
+	return {
+		onRegistryTick: tick("registry"),
+		onFileChange: path => {
+			calls.push(`changed ${path}`);
+			return true;
+		},
+		onListRefresh: tick("list"),
+		onRescanTick: tick("rescan"),
+		onUsageTick: tick("usage"),
+		onMinuteTick: tick("minute"),
+		onNoticeTick: tick("notice"),
+		onActivityTick: tick("activity"),
+		onPullTick: tick("pull"),
+	};
 }
 
 describe("repeat", () => {
@@ -99,22 +118,7 @@ describe("Loops", () => {
 		jest.useFakeTimers();
 		const dir = mkdtempSync(join(tmpdir(), "omp-loops-"));
 		const calls: string[] = [];
-		const tick = (name: string) => async () => void calls.push(name);
-		const handlers: LoopHandlers = {
-			onRegistryTick: tick("registry"),
-			onFileChange: path => {
-				calls.push(`changed ${path}`);
-				return true;
-			},
-			onListRefresh: tick("list"),
-			onRescanTick: tick("rescan"),
-			onUsageTick: tick("usage"),
-			onMinuteTick: tick("minute"),
-			onNoticeTick: tick("notice"),
-			onActivityTick: tick("activity"),
-			onPullTick: tick("pull"),
-		};
-		const loops = new Loops(dir, handlers);
+		const loops = new Loops([{ root: dir, createRoot: true }], recording(calls));
 		try {
 			loops.watch();
 			loops.start();
@@ -125,6 +129,20 @@ describe("Loops", () => {
 			jest.advanceTimersByTime(24 * 60 * 60_000);
 			await settle();
 			expect(calls).toEqual([`changed ${join(dir, "a.jsonl")}`]);
+		} finally {
+			loops.stop();
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	test("a sessions directory another agent has not made is neither made nor a failure", () => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-loops-"));
+		const missing = join(dir, "claude", "projects");
+		const loops = new Loops([{ root: join(dir, "omp"), createRoot: true }, { root: missing, createRoot: false }], recording([]));
+		try {
+			expect(() => loops.watch()).not.toThrow();
+			expect(existsSync(join(dir, "omp"))).toBe(true);
+			expect(existsSync(missing)).toBe(false);
 		} finally {
 			loops.stop();
 			rmSync(dir, { recursive: true, force: true });

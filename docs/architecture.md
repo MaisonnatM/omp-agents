@@ -77,13 +77,22 @@ The main ones:
 
 Every transcript comes from the session files on this machine, not from a network connection:
 
-- One recursive file watcher covers omp's sessions directory.
+- One recursive file watcher covers each session format's root: omp's sessions directory, Claude Code's `projects` directory under `CLAUDE_CONFIG_DIR` (else `~/.claude`), and Codex's `sessions` directory under `CODEX_HOME` (else `~/.codex`).
+  The server makes omp's directory when it is missing; a missing Claude Code or Codex directory is left alone and watched from the first rescan that finds it.
   When a file changes, every open transcript in that directory reads the bytes appended since its last read and folds the complete JSONL lines into display items.
   On macOS a burst of appends can surface only as events for omp's `.<file>.lock` sidecar, which is why a change anywhere in a directory re-reads every open transcript in it.
 - A session's transcript is its `<time>_<session id>.jsonl` file.
   A subagent's transcript is `<id>.jsonl` in its parent's artifacts directory, which is the parent's transcript path without `.jsonl`.
   A subagent that outlived a `/new` or `/resume` wrote beside the session it started in, so when the expected file is missing the server looks for the newest `<id>.jsonl` in the project's sessions that changed after the subagent registered.
 - A past session reads the same way, so a session that runs without publishing itself keeps updating.
+- A Claude Code or Codex session reads the same way, read-only.
+  `src/session-formats.ts` holds one `SessionFormat` per agent, and the format whose root holds a file decodes each of its lines into the omp entries the transcript already folds, so the tail, the conversation search, and the past list need no other path.
+  A Claude Code session is `<project>/<session id>.jsonl`; its `isMeta` and sidechain records, its bookkeeping records, and its system records other than a compaction are left out, and its tool results become `toolResult` entries.
+  A Codex session is `<year>/<month>/<day>/rollout-<time>-<session id>.jsonl`; its developer messages, the context Codex injects as a user message, its events, and its turn context are left out, and a renamed session takes its title from `session_index.jsonl`, the last line for an id winning.
+  A Codex session whose `session_meta` names a parent agent is a subagent's, and the past list leaves it out; so does Claude Code's `subagents` directory, which sits one level deeper than a session.
+  A line neither reader knows shows as a warning notice with the line's start, rather than being dropped.
+  The past row and the pane name the agent, the pane reads `Read-only`, and neither offers **Resume** nor fork buttons; `src/server/start.ts` refuses a fork or a resume of such a file before it starts omp.
+  Listing reads only each file's first 256 KB and last 64 KB, and a file whose size and modification time are unchanged keeps its row.
 - Live agent events only add what the file does not hold yet: the reply as it streams, and the running state of tool calls.
   omp keeps a message's `timestamp` when it writes the message, so the file's copy replaces the streamed copy in place, and a late event cannot undo it.
   omp writes a fresh session's file only with its first reply.
@@ -109,9 +118,9 @@ Every transcript comes from the session files on this machine, not from a networ
   The watcher's changes poke it only for its own file, that file's `.<file>.lock` sidecar, and anything under its artifacts directory, since a subagent's appends do not touch the session file, and a sibling session's writes leave it alone.
   The view's socket topic carries them as `media` messages: the whole list once the files are read, then only the images each later read added, which the page sorts in newest first.
   A file rewritten shorter, or the first read, sends the whole list again.
-- The server lists the session files through omp's session listing, the code behind omp's session picker, at startup and then once a minute, in case the watcher missed a change.
+- The server lists the session files through each format's listing at startup and then once a minute, in case a watcher missed a change; omp's is omp's session listing, the code behind omp's session picker.
   Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session.
-  The past list skips the empty sessions that omp's picker hides.
+  The past list skips the empty sessions that omp's picker hides, and a Claude Code or Codex session with no prompt and no reply.
   The server looks up files by session id in this listing, so the page never sends a path.
   While no page is connected, it skips building the roster and the past list.
   The past list goes out whole when a page connects; after that the server compares each session with what it last sent and sends only the sessions that changed, joined, or left, so an untouched row keeps its object on the page and skips its render.
