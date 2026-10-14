@@ -1,6 +1,6 @@
 /**
  * Builds the packaged macOS app, as T3 Code's script of the same name does: the platform-independent JavaScript once
- * (the server bundled into one script, the page prebuilt, the shell's main process), a Bun runtime per architecture,
+ * (the server and restricted RPC runner bundled, the page prebuilt, the shell's main process), a Bun runtime per architecture,
  * then electron-builder for a DMG and a zip, the zip and `latest-mac.yml` being what electron-updater reads.
  *
  *   bun scripts/build-desktop-artifact.ts [--arch arm64,x64] [--mock-update-port <port>]
@@ -42,6 +42,7 @@ async function buildResources(): Promise<void> {
 	for (const [path, blob] of await buildPage()) await Bun.write(join(pageDir, path), blob);
 	// The packaged server reads the prebuilt page, so `buildPage`'s Tailwind import never runs there.
 	await bundle(join(ROOT, "src", "server.ts"), RESOURCES, "server.js", { target: "bun", external: ["bun-plugin-tailwind"] });
+	await bundle(join(ROOT, "src", "omp", "restricted-rpc.ts"), RESOURCES, "restricted-rpc.js", { target: "bun" });
 	// The installer reads its layers beside itself, as `templates/omp/install.ts` does in a checkout.
 	const kitOut = join(RESOURCES, "templates", "omp");
 	cpSync(join(KIT, "agent"), join(kitOut, "agent"), { recursive: true });

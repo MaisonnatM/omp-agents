@@ -505,6 +505,17 @@ An action that fails shows its error, and its control becomes available again.
   Choosing a level starts the session at that level, for the model it was chosen on: choosing another model, or a directory whose `default` role names another model, resets the effort to **Default**.
   Models without selectable thinking levels offer only **Default**.
   Cmd+. opens the model search here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
+- The **Preset** picker fills the draft's model, thinking level, skill, and worktree policy together.
+  You can change the model, thinking level, and branch or turn off the skill before starting; the selected preset's tool allowlist still applies.
+  The draft keeps the preset as picked, even if another window edits or removes the saved preset.
+  **No preset** returns to an unrestricted session with the default choices.
+  **Minimal** allows only `bash` and `edit` and uses the connected `smol` role when first seeded, otherwise the default model.
+  **Review** allows read-only built-in tools and selects the thermonuclear review skill; it has no shell tool to run `git diff`.
+  **Ship** keeps every tool and selects `mma-mode` on a new branch in its own worktree.
+  Ship needs a checked-out Git branch unless you choose a different branch policy in the draft.
+  Restricted sessions load no MCP servers or extension tools, and dashboard resumes and forks keep that restriction.
+  A tool allowlist is not a sandbox; sandbox presets wait for the separate sandbox feature.
+  Resuming through the normal `omp` CLI does not enforce the dashboard's stored tool policy.
 - A skill pinned in **Settings** shows as a toggle after the model picker, with the skill's name.
   While it is on, the first message goes through the skill, as if you had typed `/skill:<name>` before it, and the transcript shows the skill's pill.
   Click it to start this one session without the skill.
@@ -1083,6 +1094,9 @@ An action that fails shows its error, and its control becomes available again.
   A prompt task can also **Pin the session when it finishes**.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
   The skill starts as the one pinned in **Settings › Preferences**, and **None** starts the sessions without one.
+- A prompt routine's **Preset** field selects a saved preset by id.
+  Each run reads its current model, thinking level, tools, and worktree policy; the routine's own **Skill** remains authoritative.
+  Removing a preset used by a routine makes its next run fail with an error instead of silently starting unrestricted.
 - A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.
   The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
   It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
@@ -1192,6 +1206,10 @@ An action that fails shows its error, and its control becomes available again.
   It covers every session whatever workspace the header picks.
   omp indexes session files when you first open **Analytics** and updates the tab while indexing continues.
   New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
+- **Session presets** lists the saved bundles and lets you create, edit, or remove one.
+  Choose a model and thinking level, every tool or selected built-in tools, a skill, and this directory or a new-branch worktree.
+  The first startup seeds **Minimal**, **Review**, and **Ship**; removing all presets leaves the list empty.
+  Presets live in `presets.json` beside the dashboard's access token and are shared by its browser tabs and desktop app.
 - **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
   Each row shows the branch and path, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
   No omp session reads as no omp session, not as unused.

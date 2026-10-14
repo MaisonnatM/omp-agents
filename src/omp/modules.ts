@@ -113,6 +113,32 @@ export interface UtilsModule {
 	readJsonl(stream: ReadableStream<Uint8Array>): AsyncGenerator<unknown>;
 }
 
+export interface RestrictedSession {
+	sessionManager: { appendCustomEntry(type: string, data: unknown): string };
+}
+export interface SessionSdkModule {
+	createAgentSession(options: {
+		cwd: string;
+		toolNames: string[];
+		restrictToolNames: true;
+		enableLsp: boolean;
+		hasUI: true;
+		interactivePrompts: true;
+		allowSessionModelFallback: false;
+		settingsApproval: false;
+		tuiTranscript: false;
+		autoTitle: false;
+		settings: OmpSettingsInstance;
+	}): Promise<{
+		session: RestrictedSession;
+		setToolUIContext: (context: unknown, hasUI: boolean) => void;
+		subagentEventBus?: unknown;
+	}>;
+}
+export interface RpcModeModule {
+	runRpcMode(session: RestrictedSession, options: { setToolUIContext: (context: unknown, hasUI: boolean) => void; subagentEventBus?: unknown }): Promise<never>;
+}
+
 export interface AutocompleteModule {
 	CombinedAutocompleteProvider: new (
 		commands: { name: string; description?: string }[],
@@ -151,6 +177,8 @@ export interface ConfigModule {
 }
 /** Subset of omp's `Setting` handle (src/config/registry.ts). `set`/`setEntry` stage a global write; `undefined` removes. */
 export interface SettingHandle {
+	readonly definition: { protocolDefault?: readonly string[] };
+	pinDefault(settings: OmpSettingsInstance): void;
 	readonly enumValues: readonly string[] | undefined;
 	/** @throws Error when `value` does not fit the setting. */
 	assertWritable(value: unknown): void;
@@ -158,6 +186,7 @@ export interface SettingHandle {
 	setEntry(settings: OmpSettingsInstance, key: string, value: unknown): void;
 }
 export interface SettingsRegistryModule {
+	all(): readonly SettingHandle[];
 	lookup(id: string): SettingHandle | undefined;
 }
 export interface ExtensionSettingsModule {
@@ -276,6 +305,10 @@ export interface UpdateCliModule {
 export interface UpdateSettingsModule {
 	cfgStartupCheckUpdate: SettingsReader<boolean>;
 	cfgUpdateChannel: SettingsReader<string>;
+}
+/** omp's built-in tool names (src/tools/builtin-names.ts), which a preset's tool list offers. */
+export interface BuiltinToolsModule {
+	BUILTIN_TOOL_NAMES: readonly string[];
 }
 /** pi-catalog's model identity (src/identity): the vendor lineage, product family, and `major.minor.patch` revision an id names. */
 export interface ModelIdentityModule {
@@ -502,7 +535,7 @@ export interface RateLimitModule {
 	is402BillingCapBody(message: string | undefined): boolean;
 }
 
-type Kind = "function" | "number";
+type Kind = "function" | "number" | "object";
 
 /** The value at a dotted export path such as `Settings.loadReadOnly`. */
 function exportAt(mod: unknown, path: string): unknown {
@@ -568,6 +601,8 @@ export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc
 	"RpcClient.prototype.setCustomTools": "function",
 });
 export const rpcFrames = await load<RpcFrameModule>(join(srcDir, "modes", "rpc", "rpc-frame.ts"), { RpcFrameDecoder: "function" });
+export const sessionSdk = await load<SessionSdkModule>(join(srcDir, "sdk.ts"), { createAgentSession: "function" });
+export const rpcMode = await load<RpcModeModule>(join(srcDir, "modes", "rpc", "rpc-mode.ts"), { runRpcMode: "function" });
 export const utils = await load<UtilsModule>(join(utilsSrc, "index.ts"), { "ptree.spawn": "function", readJsonl: "function" });
 
 export const autocomplete = await load<AutocompleteModule>(join(dirname(packageDir), "pi-tui", "src", "autocomplete.ts"), {
@@ -622,8 +657,9 @@ export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "ses
 	parseRetryFallbackSelector: "function",
 });
 export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), { resolveProviderModelReference: "function" });
-export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, "config", "registry.ts"), { lookup: "function" });
+export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, "config", "registry.ts"), { lookup: "function", all: "function" });
 export const updateCli = await load<UpdateCliModule>(join(srcDir, "cli", "update-cli.ts"), { getLatestRelease: "function" });
+export const builtinTools = await load<BuiltinToolsModule>(join(srcDir, "tools", "builtin-names.ts"), { BUILTIN_TOOL_NAMES: "object" });
 export const updateSettings = await load<UpdateSettingsModule>(join(srcDir, "modes", "settings.ts"), {
 	"cfgStartupCheckUpdate.get": "function",
 	"cfgUpdateChannel.get": "function",

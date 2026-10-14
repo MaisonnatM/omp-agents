@@ -191,6 +191,7 @@ export function useDashboard(): Dashboard {
 					case "routines":
 					case "scheduled":
 					case "workspaces":
+					case "presets":
 					case "projects":
 					case "notices":
 						dispatch(msg);

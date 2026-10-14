@@ -49,6 +49,8 @@ export interface Routine {
 	task: RoutineTask;
 	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
 	skill: string | null;
+	/** The id of the preset its sessions start through, looked up at each run; `null` for none. `skill` replaces the preset's skill. */
+	preset: string | null;
 	enabled: boolean;
 	createdAt: number;
 	/** Newest first, the last 10. `runs[0].at` is the time every schedule counts from. */
@@ -112,6 +114,7 @@ function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 		routine.name === spec.name &&
 		routine.cwd === spec.cwd &&
 		routine.skill === spec.skill &&
+		routine.preset === spec.preset &&
 		routine.enabled === spec.enabled &&
 		JSON.stringify([routine.schedules, routine.task]) === JSON.stringify([spec.schedules, spec.task])
 	);
@@ -193,10 +196,11 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
  */
 export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isObject(value)) return null;
-	const { id, name, cwd, enabled } = value;
+	const { id, name, cwd, enabled, preset = null } = value;
 	const schedules = parseSchedules(value.schedules);
 	const task = parseRoutineTask(value.task);
 	const skill = parseSkill(value.skill);
-	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
-	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled } };
+	const presetId = preset === null || isNonEmpty(preset) ? { ok: preset } : null;
+	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill || !presetId) return null;
+	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, preset: presetId.ok, enabled } };
 }

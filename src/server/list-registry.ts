@@ -1,6 +1,7 @@
 /** Whole-list snapshots and edits: one registration owns each message builder and its store's reducer. */
 import type { RoutineChange } from "../routines";
 import type { PinChange } from "../shared/pins";
+import type { PresetChange } from "../shared/presets";
 import type { ProjectEdit } from "../shared/projects";
 import type { ServerMsg } from "../shared/protocol";
 import type { ScheduledChange } from "../shared/scheduled";
@@ -14,6 +15,7 @@ interface ListChanges {
 	scheduled: Exclude<ScheduledChange, { op: "send-now" }>;
 	workspaces: WorkspaceChange;
 	pins: PinChange;
+	presets: PresetChange;
 	projects: ProjectEdit;
 }
 

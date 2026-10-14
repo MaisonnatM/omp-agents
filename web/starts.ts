@@ -21,8 +21,10 @@ export type StartOp =
 			branch: BranchChoice | null;
 			model: ModelOption | null;
 			thinking: string | null;
-			/** The pinned skill, `null` when none is pinned or the draft skips it. */
+			/** The pinned skill or the preset's, `null` when there is none or the draft skips it. */
 			skill: string | null;
+			/** The preset's tools, the only ones the model may call; `null` for every tool. */
+			tools: string[] | null;
 			/** The todo the session works on, `null` for none. */
 			todoId: string | null;
 	  }
@@ -51,9 +53,9 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, tools: op.tools, subject: null, todoId: op.todoId };
 		case "quick":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, ...startTarget(op.subject) };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, tools: null, ...startTarget(op.subject) };
 		case "fork":
 			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "resume":

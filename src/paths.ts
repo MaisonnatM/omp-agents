@@ -39,6 +39,8 @@ export const projectsFile = join(configDir, "projects.json");
 export const projectNotesDir = (id: string): string => join(dataDir, "projects", id);
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
+/** The session presets that the new-session draft and routines start through, beside {@link tokenFile}. */
+export const presetsFile = join(configDir, "presets.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
 /** The events the Calendar page keeps on this computer, beside {@link tokenFile}. */

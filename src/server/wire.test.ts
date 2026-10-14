@@ -120,6 +120,7 @@ describe("parseClientMsg", () => {
 			schedules: [weekdays],
 			task: { kind: "prompt", prompt: "Summarize", pin: false },
 			skill: null,
+			preset: null,
 			enabled: true,
 		};
 		const save = (fields: Record<string, unknown>) => change({ op: "save", routine: { ...routine, ...fields } });
@@ -170,6 +171,15 @@ describe("parseClientMsg", () => {
 			expect(save({ task: longest })).toMatchObject({ change: { routine: { task: longest } } });
 			expect(save({ task: { kind: "command", command: "x".repeat(10_001) } })).toBeNull();
 		});
+	});
+
+	test("preset saves a whole preset or removes one by id, and refuses a preset that does not parse", () => {
+		const preset = { id: "minimal", name: "Minimal", model: null, thinking: null, tools: ["bash", "edit"], skill: null, worktree: "here" as const };
+		expect(msg({ t: "preset", change: { op: "save", preset } })).toEqual({ t: "preset", change: { op: "save", preset } });
+		expect(msg({ t: "preset", change: { op: "remove", id: "minimal" } })).toEqual({ t: "preset", change: { op: "remove", id: "minimal" } });
+		expect(msg({ t: "preset", change: { op: "save", preset: { ...preset, tools: [] } } })).toBeNull();
+		expect(msg({ t: "preset", change: { op: "remove", id: "" } })).toBeNull();
+		expect(msg({ t: "preset", change: { op: "rename", id: "minimal" } })).toBeNull();
 	});
 
 	test("schedule adds a message to a session or a new session's start without images, and removes, takes, or sends one by id", () => {
@@ -261,6 +271,7 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({ t: "start", reqId: 4, ...newSessionRequest("~/code", "hi") });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", thinking: "high" })).toMatchObject({ thinking: "high" });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", skill: "poteto-mode" })).toMatchObject({ skill: "poteto-mode" });
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", tools: ["bash", "edit"] })).toMatchObject({ tools: ["bash", "edit"] });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", model: { provider: "anthropic", id: "claude-opus-5-5", name: "Opus" } })).toMatchObject({
 			model: { provider: "anthropic", id: "claude-opus-5-5" },
 		});
@@ -299,6 +310,9 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", thinking: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "two words" })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", tools: [] })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", tools: ["bash", "bash"] })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", tools: "bash" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "eng 7" } })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 0 } } })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "fork", view: live, entryId: "" })).toBeNull();

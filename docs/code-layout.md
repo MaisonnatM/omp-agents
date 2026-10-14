@@ -20,6 +20,8 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
+- Session preset picker: `web/components/preset-picker.tsx`, used by the new-session page and routine editor.
+  Settings › Session presets is `web/components/settings/presets-tab.tsx`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx`.
@@ -60,7 +62,7 @@ The server lives in `src/`:
 - `src/server/dashboard.ts`: `Dashboard`, the composition root: it builds the stores, `LiveSessions`, `Views`, `Notices`, `ListRegistry`, `Broadcasts`, the inboxes, `Worktrees`, the starter, `RoutineRunner`, `ProjectRunner`, `Loops`, and the socket handler in dependency order, each handed the parts above it, and owns the live-update switch, the registry listing, the file rescans, the activity check, and the owner lock's takeover.
   Two edges point down, closing the only cycles: a live session's update reaches the parts built after `LiveSessions`, and a notice change reaches the `Broadcasts` that reads the notices; no constructor calls either.
   Nothing follows the registry, watches a directory, or publishes before `start(server)`; `stop()` first stops the loops and both inboxes, so no tick publishes while the rest shuts down, then ends the sessions started here, hangs up on the shells, stops omp-stats, flushes the stores, and aborts the routine commands still running.
-- `src/server/list-registry.ts`: `ListRegistry`, the authoritative builders for the seven whole-list socket messages, registered beside their store apply functions in `Dashboard`.
+- `src/server/list-registry.ts`: `ListRegistry`, the authoritative builders for the eight whole-list socket messages, registered beside their store apply functions in `Dashboard`.
   An edit publishes its list when it changes; a no-op resends the current list only to its requesting peer.
   Routines and scheduled sends register only edits: their run-now and send-now actions stay with their runners, and notices keep their asynchronous action handler.
 - `src/server/broadcasts.ts`: `Broadcasts`, what every socket hears on the `roster` topic: the roster, the past list, plan usage, and the whole lists from `ListRegistry`.
@@ -75,6 +77,8 @@ The server lives in `src/`:
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
 - `src/server/socket.ts`: handles each socket message, answering through a `Peer` from `src/server/request-ledger.ts`; see [Socket requests](architecture.md#socket-requests).
   `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
+  `src/omp/tool-policy.ts` resolves saved tool restrictions on the resumed or forked branch.
+  `src/omp/restricted-rpc.ts` creates a native SDK-restricted session and runs omp's RPC mode; `src/omp/rpc.ts` selects that entrypoint for an allowlist.
   `src/server/session-end.ts` ends a session for the page's `end` message and for the end inbox: `endSession` stops it, then calls `Worktrees.removeCheckout` on its worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
   Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's facts, and the subject a quick action started it on, to make the roster rows.
@@ -97,12 +101,15 @@ The server lives in `src/`:
   `SessionFacts` in `sessions.ts` declares a session's pull requests, Linear issues, /ship stage, and worktree once, and `RosterHost` and `PastSession` extend it.
   `parseNewSessionRequest` there checks one, with `parseImages`, `parseModel`, `parseThinking`, and `parseSkill`, for the socket's `start` and a start kept in `scheduled.json`; `parsePullRequest` in `github.ts` checks a pull request's owner, repository, and number.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
+  `src/shared/presets.ts` defines `SessionPreset`, its validation, starter presets, reducer, and generated branch policy.
+  `src/server/presets-file.ts` seeds and persists the list in `presets.json`.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
-- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
+- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `tool-policy.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
+  `restricted-rpc.ts` is the SDK-backed RPC entrypoint for sessions with an allowlist, bundled separately as `restricted-rpc.js` in the desktop app.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and workspaces, joining each saved session's `SessionSummary`, its title and working directory, without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `isNonEmpty`, `isSafeInteger`, `isDay`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `calendars.json`, `events.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits.
-  `ReducerFile` wraps `JsonFile` for the lists the server changes through a reducer, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `calendars.json`, `events.json`, and `projects.json`: it loads the value or an empty one, applies a change through its `reduce`, saves only when the change gives a new value, and, for a `shared` file another server also writes, reads the file again before each change.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `isNonEmpty`, `isSafeInteger`, `isDay`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `events.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits.
+  `ReducerFile` wraps `JsonFile` for the lists the server changes through a reducer, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `events.json`, and `projects.json`: it loads the value or an empty one, applies a change through its `reduce`, saves only when the change gives a new value, and, for a `shared` file another server also writes, reads the file again before each change.
   `src/json.ts` also holds `Parsed<T>`, the `{ ok }` or refusal every parser returns, and `BASE64`, which the socket's parsers and the domain parsers share.
   `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
   `src/json.ts` also composes guards of whole shapes (`fields`, `tagged`, `arrayOf`, `nullable`), which `decoder` turns into decoders.
@@ -213,6 +220,7 @@ The server lives in `src/`:
   `attachToTicket` (`PUT /api/ticket/attachment`) attaches a file in base64 to an existing issue: Linear's `prepare_attachment_upload` signs a storage URL, the server sends the bytes there with the signed headers, then `create_attachment_from_upload` links the file to the issue.
   `src/server/todo-ticket.ts` holds `createTicketForTodo` (`PUT /api/todo/ticket`), which opens an issue from a top-level todo and links it, answering only once the server's todo list holds the link, or with the identifier and why it does not; it refuses a todo that already links an issue before opening one.
 - `src/routines.ts`: the routine types and the rules of routines: `nextRunAt`, `nextDueAt`, `isDue`, `applyRoutine`, which applies an edit, `parseRoutineSpec`, which checks a `RoutineSpec` for `routines.json` and the socket alike, and a command's length, time, and output limits; see [Routines](architecture.md#routines).
+  A prompt routine holds a preset id; its runner resolves that preset when the run starts.
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
 - `src/shared/scheduled.ts`: the scheduled send shapes, `applyScheduled`, and `parseScheduledSpec`, which checks a `ScheduledSpec` for `scheduled.json` and the socket alike; see [Scheduled sends](architecture.md#scheduled-sends).
   `src/server/scheduled-file.ts` keeps them in `scheduled.json`, and `src/server/scheduled-runner.ts` claims and delivers them.
@@ -326,6 +334,9 @@ The page lives in `web/`.
   `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
   `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft and the **New project** form: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
+  Preset selection uses `useDraftModelSelection.choose` to apply a saved model and thinking level together.
+  `web/components/preset-picker.tsx` shares the searchable preset list and summaries with `web/components/settings/presets-tab.tsx`.
+  `web/components/new-session.tsx` applies a preset to its draft, and `web/routines-model.ts` keeps the routine's preset id.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   `web/components/command-picker.tsx` holds `CommandPicker`, the searchable grouped list behind the branch, workspace, and skill pickers, with `CommandResults`, which the model menu's search shares.
   The checkout, the default model's role, and the skills are each one `useRead`.

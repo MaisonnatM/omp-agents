@@ -17,6 +17,7 @@ import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../sh
 import { GITHUB_NAME, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
+import { type PresetChange, parsePreset } from "../shared/presets";
 import type { ProjectEdit } from "../shared/projects";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
@@ -98,6 +99,13 @@ function parsePinChange(value: unknown): Parsed<PinChange> {
 	const { op, sessionIds } = value;
 	if (op !== "pin" && op !== "unpin") return null;
 	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { ok: { op, sessionIds } } : null;
+}
+
+function parsePresetChange(value: unknown): Parsed<PresetChange> {
+	if (!isObject(value)) return null;
+	if (value.op === "remove") return isNonEmpty(value.id) ? { ok: { op: "remove", id: value.id } } : null;
+	const preset = value.op === "save" ? parsePreset(value.preset) : null;
+	return preset && { ok: { op: "save", preset: preset.ok } };
 }
 
 /** A rename or an archive of a project; the server makes every other change. */
@@ -244,6 +252,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	pin(value) {
 		const change = parsePinChange(value.change);
 		return change && { ok: { t: "pin", change: change.ok } };
+	},
+	preset(value) {
+		const change = parsePresetChange(value.change);
+		return change && { ok: { t: "preset", change: change.ok } };
 	},
 	project(value) {
 		const change = parseProjectEdit(value.change);

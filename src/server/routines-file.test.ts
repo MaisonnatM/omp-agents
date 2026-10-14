@@ -41,7 +41,7 @@ test("a run from before `outcome` reads its command result, and a malformed or m
 	]);
 });
 
-test("an older file keeps its other routines, reads one schedule as a list and a run's queue and started sessions as an outcome, and drops a pull request routine", () => {
+test("an older file keeps its other routines, reads one schedule as a list, no preset as none, and a run's queue and started sessions as an outcome, and drops a pull request routine", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -76,6 +76,7 @@ test("an older file keeps its other routines, reads one schedule as a list and a
 		{
 			...kept,
 			schedules: [schedule],
+			preset: null,
 			runs: [
 				{ at: 4, outcome: { kind: "pending", queued: true }, errors: [] },
 				{ at: 3, outcome: { kind: "session", instanceId: "i1", sessionId: "s1" }, errors: [] },

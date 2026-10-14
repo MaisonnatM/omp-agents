@@ -19,6 +19,8 @@ export interface DraftModelSelection {
 	/** The levels the picker offers: `null` until the model's capabilities are known, none when the model list failed. */
 	levels: string[] | null;
 	pickThinking: (level: string | null) => void;
+	/** Switches to `next`, `null` for omp's default model, at `level`, `null` for that model's default, as picking a preset does. */
+	choose: (next: ModelOption | null, level: string | null) => void;
 	/** Opens or closes the model menu; opening reads the model list again. */
 	openModels: (open: ModelMenuOpen | null) => void;
 	picker: DraftPicker;
@@ -32,14 +34,13 @@ export interface DraftModelSelection {
 export function useDraftModelSelection(cwd: string, initial: { model: ModelOption | null; thinking: string | null } = { model: null, thinking: null }): DraftModelSelection {
 	const [model, setModel] = useState(initial.model);
 	const [picked, setPicked] = useState<PickedEffort | null>(initial.model && initial.thinking !== null ? { model: selectorOf(initial.model), level: initial.thinking } : null);
-	// A failed start on omp's default holds its level for the default model of the same directory, known once its roles are read.
-	const [unbound, setUnbound] = useState(initial.model === null && initial.thinking !== null ? { cwd, level: initial.thinking } : null);
+	const [pendingDefaultEffort, setPendingDefaultEffort] = useState(initial.model === null && initial.thinking !== null ? { cwd, level: initial.thinking } : null);
 	const roles = useRead<{ roles: ModelRole[] }>(`/api/models/roles?cwd=${encodeURIComponent(cwd)}`);
 	const shown = model ?? roles.data?.roles.find(role => role.role === "default")?.model ?? null;
 	const selector = shown && selectorOf(shown);
-	if (unbound !== null && (unbound.cwd !== cwd || selector !== null)) {
-		setUnbound(null);
-		if (unbound.cwd === cwd && selector !== null) setPicked({ model: selector, level: unbound.level });
+	if (pendingDefaultEffort !== null && (pendingDefaultEffort.cwd !== cwd || selector !== null)) {
+		setPendingDefaultEffort(null);
+		if (pendingDefaultEffort.cwd === cwd && selector !== null) setPicked({ model: selector, level: pendingDefaultEffort.level });
 	}
 	const [open, setOpen] = useState<ModelMenuOpen | null>(null);
 	// Reopening reads credentials and model capabilities again after a provider login.
@@ -49,8 +50,13 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 	const levels = list.error === null ? known : [];
 	const thinking = picked !== null && picked.model === selector && known?.includes(picked.level) ? picked.level : null;
 	const pickThinking = (level: string | null): void => {
-		setUnbound(null);
+		setPendingDefaultEffort(null);
 		setPicked(level !== null && selector !== null ? { model: selector, level } : null);
+	};
+	const choose = (next: ModelOption | null, level: string | null): void => {
+		setModel(next);
+		setPicked(next !== null && level !== null ? { model: selectorOf(next), level } : null);
+		setPendingDefaultEffort(next === null && level !== null ? { cwd, level } : null);
 	};
 	const openModels = (next: ModelMenuOpen | null): void => {
 		if (next !== null && open === null) setOpens(count => count + 1);
@@ -61,6 +67,7 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 		thinking,
 		levels,
 		pickThinking,
+		choose,
 		openModels,
 		picker: {
 			current: selector,
@@ -68,11 +75,7 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 			list,
 			open,
 			onOpenChange: openModels,
-			onPick: next => {
-				setModel(next);
-				setUnbound(null);
-				setPicked(null);
-			},
+			onPick: next => choose(next, null),
 			effort: { current: thinking, levels, onPick: pickThinking, allowDefault: true },
 		},
 	};

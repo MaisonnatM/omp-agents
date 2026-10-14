@@ -9,7 +9,7 @@ import { errorText, isObject, isTexts } from "./json";
 import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
-import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
+import { type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
@@ -183,14 +183,14 @@ export class DashboardSession implements LiveSession {
 	}
 
 	/**
-	 * Spawn omp holding the history of `sourceFile` before its user prompt `entryId`, as omp's
+	 * Spawn omp with `launch` holding the history of `sourceFile` before its user prompt `entryId`, as omp's
 	 * `/branch` does. omp writes the fork to a new file; `sourceFile` is only read.
 	 */
-	static async fork(instanceId: string, sourceFile: string, entryId: string, emit: (update: DashboardUpdate) => void): Promise<ForkedSession> {
+	static async fork(instanceId: string, sourceFile: string, entryId: string, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<ForkedSession> {
 		// omp would repair such a file in place on open.
 		if (await endsMidTurn(sourceFile)) throw new Error("this session ended mid-turn. Resume it in omp once, then fork.");
 		let prompt = "";
-		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), PLAIN_LAUNCH, emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), launch, emit, async client => {
 			if ((await client.switchSession(sourceFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 			try {
 				const branched = await client.branch(entryId);

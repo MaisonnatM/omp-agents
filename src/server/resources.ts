@@ -12,3 +12,4 @@ export const prebuiltPageDir: string | null = packagedResources && join(packaged
 
 /** The omp starter kit: `templates/omp` in a checkout, its copy in a packaged app. */
 export const ompTemplateDir: string = join(packagedResources ?? join(import.meta.dir, "..", ".."), "templates", "omp");
+

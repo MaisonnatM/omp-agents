@@ -4,7 +4,8 @@ import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
-import type { RpcLaunch } from "../omp/rpc";
+import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
+import { savedTools } from "../omp/tool-policy";
 import { directoryOf } from "../paths";
 import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
@@ -52,15 +53,16 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	/** `rpcLaunch` is what a project session launches with; a fork belongs to no project. */
+	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its project's extensions and host tools. */
 	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<{ started: Started } | { error: string }> {
+		const launchWith = (base: RpcLaunch, tools: string[] | null): RpcLaunch => tools === null ? base : { ...base, allowedTools: tools };
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
 				if (!dir) return { error: `${request.cwd.trim()} is not a directory.` };
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };
-				const { branch, model, thinking, skill, images } = request;
+				const { branch, model, thinking, skill, tools, images } = request;
 				let cwd = dir;
 				if (branch) {
 					try {
@@ -76,7 +78,7 @@ export function createStarter(env: StartEnv): Starter {
 					return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
 				}
 				return launch("Cannot start omp", async (id, emit) => ({
-					session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
+					session: await DashboardSession.start(id, cwd, model, thinking, launchWith(rpcLaunch, tools), emit),
 					prompt: null,
 					first: { text, images },
 				}));
@@ -84,7 +86,10 @@ export function createStarter(env: StartEnv): Starter {
 			case "fork": {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
-				return launch("Cannot fork", (id, emit) => DashboardSession.fork(id, source, request.entryId, emit));
+				return launch("Cannot fork", async (id, emit) => {
+					const tools = await savedTools(source, request.entryId);
+					return DashboardSession.fork(id, source, request.entryId, launchWith(PLAIN_LAUNCH, tools), emit);
+				});
 			}
 			case "resume": {
 				const { sessionId } = request;
@@ -93,7 +98,10 @@ export function createStarter(env: StartEnv): Starter {
 				if (!path) return { error: "Cannot resume: this session's file is not known." };
 				resuming.add(sessionId);
 				try {
-					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }));
+					return await launch("Cannot resume", async (id, emit) => {
+						const tools = await savedTools(path);
+						return { session: await DashboardSession.resume(id, path, launchWith(rpcLaunch, tools), emit), prompt: null };
+					});
 				} finally {
 					resuming.delete(sessionId);
 				}

@@ -22,6 +22,7 @@ const spec: RoutineSpec = {
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
 	skill: null,
+	preset: null,
 	enabled: true,
 };
 
@@ -31,6 +32,8 @@ describe("parseRoutineSpec", () => {
 	test("keeps a routine's edited fields and drops the runs and creation time the server keeps", () => {
 		expect(parseRoutineSpec({ ...routine({}), extra: 1 })).toEqual({ ok: spec });
 		expect(parseRoutineSpec({ ...spec, skill: "ship", schedules: [{ kind: "every", minutes: 90 }, weekdays] })?.ok).toMatchObject({ skill: "ship" });
+		expect(parseRoutineSpec({ ...spec, preset: "minimal" })?.ok).toMatchObject({ preset: "minimal" });
+		expect(parseRoutineSpec({ ...spec, preset: undefined })?.ok).toMatchObject({ preset: null });
 	});
 
 	test("refuses a skill that is not one token, an hour past 23, a weekday past Saturday, and a fractional interval", () => {

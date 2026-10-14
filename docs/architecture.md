@@ -52,6 +52,12 @@ The main ones:
   Host tools: `RpcClient`'s `customTools` option (`RpcClientCustomTool`), which `start()` sends as `set_host_tools`, so a new process for the same session gets them again; `pi-coding-agent/src/modes/rpc/host-tools.ts` runs them as strict tools, and `defaultLoadModeForToolName` in `pi-coding-agent/src/tools/essential-tools.ts` makes one without `loadMode: "essential"` only discoverable.
   A host tool stays registered through `newSession`, `switchSession`, and `/move` in one process, since omp builds `SessionTools` once per `AgentSession` (`pi-coding-agent/src/session/session-tools.ts`).
   Extensions: `omp -e <file>` (`pi-coding-agent/src/main.ts`, `additionalExtensionPaths`) loads in `rpc-ui` mode too; `pi-coding-agent/src/discovery/omp-extension-roots.ts` dedupes by path only, so the same extension at two paths loads twice.
+- Restricted RPC sessions use `createAgentSession` in `pi-coding-agent/src/sdk.ts` and `runRpcMode` in `pi-coding-agent/src/modes/rpc/rpc-mode.ts`.
+  The SDK's `restrictToolNames: true` admits only `toolNames` and disables MCP and ambient extension tools before discovery.
+  The CLI's `--tools` does not set that policy, and `refreshMCPTools` in `pi-coding-agent/src/session/session-tools.ts` otherwise reactivates connected MCP tools.
+  `appendCustomEntry` in `pi-coding-agent/src/session/session-manager.ts` persists the dashboard policy.
+  The runner enables read-only LSP when selected and mirrors `main.ts`'s RPC setup, including `PI_NO_PTY`, `PI_NO_TITLE`, and `allowSessionModelFallback: false`.
+  It pins declared RPC defaults through `all` and `Setting.pinDefault` in `pi-coding-agent/src/config/registry.ts`, on settings from `Settings.loadIsolated`.
 - Service tiers: `serviceTierFamily` and `shouldSendServiceTier` in `pi-ai/src/types.ts`, which `fastAvailable` in `src/omp/models.ts` calls to decide, as `setFastMode` in `pi-coding-agent/src/session/model-controls.ts` does, whether `/fast` can turn on for the live model.
 - Settings and discovery: `pi-coding-agent/src/config/settings.ts`, `pi-coding-agent/src/discovery/index.ts`, and `pi-coding-agent/src/task/discovery.ts`.
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
@@ -182,11 +188,18 @@ Stop the dashboard to leave every room.
 
 ## Dashboard sessions
 
-Sessions started from the dashboard are omp child processes in RPC mode with tool dialogs (`--mode rpc-ui`, NDJSON over stdio), spawned through omp's own `RpcClient` from this same package's CLI.
+Sessions started from the dashboard are omp child processes in RPC mode with tool dialogs, spawned through omp's own `RpcClient`.
+Unrestricted sessions use the installed CLI with `--mode rpc-ui`; restricted ones use `src/omp/restricted-rpc.ts` with the same SDK and RPC runner.
+The desktop build ships the runner as `restricted-rpc.js` beside `server.js`; `OMP_AGENTS_RESOURCES` selects that packaged path.
+Restricted launches reject extra extension arguments and host tools instead of dropping them or widening the allowlist.
 The page starts one with a single `start` request whose `kind` is `new`, `fork`, or `resume`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
 The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it.
 A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved.
 **Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command.
+A new-session `start` carries `tools`, either `null` for the normal CLI launch or a nonempty built-in tool allowlist.
+The restricted runner saves it as the custom entry `omp-agents-tool-allowlist` before the first prompt.
+`src/omp/tool-policy.ts` reads that entry on the saved branch's ancestor chain before a resume or fork is spawned.
+This keeps the restriction through dashboard resumes, forks, and model fallbacks; a normal terminal CLI resume does not read this policy.
 Prompts, Stop, live events, subagent progress, and questions stay on the pipe.
 A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
 A prompt omp refuses shows as a note in the session, and `LiveSession.prompt` rejects with `PromptRefused`, so a caller that has no one else to tell, such as the socket handler or a session's first message, skips it.
@@ -290,7 +303,7 @@ A prompt that fails comes back to the composer with its files and a note, and a 
 A handler's error goes to the server's log once, with its message type, on the run that threw.
 A page loaded before page ids tags its requests with no `floor`, so the server drops them until the page reloads.
 
-`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, projects, and notices.
+`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, presets, projects, and notices.
 `Dashboard` registers each typed message builder once, beside its store's edit function when it has synchronous edits.
 `Broadcasts.open` iterates these registrations, so a new list needs no separate opening-snapshot or push method.
 `Broadcasts.pushList(kind)` uses that same builder and suppresses an identical whole-list message; roster and past messages still send their row-level deltas.
@@ -379,11 +392,24 @@ When the page loads, `decode` turns each kept read back into the store's answer,
 A failed refresh keeps the last successful answer and reports its error without replacing another range's data.
 The displayed cost is omp's API-equivalent list price, not the user's subscription bill.
 
+## Session presets
+
+`src/shared/presets.ts` defines each preset and its reducer and parser, and `src/server/presets-file.ts` stores them in `presets.json`.
+The first load seeds Minimal, Review, and Ship from the connected model roles; subsequent loads preserve edits and an intentionally empty list.
+The roster topic carries the whole list in `presets`; a `preset` message applies one save or removal through `ListRegistry`.
+The new-session picker copies a preset into the draft, while routines retain its id and resolve it at run time.
+The shared preset store reloads before edits and routine lookups, and each minute refreshes the list from other servers.
+`GET /api/tools` lists the installed omp built-in names from `pi-coding-agent/src/tools/builtin-names.ts` for the settings editor.
+An allowlist permits tools but does not enable tools disabled in omp's config.
+Sandbox state is not stored until the sandbox feature exists.
+
 ## Routines
 
 A routine starts dashboard sessions, or runs a shell command, on one or more schedules. A schedule is every so many minutes, counted from the last run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST. The routine is due at the earliest of them. Two intervals share that last run, so the shorter one decides.
 Its task is one prompt or one command.
 The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
+A prompt routine stores a nullable preset id and reads the preset at run time for model, thinking, tools, and branch policy.
+The routine's own skill overrides the preset's skill, and a removed preset fails the run.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
 A file from before `schedules` reads its `schedule` as a one-element list, and drops a routine whose task was pull requests.

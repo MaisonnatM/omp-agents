@@ -1,12 +1,14 @@
 import { Sparkles } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
-import type { BranchChoice } from "../../src/shared/git";
+import type { BranchChoice, GitCheckout } from "../../src/shared/git";
+import { presetBranch, type SessionPreset } from "../../src/shared/presets";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
 import { folderName } from "../labels";
+import { getJson } from "../api";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
@@ -22,6 +24,7 @@ import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
+import { PresetPicker } from "./preset-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
 import { DirectoryPicker } from "./workspace-picker";
@@ -39,12 +42,17 @@ interface NewSessionProps {
 	onComplete: (reqId: number, text: string, cursor: number) => void;
 	/** Move the draft to directory `cwd`, as typed or displayed. */
 	onPickCwd: (cwd: string) => void;
-	/** Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at `thinking` when it names a level; through `skill` when it names one. */
+	/**
+	 * Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at
+	 * `thinking` when it names a level; through `skill` when it names one; with `tools` alone when it names some.
+	 */
 	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId">) => void;
 	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
 	onSchedule: (op: Omit<NewOp, "kind" | "cwd" | "todoId" | "images">, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
 	todo: { text: string; prompt: string } | null;
+	/** The saved presets, which the draft's preset picker offers. */
+	presets: SessionPreset[];
 }
 
 /**
@@ -52,20 +60,25 @@ interface NewSessionProps {
  * is sent, so leaving the draft leaves nothing running. The message and its images stay in the composer until the session opens.
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
+ * A preset fills the model, the thinking level, the skill, and the branch, which stay yours to change, and limits the tools.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, presets }: NewSessionProps) {
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useState(todo?.prompt ?? "");
 	const attachments = usePromptAttachments(true);
-	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
+	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(null);
 	const models = useDraftModelSelection(cwd);
 	const [pinnedSkill] = usePinnedSkill();
+	const [selection, setSelection] = useState<{ preset: SessionPreset; at: Date } | null>(null);
+	const preset = selection?.preset ?? null;
+	const draftSkill = preset ? preset.skill : pinnedSkill;
+	const tools = preset?.tools ?? null;
 	const [skipSkill, setSkipSkill] = useState(false);
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
 	const skillState: SkillState =
-		listedSkills && !listedSkills.some(skill => skill.name === pinnedSkill)
+		listedSkills && !listedSkills.some(skill => skill.name === draftSkill)
 			? "missing"
 			: skipSkill
 				? "off"
@@ -75,7 +88,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
-	const pickedChoice = picked.cwd === cwd ? picked.choice : null;
+	const presetChoice = (current: GitCheckout | null): BranchChoice | null => selection && current ? presetBranch(selection.preset, current.branch, selection.at) : null;
+	const pickedChoice = picked?.cwd === cwd ? picked.choice : presetChoice(checkout);
 	// A new branch that a failed start created is an existing one now, so the next start uses it as such.
 	const choice: BranchChoice | null =
 		pickedChoice?.kind === "new" && checkout?.branches.some(branch => branch.name === pickedChoice.name)
@@ -111,11 +125,23 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		}
 	};
 	const directCommand = blockedShortcut(draft, "new");
+	const branchForStart = async (): Promise<BranchChoice | null> => {
+		if (picked?.cwd === cwd || !selection || selection.preset.worktree === "here") return choice;
+		const current = checkout ?? await getJson<GitCheckout | null>(`/api/git?cwd=${encodeURIComponent(cwd)}`);
+		if (!current?.branch) throw new Error(`${selection.preset.name} needs a checked-out Git branch.`);
+		return checkout ? choice : presetChoice(current);
+	};
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
-		await onSchedule({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : pinnedSkill }, when);
+		await onSchedule({ prompt, branch: await branchForStart(), model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill, tools }, when);
 		setDraft(current => (current.trim() === prompt ? "" : current));
 	}, "Could not schedule the session");
+	const pickPreset = (next: SessionPreset | null): void => {
+		setSelection(next ? { preset: next, at: new Date() } : null);
+		setSkipSkill(false);
+		models.choose(next?.model ?? null, next?.thinking ?? null);
+		setPicked(null);
+	};
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = folderName(target.dir) ?? target.dir;
 	return (
@@ -142,7 +168,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						onSend={text => {
 							if (directCommand) return;
 							completion.close();
-							void attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : pinnedSkill }));
+							void attachments.read(text, async (prompt, images) => onStart({ prompt, images, branch: await branchForStart(), model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill, tools }));
 						}}
 						placeholder="Message this session…"
 						files={attachments.files}
@@ -150,8 +176,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						accept={ATTACH_ACCEPT}
 						leftSlot={
 							<>
+								{(presets.length > 0 || preset !== null) && <PresetPicker presets={presets} value={preset} onPick={pickPreset} disabled={starting} side="top" />}
 								<ModelPicker {...models.picker} disabled={starting || !connected} />
-								{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+								{draftSkill !== null && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 							</>
 						}
 						rightSlot={({ openFilePicker }) => (
@@ -210,8 +237,7 @@ function skillTitle(name: string, state: SkillState): string {
 	}
 }
 
-/** The skill pinned in the settings, as a toggle in the draft's composer: while on, the first message goes through it. */
-function PinnedSkillToggle({ name, state, onToggle, disabled }: { name: string; state: SkillState; onToggle: () => void; disabled: boolean }) {
+function SkillToggle({ name, state, onToggle, disabled }: { name: string; state: SkillState; onToggle: () => void; disabled: boolean }) {
 	return (
 		<Tooltip content={skillTitle(name, state)}>
 			<Button
@@ -219,7 +245,7 @@ function PinnedSkillToggle({ name, state, onToggle, disabled }: { name: string; 
 				size="compact"
 				leadingIcon={Sparkles}
 				aria-pressed={state === "on"}
-				aria-label={`Pinned skill ${name}`}
+				aria-label={`Skill ${name}`}
 				onClick={onToggle}
 				disabled={disabled || state === "missing" || state === "bypassed"}
 			>

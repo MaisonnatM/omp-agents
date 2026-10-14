@@ -4,6 +4,7 @@ import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
+import type { PresetChange, SessionPreset } from "./presets";
 import type { Project, ProjectEdit } from "./projects";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
@@ -43,6 +44,8 @@ export type ServerMsg =
 	| { t: "workspaces"; list: WorkspaceList<Workspace> }
 	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
 	| { t: "pins"; sessionIds: string[] }
+	/** Every session preset, whole, sent when a socket opens and after every change. */
+	| { t: "presets"; presets: SessionPreset[] }
 	/** Every project, archived ones too, whole, sent when a socket opens and after every change. */
 	| { t: "projects"; projects: Project[] }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
@@ -100,6 +103,8 @@ export type ClientMsg =
 	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
 	| { t: "pin"; change: PinChange }
+	/** Save or remove a session preset; every socket then gets the presets as they are after. */
+	| { t: "preset"; change: PresetChange }
 	/** Rename or archive a project; every socket then gets the projects as they are after. */
 	| { t: "project"; change: ProjectEdit }
 	/** Update notices `ids`, mark them seen or read, or clear them. */

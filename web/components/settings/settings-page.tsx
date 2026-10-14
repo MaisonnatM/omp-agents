@@ -1,6 +1,7 @@
 import { FolderOpen } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
+import type { SessionPreset } from "../../../src/shared/presets";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
@@ -14,6 +15,7 @@ import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { McpServersTab } from "./mcp-servers-tab";
 import { PreferencesTab } from "./preferences-tab";
+import { PresetsTab } from "./presets-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
 import { SourceControlTab } from "./source-control-tab";
@@ -96,6 +98,9 @@ export function SettingsPage({
 	workspaces,
 	workspaceList,
 	pins,
+	presets,
+	defaultCwd,
+	connected,
 }: {
 	section: SettingsSection;
 	/** The sidebar's workspace, `null` for all workspaces, which reads your user files only. */
@@ -104,6 +109,10 @@ export function SettingsPage({
 	workspaces: Workspace[];
 	workspaceList: WorkspaceList<Workspace>;
 	pins: string[];
+	presets: SessionPreset[];
+	/** Where a new session starts when nothing picks a directory, whose models and skills the preset editor offers for all workspaces. */
+	defaultCwd: string;
+	connected: boolean;
 }) {
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
 	const catalog = useMemo(
@@ -129,6 +138,7 @@ export function SettingsPage({
 		analytics: <AnalyticsTab active={section === "analytics"} />,
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
+		presets: <PresetsTab presets={presets} cwd={cwd ?? defaultCwd} connected={connected} />,
 		integrations: <IntegrationsTab active={section === "integrations"} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,

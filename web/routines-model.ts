@@ -145,6 +145,8 @@ export interface RoutineDraft {
 	cwd: string;
 	enabled: boolean;
 	skill: string | null;
+	/** The preset whose model, tools, and branch each run starts with, `null` for none. */
+	preset: string | null;
 	task: RoutineTask["kind"];
 	prompt: string;
 	/** Whether the prompt's session is pinned once it finishes. */
@@ -161,6 +163,7 @@ export function newDraft(id: string, cwd: string, skill: string | null): Routine
 		cwd,
 		enabled: true,
 		skill,
+		preset: null,
 		task: "prompt",
 		prompt: "",
 		pin: false,
@@ -188,6 +191,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		...draft,
 		name: routine.name,
 		enabled: routine.enabled,
+		preset: routine.preset,
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
 		pin: task.kind === "prompt" ? task.pin : draft.pin,
@@ -228,9 +232,8 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	}
 	const schedulesOf = nonEmpty(schedules);
 	if (!schedulesOf) return { fix: "Add a schedule." };
-	// A command runs without a session, so it has no skill to start one with.
-	const skill = task.kind === "command" ? null : draft.skill;
-	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill, task, schedules: schedulesOf } };
+	const command = task.kind === "command";
+	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill: command ? null : draft.skill, preset: command ? null : draft.preset, task, schedules: schedulesOf } };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */
