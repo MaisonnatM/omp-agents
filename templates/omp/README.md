@@ -56,6 +56,12 @@ Files, in `agent/`:
 - `extensions/projects.ts`: tells a session that belongs to an omp-agents project its role, coordinator or worker, and where the project's shared notes are, at every prompt.
   A coordinator's `edit` and `write` calls outside the notes are blocked, so it delegates every code change to a worker.
   The dashboard loads this file from the repository with `-e` while it is not installed, so projects work before you run `bun run omp-template`.
+- `extensions/request-log.ts`: records every request omp sends to a model provider, so any turn can be rebuilt and checked against its hash.
+  Each request adds one `omp-request-log.record` entry to the session file with the model, the thinking level, the session's leaf entry, and the hashes of the system prompt, the tools, the other parameters, and the messages.
+  Those parts go to omp's blob store in `~/.omp/agent/blobs/`, written once per distinct content, and the messages are stored as edits against the session's previous request, so a turn costs about what it adds.
+  `bun ~/.omp/agent/extensions/request-log.ts <session.jsonl>` rebuilds every recorded request and checks its hash, and a request number after the path prints that request's body.
+  The record is the body this extension receives, after the extensions that load before it; Anthropic can still withhold a disabled field afterwards, Codex over WebSocket sends only the new input after the first request, and compaction, summary, and title requests are not recorded.
+  The blobs hold what the provider received, including your `AGENTS.md` files, environment details, and any secret that reached the conversation, so keep `~/.omp/agent/blobs/` as private as the session files.
 - `extensions/worktree-guard.ts`: holds back a session's first `edit` or `write` in a repository's main checkout and tells the agent to work in a linked worktree; trying the same call again goes through, for when you asked it to work in place.
   The clones omp makes for `isolated: true` subagents are not main checkouts, so their edits pass.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add/check changes.

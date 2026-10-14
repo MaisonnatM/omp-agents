@@ -446,6 +446,8 @@ The page lives in `web/`.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are the default kit.
+`templates/omp/README.md` lists what each of its extensions does.
+`agent/extensions/request-log.ts` both records each provider request and, run with Bun, rebuilds the requests a session file records and checks their hashes; `templates/omp/request-log.test.ts` records requests through omp's own blob store and checks every rebuilt body against the one sent.
 `maintainer/` is the maintainer git profile, `AGENTS.md` and `templates/omp/maintainer/docs/git-workflow.md`, copied only when you pass `--maintainer`, and a file there replaces the `agent/` file with the same path.
 [Template sync](../CODING_STANDARDS.md#template-sync) says how to copy an edited live file back.
 The default `agent/AGENTS.md` keeps worktree and force-push safety inline and links to the model and review references under `agent/docs/`.
