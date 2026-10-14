@@ -32,6 +32,14 @@ function readPin(token: string): SourcePin {
 	if (received.length !== expected.length || !timingSafeEqual(expected, received)) throw new Error("This replay selection has expired. Open Replay from here again.");
 	return JSON.parse(Buffer.from(body, "base64url").toString()) as SourcePin;
 }
+// omp records its launch cwd without macOS's `/private` prefix and refuses to open a session whose header names another spelling.
+async function ompSpelling(path: string): Promise<string> {
+	if (process.platform !== "darwin" || !path.startsWith("/private/")) return path;
+	const stripped = path.slice("/private".length);
+	await mkdir(path, { recursive: true });
+	const same = await Promise.all([canonical(stripped), canonical(path)]).then(([a, b]) => a === b, () => false);
+	return same ? stripped : path;
+}
 function originalRequest(cut: PromptCut): RebuiltRequest | null {
 	const entries = cut.manager.getEntries();
 	const start = entries.findIndex(entry => entry.id === cut.prompt.id);
@@ -121,7 +129,7 @@ export async function prepareReplay(choice: { token: string; model: ModelOption 
 		const subdirectory = relative(await canonical(repo.top), await canonical(cut.cwd));
 		if (subdirectory === ".." || subdirectory.startsWith("../")) throw new Error("The source cwd does not resolve inside its repository.");
 		const printedTop = !subdirectory ? cut.cwd : cut.cwd.endsWith(`/${subdirectory}`) ? cut.cwd.slice(0, -subdirectory.length - 1) : null;
-		const cwd = join(root, subdirectory);
+		const cwd = await ompSpelling(join(root, subdirectory));
 		await mkdir(cwd, { recursive: true });
 		const trajectory = new Trajectory(true);
 		for (const entry of cut.manager.getEntries()) trajectory.applyEntry(entry);
@@ -131,7 +139,7 @@ export async function prepareReplay(choice: { token: string; model: ModelOption 
 		const bodyRef = request?.body && request.hash === request.record.requestHash ? cut.manager.putBlobSync(Buffer.from(canonicalJson(request.body))).ref : null;
 		const marker: ReplayMarker = {
 			v: 1, id, source: { sessionId: pin.sessionId, file: pin.file, turnId: pin.entryId, at: cut.at },
-			roots: { original: [...new Set([repo.top, await canonical(repo.top), ...(printedTop ? [printedTop] : [])])], replay: await canonical(root) }, base: { sha, how: historicalSha ? "reflog" : "head-now" },
+			roots: { original: [...new Set([repo.top, await canonical(repo.top), ...(printedTop ? [printedTop] : [])])], replay: await ompSpelling(root) }, base: { sha, how: historicalSha ? "reflog" : "head-now" },
 			model, thinking, modelChanged: !!origin.model && (origin.model.id !== model.id || origin.model.provider !== model.provider), promptEdited: choice.prompt !== null && choice.prompt !== cut.text,
 			repaired: exitDiagnostics.createInterruptedToolResults(cut.before, "fork").length > 0, originalTurnRef,
 			original: request && bodyRef ? { api: request.record.api, model: request.record.model, hash: request.record.requestHash, bodyRef } : null,

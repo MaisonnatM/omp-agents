@@ -47,7 +47,7 @@ export function ReplayCompareDialog({ view, facts, onClose }: { view: View; fact
 						<p className="break-all text-xs">Original: {check.originalHash}<br />Replay: {check.replayHash}<br />Normalized original: {check.normalizedOriginal}<br />Normalized replay: {check.normalizedReplay}</p>
 						{check.differences.length > 0 && <p>Changed request fields: {check.differences.join(", ")}. Inspect the complete bodies below before interpreting output differences.</p>}
 					</>}
-					<p className="text-xs text-muted-foreground">Only root-path prefixes and deliberately selected model metadata are normalized. Dates, tool catalog, AGENTS/context, history, prompt and reasoning settings remain significant. This compares the logged before-provider hook body, not final wire bytes or deterministic execution.</p>
+					<p className="text-xs text-muted-foreground">Only root-path prefixes, per-session ids (client_metadata, prompt_cache_key) and deliberately selected model metadata are normalized. Dates, tool catalog, AGENTS/context, history, prompt and reasoning settings remain significant. This compares the logged before-provider hook body, not final wire bytes or deterministic execution.</p>
 				</section>
 				{read.error && <p role="alert">{read.error}</p>}
 				{!data && !read.error && <p role="status">Reading comparison…</p>}

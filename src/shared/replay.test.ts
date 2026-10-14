@@ -26,6 +26,13 @@ describe("replay complete-request claims", () => {
 		expect(result.normalizedOriginal).toBe(result.normalizedReplay);
 		expect(result.differences).toEqual([]);
 	});
+	test("fresh per-session request identity still matches", () => {
+		const source = { ...original, client_metadata: { session_id: "source-session", turn_id: "t1" } };
+		const result = checkReplayRequest(marker(source), source, { ...relocated(), prompt_cache_key: "fork-session", client_metadata: { session_id: "fork-session", turn_id: "t2" } }, "responses", "old");
+		expect(result.status).toBe("match");
+		if (result.status === "unknown") throw new Error(result.reason);
+		expect(result.rawEqual).toBe(false);
+	});
 	test("only an explicit model switch removes model routing and generated workstation metadata", () => {
 		const body = relocated();
 		body.model = "new";
@@ -43,7 +50,6 @@ describe("replay complete-request claims", () => {
 			{ field: "tools", value: [{ ...original.tools[0], description: "Different tool" }] },
 			{ field: "tools", value: [{ ...original.tools[0], parameters: { type: "string" } }] },
 			{ field: "reasoning", value: { effort: "high" } },
-			{ field: "prompt_cache_key", value: "different" },
 			{ field: "stream", value: false },
 			{ field: "input", value: [...original.input, { role: "user", content: [{ type: "input_text", text: "extra context" }] }] },
 		];
@@ -85,6 +91,9 @@ describe("replay complete-request claims", () => {
 		expect(containsPrompt({ input: [{ role: "user", content: [{ type: "input_text", text: "do this" }, { type: "input_image", image_url: "data:image/png;base64,cGljdHVyZQ==" }] }] }, user)).toBe(true);
 		expect(containsPrompt({ messages: [{ role: "user", content: "do this" }] }, user)).toBe(false);
 		expect(containsPrompt({ messages: [{ role: "user", content: [{ type: "text", text: "[Image #1]" }, { type: "image", data: "cGljdHVyZQ==" }] }] }, user.slice(1))).toBe(true);
+		const reminder = { type: "input_text", text: "<system-reminder>\nToday: 2026-10-14\n</system-reminder>" };
+		expect(containsPrompt({ input: [{ role: "user", content: [reminder, { type: "input_text", text: "do this" }] }] }, "do this")).toBe(true);
+		expect(containsPrompt({ input: [{ role: "user", content: [{ type: "input_text", text: "do this" }, reminder] }] }, "do this")).toBe(false);
 	});
 });
 

@@ -2,6 +2,9 @@ import { canonicalJson, sha256 } from "./request-log-reader";
 import type { RequestCheck, ReplayMarker } from "../../../../../src/shared/replay";
 import { normalizeRoots } from "./replay-paths";
 
+/** Fields omp derives from the session, thread and turn ids; every fork gets fresh ones, and they are not model input. */
+const SESSION_IDENTITY: Record<string, true> = { client_metadata: true, prompt_cache_key: true };
+
 function normalizedBody(value: unknown, roots: readonly string[], model: string | null, changeModel: boolean, system = false): unknown {
 	if (typeof value === "string") {
 		let text = normalizeRoots(value, roots);
@@ -32,6 +35,7 @@ export function checkReplayRequest(marker: ReplayMarker, original: unknown, payl
 	const replayBody = payload as Record<string, unknown>;
 	const normalize = (body: Record<string, unknown>, roots: readonly string[], id: string | null): Record<string, unknown> => Object.fromEntries(Object.entries(body).map(([key, value]) => {
 		if (marker.modelChanged && typeof value === "string" && (key === "model" || key === "modelId")) return [key, "\0<model>"];
+		if (Object.hasOwn(SESSION_IDENTITY, key)) return [key, "\0<session>"];
 		if ((key === "messages" || key === "input" || key === "contents") && Array.isArray(value)) return [key, value.map(item => normalizedBody(item, roots, id, marker.modelChanged, item?.role === "system" || item?.role === "developer"))];
 		return [key, normalizedBody(value, roots, id, marker.modelChanged, key === "system" || key === "instructions" || key === "systemInstruction")];
 	}));
@@ -57,10 +61,18 @@ export function containsPrompt(payload: unknown, content: unknown): boolean {
 		const user = value.findLast(item => item && typeof item === "object" && item.role === "user");
 		if (!user) continue;
 		const images = Array.isArray(content) ? content.filter(block => block && block.type === "image") : [];
-		if (expected && textOf(user.content ?? user.parts) !== expected) continue;
+		if (expected && !endsWithText(user.content ?? user.parts, expected)) continue;
 		if (!expected && !images.length) continue;
 		const serialized = canonicalJson(user);
 		if (images.every(image => typeof image.data === "string" && serialized.includes(image.data))) return true;
 	}
 	return false;
+}
+
+/** omp prepends context blocks (a dated `<system-reminder>`) to the prompt's user message; the prompt is its trailing text blocks. */
+function endsWithText(value: unknown, expected: string): boolean {
+	if (typeof value === "string") return value === expected;
+	if (!Array.isArray(value)) return false;
+	const texts = value.flatMap(block => block && typeof block === "object" && "text" in block && typeof block.text === "string" ? [block.text] : []);
+	return texts.some((_, start) => texts.slice(start).join("") === expected);
 }
