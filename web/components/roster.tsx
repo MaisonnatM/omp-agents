@@ -94,7 +94,7 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 	return (
 		<SidebarGroup>
 			<SidebarMenu aria-label="Ticket groups">
-				{groups.map(({ status, tickets: { length } }) => (
+				{groups.map(({ status, count: length }) => (
 					<SectionLink
 						key={status}
 						href={hashForTickets(null)}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { linearMarkdown, parseIssueDetail, parseIssues, parsePage, parseTicketOptions } from "./tickets";
+import { linearMarkdown, parseIssueDetail, parseIssues, parsePage, parseRelative, parseTicketOptions } from "./tickets";
 
 const signed = (path: string): string => `https://uploads.linear.app${path}?signature=x`;
 const proxied = (path: string): string => `/api/ticket/media?issue=ENG-1&path=${encodeURIComponent(path)}`;
@@ -27,9 +27,9 @@ const listed = (data: unknown): string => JSON.stringify(data);
 const colors = new Map([["ENG", new Map([["Front", "#f2c94c"]])]]);
 
 describe("parseIssues", () => {
-	test("maps Linear's fields, colors labels as their team does, folds duplicates into canceled, and reads a missing project as none", () => {
+	test("maps Linear's fields, colors labels as their team does, folds duplicates into canceled, and reads a missing project or parent as none", () => {
 		const { project: _, createdAt: __, ...noProject } = issue("ENG-2", { statusType: "duplicate", status: "Duplicate", priority: { value: 0, name: "No priority" }, labels: ["Front", "Retired"] });
-		expect(parseIssues([issue("ENG-1", { dueDate: "2026-10-05" }), noProject, issue("OPS-1")], colors)).toEqual([
+		expect(parseIssues([issue("ENG-1", { dueDate: "2026-10-05", parentId: "ENG-9" }), noProject, issue("OPS-1")], colors)).toEqual([
 			{
 				id: "ENG-1",
 				title: "Issue ENG-1",
@@ -44,6 +44,7 @@ describe("parseIssues", () => {
 				createdAt: "2026-09-20T09:00:00.000Z",
 				updatedAt: "2026-10-01T14:46:18.399Z",
 				branch: "eng-1-issue",
+				parentId: "ENG-9",
 			},
 			{
 				id: "ENG-2",
@@ -62,6 +63,7 @@ describe("parseIssues", () => {
 				createdAt: "2026-10-01T14:46:18.399Z",
 				updatedAt: "2026-10-01T14:46:18.399Z",
 				branch: "eng-2-issue",
+				parentId: null,
 			},
 			expect.objectContaining({ id: "OPS-1", labels: [{ name: "Front", color: "" }] }),
 		]);
@@ -160,6 +162,21 @@ describe("parseIssueDetail", () => {
 		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }), colors)).toThrow("get_issue answered something other than JSON");
 		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }), colors)).toThrow("without an issue");
 		expect(() => parseIssueDetail(JSON.stringify(issue("ENG-1", { teamId: undefined })), JSON.stringify({ comments: [] }), colors)).toThrow("without its team's id");
+	});
+});
+
+describe("parseRelative", () => {
+	test("reads a parent or sub-issue's row, a duplicate as canceled and no assignee as none, and refuses one without a known state type", () => {
+		expect(parseRelative({ id: "ENG-3", title: "Part 1", status: "Duplicate", statusType: "duplicate", priority: { value: 2, name: "High" }, assignee: null })).toEqual({
+			id: "ENG-3",
+			title: "Part 1",
+			status: "Duplicate",
+			statusType: "canceled",
+			priority: 2,
+			assignee: null,
+		});
+		expect(parseRelative({ id: "ENG-4", title: "Part 2", status: "Todo", statusType: "unstarted", priority: { value: 0 }, assignee: "Ada" })).toMatchObject({ priority: 0, assignee: "Ada" });
+		expect(parseRelative({ id: "ENG-5", title: "Part 3", status: "Doing", statusType: "doing" })).toBeNull();
 	});
 });
 

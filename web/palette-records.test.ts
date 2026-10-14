@@ -32,6 +32,7 @@ const ticket: Ticket = {
 	createdAt: "2026-09-01T00:00:00Z",
 	updatedAt: "2026-10-01T00:00:00Z",
 	branch: "eng-7",
+	parentId: null,
 };
 const pr: PullRequestSummary = {
 	owner: "Acme",

@@ -18,6 +18,7 @@ const ticket = (fields: Partial<Ticket>): Ticket => ({
 	createdAt: "2026-09-01T00:00:00.000Z",
 	updatedAt: "2026-10-01T00:00:00.000Z",
 	branch: "eng-7-show-feedback",
+	parentId: null,
 	...fields,
 });
 

@@ -48,22 +48,25 @@ function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickActi
 				<FoldButton open={open} onToggle={onToggle} controls={`${id}-list`} className="items-center gap-2.5">
 					<Icon aria-hidden className={`size-4 shrink-0 ${color}`} />
 					{group.status}
-					<span className="tabular-nums text-muted-foreground">{group.tickets.length}</span>
+					<span className="tabular-nums text-muted-foreground">{group.count}</span>
 				</FoldButton>
 			</h3>
 			{open && (
 				// A row scrolled into view clears the sticky h-10 heading above it.
 				<ul id={`${id}-list`} className="py-1 *:scroll-mt-12 *:scroll-mb-2">
-					{group.tickets.map(ticket => (
-						<TicketRow
-							key={ticket.id}
-							ticket={ticket}
-							sessions={sessionsOn({ kind: "ticket", id: ticket.id }, hosts)}
-							onOpen={onOpen}
-							pending={pendingOf(quick, { kind: "ticket", id: ticket.id })}
-							onQuickAction={action => onQuickAction(ticket, action)}
-						/>
-					))}
+					{group.entries.flatMap(({ ticket, subIssues }) =>
+						[ticket, ...subIssues].map(row => (
+							<TicketRow
+								key={row.id}
+								ticket={row}
+								nested={row !== ticket}
+								sessions={sessionsOn({ kind: "ticket", id: row.id }, hosts)}
+								onOpen={onOpen}
+								pending={pendingOf(quick, { kind: "ticket", id: row.id })}
+								onQuickAction={action => onQuickAction(row, action)}
+							/>
+						)),
+					)}
 				</ul>
 			)}
 		</section>

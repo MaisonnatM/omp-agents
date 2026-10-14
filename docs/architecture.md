@@ -738,10 +738,12 @@ The server reads Linear through Linear's MCP server, with the OAuth sign-in that
 The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a hint to reconnect Linear in Settings › Integrations or run `/mcp reauth <name>`; it is never logged.
 Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST.
 It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
+Each issue carries its `parentId`, the parent's identifier, from which the page nests a listed sub-issue under its listed parent.
 `list_issues` and `get_issue` name an issue's labels without their colors, so the server reads each team's labels with `list_issue_labels`, by the team key that prefixes the identifier, and keeps them for five minutes; `?fresh` reads them again too.
 
-`GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's main content with that issue in full: the row's fields, the assignee, the team's id, the description, who opened it and when, the links Linear attaches to it, and its comment threads.
-The server calls `get_issue` and `list_comments` in parallel, through the same MCP sign-in, with no cache, so each opening reads the issue again.
+`GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's main content with that issue in full: the row's fields, the assignee, the team's id, the description, who opened it and when, the links Linear attaches to it, its comment threads, its parent, and its sub-issues.
+The server calls `get_issue`, `list_comments`, and `list_issues` with `parentId` for the sub-issues, in parallel, through the same MCP sign-in, with no cache, so each opening reads the issue again.
+For a sub-issue it then reads the parent with `get_issue`, asking only for the fields its row shows.
 It rewrites Linear's `<issue>` mentions as markdown links, its `<linear-image>` tags as image links, its `<linear-embed node-type="video">` tags as `<video>` elements, and other `<linear-embed>` tags as links.
 It threads the comments by `parentId`, oldest first.
 An identifier that is not a team key, a dash, and a number answers 400.

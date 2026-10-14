@@ -37,6 +37,13 @@ export interface Ticket {
 	updatedAt: string;
 	/** Linear's suggested git branch name. */
 	branch: string;
+	/** The identifier of the issue this one is a sub-issue of, `null` for a top-level issue. */
+	parentId: string | null;
+}
+
+/** An issue that another one's details name as its parent or one of its sub-issues: what its row shows. */
+export interface TicketRelative extends Pick<Ticket, "id" | "title" | "status" | "statusType" | "priority"> {
+	assignee: string | null;
 }
 
 /** A workflow state as an issue names it: the status and its type. */
@@ -47,7 +54,7 @@ export interface TicketsAnswer {
 	tickets: Ticket[];
 }
 
-/** A kept {@link TicketsAnswer} with every issue whole, or `null`: a read saved before tickets carried their opening date reads Linear again. */
+/** A kept {@link TicketsAnswer} with every issue whole, or `null`: a read saved before tickets carried their parent reads Linear again. */
 export const decodeTicketsAnswer = decoder(
 	fields<TicketsAnswer>({
 		tickets: arrayOf(
@@ -65,6 +72,7 @@ export const decodeTicketsAnswer = decoder(
 				createdAt: isString,
 				updatedAt: isString,
 				branch: isString,
+				parentId: nullable(isString),
 			}),
 		),
 	}),
@@ -145,6 +153,10 @@ export interface TicketDetail extends Ticket {
 	attachments: { title: string; url: string }[];
 	/** Comment threads, oldest first, each its first comment then the replies. */
 	threads: TicketComment[][];
+	/** The issue {@link Ticket.parentId} names, `null` for a top-level issue. */
+	parent: TicketRelative | null;
+	/** Its sub-issues, in Linear's answer's order. */
+	subIssues: TicketRelative[];
 }
 
 /** `GET /api/ticket/options?team=<id>`: what the issue's field pickers offer for that team. */

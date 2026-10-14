@@ -712,6 +712,9 @@ An action that fails shows its error, and its control becomes available again.
   Duplicates count as canceled.
   Completed and canceled issues show only when they changed in the last seven days, like the recent merges on the Pull requests page.
   Within a state, issues sort by priority, urgent first and no priority last, then by the latest update.
+- A sub-issue whose parent is also listed shows indented under its parent's row, in the parent's state, whatever its own state; a sub-issue of a sub-issue nests under the topmost listed one.
+  Sub-issues under a row sort by state, then by identifier number, and a state's count includes them.
+  A sub-issue whose parent is not listed, such as one assigned to someone else, is a row of its own with the parent's identifier as a chip.
 - The list spans the page's width, like Linear's, and each state's heading stays at the top of the page while its issues scroll under it.
 - A row shows the priority, the identifier, the state, and the title, then the due date when there is one, the labels, and the project as chips, then the day Linear opened the issue and the day it last changed.
   A day this year reads `Oct 6`, an earlier one `Mar 2025`; hover a day for its full time.
@@ -722,9 +725,11 @@ An action that fails shows its error, and its control becomes available again.
 - Click a row to replace the tickets list with the issue's details in the main content.
   The page header then names the issue: its identifier, with its title under it, after a back arrow.
   The back arrow, **Back to tickets**, stays in the header while the details scroll, and returns to the list with its folded states preserved.
-  The detail view lays the issue out as Linear does: the title, the description, and the comment threads in a wide column, and beside it the quick actions, the state, the priority, the assignee, the due date, the labels as chips, the project, Linear's branch name for it, the links Linear keeps for it (a pull request with its own icon), who opened the issue and when, and a link to the issue on Linear.
+  The detail view lays the issue out as Linear does: the title, the description, the sub-issues, and the comment threads in a wide column, and beside it the quick actions, the state, the priority, the assignee, the due date, the labels as chips, the project, Linear's branch name for it, the links Linear keeps for it (a pull request with its own icon), who opened the issue and when, and a link to the issue on Linear.
+  A sub-issue names its parent above its title, **Sub-issue of** with the parent's state, identifier, and title, as a link to the parent's details.
+  An issue with sub-issues lists them under its description, all of them whoever they are assigned to, with how many are done of those not canceled and a bar for it; each row shows the state, identifier, title, assignee when it is not the issue's own, and priority, links to the sub-issue's details, and dims once closed, struck through when canceled.
   On a page narrower than the side column needs, the side column stacks between the title and the description.
-  Each opening reads the issue again through Linear's `get_issue` and `list_comments` tools.
+  Each opening reads the issue again through Linear's `get_issue`, `list_comments`, and `list_issues` tools.
   Linear's issue mentions in the text become links.
   Its images show in place, its screen recordings play in a video player, and another embedded file becomes a link to download it.
   The dashboard's server fetches each of these files from Linear, so a video still plays and seeks after Linear's five-minute link to it expires.

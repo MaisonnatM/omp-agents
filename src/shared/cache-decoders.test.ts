@@ -68,6 +68,7 @@ const tickets: TicketsAnswer = {
 			createdAt: "2026-09-01T12:00:00.000Z",
 			updatedAt: "2026-10-01T12:00:00.000Z",
 			branch: "eng-1-ticket",
+			parentId: null,
 		},
 	],
 };
@@ -159,6 +160,7 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 		whole: tickets,
 		partial: {
 			"a ticket from before its opening date": { tickets: [{ ...tickets.tickets[0], createdAt: undefined }] },
+			"a ticket from before its parent": { tickets: [{ ...tickets.tickets[0], parentId: undefined }] },
 			"a ticket of an unknown status type": { tickets: [{ ...tickets.tickets[0], statusType: "doing" }] },
 		},
 	},

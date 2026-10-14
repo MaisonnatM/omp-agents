@@ -1,13 +1,17 @@
-import { GitPullRequest, Link2 } from "lucide-react";
+import { CornerLeftUp, GitPullRequest, Link2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { pullRequestOfUrl } from "../../../src/shared/github";
-import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
+import type { Ticket, TicketDetail, TicketRelative } from "../../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import type { Editable } from "../../editable-read";
 import { age } from "../../labels";
+import { hashForTickets } from "../../routing";
+import { PRIORITY_LABEL, subIssueOrder } from "../../tickets-model";
 import { BranchName } from "../git";
+import { IconTip } from "../pull-requests/avatars";
 import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
+import { PRIORITY_ICON, statusIcon } from "./ticket-row";
 
 interface TicketDetailContentProps {
 	id: string;
@@ -36,16 +40,16 @@ export function TicketDetailContent({ id, listed, read, actions, placement = "pa
 	}, [page]);
 	return (
 		<div className={page ? "grid gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_1fr]" : "grid grid-cols-[minmax(0,1fr)] gap-y-6"}>
-			<Heading
-				ref={headingRef}
-				tabIndex={-1}
-				className={cn(
-					"rounded-md leading-tight font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					page ? "text-2xl lg:col-start-1 lg:row-start-1" : "text-base",
-				)}
-			>
-				{ticket?.title ?? id}
-			</Heading>
+			<div className={cn("min-w-0", page ? "space-y-2 lg:col-start-1 lg:row-start-1" : "space-y-1.5")}>
+				{ticket?.parentId && <ParentLink id={ticket.parentId} parent={detail?.parent ?? null} />}
+				<Heading
+					ref={headingRef}
+					tabIndex={-1}
+					className={cn("rounded-md leading-tight font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring", page ? "text-2xl" : "text-base")}
+				>
+					{ticket?.title ?? id}
+				</Heading>
+			</div>
 			{ticket && <TicketSide ticket={ticket} read={read} actions={actions} page={page} />}
 			<div className={cn("min-w-0", page ? "space-y-10 lg:col-start-1 lg:row-start-2" : "space-y-6")}>
 				{detail ? <TicketBody detail={detail} page={page} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />}
@@ -82,11 +86,77 @@ function TicketSide({ ticket, read, actions, page }: TicketSideProps) {
 	);
 }
 
-/** An issue's description, then its comment threads; the sidebar sets the description at its own text size. */
-function TicketBody({ detail: { description, threads }, page }: { detail: TicketDetail; page: boolean }) {
+/** The issue a sub-issue belongs to, above its title: its identifier from the list at once, its status and title once Linear answers. */
+function ParentLink({ id, parent }: { id: string; parent: TicketRelative | null }) {
+	return (
+		<a
+			href={hashForTickets(id)}
+			title={parent ? `${id} ${parent.title}` : id}
+			className="flex h-5 w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+		>
+			<CornerLeftUp aria-hidden className="size-3.5 shrink-0" />
+			<span className="shrink-0">Sub-issue of</span>
+			{parent && <IconTip icon={[...statusIcon(parent), parent.status]} />}
+			<span className="shrink-0 tabular-nums">{id}</span>
+			{parent && <span className="min-w-0 truncate text-foreground">{parent.title}</span>}
+		</a>
+	);
+}
+
+/** Done of those still to do: a canceled sub-issue counts neither way. */
+function subIssueProgress(subIssues: TicketRelative[]): { done: number; total: number } {
+	const total = subIssues.filter(({ statusType }) => statusType !== "canceled").length;
+	return { done: subIssues.filter(({ statusType }) => statusType === "completed").length, total };
+}
+
+/** The issue's sub-issues, each a link to its details, under how many are done; a sub-issue names its assignee only when it is not `owner`, the issue's own. */
+function SubIssues({ subIssues, owner, page }: { subIssues: TicketRelative[]; owner: string | null; page: boolean }) {
+	const { done, total } = subIssueProgress(subIssues);
+	return (
+		<section className="space-y-2 border-t border-border pt-6">
+			<h2 className="flex items-center gap-2 text-sm font-medium">
+				Sub-issues
+				<span aria-hidden className="tabular-nums text-muted-foreground">
+					{done}/{total}
+				</span>
+				<span className="sr-only">
+					, {done} of {total} done
+				</span>
+				{total > 0 && (
+					<span aria-hidden className="h-1 w-16 overflow-hidden rounded-full bg-muted">
+						<span className="block h-full rounded-full bg-indigo-500 dark:bg-indigo-400" style={{ width: `${(done / total) * 100}%` }} />
+					</span>
+				)}
+			</h2>
+			<ul className="-mx-2">
+				{subIssues.toSorted(subIssueOrder).map(issue => {
+					const closed = issue.statusType === "completed" || issue.statusType === "canceled";
+					return (
+						<li key={issue.id}>
+							<a
+								href={hashForTickets(issue.id)}
+								className="flex h-9 min-w-0 items-center gap-2.5 rounded-md px-2 text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+							>
+								<IconTip icon={[...statusIcon(issue), issue.status]} />
+								<span className="shrink-0 tabular-nums text-muted-foreground">{issue.id}</span>
+								<span className={cn("min-w-0 flex-1 truncate", closed && "text-muted-foreground", issue.statusType === "canceled" && "line-through")}>{issue.title}</span>
+								{issue.assignee && issue.assignee !== owner && page && <span className="hidden max-w-32 shrink-0 truncate text-xs text-muted-foreground sm:block">{issue.assignee}</span>}
+								<IconTip icon={[...PRIORITY_ICON[issue.priority], PRIORITY_LABEL[issue.priority]]} />
+							</a>
+						</li>
+					);
+				})}
+			</ul>
+		</section>
+	);
+}
+
+/** An issue's description, its sub-issues, then its comment threads; the sidebar sets the description at its own text size. */
+function TicketBody({ detail: { description, subIssues, assignee, threads }, page }: { detail: TicketDetail; page: boolean }) {
 	return (
 		<>
 			{description.trim() ? <Markdown text={description} className={cn("leading-relaxed", page ? "text-[15px]" : "text-sm")} /> : <p className="text-sm text-muted-foreground">No description.</p>}
+			{subIssues.length > 0 && <SubIssues subIssues={subIssues} owner={assignee?.name ?? null} page={page} />}
 			{threads.length > 0 && (
 				<section className="space-y-4 border-t border-border pt-6">
 					<h2 className="flex items-baseline gap-2 text-sm font-medium">

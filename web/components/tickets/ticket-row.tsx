@@ -10,6 +10,7 @@ import {
 	CircleDot,
 	CircleX,
 	Contrast,
+	CornerDownRight,
 	Ellipsis,
 	type LucideIcon,
 	SignalHigh,
@@ -70,6 +71,8 @@ export const LabelDot = ({ color }: { color: string }) => (
 
 interface TicketRowProps {
 	ticket: Ticket;
+	/** A sub-issue listed under its parent's row, which indents it. */
+	nested?: boolean;
 	/** The running sessions that work on this issue. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
@@ -78,20 +81,31 @@ interface TicketRowProps {
 	onQuickAction: (action: WorkActionId) => void;
 }
 
-export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
+export function TicketRow({ ticket, nested = false, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
 	return (
 		<li id={ticketRowId(ticket.id)} className="group/row flex items-center rounded-md hover:bg-muted has-[:focus-visible]:bg-muted">
 			<a
 				href={hashForTickets(ticket.id)}
-				className="@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+				className={cn(
+					"@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+					nested && "pl-10",
+				)}
 			>
 				<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
 				<span className="min-w-[4.75rem] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">{ticket.id}</span>
 				<IconTip icon={[...statusIcon(ticket), ticket.status]} />
-				<span className="min-w-0 truncate">{ticket.title}</span>
+				<span className="min-w-0 truncate">
+					{ticket.title}
+					{nested && ticket.parentId && <span className="sr-only">, sub-issue of {ticket.parentId}</span>}
+				</span>
 				<span className="min-w-4 flex-1" />
 				{/* Chips that do not fit wrap onto a second line that the fixed height hides, so the title keeps its room. */}
 				<span className="hidden h-6 min-w-0 shrink-[100] flex-wrap justify-end gap-1.5 overflow-hidden @2xl:flex">
+					{!nested && ticket.parentId && (
+						<TicketChip icon={<CornerDownRight aria-hidden className="size-3.5 shrink-0" />} title={`Sub-issue of ${ticket.parentId}`}>
+							{ticket.parentId}
+						</TicketChip>
+					)}
 					{ticket.dueDate && (
 						<TicketChip icon={<Calendar aria-hidden className="size-3.5 shrink-0" />} title={`Due ${ticket.dueDate}`}>
 							{dateLabel(ticket.dueDate)}

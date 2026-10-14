@@ -8,7 +8,7 @@ import { isObject, num, oneOf, str } from "./json";
 import { integrationServer } from "./integrations";
 import { proxyUploads, rememberUploads, serveUpload } from "./linear-uploads";
 import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
-import { TICKET_ID, TICKET_PRIORITIES, TICKET_STATUS_TYPES, type Ticket, type TicketAttachmentUpload, type TicketChoice, type TicketComment, type TicketDetail, type TicketDraft, type TicketEdit, type TicketLabel, type TicketOptions, type TicketsAnswer, type TicketStatusType, type TicketTeam } from "./shared/tickets";
+import { TICKET_ID, TICKET_PRIORITIES, TICKET_STATUS_TYPES, type Ticket, type TicketAttachmentUpload, type TicketChoice, type TicketComment, type TicketDetail, type TicketDraft, type TicketEdit, type TicketLabel, type TicketOptions, type TicketRelative, type TicketsAnswer, type TicketStatusType, type TicketTeam } from "./shared/tickets";
 
 const linearServer = (): Promise<McpServer> => integrationServer("linear");
 
@@ -25,7 +25,9 @@ const MAX_PAGES = 20;
 /** How many days back the page lists closed issues. */
 const CLOSED_DAYS = 7;
 
-const FIELDS = ["id", "title", "url", "priority", "status", "statusType", "labels", "project", "team", "dueDate", "createdAt", "updatedAt", "gitBranchName"];
+const FIELDS = ["id", "title", "url", "priority", "status", "statusType", "labels", "project", "team", "dueDate", "createdAt", "updatedAt", "gitBranchName", "parentId"];
+/** What a parent's or a sub-issue's row in an issue's details shows. */
+const RELATIVE_FIELDS = ["id", "title", "status", "statusType", "priority", "assignee"];
 
 /** Linear's state types, and `duplicate`, which the query takes as a state of its own and the page reads as canceled. */
 const QUERY_STATES = [...TICKET_STATUS_TYPES, "duplicate"] as const;
@@ -58,7 +60,7 @@ function parseIssue(raw: unknown, colors: LabelColors): Ticket | null {
 	const statusType = statusTypeOf(str(raw.statusType));
 	const updatedAt = str(raw.updatedAt);
 	if (!id || title === undefined || !url || !status || !statusType || !updatedAt) return null;
-	const priority = num(isObject(raw.priority) ? raw.priority.value : raw.priority);
+	const priority = priorityOf(raw);
 	const teamColors = colors.get(teamKey(id));
 	return {
 		id,
@@ -66,7 +68,7 @@ function parseIssue(raw: unknown, colors: LabelColors): Ticket | null {
 		url,
 		status,
 		statusType,
-		priority: isPriority(priority) ? priority : 0,
+		priority,
 		labels: Array.isArray(raw.labels) ? raw.labels.filter(label => typeof label === "string").map(name => ({ name, color: teamColors?.get(name) ?? "" })) : [],
 		project: str(raw.project) ?? null,
 		team: str(raw.team) ?? "",
@@ -74,7 +76,25 @@ function parseIssue(raw: unknown, colors: LabelColors): Ticket | null {
 		createdAt: str(raw.createdAt) ?? updatedAt,
 		updatedAt,
 		branch: str(raw.gitBranchName) ?? "",
+		parentId: str(raw.parentId) ?? null,
 	};
+}
+
+/** Linear's priority, which its issue tools answer as `{ value, name }` and the page reads as a number. */
+function priorityOf(raw: Record<string, unknown>): Ticket["priority"] {
+	const priority = num(isObject(raw.priority) ? raw.priority.value : raw.priority);
+	return isPriority(priority) ? priority : 0;
+}
+
+/** A parent or sub-issue from a `get_issue` or `list_issues` answer, or `null` when it lacks what its row shows. */
+export function parseRelative(raw: unknown): TicketRelative | null {
+	if (!isObject(raw)) return null;
+	const id = str(raw.id);
+	const title = str(raw.title);
+	const status = str(raw.status);
+	const statusType = statusTypeOf(str(raw.statusType));
+	if (!id || title === undefined || !status || !statusType) return null;
+	return { id, title, status, statusType, priority: priorityOf(raw), assignee: str(raw.assignee) ?? null };
 }
 
 /** The objects under `key` in one page of `tool`'s answer, and the cursor of the next page, `null` on the last. */
@@ -148,8 +168,8 @@ function parseThreads(toolText: string, issue: string): TicketComment[][] {
 	return [...threads.values()];
 }
 
-/** One issue in full from the texts of its `get_issue` and `list_comments` answers. */
-export function parseIssueDetail(issueText: string, commentsText: string, colors: LabelColors): TicketDetail {
+/** One issue in full from the texts of its `get_issue` and `list_comments` answers, short of its parent and sub-issues, which other reads answer. */
+export function parseIssueDetail(issueText: string, commentsText: string, colors: LabelColors): Omit<TicketDetail, "parent" | "subIssues"> {
 	const raw = toolJson("Linear", "get_issue", issueText);
 	const ticket = parseIssue(raw, colors);
 	if (!ticket || !isObject(raw)) throw new Error("Linear's get_issue answered without an issue");
@@ -233,14 +253,19 @@ export async function loadTickets(fresh: boolean): Promise<TicketsAnswer> {
 const readIssueTexts = (server: McpServer, id: string): Promise<[string, string]> =>
 	Promise.all([callMcpTool(server, "get_issue", { id }), callMcpTool(server, "list_comments", { issueId: id, limit: PAGE })]);
 
-/** Issue `id` (`ENG-2368`) in full, with its description and comments; a failed read throws Linear's or omp's message. */
+/** Issue `id` (`ENG-2368`) in full, with its description, comments, parent, and sub-issues; a failed read throws Linear's or omp's message. */
 export async function loadTicketDetail(id: string): Promise<TicketDetail> {
 	const server = await linearServer();
-	const [[issue, comments], colors] = await Promise.all([readIssueTexts(server, id), loadLabelColors(server, [id])]);
+	const [[issue, comments], children, colors] = await Promise.all([
+		readIssueTexts(server, id),
+		allPages(server, "list_issues", { parentId: id, limit: PAGE, fields: RELATIVE_FIELDS }, pageOf("list_issues", "issues")),
+		loadLabelColors(server, [id]),
+	]);
 	const detail = parseIssueDetail(issue, comments, colors);
 	// Under the id that `linearMarkdown` wrote into its media addresses, the one the page asks the media route with.
 	rememberUploads(detail.id, issue, comments);
-	return detail;
+	const parent = detail.parentId ? parseRelative(toolJson("Linear", "get_issue", await callMcpTool(server, "get_issue", { id: detail.parentId, fields: RELATIVE_FIELDS }))) : null;
+	return { ...detail, parent, subIssues: children.flatMap(raw => parseRelative(raw) ?? []) };
 }
 
 /** The files of one issue whose addresses expired share one read of the issue, which signs them all anew. */
