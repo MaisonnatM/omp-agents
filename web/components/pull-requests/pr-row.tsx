@@ -19,7 +19,12 @@ import { BranchLabel } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
-import { IconTip, Reviewers } from "./avatars";
+import { IconTip, Reviewers, STATE_ICON } from "./avatars";
+
+/** A draft's icon before its number, for a row whose badge names another move, such as a draft that waits on a rebase. */
+function DraftMark({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
+	return pr.state === "draft" && move !== "draft" ? <IconTip icon={STATE_ICON.draft} className="[&_svg]:size-3.5" /> : null;
+}
 
 const MUTED = "bg-muted text-muted-foreground";
 
@@ -355,6 +360,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 				</div>
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
 					<RowMoveBadge pr={pr} move={move} {...actions} />
+					<DraftMark pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
@@ -405,6 +411,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
 					<span className="shrink-0">{pr.author.login}</span>
 					<span aria-hidden>·</span>
+					<DraftMark pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					{why && (
 						<>
