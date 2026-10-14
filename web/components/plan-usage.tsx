@@ -76,10 +76,10 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 					/>
 				</span>
 			</Tooltip>
+			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />
 			))}
-			{plan.extra && <ExtraSpent extra={plan.extra} />}
 		</li>
 	);
 }

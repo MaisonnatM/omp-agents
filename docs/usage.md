@@ -113,7 +113,7 @@ An action that fails shows its error, and its control becomes available again.
   Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
   Amber means less than 20% is left, and red means the window is used up, as omp reports it.
   Hover or focus a window to see omp's full limit name and when it resets.
-  After the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
+  Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` at startup and every minute after that.
 - The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
