@@ -570,6 +570,7 @@ An action that fails shows its error, and its control becomes available again.
 ## Replay from here
 
 - In a main session's **Trajectory**, each prompt row has **Replay from here**, separate from the button that expands its steps. Past sessions and a running source both support it. Subagents and the row before the first prompt do not.
+  Claude Code and Codex sessions do not replay, and neither does a session started with a tool allowlist, since a replay needs its own guard extension.
 - Opening the dialog pins that prompt and its history. Later source replies do not invalidate it. If someone changes the prompt, its ancestors, or its session header, open the dialog again.
   The source session stays untouched and keeps running if it was already running.
 - **Use original settings** restores the first identifiable main request's model and thinking level. You can instead select a model and a concrete thinking level.
