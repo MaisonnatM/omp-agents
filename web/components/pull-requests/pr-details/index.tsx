@@ -1,4 +1,5 @@
 /** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, and Code tabs. */
+import { FileDiff, FileText, History, MessageSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
@@ -72,6 +73,13 @@ export type Placement = "page" | "sidebar";
 type DetailTab = "summary" | "comments" | "timeline" | "code";
 
 /**
+ * The four labels and their counts outgrow the sidebar's default width, with or without the checks beside them, so
+ * below 30rem the tabs show their icons alone, which the tooltip and screen readers still name.
+ */
+const TAB_CLASS = "@min-[30rem]/pr:[&>svg]:hidden @max-[30rem]/pr:px-1.5";
+const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
+
+/**
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
  * of the other actions; then Summary, Comments, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
@@ -122,14 +130,14 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} next={next} actions={otherActions} quick={quick} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
-				<div className={cn("flex items-center gap-2 border-b border-border py-2", page && "px-6")}>
+				<div className={cn("flex flex-wrap items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
-						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)} className="min-w-0">
+						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
 							<TabsList aria-label="Show">
-								<TabItem value="summary" label="Summary" />
-								<TabItem value="comments" label="Comments" badge={unresolved || undefined} aria-label={`Comments, ${unresolved} unresolved threads`} />
-								<TabItem value="timeline" label="Timeline" badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
-								<TabItem value="code" label="Code" />
+								<TabItem value="summary" label="Summary" icon={FileText} tooltip="Summary" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
+								<TabItem value="comments" label="Comments" icon={MessageSquare} tooltip="Comments" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={unresolved || undefined} aria-label={`Comments, ${unresolved} unresolved threads`} />
+								<TabItem value="timeline" label="Timeline" icon={History} tooltip="Timeline" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
+								<TabItem value="code" label="Code" icon={FileDiff} tooltip="Code" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
 							</TabsList>
 						</Tabs>
 					</SizeProvider>

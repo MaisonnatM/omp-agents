@@ -685,6 +685,7 @@ An action that fails shows its error, and its control becomes available again.
   The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; a pull request not yet read offers **Merge on GitHub**.
   The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**, each with its logo.
 - Under the header, tabs split the details: **Summary**, **Comments**, with the count of its unresolved review threads, **Timeline**, with the count of its comments, reviews, and unresolved review threads, and **Code**.
+  Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
 - **Summary** lists the pull request's properties.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
