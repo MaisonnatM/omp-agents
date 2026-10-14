@@ -602,7 +602,7 @@ An action that fails shows its error, and its control becomes available again.
   A review asked of you is **Review**, with its author as the reason.
   Your own pull request is **Rebase** with merge conflicts, **Fix CI** with failed checks, and **Reply** with requested changes or review threads that wait for a resolution.
   A draft with none of those is **Draft**.
-  A draft that waits on another move, such as **Rebase**, shows the draft pull request icon before its number, in the sidebar and in the table.
+  Every open row whose badge is not **Draft** also shows a **Draft** or **Live** tag before its number, in the sidebar and in the table, so a draft that waits on another move, such as **Rebase**, reads as one.
   It is **Merge** when it is approved or needs no review, its checks passed or it has none, it has no conflicts, and no review thread waits for a resolution.
   It is **CI running** while its checks run, and **In review** otherwise, with the reviewers it still waits on as the reason.
   Once you ask every reviewer who requested changes for a new review, the pull request is **In review** again, though GitHub still reports the change request until they review again.

@@ -19,11 +19,22 @@ import { BranchLabel } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
-import { IconTip, Reviewers, STATE_ICON } from "./avatars";
+import { IconTip, Reviewers } from "./avatars";
 
-/** A draft's icon before its number, for a row whose badge names another move, such as a draft that waits on a rebase. */
-function DraftMark({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
-	return pr.state === "draft" && move !== "draft" ? <IconTip icon={STATE_ICON.draft} className="[&_svg]:size-3.5" /> : null;
+/** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
+function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
+	if (move === "draft" || (pr.state !== "draft" && pr.state !== "open")) return null;
+	const draft = pr.state === "draft";
+	return (
+		<span
+			className={cn(
+				"shrink-0 rounded-[4px] border px-1 text-[10px] leading-4 font-medium",
+				draft ? "border-border bg-muted text-muted-foreground" : "border-emerald-500/40 text-emerald-700 dark:text-emerald-400",
+			)}
+		>
+			{draft ? "Draft" : "Live"}
+		</span>
+	);
 }
 
 const MUTED = "bg-muted text-muted-foreground";
@@ -360,7 +371,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 				</div>
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
 					<RowMoveBadge pr={pr} move={move} {...actions} />
-					<DraftMark pr={pr} move={move} />
+					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
@@ -411,7 +422,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
 					<span className="shrink-0">{pr.author.login}</span>
 					<span aria-hidden>·</span>
-					<DraftMark pr={pr} move={move} />
+					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					{why && (
 						<>
