@@ -1259,7 +1259,8 @@ An action that fails shows its error, and its control becomes available again.
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
   - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
     All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
-- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, and **Updates** filter the list, each with its count of unread notices.
+- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
+  The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in a new tab, or the **Calendar** page for an event on this computer.

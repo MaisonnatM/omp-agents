@@ -20,13 +20,16 @@ import { OrgIcon } from "./org-icon";
 
 type Send = (msg: ClientMsg) => void;
 
-const FILTERS: [NoticeSource | "all", string][] = [
-	["all", "All"],
-	["github", "GitHub"],
-	["slack", "Slack"],
-	["providers", "Providers"],
-	["calendar", "Calendar"],
-	["updates", "Updates"],
+const TAB_LOGO = "size-3.5 shrink-0";
+
+/** The popover's source tabs, each with the logo its notices carry. */
+const FILTERS: [NoticeSource | "all", string, ReactNode][] = [
+	["all", "All", null],
+	["github", "GitHub", <OrgIcon key="github" org="github" className={TAB_LOGO} />],
+	["slack", "Slack", <BrandMark key="slack" logo={SLACK_LOGO} className={TAB_LOGO} />],
+	["providers", "Providers", <Gauge key="providers" aria-hidden className={TAB_LOGO} />],
+	["calendar", "Calendar", <CalendarClock key="calendar" aria-hidden className={TAB_LOGO} />],
+	["updates", "Updates", <Sparkles key="updates" aria-hidden className={cn(TAB_LOGO, "text-violet-600 dark:text-violet-400")} />],
 ];
 
 /** Each of your moves with the icon and colours of the Pull requests page's badge for it. */
@@ -308,17 +311,21 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 						</Button>
 					</Tooltip>
 				</header>
-				<div role="group" aria-label="Show" className="flex gap-1 border-b px-2 py-1.5">
-					{FILTERS.map(([id, label]) => {
+				<div role="group" aria-label="Show" className="flex shrink-0 gap-1 overflow-x-auto scrollbar-hide border-b px-2 py-1.5">
+					{FILTERS.map(([id, label, logo]) => {
 						const count = unread.filter(notice => id === "all" || presentNotice(notice, now).source === id).length;
 						return (
 							<button
 								key={id}
 								type="button"
 								aria-pressed={filter === id}
-								onClick={() => setFilter(id)}
-								className={cn("inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs transition-colors", filter === id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
+								onClick={event => {
+									setFilter(id);
+									event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+								}}
+								className={cn("inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs transition-colors", filter === id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
 							>
+								{logo}
 								{label}
 								{count > 0 && <span className="text-[10px] tabular-nums text-muted-foreground">{count}</span>}
 							</button>
