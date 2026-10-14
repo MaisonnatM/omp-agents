@@ -274,6 +274,7 @@ export function App() {
 											workspace={workspace}
 											hosts={state.hosts}
 											past={state.past}
+											current={detailsView.kind === "live" ? detailsView.instanceId : null}
 										/>
 									) : (
 										<SessionDetails

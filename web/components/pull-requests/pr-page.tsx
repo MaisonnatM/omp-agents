@@ -43,6 +43,8 @@ interface PullRequestDetailsProps {
 	onPick?: (pr: PullRequest) => void;
 	/** The session's pull requests, in the session details sidebar. */
 	session?: LinkedPullRequest[];
+	/** The `instanceId` of the session whose sidebar shows it, which the details neither chip nor offer to open. */
+	current?: string | null;
 }
 
 /**
@@ -50,13 +52,13 @@ interface PullRequestDetailsProps {
  * became of a quick start on it. The page also says why the list does not hold it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
-export function PullRequestDetails({ workspace, hosts, target, placement, version, files, onPick, session }: PullRequestDetailsProps) {
+export function PullRequestDetails({ workspace, hosts, target, placement, version, files, onPick, session, current = null }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const { read } = pullRequestsStore.use(workspace);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
-	const sessions = sessionsOn(item, hosts);
+	const sessions = sessionsOn(item, hosts).filter(host => host.instanceId !== current);
 	const missing = placement === "page" && read && !listed;
 	const started = quickOn(quick, item);
 	return (

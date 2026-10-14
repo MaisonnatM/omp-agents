@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { LinkedPullRequest, PullRequestSummary, PullRequestCheck, PullRequestDetail, PullRequestThread, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
+import type { LinkedPullRequest, PullRequestSummary, PullRequestCheck, PullRequestComment, PullRequestDetail, PullRequestThread, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
 import {
+	commentCount,
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
@@ -403,6 +404,13 @@ describe("pull request status", () => {
 	test("open threads are the unresolved ones, in GitHub's order", () => {
 		const threads = [thread("PRRT_a", false), thread("PRRT_b", true), thread("PRRT_c", false)];
 		expect(openThreads(detail({ threads })).map(({ id }) => id)).toEqual(["PRRT_a", "PRRT_c"]);
+	});
+
+	test("the comment count counts every comment of every thread, resolved ones too, and the conversation's comments and reviews with words", () => {
+		const said: PullRequestComment = { author: { login: "ann", avatarUrl: null }, at: 0, body: "Looks off", url: "" };
+		const threads = [{ ...thread("PRRT_a", false), comments: [said, said] }, { ...thread("PRRT_b", true), comments: [said] }];
+		const conversation = [{ ...said, review: null }, { ...said, body: "  ", review: "approved" as const }, { ...said, review: "changes-requested" as const }];
+		expect(commentCount(detail({ threads, conversation }))).toBe(5);
 	});
 
 	test("resolving or unresolving a thread moves the unresolved count with it, and keeps whether GitHub listed every thread", () => {

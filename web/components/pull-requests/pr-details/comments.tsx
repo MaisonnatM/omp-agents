@@ -5,7 +5,7 @@ import { MAX_COMMENT_BODY, type PullRequestDetail, type PullRequestThread } from
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { errorText } from "../../../api";
-import { openThreads, withThreadResolved } from "../../../pull-requests-model";
+import { openThreads, spokenConversation, withThreadResolved } from "../../../pull-requests-model";
 import { chordLabel } from "../../../shortcuts";
 import { FoldButton } from "../../fold";
 import { ERROR_TEXT, isSubmitChord, type Submit } from "../../form-dialog";
@@ -110,7 +110,7 @@ export function Comments({ detail, save, send }: CommentsProps) {
 	const resolvedId = useId();
 	const open = openThreads(detail);
 	const resolved = detail.threads.filter(thread => thread.resolved);
-	const conversation = detail.conversation.filter(event => event.body.trim() !== "");
+	const conversation = spokenConversation(detail);
 	const card = (thread: PullRequestThread) => <ThreadCard key={thread.id} detail={detail} thread={thread} save={save} send={send} />;
 	return (
 		<div className="space-y-6">

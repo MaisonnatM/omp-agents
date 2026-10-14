@@ -65,13 +65,15 @@ interface ProjectDetailsProps {
 	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
+	/** The coordinator's `instanceId`, `null` for a past coordinator. */
+	current: string | null;
 }
 
 /**
  * The right sidebar for a project's coordinator, which changes no code itself: its workers, the project's notes, and
  * the pull requests its workers opened, each tab apart.
  */
-export function ProjectDetails({ project, working, cwd, workspace, hosts, past }: ProjectDetailsProps) {
+export function ProjectDetails({ project, working, cwd, workspace, hosts, past, current }: ProjectDetailsProps) {
 	const pullRequests = workerPullRequests(project, hosts, past);
 	return (
 		<DetailsSidebarFrame
@@ -98,7 +100,7 @@ export function ProjectDetails({ project, working, cwd, workspace, hosts, past }
 					name: "PRs",
 					count: pullRequests.length,
 					pinned: true,
-					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
+					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={current} />,
 				},
 			]}
 		/>

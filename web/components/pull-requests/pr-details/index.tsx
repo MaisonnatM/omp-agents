@@ -6,7 +6,7 @@ import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { moveAction, openThreads, pullRequestStatus, reason } from "../../../pull-requests-model";
+import { commentCount, moveAction, openThreads, pullRequestStatus, reason } from "../../../pull-requests-model";
 import { putJson } from "../../../api";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { type AgentState, actionFacts, type MoveId, moveOf } from "../../../../src/shared/moves";
@@ -15,6 +15,7 @@ import { useEditableRead } from "../../../editable-read";
 import { useRead } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
 import { ERROR_TEXT } from "../../form-dialog";
+import { usePullRequestOptions } from "../pr-fields";
 import { LoadNote } from "../../sheet-details";
 import { Timeline } from "../pr-timeline";
 import { ChecksSummary } from "./checks";
@@ -116,7 +117,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
 		else if (value !== "code" && files) location.hash = hashForPullRequests(pr);
 	};
-	// The list's entry says who you are to it; the details, once read, say where it stands, as the Summary shows.
+	// The list's entry says who you are to it; the details, once read, say where it stands, as the Status shows.
 	const facts = listed && actionFacts(listed, detail);
 	const next = facts && nextMove(facts, agent, sessions);
 	const quick: QuickActionsProps = { actions: facts ? pullRequestActions(facts) : [], pending, onRun: (action: PullRequestActionId) => facts && onRun(facts, action) };
@@ -124,19 +125,20 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
 	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	const page = placement === "page";
-	const unresolved = detail?.unresolved.count ?? 0;
-	const comments = detail ? detail.conversation.length + openThreads(detail).length : 0;
+	const options = usePullRequestOptions(pr);
+	const comments = detail ? commentCount(detail) : 0;
+	const timeline = detail ? detail.conversation.length + openThreads(detail).length : 0;
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
-				<DetailHeader pr={pr} detail={detail} stack={stack} next={next} actions={otherActions} quick={quick} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
+				<DetailHeader pr={pr} detail={detail} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
 				<div className={cn("flex flex-wrap items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
 						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
 							<TabsList aria-label="Show">
 								<TabItem value="summary" label="Summary" icon={FileText} tooltip="Summary" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
-								<TabItem value="comments" label="Comments" icon={MessageSquare} tooltip="Comments" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={unresolved || undefined} aria-label={`Comments, ${unresolved} unresolved threads`} />
-								<TabItem value="timeline" label="Timeline" icon={History} tooltip="Timeline" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
+								<TabItem value="comments" label="Comments" icon={MessageSquare} tooltip="Comments" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={comments || undefined} aria-label={`Comments, ${comments} comments`} />
+								<TabItem value="timeline" label="Timeline" icon={History} tooltip="Timeline" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={timeline || undefined} aria-label={`Timeline, ${timeline} comments`} />
 								<TabItem value="code" label="Code" icon={FileDiff} tooltip="Code" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
 							</TabsList>
 						</Tabs>
@@ -161,7 +163,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 							</p>
 						)}
 						{tab === "summary" ? (
-							<Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
+							<Summary pr={pr} detail={detail} options={options} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
 						) : tab === "comments" ? (
 							<Comments detail={detail} save={save} send={send} />
 						) : (
