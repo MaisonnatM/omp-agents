@@ -12,10 +12,10 @@ interface SessionTicketsTabProps {
 	version?: unknown;
 }
 
-/** The session's Linear issues in the right sidebar: one in full, as the Tickets page shows it, the first until another is picked above it. */
+/** The session's Linear issues in the right sidebar: one in full, as the Tickets page shows it, the first until another is picked above it or from the shown one's parent and sub-issues. */
 export function SessionTicketsTab({ tickets, version }: SessionTicketsTabProps) {
 	const [picked, setPicked] = useState<string | null>(null);
-	const shown = picked !== null && tickets.includes(picked) ? picked : tickets[0];
+	const shown = picked ?? tickets[0];
 	const read = useEditableRead<TicketDetail>(shown ? `/api/ticket?${new URLSearchParams({ id: shown })}` : null, version);
 	const listed = ticketsStore.use().read?.data.tickets.find(ticket => ticket.id === shown) ?? null;
 	if (!shown) return null;
@@ -30,7 +30,7 @@ export function SessionTicketsTab({ tickets, version }: SessionTicketsTabProps) 
 					))}
 				</div>
 			)}
-			<TicketDetailContent key={shown} id={shown} listed={listed} read={read} placement="sidebar" />
+			<TicketDetailContent key={shown} id={shown} listed={listed} read={read} placement="sidebar" onPick={setPicked} />
 		</div>
 	);
 }

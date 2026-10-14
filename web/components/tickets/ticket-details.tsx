@@ -1,4 +1,4 @@
-import { CornerLeftUp, GitPullRequest, Link2 } from "lucide-react";
+import { CornerLeftUp, GitPullRequest, Link2, ListTree } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { pullRequestOfUrl } from "../../../src/shared/github";
 import type { Ticket, TicketDetail, TicketRelative } from "../../../src/shared/tickets";
@@ -9,6 +9,7 @@ import { hashForTickets } from "../../routing";
 import { PRIORITY_LABEL, subIssueOrder } from "../../tickets-model";
 import { BranchName } from "../git";
 import { IconTip } from "../pull-requests/avatars";
+import { Rail, RailRow } from "../rail";
 import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
 import { PRIORITY_ICON, statusIcon } from "./ticket-row";
@@ -22,13 +23,15 @@ interface TicketDetailContentProps {
 	actions?: (ticket: Ticket) => ReactNode;
 	/** The tickets page lays the issue out in two columns and focuses its title; the session details sidebar stacks them and leaves focus where it is. */
 	placement?: "page" | "sidebar";
+	/** Shows the parent or a sub-issue in place, as the sidebar does; without it they link to the Tickets page. */
+	onPick?: (id: string) => void;
 }
 
 /**
  * A Linear issue laid out as Linear lays it out: the title, description, and comments in a wide column, and beside it
  * {@link TicketSide}. On a narrow page, and in the sidebar, the side column follows the title.
  */
-export function TicketDetailContent({ id, listed, read, actions, placement = "page" }: TicketDetailContentProps) {
+export function TicketDetailContent({ id, listed, read, actions, placement = "page", onPick }: TicketDetailContentProps) {
 	const { data: detail, error } = read;
 	const ticket = detail ?? listed;
 	const page = placement === "page";
@@ -41,7 +44,7 @@ export function TicketDetailContent({ id, listed, read, actions, placement = "pa
 	return (
 		<div className={page ? "grid gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_1fr]" : "grid grid-cols-[minmax(0,1fr)] gap-y-6"}>
 			<div className={cn("min-w-0", page ? "space-y-2 lg:col-start-1 lg:row-start-1" : "space-y-1.5")}>
-				{ticket?.parentId && <ParentLink id={ticket.parentId} parent={detail?.parent ?? null} />}
+				{ticket?.parentId && <ParentLink id={ticket.parentId} parent={detail?.parent ?? null} onPick={onPick} />}
 				<Heading
 					ref={headingRef}
 					tabIndex={-1}
@@ -50,7 +53,7 @@ export function TicketDetailContent({ id, listed, read, actions, placement = "pa
 					{ticket?.title ?? id}
 				</Heading>
 			</div>
-			{ticket && <TicketSide ticket={ticket} read={read} actions={actions} page={page} />}
+			{ticket && <TicketSide ticket={ticket} read={read} actions={actions} page={page} onPick={onPick} />}
 			<div className={cn("min-w-0", page ? "space-y-10 lg:col-start-1 lg:row-start-2" : "space-y-6")}>
 				{detail ? <TicketBody detail={detail} page={page} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />}
 			</div>
@@ -58,18 +61,19 @@ export function TicketDetailContent({ id, listed, read, actions, placement = "pa
 	);
 }
 
-interface TicketSideProps extends Pick<TicketDetailContentProps, "actions" | "read"> {
+interface TicketSideProps extends Pick<TicketDetailContentProps, "actions" | "read" | "onPick"> {
 	ticket: Ticket;
 	page: boolean;
 }
 
-/** The side column: the quick actions, the editable fields, the branch, the links, and who opened the issue. */
-function TicketSide({ ticket, read, actions, page }: TicketSideProps) {
+/** The side column: the quick actions, the editable fields, the sidebar's sub-issues, the branch, the links, and who opened the issue. */
+function TicketSide({ ticket, read, actions, page, onPick }: TicketSideProps) {
 	const detail = read.data;
 	return (
 		<aside aria-label="Issue properties" className={cn("space-y-6", page && "lg:col-start-2 lg:row-span-2 lg:row-start-1")}>
 			{actions?.(ticket)}
 			<TicketFields ticket={ticket} detail={detail} edit={read.edit} saveError={read.saveError} />
+			{!page && detail && detail.subIssues.length > 0 && <SubIssueRail id={ticket.id} subIssues={detail.subIssues} onPick={onPick} />}
 			{detail && <TicketLinks detail={detail} />}
 			<div className="space-y-1 text-xs text-muted-foreground">
 				<p className="tabular-nums">{ticket.id}</p>
@@ -86,19 +90,27 @@ function TicketSide({ ticket, read, actions, page }: TicketSideProps) {
 	);
 }
 
-/** The issue a sub-issue belongs to, above its title: its identifier from the list at once, its status and title once Linear answers. */
-function ParentLink({ id, parent }: { id: string; parent: TicketRelative | null }) {
-	return (
-		<a
-			href={hashForTickets(id)}
-			title={parent ? `${id} ${parent.title}` : id}
-			className="flex h-5 w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-		>
+/** The issue a sub-issue belongs to, above its title: its identifier from the list at once, its status and title once Linear answers; `onPick` shows it in place. */
+function ParentLink({ id, parent, onPick }: { id: string; parent: TicketRelative | null; onPick?: (id: string) => void }) {
+	const className =
+		"flex h-5 w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
+	const content = (
+		<>
 			<CornerLeftUp aria-hidden className="size-3.5 shrink-0" />
 			<span className="shrink-0">Sub-issue of</span>
 			{parent && <IconTip icon={[...statusIcon(parent), parent.status]} />}
 			<span className="shrink-0 tabular-nums">{id}</span>
 			{parent && <span className="min-w-0 truncate text-foreground">{parent.title}</span>}
+		</>
+	);
+	const title = parent ? `${id} ${parent.title}` : id;
+	return onPick ? (
+		<button type="button" onClick={() => onPick(id)} title={title} className={className}>
+			{content}
+		</button>
+	) : (
+		<a href={hashForTickets(id)} title={title} className={className}>
+			{content}
 		</a>
 	);
 }
@@ -109,8 +121,8 @@ function subIssueProgress(subIssues: TicketRelative[]): { done: number; total: n
 	return { done: subIssues.filter(({ statusType }) => statusType === "completed").length, total };
 }
 
-/** The issue's sub-issues, each a link to its details, under how many are done; a sub-issue names its assignee only when it is not `owner`, the issue's own. */
-function SubIssues({ subIssues, owner, page }: { subIssues: TicketRelative[]; owner: string | null; page: boolean }) {
+/** The page's sub-issues, each a link to its details, under how many are done; a sub-issue names its assignee only when it is not `owner`, the issue's own. */
+function SubIssues({ subIssues, owner }: { subIssues: TicketRelative[]; owner: string | null }) {
 	const { done, total } = subIssueProgress(subIssues);
 	return (
 		<section className="space-y-2 border-t border-border pt-6">
@@ -140,7 +152,7 @@ function SubIssues({ subIssues, owner, page }: { subIssues: TicketRelative[]; ow
 								<IconTip icon={[...statusIcon(issue), issue.status]} />
 								<span className="shrink-0 tabular-nums text-muted-foreground">{issue.id}</span>
 								<span className={cn("min-w-0 flex-1 truncate", closed && "text-muted-foreground", issue.statusType === "canceled" && "line-through")}>{issue.title}</span>
-								{issue.assignee && issue.assignee !== owner && page && <span className="hidden max-w-32 shrink-0 truncate text-xs text-muted-foreground sm:block">{issue.assignee}</span>}
+								{issue.assignee && issue.assignee !== owner && <span className="hidden max-w-32 shrink-0 truncate text-xs text-muted-foreground sm:block">{issue.assignee}</span>}
 								<IconTip icon={[...PRIORITY_ICON[issue.priority], PRIORITY_LABEL[issue.priority]]} />
 							</a>
 						</li>
@@ -151,12 +163,61 @@ function SubIssues({ subIssues, owner, page }: { subIssues: TicketRelative[]; ow
 	);
 }
 
-/** An issue's description, its sub-issues, then its comment threads; the sidebar sets the description at its own text size. */
+/** The sidebar's sub-issues on a rail down to the issue `id`, as a pull request's stack runs down to its base branch; each links to its details, or `onPick` shows it in place. */
+function SubIssueRail({ id, subIssues, onPick }: { id: string; subIssues: TicketRelative[]; onPick?: (id: string) => void }) {
+	const { done, total } = subIssueProgress(subIssues);
+	return (
+		<DetailSection
+			title={
+				<>
+					<ListTree aria-hidden className="size-3.5 self-center" />
+					Sub-issues
+					<span aria-hidden className="tabular-nums">
+						{done}/{total}
+					</span>
+					<span className="sr-only">
+						, {done} of {total} done
+					</span>
+				</>
+			}
+		>
+			<Rail end={id} className="rounded-md border border-border">
+				{subIssues.toSorted(subIssueOrder).map((issue, index) => {
+					const closed = issue.statusType === "completed" || issue.statusType === "canceled";
+					const className = "min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline";
+					const label = (
+						<>
+							<span className="tabular-nums text-muted-foreground">{issue.id}</span>{" "}
+							<span className={cn(closed && "text-muted-foreground", issue.statusType === "canceled" && "line-through")}>{issue.title}</span>
+						</>
+					);
+					return (
+						<RailRow key={issue.id} first={index === 0}>
+							<IconTip icon={[...statusIcon(issue), issue.status]} />
+							{onPick ? (
+								<button type="button" onClick={() => onPick(issue.id)} className={className}>
+									{label}
+								</button>
+							) : (
+								<a href={hashForTickets(issue.id)} className={className}>
+									{label}
+								</a>
+							)}
+							<IconTip icon={[...PRIORITY_ICON[issue.priority], PRIORITY_LABEL[issue.priority]]} />
+						</RailRow>
+					);
+				})}
+			</Rail>
+		</DetailSection>
+	);
+}
+
+/** An issue's description, the page's sub-issues, then its comment threads; the sidebar sets the description at its own text size. */
 function TicketBody({ detail: { description, subIssues, assignee, threads }, page }: { detail: TicketDetail; page: boolean }) {
 	return (
 		<>
 			{description.trim() ? <Markdown text={description} className={cn("leading-relaxed", page ? "text-[15px]" : "text-sm")} /> : <p className="text-sm text-muted-foreground">No description.</p>}
-			{subIssues.length > 0 && <SubIssues subIssues={subIssues} owner={assignee?.name ?? null} page={page} />}
+			{page && subIssues.length > 0 && <SubIssues subIssues={subIssues} owner={assignee?.name ?? null} />}
 			{threads.length > 0 && (
 				<section className="space-y-4 border-t border-border pt-6">
 					<h2 className="flex items-baseline gap-2 text-sm font-medium">
