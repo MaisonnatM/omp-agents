@@ -264,9 +264,9 @@ An action that fails shows its error, and its control becomes available again.
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
 - **Transcript** and **Trajectory** in a pane's header switch what the pane shows; a live session keeps its composer under either.
-  **Trajectory** lists the conversation's turns, one row per prompt you or a skill sent, with a row first for what came before your first prompt.
-  A row shows the prompt's first line, its skill, how many model requests and tool calls the turn made, and its tokens and cost; hover the numbers for input, output, cache read, and cache write.
-  Open a row for each step in order: what omp injected before or during the turn, such as a skill's body, a system reminder, or a rule, each named by its source; model and thinking-level changes; each model request with its model, tokens, cost, time, and stop reason; the thinking and the reply; each tool call with its arguments, result size, images, and time; side calls such as auto-thinking; and compactions.
+  **Trajectory** is a ledger of the conversation's turns, one row per prompt you or a skill sent, with a row first for what came before your first prompt.
+  Its columns are the prompt's first line with its skill, the turn's model requests and tool calls, its input, output, cache-read, and cache-write tokens, and its cost, underlined by the turn's share of the session's cost; a last row adds up every turn.
+  Open a row for each step in order, its tokens in the same columns: what omp injected before or during the turn, such as a skill's body, a system reminder, or a rule, each named by its source; model and thinking-level changes; each model request with its model, time, and stop reason; the thinking and the reply; each tool call with its result size and time; side calls such as auto-thinking; and compactions.
   A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
   A subagent's turns show in the subagent's own pane, not its parent's.
   The pane goes back to **Transcript** when it opens another conversation.
