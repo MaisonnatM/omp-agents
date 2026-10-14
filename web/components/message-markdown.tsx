@@ -83,16 +83,16 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	return (
 		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
 			{favicon ? (
-				<span className="inline-flex max-w-full items-baseline gap-1">
+				<>
 					{service === "linear" || service === "slack" ? (
-						<BrandMark logo={service === "linear" ? LINEAR_LOGO : SLACK_LOGO} className="size-3 self-center" />
+						<BrandMark logo={service === "linear" ? LINEAR_LOGO : SLACK_LOGO} className="mr-1 inline-flex size-3 align-middle" />
 					) : service ? (
-						<OrgIcon org={service} className="self-center" />
+						<OrgIcon org={service} className="mr-1 inline-block align-middle" />
 					) : (
-						<img src={favicon} alt="" className="size-3 shrink-0 self-center" loading="lazy" referrerPolicy="no-referrer" />
+						<img src={favicon} alt="" className="mr-1 inline-block size-3 align-middle" loading="lazy" referrerPolicy="no-referrer" />
 					)}
 					<span className="font-semibold underline">{service && bare ? props.title || title.data?.title || label : children}</span>
-				</span>
+				</>
 			) : children}
 		</a>
 	);

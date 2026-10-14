@@ -12,11 +12,22 @@ export function FileLink({ path, children }: { path: string; children: ReactNode
 	const openFile = useContext(DashboardActionsContext)?.openFile;
 	const target = absoluteFilePath(path, useContext(FileBaseContext));
 	if (!openFile || target === null) return children;
+	// A span, not a button: a button lays out as an inline block, so a long path would jump to its own line instead of wrapping in the sentence.
 	return (
 		<Tooltip content={target}>
-			<button type="button" className="file-link" onClick={() => openFile(target)}>
+			<span
+				role="button"
+				tabIndex={0}
+				className="file-link"
+				onClick={() => openFile(target)}
+				onKeyDown={(event) => {
+					if (event.key !== "Enter" && event.key !== " ") return;
+					event.preventDefault();
+					openFile(target);
+				}}
+			>
 				{children}
-			</button>
+			</span>
 		</Tooltip>
 	);
 }
