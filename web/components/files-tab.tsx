@@ -136,7 +136,7 @@ function FileChangesDialog({ file, onClose }: { file: ChangedFile; onClose: () =
 	);
 }
 
-/** The changed files, with a search that keeps those whose path holds every word typed; the heading counts and totals what it shows. */
+/** The changed files, with a search pinned above them that keeps those whose path holds every word typed; the heading counts and totals what it shows. */
 function ChangedFiles({ files, onOpen }: { files: ChangedFile[]; onOpen: (path: string) => void }) {
 	const [query, setQuery] = useState("");
 	const holds = everyWord(query);
@@ -144,7 +144,10 @@ function ChangedFiles({ files, onOpen }: { files: ChangedFile[]; onOpen: (path: 
 	const count = matched.length === files.length ? plural(files.length, "file") : `${matched.length} of ${plural(files.length, "file")}`;
 	return (
 		<SidebarGroup>
-			<SidebarSearch label="Filter the changed files" placeholder="Search files" query={query} onQuery={setQuery} />
+			<div className="sticky top-0 z-20 -mx-2 -mt-2 bg-background px-2 pt-2 pb-1">
+				{/* Above the rows' buttons, which sit at z-10. */}
+				<SidebarSearch label="Filter the changed files" placeholder="Search files" query={query} onQuery={setQuery} />
+			</div>
 			{matched.length === 0 ? (
 				<p className="px-2 py-2 text-xs text-muted-foreground">{`No files match “${query.trim()}”`}</p>
 			) : (
@@ -164,8 +167,8 @@ function ChangedFiles({ files, onOpen }: { files: ChangedFile[]; onOpen: (path: 
 	);
 }
 
-/** What the tab shows over the page: the session's changes, opened at a file or at the first, or one file's recorded changes for a subagent. */
-type Shown = { kind: "changes"; path: string | null } | { kind: "history"; path: string } | null;
+/** What the tab shows over the page: the session's changes opened at a file, or one file's recorded changes for a subagent. */
+type Shown = { kind: "changes" | "history"; path: string } | null;
 
 interface FilesTabProps {
 	files: ChangedFile[] | null;
@@ -193,17 +196,6 @@ export function FilesTab({ files, sessionId, cwd, working }: FilesTabProps) {
 			{history && <FileChangesDialog file={history} onClose={() => setShown(null)} />}
 			{sessionId !== null && shown?.kind === "changes" && (
 				<SessionChangesDialog sessionId={sessionId} cwd={cwd} path={shown.path} work={files} working={working} onClose={() => setShown(null)} />
-			)}
-			{sessionId !== null && (
-				<SidebarGroup>
-					<SidebarMenu>
-						<SidebarMenuItem>
-							<SidebarMenuButton icon={FileDiff} aria-haspopup="dialog" onClick={() => setShown({ kind: "changes", path: null })}>
-								Open the session's changes
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-					</SidebarMenu>
-				</SidebarGroup>
 			)}
 		</>
 	);

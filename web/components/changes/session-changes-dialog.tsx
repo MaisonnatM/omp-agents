@@ -19,8 +19,8 @@ interface SessionChangesDialogProps {
 	sessionId: string;
 	/** The session's directory, which the Files tab's paths are relative to. */
 	cwd: string | null;
-	/** The file to open first, as the Files tab names it; `null` opens the first file. */
-	path: string | null;
+	/** The file to open first, as the Files tab names it. */
+	path: string;
 	/** The session's own changed files: each change reads the list again. */
 	work: ChangedFile[] | null;
 	/** A turn that starts or ends reads the list again, since bash and subagents change files without telling the page. */
@@ -33,7 +33,7 @@ interface SessionChangesDialogProps {
  * and what its own calls changed; another file opens in place.
  */
 export function SessionChangesDialog({ sessionId, cwd, path, work, working, onClose }: SessionChangesDialogProps) {
-	const [scope, setScope] = useState<Scope>("all");
+	const [scope, setScope] = useState<Scope>("session");
 	const [reads, setReads] = useState(0);
 	const [picked, setPicked] = useState<string | null>(null);
 	const edits = work?.reduce((count, file) => count + file.changes.length, 0) ?? 0;
@@ -41,7 +41,7 @@ export function SessionChangesDialog({ sessionId, cwd, path, work, working, onCl
 	const list = useRead<SessionChanges>(`/api/changes?session=${encodeURIComponent(sessionId)}`, version);
 	const changes = list.data;
 	const files = useMemo(() => (changes?.files ?? []).filter(file => scope === "all" || file.session), [changes, scope]);
-	const asked = useMemo(() => (changes && path !== null ? changesPathOf(path, cwd, changes.root, changes.files) : null), [changes, path, cwd]);
+	const asked = useMemo(() => (changes ? changesPathOf(path, cwd, changes.root, changes.files) : null), [changes, path, cwd]);
 
 	const totals = files.reduce((sum, file) => ({ added: sum.added + (file.added ?? 0), removed: sum.removed + (file.removed ?? 0) }), { added: 0, removed: 0 });
 	const sessionCount = changes?.files.filter(file => file.session).length ?? 0;
