@@ -13,12 +13,9 @@ import { useCallback, useRef, useState } from "react";
  * lands, which reads as the region ballooning and then correcting. Same
  * treatment as Accordion's content height.
  *
- * Returns a ref for the region's CONTENT element. The height it reports is the
- * clipping parent's scrollHeight, so inner margins count (the parent's
- * overflow-hidden makes it a block formatting context, so they don't collapse
- * out) and the value stays correct while the animated height is mid-flight.
- * Observing the child rather than the parent keeps the ResizeObserver out of a
- * feedback loop with that animation.
+ * Measure the content's layout height and margins, independent of the animated
+ * parent's current height and any ancestor transforms. Measuring the parent
+ * would keep a shrinking region at its previous height.
  */
 export function useRegionHeight() {
   const roRef = useRef<ResizeObserver | null>(null);
@@ -28,8 +25,8 @@ export function useRegionHeight() {
     roRef.current = null;
     if (!el) return;
     const sync = () => {
-      const next = el.parentElement?.scrollHeight ?? el.offsetHeight;
-      if (next > 0) setHeight(next);
+      const style = getComputedStyle(el);
+      setHeight(el.offsetHeight + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0));
     };
     sync();
     const ro = new ResizeObserver(sync);

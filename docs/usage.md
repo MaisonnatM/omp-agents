@@ -358,6 +358,7 @@ An action that fails shows its error, and its control becomes available again.
   **Send now** (↑ icon, or Cmd+Enter on the focused row) turns a follow-up into a steer, which the running turn takes at its next step; on a steer it stops the turn so omp runs its held steers at once.
   **Edit** (pencil, or a double-click, Enter, or F2 on the row) moves the message back into the composer, with its images; its files come back as their `<file>` blocks in the text.
   **Remove** (**×**, or Delete on the row) drops it.
+  Editing or removing a queued message shrinks the queue area to fit the remaining rows, without leaving blank space above the text field.
   ↑ in the empty composer moves the last one back, the last steer before the last follow-up, as omp does.
   **Stop** and Cmd+Shift+Backspace interrupt the turn and move every waiting message back into the composer, images included, so nothing runs after an interrupt.
   In a terminal session, Stop moves back only the follow-ups the dashboard holds; a steer already sent waits in the host's queue.
