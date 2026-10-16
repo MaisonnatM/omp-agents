@@ -49,9 +49,7 @@ test("omp-agents' directory and omp's agent directory are denied, Markdown in om
 });
 
 test("the project's and the user's notes lie outside every denied directory, so the file dialog opens them", () => {
-	for (const notes of [projectNotesDir("p1"), userNotesDir]) {
-		for (const { dir } of DENIED_DIRS) expect({ notes, inside: notes === dir || notes.startsWith(dir + sep) }).toEqual({ notes, inside: false });
-	}
+	for (const notes of [projectNotesDir("p1"), userNotesDir]) expect(DENIED_DIRS.filter(({ dir }) => notes === dir || notes.startsWith(dir + sep))).toEqual([]);
 });
 
 test("a text file in a denied directory is refused, by its real path, but for the extensions that directory opens", async () => {

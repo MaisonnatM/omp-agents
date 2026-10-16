@@ -312,11 +312,10 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	const projectNotes = get(params => {
 		const id = params.get("id") ?? "";
 		const dir = env.projectNotesDir(id);
-		const userDir = env.userNotesDir;
 		if (dir === null) return fail(404, `No project ${id}`);
 		return answer(async (): Promise<ProjectNotesAnswer> => {
-			const [notes, userNotes] = await Promise.all([listNotes(dir), listNotes(userDir)]);
-			return { dir, notes, userDir, userNotes };
+			const [notes, userNotes] = await Promise.all([listNotes(dir), listNotes(env.userNotesDir)]);
+			return { dir, notes, userDir: env.userNotesDir, userNotes };
 		});
 	});
 

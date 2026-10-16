@@ -320,7 +320,7 @@ export class Dashboard {
 			checkedOut,
 			extensionArgs: projectsExtensionArgs,
 			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),
-			writeInbox: (id, event, at) => void writeInboxEvent(projectNotesDir(id), event, at),
+			writeInbox: (id, event, at) => writeInboxEvent(projectNotesDir(id), event, at),
 			now: Date.now,
 			newId: randomUUID,
 			onChange: () => broadcasts.pushList("projects"),
@@ -451,11 +451,7 @@ export class Dashboard {
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
-		try {
-			seedUserNotes(userNotesDir);
-		} catch (error) {
-			console.error(`omp-agents: cannot seed the user notes in ${userNotesDir}: ${errorText(error)}`);
-		}
+		seedUserNotes(userNotesDir);
 		for (const project of this.#projects.value) moveOldNotes(projectNotesDir(project.id));
 		this.#loops.watch();
 		if (this.#ownerLock.acquire()) {

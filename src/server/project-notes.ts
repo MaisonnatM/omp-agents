@@ -7,6 +7,7 @@ import { readdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { errorText, isObject } from "../json";
 import type { ProjectEvent, ProjectNote } from "../shared/projects";
+import { slug } from "../shared/slug";
 
 /** The files a new project starts with, by path; notes.md comes first and indexes the rest. */
 function projectSeeds(name: string, goal: string): Record<string, string> {
@@ -58,16 +59,23 @@ const MOVED: readonly (readonly [from: string, to: string])[] = [
 	["checklist.md", "internal/checklist.md"],
 ];
 
-/** Writes each of `files` under `dir` that is not there yet; a file already there stays, even one written meanwhile. */
+/** Writes `text` to `path` when no file is there; `false`, leaving the file as it is, when one is, even one written meanwhile. */
+function writeNew(path: string, text: string): boolean {
+	try {
+		writeFileSync(path, text, { flag: "wx" });
+		return true;
+	} catch (error) {
+		if (isObject(error) && error.code === "EEXIST") return false;
+		throw error;
+	}
+}
+
+/** Writes each of `files` under `dir` that is not there yet. */
 function seed(dir: string, files: Record<string, string>): void {
 	for (const [file, text] of Object.entries(files)) {
 		const path = join(dir, file);
 		mkdirSync(dirname(path), { recursive: true });
-		try {
-			writeFileSync(path, text, { flag: "wx" });
-		} catch (error) {
-			if (!(isObject(error) && error.code === "EEXIST")) throw error;
-		}
+		writeNew(path, text);
 	}
 }
 
@@ -98,21 +106,13 @@ export function seedNotes(dir: string, name: string, goal: string): void {
 	seed(dir, projectSeeds(name, goal));
 }
 
-/** Creates the user's notes in `dir`; a file already there stays. */
+/** Creates the user's notes in `dir`, logging a failure, since sessions run without them; a file already there stays. */
 export function seedUserNotes(dir: string): void {
-	seed(dir, USER_SEEDS);
-}
-
-/** `text` as a file name's segment: lower case, dashes between words, at most 60 characters. */
-function fileSlug(text: string): string {
-	return (
-		text
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "")
-			.slice(0, 60)
-			.replace(/-+$/, "") || "event"
-	);
+	try {
+		seed(dir, USER_SEEDS);
+	} catch (error) {
+		console.error(`omp-agents: cannot seed the user notes in ${dir}: ${errorText(error)}`);
+	}
 }
 
 /**
@@ -123,18 +123,13 @@ function fileSlug(text: string): string {
 export function writeInboxEvent(dir: string, event: ProjectEvent, at: string): string {
 	const inbox = join(dir, "inbox");
 	mkdirSync(inbox, { recursive: true });
-	const stem = `${at.replace(/\.\d+Z$/, "Z").replace(/:/g, "-")}-${fileSlug(`${event.source} ${event.title}`)}`;
+	const stem = `${at.replace(/\.\d+Z$/, "Z").replace(/:/g, "-")}-${slug(`${event.source} ${event.title}`, "event", 60)}`;
 	const lines = [`# ${event.title.replace(/\s+/g, " ").trim()}`, "", `- Source: ${event.source}`, `- Time: ${at}`];
 	if (event.url) lines.push(`- URL: ${event.url}`);
 	const text = [...lines, "", event.text.trim(), ""].join("\n");
 	for (let n = 1; ; n++) {
 		const path = join(inbox, `${n === 1 ? stem : `${stem}-${n}`}.md`);
-		try {
-			writeFileSync(path, text, { flag: "wx" });
-			return path;
-		} catch (error) {
-			if (!(isObject(error) && error.code === "EEXIST")) throw error;
-		}
+		if (writeNew(path, text)) return path;
 	}
 }
 
