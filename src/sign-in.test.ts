@@ -12,26 +12,36 @@ const waitsOnBrowser = async (_: AbortSignal, waiting: (url: string) => void): P
 };
 
 describe("SignIn.hold", () => {
-	test("reads the status again while no sign-in waits, and repeats the last one while one waits on the browser", async () => {
+	test("reads the status again while no sign-in waits, and repeats the one read during a sign-in that waits on the browser", async () => {
 		const signIn = createSignIn("timed out");
-		expect(await signIn.hold(async () => signedOut)).toEqual(signedOut);
-		expect(await signIn.hold(async () => ready)).toEqual(ready);
-		await signIn.start(waitsOnBrowser);
-		expect(signIn.state()).toEqual({ phase: "waiting", url: "https://example.com/authorize" });
-		expect(await signIn.hold(async () => signedOut)).toEqual(ready);
+		expect(await signIn.hold(null, async () => signedOut)).toEqual(signedOut);
+		expect(await signIn.hold(null, async () => ready)).toEqual(ready);
+		await signIn.start(null, waitsOnBrowser);
+		expect(signIn.state()).toEqual({ signIn: { phase: "waiting", url: "https://example.com/authorize" }, target: null });
+		expect(await signIn.hold(null, async () => ready)).toEqual(ready);
+		expect(await signIn.hold(null, async () => signedOut)).toEqual(ready);
 		signIn.cancel();
-		expect(await signIn.hold(async () => signedOut)).toEqual(signedOut);
+		expect(await signIn.hold(null, async () => signedOut)).toEqual(signedOut);
 	});
 
-	test("reads a server that has no status yet even while its sign-in waits, and a failed sign-in holds nothing", async () => {
+	test("a failed sign-in holds nothing", async () => {
 		const signIn = createSignIn("timed out");
-		await signIn.start(waitsOnBrowser);
-		expect(await signIn.hold(async () => signedOut)).toEqual(signedOut);
-		expect(await signIn.hold(async () => ready)).toEqual(signedOut);
-		await signIn.start(async () => {
+		await signIn.start(null, async () => {
 			throw new Error("denied");
 		});
-		expect(signIn.state()).toEqual({ phase: "failed", error: "denied" });
-		expect(await signIn.hold(async () => ready)).toEqual(ready);
+		expect(signIn.state()).toEqual({ signIn: { phase: "failed", error: "denied" }, target: null });
+		expect(await signIn.hold(null, async () => signedOut)).toEqual(signedOut);
+		expect(await signIn.hold(null, async () => ready)).toEqual(ready);
+	});
+
+	test("a sign-in to another account starts holding nothing, and holds only its own account's status", async () => {
+		const signIn = createSignIn<string>("timed out");
+		await signIn.start("gmail", waitsOnBrowser);
+		expect(await signIn.hold("gmail", async () => ready)).toEqual(ready);
+		await signIn.start("gmail-2", waitsOnBrowser);
+		expect(signIn.state()).toEqual({ signIn: { phase: "waiting", url: "https://example.com/authorize" }, target: "gmail-2" });
+		expect(await signIn.hold("gmail-2", async () => signedOut)).toEqual(signedOut);
+		expect(await signIn.hold("gmail-2", async () => ready)).toEqual(signedOut);
+		expect(await signIn.hold("gmail", async () => signedOut)).toEqual(signedOut);
 	});
 });
