@@ -345,7 +345,7 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).worktree).toBeNull();
 	});
 
-	test("names and links the PR that heads the branch of the linked worktree a session works in, not the main checkout's, and follows a branch switch", async () => {
+	test("names the branch of the linked worktree a session works in, follows a branch switch, and links the PR that heads it, not the main checkout's", async () => {
 		const parent = realpathSync(sessionDir());
 		const main = await repoWithWorktrees(parent);
 		const inWorktree = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
@@ -370,7 +370,11 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(inWorktree).pullRequests).toEqual(linked(1));
 		expect(index.factsOf(intoWorktree).pullRequests).toEqual(linked(2));
 		expect(index.factsOf(inMain).pullRequests).toEqual([]);
-		expect([inWorktree, intoWorktree, inMain].map(path => index.factsOf(path).branch)).toEqual(["wip", "done", null]);
+		expect([inWorktree, intoWorktree, inMain].map(path => index.factsOf(path).branch)).toEqual([
+			{ name: "wip", linked: true },
+			{ name: "done", linked: true },
+			{ name: "main", linked: false },
+		]);
 
 		await git(join(parent, "app-wip"), "switch", "-q", "-c", "next");
 		await git(join(parent, "app-done"), "switch", "-q", "--detach");
@@ -379,7 +383,7 @@ describe("SessionFactsIndex", () => {
 		expect(await index.refresh(listed(2))).toBe(true);
 		expect(index.factsOf(inWorktree).pullRequests).toEqual(linked(4));
 		expect(index.factsOf(intoWorktree).pullRequests).toEqual([]);
-		expect([inWorktree, intoWorktree].map(path => index.factsOf(path).branch)).toEqual(["next", null]);
+		expect([inWorktree, intoWorktree].map(path => index.factsOf(path).branch)).toEqual([{ name: "next", linked: true }, null]);
 
 		const offGitHub = new SessionFactsIndex(async () => null, worktreeAt, headHistory);
 		await offGitHub.refresh(listed(1));
@@ -388,7 +392,51 @@ describe("SessionFactsIndex", () => {
 		await git(join(parent, "app-wip"), "switch", "-q", "wip");
 		appendFileSync(inWorktree, `${ran(".")}\n`);
 		expect(await offGitHub.refresh(listed(3))).toBe(true);
-		expect(offGitHub.factsOf(inWorktree).branch).toBe("wip");
+		expect(offGitHub.factsOf(inWorktree).branch).toEqual({ name: "wip", linked: true });
+	});
+
+	test("names the branch a main checkout had checked out when the session last wrote, keeps it through later checkouts, and none on a detached HEAD", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		const start = Math.floor(Date.now() / 1000);
+		const switchAt = (seconds: number, ...args: string[]) =>
+			runChecked(["git", "-C", main, "switch", "-q", ...args], { env: { ...IDENTITY, GIT_COMMITTER_DATE: `${start + seconds} +0000` } });
+		const earlier = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		const later = join(parent, "2026-10-01T00-00-00-000Z_s2.jsonl");
+		for (const path of [earlier, later]) writeFileSync(path, `${bashCall("b", "bun test")}\n`);
+		const at = (seconds: number) => (start + seconds) * 1000;
+		const repo = { owner: "acme", repo: "webapp" };
+		const index = new SessionFactsIndex(async () => repo, worktreeAt, headHistory);
+
+		await switchAt(10, "-c", "feature");
+		expect(
+			await index.refresh([
+				{ path: earlier, cwd: main, modifiedAt: at(5) },
+				{ path: later, cwd: main, modifiedAt: at(15) },
+			]),
+		).toBe(true);
+		index.learnHeads(repo, ["main", "feature"].map((head, i) => ({ ...repo, number: i + 1, head })));
+		const onMain = index.factsOf(earlier).branch;
+		expect(onMain).toEqual({ name: "main", linked: false });
+		expect(index.factsOf(later).branch).toEqual({ name: "feature", linked: false });
+		expect([earlier, later].map(path => index.factsOf(path).pullRequests)).toEqual([[], []]);
+
+		await switchAt(20, "--detach");
+		expect(
+			await index.refresh([
+				{ path: earlier, cwd: main, modifiedAt: at(6) },
+				{ path: later, cwd: main, modifiedAt: at(25) },
+			]),
+		).toBe(true);
+		expect(index.factsOf(earlier).branch).toBe(onMain);
+		expect(index.factsOf(later).branch).toBeNull();
+		expect(
+			await index.refresh([
+				{ path: earlier, cwd: main, modifiedAt: at(7) },
+				{ path: later, cwd: main, modifiedAt: at(25) },
+			]),
+		).toBe(false);
+		expect(index.factsOf(earlier).branch).toBe(onMain);
 	});
 
 	test("links the PR of the branch each gt submit submitted, printed or not, as checked out where and when it ran, and no dry run", async () => {

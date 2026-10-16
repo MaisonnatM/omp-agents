@@ -327,8 +327,10 @@ An action that fails shows its error, and its control becomes available again.
 - A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
-  First among the controls on the right, before the ticket and pull request buttons and **End session**, or **Resume** for a past session, the header shows the branch checked out in the linked worktree the session works in, such as `me/fix-login`.
-  A session in a repository's main checkout, on a detached HEAD, or outside git shows no branch.
+  First among the controls on the right, before the ticket and pull request buttons and **End session**, or **Resume** for a past session, the header shows the branch the session works on, such as `me/fix-login`.
+  In a linked worktree it is the branch checked out there now.
+  In a repository's main checkout it is the branch checked out there when the session last wrote, so a past session keeps its branch after the checkout moves to another one.
+  A session on a detached HEAD, outside git, or in a directory that is gone shows no branch.
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
 - Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
@@ -341,11 +343,11 @@ An action that fails shows its error, and its control becomes available again.
   The settings page labels models the same way.
 - Click the branch of a pull request's details, of a session's header, or of a Linear issue's detail view to copy its name; its icon turns into a check mark for a moment.
   A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a session's header, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
-  Copying the branch of a past session's header also removes the linked worktree that has the branch checked out, so you can check the branch out elsewhere, and keeps the branch.
+  Copying the branch of a past session's linked worktree also removes that worktree, so you can check the branch out elsewhere, and keeps the branch.
   It applies the checks of **Settings → Worktrees**: it never removes a repository's main checkout, a locked checkout, one with uncommitted or untracked changes, one a live session or this dashboard uses, or one with a nested repository.
   A toast names the worktree it removed, or the one it kept and why; a branch that no linked worktree has checked out shows no toast.
-  Copying the branch of a running session that its header can end removes nothing, since the session uses that worktree; a toast offers **End session**, which ends the session as the header's **End session** does and so removes the worktree.
-  Copying the branch of a running session that the header cannot end, of a pull request's details, or of a Linear issue only copies.
+  Copying the branch of a running session's linked worktree, when its header can end the session, removes nothing, since the session uses that worktree; a toast offers **End session**, which ends the session as the header's **End session** does and so removes the worktree.
+  Copying a main checkout's branch from a session's header, the branch of a running session that the header cannot end, the branch of a pull request's details, or the branch of a Linear issue only copies.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 
@@ -552,7 +554,7 @@ An action that fails shows its error, and its control becomes available again.
 - A running session shows **End session** in its header, unless its room is read-only.
   **End session** stops its omp process: one that the dashboard started stops over its pipe, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
-  The dashboard then removes the git worktree the session works in, the one its header names the branch of, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
+  The dashboard then removes the linked git worktree the session works in, the one whose branch its header names, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
   A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.
   The header shows **Ending…** until the process stops and the worktree check finishes.
   Each pane that showed the session, or one of its subagents, moves to the next running session the sidebar lists, else the previous one, skipping sessions already open in a pane.
