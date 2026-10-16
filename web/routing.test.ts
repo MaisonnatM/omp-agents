@@ -346,3 +346,23 @@ describe("session links", () => {
 		expect(routeFromHash(hashForSession(sessionId))).toEqual({ kind: "session", sessionId });
 	});
 });
+
+describe("replay pane placement", () => {
+	const source: View = { kind: "past", sessionId: "original" };
+	const replay: View = { kind: "live", instanceId: "replay", agentId: null };
+	const op: StartOp = { kind: "replay", view: source, turnId: "u1", token: "pinned", model: null, thinking: null, prompt: null };
+	test("keeps the source and opens the replay beside it", () => {
+		expect(layoutAfterStart({ panes: [source], focus: 0, maximized: true }, op, "replay")).toEqual({ panes: [source, replay], focus: 1, maximized: false });
+	});
+	test("replaces a different pane at capacity, including a focused source", () => {
+		const panes: View[] = [source, { kind: "past", sessionId: "b" }, { kind: "past", sessionId: "c" }, { kind: "past", sessionId: "d" }];
+		expect(layoutAfterStart({ panes, focus: 0, maximized: true }, op, "replay")).toEqual({ panes: [source, replay, panes[2], panes[3]], focus: 1, maximized: false });
+	});
+	test("restores a source closed while the start was pending without exceeding four panes", () => {
+		const panes: View[] = ["a", "b", "c", "d"].map(sessionId => ({ kind: "past", sessionId }));
+		const layout = layoutAfterStart({ panes, focus: 2, maximized: false }, op, "replay");
+		expect(layout?.panes).toHaveLength(4);
+		expect(layout?.panes).toContainEqual(source);
+		expect(layout?.panes).toContainEqual(replay);
+	});
+});

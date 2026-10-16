@@ -1,11 +1,9 @@
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Maximize2, Minimize2, Route, X } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
-import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import type { ModelList } from "../reads";
 import { hashForView } from "../routing";
@@ -16,6 +14,7 @@ import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
+import { ReplayCompareDialog } from "./replay-compare";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks } from "./transcript";
 
@@ -66,17 +65,26 @@ export const Pane = memo(function Pane({
 	// Kept by view, so a pane that switches to another session shows its transcript.
 	const [trajectoryOf, setTrajectoryOf] = useState<string | null>(null);
 	const trajectory = trajectoryOf === hashForView(view);
+	const replay = view.kind === "past" ? session?.replay : view.agentId === null ? (host ?? lastHost)?.replay : undefined;
+	const [compareOf, setCompareOf] = useState<string | null>(null);
 
+	const trajectoryToggle = (
+		<Tooltip content={trajectory ? "Show the transcript" : "Show the trajectory: each turn's injected context, model requests, tool calls, and token usage"} side="bottom">
+			<Button
+				variant="ghost"
+				size="icon-compact"
+				aria-label="Trajectory"
+				aria-pressed={trajectory}
+				className={cn(trajectory && "bg-muted text-foreground")}
+				onClick={() => setTrajectoryOf(trajectory ? null : hashForView(view))}
+			>
+				<Route />
+			</Button>
+		</Tooltip>
+	);
 	const actions = (
 		<>
-			<SizeProvider size="compact">
-				<Tabs value={trajectory ? "trajectory" : "transcript"} onValueChange={value => setTrajectoryOf(value === "trajectory" ? hashForView(view) : null)}>
-					<TabsList aria-label="Show">
-						<TabItem value="transcript" label="Transcript" tooltip="The conversation as you read it" />
-						<TabItem value="trajectory" label="Trajectory" tooltip="Each turn's injected context, model requests, tool calls, and token usage" />
-					</TabsList>
-				</Tabs>
-			</SizeProvider>
+			{replay && <Button size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
 			{count > 1 && (
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
@@ -95,7 +103,7 @@ export const Pane = memo(function Pane({
 		</>
 	);
 	const content = view.kind === "past" ? (
-		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} trajectory={trajectory} />
+		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} titleAction={trajectoryToggle} trajectory={trajectory} />
 	) : (
 		<Conversation
 			view={view}
@@ -108,6 +116,7 @@ export const Pane = memo(function Pane({
 			send={send}
 			onEnd={end}
 			actions={actions}
+			titleAction={trajectoryToggle}
 			trajectory={trajectory}
 			focused={focused}
 			workspaces={workspaces}
@@ -129,6 +138,7 @@ export const Pane = memo(function Pane({
 				<FileBaseContext.Provider value={(view.kind === "past" ? session : (host ?? lastHost))?.cwd ?? null}>
 					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
 						{content}
+						{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
 					</RenderBoundary>
 				</FileBaseContext.Provider>
 			</SubagentLinks.Provider>

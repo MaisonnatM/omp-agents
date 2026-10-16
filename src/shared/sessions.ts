@@ -4,6 +4,7 @@ import { isTodoId } from "../user-todos-parse";
 import type { BranchChoice } from "./git";
 import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
+import type { ReplayFacts } from "./replay";
 import { TICKET_ID } from "./tickets";
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
@@ -72,6 +73,7 @@ export interface SessionFacts {
 	 * than the checkout its working directory is in; `null` when it works in that checkout.
 	 */
 	worktree: string | null;
+	replay?: ReplayFacts;
 }
 
 interface RosterHostBase extends SessionFacts {
@@ -255,6 +257,7 @@ export type StartRequest =
 			todoId: string | null;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
+	| { kind: "replay"; view: View; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
 	| { kind: "resume"; sessionId: string };
 /** A `start` of a new session. */
 export type NewSessionRequest = Extract<StartRequest, { kind: "new" }>;
@@ -317,7 +320,7 @@ export function parseTools(value: unknown): Parsed<string[] | null> {
 }
 
 /** `{ ok: null }` for no branch. */
-function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
+export function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
 	if (value === null || value === undefined) return { ok: null };
 	if (!isObject(value) || !isNonEmpty(value.name)) return null;
 	if (value.kind === "existing") return { ok: { kind: "existing", name: value.name } };

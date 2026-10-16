@@ -1,6 +1,7 @@
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type RoutineSpec, type Weekday } from "../../../src/routines";
 import type { SessionPreset } from "../../../src/shared/presets";
+import type { Project } from "../../../src/shared/projects";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -142,12 +143,14 @@ interface RoutineEditorProps {
 	connected: boolean;
 	/** The saved presets, which the preset picker offers. */
 	presets: SessionPreset[];
+	/** The projects a project task may send its prompt to. */
+	projects: Project[];
 	onSave: (routine: RoutineSpec) => void;
 	onCancel: () => void;
 }
 
 /** A routine's name, workspace, task, schedules, preset, and skill, saved together. */
-export function RoutineEditor({ initial, isNew, workspaces, connected, presets, onSave, onCancel }: RoutineEditorProps) {
+export function RoutineEditor({ initial, isNew, workspaces, connected, presets, projects, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
 	const skills = useSkills(draft.cwd || "~");
@@ -181,7 +184,7 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, presets, 
 					/>
 				</Field>
 
-				<Field label="Workspace" hint={draft.task === "command" ? "The command runs in this directory." : "Its sessions start in this directory."}>
+				<Field label="Workspace" hint={draft.task === "command" ? "The command runs in this directory." : draft.task === "project" ? "Kept with the routine; the coordinator works in its project's workspace." : "Its sessions start in this directory."}>
 					<DirectoryPicker cwd={draft.cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={cwd => set("cwd", cwd)} />
 				</Field>
 
@@ -218,6 +221,31 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, presets, 
 							/>
 							<p className="text-xs text-muted-foreground">Runs with sh in the workspace, without an omp session. Stopped after {COMMAND_TIME_LIMIT}.</p>
 						</Choice>
+						<Choice name={`${id}-task`} checked={draft.task === "project"} label="Send to a project" onCheck={() => set("task", "project")}>
+							<Select value={draft.projectId} onValueChange={next => set("projectId", next)} disabled={projects.length === 0}>
+								<SelectTrigger aria-label="Project" className="w-full">
+									<SelectValue placeholder={projects.length === 0 ? "No projects yet" : "Pick a project"}>
+										{(value: string | null) => projects.find(project => project.id === value)?.name ?? "Pick a project"}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									{projects.map(project => (
+										<SelectItem key={project.id} value={project.id}>
+											{project.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<textarea
+								aria-label="Prompt for the coordinator"
+								value={draft.prompt}
+								rows={3}
+								placeholder="Read #billing-bugs in Slack since your last check, and start a worker for each new bug."
+								onChange={event => set("prompt", event.target.value)}
+								className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							/>
+							<p className="text-xs text-muted-foreground">The project's coordinator gets the prompt as an update once it is idle; no session of its own starts.</p>
+						</Choice>
 					</div>
 				</Field>
 
@@ -240,7 +268,7 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, presets, 
 					</div>
 				</Field>
 
-				{draft.task !== "command" && (
+				{draft.task === "prompt" && (
 					<>
 						<Field
 							label="Preset"

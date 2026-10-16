@@ -48,9 +48,6 @@ export function withEditedPrompt(blocks: readonly Block[], edit: { item: Extract
 	return blocks.toSpliced(Math.min(edit.position, blocks.length), 0, prompt);
 }
 
-/** How many turns the transcript holds: one per prompt, as {@link outline} counts them. */
-export const turnCount = (items: Item[]): number => items.reduce((count, item) => count + (item.kind === "user" ? 1 : 0), 0);
-
 /**
  * The reply each turn ends on: its last assistant message with text. The copy button shows only on these,
  * not on the replies a turn writes between tool calls. A turn still running has no reply yet.

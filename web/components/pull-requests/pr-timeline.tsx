@@ -6,6 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
 import { hashForPullRequestFiles } from "../../routing";
+import { openThreads } from "../../pull-requests-model";
 import { Markdown } from "../sheet-details";
 import { Avatar } from "./avatars";
 
@@ -27,7 +28,7 @@ function entriesOf(detail: PullRequestDetail): Entry[] {
 		} else entries.push({ kind: "commits", at: commit.at, author: commit.author, commits: [commit] });
 	}
 	for (const event of detail.conversation) entries.push({ kind: "event", at: event.at, author: event.author, event });
-	for (const thread of detail.threads) {
+	for (const thread of openThreads(detail)) {
 		const first = thread.comments[0];
 		if (first) entries.push({ kind: "thread", at: first.at, author: first.author, thread });
 	}
@@ -53,7 +54,8 @@ const REVIEW_PILL: Record<NonNullable<PullRequestEvent["review"]>, [string, stri
 	dismissed: ["Review dismissed", "bg-muted text-muted-foreground"],
 };
 
-function Message({ author, at, children }: { author: Person; at: number; children: ReactNode }) {
+/** One message of a Slack-like list: the author's picture, name, and time over `children`. */
+export function Message({ author, at, children }: { author: Person; at: number; children: ReactNode }) {
 	return (
 		<li className="flex gap-3 px-2 py-2 hover:bg-muted/40">
 			<Avatar person={author} label={author.login} className="size-9 rounded-md ring-0 [&_img]:rounded-md" />
@@ -87,6 +89,27 @@ function CommitLines({ commits }: { commits: PullRequestCommit[] }) {
 	);
 }
 
+/** A comment's or a review's words, after the review's verdict as a pill. */
+export function EventBody({ event }: { event: PullRequestEvent }) {
+	const pill = event.review && REVIEW_PILL[event.review];
+	return (
+		<>
+			{pill && <span className={cn("inline-block rounded px-1.5 py-0.5 text-xs font-medium", pill[1])}>{pill[0]}</span>}
+			{event.body.trim() && <Markdown text={event.body} />}
+		</>
+	);
+}
+
+/** Where a review thread sits, `path:line`, linked to that file in the Code tab. */
+export function ThreadPlace({ detail, thread }: { detail: PullRequestDetail; thread: PullRequestThread }) {
+	return (
+		<a href={hashForPullRequestFiles(detail, thread.path)} className="min-w-0 font-mono break-all hover:text-foreground hover:underline">
+			{thread.path}
+			{thread.line !== null && `:${thread.line}`}
+		</a>
+	);
+}
+
 /** A review thread as a Slack thread: its first comment, then a bar with who replied, how many, and when; the replies unfold under it. */
 function Thread({ detail, thread }: { detail: PullRequestDetail; thread: PullRequestThread }) {
 	const [open, setOpen] = useState(false);
@@ -98,10 +121,7 @@ function Thread({ detail, thread }: { detail: PullRequestDetail; thread: PullReq
 			<p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 				<span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-700 dark:text-amber-400">Unresolved</span>
 				on
-				<a href={hashForPullRequestFiles(detail, thread.path)} className="min-w-0 font-mono break-all hover:text-foreground hover:underline">
-					{thread.path}
-					{thread.line !== null && `:${thread.line}`}
-				</a>
+				<ThreadPlace detail={detail} thread={thread} />
 			</p>
 			{first && <Markdown text={first.body} />}
 			{replies.length > 0 && (
@@ -143,16 +163,12 @@ function EntryView({ detail, entry }: { detail: PullRequestDetail; entry: Entry 
 					<CommitLines commits={entry.commits} />
 				</Message>
 			);
-		case "event": {
-			const { event } = entry;
-			const pill = event.review && REVIEW_PILL[event.review];
+		case "event":
 			return (
 				<Message author={entry.author} at={entry.at}>
-					{pill && <span className={cn("inline-block rounded px-1.5 py-0.5 text-xs font-medium", pill[1])}>{pill[0]}</span>}
-					{event.body.trim() && <Markdown text={event.body} />}
+					<EventBody event={entry.event} />
 				</Message>
 			);
-		}
 		case "thread":
 			return (
 				<Message author={entry.author} at={entry.at}>
@@ -218,7 +234,7 @@ export function Timeline({ detail }: { detail: PullRequestDetail }) {
 	const seen = useLastSeen(prKey(detail));
 	const sorted = entriesOf(detail);
 	const entries = newestFirst ? sorted.toReversed() : sorted;
-	const comments = detail.conversation.length + detail.threads.reduce((sum, thread) => sum + thread.comments.length, 0);
+	const comments = detail.conversation.length + openThreads(detail).reduce((sum, thread) => sum + thread.comments.length, 0);
 	let day: string | null = null;
 	let newShown = false;
 	return (

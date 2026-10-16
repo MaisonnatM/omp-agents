@@ -13,19 +13,21 @@ interface PullRequestsTabProps {
 	hosts: RosterHost[];
 	/** A change reads the shown pull request from GitHub again. */
 	version?: unknown;
+	/** The `instanceId` of the live session the sidebar belongs to, `null` for a past one. */
+	current: string | null;
 }
 
 /**
  * The session's pull requests in the right sidebar: one's details as the Pull requests page shows them, the first until another
  * is picked from its stack or from the session's other pull requests, which its Summary lists.
  */
-export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version }: PullRequestsTabProps) {
+export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version, current }: PullRequestsTabProps) {
 	const [picked, setPicked] = useState<PullRequest | null>(null);
 	const shown = picked ?? pullRequests[0];
 	if (!shown) return <DetailsEmpty icon={GitPullRequest} title="No pull request yet" description="Pull requests this session opens or works on show here." />;
 	return (
 		<div className="space-y-3 px-4 pb-4">
-			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} onPick={setPicked} session={pullRequests} />
+			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} onPick={setPicked} session={pullRequests} current={current} />
 		</div>
 	);
 }

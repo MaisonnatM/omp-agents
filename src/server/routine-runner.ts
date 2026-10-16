@@ -1,12 +1,13 @@
 /**
- * Starts the sessions and runs the commands that routines ask for. Each tick claims the slots that came due, starts the
- * queued runs while session slots are free, and ends the sessions that finished their turn.
+ * Starts the sessions, runs the commands, and sends the project updates that routines ask for. Each tick claims the
+ * slots that came due, starts the queued runs while session slots are free, and ends the sessions that finished their turn.
  * Every step converges: a slot claimed is on disk, so a second tick, or the next server, starts nothing twice.
  */
 import { errorText } from "../json";
 import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
 import { SerialLane } from "../serial-lane";
 import type { PinChange } from "../shared/pins";
+import type { ProjectEvent } from "../shared/projects";
 import { presetBranch, type SessionPreset } from "../shared/presets";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutinesFile } from "./routines-file";
@@ -35,6 +36,8 @@ export interface RoutineRunnerDeps {
 	preset(id: string): SessionPreset | null;
 	/** The branch checked out in `cwd`, `null` when HEAD is detached or `cwd` is no git checkout. */
 	checkedOut(cwd: string): Promise<string | null>;
+	/** Saves `event` for project `projectId`'s coordinator; why it cannot, or `null` once saved. */
+	notifyProject(projectId: string, event: ProjectEvent): string | null;
 }
 
 /** A session a routine started: `starting` until its turn is seen running, `working` after; it leaves once it finished. */
@@ -49,8 +52,8 @@ interface Tracked {
 /** A session's turn runs, or waits on a question; either way it holds its slot. */
 const turnRuns = (status: HostStatus | undefined): boolean => status === "working" || status === "needs-input";
 
-/** A command runs without an omp session, so it holds no session slot. */
-const takesSession = (task: RoutineTask): boolean => task.kind !== "command";
+/** A command or a project update runs without an omp session, so it holds no session slot. */
+const takesSession = (task: RoutineTask): boolean => task.kind === "prompt";
 
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
@@ -125,6 +128,7 @@ export class RoutineRunner {
 			const { task } = routine;
 			file.dequeue(routine.id, run.at);
 			if (task.kind === "command") this.#launch(routine, run.at, task.command);
+			else if (task.kind === "project") this.#notify(routine, run.at, task.projectId, task.prompt);
 			else await this.#start(routine, run.at, task.prompt);
 		}
 	}
@@ -151,6 +155,14 @@ export class RoutineRunner {
 			this.#tracked.set(result.instanceId, { routineId: routine.id, runAt: at, startedAt: this.#deps.now(), phase: turnRuns(session.status) ? "working" : "starting" });
 			file.started(routine.id, at, { instanceId: result.instanceId, sessionId: session.sessionId });
 		}
+		this.#deps.onChange();
+	}
+
+	/** Sends `routine`'s prompt to project `projectId`'s coordinator for the run at `at`. */
+	#notify(routine: Routine, at: number, projectId: string, prompt: string): void {
+		const error = this.#deps.notifyProject(projectId, { source: "Routine", title: routine.name, text: prompt, url: null });
+		if (error === null) this.#deps.file.notified(routine.id, at, projectId);
+		else this.#deps.file.failed(routine.id, at, `${routine.name}: ${error}`);
 		this.#deps.onChange();
 	}
 

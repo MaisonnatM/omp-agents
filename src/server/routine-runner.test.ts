@@ -27,7 +27,7 @@ const everyHour = { kind: "every" as const, minutes: 60 };
 
 function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false }, preset: string | null = null): RoutinesFile {
 	const file = new RoutinesFile(path);
-	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "command" ? null : "ship", preset, enabled: true } }, T0);
+	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "prompt" ? "ship" : null, preset, enabled: true } }, T0);
 	return file;
 }
 
@@ -66,6 +66,9 @@ function harness(file: RoutinesFile, checkedOut: string | null = "main") {
 		/** Each pin change and session end, in order. */
 		log: [] as string[],
 		presets: [] as SessionPreset[],
+		/** What reached projects, and the error a project answers with, by id. */
+		notified: [] as string[],
+		projectErrors: new Map<string, string>(),
 	};
 	const runner = new RoutineRunner({
 		file,
@@ -101,6 +104,11 @@ function harness(file: RoutinesFile, checkedOut: string | null = "main") {
 		},
 		preset: id => fake.presets.find(preset => preset.id === id) ?? null,
 		checkedOut: async () => checkedOut,
+		notifyProject(projectId, { source, title, text }) {
+			const error = fake.projectErrors.get(projectId) ?? null;
+			if (error === null) fake.notified.push(`${projectId}: ${source}: ${title}: ${text}`);
+			return error;
+		},
 	});
 	return { runner, fake };
 }
@@ -148,6 +156,21 @@ describe("RoutineRunner", () => {
 				{ skill: "ship" },
 			),
 		]);
+	});
+
+	test("a project routine sends its prompt to the coordinator, starts no session, and records why a project refuses", async () => {
+		const file = fileWith(routinesPath(), { kind: "project", projectId: "p1", prompt: "Check #billing-bugs." });
+		addPrompts(file, 4);
+		const { runner, fake } = harness(file);
+		await runner.tick();
+		expect(fake.notified).toEqual(["p1: Routine: Notes: Check #billing-bugs."]);
+		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "project", projectId: "p1" });
+		// It takes no session slot: all three prompt routines started.
+		expect(fake.requests).toHaveLength(3);
+		fake.projectErrors.set("p1", "project Billing is archived.");
+		fake.now += HOUR;
+		await runner.tick();
+		expect(file.value[0]?.runs[0]?.errors).toEqual(["Notes: project Billing is archived."]);
 	});
 
 	test("a new-branch preset refuses a run outside a checked-out Git branch", async () => {

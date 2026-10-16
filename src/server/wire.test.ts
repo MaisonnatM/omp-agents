@@ -234,6 +234,14 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "archive", id: "p1", name: "ignored" })).toEqual({ t: "project", change: { op: "archive", id: "p1" } });
 		expect(change({ op: "relink", from: "s1", to: "s2" })).toBeNull();
 		expect(change({ op: "archive", id: "" })).toBeNull();
+		expect(change({ op: "unarchive", id: "p1" })).toEqual({ t: "project", change: { op: "unarchive", id: "p1" } });
+		expect(change({ op: "max-workers", id: "p1", max: 5 })).toEqual({ t: "project", change: { op: "max-workers", id: "p1", max: 5 } });
+		expect(change({ op: "max-workers", id: "p1", max: 0 })).toBeNull();
+		const watch = { pullRequests: false, linear: { team: "ENG", label: null, project: null } };
+		expect(change({ op: "watch", id: "p1", watch })).toEqual({ t: "project", change: { op: "watch", id: "p1", watch } });
+		expect(change({ op: "watch", id: "p1", watch: { pullRequests: "yes", linear: null } })).toBeNull();
+		expect(change({ op: "review-cadence", id: "p1", cadence: "every 3 PRs" })).toEqual({ t: "project", change: { op: "review-cadence", id: "p1", cadence: "every 3 PRs" } });
+		expect(change({ op: "review-cadence", id: "p1", cadence: "x".repeat(201) })).toBeNull();
 	});
 
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
@@ -412,6 +420,28 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "bug" } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "x" } })).toBeNull();
 		expect(parsePullRequestEdit({ owner: "a", repo: "b", change: { field: "state", state: "open" } })).toBeNull();
+	});
+
+	test("takes a review thread to resolve or unresolve by its new or older node id, a reply to a thread, and a comment on the pull request", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "PRRT_kwDOA-b_1", resolved: true } })?.ok).toEqual({ ...pr, change: { field: "thread", id: "PRRT_kwDOA-b_1", resolved: true } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "MDIzOlB1bGxSZXF1ZXN0UmV2aWV3VGhyZWFkMQ==", resolved: false } })?.ok).toEqual({
+			...pr,
+			change: { field: "thread", id: "MDIzOlB1bGxSZXF1ZXN0UmV2aWV3VGhyZWFkMQ==", resolved: false },
+		});
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reply", thread: "PRRT_kwDOA", body: "Done in a1b2c3." } })?.ok).toEqual({ ...pr, change: { field: "reply", thread: "PRRT_kwDOA", body: "Done in a1b2c3." } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "x".repeat(65_536) } })?.ok).toEqual({ ...pr, change: { field: "comment", body: "x".repeat(65_536) } });
+	});
+
+	test("rejects a thread id with other characters or over 100, a thread change without its direction, a blank body, and a body over 65536 characters", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "PRRT/../x", resolved: true } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "a".repeat(101), resolved: false } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "", resolved: false } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "thread", id: "PRRT_a" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reply", thread: "PRRT a", body: "ok" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reply", thread: "PRRT_a", body: " \n\t" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "x".repeat(65_537) } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: 42 } })).toBeNull();
 	});
 });
 
@@ -643,5 +673,16 @@ describe("parseMcpServerAdd", () => {
 		expect(parseMcpServerAdd({ ...server, header: { name: "Authorization", value: " Bearer k " } })).toMatchObject({ ok: { header: { name: "Authorization", value: "Bearer k" } } });
 		expect(parseMcpServerAdd({ ...server, header: { name: "Bad Name", value: "k" } })).toEqual({ error: "Enter the header's name, such as Authorization." });
 		expect(parseMcpServerAdd({ ...server, header: { name: "X-Api-Key", value: " " } })).toEqual({ error: "Enter the header's value." });
+	});
+});
+
+describe("replay start requests", () => {
+	const start = { t: "start", reqId: 7, kind: "replay", view: { kind: "past", sessionId: "source" }, token: "pinned-source", model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinking: "low", prompt: null } as const;
+	test("keeps explicit choices and the server-owned source token", () => {
+		expect(msg(start)).toEqual(start);
+		expect(msg({ ...start, prompt: "edited" })).toEqual({ ...start, prompt: "edited" });
+	});
+	test("rejects malformed tokens, settings, and views instead of accepting a raw source path", () => {
+		for (const change of [{ token: null }, { token: "" }, { thinking: 3 }, { prompt: {} }, { model: { provider: "openai-codex" } }, { view: { file: "/arbitrary/source.jsonl" } }]) expect(msg({ ...start, ...change })).toBeNull();
 	});
 });

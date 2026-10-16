@@ -133,6 +133,12 @@ export interface CatalogModel {
 	thinking: string[];
 }
 
+/** The model `provider/id` names, as omp writes a selector; `null` when either part is empty. */
+export function modelOfSelector(selector: string): ModelOption | null {
+	const slash = selector.indexOf("/");
+	return slash > 0 && slash < selector.length - 1 ? { provider: selector.slice(0, slash), id: selector.slice(slash + 1) } : null;
+}
+
 /**
  * A selector as the model `omp models` lists and its `:level` thinking suffix. Model ids can hold colons
  * (`minimax-m3:batch`), so the suffix splits off only when the rest is a listed model and the whole is not.

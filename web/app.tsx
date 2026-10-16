@@ -166,13 +166,14 @@ export function App() {
 		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
+	const replay = startOf(state.starts, "replay");
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
 	// The workspace whose pull requests `useWorkspaceScope` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
-		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: workspace }),
-		[state.connected, fork, resume, quick, resumeAll, state.ending, workspace],
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, replay, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: workspace }),
+		[state.connected, fork, replay, resume, quick, resumeAll, state.ending, workspace],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 
@@ -269,12 +270,12 @@ export function App() {
 										<ProjectDetails
 											key={hashForView(detailsView)}
 											project={coordinated}
-											view={detailsView}
 											working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 											cwd={focused.cwd ?? null}
 											workspace={workspace}
 											hosts={state.hosts}
 											past={state.past}
+											current={detailsView.kind === "live" ? detailsView.instanceId : null}
 										/>
 									) : (
 										<SessionDetails

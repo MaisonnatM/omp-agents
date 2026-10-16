@@ -14,6 +14,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Send later](#send-later)
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
+- [Replay from here](#replay-from-here)
 - [Pull requests](#pull-requests)
 - [Linear tickets](#linear-tickets)
 - [Providers](#providers)
@@ -112,7 +113,7 @@ An action that fails shows its error, and its control becomes available again.
   Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
   Amber means less than 20% is left, and red means the window is used up, as omp reports it.
   Hover or focus a window to see omp's full limit name and when it resets.
-  After the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
+  Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` at startup and every minute after that.
 - The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
@@ -139,31 +140,14 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Session details sidebar
 
-- The right sidebar shows the focused pane's conversation at a glance, and what its agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
+- The right sidebar shows what the focused pane's agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Outline**, **Files**, **Media**, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
+- Tabs split it: **Files**, **Media**, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone; with **Tickets** among them, they show their icons alone until you widen the sidebar past 30rem, and hovering one names it.
   The sidebar remembers the tab you chose, for every view.
-- A project's coordinator, which changes no code itself, gets other tabs instead: **Outline**, **Workers**, **Notes**, and **PRs**; see [Projects](#projects).
+- A project's coordinator, which changes no code itself, gets other tabs instead: **Workers**, **Notes**, and **PRs**; see [Projects](#projects).
   It remembers its own tab, **Workers** at first, apart from a session's.
-- **Outline** shows the conversation's turns in order, each weighted by how much it matters.
-  Your first prompt opens the list whole, under **Request**, rendered as the transcript renders it, with its skill's chip first.
-  The turns after it hang from a rail of icons: a person for your prompt, a bot for the reply a turn ended on.
-  A prompt shows in bold on up to three lines, and a reply muted on up to three lines; hover either to read the whole message.
-  A bold label that opens a reply, such as **Résumé**, is left out, so the line starts with what the reply says.
-  A prompt led by `go`, or of approval words alone such as `yes`, `lgtm`, or `fix all then push`, reads as one line, **Approved**, with its words after it, such as `Approved · go all don't commit`.
-  The reply such an approval follows is the agent's plan: it shows under **Plan**, rendered whole up to about twelve lines, and **Show more** opens the rest.
-  A prompt of `continue` alone reads as **Continued**, and the reply before it stays a reply, since it reports work in progress rather than a plan.
-  `ok` with more words, and `push` or `ship it` alone, read as prompts.
-  A line under a reply counts the turn's tool calls and, in red, those that failed, such as `14 tools · 2 failed`.
-  A later prompt that invoked a skill shows the skill's name in an outlined chip first, a prompt of files alone reads as their names, and a prompt of images alone reads as how many it holds, such as `2 images`.
-  The turn still running shows **Working…** where its reply will go.
-  Click a prompt, a reply, **Request**, or **Plan** to scroll the pane's transcript to that message; the page stays where it is.
-  A file's path in the **Request** or a **Plan**, relative to the session's directory or not, opens the file in the file dialog.
-  The turn you are reading carries a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
-  After you click a turn it stays marked until you scroll the transcript yourself, since the last turns may never reach the top of the transcript.
-  The list follows the conversation as it goes.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
   As in the session's changes, a count of zero is left out, so a file the agent only added to shows `+12` alone.
@@ -174,8 +158,7 @@ An action that fails shows its error, and its control becomes available again.
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-  **Open the session's changes**, under the list, opens the same dialog at the first file; a subagent's Files tab has no such button.
-  The search field above the list keeps the files whose path holds every word typed, in any order and any case, and the heading then counts and totals those, as in `2 of 9 files changed`; Esc clears it.
+  The search field above the list stays pinned to the top of the sidebar while the list scrolls; it keeps the files whose path holds every word typed, in any order and any case, and the heading then counts and totals those, as in `2 of 9 files changed`; Esc clears it.
   Opening another session clears the search.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
@@ -188,7 +171,7 @@ An action that fails shows its error, and its control becomes available again.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   The first one shows until you pick another: click another pull request of its **Stack**, or of **Other pull requests of the session** under it, to show it in place.
   **Other pull requests of the session** lists the session's pull requests that the stack does not show, each with whether the session submitted or worked on it.
-  The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
+  The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Comments**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
   The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
   The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
@@ -197,16 +180,16 @@ An action that fails shows its error, and its control becomes available again.
   The issue shows as on the tickets page, stacked in one column: its title, its status, priority, assignee, due date, labels, and project, which you can edit there, then its **Sub-issues**, its branch, its links, who opened it, **Open in Linear**, its description, and its comments.
   **Sub-issues** draws them as a pull request's **Stack** draws its pull requests, on a rail in a box, under how many are done of those not canceled: each row shows the state, identifier, title, and priority, and the rail ends at the issue's own identifier, as a stack's ends at its base branch.
   Opening the tab, picking another issue, and each start and end of the view's turn read it from Linear.
-- A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
+- A tab with nothing to show says so.
 
 ## Session changes
 
-- **Open the session's changes** in the sidebar's **Files** tab, or a click on one of its files, shows the files the session changed as an editor does, in a dialog over the page; Esc or the close button closes it.
-- The dialog lists two sets of files at once.
+- A click on a file in the sidebar's **Files** tab shows the files the session changed as an editor does, in a dialog over the page, at that file; Esc or the close button closes it.
+- The dialog knows two sets of files.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
   The other is what the session's own `edit` and `write` calls changed, from its transcript, including files outside the checkout and files changed back to how they were.
   The header names the branch and the base it compares against, and totals the files and the lines added and removed.
-- **All changes** shows both sets, and **This session** keeps only the files the session's own calls changed; edits that a subagent or a shell command made count only under **All changes**.
+- The dialog opens on **This session**, which keeps only the files the session's own calls changed, as the Files tab lists them; **All changes** shows both sets; edits that a subagent or a shell command made count only under **All changes**.
 - The explorer on the left shows the files as folders, a folder holding only one folder joined with it, such as `web/components/changes`.
   Click a folder to close or open it.
   Each file shows its lines added and removed, a blue dot when the session's own calls changed it, and a letter for what git says happened: **A** added, **U** untracked, **M** modified, **D** deleted, and **S** for a file only the session's calls name, outside the checkout or no different from the base.
@@ -272,13 +255,13 @@ An action that fails shows its error, and its control becomes available again.
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
-- **Transcript** and **Trajectory** in a pane's header switch what the pane shows; a live session keeps its composer under either.
+- The road icon right after a session's title in a pane's header switches the pane between the transcript and **Trajectory**; a live session keeps its composer under either.
   **Trajectory** is a ledger of the conversation's turns, one row per prompt you or a skill sent, with a row first for what came before your first prompt.
   Its columns are the prompt's first line with its skill, the turn's model requests and tool calls, its input, output, cache-read, and cache-write tokens, and its cost, underlined by the turn's share of the session's cost; a last row adds up every turn.
   Open a row for each step in order, its tokens in the same columns: what omp injected before or during the turn, such as a skill's body, a system reminder, or a rule, each named by its source; model and thinking-level changes; each model request with its model, time, and stop reason; the thinking and the reply; each tool call with its result size and time; side calls such as auto-thinking; and compactions.
   A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
   A subagent's turns show in the subagent's own pane, not its parent's.
-  The pane goes back to **Transcript** when it opens another conversation.
+  The pane goes back to the transcript when it opens another conversation.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group shows an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   The icon of a call that failed is red, and the group's heading counts the failures.
@@ -289,7 +272,6 @@ An action that fails shows its error, and its control becomes available again.
   The choice is saved in this browser.
   Cmd+Shift+E shows or hides the tool rows, and Alt+T (Option+T on macOS) shows or hides the thinking.
   Cmd+E still opens or closes the group.
-  Hiding either leaves the outline's tool count as it was.
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
   A tool group that spawned subagents stays open.
   In a live session or subagent, each id is a link with the subagent's status dot (green running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
@@ -308,6 +290,10 @@ An action that fails shows its error, and its control becomes available again.
   It is offered in every room that the dashboard can write to.
 - The conversation follows new output while you are at the bottom.
   Scrolling up pauses that follow; the down-arrow button jumps back to the latest message.
+- A minimap on the conversation's left edge draws one short line per turn, once there are two, when the pane is wide enough to leave room beside the messages.
+  Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
+  Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
+  The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
 - In a session the dashboard started, a prompt sent to an idle session shows at once, dimmed, at the end of the conversation, and the session shows as working.
   That covers a new session's first message, a suggested prompt, and an edited prompt.
   omp takes up to a few seconds before its turn starts, and the prompt shows in full once it does.
@@ -340,7 +326,6 @@ An action that fails shows its error, and its control becomes available again.
   File commands show their expanded text, because omp records only that.
 - A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
-  The outline's **Request** shows the first prompt the same way.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
@@ -373,13 +358,16 @@ An action that fails shows its error, and its control becomes available again.
   **Send now** (↑ icon, or Cmd+Enter on the focused row) turns a follow-up into a steer, which the running turn takes at its next step; on a steer it stops the turn so omp runs its held steers at once.
   **Edit** (pencil, or a double-click, Enter, or F2 on the row) moves the message back into the composer, with its images; its files come back as their `<file>` blocks in the text.
   **Remove** (**×**, or Delete on the row) drops it.
+  Editing or removing a queued message shrinks the queue area to fit the remaining rows, without leaving blank space above the text field.
   ↑ in the empty composer moves the last one back, the last steer before the last follow-up, as omp does.
   **Stop** and Cmd+Shift+Backspace interrupt the turn and move every waiting message back into the composer, images included, so nothing runs after an interrupt.
   In a terminal session, Stop moves back only the follow-ups the dashboard holds; a steer already sent waits in the host's queue.
 - When a turn ends, its reply can suggest what to send next: a `Suggestions:` line followed by numbered prompts, as its last lines.
   The starter kit's `APPEND_SYSTEM.md` asks omp to write one when the next moves are clear, up to three.
   The transcript leaves the block out of the reply, and so does its copy button; the composer lists the prompts under its buttons, numbered, while it is empty and nothing else waits on you: no turn runs and no question is open.
-  Press a prompt's number to send it at once. ↓ moves a highlight into the list and ↑ back out; Enter sends the highlighted prompt, Tab puts it in the composer to edit first, and Esc drops the highlight.
+  Press a prompt's number to send it at once.
+  With two or more prompts, 0 sends them all as a single message, in list order, one per line, and so does a click on the **All of them** row under them.
+  ↓ moves a highlight into the list and ↑ back out; Enter sends the highlighted prompt, Tab puts it in the composer to edit first, and Esc drops the highlight.
   A click sends it too.
   Cmd+click (Ctrl+click off macOS) marks a prompt without sending it.
   A click or a number then sends the marked prompts plus that one as a single message, one per line.
@@ -581,6 +569,38 @@ An action that fails shows its error, and its control becomes available again.
   omp moves the session to a new file, as `/branch` does, so the conversation before the edit stays under the past sessions.
   Only a plain text message that omp has saved can be edited: not a skill prompt, one with images or files, or a message in a terminal session.
 
+## Replay from here
+
+- In a main session's **Trajectory**, each prompt row has **Replay from here**, separate from the button that expands its steps. Past sessions and a running source both support it. Subagents and the row before the first prompt do not.
+  Claude Code and Codex sessions do not replay, and neither does a session started with a tool allowlist, since a replay needs its own guard extension.
+- Opening the dialog pins that prompt and its history. Later source replies do not invalidate it. If someone changes the prompt, its ancestors, or its session header, open the dialog again.
+  The source session stays untouched and keeps running if it was already running.
+- **Use original settings** restores the first identifiable main request's model and thinking level. You can instead select a model and a concrete thinking level.
+  If the source has no request log, its earlier recorded settings supply the defaults when available. Automatic thinking needs an explicit replacement level.
+  **Edit prompt** changes only the new session's first prompt. Images keep their original bytes, MIME types, and order. Missing required image blobs stop the start.
+  A skill stays `/skill:<name>` and goes through omp's normal skill expansion. An ordinary prompt restores its stored text, which may already contain expanded references.
+- **Start replay** creates a detached Git worktree of the source cwd's repository. It uses the newest surviving HEAD reflog entry at or before the prompt's timestamp, or current HEAD when that cannot be resolved.
+  The comparison names the selected commit and its provenance. This is committed history only. Replay does not reconstruct historical dirt, copy today's uncommitted changes, stash, fetch, or install dependencies.
+  An unavailable source repository is an error, not a request to choose an unrelated repository.
+- The replay opens beside its source. At the four-pane limit it replaces another pane, never its source. The first prompt is sent once after omp accepts the fork and the selected settings.
+  Further prompts, history edits, and settings switches wait until that first turn finishes. A page reload or server restart never automatically resends it.
+- Replay has a model tool policy. Local `read`, `grep`, and `glob` remain available. Normal `edit` and `write` targets must resolve inside the replay worktree.
+  Shell commands run for real in the replay worktree, unchecked, so a command can still change files outside it or reach the network.
+  Eval, task, direct LSP, MCP, and unknown tools are blocked. URI devices, Git metadata, runtime configuration, source paths, symlink escapes, and hard-linked write targets are blocked for `edit` and `write`.
+  A blocked source path suggests its equivalent inside the replay worktree; Replay never silently rewrites a tool call.
+  Human `!` commands run in the replay composer, and local slash commands are blocked. Text and `/skill:` prompts remain available.
+  This is not an OS sandbox. Reads can reach outside the worktree. Your installed extensions, startup configuration, credentials, and local dependencies must still be trusted. The dashboard's separate terminal panel is not covered by this policy.
+- The replay pane's **Compare replay** remains available while it runs, after it ends, and after a page or dashboard restart. **Open original session** returns to the source even after you close its pane.
+  The comparison freezes the original turn at launch and follows the replay's first prompt by entry id, not its row number. A source that was still running may have an incomplete frozen result.
+  It shows ordered tool calls side by side, including repeated calls, inserted or missing calls, argument changes, blocked calls, full results, the final request's text, tokens, and cost. Partial results say so.
+- **Normalized request match** means the complete logged provider-hook envelopes match after known repository-root relocation, with the per-session ids in `client_metadata` and `prompt_cache_key` set aside, and, only for an explicit model switch, top-level model routing and the generated active-model workstation line.
+  Historical model mentions, dates, loaded docs, tool descriptions and schemas, other cache fields, thinking parameters, messages, images, and repairs remain substantive.
+  **Mismatch** names the differing top-level fields. Both states show raw and normalized hashes and complete request bodies. Missing or corrupt logs, an unidentifiable main request, or different provider APIs say **Unknown**, never match.
+  This check happens before the first supported request is sent. It describes the hook-stage body, not guaranteed wire-byte equality; provider code can still change the body afterward.
+- Dashboard **Resume** regenerates the safe LSP overlay and requires a fresh protection acknowledgment before accepting prompts. The advertised model tool catalog is unchanged, so policy blocks do not themselves create a request mismatch.
+  A direct terminal resume is not the same protected launch. The installed guard can restrict tools from the transcript marker, but it refuses local writes without the dashboard's safe-launch flags and cannot disable every implicit startup effect itself.
+  If a failed start cannot safely remove its owned checkout, the error names the retained path. A successful replay keeps its checkout for inspection and uses the normal worktree removal checks on **End session**.
+
 ## Pull requests
 
 - A session lists the pull requests it submitted or worked on as `#<number>` after its title in the sidebar, and on the pull request button in its header.
@@ -681,31 +701,40 @@ An action that fails shows its error, and its control becomes available again.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
 - The details of a pull request open with a header: the repository and number, a link to it on GitHub, then the title, its author, when it last changed, and `gh pr checkout <number>`, which a click copies.
-  Its last line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
-  On the right of the first line, the **Next move** shows as its badge, with its reason on hover, and one button that makes it.
-  The badge, its button, the `⋯` menu, and the Status's buttons all follow what the details read from GitHub, so a pull request you just made a draft, whose checks failed, or that merged since the list last refreshed shows the move the Summary agrees with, and a closed one offers none.
-  The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
-  **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
-  The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; a pull request not yet read offers **Merge on GitHub**.
-  The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**, each with its logo.
-- Under the header, tabs split the details: **Summary**, **Timeline**, with the count of its comments, reviews, and review threads, and **Code**.
-  The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
-- **Summary** lists the pull request's properties.
+  Its next line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
+  The header ends with **Status** and **Reviewers**, each label beside its value at every width.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
   Click the state to make the pull request **Open**, **Draft**, or **Closed**; a merged one keeps its state.
   **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
   Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
+  On the right of the first line, the **Next move** shows as its badge, with its reason on hover, and one button that makes it.
+  The badge, its button, the `⋯` menu, and the Status's buttons all follow what the details read from GitHub, so a pull request you just made a draft, whose checks failed, or that merged since the list last refreshed shows the move the Status agrees with, and a closed one offers none.
+  The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
+  **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
+  In a session's details sidebar, that session is the one you are in, so its **Open the session** button and its chip under **Sessions** do not show.
+  The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; a pull request not yet read offers **Merge on GitHub**.
+  The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**, each with its logo.
+- Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, and **Code**.
+  Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
+  The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
+- **Summary** lists the pull request's labels and the sessions on it.
   **Labels** shows the labels in their GitHub colors; click them for the repository's labels, and pick one to add or remove it.
-  The lists of reviewers and labels come from GitHub on the first click, and the server keeps them for 5 minutes.
-  A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why.
+  The lists of reviewers and labels come from GitHub on the first click of either picker, and the server keeps them for 5 minutes.
+  A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why above the tab.
   **Sessions** shows the running sessions on the pull request.
   When another open pull request of its repository stacks with it by base branch, whoever opened it, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, as Graphite does, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
   The server reads the repository's open pull requests for it and keeps them for 30 seconds.
   Then comes the description in full.
+- **Comments** lists the pull request's review threads, unresolved ones first, each under the file and line it is on, which link to the file on the **Code** tab, with every comment in it.
+  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; the change shows at once in the header's unresolved review threads, and the details undo it and say why when GitHub refuses it.
+  Resolved threads fold behind a line with their count, such as **2 resolved**.
+  A thread you can reply to has a reply box under it: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and the box keeps your words and says why when GitHub refuses them.
+  Under the threads, **Conversation** lists the comments and reviews with words on the pull request, oldest first, then a box to comment that works as the reply box does, shown when GitHub lets you comment.
+  Replies and comments go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
 - **Timeline** lists what happened on the pull request as a chat does, newest first, with a line for each day that stays on top while you scroll its entries.
   Each entry shows its author's avatar, name, and time: a push lists its commits, one author's commits within an hour as one entry, with each commit's short hash and lines added and removed; a review shows its verdict and words; a comment shows its words.
   The pull request's own commits show, not those of its trunk that its branch took in; a commit counts as its own unless GitHub links it only to other pull requests.
-  An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came.
+  An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came; resolved threads show only on **Comments**.
   A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
   Above the list, the counts of comments and commits, and **Newest first**, which flips the order.
 - **Code** shows the pull request's files as the [session changes](#session-changes) dialog shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and every file's diff in one scroll, or the open file in **File**, with ↓ and ↑ to step through them.
@@ -1149,40 +1178,61 @@ An action that fails shows its error, and its control becomes available again.
 ## Projects
 
 - A project is a coordinator session that plans the work and hands it to worker sessions, as Cursor's Projects do.
-  The coordinator never changes the project's code: it starts a worker for each change, follows what the workers report, and tells you what is done and what waits on you.
-  Every session of a project reads and keeps one shared directory of notes.
+  The coordinator plans, delegates, and reports, and never changes the project's code: it starts a worker for each change, and for any investigation, research, review, or browser check beyond a quick look, follows what the workers report, and tells you what is done and what waits on you.
+  Every session of a project reads and keeps one shared directory of notes, and the notes about you that every project shares.
 - The **Projects** page, a `#projects` address, G then P, or **Go to projects** in the command menu, lists the projects.
   On the **Todo** page, G then P picks the focused or open todo's priority instead, as P alone does there; with no todo focused or open, it opens the projects.
   **New project** on that page, the **+** of the sidebar's projects group, or `#projects/new` opens its form: a name, the workspace the coordinator starts in, its model and effort, as on a new session, and its first message, which says what the project is for.
   **Create** starts the coordinator on that message and opens its pane; a name left empty becomes **New project**.
   The project exists once its coordinator runs, so a start that fails leaves none behind.
-- The coordinator has four tools that the dashboard serves it, and only it has them.
+- The coordinator has six tools that the dashboard serves it, and only it has them.
   `start_worker` starts a worker: a new dashboard session on a prompt that stands alone, with a short title, in the project's workspace or a directory the coordinator names, absolute, `~/`, or relative to the workspace.
-  Workers are numbered `w1`, `w2`, and so on in the order their sessions start, and run on omp's default model.
-  `list_workers` lists the workers and their phases, `read_worker` reads one worker's whole last reply and the questions it waits on, and `message_worker` sends one a message as you would: a running worker gets it after its current turn, and a stopped one is resumed first.
+  It may also name a model as `provider/id`, an effort, a skill, a session preset, and a branch; a preset fills what it leaves out.
+  In a git checkout a worker gets a branch of its own from the checked-out one, `<project>/<title>-<id>`, unless the coordinator names one, says `none`, or picks a preset that works in the checkout itself.
+  Workers are numbered `w1`, `w2`, and so on in the order their sessions start.
+  A project runs at most 3 workers at once, working or asking, unless you change **At most** on its page, up to 20; the coordinator's other workers wait in a queue, listed on the page, and start in order as slots free up.
+  `list_workers` lists the workers, their phases, and the queue, `read_worker` reads one worker's whole last reply and the questions it waits on, and `message_worker` sends one a message as you would: a running worker gets it after its current turn, and a stopped one is resumed first.
+  `answer_worker` answers a question a worker asks through `ask`, a yes or no, one of its options, or text, and `end_worker` ends a worker that is done.
 - The **Sessions** tab lists each project as a collapsible group at the top, under the project's name: the coordinator first, with a **Coordinator** badge, then the workers in order, `w1` first.
   A worker's row reads as the title the coordinator gave it, beside its `w1`, `w2` badge, rather than the title omp generated for the session.
   A project's sessions leave the other groups, **Pinned** included, and the group lists them even in `/tmp`, which the sidebar otherwise hides.
   With a workspace selected, a project shows when it started there or one of its sessions runs or ran there.
   A search that matches a project's name keeps all its rows, and one that matches a worker's title keeps that worker.
-- `#projects/<id>` opens one project: its coordinator's status with **Open coordinator**, a table of its workers in order with each one's phase and last reply, the updates still waiting for the coordinator, and its notes files.
+- `#projects/<id>` opens one project: its coordinator's status with **Open coordinator**, a table of its workers in order with each one's phase and last reply, the updates still waiting for the coordinator, and its notes.
   A worker's phase is working, asking while it waits on a question, idle, interrupted when it stopped without **End session**, or ended.
-  Click a notes file to open it in the file dialog.
-  **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, and its coordinator's tools refuse to start, list, read, or message workers.
-- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Outline** follows the coordinator's conversation, **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** lists the notes files, and **PRs** the pull requests its workers submitted or worked on, each once.
+  **Notes** shows two trees, **Project** and **User**, each with its folders first and then its files, by name, and its directory under it; click a file to open it in the file dialog.
+  **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, its coordinator's tools refuse to start, list, read, or message workers, and its updates wait.
+  **Archive and end its sessions** also ends the project's sessions that run.
+  **Unarchive** brings an archived project back and delivers what waited.
+- **Subscriptions** on a project's page says what the coordinator hears about on its own, each saved as it changes.
+  **Workers' pull requests**, on by default, reports checks that fail or pass again, new comments and reviews, a merge, and a close on the pull requests of the workers' branches.
+  **Linear issues assigned to me** reports issues assigned to you that are new or changed, filtered by a team, a label, and a project, each a name or key, empty for any.
+  The dashboard looks every 2 minutes, and the first look at each pull request or issue only records it.
+  **Ask me to review**, `every PR` by default, tells the coordinator how often to ask you to review, in your own words.
+- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** shows the same **Project** and **User** trees, and **PRs** the pull requests its workers submitted or worked on, each once.
 - Workers report back on their own, so the coordinator never polls.
   Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
   Once the coordinator runs and is idle, every waiting update reaches it as one message that starts with `[omp-agents] Project update.`, quoting each finished worker's last reply up to 2,000 characters.
   When omp does not take that message, the updates keep waiting, and the coordinator's next change of state, such as its next turn ending, sends them again.
   A worker you prompt yourself reports the same way when its turn finishes.
   A worker is told to end each turn on a report that stands alone, since the coordinator reads only its last reply, and to end its turn with a question it needs answered rather than ask it through the `ask` tool.
-  A question a worker still asks through `ask` waits for you in the dashboard: the coordinator cannot answer it, and its update tells the coordinator to tell you.
+  A question a worker still asks through `ask` reaches the coordinator with its request id: it answers it with `answer_worker` when the notes or your preferences settle it, and tells you otherwise.
+  The update also says when the dashboard restarted and stopped workers; a coordinator that stopped with the dashboard resumes on its own.
+- The notices bell's **Projects** tab tells you when a worker asks and the coordinator is idle or stopped, when a worker stopped without **End session**, and when a project is done: all its workers idle or ended, nothing queued, and nothing waiting for the coordinator.
+- A routine can **Send to a project**: each run sends its prompt to the project's coordinator as an update from **Routine**, taking no session of its own.
 - A project's notes live in `$XDG_DATA_HOME/omp-agents/projects/<id>/`, `~/.local/share/omp-agents/projects/<id>/` by default, outside every repository, so every worktree the project works in shares them.
-  A new project starts with `README.md`, which holds the goal from the first message and links the others, `testing.md` for how to build, run, and test the work, `preferences.md` for how you want it done, and `research.md` for what agents found out, with sources.
-  Every session of the project is told to read `README.md` first and to record there what lasts.
-  The coordinator may edit and write only these notes: its `edit` and `write` calls outside them, and calls whose files the extension cannot tell, are refused, and it is told to start a worker instead.
+  A new project starts with `notes.md`, which holds the name, the goal from the first message, a **Decisions** section, the index of the other notes, and a **Promoted** section, `testing.md` under `docs/` for how to build, run, and test the work, `research.md` beside it for what agents found out, with sources, `internal/checklist.md`, the coordinator's plan, and `archived.md`, for finished work moved out of the other notes.
+  `inbox/` holds one Markdown file per outside event, such as a routine's prompt, a pull request's checks, or a Linear issue, named by its time, source, and title, with its source, time, link, and text; the coordinator deletes the file, or moves its line to `archived.md`, once it has handled it, and moves finished checklist items there too.
+  The coordinator records what you decide about the project under **Decisions** in `notes.md`, and each worker ends by recording what it learned; what should outlive the project goes under `## Promoted` in `notes.md`.
+  A project from an older version keeps its files: when the dashboard starts, `README.md` moves to `notes.md`, `testing.md`, `research.md`, and `preferences.md` to `docs/`, and `checklist.md` to `internal/`, each only when its new place is free, and any other file stays where it is.
+- Your own notes, shared by every project, as Cursor's User folder, live in `$XDG_DATA_HOME/omp-agents/user/`, `~/.local/share/omp-agents/user/` by default.
+  The dashboard starts them with `preferences.md`, how you work across every project, and `workflows/README.md`, which says to keep one file per way of working that held across projects, such as a new feature's flow or a quality pass; it never overwrites a file there.
+  Every session of a project is told to read the project's `notes.md` first, then your `preferences.md` and any workflow that fits its task, and to record a preference that holds beyond the project in your notes and one about this project only in the project's `notes.md`.
+- The coordinator may edit and write only the project's notes and yours: its `edit` and `write` calls outside them, and calls whose files the extension cannot tell, are refused, and it is told to start a worker instead.
   Its `local://` and `artifact://` scratch files are allowed.
-  A subagent that runs in a project session's own session, such as an advisor, has its role and its limit; one with a session of its own, such as a `task` subagent, has neither.
+  Its `bash` calls that redirect or `tee` output to a file outside those notes, and git and `gt` commands that change the checkout or a branch, are refused.
+  That shell check is a reminder, not a wall: other commands, such as a script that writes files, still run.
+  A subagent has its project session's role and its limits, a `task` subagent included.
 - The role text and that limit come from the omp extension `~/.omp/agent/extensions/projects.ts`, which `bun run omp-template` installs.
   When it is not installed, the dashboard loads this repository's copy with `-e` for each project session, so a project works either way.
   The extension adds the session's role and the notes' place to every prompt, so they survive compaction.
@@ -1191,11 +1241,6 @@ An action that fails shows its error, and its control becomes available again.
   A `/move` or an edited prompt, which gives a session a new id, keeps it in its project, and a fork of a project's session belongs to no project.
 - The server keeps the projects and their waiting updates in `projects.json` beside its access token, so no update is lost while the coordinator is stopped or the dashboard restarts.
   Quitting the dashboard stops its sessions without telling any coordinator.
-- This first version has limits.
-  The coordinator cannot answer a worker's question; only you can, in the dashboard.
-  No tool ends a worker, so end one yourself with **End session**.
-  The coordinator's limit covers its `edit` and `write` calls, not its shell commands.
-  **Archive** cannot be undone, and an archived project's workers still report to its coordinator, which can no longer act on what they say.
 
 ## Settings
 

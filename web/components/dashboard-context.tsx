@@ -41,6 +41,7 @@ export interface DashboardStatus {
 	/** The last start of each kind, under way or failed. */
 	starts: {
 		fork: StartOf<"fork"> | null;
+		replay: StartOf<"replay"> | null;
 		resume: StartOf<"resume"> | null;
 		quick: StartOf<"quick"> | null;
 		resumeAll: StartOf<"resume-all"> | null;

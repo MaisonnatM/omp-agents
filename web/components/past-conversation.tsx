@@ -22,11 +22,13 @@ interface PastConversationProps {
 	onResume: () => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
+	/** A control the page puts right after the title, such as the trajectory switch; a foreign session has no trajectory, so it gets none. */
+	titleAction?: ReactNode;
 	/** Show its turns in place of its transcript. */
 	trajectory: boolean;
 }
 
-export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, trajectory }: PastConversationProps) {
+export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, titleAction, trajectory }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
@@ -35,7 +37,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
-				<Header title={title} status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"} alert={false}>
+				<Header title={title} trailing={foreign ? undefined : titleAction} status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"} alert={false}>
 					{session && (
 						<>
 							<TicketMenu tickets={session.tickets} />

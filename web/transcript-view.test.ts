@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared/transcript";
-import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnCount, turnReplies, withEditedPrompt } from "./transcript-view";
+import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnReplies, withEditedPrompt } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -63,10 +63,6 @@ describe("transcript rendering", () => {
 		}
 		expect(withEditedPrompt(replaced, { ...edit, submitted: null }).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["u", "old", "new"]);
 		expect(withEditedPrompt(toBlocks([replacement, user]), edit).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["new", "old", "u"]);
-	});
-
-	test("turnCount counts the prompts", () => {
-		expect(turnCount([user, tool("t1", "ok"), { ...user, id: "u2" }])).toBe(2);
 	});
 });
 

@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RpcLaunch } from "../omp/rpc";
 import { HOME } from "../paths";
-import type { Project } from "../shared/projects";
-import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
+import type { Project, ProjectEvent } from "../shared/projects";
+import type { SessionPreset } from "../shared/presets";
+import type { HostStatus, StartRequest, StartResult, UserAnswer, UserRequest } from "../shared/sessions";
+import { projectNotices } from "./notices";
 import { type ProjectLaunch, ProjectRunner } from "./project-runner";
 import { projectTools } from "./project-tools";
 import { ProjectsFile, parseProjects } from "./projects-file";
@@ -16,14 +18,16 @@ afterEach(() => {
 });
 
 const T0 = Date.parse("2026-10-10T08:00:00Z");
-const TOOL_NAMES = ["start_worker", "list_workers", "read_worker", "message_worker"];
+const TOOL_NAMES = ["start_worker", "list_workers", "read_worker", "message_worker", "answer_worker", "end_worker"];
 
 interface FakeSession {
 	instanceId: string;
 	sessionId: string;
 	cwd: string;
 	status: HostStatus;
-	requests: { id: string; title: string }[];
+	requests: UserRequest[];
+	/** The answers the session got. */
+	answers: { requestId: string; answer: UserAnswer }[];
 	/** The prompts omp took. */
 	prompts: string[];
 	/** Every prompt sent, taken or not. */
@@ -41,12 +45,24 @@ interface Harness {
 	sessions: Map<string, FakeSession>;
 	launches: { request: StartRequest; project: ProjectLaunch | null; launch: RpcLaunch }[];
 	seeded: string[];
+	/** The events written into each project's inbox, with their project and time. */
+	inbox: { id: string; event: ProjectEvent; at: string }[];
 	/** The next start fails as omp would, after the runner chose its launch. */
 	failNextStart(): void;
 	/** Settles at the first change, from now on, after which `done` holds. */
 	until(done: () => boolean): Promise<void>;
 	/** The starter the runner uses. */
 	start(request: StartRequest, project: ProjectLaunch | null): Promise<StartResult>;
+	/** The session ids ended through the runner. */
+	ended: string[];
+}
+
+interface HarnessOptions {
+	/** The branch checked out in every directory; `null` outside git. */
+	checkedOut?: string | null;
+	presets?: SessionPreset[];
+	/** The session ids that ran when the last server stopped. */
+	stoppedWithServer?: string[];
 }
 
 function projectsPath(): string {
@@ -59,10 +75,15 @@ function projectsPath(): string {
  * A runner over the file at `path`, whose starter spawns fake sessions in the order `start.ts` keeps: the runner's
  * launch, the spawn, the link, then a new session's first message.
  */
-function harness(path = projectsPath(), sessions = new Map<string, FakeSession>()): Harness {
+/** The bell's notices for `h`'s projects now. */
+const notices = (h: ReturnType<typeof harness>) => projectNotices(h.runner.noticeFacts(), 0);
+
+function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(), options: HarnessOptions = {}): Harness {
 	const file = new ProjectsFile(path);
 	const launches: Harness["launches"] = [];
 	const seeded: string[] = [];
+	const inbox: Harness["inbox"] = [];
+	const ended: string[] = [];
 	const waiters: { done: () => boolean; resolve: () => void }[] = [];
 	let failing = false;
 	let ids = 0;
@@ -77,6 +98,10 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 						if (session.refuses) throw new Error("omp is gone");
 						session.prompts.push(text);
 					},
+					answer: (requestId: string, answer: UserAnswer) => {
+						session.answers.push({ requestId, answer });
+						session.requests = session.requests.filter(request => request.id !== requestId);
+					},
 				}
 			: null;
 	const start = async (request: StartRequest, project: ProjectLaunch | null): Promise<StartResult> => {
@@ -90,7 +115,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		const instanceId = `i${sessions.size + 1}`;
 		const sessionId = request.kind === "resume" ? request.sessionId : `s-${instanceId}`;
 		const cwd = request.kind === "new" ? request.cwd : "/work/app";
-		const session: FakeSession = { instanceId, sessionId, cwd, status: "idle", requests: [], prompts: [], attempts: 0, refuses: false, firstPromptSaw: null, alive: true };
+		const session: FakeSession = { instanceId, sessionId, cwd, status: "idle", requests: [], answers: [], prompts: [], attempts: 0, refuses: false, firstPromptSaw: null, alive: true };
 		sessions.set(instanceId, session);
 		join.attach(session);
 		if (request.kind === "new") {
@@ -111,9 +136,17 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 			if (!result.ok) throw new Error(result.error);
 			return live(sessions.get(result.instanceId))!;
 		},
+		async end(sessionId) {
+			ended.push(sessionId);
+			for (const session of sessions.values()) if (session.sessionId === sessionId) session.alive = false;
+		},
 		interrupted: () => true,
+		stoppedWithServer: sessionId => options.stoppedWithServer?.includes(sessionId) ?? false,
+		preset: id => options.presets?.find(preset => preset.id === id) ?? null,
+		checkedOut: async () => options.checkedOut ?? null,
 		extensionArgs: () => ["-e", "/repo/projects.ts"],
 		seedNotes: id => seeded.push(id),
+		writeInbox: (id, event, at) => inbox.push({ id, event, at }),
 		now: () => T0,
 		newId: () => `id${++ids}`,
 		onChange() {
@@ -128,13 +161,17 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		waiters.push({ done, resolve });
 		return promise;
 	};
-	return { runner, file, sessions, launches, seeded, failNextStart: () => (failing = true), until, start };
+	return { runner, file, sessions, launches, seeded, inbox, failNextStart: () => (failing = true), until, start, ended };
 }
 
 /** The coordinator's own `start_worker` tool. */
-const startWorker = (h: Harness, projectId: string, params: { title: string; prompt: string; cwd: string | null }) =>
+const startWorker = (h: Harness, projectId: string, params: { title: string; prompt: string; cwd: string | null } & Record<string, string | null>) =>
+	tool(h, projectId, "start_worker", params);
+
+/** The coordinator's tool `name`. */
+const tool = (h: Harness, projectId: string, name: string, params: Record<string, unknown>) =>
 	projectTools(projectId, h.runner)
-		.find(tool => tool.name === "start_worker")!
+		.find(candidate => candidate.name === name)!
 		.execute(params, { toolCallId: "t", signal: new AbortController().signal });
 
 /** Creates a project and starts `workers` workers through the coordinator's own tool; the coordinator stays working. */
@@ -178,6 +215,8 @@ describe("ProjectRunner", () => {
 		h.failNextStart();
 		await expect(startWorker(h, projectId, { title: "Broken", prompt: "Crash.", cwd: null })).rejects.toThrow("Cannot start omp: it crashed");
 		expect(h.file.get(projectId)?.workers.map(worker => worker.id)).toEqual(["w1"]);
+		expect(h.file.get(projectId)?.queue).toEqual([]);
+		expect(h.file.get(projectId)?.updates).toEqual([]);
 		expect(await startWorker(h, projectId, { title: "Next", prompt: "Work.", cwd: null })).toStartWith('Started w2 "Next"');
 	});
 
@@ -205,7 +244,7 @@ describe("ProjectRunner", () => {
 		const { projectId, worker } = await project(h, 1);
 		const w1 = worker(1);
 		w1.status = "needs-input";
-		w1.requests = [{ id: "r1", title: "Which retry policy?" }];
+		w1.requests = [{ id: "r1", title: "Which retry policy?", deadline: null, kind: "text", multiline: false, placeholder: null, prefill: "" }];
 		h.runner.observe(w1.instanceId);
 		h.runner.observe(w1.instanceId);
 		expect(h.file.get(projectId)!.updates).toMatchObject([{ kind: "asked", requestId: "r1", question: "Which retry policy?" }]);
@@ -317,5 +356,132 @@ describe("ProjectRunner", () => {
 		h.runner.stop();
 		h.runner.exited(worker(2).instanceId);
 		expect(h.file.get(projectId)!.updates).toHaveLength(1);
+	});
+
+	test("in a git checkout a worker gets a new branch from the checked-out one, a named one, or none", async () => {
+		const h = harness(projectsPath(), new Map(), { checkedOut: "main" });
+		const { projectId } = await project(h, 0);
+		await startWorker(h, projectId, { title: "Fix Login!", prompt: "Fix it.", cwd: null, branch: null });
+		await startWorker(h, projectId, { title: "Docs", prompt: "Write.", cwd: null, branch: "docs/billing" });
+		await startWorker(h, projectId, { title: "Read", prompt: "Read.", cwd: null, branch: "none" });
+		const branches = h.launches.slice(1).map(({ request }) => (request.kind === "new" ? request.branch : undefined));
+		expect(branches[0]).toEqual({ kind: "new", name: expect.stringMatching(/^billing\/fix-login-[0-9a-z]{1,6}$/), base: "main" });
+		expect(branches.slice(1)).toEqual([{ kind: "new", name: "docs/billing", base: "main" }, null]);
+	});
+
+	test("a worker starts on the model, thinking level, and skill it names, its preset filling the rest", async () => {
+		const review: SessionPreset = { id: "review", name: "Review", model: { provider: "openai", id: "gpt" }, thinking: "low", tools: ["read"], skill: "review", worktree: "here" };
+		const h = harness(projectsPath(), new Map(), { checkedOut: "main", presets: [review] });
+		const { projectId } = await project(h, 0);
+		await startWorker(h, projectId, { title: "Review", prompt: "Review.", cwd: null, branch: null, model: "anthropic/claude-haiku-5-5", preset: "review" });
+		expect(h.launches.at(-1)?.request).toMatchObject({ model: { provider: "anthropic", id: "claude-haiku-5-5" }, thinking: "low", tools: ["read"], skill: "review", branch: null });
+		await expect(startWorker(h, projectId, { title: "X", prompt: "X.", cwd: null, preset: "gone" })).rejects.toThrow('No preset "gone"');
+		await expect(startWorker(h, projectId, { title: "X", prompt: "X.", cwd: null, model: "haiku" })).rejects.toThrow("model must read provider/id");
+	});
+
+	test("workers beyond the cap queue, persist, and start in order as busy ones finish", async () => {
+		const h = harness();
+		const { projectId, worker } = await project(h, 0);
+		h.file.apply({ op: "max-workers", id: projectId, max: 1 });
+		expect(await startWorker(h, projectId, { title: "One", prompt: "1.", cwd: null })).toStartWith('Started w1 "One"');
+		expect(await startWorker(h, projectId, { title: "Two", prompt: "2.", cwd: null })).toStartWith('Queued "Two" at position 1');
+		expect(await startWorker(h, projectId, { title: "Three", prompt: "3.", cwd: null })).toStartWith('Queued "Three" at position 2');
+		expect(parseProjects(JSON.parse(JSON.stringify({ projects: h.file.value })))?.[0]?.queue.map(queued => queued.title)).toEqual(["Two", "Three"]);
+		const started = h.until(() => h.file.get(projectId)!.workers.length === 2);
+		worker(1).status = "idle";
+		h.runner.turnEnded(worker(1).instanceId, "done");
+		await started;
+		expect(h.file.get(projectId)!.queue.map(queued => queued.title)).toEqual(["Three"]);
+		expect(h.file.get(projectId)!.workers.map(({ id, title }) => `${id} ${title}`)).toEqual(["w1 One", "w2 Two"]);
+	});
+
+	test("answer_worker answers a worker's question in the form it asks, and end_worker ends it", async () => {
+		const h = harness();
+		const { projectId, worker } = await project(h, 1);
+		const w1 = worker(1);
+		w1.status = "needs-input";
+		w1.requests = [
+			{ id: "r1", title: "Proceed?", deadline: null, kind: "confirm", message: "Proceed?" },
+			{ id: "r2", title: "Policy", deadline: null, kind: "select", options: [{ label: "Retry" }, { label: "Fail" }], checked: [] },
+		] as UserRequest[];
+		expect(await tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r1", answer: "Yes" })).toStartWith("Answered w1.");
+		await expect(tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r2", answer: "Maybe" })).rejects.toThrow('offers "Retry", "Fail"');
+		await tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r2", answer: "retry" });
+		expect(w1.answers).toEqual([
+			{ requestId: "r1", answer: { kind: "confirm", confirmed: true } },
+			{ requestId: "r2", answer: { kind: "value", value: "Retry" } },
+		]);
+		await expect(tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r9", answer: "x" })).rejects.toThrow("waits on no request r9");
+		expect(await tool(h, projectId, "end_worker", { worker: "w1" })).toBe("Ended w1.");
+		expect(h.ended).toEqual([w1.sessionId]);
+		await expect(tool(h, projectId, "end_worker", { worker: "w1" })).rejects.toThrow("w1 does not run");
+	});
+
+	test("after a restart, a coordinator that stopped with the server resumes and hears which workers stopped", async () => {
+		const before = harness();
+		const { projectId, coordinator, worker } = await project(before, 2);
+		before.runner.stop();
+		for (const session of before.sessions.values()) session.alive = false;
+		before.file.flush();
+
+		const after = harness(join(dirs.at(-1)!, "projects.json"), before.sessions, { stoppedWithServer: [coordinator.sessionId, worker(2).sessionId] });
+		const delivered = after.until(() => after.file.get(projectId)!.updates.length === 0);
+		after.runner.recover();
+		const resumed = [...after.sessions.values()].at(-1)!;
+		resumed.status = "idle";
+		after.runner.observe(resumed.instanceId);
+		await delivered;
+		expect(resumed.sessionId).toBe(coordinator.sessionId);
+		expect(resumed.prompts[0]).toContain('The dashboard restarted and stopped w2 "Task 2".');
+	});
+
+	test("an event from outside reaches the coordinator with its source, title, link, and text, and lands in the project's inbox", async () => {
+		const h = harness();
+		const { projectId, coordinator } = await project(h, 0);
+		const delivered = h.until(() => h.file.get(projectId)!.updates.length === 0);
+		coordinator.status = "idle";
+		const event = { source: "GitHub", title: "Checks failed on #12", text: "lint", url: "https://github.com/o/r/pull/12" };
+		expect(h.runner.notify(projectId, event)).toBeNull();
+		await delivered;
+		expect(coordinator.prompts[0]).toContain("- GitHub: Checks failed on #12 (https://github.com/o/r/pull/12)\n  lint");
+		expect(h.inbox).toEqual([{ id: projectId, event, at: new Date(T0).toISOString() }]);
+		h.file.apply({ op: "archive", id: projectId });
+		expect(h.runner.notify(projectId, event)).toContain("archived");
+		expect(h.inbox).toHaveLength(1);
+	});
+
+	test("an archived project keeps its updates until it is unarchived", async () => {
+		const h = harness();
+		const { projectId, coordinator, worker } = await project(h, 1);
+		h.file.apply({ op: "archive", id: projectId });
+		h.runner.turnEnded(worker(1).instanceId, "ok");
+		coordinator.status = "idle";
+		h.runner.observe(coordinator.instanceId);
+		expect(coordinator.prompts).toEqual([]);
+		const delivered = h.until(() => h.file.get(projectId)!.updates.length === 0);
+		h.file.apply({ op: "unarchive", id: projectId });
+		h.runner.settle(projectId);
+		await delivered;
+		expect(coordinator.prompts[0]).toContain("w1");
+	});
+
+	test("a worker's question is a notice once the coordinator is idle, and a settled project is done", async () => {
+		const h = harness();
+		const { projectId, coordinator, worker } = await project(h, 1);
+		const w1 = worker(1);
+		w1.status = "needs-input";
+		w1.requests = [{ id: "r1", title: "Which retry policy?", deadline: null, kind: "text", multiline: false, placeholder: null, prefill: "" }];
+		expect(notices(h)).toEqual([]);
+		coordinator.status = "idle";
+		expect(notices(h)).toMatchObject([{ id: `project:${projectId}:w1:asks:r1`, about: "asks", worker: { id: "w1" }, text: "Which retry policy?" }]);
+		w1.status = "idle";
+		w1.requests = [];
+		h.runner.turnEnded(w1.instanceId, "ok");
+		expect(notices(h)).toEqual([]);
+		h.file.apply({ op: "archive", id: projectId });
+		expect(notices(h)).toEqual([]);
+		h.file.apply({ op: "unarchive", id: projectId });
+		await h.until(() => h.file.get(projectId)!.updates.length === 0);
+		expect(notices(h)).toMatchObject([{ about: "done", worker: null }]);
 	});
 });

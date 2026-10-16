@@ -64,7 +64,7 @@ export interface DirsModule {
 	getStatsDbPath(): string;
 }
 /** Subset of omp's `SessionEntry` (src/session/session-entries.ts); the header has `type: "session"`. */
-export interface FileEntry {
+export interface FileEntry extends Record<string, unknown> {
 	type: string;
 	id: string;
 	parentId?: string | null;
@@ -92,6 +92,7 @@ export interface ExitDiagnosticsModule {
 		entries: readonly FileEntry[],
 		fallbackModel?: { api: string; provider: string; model: string },
 	): object | undefined;
+	createInterruptedToolResults(entries: readonly FileEntry[], context: "fork"): object[];
 }
 
 /** omp's `RpcAgentProcess` (src/modes/rpc/rpc-client.ts): the transport `RpcClient` drives, which `ptree.ChildProcess` implements. */
@@ -619,6 +620,35 @@ export const listing = await load<ListingModule>(join(srcDir, "session", "sessio
 });
 export const storage = await load<StorageModule>(join(srcDir, "session", "session-storage.ts"), { FileSessionStorage: "function" });
 export const loader = await load<LoaderModule>(join(srcDir, "session", "session-loader.ts"), { loadEntriesFromFile: "function" });
+export interface OmpSessionManager {
+	getSessionId(): string;
+	getCwd(): string;
+	getHeader(): Record<string, unknown> | null;
+	getEntry(id: string): (FileEntry & Record<string, unknown>) | undefined;
+	getEntries(): (FileEntry & Record<string, unknown>)[];
+	getBranch(leafId?: string): (FileEntry & Record<string, unknown>)[];
+	createBranchedSession(leafId: string, options: { copyArtifacts: boolean }): string | undefined;
+	newSession(options?: { parentSession?: string }): Promise<string | undefined>;
+	appendMessage(message: object): string;
+	appendCustomEntry(customType: string, data: unknown): string;
+	appendCustomMessageEntry(customType: string, content: string, display: boolean, details?: unknown, attribution?: "user" | "agent"): string;
+	moveTo(cwd: string): Promise<void>;
+	setAdditionalDirectories(directories: string[]): Promise<void>;
+	getSessionFile(): string | undefined;
+	putBlobSync(data: Buffer): { ref: string };
+	flush(): Promise<void>;
+	close(): Promise<void>;
+}
+export const sessionManager = await load<{
+	SessionManager: {
+		create(cwd: string, dir?: string): OmpSessionManager;
+		open(file: string, dir?: string, storage?: undefined, options?: { suppressBreadcrumb?: boolean; throwIfMissing?: boolean }): Promise<OmpSessionManager>;
+	};
+}>(join(srcDir, "session", "session-manager.ts"), { SessionManager: "function" });
+export const transcriptEntry = await load<{
+	userTurnDraft(entry: unknown): string | undefined;
+	imageContent(content: unknown): { type: "image"; data: string; mimeType: string }[];
+}>(join(dirname(packageDir), "pi-tui", "src", "chat", "transcript-entry.ts"), { userTurnDraft: "function", imageContent: "function" });
 export const sessionContext = await load<SessionContextModule>(join(srcDir, "session", "session-context.ts"), { buildSessionContext: "function" });
 export const tokenizer = await load<TokenizerModule>(join(dirname(packageDir), "pi-agent-core", "src", "tokenizer.ts"), { Tokenizer: "function" });
 export const modelTokenizer = await load<ModelTokenizerModule>(join(dirname(packageDir), "pi-catalog", "src", "model-tokenizer.ts"), {
@@ -626,6 +656,7 @@ export const modelTokenizer = await load<ModelTokenizerModule>(join(dirname(pack
 });
 export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "session", "exit-diagnostics.ts"), {
 	createInterruptedTurnAbortMessage: "function",
+	createInterruptedToolResults: "function",
 });
 export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getSessionsDir: "function",

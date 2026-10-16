@@ -35,9 +35,13 @@ import { GOOGLE_SERVICES, type GoogleService, type McpIntegration, type McpInteg
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
+import type { ProjectNotesAnswer } from "../shared/projects";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
+import type { ReplayComparison, ReplayDetail } from "../shared/replay";
+import type { View } from "../shared/sessions";
+import { parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
@@ -74,11 +78,15 @@ export interface SessionRoutesEnv {
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
 	/** The notes directory of project `id`, or `null` when there is no such project. */
 	projectNotesDir(id: string): string | null;
+	/** The user's notes directory, which every project shares. */
+	userNotesDir: string;
 	/** The saved conversations whose prompts or replies hold every word of `query`, the file changed last first. */
 	searchConversations(query: string): Promise<ConversationHit[]>;
 	sourceControl(): Promise<SourceControlAnswer>;
 	/** Apply `change` to the automatic pulls, and pull again when it changed them. */
 	changeAutoPull(change: AutoPullChange): void;
+	replayDetail(view: View, turnId: string): Promise<ReplayDetail>;
+	replayComparison(view: View): Promise<ReplayComparison>;
 }
 
 /** What the calendar routes read: Google Calendar, the calendars it shows, and the events kept on this computer. */
@@ -158,6 +166,15 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		const cwd = params.get("cwd");
 		return cwd === null || env.knownCwds().includes(cwd) || env.addedCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
 	}
+
+	const replayRead = (compare: boolean) => get(params => answer(async () => {
+		const parsed = parseView(JSON.parse(params.get("view") ?? "null"));
+		if (!parsed || parsed.ok.kind === "live" && parsed.ok.agentId !== null) throw new Error("Replay requires a main session.");
+		const turnId = params.get("turnId");
+		if (compare) return env.replayComparison(parsed.ok);
+		if (!turnId) throw new Error("Choose a prompt turn to replay.");
+		return env.replayDetail(parsed.ok, turnId);
+	}));
 
 	/** `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. */
 	const settings = get(params => {
@@ -291,11 +308,15 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return file ? Response.json(file) : fail(404, `The session changed no file ${path}`);
 	});
 
-	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the Markdown files in it, which the file dialog opens. */
+	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the user's, with the Markdown files in each, which the file dialog opens. */
 	const projectNotes = get(params => {
 		const id = params.get("id") ?? "";
 		const dir = env.projectNotesDir(id);
-		return dir === null ? fail(404, `No project ${id}`) : answer(async () => ({ dir, notes: await listNotes(dir) }));
+		if (dir === null) return fail(404, `No project ${id}`);
+		return answer(async (): Promise<ProjectNotesAnswer> => {
+			const [notes, userNotes] = await Promise.all([listNotes(dir), listNotes(env.userNotesDir)]);
+			return { dir, notes, userDir: env.userNotesDir, userNotes };
+		});
 	});
 
 	/** `GET /api/conversations?q=<words>`: the saved conversations whose prompts or replies hold every word, each by its latest such message. */
@@ -312,6 +333,8 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models/connected": { GET: connected },
 		"/api/models/roles": { GET: roles },
 		"/api/tools": { GET: tools },
+		"/api/replay/detail": { GET: replayRead(false) },
+		"/api/replay/compare": { GET: replayRead(true) },
 		"/api/analytics": { GET: analytics },
 		"/api/analytics/context": { GET: contextReport },
 		"/api/skills": { GET: skills },
@@ -590,7 +613,11 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
-		body => checked(parsePullRequestEdit(body), "Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, or a merge method and head commit"),
+		body =>
+			checked(
+				parsePullRequestEdit(body),
+				"Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, a merge method and head commit, a review thread to resolve or unresolve, or a reply or comment of at most 65536 characters",
+			),
 		savePullRequest,
 	);
 

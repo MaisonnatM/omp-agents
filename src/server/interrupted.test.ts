@@ -23,8 +23,11 @@ describe("InterruptedSessions", () => {
 		// The server died without another write.
 		const next = new InterruptedSessions(path);
 		expect([next.has("a"), next.has("b"), next.has("c")]).toEqual([true, true, false]);
+		expect([next.stoppedWithServer("a"), next.stoppedWithServer("c")]).toEqual([true, false]);
+		flushJsonFiles();
 		// Its own restart does not count them twice, nor forget them.
-		expect(new InterruptedSessions(path).has("a")).toBe(true);
+		const again = new InterruptedSessions(path);
+		expect([again.has("a"), again.stoppedWithServer("a")]).toEqual([true, false]);
 	});
 
 	test("a session that stopped while the server ran stays interrupted across a restart, until it runs again", () => {

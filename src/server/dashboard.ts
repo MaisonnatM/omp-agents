@@ -14,22 +14,26 @@ import { flushJsonFiles } from "../fs";
 import { gitCheckout } from "../git";
 import { GmailClient } from "../gmail";
 import { GoogleCalendarClient } from "../google-calendar";
-import { loadPullRequests } from "../pull-requests";
+import { loadPullRequestDetail, loadPullRequests } from "../pull-requests";
+import { loadTickets } from "../tickets";
 import { integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { connectedRoles } from "../omp/models";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
+import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, presetsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, presetsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { replayComparison, replayDetail } from "../replay";
+import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
 import { SourceControl } from "../source-control";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { agentOn } from "../shared/moves";
-import { starterPresets } from "../shared/presets";
+import { type SessionPreset, starterPresets } from "../shared/presets";
 import type { ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
@@ -45,12 +49,13 @@ import { ListRegistry } from "./list-registry";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops } from "./loops";
-import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
 import { PresetsFile } from "./presets-file";
-import { seedNotes } from "./project-notes";
+import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
 import { ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
+import { ProjectWatch } from "./project-watch";
 import { ProjectsFile } from "./projects-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
@@ -96,6 +101,7 @@ export class Dashboard {
 	readonly #gmail = new GmailClient(integrationFetch("gmail"));
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
+	readonly #pathFor: (view: View) => string | null;
 	readonly #notices: Notices;
 	readonly #broadcasts: Broadcasts;
 	readonly #lists: ListRegistry;
@@ -106,6 +112,7 @@ export class Dashboard {
 	readonly #runner: RoutineRunner;
 	readonly #scheduledRunner: ScheduledRunner;
 	readonly #projectRunner: ProjectRunner;
+	readonly #projectWatch: ProjectWatch;
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
@@ -138,6 +145,7 @@ export class Dashboard {
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
+		this.#pathFor = pathFor;
 		const views = (this.#views = new Views(
 			pathFor,
 			(topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg)),
@@ -168,6 +176,7 @@ export class Dashboard {
 						when.allDay ? [] : [{ ref: `google/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url }],
 					);
 				},
+				projects: () => this.#projectRunner.noticeFacts(),
 				now: Date.now,
 			},
 			() => this.#broadcasts.pushList("notices"),
@@ -185,7 +194,14 @@ export class Dashboard {
 			},
 			pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 			presets: { msg: () => ({ t: "presets", presets: presets.value }), apply: change => presets.apply(change) },
-			projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
+			projects: {
+				msg: () => ({ t: "projects", projects: projects.value }),
+				apply: change => {
+					const changed = projects.apply(change);
+					if (changed) this.#projectRunner.settle(change.id);
+					return changed;
+				},
+			},
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
@@ -202,6 +218,12 @@ export class Dashboard {
 			sessions,
 			pathFor,
 			savedFile: files.pathOf,
+			mayDiscardReplay: async cwd => {
+				const at = await worktreeAt(cwd);
+				if (!at?.linked) return "This is not a registered linked worktree.";
+				const plan = await this.#worktrees.preview({ repository: await canonical(at.common), path: await canonical(at.top) });
+				return plan.blockers.length ? plan.blockers.map(blocker => blocker.message).join(" ") : plan.kind === "unreadable" ? "The checkout could not be inspected." : null;
+			},
 			onStarted: () => broadcasts.syncRoster(),
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
@@ -219,7 +241,7 @@ export class Dashboard {
 				}));
 			},
 		}));
-		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "new" && request.branch !== null);
+		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "replay" || request.kind === "new" && request.branch !== null);
 		const startSession = (this.#startSession = request => startWith(request, null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
 		const reach = async (sessionId: string): Promise<LiveSession> => {
@@ -240,6 +262,16 @@ export class Dashboard {
 				return true;
 			},
 		});
+		/** The saved preset `id`, read fresh, or `null` when there is none. */
+		const preset = (id: string): SessionPreset | null => {
+			presets.reload();
+			return presets.value.find(candidate => candidate.id === id) ?? null;
+		};
+		/** The branch checked out in `cwd`, or `null` outside git or on a detached head. */
+		const checkedOut = async (cwd: string): Promise<string | null> => {
+			const dir = await directoryOf(cwd);
+			return dir ? gitCheckout(dir).then(checkout => checkout?.branch ?? null, () => null) : null;
+		};
 		const stopping = this.#stopping.signal;
 		const runner = (this.#runner = new RoutineRunner({
 			file: routines,
@@ -256,14 +288,9 @@ export class Dashboard {
 			},
 			onChange: () => broadcasts.pushList("routines"),
 			changePins: change => void lists.apply("pins", change),
-			preset: id => {
-				presets.reload();
-				return presets.value.find(preset => preset.id === id) ?? null;
-			},
-			async checkedOut(cwd) {
-				const dir = await directoryOf(cwd);
-				return dir ? gitCheckout(dir).then(checkout => checkout?.branch ?? null, () => null) : null;
-			},
+			preset,
+			checkedOut,
+			notifyProject: (projectId, event) => this.#projectRunner.notify(projectId, event),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -274,7 +301,7 @@ export class Dashboard {
 		}));
 		const runnerSession = (session: LiveSession): RunnerSession => {
 			const { status, requests } = session.row();
-			return { sessionId: session.sessionId, status, requests, prompt: text => session.prompt(null, text, [], "followUp") };
+			return { sessionId: session.sessionId, status, requests, prompt: text => session.prompt(null, text, [], "followUp"), answer: (requestId, answer) => session.answer(requestId, answer) };
 		};
 		const liveRunner = (session: LiveSession | undefined): RunnerSession | null => (session ? runnerSession(session) : null);
 		const projectRunner = (this.#projectRunner = new ProjectRunner({
@@ -283,13 +310,28 @@ export class Dashboard {
 			session: instanceId => liveRunner(sessions.get(instanceId)),
 			bySessionId: sessionId => liveRunner(sessions.bySessionId(sessionId)),
 			reach: async sessionId => runnerSession(await reach(sessionId)),
+			end: async sessionId => {
+				const session = sessions.bySessionId(sessionId);
+				if (session) await this.#endLive(session);
+			},
 			interrupted: sessionId => interrupted.has(sessionId),
+			stoppedWithServer: sessionId => interrupted.stoppedWithServer(sessionId),
+			preset,
+			checkedOut,
 			extensionArgs: projectsExtensionArgs,
 			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),
+			writeInbox: (id, event, at) => writeInboxEvent(projectNotesDir(id), event, at),
 			now: Date.now,
 			newId: randomUUID,
 			onChange: () => broadcasts.pushList("projects"),
 		}));
+		this.#projectWatch = new ProjectWatch({
+			projects: () => projects.value,
+			pullRequestsOf: sessionId => files.factsOf(sessionId).pullRequests,
+			detail: pr => loadPullRequestDetail(pr, true),
+			tickets: async () => (await loadTickets(true)).tickets,
+			notify: (projectId, event) => projectRunner.notify(projectId, event),
+		});
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
 				if (broadcasts.listening()) await this.#listRegistry();
@@ -313,11 +355,12 @@ export class Dashboard {
 				broadcasts.pushList("scheduled");
 				presets.reload();
 				broadcasts.pushList("presets");
-				await notices.check(EVENT_KINDS);
+				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
 				await scheduledRunner.tick();
 				await runner.tick();
+				await this.#projectWatch.tick();
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
@@ -373,6 +416,17 @@ export class Dashboard {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
 				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
+				userNotesDir,
+				replayDetail: async (view, turnId) => {
+					const file = this.#pathFor(view);
+					if (!file) throw new Error("The source session file is unavailable.");
+					return replayDetail(file, turnId);
+				},
+				replayComparison: async view => {
+					const file = this.#pathFor(view);
+					if (!file) throw new Error("The replay session file is unavailable.");
+					return replayComparison(file);
+				},
 				searchConversations: query => files.searchConversations(query),
 				sourceControl: () => this.#sourceControl.answer(this.#workspaceCwds()),
 				changeAutoPull: change => {
@@ -391,15 +445,19 @@ export class Dashboard {
 	}
 
 	/**
-	 * Starts following omp: watches the session files and the inboxes, takes the owner lock when it is free, lists the
-	 * files and the registry, and starts the loops; `publisher` is the server now listening.
+	 * Starts following omp: seeds the user's notes and moves each project's older notes to their places now, watches the
+	 * session files and the inboxes, takes the owner lock when it is free, lists the files and the registry, and starts
+	 * the loops; `publisher` is the server now listening.
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
+		seedUserNotes(userNotesDir);
+		for (const project of this.#projects.value) moveOldNotes(projectNotesDir(project.id));
 		this.#loops.watch();
 		if (this.#ownerLock.acquire()) {
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
+			this.#projectRunner.recover();
 		} else {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo inbox; this one takes over when it exits.`);

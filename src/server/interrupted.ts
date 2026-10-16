@@ -38,6 +38,8 @@ export class InterruptedSessions {
 	 * them, so the next start finds the ones the server went down with.
 	 */
 	readonly #sessions: Map<string, SessionState>;
+	/** The sessions that ran when the last server stopped, whatever happened to them since. */
+	readonly #stoppedWithServer: ReadonlySet<string>;
 
 	constructor(path: string) {
 		this.#file = new JsonFile(path, {
@@ -48,7 +50,13 @@ export class InterruptedSessions {
 		const saved = this.#file.load()?.sessions ?? [];
 		// The sessions that ran when the last server stopped stopped with it.
 		this.#sessions = new Map(saved.map(({ id, working }) => [id, { interrupted: true, working }]));
-		if (saved.some(session => !session.interrupted)) this.#save();
+		this.#stoppedWithServer = new Set(saved.filter(session => !session.interrupted).map(session => session.id));
+		if (this.#stoppedWithServer.size > 0) this.#save();
+	}
+
+	/** Whether session `sessionId` ran when the last server stopped. */
+	stoppedWithServer(sessionId: string): boolean {
+		return this.#stoppedWithServer.has(sessionId);
 	}
 
 	has(sessionId: string): boolean {

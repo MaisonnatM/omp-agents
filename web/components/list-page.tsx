@@ -27,7 +27,8 @@ export function PageFrame({ title, meta, leading, actions, children }: PageFrame
 			<Header title={title} meta={meta} leading={leading}>
 				{actions}
 			</Header>
-			<div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+			{/* Relative, so an absolute child such as a row's `sr-only` text stays in this scroll and never makes the document scroll. */}
+			<div className="relative min-h-0 flex-1 overflow-y-auto">{children}</div>
 		</div>
 	);
 }

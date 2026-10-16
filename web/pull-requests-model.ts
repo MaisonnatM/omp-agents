@@ -1,6 +1,6 @@
-/** Pull request links, what each pull request waits on next, the list's sections and stacks, and what stands between a pull request and its merge. */
+/** Pull request links, what each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, and its open review threads. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type StackedPullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
@@ -342,4 +342,20 @@ export function pullRequestStatus(detail: PullRequestDetail): StatusItem[] {
 	if (detail.review === "approved") items.push({ kind: "approved", by: by("approved") });
 	if (detail.checks === "passing") items.push({ kind: "checks-passing", passed: count("passing"), skipped: count("skipped") });
 	return items;
+}
+
+/** The review threads not yet resolved, in GitHub's order. */
+export const openThreads = ({ threads }: Pick<PullRequestDetail, "threads">): PullRequestThread[] => threads.filter(thread => !thread.resolved);
+
+/** The comments and reviews of the conversation that have words, which **Comments** lists. */
+export const spokenConversation = ({ conversation }: Pick<PullRequestDetail, "conversation">): PullRequestDetail["conversation"] => conversation.filter(event => event.body.trim() !== "");
+
+/** The comments **Comments** lists: every review thread's, resolved or not, and the conversation's with words. */
+export const commentCount = (detail: Pick<PullRequestDetail, "threads" | "conversation">): number =>
+	detail.threads.reduce((sum, thread) => sum + thread.comments.length, 0) + spokenConversation(detail).length;
+
+/** What the details show once thread `id` is `resolved`: its threads and their unresolved count together, so every count agrees while GitHub answers. */
+export function withThreadResolved(detail: PullRequestDetail, id: string, resolved: boolean): Pick<PullRequestDetail, "threads" | "unresolved"> {
+	const threads = detail.threads.map(thread => (thread.id === id ? { ...thread, resolved } : thread));
+	return { threads, unresolved: { count: openThreads({ threads }).length, exact: detail.unresolved.exact } };
 }

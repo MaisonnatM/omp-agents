@@ -5,55 +5,16 @@
 // the messages go to omp's blob store, where a blob is written once and shared by every request and session that
 // sends the same bytes. Messages are stored as edits against the session's previous request, so a turn stores only the
 // messages it adds or changes, and the session file references every blob, which keeps `omp gc` from deleting them.
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-
-const RECORD_TYPE = "omp-request-log.record";
+import { canonicalJson, rebuildRequests, RECORD_TYPE, sha256 } from "./replay/request-log-reader";
+import type { Body, Edit, Json, RebuiltRequest, RequestRecord } from "./replay/request-log-reader";
+export { canonicalJson, rebuildRequests } from "./replay/request-log-reader";
 
 const SYSTEM_KEYS = ["system", "instructions", "systemInstruction"];
 const MESSAGE_KEYS = ["messages", "input", "contents"];
-const BLOB_PREFIX = "blob:sha256:";
-
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-type Body = { [key: string]: Json };
-/** `count` messages copied from the base request starting at index `from`, or one message the base did not send. */
-type Edit = { from: number; count: number } | { add: Json };
-
-interface RequestRecord {
-	/** SHA-256 of the request body as canonical JSON. */
-	requestHash: string;
-	provider: string | null;
-	api: string | null;
-	model: string | null;
-	thinkingLevel: string | null;
-	/** The session entry the request was built from; its ancestors are the entries in the context. */
-	leafId: string | null;
-	/** Blob holding `{ <system field>: value }`; the field is `system`, `instructions`, or `systemInstruction`. */
-	systemPromptHash: string | null;
-	/** Blob holding `{ tools: value }`, in the order the provider receives them. */
-	toolsHash: string | null;
-	/** Blob holding every other top-level field of the body. */
-	paramsHash: string;
-	/** Blob holding the edits that turn the base request's messages into this request's `key` field. */
-	messages: { key: string; base: string | null; edits: string } | null;
-}
-
-/** JSON with every object's keys sorted, so equal bodies hash equally whatever order a provider built them in. */
-function canonicalJson(value: unknown): string {
-	return JSON.stringify(value, (_key, field: unknown) => {
-		if (typeof field === "bigint") return field.toString();
-		if (field === null || typeof field !== "object" || Array.isArray(field)) return field;
-		const object = field as Record<string, unknown>;
-		return Object.fromEntries(Object.keys(object).sort().map(key => [key, object[key]]));
-	});
-}
-
-function sha256(text: string): string {
-	return createHash("sha256").update(text).digest("hex");
-}
 
 function diffMessages(base: string[], hashes: string[], messages: Json[]): Edit[] {
 	const firstIndex = new Map<string, number>();
@@ -133,51 +94,6 @@ export default function requestLog(pi: ExtensionAPI) {
 	});
 }
 
-interface RebuiltRequest {
-	record: RequestRecord;
-	body?: Body;
-	/** SHA-256 of the rebuilt body as canonical JSON; equals `record.requestHash` when the rebuild is exact. */
-	hash?: string;
-	error?: string;
-}
-
-/** Rebuilds every request a session file records, in file order. */
-function rebuildRequests(sessionText: string, readBlob: (hash: string) => string): RebuiltRequest[] {
-	const messagesByRequest = new Map<string, Json[]>();
-	const read = (ref: string): Json => {
-		if (!ref.startsWith(BLOB_PREFIX)) throw new Error(`not a blob reference: ${ref}`);
-		return JSON.parse(readBlob(ref.slice(BLOB_PREFIX.length))) as Json;
-	};
-	const rebuilt: RebuiltRequest[] = [];
-	for (const line of sessionText.split("\n")) {
-		if (!line.includes(RECORD_TYPE)) continue;
-		const entry = JSON.parse(line) as { type?: string; customType?: string; data?: RequestRecord };
-		if (entry.type !== "custom" || entry.customType !== RECORD_TYPE || !entry.data) continue;
-		const record = entry.data;
-		try {
-			const body: Body = {};
-			for (const ref of [record.paramsHash, record.systemPromptHash, record.toolsHash]) {
-				if (ref !== null) Object.assign(body, read(ref));
-			}
-			if (record.messages) {
-				const { key, base, edits } = record.messages;
-				const baseMessages = base === null ? [] : messagesByRequest.get(base);
-				if (!baseMessages) throw new Error(`base request ${base} is not recorded earlier in this file`);
-				const items: Json[] = [];
-				for (const edit of read(edits) as Edit[]) {
-					if ("add" in edit) items.push(edit.add);
-					else items.push(...baseMessages.slice(edit.from, edit.from + edit.count));
-				}
-				messagesByRequest.set(record.requestHash, items);
-				body[key] = items;
-			}
-			rebuilt.push({ record, body, hash: sha256(canonicalJson(body)) });
-		} catch (error) {
-			rebuilt.push({ record, error: error instanceof Error ? error.message : String(error) });
-		}
-	}
-	return rebuilt;
-}
 
 if (import.meta.main) {
 	const args = process.argv.slice(2);

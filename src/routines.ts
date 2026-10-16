@@ -17,7 +17,9 @@ export type RoutineTask =
 	/** One session in `cwd` that takes `prompt`; with `pin`, the session is pinned once its turn finishes, in place of the routine's earlier sessions. */
 	| { kind: "prompt"; prompt: string; pin: boolean }
 	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
-	| { kind: "command"; command: string };
+	| { kind: "command"; command: string }
+	/** `prompt` sent to project `projectId`'s coordinator as an update, with no session of its own. */
+	| { kind: "project"; projectId: string; prompt: string };
 
 /** A run's command: `running` from its launch, saved before it can end, then how it ended. */
 export type CommandRun =
@@ -32,7 +34,9 @@ export type CommandRun =
 export type RoutineOutcome =
 	| { kind: "pending"; queued: boolean }
 	| { kind: "session"; instanceId: string; sessionId: string }
-	| { kind: "command"; run: CommandRun };
+	| { kind: "command"; run: CommandRun }
+	/** The prompt reached the project's updates; the coordinator gets it once it is idle. */
+	| { kind: "project"; projectId: string };
 
 export interface RoutineRun {
 	at: number;
@@ -185,6 +189,8 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 			return isNonEmpty(value.prompt) && typeof value.pin === "boolean" ? { ok: { kind: "prompt", prompt: value.prompt, pin: value.pin } } : null;
 		case "command":
 			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
+		case "project":
+			return isNonEmpty(value.projectId) && isNonEmpty(value.prompt) ? { ok: { kind: "project", projectId: value.projectId, prompt: value.prompt } } : null;
 		default:
 			return null;
 	}

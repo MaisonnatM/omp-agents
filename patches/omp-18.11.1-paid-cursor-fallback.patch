@@ -1,0 +1,2575 @@
+diff --git a/docs/non-compaction-retry-policy.md b/docs/non-compaction-retry-policy.md
+index 952a51f..0202786 100644
+--- a/docs/non-compaction-retry-policy.md
++++ b/docs/non-compaction-retry-policy.md
+@@ -200,6 +200,7 @@ Defined in `packages/coding-agent/src/session/settings.ts`:
+ - `retry.usageAwareFallback` (default `false`; runs a preflight for supported coding-plan usage reports)
+ - `retry.usageReservePct` (default `10`; remaining-quota reserve threshold)
+ - `retry.usageReservePolicy` (default `"confirm"`; `"auto"` and `"fail-closed"` are also supported)
++- `retry.paidFallback` (default `""`; opt-in paid-last-resort selector for session routing)
+ 
+ Programmatic toggles in session:
+ 
+@@ -277,3 +278,33 @@ A new retry chain can still start later on a future retryable error after counte
+ - `RpcSessionState` currently exposes `autoCompactionEnabled` but not an `autoRetryEnabled` field; RPC callers must track their own toggle state or query settings through other APIs.
+ - Model fallback changes append temporary `model_change` entries and may later restore the primary model when its cooldown expires, depending on `retry.fallbackRevertPolicy`.
+ - Usage-aware preflight runs before a provider request when `retry.usageAwareFallback` is enabled. It prefers healthy same-provider coding-plan accounts before configured model fallback; ordinary configured API keys are excluded. Unknown/unmapped usage fails open. `retry.modelFallback` gates model switching, not the preflight's account selection or `"fail-closed"` policy. At the reserve threshold, `"confirm"` asks interactive sessions and keeps the current model when declined; sessions without a confirmation UI automatically apply an eligible fallback. `"auto"` applies an eligible fallback without asking. `"fail-closed"` rejects reserve or depleted usage instead of spending it or selecting a fallback. Depleted usage under the other policies applies an eligible fallback without a reserve confirmation.
++
++## Paid-last-resort routing
++
++`retry.paidFallback` is separate from `retry.fallbackChains`. An empty selector disables paid-last-resort routing. Both `retry.usageAwareFallback` and `retry.modelFallback` must be enabled.
++
++```yaml
++modelRoles:
++  default: anthropic/claude-opus-5-5
++  plan: anthropic/claude-fable-5-1
++retry:
++  usageAwareFallback: true
++  modelFallback: true
++  paidFallback: cursor/claude-opus-5-5
++```
++
++Startup, including startup without an explicit model argument, prompt preflight, and error recovery use the same selection policy:
++
++1. Check the normal fallback chain and then other configured chat-role primaries and fallback selectors. The extra configured candidates follow provider priority and retain configuration order within a provider. The policy does not search the entire catalog.
++2. Prefer healthy included quota. Unknown included quota and positive reserve remain included routes, not evidence that paid funding is needed. Numeric zero remaining is depleted even if the provider labels the window `ok`. Existing reserve confirmation and fail-closed policies still apply.
++3. Admit the paid selector only when every eligible included route is depleted or unavailable. A disabled provider, incompatible model, inaccessible child account pool, or account-access restriction cannot be bypassed.
++4. Require an inspectable credential whose report explicitly enables usable paid funding. Cursor reports with `onDemand.enabled: true` and a null limit represent unlimited funding. Disabled funding, exhausted capped funding, missing reports, and active credential blocks are rejected, even for a single account.
++5. Recheck included quota on each later logical prompt. Restored included quota replaces paid routing even when the fallback is pinned or `retry.fallbackRevertPolicy` is `never`. Configured role primaries do not change.
++
++With `retry.usageReservePolicy: confirm`, interactive startup keeps a reserve primary until the first prompt can ask whether to switch to a healthy alternative. SDK hosts can request the same behavior with `deferUsageReserveConfirmation`. Declining keeps the current included route for the reserve episode. Noninteractive sessions select the alternative automatically. Neither choice admits paid funding while positive included reserve remains.
++
++Usage preflight preserves the configured thinking selector, including `auto`. Selecting the unchanged model and billing intent does not create a fallback transition or replace automatic thinking with its resolved request effort.
++
++Paid authorization follows the request through credential refresh, rotation, preflight, and outbound key resolution. Custom SDK `getApiKey` callbacks cannot use automatic paid fallback because the registry cannot inspect the callback's selected account. Ordinary fallback-chain consumers, including auxiliary model runners, do not inherit this authorization.
++
++Cursor uses the same completion transport for included and on-demand requests. This policy controls deliberate local routing using reported quota. It does not disable Cursor's server-side automatic billing or guarantee zero incidental overage when reports are stale or unknown.
+diff --git a/docs/settings.md b/docs/settings.md
+index be2137f..a0dff07 100644
+--- a/docs/settings.md
++++ b/docs/settings.md
+@@ -579,6 +579,7 @@ providers:
+ | `retry.fallbackRevertPolicy`             | enum    | `cooldown-expiry` | `cooldown-expiry` returns to the primary model once its suppression window ends; `never` stays on the fallback until switched manually.                                                                                                                                                                                                                                                                                                                                                     |
+ | `retry.waitForUsageReset` | boolean | `false` | Allow provider-stated usage-limit waits past `retry.maxDelayMs` when a reset hint or complete usage report supplies authoritative timing. Waits are abortable but can also hold subagents. |
+ | `retry.usageAwareFallback` | boolean | `false` | Before a turn, use reliable coding-plan quota reports to prefer healthy same-provider accounts and then configured fallback models. Unknown usage keeps the current model; ordinary API keys are excluded. |
++| `retry.paidFallback` | string | `""` | Optional paid-last-resort chat selector, such as `cursor/claude-opus-5-5`. Requires `retry.usageAwareFallback` and `retry.modelFallback`. Sessions exhaust eligible configured included plans before admitting explicitly enabled, usable paid funding. Separate from ordinary fallback chains and auxiliary consumers. See [paid fallback policy](./non-compaction-retry-policy.md#paid-last-resort-routing). |
+ | `retry.usageReservePct` | number | `10` | Remaining quota percentage protected by usage-aware fallback. |
+ | `retry.usageReservePolicy` | enum | `confirm` | `confirm`, `auto`, `fail-closed`. At reserve, `confirm` asks when an interactive confirmer is available and otherwise auto-falls back; exhausted quota can fall back without confirmation. `fail-closed` blocks known reserve/depleted quota rather than spending it. |
+ | `providers.anthropic.serverSideFallback` | boolean | `false`           | Opt in to Anthropic's `server-side-fallback-2026-06-01` beta for eligible direct Claude Fable/Mythos requests. The catalog-owned server-side chain currently targets `claude-opus-5`, not `claude-opus-5-5`; unsupported models and hosts have no chain.                                                                                                                                          |
+diff --git a/packages/ai/CHANGELOG.md b/packages/ai/CHANGELOG.md
+index 3dcc398..fa77304 100644
+--- a/packages/ai/CHANGELOG.md
++++ b/packages/ai/CHANGELOG.md
+@@ -2,6 +2,14 @@
+ 
+ ## [Unreleased]
+ 
++### Added
++
++- Added explicit paid-last-resort credential admission, including enabled unlimited Cursor on-demand funding, without treating paid funding as included quota.
++
++### Fixed
++
++- Treat numerically exhausted included-plan windows as depleted even when the provider labels them `ok`, preserving their reset time instead of routing through zero reserve.
++
+ ## [18.11.1] - 2026-10-15
+ 
+ ### Added
+diff --git a/packages/ai/src/auth/cascade.ts b/packages/ai/src/auth/cascade.ts
+index eea48c1..3acf75f 100644
+--- a/packages/ai/src/auth/cascade.ts
++++ b/packages/ai/src/auth/cascade.ts
+@@ -358,6 +358,10 @@ export class KeyCascade implements KeysApi {
+ 		onCredentialId?: (id: number, identity?: OAuthRequestIdentity) => void,
+ 	): Promise<string | undefined> {
+ 		const restricted = this.#deps.affinity.isRestricted(provider, sessionId);
++		if (options?.billingIntent === "paid-last-resort") {
++			const origin = this.source(provider);
++			if (!origin || (origin.kind !== "oauth" && origin.kind !== "api_key")) return undefined;
++		}
+ 		// Runtime override takes highest priority
+ 		const runtimeKey = restricted ? undefined : this.#deps.overrides.runtimeKey(provider);
+ 		if (runtimeKey) {
+@@ -410,7 +414,9 @@ export class KeyCascade implements KeysApi {
+ 			provider,
+ 			sessionId,
+ 			options,
+-			credential => credential.source === "login" && !this.isKeylessFallback(provider, credential),
++			credential =>
++				(options?.billingIntent === "paid-last-resort" || credential.source === "login") &&
++				!this.isKeylessFallback(provider, credential),
+ 		);
+ 		if (loginApiKeySelection) {
+ 			if (options?.recordAffinity !== false) {
+@@ -423,6 +429,10 @@ export class KeyCascade implements KeysApi {
+ 			if (apiKey !== undefined && credentialId !== undefined) onCredentialId?.(credentialId);
+ 			return apiKey;
+ 		}
++		if (options?.billingIntent === "paid-last-resort") {
++			if (oauthRefreshFailure) throw oauthRefreshFailure;
++			return undefined;
++		}
+ 
+ 		// Past OAuth: the session sticky (if any) is stale — the request authenticates via
+ 		// env/api_key, not OAuth, so clear it now so getOAuthAccountId() correctly
+diff --git a/packages/ai/src/auth/health.ts b/packages/ai/src/auth/health.ts
+index 2608403..f8c7b95 100644
+--- a/packages/ai/src/auth/health.ts
++++ b/packages/ai/src/auth/health.ts
+@@ -1,5 +1,5 @@
+ import type { Provider } from "../types";
+-import { isWithinUsageReserve, resolveUsedFraction } from "../usage";
++import { hasAvailablePaidFunding, isWithinUsageReserve, resolveUsedFraction } from "../usage";
+ import type {
+ 	CredentialRankingContext,
+ 	UsageCredential,
+@@ -28,10 +28,16 @@ import type {
+ } from "./types";
+ import { buildRefreshableOauthCredential, mergeRefreshedUsageCredential } from "./usage";
+ import type { UsageService } from "./usage";
+-import { REMOTE_REFRESH_SENTINEL } from "./types";
++import { oauthAccountKey, REMOTE_REFRESH_SENTINEL } from "./types";
+ import { oauthUsageRequest, usageCacheIdentity, usageRequest } from "./usage-cache";
+ import type { UsageRequestDescriptor } from "./usage-cache";
+-import { isUsageLimitExhausted, reserveUsageLimits, usageReportMetadataValue } from "./usage-report";
++import {
++	isUsageLimitExhausted,
++	isUsageLimitReached,
++	reserveUsageLimits,
++	scopedUsageLimits,
++	usageReportMetadataValue,
++} from "./usage-report";
+ 
+ /** Dependencies for model pool health and stored credential probes. */
+ export interface CredentialHealthDeps {
+@@ -114,7 +120,19 @@ export class CredentialHealth implements HealthApi {
+ 		const loginApiKeyPool = apiKeyPool.filter(
+ 			({ entry }) => entry.credential.type === "api_key" && entry.credential.source === "login",
+ 		);
+-		const pool = origin.kind === "oauth" ? oauthPool : loginApiKeyPool;
++		const accountPool =
++			origin.kind === "oauth"
++				? oauthPool
++				: options.billingIntent === "paid-last-resort"
++					? apiKeyPool
++					: loginApiKeyPool;
++		const pool = accountPool.filter(({ entry }) => {
++			if (!this.#deps.affinity.allows(provider, options.sessionId, entry.credential)) return false;
++			if (!options.accountIds) return true;
++			if (entry.credential.type !== "oauth") return false;
++			const key = oauthAccountKey(entry.credential);
++			return key !== undefined && options.accountIds.includes(key);
++		});
+ 		if (pool.length === 0) return { state: "unknown", accounts: [] };
+ 		const sessionCredential = this.#deps.affinity.get(provider, options.sessionId);
+ 		const selectedCredentialId =
+@@ -124,6 +142,7 @@ export class CredentialHealth implements HealthApi {
+ 
+ 		const rankingContext: CredentialRankingContext = {
+ 			modelId: options.modelId,
++			billingIntent: options.billingIntent,
+ 		};
+ 		const planGate = strategy?.planGate?.(rankingContext);
+ 		const planEligibilityByCredential = new Map<number, boolean | undefined>();
+@@ -190,6 +209,19 @@ export class CredentialHealth implements HealthApi {
+ 					};
+ 				}
+ 				if (!report) return { credentialId: entry.id, credentialType, state: "unknown" };
++				if (options.billingIntent === "paid-last-resort") {
++					return {
++						credentialId: entry.id,
++						credentialType,
++						state:
++							hasAvailablePaidFunding(report) &&
++							!isUsageLimitReached(
++								strategy ? scopedUsageLimits(strategy, report, rankingContext) : report.limits,
++							)
++								? "healthy"
++								: "depleted",
++					};
++				}
+ 
+ 				const limits = reserveUsageLimits(strategy, report, rankingContext);
+ 				if (limits.length === 0) return { credentialId: entry.id, credentialType, state: "unknown" };
+@@ -201,7 +233,9 @@ export class CredentialHealth implements HealthApi {
+ 				if (currentLimits.length === 0) {
+ 					return { credentialId: entry.id, credentialType, state: "unknown" };
+ 				}
+-				const activeExhausted = currentLimits.filter(limit => isUsageLimitExhausted(limit));
++				const activeExhausted = currentLimits.filter(
++					limit => isUsageLimitExhausted(limit) || (resolveUsedFraction(limit) ?? 0) >= 1,
++				);
+ 				if (activeExhausted.length > 0) {
+ 					const futureResets = activeExhausted
+ 						.map(limit => limit.window?.resetsAt)
+diff --git a/packages/ai/src/auth/rank.ts b/packages/ai/src/auth/rank.ts
+index d4d0372..07de033 100644
+--- a/packages/ai/src/auth/rank.ts
++++ b/packages/ai/src/auth/rank.ts
+@@ -16,6 +16,8 @@ export type UsageCandidate<T extends AuthCredential> = {
+ 	selection: CredentialSelection<T>;
+ 	usage: UsageReport | null;
+ 	usageChecked: boolean;
++	/** Identity of the account whose usage was inspected, before the selection can be rebound. */
++	usageIdentity?: string;
+ 	/** Present after policy-aware ranking; used to decide whether a warm automatic pin may be evicted. */
+ 	inReserve?: boolean;
+ 	/** True only when reserve ranking had a usable remaining-fraction measurement. */
+@@ -149,6 +151,7 @@ export function orderUsageRankedCandidates<T extends AuthCredential>(
+ 		selection: candidate.selection,
+ 		usage: candidate.usage,
+ 		usageChecked: candidate.usageChecked,
++		usageIdentity: candidate.usageIdentity,
+ 		inReserve: candidate.inReserve,
+ 		reserveMeasured: candidate.reserveMeasured,
+ 		allowanceSpent: candidate.allowanceSpent,
+diff --git a/packages/ai/src/auth/rotation.ts b/packages/ai/src/auth/rotation.ts
+index e901785..952e817 100644
+--- a/packages/ai/src/auth/rotation.ts
++++ b/packages/ai/src/auth/rotation.ts
+@@ -120,10 +120,11 @@ export class RateLimits implements LimitsApi {
+ 		credentialType: AuthCredential["type"],
+ 		modelId: string | undefined,
+ 		blockScopeOverride?: string,
++		billingIntent?: CredentialRankingContext["billingIntent"],
+ 	): CredentialBlockRouting {
+ 		const providerKey = providerTypeKey(provider, credentialType);
+ 		const strategy = this.#deps.strategies(provider);
+-		const rankingContext: CredentialRankingContext = { modelId };
++		const rankingContext: CredentialRankingContext = { modelId, billingIntent };
+ 		const defaultBlockScope = strategy?.blockScope?.(rankingContext);
+ 		const blockScope = blockScopeOverride ?? defaultBlockScope;
+ 		const requestBlockScopes = credentialBlockScopesForRequest(provider, strategy, rankingContext, defaultBlockScope);
+@@ -246,7 +247,13 @@ export class RateLimits implements LimitsApi {
+ 		const credentialType = sessionCredential.type;
+ 		const targetCredentialId = target.id;
+ 
+-		const routing = this.#credentialBlockRouting(provider, credentialType, options?.modelId);
++		const routing = this.#credentialBlockRouting(
++			provider,
++			credentialType,
++			options?.modelId,
++			undefined,
++			options?.billingIntent,
++		);
+ 		const now = Date.now();
+ 		const requestedBlockedUntilMs = now + (options?.retryAfterMs ?? DEFAULT_BLOCK_MS);
+ 		let blockedUntil = requestedBlockedUntilMs;
+@@ -417,6 +424,7 @@ export class RateLimits implements LimitsApi {
+ 				retryAfterMs,
+ 				providerTimed: retryAfterMs !== undefined,
+ 				modelId: options?.modelId,
++				billingIntent: options?.billingIntent,
+ 				apiKey: options?.apiKey,
+ 				credentialId: options?.credentialId,
+ 				signal: options?.signal,
+@@ -448,6 +456,7 @@ export class RateLimits implements LimitsApi {
+ 				sessionCredential.type,
+ 				options?.modelId,
+ 				modelPolicyScope,
++				options?.billingIntent,
+ 			);
+ 			// Account-wide denials must not inherit a quota scope that healthy usage can heal.
+ 			routing.blockScope = modelPolicyScope ?? ACCOUNT_POLICY_BLOCK_SCOPE;
+diff --git a/packages/ai/src/auth/select.ts b/packages/ai/src/auth/select.ts
+index 0c5fe68..28b2823 100644
+--- a/packages/ai/src/auth/select.ts
++++ b/packages/ai/src/auth/select.ts
+@@ -4,7 +4,7 @@ import { getOAuthApiKey, getOAuthProvider } from "../registry/oauth";
+ import type { OAuthCredentials, OAuthProvider } from "../registry/oauth/types";
+ import type { Provider } from "../types";
+ import type { CredentialRankingContext, CredentialRankingStrategy, PlanGate, UsageReport } from "../usage";
+-import { isWithinUsageReserve } from "../usage";
++import { hasAvailablePaidFunding, isWithinUsageReserve } from "../usage";
+ import type { RankingStrategyResolver } from "../usage/registry";
+ import type { SessionAffinity } from "./affinity";
+ import {
+@@ -38,6 +38,7 @@ import {
+ 	type StoredAuthCredential,
+ } from "./types";
+ import type { UsageService } from "./usage";
++import { buildUsageCredential, usageCacheIdentity } from "./usage-cache";
+ import {
+ 	isUsageLimitReached,
+ 	normalizeUsageFraction,
+@@ -59,6 +60,7 @@ export type TryOAuthOptions = {
+ 	allowBlocked: boolean;
+ 	prefetchedUsage?: UsageReport | null;
+ 	usagePrechecked?: boolean;
++	prefetchedUsageIdentity?: string;
+ 	planGate?: PlanGate;
+ 	enforcePlanRequirement?: boolean;
+ 	strategy?: CredentialRankingStrategy;
+@@ -306,6 +308,31 @@ export class CredentialSelector {
+ 			});
+ 
+ 		if (credentials.length === 0) return undefined;
++		if (options?.billingIntent === "paid-last-resort") {
++			if (options.accountIds) return undefined;
++			const strategy = this.#deps.strategies(provider);
++			const context: CredentialRankingContext = { modelId: options.modelId, billingIntent: options.billingIntent };
++			const scopes = credentialBlockScopesForRequest(provider, strategy, context, strategy?.blockScope?.(context));
++			for (const selection of credentials) {
++				if (!this.#deps.affinity.allows(provider, sessionId, selection.credential)) continue;
++				if (this.#deps.blocks.isBlocked(provider, providerTypeKey(provider, "api_key"), selection.index, scopes))
++					continue;
++				const report = await this.#deps.usage.report(provider, selection.credential, options);
++				if (
++					report &&
++					hasAvailablePaidFunding(report) &&
++					!isUsageLimitReached(strategy ? scopedUsageLimits(strategy, report, context) : report.limits)
++				) {
++					if (
++						this.#deps.pool.credentials(provider)[selection.index] !== selection.credential ||
++						this.#deps.blocks.isBlocked(provider, providerTypeKey(provider, "api_key"), selection.index, scopes)
++					)
++						continue;
++					return selection;
++				}
++			}
++			return undefined;
++		}
+ 		if (credentials.length === 1) return credentials[0];
+ 
+ 		const providerKey = providerTypeKey(provider, "api_key");
+@@ -367,6 +394,10 @@ export class CredentialSelector {
+ 			args.order.map(async idx => {
+ 				const selection = args.credentials[idx];
+ 				if (!selection) return null;
++				const usageIdentity =
++					args.options?.billingIntent === "paid-last-resort"
++						? usageCacheIdentity(buildUsageCredential(selection.credential))
++						: undefined;
+ 				let blockedUntil = this.#deps.blocks.blockedUntil(
+ 					args.provider,
+ 					args.providerKey,
+@@ -396,7 +427,7 @@ export class CredentialSelector {
+ 						args.blockScopes ?? args.blockScope,
+ 					);
+ 				}
+-				if (blockedUntil !== undefined) return { selection, usage, usageChecked, blockedUntil };
++				if (blockedUntil !== undefined) return { selection, usage, usageChecked, usageIdentity, blockedUntil };
+ 				if (!usageChecked) {
+ 					usage = await this.#deps.usage.report(args.provider, selection.credential, {
+ 						...args.options,
+@@ -408,6 +439,7 @@ export class CredentialSelector {
+ 					selection,
+ 					usage,
+ 					usageChecked,
++					usageIdentity,
+ 					blockedUntil: undefined as number | undefined,
+ 				};
+ 			}),
+@@ -430,6 +462,7 @@ export class CredentialSelector {
+ 								selection,
+ 								usage: null,
+ 								usageChecked: false,
++								usageIdentity: undefined,
+ 								blockedUntil: undefined,
+ 							}
+ 						: null;
+@@ -440,7 +473,7 @@ export class CredentialSelector {
+ 		for (let orderPos = 0; orderPos < usageResults.length; orderPos += 1) {
+ 			const result = usageResults[orderPos];
+ 			if (!result) continue;
+-			const { selection, usage, usageChecked } = result;
++			const { selection, usage, usageChecked, usageIdentity } = result;
+ 			let { blockedUntil } = result;
+ 			let blocked = blockedUntil !== undefined;
+ 			const scopedLimits = usage && strategy ? scopedUsageLimits(strategy, usage, args.rankingContext) : undefined;
+@@ -474,6 +507,7 @@ export class CredentialSelector {
+ 				selection,
+ 				usage,
+ 				usageChecked,
++				usageIdentity,
+ 				blocked,
+ 				blockedUntil,
+ 				inReserve:
+@@ -545,6 +579,7 @@ export class CredentialSelector {
+ 		const strategy = this.#deps.strategies(provider);
+ 		const rankingContext: CredentialRankingContext = {
+ 			modelId: options?.modelId,
++			billingIntent: options?.billingIntent,
+ 		};
+ 		const blockScope = strategy?.blockScope?.(rankingContext);
+ 		// Reads honour every scope that applies; the scalar above is for args that persist.
+@@ -552,12 +587,14 @@ export class CredentialSelector {
+ 		const planGate = strategy?.planGate?.(rankingContext);
+ 		const hasPlanRequirement = planGate !== undefined;
+ 		const accountIds = options?.accountIds?.length ? new Set(options.accountIds) : undefined;
++		const paid = options?.billingIntent === "paid-last-resort";
+ 		const enforceAccounts =
+ 			accountIds !== undefined &&
+-			credentials.some(({ credential }) => {
+-				const accountKey = oauthAccountKey(credential);
+-				return accountKey !== undefined && accountIds.has(accountKey);
+-			});
++			(paid ||
++				credentials.some(({ credential }) => {
++					const accountKey = oauthAccountKey(credential);
++					return accountKey !== undefined && accountIds.has(accountKey);
++				}));
+ 		const hasAccountPolicy = credentials.some(
+ 			({ credential }) => this.#deps.policies.forCredential(provider, credential) !== undefined,
+ 		);
+@@ -567,7 +604,7 @@ export class CredentialSelector {
+ 		const canFetchPolicyUsage = strategy !== undefined || this.#deps.usage.canFetchOAuthUsage(provider);
+ 		const policyReserveEnabled = hasAccountPolicy && canFetchPolicyUsage;
+ 		const checkUsage =
+-			(strategy !== undefined || policyReserveEnabled) && (credentials.length > 1 || hasPlanRequirement);
++			paid || ((strategy !== undefined || policyReserveEnabled) && (credentials.length > 1 || hasPlanRequirement));
+ 		const sessionCredential = this.#deps.affinity.get(provider, sessionId);
+ 		const sessionPreferredIndex = sessionCredential?.type === "oauth" ? sessionCredential.index : undefined;
+ 		const sessionPreferredCredential =
+@@ -659,7 +696,14 @@ export class CredentialSelector {
+ 					.filter((selection): selection is { credential: OAuthCredential; index: number } => Boolean(selection))
+ 					.map(selection =>
+ 						selection.index === sessionPreferredIndex && sessionPreferredUsage !== undefined
+-							? { selection, usage: sessionPreferredUsage, usageChecked: true }
++							? {
++									selection,
++									usage: sessionPreferredUsage,
++									usageChecked: true,
++									usageIdentity: paid
++										? usageCacheIdentity(buildUsageCredential(selection.credential))
++										: undefined,
++								}
+ 							: { selection, usage: null, usageChecked: false },
+ 					);
+ 		// Keep the candidate object: preflight may rebind its positional index
+@@ -889,12 +933,14 @@ export class CredentialSelector {
+ 			allowBlocked: boolean;
+ 			enforcePlanRequirement: boolean;
+ 			enforceAccounts: boolean;
+-		}> = [
+-			{ allowBlocked: false, enforcePlanRequirement, enforceAccounts },
+-			{ allowBlocked: true, enforcePlanRequirement, enforceAccounts },
+-		];
+-		if (enforcePlanRequirement) passes.push({ allowBlocked: true, enforcePlanRequirement: false, enforceAccounts });
+-		if (enforceAccounts) passes.push({ allowBlocked: true, enforcePlanRequirement: false, enforceAccounts: false });
++		}> = [{ allowBlocked: false, enforcePlanRequirement, enforceAccounts }];
++		if (!paid) {
++			passes.push({ allowBlocked: true, enforcePlanRequirement, enforceAccounts });
++			if (enforcePlanRequirement)
++				passes.push({ allowBlocked: true, enforcePlanRequirement: false, enforceAccounts });
++			if (enforceAccounts)
++				passes.push({ allowBlocked: true, enforcePlanRequirement: false, enforceAccounts: false });
++		}
+ 		// Blocked candidates rank earliest-unblock first, which would route a
+ 		// blocked explicit pin to an equally blocked sibling. Once the strict
+ 		// pass finds no unblocked account, the user's pin goes first.
+@@ -913,6 +959,7 @@ export class CredentialSelector {
+ 					allowBlocked: pass.allowBlocked,
+ 					prefetchedUsage: candidate.usage,
+ 					usagePrechecked: candidate.usageChecked,
++					prefetchedUsageIdentity: candidate.usageIdentity,
+ 					planGate,
+ 					enforcePlanRequirement: pass.enforcePlanRequirement,
+ 					strategy,
+@@ -995,6 +1042,7 @@ export class CredentialSelector {
+ 			prefetchedUsage = null,
+ 			usagePrechecked = false,
+ 			planGate: providedPlanGate,
++			prefetchedUsageIdentity,
+ 			enforcePlanRequirement,
+ 			strategy,
+ 			rankingContext,
+@@ -1023,18 +1071,33 @@ export class CredentialSelector {
+ 		const applyPlanFilter = enforcePlanRequirement ?? hasPlanRequirement;
+ 		let usage: UsageReport | null = null;
+ 		let usageChecked = false;
++		let usageIdentity: string | undefined;
+ 
+ 		if ((checkUsage && !allowBlocked) || hasPlanRequirement) {
+-			if (usagePrechecked) {
++			const selectedUsageIdentity =
++				options?.billingIntent === "paid-last-resort"
++					? usageCacheIdentity(buildUsageCredential(selection.credential))
++					: undefined;
++			if (
++				usagePrechecked &&
++				(options?.billingIntent !== "paid-last-resort" || prefetchedUsageIdentity === selectedUsageIdentity)
++			) {
+ 				usage = prefetchedUsage;
+ 				usageChecked = true;
++				usageIdentity = prefetchedUsageIdentity;
+ 			} else {
++				usageIdentity = selectedUsageIdentity;
+ 				usage = await this.#deps.usage.report(provider, selection.credential, {
+ 					...options,
+ 					timeoutMs: this.#deps.usage.requestTimeoutMs,
+ 				});
+ 				usageChecked = true;
+ 			}
++			if (
++				options?.billingIntent === "paid-last-resort" &&
++				(!usage || !hasAvailablePaidFunding(usage) || (!strategy && isUsageLimitReached(usage.limits)))
++			)
++				return undefined;
+ 			if (applyPlanFilter && planGate?.(usage) !== true) {
+ 				return undefined;
+ 			}
+@@ -1096,14 +1159,27 @@ export class CredentialSelector {
+ 				if (rowId !== undefined) this.#deps.pool.replaceById(provider, rowId, updated);
+ 			}
+ 			if ((checkUsage && !allowBlocked) || hasPlanRequirement) {
+-				const sameAccount = selection.credential.accountId === updated.accountId;
++				const updatedUsageIdentity =
++					options?.billingIntent === "paid-last-resort"
++						? usageCacheIdentity(buildUsageCredential(updated))
++						: undefined;
++				const sameAccount =
++					options?.billingIntent === "paid-last-resort"
++						? usageIdentity === updatedUsageIdentity
++						: selection.credential.accountId === updated.accountId;
+ 				if (!usageChecked || !sameAccount) {
++					usageIdentity = updatedUsageIdentity;
+ 					usage = await this.#deps.usage.report(provider, updated, {
+ 						...options,
+ 						timeoutMs: this.#deps.usage.requestTimeoutMs,
+ 					});
+ 					usageChecked = true;
+ 				}
++				if (
++					options?.billingIntent === "paid-last-resort" &&
++					(!usage || !hasAvailablePaidFunding(usage) || (!strategy && isUsageLimitReached(usage.limits)))
++				)
++					return undefined;
+ 				if (applyPlanFilter && planGate?.(usage) !== true) {
+ 					return undefined;
+ 				}
+@@ -1123,6 +1199,19 @@ export class CredentialSelector {
+ 					}
+ 				}
+ 			}
++			if (options?.billingIntent === "paid-last-resort") {
++				const accountKey = oauthAccountKey(updated);
++				if (
++					credentialId === undefined ||
++					!this.#syncOAuthSelectionFromStore(provider, selection, credentialId) ||
++					selection.credential.access !== updated.access ||
++					usageCacheIdentity(buildUsageCredential(selection.credential)) !== usageIdentity ||
++					!this.#deps.affinity.allows(provider, sessionId, updated) ||
++					(options.accountIds && (accountKey === undefined || !options.accountIds.includes(accountKey))) ||
++					this.#deps.blocks.isBlocked(provider, providerKey, selection.index, blockScopes ?? blockScope)
++				)
++					return undefined;
++			}
+ 			this.#deps.pool.noteBearer(provider, result.apiKey, credentialId);
+ 			if (options?.recordAffinity !== false) {
+ 				this.#deps.affinity.record(provider, sessionId, "oauth", selection.index);
+diff --git a/packages/ai/src/auth/types.ts b/packages/ai/src/auth/types.ts
+index 3a137f0..d5895a0 100644
+--- a/packages/ai/src/auth/types.ts
++++ b/packages/ai/src/auth/types.ts
+@@ -12,6 +12,7 @@ import type {
+ 	ClientUsageReport,
+ 	ClientUsageSummary,
+ 	CredentialRankingStrategy,
++	RequestBillingIntent,
+ 	UsageHistoryEntry,
+ 	UsageHistoryQuery,
+ 	UsageLogger,
+@@ -471,6 +472,8 @@ export interface ModelUsageHealthOptions {
+ 	sessionId?: string;
+ 	baseUrl?: string;
+ 	reserveFraction: number;
++	billingIntent?: RequestBillingIntent;
++	accountIds?: readonly string[];
+ 	signal?: AbortSignal;
+ }
+ 
+@@ -478,6 +481,7 @@ export interface ModelUsageHealthOptions {
+ export type AuthApiKeyOptions = {
+ 	baseUrl?: string;
+ 	modelId?: string;
++	billingIntent?: RequestBillingIntent;
+ 	/** {@link oauthAccountKey}s of accounts known to serve `modelId` from multi-account discovery; OAuth selection prefers them and tries other accounts only as a last resort. */
+ 	accountIds?: readonly string[];
+ 	/**
+@@ -740,6 +744,7 @@ export type MarkUsageLimitOptions = {
+ 	providerTimed?: boolean;
+ 	baseUrl?: string;
+ 	modelId?: string;
++	billingIntent?: RequestBillingIntent;
+ 	apiKey?: string;
+ 	credentialId?: number;
+ 	signal?: AbortSignal;
+@@ -749,6 +754,7 @@ export type MarkUsageLimitOptions = {
+ export type RotateCredentialOptions = {
+ 	error?: unknown;
+ 	modelId?: string;
++	billingIntent?: RequestBillingIntent;
+ 	apiKey?: string;
+ 	credentialId?: number;
+ 	signal?: AbortSignal;
+diff --git a/packages/ai/src/usage.ts b/packages/ai/src/usage.ts
+index 4fc15f1..9a42afa 100644
+--- a/packages/ai/src/usage.ts
++++ b/packages/ai/src/usage.ts
+@@ -135,11 +135,26 @@ export interface UsageResetCredits {
+ 	credits?: UsageResetCreditDetail[];
+ }
+ 
++/** Local credential admission intent, never a provider billing switch. */
++export type RequestBillingIntent = "default" | "paid-last-resort";
++
++/** Explicit provider-reported permission to fund requests outside the included plan. */
++export type PaidFunding =
++	| { enabled: false }
++	| { enabled: true; unlimited: true }
++	| { enabled: true; unlimited: false; remainingFraction: number };
++
++export function hasAvailablePaidFunding(report: UsageReport | null): boolean {
++	const funding = report?.paidFunding;
++	return funding?.enabled === true && (funding.unlimited || funding.remainingFraction > 0);
++}
++
+ /** Aggregated usage report for a provider. */
+ export interface UsageReport {
+ 	provider: Provider;
+ 	fetchedAt: number;
+ 	limits: UsageLimit[];
++	paidFunding?: PaidFunding;
+ 	/** Saved rate-limit resets the account can redeem, when the provider reports them. */
+ 	resetCredits?: UsageResetCredits;
+ 	/**
+@@ -441,6 +456,7 @@ export interface UsageProvider {
+ export interface CredentialRankingContext {
+ 	/** Provider model id, when the caller is selecting a credential for one model. */
+ 	modelId?: string;
++	billingIntent?: RequestBillingIntent;
+ }
+ 
+ /** Classify an account report as eligible, ineligible, or unknown for a model's plan gate. */
+diff --git a/packages/ai/src/usage/cursor.ts b/packages/ai/src/usage/cursor.ts
+index 6304de0..4ac7fa2 100644
+--- a/packages/ai/src/usage/cursor.ts
++++ b/packages/ai/src/usage/cursor.ts
+@@ -18,6 +18,7 @@ import type {
+ 	UsageWindow,
+ } from "../usage";
+ import { isRecord } from "../utils";
++import { hasAvailablePaidFunding, type PaidFunding } from "../usage";
+ import { DAY_MS, parseIsoTimestamp, usageStatus } from "./shared";
+ 
+ function parseTimestamp(value: unknown): number | undefined {
+@@ -251,10 +252,20 @@ export function parseCursorIndividualUsage(payload: unknown, fetchedAt = Date.no
+ 		pushCursorPlanRails(limits, plan, window);
+ 	}
+ 
++	let paidFunding: PaidFunding | undefined;
+ 	// Keep on-demand even when the included plan/overall bucket is absent or unusable.
+ 	if (isRecord(payload.individualUsage.onDemand)) {
+-		const onDemandAmount = parseCursorCentsBucket(payload.individualUsage.onDemand);
+-		if (onDemandAmount && onDemandAmount.limit !== undefined && onDemandAmount.limit > 0) {
++		const bucket = payload.individualUsage.onDemand;
++		const onDemandAmount = parseCursorCentsBucket(bucket);
++		paidFunding =
++			bucket.enabled !== true
++				? { enabled: false }
++				: bucket.limit === null
++					? { enabled: true, unlimited: true }
++					: onDemandAmount?.remainingFraction !== undefined
++						? { enabled: true, unlimited: false, remainingFraction: onDemandAmount.remainingFraction }
++						: { enabled: false };
++		if (onDemandAmount && bucket.enabled === true) {
+ 			limits.push({
+ 				id: "cursor:usd:individual-ondemand",
+ 				label: "On-Demand Usage",
+@@ -266,12 +277,13 @@ export function parseCursorIndividualUsage(payload: unknown, fetchedAt = Date.no
+ 		}
+ 	}
+ 
+-	if (limits.length === 0) return null;
++	if (limits.length === 0 && paidFunding?.enabled !== true) return null;
+ 
+ 	return {
+ 		provider: "cursor",
+ 		fetchedAt,
+ 		limits,
++		...(paidFunding ? { paidFunding } : {}),
+ 		raw: payload,
+ 	};
+ }
+@@ -376,7 +388,9 @@ function scopeCursorLimitsForModel(report: UsageReport, context: CredentialRanki
+ 	const combinedLimits = report.limits.filter(
+ 		limit => limit.id === "cursor:usd:individual-plan" || limit.id === "cursor:usd:individual-overall",
+ 	);
+-	return combinedLimits.length > 0 ? combinedLimits : report.limits;
++	return combinedLimits.length > 0
++		? combinedLimits
++		: report.limits.filter(limit => limit.id !== "cursor:usd:individual-ondemand");
+ }
+ 
+ /** Routes Cursor credential ranking and reserve checks through the requested model's billing pool. */
+@@ -384,13 +398,39 @@ export const cursorRankingStrategy: CredentialRankingStrategy = {
+ 	findWindowLimits(report, context) {
+ 		return { secondary: scopeCursorLimitsForModel(report, context)[0] };
+ 	},
+-	scopeLimits: scopeCursorLimitsForModel,
++	scopeLimits(report, context) {
++		return hasAvailablePaidFunding(report)
++			? report.limits.filter(limit => limit.id === "cursor:usd:individual-ondemand")
++			: scopeCursorLimitsForModel(report, context);
++	},
+ 	scopeLimitsForReserve: scopeCursorLimitsForModel,
+ 	// Back off per billing pool so an exhausted Other Models pool does not
+ 	// block Grok/Composer on the same account (and vice versa).
+ 	blockScope(context) {
+ 		return context?.modelId ? `pool:${quotaTierFor("cursor", context.modelId)}` : undefined;
+ 	},
++	blockScopes(context) {
++		return context?.modelId ? [`pool:${quotaTierFor("cursor", context.modelId)}`] : ["pool:auto", "pool:api"];
++	},
++	healableBlockScopes(report) {
++		const combined = report.limits.filter(
++			limit => limit.id === "cursor:usd:individual-plan" || limit.id === "cursor:usd:individual-overall",
++		);
++		return [
++			{
++				blockScope: "pool:auto",
++				limits: report.limits.some(limit => limit.id === CURSOR_MODELS_LIMIT_ID)
++					? report.limits.filter(limit => limit.id === CURSOR_MODELS_LIMIT_ID)
++					: combined,
++			},
++			{
++				blockScope: "pool:api",
++				limits: report.limits.some(limit => limit.id === OTHER_MODELS_LIMIT_ID)
++					? report.limits.filter(limit => limit.id === OTHER_MODELS_LIMIT_ID)
++					: combined,
++			},
++		];
++	},
+ 	windowDefaults: {
+ 		primaryMs: 30 * DAY_MS,
+ 		secondaryMs: 30 * DAY_MS,
+@@ -399,6 +439,7 @@ export const cursorRankingStrategy: CredentialRankingStrategy = {
+ 
+ export const cursorUsageProvider: UsageProvider = {
+ 	id: "cursor",
++	cacheVersion: 1,
+ 	supports(params: UsageFetchParams): boolean {
+ 		if (params.provider !== "cursor") return false;
+ 		const { credential } = params;
+@@ -478,6 +519,7 @@ export const cursorUsageProvider: UsageProvider = {
+ 				provider: "cursor",
+ 				fetchedAt,
+ 				limits: [...legacyLimits, ...summaryReport.limits],
++				...(summaryReport.paidFunding ? { paidFunding: summaryReport.paidFunding } : {}),
+ 				raw: {
+ 					authUsage: legacyReport.raw,
+ 					usageSummary: summaryReport.raw,
+diff --git a/packages/ai/test/auth-storage-model-usage-health.test.ts b/packages/ai/test/auth-storage-model-usage-health.test.ts
+index 8bd510b..5c360fd 100644
+--- a/packages/ai/test/auth-storage-model-usage-health.test.ts
++++ b/packages/ai/test/auth-storage-model-usage-health.test.ts
+@@ -3,12 +3,14 @@ import {
+ 	type ApiKeyCredential,
+ 	type AuthCredential,
+ 	type AuthCredentialStore,
++	type OAuthCredential,
+ 	AuthStorage,
+ 	type StoredAuthCredential,
+ } from "@oh-my-pi/pi-ai/auth-storage";
+ import type { CredentialRankingStrategy, UsageLimit, UsageProvider, UsageReport } from "@oh-my-pi/pi-ai/usage";
+ import { claudeRankingStrategy } from "@oh-my-pi/pi-ai/usage/claude";
+ import { logger } from "@oh-my-pi/pi-utils";
++import { cursorRankingStrategy, parseCursorIndividualUsage } from "@oh-my-pi/pi-ai/usage/cursor";
+ 
+ interface CacheEntry {
+ 	value: string;
+@@ -79,6 +81,16 @@ function report(accountId: string, limits: UsageLimit[]): UsageReport {
+ 		metadata: { accountId },
+ 	};
+ }
++function cursorFunding(enabled: boolean, capped = false): UsageReport {
++	const parsed = parseCursorIndividualUsage({
++		individualUsage: {
++			plan: { enabled: true, limit: 7000, autoPercentUsed: 100, apiPercentUsed: 100 },
++			onDemand: { enabled, used: 13397, limit: capped ? 13397 : null, remaining: capped ? 0 : null },
++		},
++	});
++	if (!parsed) throw new Error("expected Cursor report");
++	return parsed;
++}
+ 
+ const strategy: CredentialRankingStrategy = {
+ 	findWindowLimits: usage => ({ primary: usage.limits[0], secondary: usage.limits[1] }),
+@@ -121,6 +133,24 @@ describe("AuthStorage model usage health", () => {
+ 		return storage;
+ 	}
+ 
++	async function createCursorStorage(
++		rows: StoredAuthCredential[],
++		reports: Record<string, UsageReport>,
++		store = makeStore(rows),
++	): Promise<AuthStorage> {
++		const usage: UsageProvider = {
++			id: "cursor",
++			fetchUsage: async params => reports[params.credential.accountId ?? ""] ?? null,
++		};
++		const storage = new AuthStorage(store, {
++			usageProviderResolver: provider => (provider === "cursor" ? usage : undefined),
++			rankingStrategyResolver: provider => (provider === "cursor" ? cursorRankingStrategy : undefined),
++		});
++		await storage.credentials.reload();
++		storages.push(storage);
++		return storage;
++	}
++
+ 	it("honours every request scope when checking persisted health blocks", async () => {
+ 		const rows = [oauthRow(1)];
+ 		const store = makeStore(rows);
+@@ -145,6 +175,154 @@ describe("AuthStorage model usage health", () => {
+ 		expect(health.accounts[0]?.state).toBe("depleted");
+ 	});
+ 
++	it("does not borrow included quota from an account outside the child's pool or model access", async () => {
++		const storage = await createStorage([oauthRow(1), oauthRow(2)], {
++			"account-1": report("account-1", [limit("short", 1)]),
++			"account-2": report("account-2", [limit("short", 0.4)]),
++		});
++		storage.sessions.restrict("anthropic", "child", ["account:account-1"]);
++		const restricted = await storage.health.model("anthropic", {
++			modelId: "claude",
++			sessionId: "child",
++			reserveFraction: 0.1,
++		});
++		const modelScoped = await storage.health.model("anthropic", {
++			modelId: "claude",
++			accountIds: ["account-2"],
++			reserveFraction: 0.1,
++		});
++		expect(restricted.state).toBe("depleted");
++		expect(restricted.accounts.map(account => account.credentialId)).toEqual([1]);
++		expect(modelScoped.state).toBe("healthy");
++		expect(modelScoped.accounts.map(account => account.credentialId)).toEqual([2]);
++	});
++
++	it("admits funded paid siblings without bypassing restrictions or existing blocks", async () => {
++		const rows = [oauthRow(1), oauthRow(2)].map(row => ({ ...row, provider: "cursor" }));
++		const reports: Record<string, UsageReport> = {
++			"account-1": cursorFunding(false),
++			"account-2": cursorFunding(true),
++		};
++		const blocked = new Map<number, number>();
++		const storage = await createCursorStorage(rows, reports, makeStore(rows, blocked));
++		const options = { modelId: "claude-opus-5-5", billingIntent: "paid-last-resort" as const };
++		expect(await storage.keys.get("cursor", "paid", options)).toBe("access-2");
++		expect((await storage.health.model("cursor", { modelId: options.modelId, reserveFraction: 0 })).state).toBe(
++			"depleted",
++		);
++		storage.sessions.restrict("cursor", "child", ["account:account-1"]);
++		await expect(storage.keys.get("cursor", "child", options)).rejects.toThrow("restricted");
++		expect(
++			await storage.keys.get("cursor", "model-scoped", { ...options, accountIds: ["account-1"] }),
++		).toBeUndefined();
++		blocked.set(2, Date.now() + 60_000);
++		expect(await storage.keys.get("cursor", "blocked", options)).toBeUndefined();
++		blocked.clear();
++		reports["account-2"] = cursorFunding(true, true);
++		storage.usage.setProvider("cursor", {
++			id: "cursor",
++			fetchUsage: async params => reports[params.credential.accountId ?? ""] ?? null,
++		});
++		expect(await storage.keys.get("cursor", "cap-spent", options)).toBeUndefined();
++		reports["account-2"] = cursorFunding(true);
++		storage.usage.setProvider("cursor", {
++			id: "cursor",
++			fetchUsage: async params => reports[params.credential.accountId ?? ""] ?? null,
++		});
++		expect(await storage.keys.get("cursor", "still-blocked", options)).toBeUndefined();
++	});
++
++	it.each([
++		{ name: "funded", enabled: true, capped: false, expected: "access-2" },
++		{ name: "disabled", enabled: false, capped: false, expected: undefined },
++		{ name: "cap-spent", enabled: true, capped: true, expected: undefined },
++	])("checks paid funding in a fresh single-account $name pool", async ({ enabled, capped, expected }) => {
++		const rows = [{ ...oauthRow(2), provider: "cursor" }];
++		const storage = await createCursorStorage(rows, { "account-2": cursorFunding(enabled, capped) });
++		expect(
++			await storage.keys.get("cursor", "single", {
++				modelId: "claude-opus-5-5",
++				billingIntent: "paid-last-resort",
++			}),
++		).toBe(expected);
++		expect(await storage.keys.get("cursor", "ordinary")).toBe("access-2");
++	});
++
++	it("rejects uninspectable paid overrides without changing ordinary auth resolution", async () => {
++		const rows = [{ ...oauthRow(2), provider: "cursor" }];
++		const storage = await createCursorStorage(rows, { "account-2": cursorFunding(true) });
++		const options = { modelId: "claude-opus-5-5", billingIntent: "paid-last-resort" as const };
++		storage.keys.setRuntime("cursor", "uninspectable-runtime-key");
++		expect(await storage.keys.get("cursor", "override", options)).toBeUndefined();
++		expect(await storage.keys.get("cursor", "ordinary")).toBe("uninspectable-runtime-key");
++	});
++
++	it.each(["forced refresh", "peer resync", "request preparation", "request refresh"])(
++		"does not authorize an unfunded identity with the old account's paid report after %s",
++		async transition => {
++			const rows = [{ ...oauthRow(1), provider: "cursor" }];
++			const store = makeStore(rows);
++			const next: OAuthCredential = {
++				type: "oauth",
++				access: "unfunded-access",
++				refresh: "unfunded-refresh",
++				expires: Date.now() + 60 * 60_000,
++				accountId: "account-2",
++			};
++			store.refreshOAuthCredential = async () => {
++				rows[0].credential = next;
++				return next;
++			};
++			store.prepareForRequest = async () => {
++				if (transition === "request preparation") rows[0].credential = next;
++				if (transition === "request refresh" && rows[0].credential.type === "oauth") {
++					rows[0].credential = { ...rows[0].credential, expires: 0 };
++				}
++				return true;
++			};
++			const storage = await createCursorStorage(rows, {}, store);
++			const inspectedAccounts: string[] = [];
++			storage.usage.setProvider("cursor", {
++				id: "cursor",
++				fetchUsage: async params => {
++					const accountId = params.credential.accountId ?? "";
++					inspectedAccounts.push(accountId);
++					if (transition === "peer resync" && accountId === "account-1") rows[0].credential = next;
++					return cursorFunding(accountId === "account-1");
++				},
++			});
++
++			const key = await storage.keys.get("cursor", "identity-change", {
++				modelId: "claude-opus-5-5",
++				billingIntent: "paid-last-resort",
++				forceRefresh: transition === "forced refresh",
++			});
++
++			expect(key).toBeUndefined();
++			expect(inspectedAccounts).toEqual(["account-1", "account-2"]);
++			expect(storage.oauth.accounts("cursor").map(account => account.accountId)).toEqual(["account-2"]);
++		},
++	);
++
++	it("keeps paid admission after a forced token refresh within the inspected account", async () => {
++		const rows = [{ ...oauthRow(1), provider: "cursor" }];
++		const store = makeStore(rows);
++		store.refreshOAuthCredential = async (_provider, _credentialId, credential) => {
++			const next = { ...credential, access: "rotated-access", expires: Date.now() + 60 * 60_000 };
++			rows[0].credential = next;
++			return next;
++		};
++		const storage = await createCursorStorage(rows, { "account-1": cursorFunding(true) }, store);
++
++		expect(
++			await storage.keys.get("cursor", "same-identity", {
++				modelId: "claude-opus-5-5",
++				billingIntent: "paid-last-resort",
++				forceRefresh: true,
++			}),
++		).toBe("rotated-access");
++	});
++
+ 	it("keeps the model healthy while any OAuth sibling has headroom", async () => {
+ 		const storage = await createStorage([oauthRow(1), oauthRow(2)], {
+ 			"account-1": report("account-1", [limit("short", 1)]),
+@@ -171,6 +349,21 @@ describe("AuthStorage model usage health", () => {
+ 		expect(health.accounts.map(account => account.state)).toEqual(["depleted", "unknown"]);
+ 	});
+ 
++	it.each([
++		{ usedFraction: 1, expected: "depleted" },
++		{ usedFraction: 1.02, expected: "depleted" },
++		{ usedFraction: 0.9999, expected: "healthy" },
++	])("classifies numeric quota independently of an ok status (%j)", async ({ usedFraction, expected }) => {
++		const window = { ...limit("5-hour", usedFraction), status: "ok" as const };
++		const storage = await createStorage([oauthRow(1)], {
++			"account-1": report("account-1", [window]),
++		});
++		const health = await storage.health.model("anthropic", { modelId: "claude", reserveFraction: 0 });
++		expect(health.state).toBe(expected);
++		if (expected === "depleted") expect(health.accounts[0]?.resetsAt).toBe(window.window?.resetsAt);
++		else expect(health.accounts[0]?.remainingFraction).toBeCloseTo(0.0001);
++	});
++
+ 	it("reports reserve only after every sibling is reserve or depleted", async () => {
+ 		const storage = await createStorage([oauthRow(1), oauthRow(2)], {
+ 			"account-1": report("account-1", [limit("short", 0.95)]),
+diff --git a/packages/ai/test/cursor-usage.test.ts b/packages/ai/test/cursor-usage.test.ts
+index 8a849ea..c60a9a1 100644
+--- a/packages/ai/test/cursor-usage.test.ts
++++ b/packages/ai/test/cursor-usage.test.ts
+@@ -6,8 +6,14 @@ import { type AuthCredentialStore, AuthStorage, SqliteAuthCredentialStore } from
+ import { isUsageLimitReached } from "../src/auth/usage-report";
+ import * as oauthUtils from "../src/registry/oauth";
+ import type { UsageFetchContext, UsageFetchParams, UsageProvider, UsageReport } from "../src/usage";
+-import { cursorUsageProvider, parseCursorIndividualUsage, parseCursorUsage } from "../src/usage/cursor";
++import {
++	cursorRankingStrategy,
++	cursorUsageProvider,
++	parseCursorIndividualUsage,
++	parseCursorUsage,
++} from "../src/usage/cursor";
+ import { defaultRankingStrategy } from "../src/usage/registry";
++import { hasAvailablePaidFunding } from "../src/usage";
+ 
+ function createCursorAccessToken(sub: string): string {
+ 	const payload = btoa(JSON.stringify({ sub })).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+@@ -431,6 +437,49 @@ describe("cursor usage provider", () => {
+ 		});
+ 	});
+ 
++	describe("paid funding", () => {
++		it("preserves unlimited funding without treating it as included quota or inventing a fraction", () => {
++			const report = parseCursorIndividualUsage({
++				individualUsage: {
++					plan: { enabled: true, limit: 7000, autoPercentUsed: 100, apiPercentUsed: 100 },
++					onDemand: { enabled: true, used: 13397, limit: null, remaining: null },
++				},
++			});
++			if (!report) throw new Error("expected Cursor report");
++			expect(hasAvailablePaidFunding(report)).toBe(true);
++			expect(report.paidFunding).toEqual({ enabled: true, unlimited: true });
++			expect(report.limits.find(limit => limit.id === "cursor:usd:individual-ondemand")?.amount).toEqual({
++				used: 133.97,
++				unit: "usd",
++			});
++			expect(cursorRankingStrategy.findWindowLimits(report, { modelId: "claude-opus-5-5" }).secondary?.status).toBe(
++				"exhausted",
++			);
++			expect(isUsageLimitReached(cursorRankingStrategy.scopeLimits!(report, { modelId: "claude-opus-5-5" }))).toBe(
++				false,
++			);
++			const paidOnly = parseCursorIndividualUsage({
++				individualUsage: { onDemand: { enabled: true, used: 13397, limit: null } },
++			});
++			if (!paidOnly) throw new Error("expected paid-only report");
++			expect(hasAvailablePaidFunding(paidOnly)).toBe(true);
++			expect(cursorRankingStrategy.findWindowLimits(paidOnly, { modelId: "claude-opus-5-5" })).toEqual({
++				secondary: undefined,
++			});
++		});
++
++		it.each([
++			[{ enabled: false, used: 0, limit: null }, false],
++			[{ enabled: true, used: 1000, limit: 1000, remaining: 0 }, false],
++			[{ enabled: true, used: 100, limit: 1000, remaining: 900 }, true],
++		])("requires enabled funding and positive capped headroom", (onDemand, expected) => {
++			const report = parseCursorIndividualUsage({
++				individualUsage: { plan: { enabled: true, limit: 7000, apiPercentUsed: 100 }, onDemand },
++			});
++			expect(hasAvailablePaidFunding(report)).toBe(expected);
++		});
++	});
++
+ 	describe("credential ranking", () => {
+ 		it("does not let an exhausted Other Models pool block Grok or Composer", () => {
+ 			const report = parseCursorIndividualUsage({
+diff --git a/packages/coding-agent/CHANGELOG.md b/packages/coding-agent/CHANGELOG.md
+index 6cb03ad..7263f96 100644
+--- a/packages/coding-agent/CHANGELOG.md
++++ b/packages/coding-agent/CHANGELOG.md
+@@ -2,6 +2,10 @@
+ 
+ ## [Unreleased]
+ 
++### Added
++
++- Added opt-in `retry.paidFallback` for session routing after all eligible configured included plans are depleted or unavailable, with automatic included-plan recovery on later prompts. Usage preflight preserves automatic thinking and defers interactive reserve confirmation until the first prompt.
++
+ ## [18.11.1] - 2026-10-15
+ 
+ ### Added
+diff --git a/packages/coding-agent/src/config/account-pools.ts b/packages/coding-agent/src/config/account-pools.ts
+index ed6d34b..cb64845 100644
+--- a/packages/coding-agent/src/config/account-pools.ts
++++ b/packages/coding-agent/src/config/account-pools.ts
+@@ -127,8 +127,11 @@ export class SessionAccountPoolScope {
+ 	 */
+ 	registry(registry: ModelRegistry): ModelRegistry {
+ 		const target = scopedRegistryTargets.get(registry) ?? registry;
+-		const getApiKey = (model: Model<Api>, sessionId?: string, options?: { signal?: AbortSignal }) =>
+-			target.getApiKey(model, this.#sessionIdFor(model.provider, sessionId), options);
++		const getApiKey = (
++			model: Model<Api>,
++			sessionId?: string,
++			options?: Pick<AuthApiKeyOptions, "signal" | "billingIntent">,
++		) => target.getApiKey(model, this.#sessionIdFor(model.provider, sessionId), options);
+ 		const getApiKeyWithCredentialForProvider = (provider: string, sessionId?: string, options?: AuthApiKeyOptions) =>
+ 			target.getApiKeyWithCredentialForProvider(provider, this.#sessionIdFor(provider, sessionId), options);
+ 		const scoped: Partial<ModelRegistry> = {
+diff --git a/packages/coding-agent/src/config/api-key-resolver.ts b/packages/coding-agent/src/config/api-key-resolver.ts
+index 9f48384..ae80ecc 100644
+--- a/packages/coding-agent/src/config/api-key-resolver.ts
++++ b/packages/coding-agent/src/config/api-key-resolver.ts
+@@ -14,6 +14,7 @@ export interface ApiKeyResolverOptions {
+ 	baseUrl?: string;
+ 	/** Provider model id forwarded to model-scoped usage ranking/backoff. */
+ 	modelId?: string;
++	billingIntent?: AuthApiKeyOptions["billingIntent"];
+ }
+ 
+ /**
+@@ -63,6 +64,7 @@ export function createApiKeyResolver(
+ 		registry.getApiKeyWithCredentialForProvider(provider, sessionId, {
+ 			baseUrl,
+ 			modelId,
++			billingIntent: options.billingIntent,
+ 			forceRefresh,
+ 			signal,
+ 			refreshReason,
+@@ -81,6 +83,7 @@ export function createApiKeyResolver(
+ 			const rotation = await registry.authStorage.limits.rotate(provider, sessionId, {
+ 				error,
+ 				modelId,
++				billingIntent: options.billingIntent,
+ 				signal,
+ 				apiKey: previousKey,
+ 			});
+diff --git a/packages/coding-agent/src/config/model-registry.ts b/packages/coding-agent/src/config/model-registry.ts
+index abace79..df06fbd 100644
+--- a/packages/coding-agent/src/config/model-registry.ts
++++ b/packages/coding-agent/src/config/model-registry.ts
+@@ -3244,19 +3244,20 @@ export class ModelRegistry {
+ 	async getApiKey(
+ 		model: Model<Api>,
+ 		sessionId?: string,
+-		options?: { signal?: AbortSignal },
++		options?: Pick<AuthApiKeyOptions, "signal" | "billingIntent">,
+ 	): Promise<string | undefined> {
+ 		// A disabled provider gets no credential, so no request reaches it however
+ 		// its model was obtained.
+ 		if (this.#isProviderDisabled(model.provider)) return undefined;
+ 		if (this.#isKeylessProvider(model.provider)) {
+-			return kNoAuth;
++			return options?.billingIntent === "paid-last-resort" ? undefined : kNoAuth;
+ 		}
+ 		return this.authStorage.keys.get(model.provider, sessionId, {
+ 			baseUrl: model.baseUrl,
+ 			modelId: model.id,
+ 			accountIds: model.accountAccess && Object.keys(model.accountAccess),
+ 			signal: options?.signal,
++			billingIntent: options?.billingIntent,
+ 		});
+ 	}
+ 
+@@ -3312,7 +3313,7 @@ export class ModelRegistry {
+ 		if (this.#isProviderDisabled(provider)) return undefined;
+ 		if (options?.forceRefresh) this.#invalidateProviderCommandConfigs(provider);
+ 		if (this.#isKeylessProvider(provider)) {
+-			return { apiKey: kNoAuth };
++			return options?.billingIntent === "paid-last-resort" ? undefined : { apiKey: kNoAuth };
+ 		}
+ 		const accountAccess = options?.modelId ? this.find(provider, options.modelId)?.accountAccess : undefined;
+ 		return this.authStorage.keys.getWithCredential(provider, sessionId, {
+@@ -3322,6 +3323,7 @@ export class ModelRegistry {
+ 			forceRefresh: options?.forceRefresh,
+ 			refreshReason: options?.refreshReason,
+ 			signal: options?.signal,
++			billingIntent: options?.billingIntent,
+ 		});
+ 	}
+ 
+diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
+index 5fba315..ea285b5 100644
+--- a/packages/coding-agent/src/sdk.ts
++++ b/packages/coding-agent/src/sdk.ts
+@@ -215,6 +215,15 @@ import {
+ 	type RetryFallbackResolutionContext,
+ 	resolveRetryFallbackChainKey,
+ } from "./session/retry-fallback-chains";
++import {
++	collectConfiguredUsageCandidates,
++	resolveUsageRouting,
++	type UsageRoutingCandidate,
++} from "./session/usage-aware-routing";
++import { formatRetryFallbackSelector, parseRetryFallbackSelector } from "./session/retry-fallback-chains";
++import { modelKind } from "@oh-my-pi/pi-catalog/types";
++import { modelSupportsEffortCeiling } from "@oh-my-pi/pi-tui/thinking";
++import { resolveModelOverride } from "./config/model-resolver";
+ import { describeUsageFallback } from "./session/retry-fallback-reason";
+ import { loadRuntimeIdentity } from "./session/runtime-identity";
+ import { getRestorableSessionModels } from "./session/session-context";
+@@ -249,6 +258,7 @@ import {
+ 	AUTO_THINKING,
+ 	type ConfiguredThinkingLevel,
+ 	concreteThinkingLevel,
++	clampThinkingLevelToCeiling,
+ 	parseConfiguredThinkingLevel,
+ 	parseThinkingLevel,
+ 	resolveProvisionalAutoLevel,
+@@ -346,6 +356,7 @@ import {
+ 	cfgProvidersKimiApiFormat,
+ 	cfgRetryFallbackChains,
+ 	cfgRetryModelFallback,
++	cfgRetryPaidFallback,
+ 	cfgRetryUsageAwareFallback,
+ 	cfgRetryUsageReservePct,
+ 	cfgRetryUsageReservePolicy,
+@@ -2203,9 +2214,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+ 	let contextFiles = initialContextFiles;
+ 
+ 	let agent: Agent;
+-	const effectiveGetApiKey =
+-		options.getApiKey ?? (requestModel => modelRegistry.resolver(requestModel, agent.sessionId));
+ 	let session!: AgentSession;
++	const effectiveGetApiKey =
++		options.getApiKey ??
++		(requestModel =>
++			modelRegistry.resolver(requestModel.provider, {
++				sessionId: agent.sessionId,
++				modelId: requestModel.id,
++				baseUrl: requestModel.baseUrl,
++				billingIntent: hasSession ? session.requestBillingIntent : initialRetryFallback?.billingIntent,
++			}));
+ 	let hasSession = false;
+ 	let hasRegistered = false;
+ 	const restrictToolNames = options.restrictToolNames === true;
+@@ -3010,7 +3028,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+ 				if (
+ 					((modelFallbackEnabled && (hasUsageFallbackCandidate || usageFallbackTriggered)) ||
+ 						usageReservePolicy === "fail-closed") &&
+-					cfgRetryUsageAwareFallback.get(settings)
++					cfgRetryUsageAwareFallback.get(settings) &&
++					!cfgRetryPaidFallback.get(settings)
+ 				) {
+ 					let usageHealth: ModelUsageHealth | undefined;
+ 					try {
+@@ -3319,6 +3338,68 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+ 				adoptThinkingForModel(refreshedModel);
+ 			}
+ 		}
++		if (
++			model &&
++			cfgRetryPaidFallback.get(settings) &&
++			cfgRetryUsageAwareFallback.get(settings) &&
++			cfgRetryModelFallback.get(settings)
++		) {
++			const originalModel = model;
++			const originalSelector = formatRetryFallbackSelector(model, thinkingLevel);
++			const selector = parseRetryFallbackSelector(originalSelector, modelRegistry)!;
++			const chains = expandDefaultRetryFallbackChains(
++				cfgRetryFallbackChains.get(settings),
++				Object.keys(settings.getModelRoles()),
++			);
++			const context: RetryFallbackResolutionContext = {
++				chains,
++				getModelRole: role => settings.getModelRole(role),
++				modelLookup: modelRegistry,
++			};
++			const role = resolveRetryFallbackChainKey(context, originalSelector, model) ?? "default";
++			const preferred: UsageRoutingCandidate[] = [{ model, selector, chainKey: role }];
++			for (const next of findRetryFallbackCandidates(context, role, originalSelector, model)) {
++				const resolved = resolveModelOverride([next.raw], modelRegistry, settings).model;
++				if (resolved) preferred.push({ model: resolved, selector: next, chainKey: role });
++			}
++			const decision = await resolveUsageRouting({
++				preferred,
++				configured: collectConfiguredUsageCandidates(settings, modelRegistry, preferred[0]),
++				paidSelector: options.getApiKey ? "" : cfgRetryPaidFallback.get(settings),
++				registry: modelRegistry,
++				settings,
++				sessionId: providerSessionId,
++				reserveFraction: cfgRetryUsageReservePct.get(settings) / 100,
++				reserveConfirmation: options.hasUI || options.deferUsageReserveConfirmation ? "defer" : undefined,
++				eligible: candidate =>
++					modelKind(candidate.model) === "chat" &&
++					(options.thinkingLevelCeiling === undefined ||
++						modelSupportsEffortCeiling(candidate.model, options.thinkingLevelCeiling)),
++			});
++			if (decision.kind === "unavailable") throw new Error(`Usage preflight blocked: ${decision.reason}`);
++			model = decision.candidate.model;
++			if (model !== originalModel || decision.kind === "paid-last-resort") {
++				initialRetryFallback = {
++					role: decision.candidate.chainKey,
++					originalSelector,
++					originalThinkingLevel: thinkingLevel,
++					pinned: true,
++					billingIntent: decision.kind === "paid-last-resort" ? decision.kind : "default",
++				};
++				adoptThinkingForModel(model);
++				if (decision.candidate.selector.thinkingLevel !== undefined) {
++					thinkingLevel = decision.candidate.selector.thinkingLevel;
++					autoThinking = thinkingLevel === AUTO_THINKING;
++					effectiveThinkingLevel = autoThinking
++						? resolveProvisionalAutoLevel(model)
++						: clampThinkingLevelToCeiling(
++								model,
++								concreteThinkingLevel(thinkingLevel),
++								options.thinkingLevelCeiling,
++							);
++				}
++			}
++		}
+ 
+ 		// A first-turn user tail has no assistant metadata to copy. Once startup
+ 		// has selected its final model, use that model to terminate the
+@@ -4630,6 +4711,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+ 			thinkingLevel: autoThinking ? AUTO_THINKING : effectiveThinkingLevel,
+ 			thinkingLevelCeiling: options.thinkingLevelCeiling,
+ 			initialRetryFallback,
++			paidFallbackAllowed: !options.getApiKey,
+ 			deferRetryFallbackValidation: options.deferRetryFallbackValidation,
+ 			prewalk,
+ 			planYolo: options.planYolo,
+diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages/coding-agent/src/session/agent-session-types.ts
+index a80f040..2cd61e6 100644
+--- a/packages/coding-agent/src/session/agent-session-types.ts
++++ b/packages/coding-agent/src/session/agent-session-types.ts
+@@ -15,6 +15,7 @@ import type {
+ 	MessageAttribution,
+ 	Model,
+ 	OAuthAccountSummary,
++	RequestBillingIntent,
+ 	ServiceTierByFamily,
+ 	SimpleStreamOptions,
+ 	ToolChoice,
+@@ -159,6 +160,7 @@ export interface InitialRetryFallbackState {
+ 	originalThinkingLevel: ConfiguredThinkingLevel | undefined;
+ 	/** Prevent cooldown restoration when startup selected this fallback from live usage health. */
+ 	pinned?: boolean;
++	billingIntent?: RequestBillingIntent;
+ }
+ 
+ /** Dependencies and initial state used to construct an AgentSession. */
+@@ -204,6 +206,8 @@ export interface AgentSessionConfig {
+ 	thinkingLevelCeiling?: Effort;
+ 	/** Retry chain ownership when startup selected one of its fallback entries. */
+ 	initialRetryFallback?: InitialRetryFallbackState;
++	/** Custom key callbacks cannot acquire automatic paid permission. */
++	paidFallbackAllowed?: boolean;
+ 	/** Skip retry.fallbackChains validation at construction; the host calls `validateRetryFallbackChains()` later. */
+ 	deferRetryFallbackValidation?: boolean;
+ 	/**
+diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
+index 95835ef..0c86b4a 100644
+--- a/packages/coding-agent/src/session/agent-session.ts
++++ b/packages/coding-agent/src/session/agent-session.ts
+@@ -1868,6 +1868,7 @@ export class AgentSession implements SettingsScope {
+ 		this.#fallbackChainValidationDeferred = config.deferRetryFallbackValidation === true;
+ 		this.#recovery = new TurnRecovery(recoveryHost, {
+ 			initialRetryFallback: config.initialRetryFallback,
++			paidFallbackAllowed: config.paidFallbackAllowed,
+ 			deferFallbackChainValidation: this.#fallbackChainValidationDeferred,
+ 			unexpectedStopJudgeTimeoutMs: config.unexpectedStopJudgeTimeoutMs,
+ 		});
+@@ -6136,6 +6137,10 @@ export class AgentSession implements SettingsScope {
+ 		return allowed;
+ 	}
+ 
++	get requestBillingIntent(): "default" | "paid-last-resort" {
++		return this.#recovery.requestBillingIntent;
++	}
++
+ 	async #runUsageAwarePreflight(signal?: AbortSignal): Promise<boolean> {
+ 		if (signal?.aborted) return false;
+ 		const generation = this.#promptGeneration;
+@@ -7939,7 +7944,9 @@ export class AgentSession implements SettingsScope {
+ 			}
+ 
+ 			// Validate API key
+-			const apiKey = await this.#modelRegistry.getApiKey(this.model, this.sessionId);
++			const apiKey = await this.#modelRegistry.getApiKey(this.model, this.sessionId, {
++				billingIntent: this.requestBillingIntent,
++			});
+ 			if (!apiKey) {
+ 				throw new Error(
+ 					`No API key found for ${this.model.provider}.\n\n` +
+diff --git a/packages/coding-agent/src/session/retry-fallback-chains.ts b/packages/coding-agent/src/session/retry-fallback-chains.ts
+index 028551c..7058dbb 100644
+--- a/packages/coding-agent/src/session/retry-fallback-chains.ts
++++ b/packages/coding-agent/src/session/retry-fallback-chains.ts
+@@ -1,15 +1,11 @@
+ import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+-import type { Model } from "@oh-my-pi/pi-ai";
++import type { Model, RequestBillingIntent } from "@oh-my-pi/pi-ai";
+ import type { ModelRegistry } from "../config/model-registry";
+ import { cfgModelRoles } from "../config/model-settings";
+ import { formatModelSelectorValue, parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
+ import { formatModelString, formatModelStringWithRouting } from "../config/model-resolver";
+ import type { Settings } from "../config/settings";
+-import {
+-	type ConfiguredThinkingLevel,
+-	concreteThinkingLevel,
+-	resolveThinkingLevelForModel,
+-} from "@oh-my-pi/pi-tui/thinking";
++import { AUTO_THINKING, type ConfiguredThinkingLevel, resolveThinkingLevelForModel } from "@oh-my-pi/pi-tui/thinking";
+ import { resolveConfiguredModelPatterns, resolveModelRoleValue } from "../config/model-resolver";
+ import { getRoleInfo, isKindRole } from "../config/model-roles";
+ 
+@@ -26,7 +22,7 @@ export interface RetryFallbackSelector {
+ 	raw: string;
+ 	provider: string;
+ 	id: string;
+-	thinkingLevel: ThinkingLevel | undefined;
++	thinkingLevel: ConfiguredThinkingLevel | undefined;
+ }
+ 
+ /** Minimal model lookup needed by fallback-chain resolution. */
+@@ -54,6 +50,7 @@ export interface ActiveRetryFallbackState {
+ 	originalThinkingLevel: ConfiguredThinkingLevel | undefined;
+ 	lastAppliedFallbackThinkingLevel: ConfiguredThinkingLevel | undefined;
+ 	pinned: boolean;
++	billingIntent?: RequestBillingIntent;
+ 	/**
+ 	 * Set once a turn on the fallback target settles successfully. Until then the
+ 	 * switch is only a routing decision — nothing has been produced by the new
+@@ -108,7 +105,7 @@ export function parseRetryFallbackSelector(
+ 		raw: trimmed,
+ 		provider: parsed.provider,
+ 		id: parsed.id,
+-		thinkingLevel: concreteThinkingLevel(parsed.thinkingLevel),
++		thinkingLevel: parsed.thinkingLevel,
+ 	};
+ }
+ 
+@@ -133,8 +130,8 @@ export function parseRetryFallbackWildcard(
+ 	return { provider: template.slice(0, slash), idPrefix: template.slice(slash + 1) };
+ }
+ 
+-/** Formats a concrete model and thinking level as a fallback selector. */
+-export function formatRetryFallbackSelector(model: Model, thinkingLevel: ThinkingLevel | undefined): string {
++/** Formats a model and its configured thinking level as a fallback selector. */
++export function formatRetryFallbackSelector(model: Model, thinkingLevel: ConfiguredThinkingLevel | undefined): string {
+ 	return formatModelSelectorValue(formatModelStringWithRouting(model), thinkingLevel);
+ }
+ 
+@@ -409,6 +406,7 @@ function selectorMatchKind(
+ 	if (!matchedCurrent) return "none";
+ 	if (level === matchedCurrent.thinkingLevel) return "exact";
+ 	if (level === undefined) return "base";
++	if (level === AUTO_THINKING || matchedCurrent.thinkingLevel === AUTO_THINKING) return "effort";
+ 	if (
+ 		currentModel &&
+ 		resolveThinkingLevelForModel(currentModel, level) ===
+@@ -533,7 +531,7 @@ export function resolveRetryFallbackChainKey(
+  * openrouter/google/x). Ids the target provider lacks are skipped by the
+  * candidate loop's registry lookup.
+  */
+-function parseRetryFallbackChainEntry(
++export function parseRetryFallbackChainEntry(
+ 	context: RetryFallbackResolutionContext,
+ 	entry: string,
+ 	current: RetryFallbackSelector | undefined,
+diff --git a/packages/coding-agent/src/session/session-advisors.ts b/packages/coding-agent/src/session/session-advisors.ts
+index 0e9634e..1932458 100644
+--- a/packages/coding-agent/src/session/session-advisors.ts
++++ b/packages/coding-agent/src/session/session-advisors.ts
+@@ -2191,7 +2191,7 @@ export class SessionAdvisors {
+ 				signal.throwIfAborted();
+ 
+ 				const originalThinkingLevel = advisor.thinkingLevel;
+-				const requestedThinkingLevel = selector.thinkingLevel ?? originalThinkingLevel;
++				const requestedThinkingLevel = concreteThinkingLevel(selector.thinkingLevel) ?? originalThinkingLevel;
+ 				const nextThinkingLevel = this.#setAdvisorModel(advisor, candidate, requestedThinkingLevel);
+ 				if (advisor.retryFallback) {
+ 					advisor.retryFallback.lastAppliedThinkingLevel = nextThinkingLevel;
+diff --git a/packages/coding-agent/src/session/settings.ts b/packages/coding-agent/src/session/settings.ts
+index b8b55a4..97e210b 100644
+--- a/packages/coding-agent/src/session/settings.ts
++++ b/packages/coding-agent/src/session/settings.ts
+@@ -790,6 +790,12 @@ export const cfgRetryUsageReservePolicy = register({
+ 	},
+ });
+ 
++export const cfgRetryPaidFallback = register({
++	id: "retry.paidFallback",
++	type: "string",
++	default: "",
++});
++
+ export const cfgRetryFallbackChains = register({
+ 	id: "retry.fallbackChains",
+ 	type: "record",
+diff --git a/packages/coding-agent/src/session/turn-recovery.ts b/packages/coding-agent/src/session/turn-recovery.ts
+index e10c353..03d5bc7 100644
+--- a/packages/coding-agent/src/session/turn-recovery.ts
++++ b/packages/coding-agent/src/session/turn-recovery.ts
+@@ -13,6 +13,7 @@ import type {
+ 	Effort,
+ 	Model,
+ 	ModelUsageHealth,
++	RequestBillingIntent,
+ 	TextContent,
+ 	ToolChoice,
+ 	AnthropicFallbackCreditHandle,
+@@ -76,6 +77,12 @@ import type { SessionManager } from "./session-manager";
+ import { sameMessageContent, sessionMessagePersistenceKey } from "./turn-persistence";
+ import { journalJudgmentUsage } from "../judgment";
+ import { classifyUnexpectedStop, isUnexpectedStopCandidate } from "./unexpected-stop-classifier";
++import {
++	collectConfiguredUsageCandidates,
++	resolveUsageRouting,
++	type UsageRoutingCandidate,
++} from "./usage-aware-routing";
++import { modelKind } from "@oh-my-pi/pi-catalog/types";
+ 
+ import {
+ 	cfgFeaturesUnexpectedStopDetection,
+@@ -83,6 +90,7 @@ import {
+ 	cfgRetry,
+ 	cfgRetryEnabled,
+ 	cfgRetryModelFallback,
++	cfgRetryPaidFallback,
+ 	cfgRetryUsageAwareFallback,
+ 	cfgRetryUsageReservePct,
+ 	cfgRetryUsageReservePolicy,
+@@ -289,6 +297,7 @@ export interface TurnRecoveryHost {
+ /** Construction-time retry state restored from model selection. */
+ export interface TurnRecoveryOptions {
+ 	initialRetryFallback?: InitialRetryFallbackState;
++	paidFallbackAllowed?: boolean;
+ 	/** Skip construction-time fallback-chain validation; the owner runs {@link TurnRecovery.validateRetryFallbackChains}. */
+ 	deferFallbackChainValidation?: boolean;
+ 	/**
+@@ -347,6 +356,7 @@ export class TurnRecovery {
+ 	#retryPromise: Promise<void> | undefined;
+ 	#retryResolve: (() => void) | undefined;
+ 	#activeRetryFallback: ActiveRetryFallbackState | undefined;
++	#paidFallbackAllowed: boolean;
+ 	#activeFallbackCreditRedemption?: {
+ 		targetSelector: string;
+ 		handle: AnthropicFallbackCreditHandle;
+@@ -400,6 +410,7 @@ export class TurnRecovery {
+ 	constructor(host: TurnRecoveryHost, options: TurnRecoveryOptions = {}) {
+ 		this.#host = host;
+ 		this.#unexpectedStopJudgeTimeoutMs = options.unexpectedStopJudgeTimeoutMs ?? UNEXPECTED_STOP_TIMEOUT_MS;
++		this.#paidFallbackAllowed = options.paidFallbackAllowed !== false;
+ 		if (options.initialRetryFallback) {
+ 			this.#activeRetryFallback = {
+ 				...options.initialRetryFallback,
+@@ -751,7 +762,11 @@ export class TurnRecovery {
+ 		return this.#maybeRestoreRetryFallbackPrimary();
+ 	}
+ 
+-	/** Applies model fallback policy from live usage health before a turn starts. */
++	/** Billing authorization for the main conversation request, not auxiliary model calls. */
++	get requestBillingIntent(): RequestBillingIntent {
++		return this.#activeRetryFallback?.billingIntent ?? "default";
++	}
++
+ 	maybeApplyUsageAwareFallback(signal: AbortSignal, confirmer?: UsageFallbackConfirmer): Promise<boolean> {
+ 		return this.#maybeApplyUsageAwareFallback(signal, confirmer);
+ 	}
+@@ -788,6 +803,7 @@ export class TurnRecovery {
+ 						providerTimed: parsedRetryAfterMs !== undefined,
+ 						baseUrl: activeModel.baseUrl,
+ 						modelId: activeModel.id,
++						billingIntent: this.requestBillingIntent,
+ 					},
+ 				);
+ 				return {
+@@ -1887,12 +1903,209 @@ export class TurnRecovery {
+ 		);
+ 	}
+ 
++	async #applyIncludedFirstRouting(
++		signal?: AbortSignal,
++		retry?: {
++			failedMessage: AssistantMessage;
++			excludeProvider?: string;
++			preserveFailedTurn?: boolean;
++			refusalWalk?: boolean;
++			pinFallback?: boolean;
++		},
++		confirmer?: UsageFallbackConfirmer,
++	): Promise<boolean> {
++		const current = this.#host.model();
++		if (!current) return false;
++		const settings = this.#host.settings;
++		const registry = this.#host.modelRegistry;
++		const currentSelector = formatRetryFallbackSelector(current, this.#host.configuredThinkingLevel());
++		const currentCandidate: UsageRoutingCandidate = {
++			model: current,
++			selector: parseRetryFallbackSelector(currentSelector, registry)!,
++			chainKey:
++				this.#activeRetryFallback?.role ?? this.resolveRetryFallbackRole(currentSelector, current) ?? "default",
++		};
++		const preferred: UsageRoutingCandidate[] = [];
++		const append = (raw: string, chainKey: string) => {
++			const model = resolveModelOverride([raw], registry, settings).model;
++			const selector = parseRetryFallbackSelector(raw, registry);
++			if (model && selector) preferred.push({ model, selector, chainKey });
++		};
++		if (!retry && this.requestBillingIntent === "paid-last-resort" && this.#activeRetryFallback) {
++			append(this.#activeRetryFallback.originalSelector, this.#activeRetryFallback.role);
++			for (const selector of this.findRetryFallbackCandidates(
++				this.#activeRetryFallback.role,
++				this.#activeRetryFallback.originalSelector,
++			)) {
++				append(selector.raw, this.#activeRetryFallback.role);
++			}
++		}
++		preferred.push(currentCandidate);
++		for (const role of this.retryFallbackChainKeys(currentSelector, current)) {
++			for (const selector of this.findRetryFallbackCandidates(role, currentSelector, current))
++				append(selector.raw, role);
++		}
++		const ceiling = this.#host.thinkingLevelCeiling();
++		const latestAssistant = retry?.preserveFailedTurn
++			? retry.failedMessage
++			: this.#host.agent.state.messages.findLast(
++					(message): message is AssistantMessage =>
++						message.role === "assistant" && message !== retry?.failedMessage,
++				);
++		const creditHandle = retry?.failedMessage.fallbackCreditHandle;
++		const failedModel =
++			creditHandle && retry ? registry.find(retry.failedMessage.provider, retry.failedMessage.model) : undefined;
++		const creditTargets = failedModel ? fallbackCreditTargets(failedModel) : [];
++		const canRedeemCredit = (model: Model) =>
++			creditHandle !== undefined &&
++			retry !== undefined &&
++			model.api === "anthropic-messages" &&
++			model.provider === retry.failedMessage.provider &&
++			creditTargets.includes(model.id) &&
++			Date.now() < creditHandle.expiresAt;
++		const decision = await resolveUsageRouting({
++			preferred,
++			configured: collectConfiguredUsageCandidates(settings, registry, currentCandidate),
++			paidSelector:
++				this.#paidFallbackAllowed && cfgRetryUsageAwareFallback.get(settings) && cfgRetryModelFallback.get(settings)
++					? cfgRetryPaidFallback.get(settings)
++					: "",
++			registry,
++			settings,
++			sessionId: this.#host.sessionId(),
++			reserveFraction: cfgRetryUsageReservePct.get(settings) / 100,
++			signal,
++			reserveConfirmation:
++				!retry && confirmer && signal && this.requestBillingIntent !== "paid-last-resort"
++					? async (primary, fallback, health) => {
++							const sessionId = this.#host.sessionManager.getSessionId();
++							if (
++								this.#usageReserveApproval?.sessionId === sessionId &&
++								this.#usageReserveApproval.model === formatModelStringWithRouting(current)
++							)
++								return false;
++							const remaining =
++								health.accounts.find(account => account.selected)?.remainingFraction ??
++								health.accounts.reduce<number | undefined>(
++									(minimum, account) =>
++										account.remainingFraction === undefined
++											? minimum
++											: Math.min(minimum ?? 1, account.remainingFraction),
++									undefined,
++								);
++							const approved = await this.#confirmUsageFallback(
++								confirmer,
++								{
++									from: primary.selector.raw,
++									to: fallback.selector.raw,
++									remainingPercent: remaining === undefined ? undefined : Math.max(0, remaining * 100),
++								},
++								signal,
++							);
++							if (
++								signal.aborted ||
++								sessionId !== this.#host.sessionManager.getSessionId() ||
++								!modelsAreEqual(this.#host.model(), current)
++							)
++								return false;
++							this.#usageReserveApproval = approved
++								? undefined
++								: { model: formatModelStringWithRouting(current), sessionId };
++							return approved;
++						}
++					: undefined,
++			eligible: ({ model }) => {
++				if (modelKind(model) !== "chat" || (ceiling !== undefined && !modelSupportsEffortCeiling(model, ceiling)))
++					return false;
++				if (
++					!this.#host.contextFitsModel(model, retry && !retry.preserveFailedTurn ? retry.failedMessage : undefined)
++				)
++					return false;
++				if (!retry) return true;
++				if (retry.excludeProvider === model.provider) return false;
++				return !(
++					!canRedeemCredit(model) &&
++					model.api === "anthropic-messages" &&
++					latestAssistant?.api === "anthropic-messages" &&
++					latestAssistant.provider === model.provider &&
++					latestAssistant.model !== model.id &&
++					latestAssistant.content.some(
++						block =>
++							(block.type === "thinking" && Boolean(block.thinkingSignature?.trim())) ||
++							block.type === "redactedThinking",
++					)
++				);
++			},
++			canSelect: ({ model, selector }, billingIntent) => {
++				if (!retry) return true;
++				const intentUpgrade = billingIntent === "paid-last-resort" && this.requestBillingIntent !== billingIntent;
++				if (
++					(this.#isNoOpRetryFallback(model, selector) || this.isRetryFallbackSelectorSuppressed(selector)) &&
++					!intentUpgrade
++				)
++					return false;
++				return !retry.refusalWalk || !this.#refusalWalkTried.has(formatRetryFallbackBaseSelector(selector));
++			},
++		});
++		if (signal?.aborted || !modelsAreEqual(this.#host.model(), current)) return false;
++		if (decision.kind === "unavailable") throw new Error(`${USAGE_PREFLIGHT_BLOCKED_PREFIX} ${decision.reason}`);
++		if (decision.kind !== "included" || decision.health.state !== "reserve") this.#usageReserveApproval = undefined;
++		const billingIntent = decision.kind === "paid-last-resort" ? decision.kind : "default";
++		const creditSurface =
++			retry?.pinFallback && canRedeemCredit(decision.candidate.model)
++				? {
++						editMode: this.#host.resolveActiveEditMode(),
++						systemPrompt: [...this.#host.agent.state.systemPrompt],
++						tools: [...this.#host.agent.state.tools],
++					}
++				: undefined;
++		const changed = await this.applyRetryFallbackCandidate(
++			decision.candidate.chainKey,
++			decision.candidate.selector,
++			currentSelector,
++			{
++				pinFallback: billingIntent === "paid-last-resort" || !retry || retry.pinFallback === true,
++				apiKey: decision.apiKey,
++				signal,
++				billingIntent,
++				reason: retry
++					? `Request failed: ${retry.failedMessage.errorMessage ?? "provider error"}`
++					: "Included-plan-first usage routing",
++			},
++		);
++		if (changed && creditSurface && creditHandle) {
++			const { systemPrompt, tools } = this.#host.agent.state;
++			if (
++				this.#host.resolveActiveEditMode() === creditSurface.editMode &&
++				Bun.deepEquals(systemPrompt, creditSurface.systemPrompt) &&
++				tools.length === creditSurface.tools.length &&
++				tools.every((tool, index) => tool === creditSurface.tools[index])
++			) {
++				this.#activeFallbackCreditRedemption = {
++					targetSelector: `${decision.candidate.model.provider}/${decision.candidate.model.id}`,
++					handle: creditHandle,
++				};
++			}
++		}
++		if (
++			billingIntent === "default" &&
++			this.#activeRetryFallback?.originalSelector === decision.candidate.selector.raw
++		)
++			this.clearActiveRetryFallback();
++		return changed;
++	}
++
+ 	async #maybeApplyUsageAwareFallback(signal: AbortSignal, confirmer?: UsageFallbackConfirmer): Promise<boolean> {
++		if (this.requestBillingIntent === "paid-last-resort")
++			return this.#applyIncludedFirstRouting(signal, undefined, confirmer);
+ 		if (!cfgRetryUsageAwareFallback.get(this.#host.settings)) return false;
+ 		const currentModel = this.#host.model();
+ 		if (!currentModel) return false;
++		if (cfgRetryPaidFallback.get(this.#host.settings) && cfgRetryModelFallback.get(this.#host.settings)) {
++			return this.#applyIncludedFirstRouting(signal, undefined, confirmer);
++		}
+ 		const sessionId = this.#host.sessionManager.getSessionId();
+-		const currentSelector = formatRetryFallbackSelector(currentModel, this.#host.thinkingLevel());
++		const currentSelector = formatRetryFallbackSelector(currentModel, this.#host.configuredThinkingLevel());
+ 		let health: ModelUsageHealth;
+ 		try {
+ 			health = await this.#host.modelRegistry.authStorage.health.model(currentModel.provider, {
+@@ -2087,7 +2300,13 @@ export class TurnRecovery {
+ 		role: string,
+ 		selector: RetryFallbackSelector,
+ 		currentSelector: string,
+-		options?: { pinFallback?: boolean; apiKey?: string; signal?: AbortSignal; reason?: string },
++		options?: {
++			pinFallback?: boolean;
++			apiKey?: string;
++			signal?: AbortSignal;
++			reason?: string;
++			billingIntent?: RequestBillingIntent;
++		},
+ 	): Promise<boolean> {
+ 		const resolved = resolveModelOverride([selector.raw], this.#host.modelRegistry, this.#host.settings);
+ 		const candidate = resolved.model ?? this.#host.modelRegistry.find(selector.provider, selector.id);
+@@ -2096,11 +2315,28 @@ export class TurnRecovery {
+ 		}
+ 		const apiKey =
+ 			options?.apiKey ??
+-			(await this.#host.modelRegistry.getApiKey(candidate, this.#host.sessionId(), { signal: options?.signal }));
++			(await this.#host.modelRegistry.getApiKey(candidate, this.#host.sessionId(), {
++				signal: options?.signal,
++				billingIntent: options?.billingIntent,
++			}));
+ 		if (!apiKey) {
+ 			throw new Error(`No API key for retry fallback ${selector.raw}`);
+ 		}
+ 		if (options?.signal?.aborted) return false;
++		if (modelsAreEqual(this.#host.model(), candidate) && this.#isNoOpRetryFallback(candidate, selector)) {
++			if (this.requestBillingIntent === (options?.billingIntent ?? "default")) return false;
++			if (this.#activeRetryFallback) this.#activeRetryFallback.billingIntent = options?.billingIntent ?? "default";
++			else
++				this.#activeRetryFallback = {
++					role,
++					originalSelector: currentSelector,
++					originalThinkingLevel: this.#host.configuredThinkingLevel(),
++					lastAppliedFallbackThinkingLevel: this.#host.configuredThinkingLevel(),
++					pinned: options?.pinFallback === true,
++					billingIntent: options?.billingIntent,
++				};
++			return true;
++		}
+ 
+ 		// Capture the configured selector (auto-aware) so a fallback chain preserves
+ 		// `auto` instead of collapsing it to the level it resolved to this turn.
+@@ -2158,6 +2394,7 @@ export class TurnRecovery {
+ 			this.#activeRetryFallback.lastAppliedFallbackThinkingLevel = nextThinkingLevel;
+ 			this.#activeRetryFallback.pinned = this.#activeRetryFallback.pinned || options?.pinFallback === true;
+ 		}
++		this.#activeRetryFallback.billingIntent = options?.billingIntent ?? "default";
+ 		await this.#host.syncAfterModelChange(previousEditMode);
+ 		await this.#host.emitSessionEvent({
+ 			type: "retry_fallback_applied",
+@@ -2181,6 +2418,9 @@ export class TurnRecovery {
+ 			refusalWalk?: boolean;
+ 		},
+ 	): Promise<boolean> {
++		if (cfgRetryPaidFallback.get(this.#host.settings) && cfgRetryUsageAwareFallback.get(this.#host.settings)) {
++			return this.#applyIncludedFirstRouting(undefined, { failedMessage, ...options });
++		}
+ 		const ceiling = this.#host.thinkingLevelCeiling();
+ 		const latestAssistant = options?.preserveFailedTurn
+ 			? failedMessage
+@@ -2366,7 +2606,9 @@ export class TurnRecovery {
+ 			return false;
+ 		}
+ 		if (this.#hasReplayUnsafeOutput(message)) return false;
+-		const currentSelector = formatRetryFallbackSelector(model, this.#host.thinkingLevel());
++		const currentSelector = formatRetryFallbackSelector(model, this.#host.configuredThinkingLevel());
++		if (cfgRetryPaidFallback.get(this.#host.settings) && cfgRetryUsageAwareFallback.get(this.#host.settings))
++			return true;
+ 		return this.retryFallbackChainKeys(currentSelector).some(
+ 			role => this.findRetryFallbackCandidates(role, currentSelector).length > 0,
+ 		);
+@@ -2406,6 +2648,7 @@ export class TurnRecovery {
+ 
+ 	async #maybeRestoreRetryFallbackPrimary(): Promise<boolean> {
+ 		if (!this.#activeRetryFallback) return false;
++		if (this.requestBillingIntent === "paid-last-resort") return false;
+ 		if (this.#activeRetryFallback.pinned) return false;
+ 		if (this.#getRetryFallbackRevertPolicy() !== "cooldown-expiry") return false;
+ 
+@@ -2427,7 +2670,7 @@ export class TurnRecovery {
+ 
+ 		const currentModel = this.#host.model();
+ 		if (!currentModel) return false;
+-		const currentSelector = formatRetryFallbackSelector(currentModel, this.#host.thinkingLevel());
++		const currentSelector = formatRetryFallbackSelector(currentModel, this.#host.configuredThinkingLevel());
+ 		if (currentSelector === originalSelector.raw) {
+ 			if (!this.isRetryFallbackSelectorSuppressed(originalSelector)) {
+ 				this.clearActiveRetryFallback();
+@@ -2689,7 +2932,7 @@ export class TurnRecovery {
+ 		const allowModelFallback = options?.allowModelFallback !== false;
+ 		const currentModel = this.#host.model();
+ 		const currentSelector = currentModel
+-			? formatRetryFallbackSelector(currentModel, this.#host.thinkingLevel())
++			? formatRetryFallbackSelector(currentModel, this.#host.configuredThinkingLevel())
+ 			: undefined;
+ 		if (accountPolicyDenial && currentModel) {
+ 			// `rotate` may sleep out a sibling's short block; register its signal
+@@ -2703,6 +2946,7 @@ export class TurnRecovery {
+ 					await this.#host.modelRegistry.authStorage.limits.rotate(currentModel.provider, this.#host.sessionId(), {
+ 						error: errorMessage,
+ 						modelId: currentModel.id,
++						billingIntent: this.requestBillingIntent,
+ 						signal: rotateAbortController.signal,
+ 					})
+ 				).switched;
+diff --git a/packages/coding-agent/src/session/usage-aware-routing.ts b/packages/coding-agent/src/session/usage-aware-routing.ts
+new file mode 100644
+index 0000000..f28f069
+--- /dev/null
++++ b/packages/coding-agent/src/session/usage-aware-routing.ts
+@@ -0,0 +1,227 @@
++import type { Model, ModelUsageHealth, RequestBillingIntent } from "@oh-my-pi/pi-ai";
++import { buildModelProviderPriorityRank } from "@oh-my-pi/pi-catalog/identity";
++import { modelKind } from "@oh-my-pi/pi-catalog/types";
++import type { ModelRegistry } from "../config/model-registry";
++import {
++	disabledProviderIds,
++	getModelMatchPreferences,
++	resolveConfiguredModelPatterns,
++	resolveModelOverride,
++} from "../config/model-resolver";
++import { isKindRole } from "../config/model-roles";
++import type { Settings } from "../config/settings";
++import {
++	findRetryFallbackCandidates,
++	formatRetryFallbackSelector,
++	getRetryFallbackChains,
++	parseRetryFallbackChainEntry,
++	parseRetryFallbackSelector,
++	type RetryFallbackSelector,
++} from "./retry-fallback-chains";
++import { cfgRetryUsageReservePolicy } from "./settings";
++
++export interface UsageRoutingCandidate {
++	selector: RetryFallbackSelector;
++	model: Model;
++	chainKey: string;
++}
++
++export type UsageRoutingDecision =
++	| { kind: "included"; candidate: UsageRoutingCandidate; apiKey: string; health: ModelUsageHealth }
++	| { kind: "paid-last-resort"; candidate: UsageRoutingCandidate; apiKey: string }
++	| { kind: "unavailable"; reason: string };
++
++/** Only configured chat routes enter the inventory, never the unconfigured catalog. */
++export function collectConfiguredUsageCandidates(
++	settings: Settings,
++	registry: ModelRegistry,
++	current?: UsageRoutingCandidate,
++): UsageRoutingCandidate[] {
++	const candidates: UsageRoutingCandidate[] = [];
++	const chains = getRetryFallbackChains(settings);
++	const context = { chains, getModelRole: (role: string) => settings.getModelRole(role), modelLookup: registry };
++	const append = (value: string, chainKey: string, primary?: RetryFallbackSelector) => {
++		for (const pattern of resolveConfiguredModelPatterns(value, settings)) {
++			const entry = parseRetryFallbackChainEntry(context, pattern, primary);
++			const resolved = resolveModelOverride([entry?.raw ?? pattern], registry, settings);
++			if (!resolved.model || modelKind(resolved.model) !== "chat") continue;
++			const selector = parseRetryFallbackSelector(
++				formatRetryFallbackSelector(resolved.model, entry?.thinkingLevel),
++				registry,
++			);
++			if (selector) candidates.push({ selector, model: resolved.model, chainKey });
++		}
++	};
++	for (const [role, value] of Object.entries(settings.getModelRoles())) {
++		if (!value || isKindRole(role)) continue;
++		const start = candidates.length;
++		append(value, role);
++		for (const primary of candidates.slice(start)) {
++			for (const selector of findRetryFallbackCandidates(context, role, primary.selector.raw, primary.model))
++				append(selector.raw, role, primary.selector);
++		}
++	}
++	for (const [key, chain] of Object.entries(chains)) {
++		if (isKindRole(key)) continue;
++		const primary = parseRetryFallbackSelector(key, registry) ?? current?.selector;
++		for (const value of chain) append(value, key, primary);
++	}
++	const priority = buildModelProviderPriorityRank(getModelMatchPreferences(settings).providerOrder);
++	return candidates.sort(
++		(a, b) =>
++			(priority.get(a.model.provider.toLowerCase()) ?? Infinity) -
++			(priority.get(b.model.provider.toLowerCase()) ?? Infinity),
++	);
++}
++
++/** All session entry points use the same included-plan terminal gate. */
++export async function resolveUsageRouting(options: {
++	preferred: readonly UsageRoutingCandidate[];
++	configured: readonly UsageRoutingCandidate[];
++	paidSelector: string;
++	registry: ModelRegistry;
++	settings: Settings;
++	sessionId?: string;
++	reserveFraction: number;
++	reserveConfirmation?:
++		| "defer"
++		| ((
++				primary: UsageRoutingCandidate,
++				fallback: UsageRoutingCandidate,
++				health: ModelUsageHealth,
++		  ) => Promise<boolean>);
++	eligible(candidate: UsageRoutingCandidate, billingIntent: RequestBillingIntent): boolean;
++	canSelect?(candidate: UsageRoutingCandidate, billingIntent: RequestBillingIntent): boolean;
++	signal?: AbortSignal;
++}): Promise<UsageRoutingDecision> {
++	const { registry, settings, signal } = options;
++	const disabled = disabledProviderIds(settings);
++	const seen = new Set<string>();
++	let reserve: { candidate: UsageRoutingCandidate; apiKey: string; health: ModelUsageHealth } | undefined;
++	let hasUnspentUnselectablePlan = false;
++	const preferred = new Set(options.preferred.map(candidate => candidate.selector.raw));
++	for (const candidate of [...options.preferred, ...options.configured]) {
++		signal?.throwIfAborted();
++		const { model, selector } = candidate;
++		if (seen.has(selector.raw)) continue;
++		seen.add(selector.raw);
++		if (disabled.has(model.provider) || !registry.hasConfiguredAuth(model) || !options.eligible(candidate, "default"))
++			continue;
++		let health: ModelUsageHealth;
++		try {
++			health = await registry.authStorage.health.model(model.provider, {
++				modelId: model.id,
++				baseUrl: model.baseUrl,
++				sessionId: options.sessionId,
++				accountIds: model.accountAccess && Object.keys(model.accountAccess),
++				reserveFraction: options.reserveFraction,
++				signal,
++			});
++		} catch (error) {
++			if (signal?.aborted) throw error;
++			health = { state: "unknown", accounts: [] };
++		}
++		if (
++			candidate === options.preferred[0] &&
++			cfgRetryUsageReservePolicy.get(settings) === "fail-closed" &&
++			(health.state === "depleted" || health.state === "reserve")
++		) {
++			return {
++				kind: "unavailable",
++				reason: `Usage ${health.state} for ${selector.raw}; reserve policy is fail-closed.`,
++			};
++		}
++		if (health.state === "depleted") continue;
++		if (model.accountAccess && health.accounts.length === 0) continue;
++		// Unmanaged metered keys are not additional included-plan funding.
++		if (
++			!preferred.has(selector.raw) &&
++			health.accounts.length === 0 &&
++			registry.authStorage.keys.source(model.provider)?.kind !== "oauth"
++		)
++			continue;
++		const selected = health.accounts.find(account => account.selected);
++		if (
++			options.sessionId &&
++			selected &&
++			selected.state !== "healthy" &&
++			health.accounts.some(account => account.state === "healthy")
++		) {
++			registry.authStorage.sessions.release(model.provider, options.sessionId);
++		}
++		let apiKey: string | undefined;
++		try {
++			apiKey = await registry.getApiKey(model, options.sessionId, { signal });
++		} catch (error) {
++			if (signal?.aborted) throw error;
++			continue;
++		}
++		if (!apiKey) continue;
++		if (options.canSelect?.(candidate, "default") === false) {
++			hasUnspentUnselectablePlan = true;
++			continue;
++		}
++		if (health.state === "reserve") {
++			reserve ??= { candidate, apiKey, health };
++			if (
++				candidate === options.preferred[0] &&
++				cfgRetryUsageReservePolicy.get(settings) === "confirm" &&
++				options.reserveConfirmation === "defer"
++			) {
++				return { kind: "included", candidate, apiKey, health };
++			}
++			continue;
++		}
++		if (
++			reserve &&
++			reserve.candidate === options.preferred[0] &&
++			cfgRetryUsageReservePolicy.get(settings) === "confirm" &&
++			typeof options.reserveConfirmation === "function" &&
++			!(await options.reserveConfirmation(reserve.candidate, candidate, reserve.health))
++		) {
++			return { kind: "included", candidate: reserve.candidate, apiKey: reserve.apiKey, health: reserve.health };
++		}
++		return { kind: "included", candidate, apiKey, health };
++	}
++	if (reserve)
++		return { kind: "included", candidate: reserve.candidate, apiKey: reserve.apiKey, health: reserve.health };
++	if (hasUnspentUnselectablePlan) {
++		return {
++			kind: "unavailable",
++			reason:
++				"A configured included-plan route still has unknown or unspent quota but cannot be retried for this request.",
++		};
++	}
++	if (!options.paidSelector.trim())
++		return {
++			kind: "unavailable",
++			reason: "No eligible configured included-plan route is available and paid fallback is disabled.",
++		};
++	const resolved = resolveModelOverride([options.paidSelector], registry, settings);
++	const model = resolved.model;
++	if (model && !disabled.has(model.provider)) {
++		const selector = parseRetryFallbackSelector(formatRetryFallbackSelector(model, resolved.thinkingLevel), registry);
++		if (selector) {
++			const candidate = { model, selector, chainKey: "paid-last-resort" };
++			if (
++				options.eligible(candidate, "paid-last-resort") &&
++				options.canSelect?.(candidate, "paid-last-resort") !== false
++			) {
++				try {
++					const apiKey = await registry.getApiKey(model, options.sessionId, {
++						signal,
++						billingIntent: "paid-last-resort",
++					});
++					if (apiKey) return { kind: "paid-last-resort", candidate, apiKey };
++				} catch (error) {
++					if (signal?.aborted) throw error;
++				}
++			}
++		}
++	}
++	return {
++		kind: "unavailable",
++		reason:
++			"All eligible configured included-plan routes are depleted or unavailable, and no usable paid fallback is available.",
++	};
++}
+diff --git a/packages/coding-agent/test/paid-cursor-routing.test.ts b/packages/coding-agent/test/paid-cursor-routing.test.ts
+new file mode 100644
+index 0000000..a2dbc69
+--- /dev/null
++++ b/packages/coding-agent/test/paid-cursor-routing.test.ts
+@@ -0,0 +1,453 @@
++import { describe, expect, test, vi } from "bun:test";
++import { Database } from "bun:sqlite";
++import * as fs from "node:fs/promises";
++import * as os from "node:os";
++import * as path from "node:path";
++import { Effort } from "@oh-my-pi/pi-ai";
++import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
++import type { UsageProvider } from "@oh-my-pi/pi-ai/usage";
++import { claudeRankingStrategy } from "@oh-my-pi/pi-ai/usage/claude";
++import { cursorRankingStrategy, parseCursorIndividualUsage } from "@oh-my-pi/pi-ai/usage/cursor";
++import { AUTO_THINKING } from "@oh-my-pi/pi-tui/thinking";
++import * as autoThinkingClassifier from "../src/auto-thinking/classifier";
++import { ModelRegistry, type ProviderConfigInput } from "../src/config/model-registry";
++import { Settings } from "../src/config/settings";
++import { createAgentSession, type CreateAgentSessionOptions } from "../src/sdk";
++import type { AgentSession } from "../src/session/agent-session";
++import { SessionManager } from "../src/session/session-manager";
++
++async function createRoutingFixture(
++	fableFraction: number | null = 0.46,
++	disabledProviders: string[] = [],
++	usageReservePolicy: "auto" | "confirm" | "fail-closed" = "auto",
++) {
++	const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-paid-routing-"));
++	const quota = { opus: 1, fable: fableFraction, paidEnabled: true, failNext: false, reportsExhaustion: true };
++	const requests: { model: string; authorization: string | null }[] = [];
++	const resetsAt = Date.now() + 86_400_000;
++	const anthropicUsage: UsageProvider = {
++		id: "anthropic",
++		fetchUsage: async () => ({
++			provider: "anthropic",
++			fetchedAt: Date.now(),
++			limits: Object.entries({ opus: quota.opus, fable: quota.fable }).flatMap(([tier, fraction]) =>
++				fraction === null
++					? []
++					: [
++							{
++								id: `anthropic:7d:${tier}`,
++								label: tier,
++								scope: { provider: "anthropic", tier },
++								window: { id: "7d", label: "Weekly", durationMs: 604_800_000, resetsAt },
++								amount: { unit: "percent" as const, usedFraction: fraction },
++								status: quota.reportsExhaustion && fraction >= 1 ? ("exhausted" as const) : ("ok" as const),
++							},
++						],
++			),
++		}),
++	};
++	const cursorUsage: UsageProvider = {
++		id: "cursor",
++		fetchUsage: async () =>
++			parseCursorIndividualUsage({
++				individualUsage: {
++					plan: { enabled: true, limit: 7000, apiPercentUsed: 100, autoPercentUsed: 100 },
++					onDemand: { enabled: quota.paidEnabled, used: 13397, limit: null, remaining: null },
++				},
++			}),
++	};
++	const store = new SqliteAuthCredentialStore(new Database(":memory:"));
++	const auth = new AuthStorage(store, {
++		usageProviderResolver: provider =>
++			provider === "anthropic" ? anthropicUsage : provider === "cursor" ? cursorUsage : undefined,
++		rankingStrategyResolver: provider =>
++			provider === "anthropic" ? claudeRankingStrategy : provider === "cursor" ? cursorRankingStrategy : undefined,
++	});
++	for (const provider of ["anthropic", "cursor"]) {
++		await auth.credentials.set(provider, {
++			type: "oauth",
++			access: `fixture-${provider}`,
++			refresh: "fixture-refresh",
++			expires: Date.now() + 3_600_000,
++			accountId: `${provider}-account`,
++		});
++	}
++	const server = Bun.serve({
++		port: 0,
++		hostname: "127.0.0.1",
++		async fetch(request) {
++			if (request.method !== "POST") return new Response(null, { status: 204 });
++			const body = await request.json();
++			if (!body || typeof body !== "object" || !("model" in body) || typeof body.model !== "string") {
++				return new Response("Expected a chat model", { status: 400 });
++			}
++			requests.push({ model: body.model, authorization: request.headers.get("authorization") });
++			if (quota.failNext) {
++				quota.failNext = false;
++				quota.fable = 1;
++				auth.usage.setProvider("anthropic", anthropicUsage);
++				return Response.json(
++					{ error: { message: "Request cannot be served", type: "invalid_request_error" } },
++					{ status: 400 },
++				);
++			}
++			const chunk = (delta: object, finishReason: string | null) =>
++				JSON.stringify({
++					id: "chatcmpl-fixture",
++					object: "chat.completion.chunk",
++					created: 1,
++					model: body.model,
++					choices: [{ index: 0, delta, finish_reason: finishReason }],
++					...(finishReason ? { usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } } : {}),
++				});
++			return new Response(
++				`data: ${chunk({ role: "assistant", content: `served:${body.model}` }, null)}\n\ndata: ${chunk({}, "stop")}\n\ndata: [DONE]\n\n`,
++				{
++					headers: { "content-type": "text/event-stream" },
++				},
++			);
++		},
++	});
++	const settings = Settings.isolated({
++		disabledProviders,
++		"retry.usageAwareFallback": true,
++		"retry.usageReservePct": 10,
++		"retry.usageReservePolicy": usageReservePolicy,
++		"retry.modelFallback": true,
++		"retry.paidFallback": "cursor/claude-opus-5-5",
++		"retry.fallbackChains": { default: ["cursor/claude-opus-5-5"] },
++		"retry.fallbackRevertPolicy": "never",
++		"advisor.enabled": false,
++		"security.enabled": false,
++		"compaction.enabled": false,
++	});
++	settings.setModelRole("default", "anthropic/claude-opus-5-5");
++	settings.setModelRole("plan", "anthropic/claude-fable-5-1");
++	const registry = new ModelRegistry(auth, path.join(root, "models.yml"));
++	for (const provider of ["anthropic", "cursor"]) {
++		registry.registerProvider(provider, {
++			baseUrl: `http://127.0.0.1:${server.port}/v1`,
++			api: "openai-completions",
++			oauth: {
++				name: `${provider} routing fixture`,
++				async login() {
++					throw new Error("Fixture login must not run");
++				},
++				getApiKey: credentials => credentials.access,
++			},
++			models: (provider === "anthropic" ? ["claude-opus-5-5", "claude-fable-5-1"] : ["claude-opus-5-5"]).map(
++				(id): NonNullable<ProviderConfigInput["models"]>[number] => ({
++					id,
++					name: id,
++					reasoning: true,
++					input: ["text"],
++					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
++					contextWindow: 300_000,
++					maxTokens: 4096,
++				}),
++			),
++		});
++	}
++	let session: AgentSession | undefined;
++	return {
++		quota,
++		requests,
++		auth,
++		settings,
++		refresh() {
++			auth.usage.setProvider("anthropic", anthropicUsage);
++			auth.usage.setProvider("cursor", cursorUsage);
++		},
++		async start(options: Partial<CreateAgentSessionOptions> = {}) {
++			const created = await createAgentSession({
++				cwd: root,
++				agentDir: root,
++				authStorage: auth,
++				modelRegistry: registry,
++				settings,
++				sessionManager: SessionManager.inMemory(),
++				disableExtensionDiscovery: true,
++				extensions: [],
++				skills: [],
++				contextFiles: [],
++				promptTemplates: [],
++				slashCommands: [],
++				rules: [],
++				preloadedCustomToolPaths: [],
++				toolNames: [],
++				enableMCP: false,
++				enableLsp: false,
++				skipPythonPreflight: true,
++				hasUI: false,
++				thinkingLevel: "off",
++				...options,
++			});
++			session = created.session;
++			return session;
++		},
++		async close() {
++			await session?.dispose();
++			for (const provider of ["anthropic", "cursor"]) registry.unregisterProvider(provider);
++			auth.close();
++			server.stop(true);
++			await fs.rm(root, { recursive: true, force: true });
++		},
++	};
++}
++
++describe("session included-plan-first paid fallback", () => {
++	test("keeps automatic thinking across repeated healthy prompts without a fallback transition", async () => {
++		const fixture = await createRoutingFixture();
++		const classifier = vi
++			.spyOn(autoThinkingClassifier, "classifyDifficulty")
++			.mockResolvedValueOnce(Effort.Low)
++			.mockResolvedValueOnce(Effort.High);
++		try {
++			fixture.quota.opus = 0.1;
++			fixture.refresh();
++			const session = await fixture.start({ thinkingLevel: AUTO_THINKING });
++			const transitions: string[] = [];
++			session.subscribe(event => {
++				if (event.type === "retry_fallback_applied") transitions.push(event.to);
++				if (event.type === "model_changed") transitions.push("model_changed");
++			});
++			await session.prompt("Return the first transport marker.");
++			expect(session.configuredThinkingLevel()).toBe(AUTO_THINKING);
++			expect(session.autoResolvedThinkingLevel()).toBe(Effort.Low);
++			await session.prompt("Return the second transport marker.");
++			await session.waitForIdle();
++			expect(session.configuredThinkingLevel()).toBe(AUTO_THINKING);
++			expect(session.autoResolvedThinkingLevel()).toBe(Effort.High);
++			expect(session.model?.provider).toBe("anthropic");
++			expect(session.model?.id).toBe("claude-opus-5-5");
++			expect(fixture.requests.map(request => request.authorization)).toEqual([
++				"Bearer fixture-anthropic",
++				"Bearer fixture-anthropic",
++			]);
++			expect(
++				session.messages.filter(message => message.role === "assistant").map(message => message.stopReason),
++			).toEqual(["stop", "stop"]);
++			expect(transitions).toEqual([]);
++			expect(session.requestBillingIntent).toBe("default");
++		} finally {
++			classifier.mockRestore();
++			await fixture.close();
++		}
++	});
++
++	test.each([
++		{ hasUI: true, deferUsageReserveConfirmation: false, approved: true },
++		{ hasUI: true, deferUsageReserveConfirmation: false, approved: false },
++		{ hasUI: false, deferUsageReserveConfirmation: true, approved: true },
++		{ hasUI: false, deferUsageReserveConfirmation: true, approved: false },
++	])("defers reserve routing from startup to first-prompt confirmation (%j)", async options => {
++		const fixture = await createRoutingFixture(0.46, [], "confirm");
++		try {
++			fixture.quota.opus = 0.95;
++			fixture.refresh();
++			const session = await fixture.start({
++				hasUI: options.hasUI,
++				deferUsageReserveConfirmation: options.deferUsageReserveConfirmation,
++			});
++			expect(session.model?.provider).toBe("anthropic");
++			expect(session.model?.id).toBe("claude-opus-5-5");
++			const confirmations: { from: string; to: string; remainingPercent: number | undefined }[] = [];
++			session.setUsageFallbackConfirmer(async request => {
++				confirmations.push(request);
++				return options.approved;
++			});
++			await session.prompt("Return the first transport marker.");
++			await session.prompt("Return the second transport marker.");
++			await session.waitForIdle();
++			expect(confirmations).toEqual([
++				{
++					from: "anthropic/claude-opus-5-5:off",
++					to: "anthropic/claude-fable-5-1",
++					remainingPercent: expect.closeTo(5),
++				},
++			]);
++			expect(session.model?.id).toBe(options.approved ? "claude-fable-5-1" : "claude-opus-5-5");
++			expect(fixture.requests.map(request => request.model)).toEqual(
++				options.approved ? ["claude-fable-5-1", "claude-fable-5-1"] : ["claude-opus-5-5", "claude-opus-5-5"],
++			);
++			expect(fixture.requests.map(request => request.authorization)).toEqual([
++				"Bearer fixture-anthropic",
++				"Bearer fixture-anthropic",
++			]);
++			expect(
++				session.messages.filter(message => message.role === "assistant").map(message => message.stopReason),
++			).toEqual(["stop", "stop"]);
++			expect(session.requestBillingIntent).toBe("default");
++			if (!options.approved) {
++				fixture.quota.opus = 0.1;
++				fixture.refresh();
++				await session.prompt("Return the recovered quota marker.");
++				fixture.quota.opus = 0.95;
++				fixture.refresh();
++				await session.prompt("Return the new reserve episode marker.");
++				expect(confirmations).toHaveLength(2);
++				expect(session.model?.id).toBe("claude-opus-5-5");
++				expect(fixture.requests.map(request => request.authorization)).toEqual([
++					"Bearer fixture-anthropic",
++					"Bearer fixture-anthropic",
++					"Bearer fixture-anthropic",
++					"Bearer fixture-anthropic",
++				]);
++			}
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test("automatically leaves reserve at noninteractive startup under confirm policy", async () => {
++		const fixture = await createRoutingFixture(0.46, [], "confirm");
++		try {
++			fixture.quota.opus = 0.95;
++			fixture.refresh();
++			const session = await fixture.start();
++			expect(session.model?.id).toBe("claude-fable-5-1");
++			await session.prompt("Return the transport marker.");
++			expect(fixture.requests).toEqual([{ model: "claude-fable-5-1", authorization: "Bearer fixture-anthropic" }]);
++			expect(session.requestBillingIntent).toBe("default");
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test.each([0.95, 1])("fails closed at startup before sending reserve or depleted quota (%s)", async used => {
++		const fixture = await createRoutingFixture(0.46, [], "fail-closed");
++		try {
++			fixture.quota.opus = used;
++			fixture.refresh();
++			await expect(fixture.start({ hasUI: true })).rejects.toThrow("reserve policy is fail-closed");
++			expect(fixture.requests).toEqual([]);
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test("starts on configured Fable, admits paid only after depletion, and restores included quota despite never-revert", async () => {
++		const fixture = await createRoutingFixture();
++		try {
++			fixture.quota.reportsExhaustion = false;
++			fixture.refresh();
++			const session = await fixture.start();
++			const routedProviders: string[] = [];
++			session.subscribe(event => {
++				if (event.type === "retry_fallback_applied") routedProviders.push(event.to.split("/")[0]!);
++			});
++			expect(session.model?.id).toBe("claude-fable-5-1");
++			await session.prompt("Return the transport marker.");
++			fixture.quota.fable = 1;
++			fixture.refresh();
++			await session.prompt("Return the transport marker.");
++			expect(session.model?.provider).toBe("cursor");
++			expect(session.model?.id).toBe("claude-opus-5-5");
++			await session.prompt("Return the transport marker again.");
++			expect(session.requestBillingIntent).toBe("paid-last-resort");
++			fixture.quota.opus = 0.1;
++			fixture.refresh();
++			await session.prompt("Return the restored transport marker.");
++			expect(session.requestBillingIntent).toBe("default");
++			expect(session.model?.provider).toBe("anthropic");
++			expect(session.model?.id).toBe("claude-opus-5-5");
++			expect(fixture.requests).toEqual([
++				{ model: "claude-fable-5-1", authorization: "Bearer fixture-anthropic" },
++				expect.objectContaining({ authorization: "Bearer fixture-cursor" }),
++				expect.objectContaining({ authorization: "Bearer fixture-cursor" }),
++				{ model: "claude-opus-5-5", authorization: "Bearer fixture-anthropic" },
++			]);
++			expect(
++				session.messages.filter(message => message.role === "assistant").map(message => message.stopReason),
++			).toEqual(["stop", "stop", "stop", "stop"]);
++			expect(routedProviders).toEqual(["cursor", "anthropic"]);
++			expect(fixture.settings.getModelRole("default")).toBe("anthropic/claude-opus-5-5");
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test.each([null, 0.95])(
++		"keeps unknown or positive-reserve configured quota ahead of paid funding (%s)",
++		async fraction => {
++			const fixture = await createRoutingFixture(fraction);
++			try {
++				const session = await fixture.start({ modelPattern: "@default" });
++				await session.prompt("Return the transport marker.");
++				expect(fixture.requests).toEqual([
++					{ model: "claude-fable-5-1", authorization: "Bearer fixture-anthropic" },
++				]);
++				expect(session.requestBillingIntent).toBe("default");
++			} finally {
++				await fixture.close();
++			}
++		},
++	);
++
++	test("uses the same terminal gate on a hard-error retry", async () => {
++		const fixture = await createRoutingFixture();
++		try {
++			const session = await fixture.start();
++			fixture.quota.failNext = true;
++			await session.prompt("Return the transport marker.");
++			expect(fixture.requests).toEqual([
++				{ model: "claude-fable-5-1", authorization: "Bearer fixture-anthropic" },
++				expect.objectContaining({ authorization: "Bearer fixture-cursor" }),
++			]);
++			expect(session.model?.provider).toBe("cursor");
++			expect(session.model?.id).toBe("claude-opus-5-5");
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test("denies startup with exhausted plans and disabled funding instead of dispatching an exhausted model", async () => {
++		const fixture = await createRoutingFixture(1);
++		try {
++			fixture.quota.paidEnabled = false;
++			fixture.refresh();
++			await expect(fixture.start()).rejects.toThrow("Usage preflight blocked");
++			expect(fixture.requests).toEqual([]);
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test("stops a paid session before its next request when funding is disabled", async () => {
++		const fixture = await createRoutingFixture(1);
++		try {
++			const session = await fixture.start({ modelPattern: "cursor/claude-opus-5-5" });
++			await session.prompt("Return the transport marker.");
++			fixture.quota.paidEnabled = false;
++			fixture.refresh();
++			await expect(session.prompt("Do not dispatch this request.")).rejects.toThrow("Usage preflight blocked");
++			expect(fixture.requests.map(request => request.authorization)).toEqual(["Bearer fixture-cursor"]);
++			expect(session.model?.provider).toBe("cursor");
++			expect(session.model?.id).toBe("claude-opus-5-5");
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test("does not use a disabled provider as the paid last resort", async () => {
++		const fixture = await createRoutingFixture(1, ["cursor"]);
++		try {
++			await expect(fixture.start()).rejects.toThrow("Usage preflight blocked");
++			expect(fixture.requests).toEqual([]);
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	test("does not authorize a custom outbound key callback through a registry-only paid check", async () => {
++		const fixture = await createRoutingFixture(1);
++		try {
++			await expect(fixture.start({ getApiKey: async () => "custom-unverified-key" })).rejects.toThrow(
++				"Usage preflight blocked",
++			);
++			expect(fixture.requests).toEqual([]);
++		} finally {
++			await fixture.close();
++		}
++	});
++});

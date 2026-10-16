@@ -1,13 +1,11 @@
-import { GitPullRequest, NotebookText, TableOfContents, Users } from "lucide-react";
+import { GitPullRequest, NotebookText, Users } from "lucide-react";
 import { type LinkedPullRequest, samePullRequest } from "../../src/shared/github";
 import type { Project } from "../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { modeOf, SPLIT_CLICK } from "../labels";
-import { useTurnCount } from "../pane-store";
 import { projectSession } from "../sessions";
 import { DetailsEmpty, DetailsSidebarFrame } from "./details-sidebar-frame";
 import { useDashboardActions } from "./dashboard-context";
-import { OutlineTab } from "./outline-tab";
 import { PHASE_LABEL, ProjectNotesList } from "./projects/project-parts";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 
@@ -61,22 +59,21 @@ function WorkersTab({ project, hosts, past }: { project: Project; hosts: RosterH
 
 interface ProjectDetailsProps {
 	project: Project;
-	/** The coordinator's view, whose conversation the outline follows. */
-	view: View;
 	working: boolean;
-	/** The coordinator's directory, which relative paths in its outline resolve against. */
+	/** The coordinator's directory, which relative paths in its tabs resolve against. */
 	cwd: string | null;
 	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
+	/** The coordinator's `instanceId`, `null` for a past coordinator. */
+	current: string | null;
 }
 
 /**
- * The right sidebar for a project's coordinator, which changes no code itself: an outline of its conversation, its
- * workers, the project's notes, and the pull requests its workers opened, each tab apart.
+ * The right sidebar for a project's coordinator, which changes no code itself: its workers, the project's notes, and
+ * the pull requests its workers opened, each tab apart.
  */
-export function ProjectDetails({ project, view, working, cwd, workspace, hosts, past }: ProjectDetailsProps) {
-	const turnCount = useTurnCount(view);
+export function ProjectDetails({ project, working, cwd, workspace, hosts, past, current }: ProjectDetailsProps) {
 	const pullRequests = workerPullRequests(project, hosts, past);
 	return (
 		<DetailsSidebarFrame
@@ -85,7 +82,6 @@ export function ProjectDetails({ project, view, working, cwd, workspace, hosts, 
 			defaultTab="workers"
 			cwd={cwd}
 			tabs={[
-				{ value: "outline", icon: TableOfContents, name: "Outline", count: turnCount, content: <OutlineTab view={view} working={working} /> },
 				{ value: "workers", icon: Users, name: "Workers", count: project.workers.length, content: <WorkersTab project={project} hosts={hosts} past={past} /> },
 				{
 					value: "notes",
@@ -104,7 +100,7 @@ export function ProjectDetails({ project, view, working, cwd, workspace, hosts, 
 					name: "PRs",
 					count: pullRequests.length,
 					pinned: true,
-					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
+					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={current} />,
 				},
 			]}
 		/>

@@ -14,11 +14,11 @@ import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type Ma
 import { parseImages, parseModel, parseNewSessionRequest, parseThinking } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
-import { GITHUB_NAME, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
+import { GITHUB_NAME, MAX_COMMENT_BODY, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import { type PresetChange, parsePreset } from "../shared/presets";
-import type { ProjectEdit } from "../shared/projects";
+import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "../shared/projects";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import { type AutoPullChange, MERGE_METHODS } from "../shared/source-control";
@@ -50,7 +50,7 @@ function parseLiveView(value: unknown): Parsed<LiveView> {
 	return { ok: { kind: "live", instanceId, agentId } };
 }
 
-function parseView(value: unknown): Parsed<View> {
+export function parseView(value: unknown): Parsed<View> {
 	if (isObject(value) && value.kind === "past") {
 		return typeof value.sessionId === "string" ? { ok: { kind: "past", sessionId: value.sessionId } } : null;
 	}
@@ -112,7 +112,13 @@ function parsePresetChange(value: unknown): Parsed<PresetChange> {
 function parseProjectEdit(value: unknown): Parsed<ProjectEdit> {
 	if (!isObject(value) || !isNonEmpty(value.id)) return null;
 	const { op, id, name } = value;
-	if (op === "archive") return { ok: { op, id } };
+	if (op === "archive" || op === "unarchive") return { ok: { op, id } };
+	if (op === "watch") {
+		const watch = parseWatch(value.watch);
+		return watch && { ok: { op, id, watch } };
+	}
+	if (op === "review-cadence") return typeof value.cadence === "string" && value.cadence.length <= MAX_REVIEW_CADENCE ? { ok: { op, id, cadence: value.cadence } } : null;
+	if (op === "max-workers") return isMaxWorkers(value.max) ? { ok: { op, id, max: value.max } } : null;
 	return op === "rename" && typeof name === "string" && name.length <= MAX_PROJECT_NAME ? { ok: { op, id, name } } : null;
 }
 
@@ -124,6 +130,13 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			const view = parseView(value.view);
 			const { entryId } = value;
 			return view && typeof entryId === "string" && entryId ? { ok: { kind: "fork", view: view.ok, entryId } } : null;
+		}
+		case "replay": {
+			const view = parseView(value.view);
+			const model = value.model === null ? { ok: null } : parseModel(value.model);
+			const thinking = parseThinking(value.thinking);
+			const { token, prompt } = value;
+			return view && isNonEmpty(token) && model && thinking && (prompt === null || typeof prompt === "string") ? { ok: { kind: "replay", view: view.ok, token, prompt, model: model.ok, thinking: thinking.ok } } : null;
 		}
 		case "resume": {
 			const { sessionId } = value;
@@ -343,6 +356,10 @@ export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullReque
 const isSettableState = oneOf(SETTABLE_STATES);
 const isMergeMethod = oneOf(MERGE_METHODS);
 const COMMIT = /^[0-9a-f]{40,64}$/;
+/** A GitHub node id: a review thread's `PRRT_…` id, or an older id's base64 with its `=` padding. */
+const NODE_ID = /^[A-Za-z0-9_=-]{1,100}$/;
+const isNodeId = (value: unknown): value is string => typeof value === "string" && NODE_ID.test(value);
+const isCommentBody = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_COMMENT_BODY;
 
 function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (!isObject(change)) return null;
@@ -350,6 +367,9 @@ function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (change.field === "reviewer" && typeof change.login === "string" && GITHUB_NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
 	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };
 	if (change.field === "merge" && isMergeMethod(change.method) && typeof change.head === "string" && COMMIT.test(change.head)) return { ok: { field: "merge", method: change.method, head: change.head } };
+	if (change.field === "thread" && isNodeId(change.id) && typeof change.resolved === "boolean") return { ok: { field: "thread", id: change.id, resolved: change.resolved } };
+	if (change.field === "reply" && isNodeId(change.thread) && isCommentBody(change.body)) return { ok: { field: "reply", thread: change.thread, body: change.body } };
+	if (change.field === "comment" && isCommentBody(change.body)) return { ok: { field: "comment", body: change.body } };
 	return null;
 }
 

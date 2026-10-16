@@ -1,12 +1,12 @@
-import { ArrowLeft, Check, Copy, Ellipsis, ExternalLink, FileDiff, GitMerge, Layers, Zap } from "lucide-react";
+import { ArrowLeft, Check, CircleDashed, CircleDot, CircleX, Copy, Ellipsis, ExternalLink, FileDiff, GitMerge, Layers, type LucideIcon, MessageSquare, Users, Zap } from "lucide-react";
 import { type ReactNode, type RefObject, useState } from "react";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { MERGE_METHOD_LABELS, type MergeMethod, startingMethod } from "../../../../src/shared/source-control";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useLastMergeMethod, useMergeMethodChoice } from "../../../merge-method";
-import type { SavePullRequest } from "../pr-fields";
-import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, type StackedPullRequest } from "../../../../src/shared/github";
+import { type PullRequestOptionsRead, ReviewersField, type SavePullRequest, StateField } from "../pr-fields";
+import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, type Reviewer, type ReviewerState, type StackedPullRequest } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -21,6 +21,60 @@ import { QuickActionButton, type QuickActionsProps } from "../../quick-actions";
 import { Avatar, IconTip, STATE_ICON } from "../avatars";
 import { MoveBadge } from "../pr-row";
 import type { DetailContentProps, NextMove, Placement } from ".";
+import { type PlacedItem, TONE_COLOR, viewOf } from "./status-view";
+
+const REVIEWER_ICON: Record<ReviewerState, [LucideIcon, string, string]> = {
+	approved: [Check, "text-emerald-600 dark:text-emerald-400", "Approved"],
+	"changes-requested": [CircleX, "text-red-600 dark:text-red-400", "Requested changes"],
+	commented: [MessageSquare, "text-muted-foreground", "Commented"],
+	requested: [CircleDashed, "text-amber-600 dark:text-amber-400", "Review requested"],
+};
+
+/** A header row: its label beside its value at every width, so the sticky header stays short in the sidebar. */
+function Field({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
+	return (
+		<>
+			<dt className="flex items-center gap-2 py-1 text-muted-foreground">
+				<Icon aria-hidden className="size-4" />
+				{label}
+			</dt>
+			<dd className="min-w-0 py-1">{children}</dd>
+		</>
+	);
+}
+
+function StatusInline({ placed, quick }: { placed: PlacedItem[]; quick: QuickActionsProps }) {
+	return (
+		<ul className="space-y-1.5">
+			{placed.map(({ item, fix }) => {
+				const { tone, icon: Icon, text } = viewOf(item);
+				return (
+					<li key={item.kind} className="flex items-start gap-2">
+						<Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", TONE_COLOR[tone])} />
+						<span className="flex min-w-0 flex-wrap items-center gap-2">
+							<span className="min-w-0">{text(item)}</span>
+							{fix && <QuickActionButton action={fix} pending={quick.pending} onRun={quick.onRun} />}
+						</span>
+					</li>
+				);
+			})}
+		</ul>
+	);
+}
+
+function ReviewerInline({ reviewers }: { reviewers: Reviewer[] }) {
+	return (
+		<span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+			{reviewers.map(reviewer => (
+				<span key={reviewer.login} className="flex items-center gap-1.5">
+					<Avatar person={reviewer} label={reviewer.login} />
+					{reviewer.login}
+					<IconTip icon={REVIEWER_ICON[reviewer.state]} />
+				</span>
+			))}
+		</span>
+	);
+}
 
 /** Merges on GitHub with the method Settings starts it on, after a confirmation that can switch the method. */
 function MergeButton({ pr, detail, onSave }: { pr: PullRequest; detail: PullRequestDetail; onSave: SavePullRequest }) {
@@ -159,6 +213,9 @@ interface DetailHeaderProps {
 	/** The quick actions for the `⋯` menu. */
 	actions: QuickActionId[];
 	quick: QuickActionsProps;
+	/** The Status's items, each with the quick action that fixes it. */
+	placed: PlacedItem[];
+	options: PullRequestOptionsRead;
 	onOpen: DetailContentProps["onOpen"];
 	onSave: SavePullRequest;
 	placement: Placement;
@@ -166,11 +223,13 @@ interface DetailHeaderProps {
 	headingRef: RefObject<HTMLHeadingElement | null>;
 }
 
-/** The header: the pull request's name, author, branches, and size, with the Next move's button and the `⋯` menu. */
-export function DetailHeader({ pr, detail, stack, next, actions, quick, onOpen, onSave, placement, headingRef }: DetailHeaderProps) {
+/** The header: the pull request's name, author, branches, size, status, and reviewers, with the Next move's button and the `⋯` menu. */
+export function DetailHeader({ pr, detail, stack, next, actions, quick, placed, options, onOpen, onSave, placement, headingRef }: DetailHeaderProps) {
 	const page = placement === "page";
 	const Heading = page ? "h1" : "h3";
 	const stackedBase = detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
+	// The state picker says it is a draft already.
+	const blockers = placed.filter(({ item, fix }) => item.kind !== "draft" || fix);
 	return (
 		<header className={cn("space-y-2 border-b border-border pb-4", page ? "px-6 pt-5" : "pt-1")}>
 			<div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -226,6 +285,19 @@ export function DetailHeader({ pr, detail, stack, next, actions, quick, onOpen, 
 							</span>
 						</span>
 					</div>
+					<dl className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 text-sm">
+						<Field icon={CircleDot} label="Status">
+							<div className="space-y-1.5">
+								<StateField detail={detail} save={onSave} />
+								{blockers.length > 0 && <StatusInline placed={blockers} quick={quick} />}
+							</div>
+						</Field>
+						<Field icon={Users} label="Reviewers">
+							<ReviewersField detail={detail} options={options} save={onSave}>
+								<ReviewerInline reviewers={detail.reviewers} />
+							</ReviewersField>
+						</Field>
+					</dl>
 				</>
 			)}
 		</header>

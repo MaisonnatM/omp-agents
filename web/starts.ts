@@ -29,6 +29,7 @@ export type StartOp =
 			todoId: string | null;
 	  }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
+	| { kind: "replay"; view: View; turnId: string; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
 	| { kind: "resume"; sessionId: string }
 	/** `skill`: the skill pinned in the settings, `null` for none. */
 	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject; skill: string | null }
@@ -58,6 +59,8 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, tools: null, ...startTarget(op.subject) };
 		case "fork":
 			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
+		case "replay":
+			return { t: "start", reqId, kind: "replay", view: op.view, token: op.token, model: op.model, thinking: op.thinking, prompt: op.prompt };
 		case "resume":
 			return { t: "start", reqId, kind: "resume", sessionId: op.sessionId };
 		case "resume-all":
@@ -119,7 +122,7 @@ export function failStart(starts: Starts, reqId: number, error: string): Starts 
 
 /** The view a failed start shows its reason in, `null` when the reason belongs to the page rather than to a view. */
 const viewOf = (op: StartOp): View | null => {
-	if (op.kind === "fork") return op.view;
+	if (op.kind === "fork" || op.kind === "replay") return op.view;
 	return op.kind === "resume" ? { kind: "past", sessionId: op.sessionId } : null;
 };
 

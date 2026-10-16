@@ -1,7 +1,7 @@
 /** A pull request's editable fields in its details: state, reviewers, and labels, saved to GitHub. */
 import { Tag, UserPlus } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type PullRequestChange, type PullRequestDetail, type PullRequestLabel, type PullRequestOptions, type Reviewer, SETTABLE_STATES } from "../../../src/shared/github";
+import { type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestLabel, type PullRequestOptions, type Reviewer, SETTABLE_STATES } from "../../../src/shared/github";
 import { cn } from "@/lib/utils";
 import { type ReadState, useRead } from "../../reads";
 import { FieldPicker } from "../field-picker";
@@ -9,6 +9,9 @@ import { STATE_ICON } from "./avatars";
 
 /** A pick's change, sent to GitHub, and what the details show until GitHub answers. */
 export type SavePullRequest = (change: PullRequestChange, shown: Partial<PullRequestDetail>) => void;
+
+/** Sends a reply or a comment and settles once GitHub took it, or rejects with why it did not. */
+export type SendPullRequest = (change: PullRequestChange) => Promise<void>;
 
 const STATE_LABEL: Record<PullRequestDetail["state"], string> = { open: "Open", draft: "Draft", closed: "Closed", merged: "Merged" };
 
@@ -18,11 +21,11 @@ const ROW_FIELD = "-mx-2 -my-1 h-auto min-h-7 w-[calc(100%+1rem)] justify-start 
 /** The repository's labels and reviewers; `open` asks GitHub for them, again after a failure. */
 export type PullRequestOptionsRead = ReadState<PullRequestOptions> & { open: () => void };
 
-/** The repository's labels and reviewers, asked of GitHub when a picker first opens. */
-export function usePullRequestOptions(detail: PullRequestDetail): PullRequestOptionsRead {
+/** The repository's labels and reviewers, asked of GitHub when a picker first opens; the header's and the Summary's pickers share one read. */
+export function usePullRequestOptions({ owner, repo }: Pick<PullRequest, "owner" | "repo">): PullRequestOptionsRead {
 	const [opened, setOpened] = useState(false);
 	const [retry, setRetry] = useState(0);
-	const read = useRead<PullRequestOptions>(opened ? `/api/pull-request/options?${new URLSearchParams({ owner: detail.owner, repo: detail.repo })}` : null, retry);
+	const read = useRead<PullRequestOptions>(opened ? `/api/pull-request/options?${new URLSearchParams({ owner, repo })}` : null, retry);
 	return {
 		...read,
 		open: () => {

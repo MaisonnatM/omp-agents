@@ -36,6 +36,19 @@ The server imports omp's own modules from the installed package, so it does not 
 `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 
+Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.11.1-paid-cursor-fallback.patch`](../patches/omp-18.11.1-paid-cursor-fallback.patch) with its regression tests.
+Its base is upstream tag `v18.11.1`, commit `7cc912940b107eb2d771b0d106c640a8eddc9edf`; do not apply it to another release without porting and verifying it.
+From a clean checkout of that release, check and apply the patch:
+
+```sh
+git apply --check /absolute/path/to/omp-agents/patches/omp-18.11.1-paid-cursor-fallback.patch
+git apply /absolute/path/to/omp-agents/patches/omp-18.11.1-paid-cursor-fallback.patch
+```
+
+Build and install both patched packages, `@oh-my-pi/pi-ai` and `@oh-my-pi/pi-coding-agent`, including the CLI bundle and SDK sources and declarations.
+The dashboard does not apply this patch at startup, and installing or upgrading stock OMP removes the runtime changes.
+The [routing policy](../templates/omp/agent/docs/model-routing.md) describes the opt-in `retry.paidFallback` setting and its billing limits.
+
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
 The main ones:
@@ -133,7 +146,7 @@ Every transcript comes from the session files on this machine, not from a networ
   The watcher's changes poke it only for its own file, that file's `.<file>.lock` sidecar, and anything under its artifacts directory, since a subagent's appends do not touch the session file, and a sibling session's writes leave it alone.
   The view's socket topic carries them as `media` messages: the whole list once the files are read, then only the images each later read added, which the page sorts in newest first.
   A file rewritten shorter, or the first read, sends the whole list again.
-- A view whose **Trajectory** a socket shows also gets a trajectory tail (`src/trajectory.ts`), which folds the view's own file into turns: a turn opens at each user message or `custom_message` that the transcript shows as a prompt, so the turns match the Outline's.
+- A view whose **Trajectory** a socket shows also gets a trajectory tail (`src/trajectory.ts`), which folds the view's own file into turns: a turn opens at each user message or `custom_message` that the transcript shows as a prompt, so the turns match the minimap's.
   Entries that wait for the model, such as a model change, a `model_usage` side call, a `ttsr_injection`, or a hidden `custom_message`, join the turn in which the next assistant message reads them, and are left out until one does.
   Each assistant message is a request with the `usage` omp recorded on it; `model_usage` entries are only side calls such as auto-thinking and cache warming, so a turn's usage adds both.
   `watch` lists those views in `trajectories`, and the watcher's changes poke the tail as they poke the transcript.
@@ -216,7 +229,7 @@ Sessions started from the dashboard are omp child processes in RPC mode with too
 Unrestricted sessions use the installed CLI with `--mode rpc-ui`; restricted ones use `src/omp/restricted-rpc.ts` with the same SDK and RPC runner.
 The desktop build ships the runner as `restricted-rpc.js` beside `server.js`; `OMP_AGENTS_RESOURCES` selects that packaged path.
 Restricted launches reject extra extension arguments and host tools instead of dropping them or widening the allowlist.
-The page starts one with a single `start` request whose `kind` is `new`, `fork`, or `resume`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
+The page starts one with a single `start` request whose `kind` is `new`, `fork`, `resume`, or `replay`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
 The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it.
 A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved.
 **Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command.
@@ -302,6 +315,50 @@ The route hands the bytes and the name's extension to omp's `convertBufferWithMa
 `withFiles` in `src/shared/prompt-files.ts` puts each file after the typed text in the block omp's `@file` arguments write, `<file name="…">`, its text, and `</file>`, so a leading `/skill:` or file command still expands with the files as its arguments.
 `preparePrompt` in `web/prompt-attachments-model.ts` keeps the files' text under `MAX_PROMPT_FILE_CHARS`, a million characters, in attach order, both as files attach and on the files a prompt sends, after awaiting each file's read.
 omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits the trailing blocks off again with `splitFiles`, and a user item's `files` holds their names, which the transcript shows as chips.
+
+## Replay from here
+
+`src/replay.ts` owns replay preparation and comparison. The dialog first reads `GET /api/replay/detail?view=<JSON View>&turnId=<prompt entry id>`.
+The dashboard resolves that authorized main-session view to its known file, then reads the prompt through omp. It returns an HMAC-authenticated source token containing the file, session id, selected prompt id, and a fingerprint of the header, ancestors, and prompt.
+`start` with `kind: "replay"` carries that token, the same view, the selected model and thinking level, and either a replacement prompt or `null` to retain the original.
+Revalidating the token rejects a replaced or edited source without rejecting later appended responses. No browser-supplied source path is opened.
+
+`src/omp/replay-fork.ts` uses the installed `SessionManager` to branch through the prompt's parent with artifacts copied. A null parent uses `newSession`.
+`userTurnDraft` restores ordinary stored text or a skill invocation, and blob-aware `imageContent` restores images in order. Required missing images are errors.
+The new prefix receives only omp's synthetic unresolved-tool results, never execution of inherited calls. The fork moves to the detached checkout, clears inherited additional write directories, and flushes and closes before RPC opens it.
+The source is never RPC-opened. The accepted original turn and its verified complete first request body are frozen in omp's native blob store.
+
+The checkout uses only the source cwd's current Git repository and canonical common-directory identity. A surviving HEAD reflog commit at the prompt's time is preferred; otherwise current HEAD is explicit provenance.
+Neither route reconstructs historical dirty state. `Worktrees.start` serializes this checkout creation with removal, and a failed launch removes only its recorded owned root after the existing preview permits it.
+The normal dashboard registry, request ledger, session transport, first-prompt path, and worktree removal checks remain the lifecycle owners.
+
+The `omp-agents-replay` custom entry stores versioned source and checkout identities, accepted settings and prompt-change flags, repair provenance, and original blob references.
+`ReplayFold` exposes it through ordinary session facts, records the first subsequent user prompt's entry id, and consumes the `omp-agents-replay-check` evidence. Later prompts never replace that target.
+There is no replay registry or durable draft state machine. Native session inventory and existing transcript and trajectory streams provide live state. A restart never resends the first prompt.
+Before admission, only the selected first text and exact ordered images are accepted. That turn excludes further prompts and settings or history changes until completion, including a preflight refusal reported by `prompt_result`.
+
+`src/omp/replay-launch.ts` keeps advertised tools intact. It adds the guard and request-log extensions when absent and launches with an atomically regenerated private LSP overlay outside the writable checkout.
+The overlay disables format-on-write and edit/write diagnostics and enables lazy LSP startup. Before prompting, the server waits for `omp-agents-replay-ready` with this launch's random nonce, so a stale acknowledgment cannot authorize an unprotected resumed process.
+`replay-guard.ts` lets model `bash` calls run unchecked and blocks eval, task, direct LSP, MCP, and unknown tool calls. Only audited local reads and checked in-root writes run among the file tools.
+Its pure policy uses omp's native edit inspector across supported grammars, including delete and move destinations. It rejects URI, database and archive mutations, lexical and canonical metadata paths, outside targets, symlink escapes, and hard links.
+Blocked calls add `omp-agents-replay-block` so the ordinary tool trajectory can distinguish a policy block from another error.
+This policy is not an OS sandbox or a confidentiality guarantee. Installed startup code and dependencies remain trusted, outside reads remain possible, and another process can race filesystem checks.
+The dashboard rejects local slash commands, including history edits, and subagent steering prompts in a replay; human `!` commands run, and the independent terminal panel is not restricted. Dashboard resumes restore the policy and its safe-launch overlay. A direct terminal resume cannot promise the same launch configuration.
+
+At `before_provider_request`, the guard correlates the chosen model and final user text and images with the native first prompt. A classifier that quotes that prompt is not sufficient.
+The prompt must be the trailing text of the last user message, because omp prepends a dated `<system-reminder>` block to it.
+The same request-log reconstruction exported by `request-log.ts` verifies the complete original body against its logged SHA-256.
+The pre-send comparison includes the complete envelope, not a combination of component hashes. It permits only known root-prefix relocation, the per-session `client_metadata` and `prompt_cache_key` fields, and an explicitly selected model's top-level routing and generated workstation metadata.
+Those two fields carry the session, thread, and turn ids, which every fork gets fresh, so only the raw hash still covers them.
+Dates, messages, images, other cache metadata, loaded docs, tool catalog text and schemas, thinking, and unknown repair outcomes stay unchanged. Missing evidence or different APIs produces unknown, and no body is changed to manufacture equality.
+The replay checkout is recorded with omp's spelling of its path: on macOS omp drops the `/private` prefix of its launch directory and refuses to open a session whose header names the other spelling.
+Literal normalization-tag text cannot alias generated tags, and a structured `model` object is not erased as a routing identifier.
+The hook can precede provider transformations, so the claim is hook-stage equality, not guaranteed wire equality.
+
+`GET /api/replay/compare?view=<JSON View>` reads a replay's accepted original blobs, pinned first prompt, complete reconstructed request bodies, and full-detail trajectories.
+The web dialog uses the existing trajectory stream as its refresh signal, aligns tool sequences by ordered names while retaining repeats and unmatched calls, compares unclipped arguments and the last request's full text, and displays recorded token and dollar totals.
+Truncated previews never establish equality. A response without a correlated pre-send check or a request that cannot reconstruct to that check says unknown.
+The source relation and comparison remain readable from the replay file after it stops or the dashboard restarts.
 
 ## Socket requests
 
@@ -471,7 +528,7 @@ Sandbox state is not stored until the sandbox feature exists.
 ## Routines
 
 A routine starts dashboard sessions, or runs a shell command, on one or more schedules. A schedule is every so many minutes, counted from the last run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST. The routine is due at the earliest of them. Two intervals share that last run, so the shorter one decides.
-Its task is one prompt or one command.
+Its task is one prompt, one command, or one `project` task, `{ projectId, prompt }`, which takes no session slot: the run hands the prompt to the project runner's `notify` as an `event` from **Routine** and ends with outcome `project`, or with the error when the project is gone or archived.
 The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
 A prompt routine stores a nullable preset id and reads the preset at run time for model, thinking, tools, and branch policy.
 The routine's own skill overrides the preset's skill, and a removed preset fails the run.
@@ -570,7 +627,7 @@ A message whose session runs live on a server that does not own the unattended w
 
 ## Projects
 
-A project is a coordinator session that plans the work and starts worker sessions, which all share one notes directory; see [Projects](usage.md#projects) for what the user sees.
+A project is a coordinator session that plans the work and starts worker sessions, which all share one notes directory, and the user's notes, which every project shares; see [Projects](usage.md#projects) for what the user sees.
 `src/shared/projects.ts` holds what the page reads and sends: `Project`, `Worker`, `ProjectUpdate`, `ProjectEdit`, `DEFAULT_PROJECT_NAME`, and `workerPhase`, which turns a worker's live status, or its absence and whether it was interrupted, into `working`, `asking`, `idle`, `interrupted`, or `ended`.
 The rules only the server applies live in `src/server/projects-file.ts`: `ProjectChange`, the page's `ProjectEdit` plus the runner's changes, `applyProject`, which returns the same array for a change that changes nothing, `ProjectRole`, and `ProjectsFile.roleOf`, which finds a session's project and role by its session id.
 
@@ -580,7 +637,7 @@ A worker holds its id (`w1`, `w2`, …), `title`, `sessionId`, `cwd`, `startedAt
 An update holds its id, worker id, time, and one `kind`: `finished`, whose reply is the worker's `lastReply`, `asked` with the request id and the question, or `stopped`.
 The `update` change keeps one `finished` per worker: a later one replaces the earlier, since both would quote the same last reply.
 The servers are the file's only writers.
-The page sends `rename` and `archive` in a `project` socket message (`ProjectEdit`), and creates a project with `project-create`, `{ reqId, name, cwd, prompt, model, thinking }`, which the server answers with the same `started` reply a `start` gets; `ProjectRunner` in `src/server/project-runner.ts` makes every other change.
+The page sends `rename`, `archive`, `unarchive`, `max-workers`, `watch`, and `review-cadence` in a `project` socket message (`ProjectEdit`), and creates a project with `project-create`, `{ reqId, name, cwd, prompt, model, thinking }`, which the server answers with the same `started` reply a `start` gets; `ProjectRunner` in `src/server/project-runner.ts` makes every other change.
 Every socket hears the projects after each change as a `projects` message on the roster topic, also sent when a socket opens; an edit that changes nothing sends them back to its own socket alone.
 An older version kept the workspace list under the same name, so the `Dashboard` constructor first calls `adoptOldWorkspaces` from `src/server/workspaces-file.ts`, which moves a `projects.json` in that shape to `workspaces.json`, and only then builds `ProjectsFile`.
 omp's `projects` extension reads the file too, and cannot import `src/`, so it declares the fields it reads by hand.
@@ -595,12 +652,17 @@ It asks the runner's `launchFor(request, launch)` how to start, which for `null`
 A project session's `RpcLaunch` holds `projectsExtensionArgs()` and, for a coordinator, the four host tools of `src/server/project-tools.ts`, bound to its project.
 `projectsExtensionArgs()`, in `project-runner.ts`, is `-e` with this repository's `templates/omp/agent/extensions/projects.ts` while `~/.omp/agent/extensions/projects.ts` does not exist, and nothing once it does, since omp would load the same extension at two paths twice.
 Every spawn of a coordinator gets its tools, a resume included, since the process that serves host tools hands them to omp as it starts; a coordinator resumed in a terminal has none.
-`attach` saves what the launch makes: `create` saves the project, its workspace the session's directory, and seeds its notes, and `new-worker` applies `add-worker`, which gives the worker the project's next id and bumps `nextWorker`.
+`attach` saves what the launch makes: `create` saves the project, its workspace the session's directory, and seeds its notes, and `new-worker` applies `add-worker`, which takes the worker out of the queue, gives it the project's next id, and bumps `nextWorker`, in one change.
 It then flushes the file, because `JsonFile.save` writes at the end of the event-loop turn and the extension reads the file at the first prompt, and tracks the session by the role the file now gives it.
 So a coordinator that fails to start saves no project, a worker that fails to start takes no id, and workers take their ids in the order their sessions start; `startWorker` reads the id back from the tracked session.
-A worker starts in the directory `start_worker` names, read through `expandHome` in `src/paths.ts` and resolved against the project's workspace, else in the workspace, on omp's default model, with no branch of its own.
+A worker starts in the directory `start_worker` names, read through `expandHome` in `src/paths.ts` and resolved against the project's workspace, else in the workspace.
+Its model (`modelOfSelector` in `src/shared/models.ts`), effort, and skill are the tool's, else its preset's; its branch is the one named, none for `none` or a preset whose worktree is `here`, else, in a git checkout, `<project slug>/<title slug>-<6-character id>` from the checked-out branch.
+Every worker joins the project's `queue` with `enqueue` first, so a crash before its session attaches leaves it queued for the next start.
+The runner's `#drain` starts queued workers in order while fewer than `maxWorkers` are busy, working, asking, or still starting; `startWorker` awaits its own worker's start when `#drain` began it, and reports its queue position otherwise.
+A queued worker that fails to start leaves the queue with `dequeue`; its error goes to the coordinator as the tool's error when `startWorker` began it, else as an `event` update.
+`settle` delivers the waiting updates and drains the queue; the runner calls it on each turn end, exit, roster change, outside event, and boot, and the server calls it after every project edit from the page that changed something.
 
-The coordinator's tools are strict host tools, every property required, loaded as `essential`: `start_worker` (`title`, `prompt`, `cwd`), `list_workers`, `read_worker` (`worker`), and `message_worker` (`worker`, `text`).
+The coordinator's tools are strict host tools, every property required, loaded as `essential`: `start_worker` (`title`, `prompt`, `cwd`, `branch`, `model`, `thinking`, `skill`, `preset`, nullable), `list_workers`, `read_worker` (`worker`), `message_worker` (`worker`, `text`), `answer_worker` (`worker`, `requestId`, `answer`), which maps the answer to the request's kind, and `end_worker` (`worker`).
 An error a tool throws reaches the coordinator as the tool's error, and every tool throws once the project is archived.
 `message_worker` prompts the worker as a follow-up, reaching it through the same `reach` as a scheduled message, so a worker that does not run resumes first.
 
@@ -610,21 +672,37 @@ A worker's session reports three kinds of news, which the runner saves as update
 2. Each roster change, which the server passes to `observe`, reports every question the worker waits on whose request id the runner has not reported for that live session, as `asked`, so a question is reported once.
 3. Its process's exit becomes `stopped`, unless the dashboard is stopping: `Dashboard.stop` calls the runner's `stop` before it ends the sessions, since they exit with the dashboard, which is no news.
 
-The runner saves each update in `projects.json` at once and then delivers.
-When the coordinator's session runs and its status is `idle`, the runner sends every waiting update, in order, as one prompt that `updateText` builds, starting `[omp-agents] Project update.`, quoting at most `REPLY_QUOTE_CHARS` (2,000) of each finished worker's `lastReply`, and telling the coordinator that only the user answers an `asked` question, in the dashboard.
+Two kinds come from elsewhere: `restarted`, which `recover` saves at boot when the owner lock is held, naming the workers `interrupted.json` says stopped with the server, after it resumes a coordinator that did, and `event`, which `notify` saves for the routine runner's `project` task and for `ProjectWatch`.
+`notify` also writes the event into the project's `inbox/` through the runner's `writeInbox`, which `Dashboard` wires to `writeInboxEvent` in `src/server/project-notes.ts`, and logs a write that fails rather than losing the update.
+`ProjectWatch` in `src/server/project-watch.ts` hears the minute tick and looks every `PROJECT_WATCH_MINUTES` (2): for each project not archived, it loads the pull request of each worker's branch and the viewer's Linear issues that match the project's `watch.linear`, keeps a snapshot of each in memory, and reports what changed since; the first look only records.
+
+The runner saves each update in `projects.json` at once and then delivers; an archived project's updates wait until `unarchive`, whose apply calls the runner's `settle`.
+When the coordinator's session runs and its status is `idle`, the runner sends every waiting update, in order, as one prompt that `updateText` builds, starting `[omp-agents] Project update.`, quoting at most `REPLY_QUOTE_CHARS` (2,000) of each finished worker's `lastReply`, and naming each `asked` question's request id for `answer_worker`.
 It sends it through `LiveSession.prompt` as a `followUp`, which rejects with `PromptRefused` when the session does not take the message, after showing the refusal in the session.
 Once omp takes it, `delivered` removes those updates, and delivery runs again for the ones that came meanwhile; one delivery per project is in flight at a time.
 When omp refuses it, the updates stay and nothing retries at once: delivery runs again when the coordinator's row changes, when its turn ends, and when it attaches, which is also how what waited while it worked, or while it was stopped, reaches it once it is idle.
 Only sessions that attached through the starter are tracked, so a project's session resumed in a terminal reports nothing.
 
-`src/server/project-notes.ts` seeds a new project's notes in `projectNotesDir(id)` from `src/paths.ts`, `$XDG_DATA_HOME/omp-agents/projects/<id>/`, else `~/.local/share/omp-agents/projects/<id>/`: `README.md` with the project's name, its goal (the coordinator's first message), and links to `testing.md`, `preferences.md`, and `research.md`, which it seeds too, and it never overwrites a file already there.
+`src/server/project-notes.ts` seeds a new project's notes in `projectNotesDir(id)` from `src/paths.ts`, `$XDG_DATA_HOME/omp-agents/projects/<id>/`, else `~/.local/share/omp-agents/projects/<id>/`, laid out as Cursor's Project folder: `notes.md` with the project's name, its goal (the coordinator's first message), a `## Decisions` section, the index of the others, and `## Promoted`, then `testing.md` and `research.md` under `docs/`, `internal/checklist.md`, and `archived.md`.
+It writes each file with the `wx` flag, so it never overwrites a file already there, even one another server wrote meanwhile.
+`writeInboxEvent` writes one outside event into `inbox/`, named `<time>-<slug of source and title>.md` with the time's colons as dashes, so the names sort oldest first, and holding the title, the source, the time, the link when there is one, and the text; a second event of the same name takes `-2`, `-3`, and so on.
+`moveOldNotes` moves the files an older version kept, `README.md` to `notes.md`, `testing.md`, `research.md`, and `preferences.md` to `docs/`, and `checklist.md` to `internal/`, each by linking the new name and then unlinking the old one, so a file already in the new place stays and the old one beside it too; any other file stays where it is.
+`seedNotes` calls it before it seeds, and `Dashboard.start` calls it for every project in `projects.json`.
+`Dashboard.start` also seeds the user's notes, `userNotesDir` from `src/paths.ts`, `$XDG_DATA_HOME/omp-agents/user/`, else `~/.local/share/omp-agents/user/`, as Cursor's User folder: `preferences.md` and `workflows/README.md`, through `seedUserNotes`, which never overwrites a file either.
+`listNotes` lists a notes directory's Markdown files at any depth, by name, each named by its path from the directory with `/`, skipping hidden entries and not following a linked directory.
 The notes live outside every repository, so every worktree shares them, and outside the access token's directory, which the file dialog refuses.
 
 `templates/omp/agent/extensions/projects.ts` reads `projects.json` at each prompt and each `edit` or `write` call.
-Both of its handlers find the role by the session id, with no rule of their own for subagents: a subagent that runs in the project session's own session, such as an advisor or a `/tan` clone, acts in its role, and a `task` subagent, which has a session of its own, has none.
-Its `before_agent_start` handler adds the session's role and the notes' place to the system prompt of every prompt, so they survive compaction.
-Its `tool_call` handler blocks a coordinator's `edit` and `write` calls whose `path`, or a hashline edit's `[path#TAG]` header, resolves outside the notes directory, and fails closed: a call that names no file it can read is blocked too.
+Both of its handlers find the role by the session id, and for a `task` subagent, whose transcript is `<parent>/<agent>.jsonl` beside its parent's, by its ancestors' session ids (`ancestorSessionIds`), so it acts in its parent's role.
+Its `before_agent_start` handler adds the session's role and the places of the project's notes and the user's to the system prompt of every prompt, so they survive compaction.
+The coordinator's role text says its job is to plan, delegate, and report, reading only the notes, the workers' reports, and what a quick look answers, and starting a worker for anything more, with a prompt that says what to report back.
+The extension keeps its own copy of `userNotesDir`, since it cannot import `src/`.
+Its `tool_call` handler blocks a coordinator's `edit` and `write` calls whose `path`, or a hashline edit's `[path#TAG]` header, resolves outside both the project's notes and the user's, the roots `inNotes` takes, and fails closed: a call that names no file it can read is blocked too.
 Only `local://` and `artifact://` paths, the session's scratch space, pass without a check.
+Its shell guard, `shellWrite`, is a nudge rather than a boundary: after unquoting, it blocks a coordinator's `bash` call that redirects or `tee`s to a file outside the same roots, runs a git subcommand that writes (skipping `-C` and `-c` values), or runs `gt` other than its read subcommands.
+Anything else runs, so a command or script that writes on its own is not caught.
+
+The runner's `noticeFacts` feeds the `projects` notice source (`PROJECT_KINDS`) each project's coordinator status and its workers' phases and questions, and `projectNotices` in `src/server/notices.ts` turns them into notices, each id naming the state it reports: a worker's request once the coordinator is not working, a worker that stopped, and a settled project.
 
 On a takeover, the server reads `projects.json` again, since the previous owner kept saving it; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
 Each server's runner follows only the sessions that server started.
@@ -746,7 +824,8 @@ It folds the session's transcript with `Work` for the files its own `edit` and `
 `GET /api/changes/file?session=<session id>&path=<path>` answers one file of that list in full, `ChangedFileText`, with every line of `git diff --histogram` as numbered rows, or a note for a binary file or one over `MAX_CHANGED_FILE_BYTES` (1 MB).
 It computes the list again and answers 404 for a path the list does not hold, so it reads no file the session and its checkout did not change, and passes the path with `--literal-pathspecs`, so a name such as `app/[id]/page.tsx` is not a glob.
 The dialog reads both routes again whenever the session's own changes grow and when a turn starts or ends.
-`GET /api/project-notes?id=<project id>` answers a project's notes, `{ dir, notes }`, each note a `ProjectNote` (`{ name, path, modifiedAt }`) for a Markdown file in the directory, `README.md` first and then by name, or 404 for a project the server does not know; the page opens a note through `GET /api/file`.
+`GET /api/project-notes?id=<project id>` answers a project's notes and the user's, `ProjectNotesAnswer` (`{ dir, notes, userDir, userNotes }`), each note a `ProjectNote` (`{ name, path, modifiedAt }`) for a Markdown file at any depth in its directory, named by its path from it with `/`, by name, or 404 for a project the server does not know.
+The page lays each list out as a tree through `noteRows` in `web/notes-model.ts` and opens a note through `GET /api/file`, which opens both directories, since they lie outside `DENIED_DIRS`.
 `GET /api/conversations?q=<words>` answers `ConversationSearchAnswer` from `src/shared/sessions.ts`: every saved conversation whose prompts or replies hold every word, the file changed last first, each by its latest such message, with that message's transcript item id, a snippet, and how many messages match; a blank `q` is a 400.
 It waits for the transcript reads asked for so far, then reads nothing itself; the page leaves out the sessions the sidebar hides and lists the first 30.
 `GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub or Graphite PR link.
@@ -764,7 +843,15 @@ A removed file's patch holds every line, so it reads no blob; a file GitHub send
 `PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
 A `merge` change, `{ method, head }`, runs GraphQL's `mergePullRequest` with that method and `expectedHeadOid: head`, so GitHub refuses the merge once the branch moved past the commit the page showed.
 The pull request's answer carries that commit as `headOid` and the methods its repository allows as `mergeMethods`.
-It answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
+A `thread` change, `{ id, resolved }`, runs GraphQL's `resolveReviewThread` or `unresolveReviewThread` on the review thread with that node id, which `parsePullRequestEdit` takes only as letters, digits, `_`, `-`, and the `=` an older base64 id ends with, at most 100.
+A `reply` change, `{ thread, body }`, runs `addPullRequestReviewThreadReply` on that thread.
+A `comment` change, `{ body }`, posts to REST's `repos/<o>/<r>/issues/<n>/comments`, the pull request's number naming it, with the body as a `-f` field, which `gh` sends as written, never as a number, a file, or a placeholder.
+A reply's or comment's body is not blank and at most 65536 characters, GitHub's limit.
+The pull request's answer lists every review thread among the first 100, resolved ones too, each with its node id and whether the viewer may reply, resolve, and unresolve it, from `viewerCanReply`, `viewerCanResolve`, and `viewerCanUnresolve`, so the button a resolve or unresolve shows at once stays right.
+Its `unresolved` counts the open threads among those it lists, with `exact` false when GitHub has more than it listed, so the details' counts agree with their threads.
+GitHub's GraphQL has no `viewerCanComment` on a pull request, so its `canComment` is true unless the repository is archived, or the conversation is locked and the viewer's `viewerPermission` is below `WRITE`, as GitHub lets only people who can write comment on a locked conversation.
+Every mutation goes through `ghMutation` in `src/github.ts`, which throws GitHub's errors even when its answer carries `data`, since a refused mutation answers its field as `null` beside them.
+`PUT /api/pull-request` answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
 One change goes per call, so two changes made at once each keep the other.
 The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
 Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.

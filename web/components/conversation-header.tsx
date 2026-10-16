@@ -25,6 +25,8 @@ interface ConversationHeaderProps {
 	onEnd: (instanceId: string) => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
+	/** A control the page puts right after the title. */
+	titleAction?: ReactNode;
 }
 
 /**
@@ -32,7 +34,7 @@ interface ConversationHeaderProps {
  * the connection status; a session's Linear issues and pull requests, its directory in Cursor, and End session, which shows it is
  * ending until the server answers, though the session may leave the roster before then.
  */
-export function ConversationHeader({ view, subject, onEnd, actions }: ConversationHeaderProps) {
+export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
 	const { open } = useDashboardActions();
 	const ending = useDashboardStatus().ending.has(view.instanceId);
@@ -68,7 +70,7 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 			(shown ? hostLabel(shown) : view.instanceId)
 		);
 	return (
-		<Header title={title} status={status} alert={!ending && phase.phase === "ended"}>
+		<Header title={title} trailing={titleAction} status={status} alert={!ending && phase.phase === "ended"}>
 			{subject.kind === "session" && shown && <TicketMenu tickets={shown.tickets} />}
 			{subject.kind === "session" && shown && <PullRequestButton pullRequests={shown.pullRequests} />}
 			{subject.kind === "session" && endable && (
