@@ -1,4 +1,4 @@
-/** The suggested next prompts above the composer, which a key or click sends or fills in, alone or several marked together. */
+/** The suggested next prompts above the composer, which a key or click sends or fills in, alone, several marked together, or all at once. */
 import { AnimatePresence, motion } from "framer-motion";
 import { type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
@@ -19,9 +19,10 @@ export function chosenText(prompts: readonly string[], marked: ReadonlySet<strin
 	return prompts.filter((text, i) => i === index || marked.has(text)).join("\n");
 }
 
-/** What a key does to the list: send or fill the marks plus row `index`, move the highlight to `to`, or clear both. */
+/** What a key does to the list: send or fill the marks plus row `index`, send every row, move the highlight to `to`, or clear both. */
 export type SuggestionKey =
 	| { kind: "send"; index: number | null }
+	| { kind: "send-all" }
 	| { kind: "fill"; index: number | null }
 	| { kind: "move"; to: number | null }
 	| { kind: "clear" };
@@ -39,12 +40,13 @@ interface ListState {
 
 /**
  * The list's action for `event`, or null to leave the key to the composer. A digit takes Shift, since some layouts type
- * digits with it.
+ * digits with it; 0 sends every row once there are two.
  */
 export function suggestionKey(event: KeyPress, { open, count, active, marked }: ListState): SuggestionKey | null {
 	if (!open || event.altKey || event.metaKey || event.ctrlKey || event.nativeEvent.isComposing) return null;
 	const numbered = /^[1-9]$/.test(event.key) ? Number(event.key) - 1 : null;
 	if (numbered !== null && numbered < count) return { kind: "send", index: numbered };
+	if (event.key === "0" && count > 1) return { kind: "send-all" };
 	if (event.shiftKey) return null;
 	if (event.key === "ArrowDown") return { kind: "move", to: active === null ? 0 : Math.min(active + 1, count - 1) };
 	if (event.key === "ArrowUp") return active === null ? null : { kind: "move", to: active === 0 ? null : active - 1 };
@@ -59,6 +61,28 @@ export function suggestionKey(event: KeyPress, { open, count, active, marked }: 
 		default:
 			return null;
 	}
+}
+
+/** A row's sending key; filled while the row is marked. */
+function KeyBadge({ filled, children }: { filled: boolean; children: ReactNode }) {
+	const compactStep = useSize().variant === "compact";
+	return (
+		<kbd
+			aria-hidden="true"
+			className={cn(
+				"inline-flex shrink-0 items-center justify-center rounded-[5px] border px-1 font-sans tabular-nums transition-colors duration-80",
+				filled ? "border-foreground bg-foreground text-background" : "border-border bg-background",
+				compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]",
+			)}
+		>
+			{children}
+		</kbd>
+	);
+}
+
+/** Row geometry shared by the prompts and the hint under them. Text size mirrors the composer's text field: the rows read as prompt candidates, not metadata. */
+function rowClass(compactStep: boolean): string {
+	return cn("relative flex cursor-pointer items-center gap-2", compactStep ? "h-7 px-2 text-[13px]" : "h-8 px-2.5 text-[14px]", "transition-colors duration-80");
 }
 
 interface SuggestionRowProps {
@@ -91,30 +115,33 @@ function SuggestionRow({ text, index, active, marked, optionId, registerItem, on
 			role="option"
 			aria-selected={marked}
 			onClick={event => onPick(modHeld(event))}
-			className={cn(
-				"relative flex cursor-pointer items-center gap-2",
-				active || marked ? "text-foreground" : "text-muted-foreground",
-				// Text size mirrors the composer's text field: the rows read as prompt candidates, not metadata.
-				compactStep ? "h-7 px-2 text-[13px]" : "h-8 px-2.5 text-[14px]",
-				"transition-colors duration-80",
-			)}
+			className={cn(rowClass(compactStep), active || marked ? "text-foreground" : "text-muted-foreground")}
 			style={{ fontVariationSettings: fontWeights.normal }}
 		>
-			{/* The number key that sends this row; filled while the row is marked. */}
-			<kbd
-				aria-hidden="true"
-				className={cn(
-					"inline-flex shrink-0 items-center justify-center rounded-[5px] border px-1 font-sans tabular-nums transition-colors duration-80",
-					marked ? "border-foreground bg-foreground text-background" : "border-border bg-background",
-					compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]",
-				)}
-			>
-				{index + 1}
-			</kbd>
+			<KeyBadge filled={marked}>{index + 1}</KeyBadge>
 			{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping ascenders/descenders outside the trimmed box. */}
 			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{text}</span>
 			{/* ↵ on the highlighted row: Enter sends it. */}
 			<EnterIcon size={13} className={cn("shrink-0 transition-opacity duration-80", active ? "opacity-100" : "opacity-0")} />
+		</div>
+	);
+}
+
+/**
+ * The 0 key's row under the listbox, which sends every prompt. It stays out of the listbox and the fluid hover: it is a
+ * hint, not an option, and the hover's gap click would send the nearest row instead.
+ */
+function SendAllHint({ onSend }: { onSend: () => void }) {
+	const compactStep = useSize().variant === "compact";
+	return (
+		<div
+			aria-hidden="true"
+			onClick={onSend}
+			className={cn(rowClass(compactStep), "text-muted-foreground hover:text-foreground")}
+			style={{ fontVariationSettings: fontWeights.normal }}
+		>
+			<KeyBadge filled={false}>0</KeyBadge>
+			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">All of them</span>
 		</div>
 	);
 }
@@ -177,6 +204,10 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 		clear();
 		deliver(chosenText(prompts, marked, index));
 	};
+	const sendAll = (): void => {
+		clear();
+		onSend(prompts.join("\n"));
+	};
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		const action = suggestionKey(event, { open, count: prompts.length, active: activeIndex, marked: prompts.some(text => marked.has(text)) });
 		if (!action) return;
@@ -184,6 +215,8 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 		switch (action.kind) {
 			case "send":
 				return take(action.index, onSend);
+			case "send-all":
+				return sendAll();
 			case "fill":
 				return take(action.index, onFill);
 			case "move":
@@ -208,38 +241,38 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 					exit={{ height: 0 }}
 					transition={{ ...spring.moderate, bounce: 0 }}
 					// -mx-2 cancels the composer's padding so the divider runs its full width. -mt-1 cancels the composer's gap above
-					// this region and the listbox's mt-2 restores it inside the collapsible area, so the gap animates with the height.
+					// this region and the measured wrapper's mt-2 restores it inside the collapsible area, so the gap animates with the height.
 					className="-mx-2 -mt-1 overflow-hidden"
 				>
-					<div
-						ref={element => {
-							listRef.current = element;
-							regionRef(element);
-						}}
-						role="listbox"
-						id={listId}
-						aria-label="Suggested prompts"
-						aria-multiselectable="true"
-						onMouseEnter={handlers.onMouseEnter}
-						onMouseMove={handlers.onMouseMove}
-						onMouseLeave={handlers.onMouseLeave}
-						onClick={handlers.onClick}
-						className="relative mt-2 flex flex-col border-t border-border/60 px-1.5 pt-1.5"
-					>
-						<FluidHoverHighlight hover={hover} className={shape.bg} />
-						{prompts.map((text, index) => (
-							<SuggestionRow
-								key={`${text}-${index}`}
-								text={text}
-								index={index}
-								active={index === activeIndex}
-								marked={marked.has(text)}
-								optionId={`${listId}-${index}`}
-								registerItem={registerItem}
-								// The composer's frame keeps the text field focused on a mousedown here, so marking never moves focus.
-								onPick={mark => (mark ? toggleMark(text) : take(index, onSend))}
-							/>
-						))}
+					<div ref={regionRef} className="mt-2 border-t border-border/60 px-1.5 pt-1.5">
+						<div
+							ref={listRef}
+							role="listbox"
+							id={listId}
+							aria-label="Suggested prompts"
+							aria-multiselectable="true"
+							onMouseEnter={handlers.onMouseEnter}
+							onMouseMove={handlers.onMouseMove}
+							onMouseLeave={handlers.onMouseLeave}
+							onClick={handlers.onClick}
+							className="relative flex flex-col"
+						>
+							<FluidHoverHighlight hover={hover} className={shape.bg} />
+							{prompts.map((text, index) => (
+								<SuggestionRow
+									key={`${text}-${index}`}
+									text={text}
+									index={index}
+									active={index === activeIndex}
+									marked={marked.has(text)}
+									optionId={`${listId}-${index}`}
+									registerItem={registerItem}
+									// The composer's frame keeps the text field focused on a mousedown here, so marking never moves focus.
+									onPick={mark => (mark ? toggleMark(text) : take(index, onSend))}
+								/>
+							))}
+						</div>
+						{prompts.length > 1 && <SendAllHint onSend={sendAll} />}
 					</div>
 				</motion.div>
 			)}

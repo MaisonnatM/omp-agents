@@ -365,7 +365,9 @@ An action that fails shows its error, and its control becomes available again.
 - When a turn ends, its reply can suggest what to send next: a `Suggestions:` line followed by numbered prompts, as its last lines.
   The starter kit's `APPEND_SYSTEM.md` asks omp to write one when the next moves are clear, up to three.
   The transcript leaves the block out of the reply, and so does its copy button; the composer lists the prompts under its buttons, numbered, while it is empty and nothing else waits on you: no turn runs and no question is open.
-  Press a prompt's number to send it at once. ↓ moves a highlight into the list and ↑ back out; Enter sends the highlighted prompt, Tab puts it in the composer to edit first, and Esc drops the highlight.
+  Press a prompt's number to send it at once.
+  With two or more prompts, 0 sends them all as a single message, in list order, one per line, and so does a click on the **All of them** row under them.
+  ↓ moves a highlight into the list and ↑ back out; Enter sends the highlighted prompt, Tab puts it in the composer to edit first, and Esc drops the highlight.
   A click sends it too.
   Cmd+click (Ctrl+click off macOS) marks a prompt without sending it.
   A click or a number then sends the marked prompts plus that one as a single message, one per line.
