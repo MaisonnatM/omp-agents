@@ -1405,7 +1405,8 @@ An action that fails shows its error, and its control becomes available again.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in a new tab, or the **Calendar** page for an event on this computer.
   Selecting an update's notice marks it read.
   The check mark in the header marks every notice in the filter read.
-- Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge on GitHub** for one ready to merge.
+- Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
+  **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once GitHub merged it; when GitHub refuses, a toast says why.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
   Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or **Calendar** for an event kept on this computer, or omp for an update.
   A pull request's, Slack message's, provider's, or event's toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts.

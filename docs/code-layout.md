@@ -493,7 +493,7 @@ The page lives in `web/`.
   `pr-timeline.tsx` is the **Timeline**: commits, comments, reviews, and unresolved threads in one list by day, with the **New** line from the last visit it keeps in localStorage; it exports the message row, a comment's or review's body, and a thread's `path:line` link, which **Comments** draws too.
   `pr-row.tsx` draws the sidebar row and the table row, each with the copy-branch button that shows on hover or focus, and exports the DOM lookups of a row and its link that the board's keys use.
   `pr-menu.tsx` holds `PullRequestMenu`, the `⋯` menu of a row and of the details' header: the quick actions, the state changes, and the links to GitHub and Graphite.
-  `merge-popover.tsx` holds `MergePopover`, the confirmation before a merge that the header's merge button and a row's **Merge** badge open; it waits while the pull request is read.
+  `merge-popover.tsx` holds `MergePopover`, the confirmation before a merge that the header's merge button, a row's **Merge** badge, and the bell's **Merge** open; it waits while the pull request is read, and `useMergeTarget` reads it while the confirmation is open, for the row and the bell, which hold no details.
   `web/use-drag-order.ts` drags the pull request list's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
   The tickets and Pull requests pages use `web/components/list-page.tsx` for their frame, header, and load and refresh states, their issue details use its `DetailPage`, the Inbox page its `PolledPageFrame` and `PolledContent`, and the Todo, Routines, and Calendar pages its `PageFrame`.
   `PolledPageFrame` renders ordinary children while reads load; only `PolledContent` supplies a data render callback, after an answer exists.

@@ -1,4 +1,4 @@
-/** The confirmation before a pull request merges on GitHub, which the details' merge button and a row's **Merge** badge open. */
+/** The confirmation before a pull request merges on GitHub, which the details' merge button, a row's **Merge** badge, and the bell's **Merge** open. */
 import { GitMerge } from "lucide-react";
 import { type ReactElement, useState } from "react";
 import { Radio } from "@base-ui/react/radio";
@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useLastMergeMethod, useMergeMethodChoice } from "../../merge-method";
+import { useRead } from "../../reads";
+
+/** What a merge of `pr` needs, read from GitHub only while its confirmation is `open`, for a place that holds no details of it. */
+export const useMergeTarget = (pr: PullRequest, open: boolean) =>
+	useRead<PullRequestDetail>(open ? `/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}` : null);
 
 export interface MergePopoverProps {
 	pr: PullRequest;
