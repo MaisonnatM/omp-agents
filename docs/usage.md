@@ -881,6 +881,14 @@ An action that fails shows its error, and its control becomes available again.
   When Google's MCP server answers HTTP 403, the Google Calendar or Gmail row says the MCP API is most often off in the OAuth client's Google Cloud project, and adds **Enable Calendar MCP API** or **Enable Gmail MCP API**, which opens Google's page that turns it on in that project, the number the client ID starts with.
   An unconfigured Slack, Google Calendar, or Gmail row says **Not set up** until its OAuth client is saved.
   The section checks again every minute while it is open, and **Refresh** checks at once.
+- Google Calendar and Gmail each hold several accounts.
+  Once the OAuth client is saved, **Connect** signs in the first account and **Add account** opens Google's account chooser for another; each account then has its own line with its address, its status, **Reconnect** and **Remove** in its menu, and its tools.
+  **Add account** refuses an address the service already holds, and an add that fails or is abandoned leaves no server behind.
+  **Remove** takes the account's server and sign-in out of omp; the last account on a service stays as a signed-out server, since it keeps the OAuth client.
+  A new OAuth client ID or secret removes every added account and signs out the remaining one, since Google ties sign-ins to the client.
+- Each Google account's workspace picker links its address to workspaces, which covers that address's Gmail and Google Calendar accounts.
+  While the sidebar picks a workspace, the Inbox, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with **All workspaces** they show every account.
+- omp's own `/mcp reauth` or `/mcp unauth` on an added account writes it back under its URL and can merge two accounts into one; reconnect it from this page instead.
 - **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   Slack sends the browser to the HTTPS redirect saved for the app, and omp listens for HTTP on the saved callback port.
@@ -1109,9 +1117,11 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Inbox
 
-- The **Inbox** tab, G then I, or an `#inbox` address shows the latest 50 conversations of your Gmail inbox in place of the panes, newest first, as Gmail lists them.
-  The tab and its shortcut show only once Gmail is connected in **Settings › Integrations**; see [Integrations](#integrations).
-  The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread.
+- The **Inbox** tab, G then I, or an `#inbox` address shows the latest 50 conversations of each Gmail inbox the sidebar's workspace shows, merged newest first, in place of the panes.
+  The tab and its shortcut show only once a Gmail account is connected in **Settings › Integrations**; see [Integrations](#integrations).
+  The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread; with several accounts it shows **All inboxes** and a row for each address, and picking one narrows the list to that account, a choice this browser keeps.
+  While the list holds several accounts, each conversation is tagged with its inbox's address, and a new mail picks the address it is sent **From**.
+  A conversation opens at `#inbox/<account>/<thread id>`; an account that cannot be read says why above the list while the others still show.
 - Each row shows, on three lines, who sent the conversation's last message, how many messages it holds when more than one, and when its last message arrived: the time today, the day earlier this year, and the full date before; then its subject; then a snippet.
   An unread conversation's sender and subject are bold, with a blue dot before them, and the header counts them beside your address.
 - Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at an `#inbox/<thread id>` address; its row shows selected, with a bar on its left edge.

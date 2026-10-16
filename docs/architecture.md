@@ -973,6 +973,13 @@ Linear and `todos.json` are not one transaction, so the page shows an unlinked i
 `MCP_SERVICES` in `src/shared/accounts.ts` holds the services whose MCP server the **Integrations** page signs omp in to, keyed by the ids in `MCP_INTEGRATIONS`.
 `integrationOn(host)` there names the service whose server is on a host, which is how the MCP servers page tells an integration's server from one it manages itself.
 Linear, Slack, Google Calendar, and Gmail are the four.
+Each service's `accounts` column says whether it signs in to the first server on its host (`one`, Linear and Slack) or holds an account per server on its host (`many`, Google Calendar and Gmail).
+Google's MCP endpoints answer only their bare URL, so accounts cannot differ by address; each account the page adds is a server named `<serverName>-<n>` with `auth.credentialId` set to `mcp_oauth_omp_agents_<hex>`, a prefix `omp token` refreshes and `removeManagedMcpOAuthCredentials` removes.
+`src/integrations.ts` stores the grant under that id before `addMcpServer` writes the server, since omp answers a server whose own row is missing with the row filed under its URL, another account's; an address the service already holds is refused and its grant removed.
+`signOutMcp` in `src/omp/mcp.ts` removes only a server's own credential id, and the URL-keyed ids only when its own id is one of them.
+Removing an account removes its server first, then its row; the last server on a host stays, signed out, because it holds the OAuth client, which `saveClient` writes to every server on the host.
+`google-accounts.json` beside the access token (`src/server/google-accounts-file.ts`) keeps each account's address by server name, learned from Gmail's profile or the Calendar list's primary entry, and each address's linked workspaces; `visibleAccounts` in `src/shared/accounts.ts` is the one rule the Inbox, the Calendar, and the `@` menu filter by.
+`accountClients` makes one `GmailClient` or `GoogleCalendarClient` per signed-in account and drops it once its server or credential id changes; `GmailAccounts` and `GoogleCalendars` merge their reads with one failing account kept apart from the others.
 Each names its label, the host omp's server for the service is on, and the name and URL of the server a sign-in adds when omp has none.
 Each also names its `client`, where its sign-in gets its OAuth client: `none` for Linear, which registers its own, `slack-app` for Slack, and `google-oauth` for Google Calendar and Gmail.
 Its `requireRefresh` says whether a sign-in refuses a grant without a refresh token, which only Slack's does.
@@ -1137,7 +1144,7 @@ The page owns what a write changes: it adds the kept event that `PUT /api/calend
 
 ### Gmail
 
-`GmailClient` in `src/gmail.ts` reads Gmail's REST API (`https://gmail.googleapis.com/gmail/v1/users/me`) with the token omp holds for its Gmail MCP server, through `integrationFetch("gmail")` as `GoogleCalendarClient` reads through `integrationFetch("google-calendar")`, so the Inbox page needs no sign-in of its own.
+`GmailClient` in `src/gmail.ts` reads one account's Gmail REST API (`https://gmail.googleapis.com/gmail/v1/users/me`) with the token omp holds for that account's Gmail MCP server, through `accountFetch("gmail", account)`, so the Inbox page needs no sign-in of its own; `GmailAccounts` merges every signed-in account's inbox and routes each thread read and write by its `account`.
 Gmail's MCP tools answer only for OAuth clients enrolled in Google's Workspace Developer Preview Program, while the API answers any client that requested `gmail.modify`.
 The client reads, replies, and moves conversations to Trash; it never deletes mail for good, labels it otherwise, or marks it read.
 `GET /api/gmail/inbox` answers an `InboxAnswer` from `src/shared/gmail.ts`, `{ address, threads }`: the signed-in address from `profile`, and a `MailThread` for each of the inbox's latest 50 threads (`threads?labelIds=INBOX&maxResults=50`), in Gmail's order.
