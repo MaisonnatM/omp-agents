@@ -1,6 +1,6 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
 import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQuestionMark } from "lucide-react";
-import { isClosed, type TodoStatus, type UserTodo, type UserTodoChange, type UserTodoLeaf, type UserTodoList } from "../src/user-todos-shared";
+import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "./days";
@@ -110,17 +110,6 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): number {
 	const todos = todosOf(list, view, day, sessions);
 	return view.kind === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
-}
-
-/** The todo a list opens when you arrive at it: the open one added last among `todos`, else the first. */
-export function latestTodo(todos: readonly UserTodo[]): UserTodo | undefined {
-	let latest: { todo: UserTodo; at: number } | undefined;
-	for (const todo of todos) {
-		if (isClosed(todo.status) || todo.createdAt === null) continue;
-		const at = Date.parse(todo.createdAt);
-		if (!latest || at > latest.at) latest = { todo, at };
-	}
-	return latest?.todo ?? todos[0];
 }
 
 /** What a list shows: its top-level todos, and the category a todo added there joins. */

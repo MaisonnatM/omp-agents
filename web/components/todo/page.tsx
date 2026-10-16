@@ -8,7 +8,7 @@ import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../days";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
-import { byStatus, LIST_KINDS, lastOf, latestTodo, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
+import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, type TodoField, useTodoKeys } from "../../use-todo-keys";
@@ -67,7 +67,6 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
 	const listed = todosOf(list, view, day, sessions);
-	useOpenLatest(id => hashForTodo(view, id), openId, latestTodo(listed)?.id ?? null);
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
 	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
 	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
@@ -84,6 +83,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 		// A search shows every match, closed ones too.
 		.map(group => ({ ...group, open: query !== "" || !folds.isFolded(group.status) }));
 	const shown = kind.readOnly ? section.todos : groups.flatMap(group => (group.open ? group.todos : []));
+	useOpenLatest(id => hashForTodo(view, id), openId, shown[0]?.id ?? null);
 	const order = shown.flatMap(todo => [todo.id, ...(kind.readOnly ? [] : todo.children.map(child => child.id))]);
 	const at = open ? order.indexOf(open.todo.id) : -1;
 	const startDraft = (status: TodoStatus): void => {
