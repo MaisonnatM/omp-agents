@@ -1,6 +1,6 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
 import { type Project, type Worker, type WorkerPhase, workerPhase } from "../src/shared/projects";
-import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
+import { newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 
@@ -189,6 +189,15 @@ export const waitsOnYou = (host: RosterHost): boolean => host.status === "idle" 
 
 /** How many live sessions in `lists` wait on your move. */
 export const waitingCount = ({ projects, pinned, running, idle }: SidebarSessions): number => [...projectHosts(projects), ...pinned.hosts, ...running, ...idle].filter(waitsOnYou).length;
+
+/** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */
+export function latestSession({ projects, pinned, running, idle, interrupted, ended }: SidebarSessions): View | null {
+	const live = [...projectHosts(projects), ...pinned.hosts, ...running, ...idle].toSorted(newestFirst)[0];
+	if (live) return { kind: "live", instanceId: live.instanceId, agentId: null };
+	const projectPast = projects.flatMap(({ members }) => members.flatMap(({ row }) => (row.kind === "past" ? [row.session] : [])));
+	const saved = [...projectPast, ...pinned.past, ...interrupted, ...ended].toSorted(newestPastFirst)[0];
+	return saved ? { kind: "past", sessionId: saved.sessionId } : null;
+}
 
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
 export function listedViews({ projects, pinned, running, idle, interrupted, ended }: SidebarSessions): View[] {

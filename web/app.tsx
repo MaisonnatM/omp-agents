@@ -71,7 +71,7 @@ export function App() {
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useMemo(() => settingsRoute(page), [page]);
-	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, settings, navigate, show });
+	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, latestSession: sessions.latest, settings, navigate, show });
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
