@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	type AccountId,
-	callable,
+	anyCallable,
 	decodeIntegrationsAnswer,
 	type GoogleAccount,
 	type IntegrationsAnswer,
@@ -30,6 +30,7 @@ import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import { errorText, getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 import { withPullRequestChanged } from "./pull-requests-model";
+import { pickedInbox } from "./inbox-model";
 import { useStoredState } from "./stored-state";
 
 export interface ReadState<T> {
@@ -128,9 +129,6 @@ export interface MentionEvent {
 
 const startOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.firstDay}T00:00`).getTime() : when.start);
 const endOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.lastDay}T00:00`).getTime() + 86_400_000 : when.end);
-
-/** Whether the dashboard calls any of `accounts`: a sign-in to it works, or failed for a reason a retry may clear. */
-export const anyCallable = (accounts: readonly GoogleAccount[]): boolean => accounts.some(account => callable(account.connection));
 
 /**
  * What the `@` menu offers from your inbox and calendars, of the accounts `workspace` shows: the inbox's latest
@@ -246,7 +244,7 @@ export const gmailStore = createPolledStore<InboxAnswer>({
 /** The Gmail account the Inbox's picker narrows to; absent for every account. */
 const INBOX_ACCOUNT_KEY = "omp-agents.gmail-account";
 
-const decodeAccount = (raw: string | null): AccountId | null => raw;
+const decodeAccount = (raw: string | null): AccountId | null => raw || null;
 const encodeAccount = (account: AccountId | null): string => account ?? "";
 
 /** The Inbox as a workspace shows it. */
@@ -256,15 +254,14 @@ export interface GmailInbox {
 	inbox: PolledEntry<InboxAnswer>;
 	/** The Gmail accounts the workspace shows. */
 	accounts: GoogleAccount[];
-	/** The account the picker narrows to, `null` for every shown account; one the workspace hides reads as `null`. */
+	/** The account the picker narrows to, as {@link pickedInbox} reads the stored choice; `null` for every shown account. */
 	picked: AccountId | null;
 	pick: (account: AccountId | null) => void;
-	/** The conversations of the picked account, else of every shown account, newest first. */
+	/** The conversations of every shown account, newest first, whatever the picker narrows to. */
 	threads: MailThread[];
-	unread: number;
 }
 
-/** The inboxes of the Gmail accounts `workspace` shows, `null` for all workspaces, read every minute while one is callable, narrowed by the Inbox's account picker. */
+/** The inboxes of the Gmail accounts `workspace` shows, `null` for all workspaces, read every minute while one is callable, and the Inbox's account picker. */
 export function useGmailInbox(workspace: string | null): GmailInbox {
 	const gmail = integrationsStore.usePolling().read?.data.integrations.gmail ?? null;
 	const all = gmail?.accounts ?? NO_ACCOUNTS;
@@ -273,17 +270,9 @@ export function useGmailInbox(workspace: string | null): GmailInbox {
 	const listed = inbox.read?.data.threads;
 	return useMemo(() => {
 		const shown = visibleAccounts(all, workspace);
-		const picked = stored !== null && shown.has(stored) ? stored : null;
-		const threads = (listed ?? NO_THREADS).filter(thread => (picked === null ? shown.has(thread.account) : thread.account === picked));
-		return {
-			gmail,
-			inbox,
-			accounts: all.filter(account => shown.has(account.name)),
-			picked,
-			pick,
-			threads,
-			unread: threads.filter(thread => thread.unread).length,
-		};
+		const accounts = all.filter(account => shown.has(account.name));
+		const threads = (listed ?? NO_THREADS).filter(thread => shown.has(thread.account));
+		return { gmail, inbox, accounts, picked: pickedInbox(stored, accounts), pick, threads };
 	}, [gmail, all, inbox, stored, pick, listed, workspace]);
 }
 

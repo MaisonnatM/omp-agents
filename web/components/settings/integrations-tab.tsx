@@ -1,13 +1,13 @@
 import { RefreshCw } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { callable, connectionsOf, type IntegrationsAnswer, MCP_INTEGRATIONS, signedIn } from "../../../src/shared/accounts";
+import { anyCallable, callable, connectionsOf, type IntegrationsAnswer, MCP_INTEGRATIONS, signedIn } from "../../../src/shared/accounts";
 import type { GoogleStatus } from "../../../src/shared/calendar";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { readTime } from "../../labels";
 import type { PolledEntry } from "../../polled-store";
-import { anyCallable, googleStore, integrationsStore } from "../../reads";
-import { GoogleCalendarList } from "../integrations/google-calendar";
+import { googleStore, integrationsStore } from "../../reads";
+import { GoogleCalendarList, GoogleCalendarsError } from "../integrations/google-calendar";
 import { IntegrationList } from "../integrations/integration-row";
 import { McpIntegrationRow } from "../integrations/mcp-integration";
 import { LoadNote } from "../sheet-details";
@@ -46,6 +46,7 @@ function Groups({ answer, google, workspaces }: { answer: IntegrationsAnswer; go
 			<McpIntegrationRow
 				integration={integration}
 				workspaces={workspaces}
+				notice={integration.id === "google-calendar" && <GoogleCalendarsError entry={google} />}
 				details={account => integration.id === "google-calendar" && callable(account.connection) && <GoogleCalendarList entry={google} account={account.name} />}
 			/>
 		),

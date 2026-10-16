@@ -1,12 +1,12 @@
 import { Mail, SquarePen } from "lucide-react";
-import { useEffect, useState } from "react";
-import { type AccountId, callable, type GoogleAccount } from "../../../src/shared/accounts";
+import { useEffect, useRef, useState } from "react";
+import { type AccountId, anyCallable, callable, type GoogleAccount } from "../../../src/shared/accounts";
 import type { MailThread } from "../../../src/shared/gmail";
 import { threadUrl, type MailSend } from "../../../src/shared/gmail";
 import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
 import { type MailDocument, useMailDraft } from "../../mail-draft";
-import { anyCallable, gmailStore, mailThreadScope, mailThreadStore, useGmailInbox } from "../../reads";
+import { gmailStore, mailThreadScope, mailThreadStore, useGmailInbox } from "../../reads";
 import { hashForInbox, type InboxRoute } from "../../routing";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useOpenLatest } from "../../use-open-latest";
@@ -124,12 +124,15 @@ const NEW_MAIL: MailDocument = { to: [], cc: [], bcc: [], subject: "", body: "" 
 /**
  * The latest conversations of the Gmail inboxes `workspace` shows, newest first, each tagged with its inbox while there
  * are several and narrowed to one by the sidebar's picker, beside the conversation `target` names, or Gmail's
- * integration row while omp can read none of them. With no conversation open, ↓ and ↑ focus the next and previous row;
+ * integration row while omp can read none of them. A conversation that opens from the address while the picker narrows
+ * to another account picks its own. With no conversation open, ↓ and ↑ focus the next and previous row;
  * with one open, they open the next and previous one and focus its row, which they read ahead. Esc closes it, and O
  * opens the focused row in Gmail, else the open conversation.
  */
 export function InboxPage({ target, workspace }: { target: InboxRoute["target"]; workspace: string | null }) {
-	const { gmail, inbox, accounts, picked, threads, unread } = useGmailInbox(workspace);
+	const { gmail, inbox, accounts, picked, pick, threads: shownThreads } = useGmailInbox(workspace);
+	const threads = picked === null ? shownThreads : shownThreads.filter(thread => thread.account === picked);
+	const unread = threads.filter(thread => thread.unread).length;
 	const read = inbox.read;
 	const open = target === null || target === "new" ? null : target;
 	const at = open === null ? -1 : threads.findIndex(thread => thread.account === open.account && thread.id === open.thread);
@@ -141,6 +144,15 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 	const openKey = open && rowId({ account: open.account, id: open.thread });
 	useReturnFocus(openKey, id => id, id => document.getElementById(id)?.querySelector<HTMLElement>("a"), read);
 	useOpenLatest(hashForInbox, target, threads[0] ? { account: threads[0].account, thread: threads[0].id } : null, read !== null);
+
+	// Only a conversation that opens picks its account, so a pick made while one is open leaves it open.
+	const openAccount = open?.account ?? null;
+	const arrived = useRef<string | null>(null);
+	useEffect(() => {
+		if (gmail === null || openKey === arrived.current) return;
+		arrived.current = openKey;
+		if (openAccount !== null && picked !== null && openAccount !== picked && accounts.some(account => account.name === openAccount)) pick(openAccount);
+	}, [gmail, openKey, openAccount, picked, accounts, pick]);
 
 	// Read the next and previous conversations while one is open, so ↓/↑ open them at once.
 	const previous = at > 0 ? threads[at - 1] : undefined;

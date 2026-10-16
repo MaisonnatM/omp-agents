@@ -887,7 +887,7 @@ An action that fails shows its error, and its control becomes available again.
   Addresses match whatever their case, so `Ana@example.com` in Gmail and `ana@example.com` in Google Calendar are one address.
   **Remove** takes the account's server and sign-in out of omp; the last account on a service stays as a signed-out server, since it keeps the OAuth client.
   A new OAuth client ID or secret removes every added account and signs out the remaining one, since Google ties sign-ins to the client.
-- Each Google account's workspace picker links its address to workspaces, which covers that address's Gmail and Google Calendar accounts.
+- Each Google account's workspace picker links its address to workspaces, which covers that address's Gmail and Google Calendar accounts; a pick made before the one before it is saved adds to it rather than replacing it.
   While the sidebar picks a workspace, the Inbox, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with **All workspaces** they show every account.
   With the starter kit's `extensions/google-accounts.ts` installed (`bun run omp-template`), an omp session whose service has two or more accounts is told at each prompt each account's address and tool prefix, and, when its workspace has linked addresses, to use those for its mail and calendar unless you name another account.
   A session in a linked worktree counts as in its repository's main checkout when its own directory is in no linked workspace; every account's tools stay available to it.
@@ -933,7 +933,8 @@ An action that fails shows its error, and its control becomes available again.
   Under [Credentials](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**, and add `http://localhost:3119/callback`, with your callback port, as an authorized redirect URI.
   Paste the client ID and secret, then **Connect**; Google asks you to grant reading and editing your events, reading your calendar list, and free/busy.
   omp stores the secret in that server's entry in `~/.omp/agent/mcp.json`, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
-  Once connected, the row lists the calendars checked in Google Calendar's own list, in their colors, with why the last read of one failed; one you unchecked in the Calendar page's sidebar shows muted and says **Hidden on the Calendar page**.
+  Once connected, each account lists the calendars checked in its Google Calendar list, in their colors, with why the last read of one failed; one you unchecked in the Calendar page's sidebar shows muted and says **Hidden on the Calendar page**.
+  An account whose list could not be read this time says why above the calendars it last listed, and a list that could never be read says why once above the accounts.
   Google Calendar's MCP tools also need the Calendar MCP API on in that project; the row links to it when Google refuses them.
   The Calendar page reads Google's Calendar API and does not need the MCP API.
 - Gmail shows **Not set up** and **Set up** until its OAuth client is saved, and its form is Google Calendar's.
@@ -1122,12 +1123,13 @@ An action that fails shows its error, and its control becomes available again.
 
 - The **Inbox** tab, G then I, or an `#inbox` address shows the latest 50 conversations of each Gmail inbox the sidebar's workspace shows, merged newest first, in place of the panes.
   The tab and its shortcut show only once a Gmail account is connected in **Settings › Integrations**; see [Integrations](#integrations).
-  The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread; with several accounts it shows **All inboxes** and a row for each address, and picking one narrows the list to that account, a choice this browser keeps.
+  The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread; with several accounts it shows **All inboxes** and a row for each address, each with its unread count, and picking one narrows the list to that account and leaves an open conversation open, a choice this browser keeps.
+  While the workspace shows one account, the list shows it whatever was picked, and the pick comes back in a workspace that shows that account among others.
   While the list holds several accounts, each conversation is tagged with its inbox's address, and a new mail picks the address it is sent **From**.
-  A conversation opens at `#inbox/<account>/<thread id>`; an account that cannot be read says why above the list while the others still show.
+  A conversation opens at `#inbox/<account>/<thread id>`, and opening such an address while the picker narrows to another account picks the conversation's own; an account that cannot be read says why above the list while the others still show.
 - Each row shows, on three lines, who sent the conversation's last message, how many messages it holds when more than one, and when its last message arrived: the time today, the day earlier this year, and the full date before; then its subject; then a snippet.
   An unread conversation's sender and subject are bold, with a blue dot before them, and the header counts them beside your address.
-- Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at an `#inbox/<thread id>` address; its row shows selected, with a bar on its left edge.
+- Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at its `#inbox/<account>/<thread id>` address; its row shows selected, with a bar on its left edge.
   Arriving at the page, from the **Inbox** tab, G then I, or the Inbox's number, opens the newest conversation.
   Closing it leaves the list with nothing open, and the panel then says how to open one.
   Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.

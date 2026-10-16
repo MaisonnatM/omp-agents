@@ -218,6 +218,9 @@ export const signedIn = (connection: McpConnection): boolean => connection.kind 
 /** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */
 export const callable = (connection: McpConnection): boolean => connection.kind === "ready" || connection.kind === "failing";
 
+/** Whether the dashboard calls any of `accounts`, as {@link callable} says of each. */
+export const anyCallable = (accounts: readonly { connection: McpConnection }[]): boolean => accounts.some(account => callable(account.connection));
+
 /** One account of a Google service: its server, the address Google says it signs in as once a read learned it, and the workspaces it is linked to. */
 export interface GoogleAccount {
 	name: AccountId;
@@ -272,9 +275,12 @@ export type McpIntegration<Id extends McpIntegrationId = McpIntegrationId> = {
 	} & ConnectionsOf[AccountsOf<K>];
 }[Id];
 
+/** Whether `integration` holds an account per server, Gmail's or Google Calendar's. */
+export const hasAccounts = (integration: McpIntegration): integration is McpIntegration<AccountsService> => holdsAccounts(integration.id);
+
 /** Every connection `integration` holds: its server's, or each account's. */
 export const connectionsOf = (integration: McpIntegration): McpConnection[] =>
-	"accounts" in integration ? integration.accounts.map(account => account.connection) : [integration.connection];
+	hasAccounts(integration) ? integration.accounts.map(account => account.connection) : [integration.connection];
 
 /** Whether `integration` signs in with a Google OAuth client of your own. */
 export const isGoogleIntegration = (integration: McpIntegration): integration is McpIntegration<GoogleService> => isGoogleService(integration.id);

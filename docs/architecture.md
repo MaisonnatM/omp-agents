@@ -1069,6 +1069,7 @@ A sign-in that omp does not manage stays, and the route answers an error that sa
 `parseIntegrationTarget` in `src/server/wire.ts` checks both bodies.
 
 `PUT /api/integrations/google-links`, with `{ address, workspaces }`, checked by `parseGoogleLinks`, replaces the absolute workspace directories a Google address's accounts are linked to, none to show them in every workspace, and answers every integration.
+The route replaces the whole list, so `toggleLink` in `web/components/integrations/google-accounts.tsx` sends an address's writes one after another, each built on the list the one before saved, and a second toggle before the first answer keeps both.
 
 ### MCP servers
 

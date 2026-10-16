@@ -1,7 +1,7 @@
 /** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list, or its accounts. */
 import { KeyRound } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type GoogleAccount, MCP_SERVICES, type McpIntegration, type SignInState, type SingleService, signedIn } from "../../../src/shared/accounts";
+import { type GoogleAccount, hasAccounts, MCP_SERVICES, type McpIntegration, type SignInState, type SingleService, signedIn } from "../../../src/shared/accounts";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
@@ -163,11 +163,17 @@ interface McpIntegrationRowProps {
 	integration: McpIntegration;
 	/** The workspaces a Google account may be linked to; `null` where links are not edited. */
 	workspaces: Workspace[] | null;
+	/** What shows once above a Google service's accounts, such as why none of their calendars could be listed. */
+	notice?: ReactNode;
 	/** What shows under each Google account, such as its calendars. */
 	details?: (account: GoogleAccount) => ReactNode;
 }
 
 /** One service whose MCP server omp signs in to, or whose accounts it signs in to, one server each. */
-export function McpIntegrationRow({ integration, workspaces, details }: McpIntegrationRowProps) {
-	return "accounts" in integration ? <GoogleAccountsRow integration={integration} workspaces={workspaces} details={details} /> : <ServerIntegrationRow integration={integration} />;
+export function McpIntegrationRow({ integration, workspaces, notice, details }: McpIntegrationRowProps) {
+	return hasAccounts(integration) ? (
+		<GoogleAccountsRow integration={integration} workspaces={workspaces} notice={notice} details={details} />
+	) : (
+		<ServerIntegrationRow integration={integration} />
+	);
 }

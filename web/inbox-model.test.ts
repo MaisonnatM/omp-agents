@@ -1,6 +1,21 @@
 import { expect, test } from "bun:test";
+import type { GoogleAccount } from "../src/shared/accounts";
 import type { MailMessage } from "../src/shared/gmail";
-import { colorIndex, type FoldEvent, type Folds, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, recipientsLine } from "./inbox-model";
+import { colorIndex, type FoldEvent, type Folds, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, pickedInbox, recipientsLine } from "./inbox-model";
+
+const account = (name: string): GoogleAccount => ({
+	name,
+	address: `${name}@example.com`,
+	connection: { kind: "ready", tools: [], server: { name, url: "https://gmailmcp.googleapis.com/mcp/v1", host: "gmailmcp.googleapis.com" } },
+	workspaces: [],
+});
+
+test("the Inbox picker keeps an account it shows among several, and reads as every inbox once one account or none is shown", () => {
+	expect(pickedInbox("gmail-2", [account("gmail"), account("gmail-2")])).toBe("gmail-2");
+	expect(pickedInbox("gmail-2", [account("gmail-2")])).toBeNull();
+	expect(pickedInbox("gmail-2", [account("gmail"), account("gmail-3")])).toBeNull();
+	expect(pickedInbox(null, [account("gmail"), account("gmail-2")])).toBeNull();
+});
 
 const message = (id: string, unread = false): MailMessage => ({
 	id,

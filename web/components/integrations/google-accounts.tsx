@@ -35,6 +35,30 @@ function linkLabel(account: GoogleAccount, workspaces: Workspace[]): string {
 	return names.length === 0 ? "All workspaces" : names.length === 1 ? names[0]! : `${names.length} workspaces`;
 }
 
+/** The link writes under way, by address, each after the one before; each resolves to the workspaces it saved. */
+const linkWrites = new Map<string, Promise<readonly string[]>>();
+
+/**
+ * Links or unlinks `cwd` for Google address `address`, after any write for it under way, from the workspaces that write
+ * saved, else from `linked`, so two quick toggles both stand.
+ */
+function toggleLink(address: string, linked: readonly string[], cwd: string): Promise<readonly string[]> {
+	const write = (linkWrites.get(address) ?? Promise.resolve(linked))
+		.catch(() => linked)
+		.then(async current => {
+			const workspaces = current.includes(cwd) ? current.filter(other => other !== cwd) : [...current, cwd];
+			const answer = await putJson<IntegrationsAnswer>("/api/integrations/google-links", { address, workspaces } satisfies GoogleLinks);
+			integrationsStore.update(() => answer);
+			return workspaces;
+		});
+	linkWrites.set(address, write);
+	const settle = (): void => {
+		if (linkWrites.get(address) === write) linkWrites.delete(address);
+	};
+	write.then(settle, settle);
+	return write;
+}
+
 /**
  * The workspaces Google address `address`'s accounts are linked to: each pick links or unlinks one, and none shows the
  * accounts in every workspace. A link to a workspace no longer listed stays checked until you uncheck it.
@@ -45,10 +69,8 @@ function WorkspaceLinks({ account, address, workspaces }: { account: GoogleAccou
 	const options = [...workspaces.map(workspace => ({ cwd: workspace.cwd, label: workspace.cwdDisplay })), ...account.workspaces.filter(cwd => !listed.has(cwd)).map(cwd => ({ cwd, label: cwd }))];
 	const toggle = async (cwd: string): Promise<void> => {
 		setError(null);
-		const linked = account.workspaces.includes(cwd) ? account.workspaces.filter(other => other !== cwd) : [...account.workspaces, cwd];
 		try {
-			const answer = await putJson<IntegrationsAnswer>("/api/integrations/google-links", { address, workspaces: linked } satisfies GoogleLinks);
-			integrationsStore.update(() => answer);
+			await toggleLink(address, account.workspaces, cwd);
 		} catch (err) {
 			setError(errorText(err));
 		}
@@ -197,6 +219,8 @@ interface GoogleAccountsRowProps {
 	integration: AccountsIntegration;
 	/** The workspaces an account may be linked to; `null` where links are not edited, such as a page that offers to connect. */
 	workspaces: Workspace[] | null;
+	/** What shows once above the accounts, such as why none of their calendars could be listed. */
+	notice?: ReactNode;
 	/** What shows under each account, such as its calendars. */
 	details?: (account: GoogleAccount) => ReactNode;
 }
@@ -205,7 +229,7 @@ interface GoogleAccountsRowProps {
  * A Google service whose accounts omp signs in to, each a server of its own: Set up until its OAuth client is saved,
  * then Add account, which lets you pick another Google account, and the accounts, each with its own controls.
  */
-export function GoogleAccountsRow({ integration, workspaces, details }: GoogleAccountsRowProps) {
+export function GoogleAccountsRow({ integration, workspaces, notice, details }: GoogleAccountsRowProps) {
 	const { id, accounts, setup } = integration;
 	const { label } = MCP_SERVICES[id];
 	const service = SERVICES[id];
@@ -267,6 +291,7 @@ export function GoogleAccountsRow({ integration, workspaces, details }: GoogleAc
 		>
 			<ConnectionCallout approveOn={label} signIn={adding} question={null} refused={null} failing={null} />
 			{formOpen && <GoogleClientForm id={id} setup={setup} connected={connected.length > 0} onDone={() => setFormOpen(false)} />}
+			{connected.length > 0 && notice}
 			{connected.length > 0 && (
 				<ul aria-label={`${label} accounts`} className="divide-y divide-border rounded-lg bg-muted/40 px-3 py-3">
 					{accounts.map(account => (

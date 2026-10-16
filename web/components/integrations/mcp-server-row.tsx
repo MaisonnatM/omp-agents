@@ -1,6 +1,6 @@
 import { Power, PowerOff, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { MCP_SERVICES, type McpIntegrationId, type SignInState } from "../../../src/shared/accounts";
+import { hasAccounts, MCP_SERVICES, type McpIntegrationId, type SignInState } from "../../../src/shared/accounts";
 import { catalogEntry } from "../../../src/shared/mcp-catalog";
 import type { McpServerRow, McpServerStatus, McpTransport } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,7 @@ const SourceMeta = ({ server }: { server: McpServerRow }) =>
 function IntegrationServerRow({ server, id }: { server: McpServerRow; id: McpIntegrationId }) {
 	const { label } = MCP_SERVICES[id];
 	const integration = integrationsStore.use().read?.data.integrations[id];
-	const connection = integration && ("accounts" in integration ? integration.accounts.find(account => account.name === server.name)?.connection : integration.connection);
+	const connection = integration && (hasAccounts(integration) ? integration.accounts.find(account => account.name === server.name)?.connection : integration.connection);
 	return (
 		<IntegrationRow
 			name={server.name}
