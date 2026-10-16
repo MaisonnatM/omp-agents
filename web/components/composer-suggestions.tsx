@@ -1,6 +1,6 @@
 /** The suggested next prompts above the composer, which a key or click sends or fills in, alone, several marked together, or all at once. */
 import { AnimatePresence, motion } from "framer-motion";
-import { type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ComponentProps, type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
 import { useRegionHeight } from "@/hooks/use-region-height";
@@ -63,27 +63,45 @@ export function suggestionKey(event: KeyPress, { open, count, active, marked }: 
 	}
 }
 
-/** A row's sending key; filled while the row is marked. */
-function KeyBadge({ filled, children }: { filled: boolean; children: ReactNode }) {
-	const compactStep = useSize().variant === "compact";
-	return (
-		<kbd
-			aria-hidden="true"
-			className={cn(
-				"inline-flex shrink-0 items-center justify-center rounded-[5px] border px-1 font-sans tabular-nums transition-colors duration-80",
-				filled ? "border-foreground bg-foreground text-background" : "border-border bg-background",
-				compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]",
-			)}
-		>
-			{children}
-		</kbd>
-	);
+interface RowProps extends ComponentProps<"div"> {
+	/** The key that sends the row. */
+	sendKey: number;
+	marked: boolean;
+	label: string;
 }
 
-/** Row geometry shared by the prompts and the hint under them. */
-const ROW = "relative flex cursor-pointer items-center gap-2 transition-colors duration-80";
-/** Text size mirrors the composer's text field: the rows read as prompt candidates, not metadata. */
-const ROW_SIZE: Record<"default" | "compact", string> = { default: "h-8 px-2.5 text-[14px]", compact: "h-7 px-2 text-[13px]" };
+/** A row's look, shared by the prompts and the hint under them: its key, its text, then `children`. */
+function Row({ sendKey, marked, label, className, children, ...props }: RowProps) {
+	const compactStep = useSize().variant === "compact";
+	return (
+		<div
+			{...props}
+			className={cn(
+				"relative flex cursor-pointer items-center gap-2",
+				// Text size mirrors the composer's text field: the rows read as prompt candidates, not metadata.
+				compactStep ? "h-7 px-2 text-[13px]" : "h-8 px-2.5 text-[14px]",
+				"transition-colors duration-80",
+				className,
+			)}
+			style={{ fontVariationSettings: fontWeights.normal }}
+		>
+			{/* The key that sends this row; filled while the row is marked. */}
+			<kbd
+				aria-hidden="true"
+				className={cn(
+					"inline-flex shrink-0 items-center justify-center rounded-[5px] border px-1 font-sans tabular-nums transition-colors duration-80",
+					marked ? "border-foreground bg-foreground text-background" : "border-border bg-background",
+					compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]",
+				)}
+			>
+				{sendKey}
+			</kbd>
+			{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping ascenders/descenders outside the trimmed box. */}
+			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{label}</span>
+			{children}
+		</div>
+	);
+}
 
 interface SuggestionRowProps {
 	text: string;
@@ -103,46 +121,25 @@ interface SuggestionRowProps {
  */
 function SuggestionRow({ text, index, active, marked, optionId, registerItem, onPick }: SuggestionRowProps) {
 	const EnterIcon = useIcon("corner-down-left");
-	const size = useSize().variant;
 	const ref = useRef<HTMLDivElement>(null);
 
 	useRegisterFluidHoverItem(registerItem, index, ref);
 
 	return (
-		<div
+		<Row
 			ref={ref}
 			id={optionId}
 			role="option"
 			aria-selected={marked}
 			onClick={event => onPick(modHeld(event))}
-			className={cn(ROW, ROW_SIZE[size], active || marked ? "text-foreground" : "text-muted-foreground")}
-			style={{ fontVariationSettings: fontWeights.normal }}
+			sendKey={index + 1}
+			marked={marked}
+			label={text}
+			className={active || marked ? "text-foreground" : "text-muted-foreground"}
 		>
-			<KeyBadge filled={marked}>{index + 1}</KeyBadge>
-			{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping ascenders/descenders outside the trimmed box. */}
-			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{text}</span>
 			{/* ↵ on the highlighted row: Enter sends it. */}
 			<EnterIcon size={13} className={cn("shrink-0 transition-opacity duration-80", active ? "opacity-100" : "opacity-0")} />
-		</div>
-	);
-}
-
-/**
- * The 0 key's row under the listbox, which sends every prompt. It stays out of the listbox and the fluid hover: it is a
- * hint, not an option, and the hover's gap click would send the nearest row instead.
- */
-function SendAllHint({ onSend }: { onSend: () => void }) {
-	const size = useSize().variant;
-	return (
-		<div
-			aria-hidden="true"
-			onClick={onSend}
-			className={cn(ROW, ROW_SIZE[size], "text-muted-foreground hover:text-foreground")}
-			style={{ fontVariationSettings: fontWeights.normal }}
-		>
-			<KeyBadge filled={false}>0</KeyBadge>
-			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">All of them</span>
-		</div>
+		</Row>
 	);
 }
 
@@ -272,7 +269,18 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 								/>
 							))}
 						</div>
-						{prompts.length > 1 && <SendAllHint onSend={sendAll} />}
+						{/* 0's row, which sends every prompt. It stays out of the listbox and the fluid hover: it is a hint, not an
+						option, and the hover's gap click would send the nearest prompt instead. */}
+						{prompts.length > 1 && (
+							<Row
+								aria-hidden="true"
+								onClick={sendAll}
+								sendKey={0}
+								marked={false}
+								label="All of them"
+								className="text-muted-foreground hover:text-foreground"
+							/>
+						)}
 					</div>
 				</motion.div>
 			)}
