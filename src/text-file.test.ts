@@ -1,9 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { agentDir } from "./omp/config";
-import { tokenFile } from "./paths";
+import { projectNotesDir, tokenFile, userNotesDir } from "./paths";
 import { MAX_TEXT_FILE_BYTES } from "./shared/transcript";
 import { DENIED_DIRS, readTextFile } from "./text-file";
 
@@ -46,6 +46,12 @@ test("omp-agents' directory and omp's agent directory are denied, Markdown in om
 		{ dir: dirname(tokenFile), opens: [] },
 		{ dir: agentDir, opens: ["md", "markdown"] },
 	]);
+});
+
+test("the project's and the user's notes lie outside every denied directory, so the file dialog opens them", () => {
+	for (const notes of [projectNotesDir("p1"), userNotesDir]) {
+		for (const { dir } of DENIED_DIRS) expect({ notes, inside: notes === dir || notes.startsWith(dir + sep) }).toEqual({ notes, inside: false });
+	}
 });
 
 test("a text file in a denied directory is refused, by its real path, but for the extensions that directory opens", async () => {

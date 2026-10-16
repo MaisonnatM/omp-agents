@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RpcLaunch } from "../omp/rpc";
 import { HOME } from "../paths";
-import type { Project } from "../shared/projects";
+import type { Project, ProjectEvent } from "../shared/projects";
 import type { SessionPreset } from "../shared/presets";
 import type { HostStatus, StartRequest, StartResult, UserAnswer, UserRequest } from "../shared/sessions";
 import { projectNotices } from "./notices";
@@ -45,6 +45,8 @@ interface Harness {
 	sessions: Map<string, FakeSession>;
 	launches: { request: StartRequest; project: ProjectLaunch | null; launch: RpcLaunch }[];
 	seeded: string[];
+	/** The events written into each project's inbox, with their project and time. */
+	inbox: { id: string; event: ProjectEvent; at: string }[];
 	/** The next start fails as omp would, after the runner chose its launch. */
 	failNextStart(): void;
 	/** Settles at the first change, from now on, after which `done` holds. */
@@ -80,6 +82,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 	const file = new ProjectsFile(path);
 	const launches: Harness["launches"] = [];
 	const seeded: string[] = [];
+	const inbox: Harness["inbox"] = [];
 	const ended: string[] = [];
 	const waiters: { done: () => boolean; resolve: () => void }[] = [];
 	let failing = false;
@@ -143,6 +146,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		checkedOut: async () => options.checkedOut ?? null,
 		extensionArgs: () => ["-e", "/repo/projects.ts"],
 		seedNotes: id => seeded.push(id),
+		writeInbox: (id, event, at) => inbox.push({ id, event, at }),
 		now: () => T0,
 		newId: () => `id${++ids}`,
 		onChange() {
@@ -157,7 +161,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		waiters.push({ done, resolve });
 		return promise;
 	};
-	return { runner, file, sessions, launches, seeded, failNextStart: () => (failing = true), until, start, ended };
+	return { runner, file, sessions, launches, seeded, inbox, failNextStart: () => (failing = true), until, start, ended };
 }
 
 /** The coordinator's own `start_worker` tool. */
@@ -431,14 +435,19 @@ describe("ProjectRunner", () => {
 		expect(resumed.prompts[0]).toContain('The dashboard restarted and stopped w2 "Task 2".');
 	});
 
-	test("an event from outside reaches the coordinator with its source, title, link, and text", async () => {
+	test("an event from outside reaches the coordinator with its source, title, link, and text, and lands in the project's inbox", async () => {
 		const h = harness();
 		const { projectId, coordinator } = await project(h, 0);
 		const delivered = h.until(() => h.file.get(projectId)!.updates.length === 0);
 		coordinator.status = "idle";
-		h.runner.notify(projectId, { source: "GitHub", title: "Checks failed on #12", text: "lint", url: "https://github.com/o/r/pull/12" });
+		const event = { source: "GitHub", title: "Checks failed on #12", text: "lint", url: "https://github.com/o/r/pull/12" };
+		expect(h.runner.notify(projectId, event)).toBeNull();
 		await delivered;
 		expect(coordinator.prompts[0]).toContain("- GitHub: Checks failed on #12 (https://github.com/o/r/pull/12)\n  lint");
+		expect(h.inbox).toEqual([{ id: projectId, event, at: new Date(T0).toISOString() }]);
+		h.file.apply({ op: "archive", id: projectId });
+		expect(h.runner.notify(projectId, event)).toContain("archived");
+		expect(h.inbox).toHaveLength(1);
 	});
 
 	test("an archived project keeps its updates until it is unarchived", async () => {

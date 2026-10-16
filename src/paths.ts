@@ -37,6 +37,8 @@ export const workspacesFile = join(configDir, "workspaces.json");
 export const projectsFile = join(configDir, "projects.json");
 /** Project `id`'s notes, which every session of the project reads and writes; outside every repository, so all worktrees share them. */
 export const projectNotesDir = (id: string): string => join(dataDir, "projects", id);
+/** The user's notes, which every project's sessions read: how the user works, and the workflows that held across projects. */
+export const userNotesDir = join(dataDir, "user");
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
 /** The session presets that the new-session draft and routines start through, beside {@link tokenFile}. */

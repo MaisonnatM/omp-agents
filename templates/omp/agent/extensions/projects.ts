@@ -1,6 +1,6 @@
-// omp-agents projects: tells a session that belongs to a dashboard project its role and where the project's notes are,
-// at every prompt, so the text survives compaction. A coordinator plans and starts workers through the tools the
-// dashboard serves it, and may edit or write only the notes. The dashboard keeps `projects.json`; this only reads it.
+// omp-agents projects: tells a session that belongs to a dashboard project its role and where the project's notes and
+// the user's notes are, at every prompt, so the text survives compaction. A coordinator plans and starts workers through
+// the tools the dashboard serves it, and may edit or write only those notes. The dashboard keeps `projects.json`; this only reads it.
 // The dashboard loads this file with `-e` when it is not installed here, so it must not be loaded twice.
 // Both hooks find the role by the session's id. A subagent that runs in the session (an advisor, a `/tan` clone) acts in
 // its role; a `task` subagent, whose transcript omp writes inside its parent's session directory, takes its parent's role.
@@ -10,7 +10,10 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const PROJECTS_FILE = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents", "projects.json");
-const NOTES_ROOT = join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "omp-agents", "projects");
+const DATA_DIR = join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "omp-agents");
+const NOTES_ROOT = join(DATA_DIR, "projects");
+// `userNotesDir` in `src/paths.ts`; change both together.
+const USER_NOTES = join(DATA_DIR, "user");
 
 // Internal URLs that name the session's own scratch space, not the project's code.
 const SCRATCH_SCHEMES = ["local://", "artifact://"];
@@ -84,18 +87,20 @@ function roleOf(ctx: SessionContext): Role | null {
 	return null;
 }
 
-/** The role text for `role`, whose notes are in `notes`. */
-export function roleText({ project, worker, subagent }: Role, notes: string): string {
+/** The role text for `role`, whose project's notes are in `notes` and the user's, which every project shares, in `user`. */
+export function roleText({ project, worker, subagent }: Role, notes: string, user: string): string {
 	const shared = [
-		`The project's notes, shared by every session of the project, are in ${notes}. Read ${join(notes, "README.md")} first.`,
-		"Record what lasts there: how to build, run, and test the work in testing.md, the user's preferences and decisions in preferences.md, research and its sources in research.md, and link any new file from README.md.",
+		`The project's notes, shared by every session of the project, are in ${notes}. Read ${join(notes, "notes.md")} first: the goal, the decisions, and the index of the other notes.`,
+		"Record what lasts there: a decision or preference about this project only under Decisions in notes.md, how to build, run, and test the work in docs/testing.md, research and its sources in docs/research.md, and link any new file from notes.md.",
+		`The user's own notes, shared by every project, are in ${user}. Read ${join(user, "preferences.md")}, and any workflow in ${join(user, "workflows")} that fits the task.`,
+		"Record there a preference that holds beyond this project; one about this project only goes in the project's notes.md.",
 	].join(" ");
 	if (subagent) {
 		const parent = worker ? `worker ${worker.id} (${JSON.stringify(worker.title)})` : "the coordinator";
 		return [
 			`You are a subagent of ${parent} of the omp-agents project ${JSON.stringify(project.name)}.`,
 			shared,
-			worker ? "" : "Like the coordinator, you never change the project's code: your edit and write calls outside the notes are blocked, and so are shell redirections there and git or Graphite writes.",
+			worker ? "" : "Like the coordinator, you never change the project's code: your edit and write calls outside the project's and the user's notes are blocked, and so are shell redirections there and git or Graphite writes.",
 		]
 			.filter(Boolean)
 			.join(" ");
@@ -104,13 +109,15 @@ export function roleText({ project, worker, subagent }: Role, notes: string): st
 		const cadence = project.reviewCadence?.trim() || "every PR";
 		return [
 			`You are the coordinator of the omp-agents project ${JSON.stringify(project.name)}.`,
-			"You plan the work and delegate it: start_worker starts a worker session on a prompt that stands alone, on its own branch, model, skill, or preset when you name them, and queues it when the project already runs its most workers.",
+			"Your job is to plan, delegate, and report: start_worker starts a worker session on a prompt that stands alone, on its own branch, model, skill, or preset when you name them, and queues it when the project already runs its most workers.",
+			"Read only the notes, the workers' reports, and what a quick look answers; start a worker for anything more, investigation, research, reviews, and browser checks included, with a prompt that says what to report back.",
 			"list_workers, read_worker, and message_worker follow and steer the workers; answer_worker answers a question a worker asks, and end_worker ends a worker that is done.",
-			"Never change the project's code yourself, in any way: your edit and write calls outside the notes, shell redirections there, and git or Graphite writes are blocked, so start a worker for any change.",
+			"Never change the project's code yourself, in any way: your edit and write calls outside the project's and the user's notes, shell redirections there, and git or Graphite writes are blocked, so start a worker for any change.",
 			shared,
-			"Record the user's feedback and decisions in preferences.md as soon as you hear them, and tell each worker what of it applies.",
-			"When a note has held across several workers, promote it into the repository through a worker, as an AGENTS.md line or a skill, and list it under Promoted in README.md.",
-			"For work that spans several pull requests, such as a migration, keep checklist.md current: each item, its status, its worker, and its pull request; start the next batch as pull requests merge.",
+			"Record the user's feedback and decisions as soon as you hear them, and tell each worker what of it applies.",
+			"When a note has held across several workers, promote it into the repository through a worker, as an AGENTS.md line or a skill, and list it under Promoted in notes.md.",
+			"For work that spans several pull requests, such as a migration, keep internal/checklist.md current: each item, its status, its worker, and its pull request; start the next batch as pull requests merge, and move finished items to archived.md.",
+			"Each outside event, such as a pull request's checks or a Linear issue, is also a file in inbox/; once you have handled it, delete the file or move its line to archived.md.",
 			`The user's review cadence is: ${cadence}. Ask the user to review a pull request only when that cadence calls for it; always ask for a failure you cannot resolve.`,
 			"Updates about your workers and your subscriptions arrive as user messages that start with [omp-agents]; never poll for them.",
 			"Tell the user what the workers found and what is done, and tell them when a worker waits on a question you cannot answer.",
@@ -119,7 +126,7 @@ export function roleText({ project, worker, subagent }: Role, notes: string): st
 	return [
 		`You are worker ${worker.id} (${JSON.stringify(worker.title)}) of the omp-agents project ${JSON.stringify(project.name)}, started by its coordinator agent.`,
 		shared,
-		"Before your final report, add to testing.md, preferences.md, or research.md whatever you learned that the next worker would need, and say in the report which notes you changed.",
+		"Before your final report, add to docs/testing.md or docs/research.md whatever you learned that the next worker would need, and say in the report which notes you changed.",
 		"The coordinator reads only your last reply, so end each turn with a report that stands alone: what you did, what you found, and what is left.",
 		"When you need a decision, end your turn with the question rather than asking through the ask tool.",
 	].join(" ");
@@ -132,11 +139,11 @@ function targets(input: Record<string, unknown>): string[] {
 	return paths;
 }
 
-/** Whether `path`, from `cwd`, is in `notes` or the session's scratch space. */
-function inNotes(path: string, cwd: string, notes: string): boolean {
+/** Whether `path`, from `cwd`, is in one of the notes directories `roots` or the session's scratch space. */
+function inNotes(path: string, cwd: string, roots: readonly string[]): boolean {
 	if (SCRATCH_SCHEMES.some(scheme => path.startsWith(scheme)) || path === "/dev/null") return true;
 	const file = resolve(cwd, path.replace(/^~(?=\/|$)/, homedir()));
-	return file === notes || file.startsWith(notes + sep);
+	return roots.some(root => file === root || file.startsWith(root + sep));
 }
 
 /**
@@ -158,21 +165,21 @@ const GIT_WRITES: Record<string, true> = { commit: true, push: true, checkout: t
 const GT_READS: Record<string, true> = { log: true, ls: true, ll: true, status: true, info: true, "branch-info": true, parent: true, children: true, trunk: true, "--help": true, help: true };
 
 /**
- * Why a coordinator's shell `command`, run in `cwd`, writes outside `notes`; `null` when it does not seem to. A nudge
- * that reminds the coordinator of its role, not a boundary: it catches a redirection or `tee` to a file outside the notes,
+ * Why a coordinator's shell `command`, run in `cwd`, writes outside the notes directories `roots`; `null` when it does not
+ * seem to. A nudge that reminds the coordinator of its role, not a boundary: it catches a redirection or `tee` to a file outside them,
  * and git and Graphite commands that change the checkout or a branch. Any other command runs.
  */
-export function shellWrite(command: string, cwd: string, notes: string): string | null {
+export function shellWrite(command: string, cwd: string, roots: readonly string[]): string | null {
 	const plain = unquoted(command);
 	for (const redirect of plain.matchAll(/(?<![0-9&<>=-])(?:[0-9]?>>?|&>>?)\s*(?!&)([^\s;|&<>]+)/g)) {
 		const target = redirect[1] ?? "";
-		if (!inNotes(target, cwd, notes)) return `it redirects output to ${target}`;
+		if (!inNotes(target, cwd, roots)) return `it redirects output to ${target}`;
 	}
 	for (const segment of plain.split(/&&|\|\||[;|\n]/)) {
 		const [verb = "", ...rest] = words(segment);
 		const operands = rest.filter(word => !word.startsWith("-"));
 		if (verb === "tee") {
-			const target = operands.find(path => !inNotes(path, cwd, notes));
+			const target = operands.find(path => !inNotes(path, cwd, roots));
 			if (target !== undefined) return `tee writes ${target}`;
 		} else if (verb === "git") {
 			// `-C <dir>` and `-c <name=value>` take a value before the subcommand.
@@ -190,26 +197,28 @@ export default function projects(pi: ExtensionAPI) {
 	pi.on("before_agent_start", (event, ctx) => {
 		const role = roleOf(ctx);
 		if (!role) return;
-		return { systemPrompt: [...event.systemPrompt, roleText(role, join(NOTES_ROOT, role.project.id))] };
+		return { systemPrompt: [...event.systemPrompt, roleText(role, join(NOTES_ROOT, role.project.id), USER_NOTES)] };
 	});
 	pi.on("tool_call", (event, ctx) => {
 		if (event.toolName !== "edit" && event.toolName !== "write" && event.toolName !== "bash") return;
 		const role = roleOf(ctx);
 		if (!role || role.worker) return;
 		const notes = join(NOTES_ROOT, role.project.id);
+		const roots = [notes, USER_NOTES];
+		const where = `the project's notes in ${notes} and the user's notes in ${USER_NOTES}`;
 		const input = event.input as Record<string, unknown>;
 		if (event.toolName === "bash") {
-			const why = typeof input.command === "string" ? shellWrite(input.command, typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd, notes) : null;
+			const why = typeof input.command === "string" ? shellWrite(input.command, typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd, roots) : null;
 			if (why === null) return;
-			return { block: true, reason: `A project coordinator does not change code, and ${why}, outside the project's notes in ${notes}. Start a worker with start_worker for the change.` };
+			return { block: true, reason: `A project coordinator does not change code, and ${why}, outside ${where}. Start a worker with start_worker for the change.` };
 		}
 		const paths = targets(input);
 		// A call whose files cannot be read, such as one in a format this does not know, is refused rather than let through.
 		if (paths.length === 0) {
-			return { block: true, reason: `A project coordinator does not change code, and this ${event.toolName} call names no file the guard can check against the project's notes in ${notes}. Start a worker with start_worker for the change.` };
+			return { block: true, reason: `A project coordinator does not change code, and this ${event.toolName} call names no file the guard can check against ${where}. Start a worker with start_worker for the change.` };
 		}
-		const outside = paths.find(path => !inNotes(path, ctx.cwd, notes));
+		const outside = paths.find(path => !inNotes(path, ctx.cwd, roots));
 		if (outside === undefined) return;
-		return { block: true, reason: `A project coordinator does not change code: ${outside} is outside the project's notes in ${notes}. Start a worker with start_worker for the change.` };
+		return { block: true, reason: `A project coordinator does not change code: ${outside} is outside ${where}. Start a worker with start_worker for the change.` };
 	});
 }

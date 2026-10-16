@@ -35,6 +35,7 @@ import { GOOGLE_SERVICES, type GoogleService, type McpIntegration, type McpInteg
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
+import type { ProjectNotesAnswer } from "../shared/projects";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
@@ -77,6 +78,8 @@ export interface SessionRoutesEnv {
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
 	/** The notes directory of project `id`, or `null` when there is no such project. */
 	projectNotesDir(id: string): string | null;
+	/** The user's notes directory, which every project shares. */
+	userNotesDir: string;
 	/** The saved conversations whose prompts or replies hold every word of `query`, the file changed last first. */
 	searchConversations(query: string): Promise<ConversationHit[]>;
 	sourceControl(): Promise<SourceControlAnswer>;
@@ -305,11 +308,16 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return file ? Response.json(file) : fail(404, `The session changed no file ${path}`);
 	});
 
-	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the Markdown files in it, which the file dialog opens. */
+	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the user's, with the Markdown files in each, which the file dialog opens. */
 	const projectNotes = get(params => {
 		const id = params.get("id") ?? "";
 		const dir = env.projectNotesDir(id);
-		return dir === null ? fail(404, `No project ${id}`) : answer(async () => ({ dir, notes: await listNotes(dir) }));
+		const userDir = env.userNotesDir;
+		if (dir === null) return fail(404, `No project ${id}`);
+		return answer(async (): Promise<ProjectNotesAnswer> => {
+			const [notes, userNotes] = await Promise.all([listNotes(dir), listNotes(userDir)]);
+			return { dir, notes, userDir, userNotes };
+		});
 	});
 
 	/** `GET /api/conversations?q=<words>`: the saved conversations whose prompts or replies hold every word, each by its latest such message. */

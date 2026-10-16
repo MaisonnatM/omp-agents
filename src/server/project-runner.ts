@@ -82,6 +82,8 @@ export interface ProjectRunnerDeps {
 	extensionArgs(): string[];
 	/** Creates project `id`'s notes for a project named `name` working on `goal`. */
 	seedNotes(id: string, name: string, goal: string): void;
+	/** Writes outside event `event`, which came at `at`, into project `id`'s inbox in its notes. */
+	writeInbox(id: string, event: ProjectEvent, at: string): void;
 	now(): number;
 	newId(): string;
 	/** The projects changed; every socket should hear them. */
@@ -199,11 +201,16 @@ export class ProjectRunner implements ProjectControl {
 		}
 	}
 
-	/** Saves `event` for project `projectId`'s coordinator; why it cannot, or `null` once saved. */
+	/** Saves `event` for project `projectId`'s coordinator, and writes it into the project's inbox; why it cannot, or `null` once saved. */
 	notify(projectId: string, event: ProjectEvent): string | null {
 		const project = this.#deps.file.get(projectId);
 		if (!project) return "its project no longer exists.";
 		if (project.archived) return `project ${project.name} is archived.`;
+		try {
+			this.#deps.writeInbox(projectId, event, this.#now());
+		} catch (error) {
+			console.error(`omp-agents: cannot write ${project.name}'s inbox: ${errorText(error)}`);
+		}
 		this.#save(projectId, [{ kind: "event", ...event }]);
 		this.settle(projectId);
 		return null;

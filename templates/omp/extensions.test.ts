@@ -153,6 +153,7 @@ describe("projects", () => {
 	afterAll(() => rmSync(root, { recursive: true, force: true }));
 	const env = { XDG_CONFIG_HOME: join(root, "config"), XDG_DATA_HOME: join(root, "data") };
 	const notes = join(root, "data", "omp-agents", "projects", "p1");
+	const user = join(root, "data", "omp-agents", "user");
 	mkdirSync(join(root, "config", "omp-agents"), { recursive: true });
 	writeFileSync(
 		join(root, "config", "omp-agents", "projects.json"),
@@ -163,7 +164,8 @@ describe("projects", () => {
 		const coordinator = exercise("projects", { agentStart: true, sessionId: "s-c" }, env).prompt;
 		expect(coordinator?.[0]).toBe("base");
 		expect(coordinator?.[1]).toStartWith('You are the coordinator of the omp-agents project "Billing".');
-		expect(coordinator?.[1]).toContain(`Read ${join(notes, "README.md")} first.`);
+		expect(coordinator?.[1]).toContain(`Read ${join(notes, "notes.md")} first:`);
+		expect(coordinator?.[1]).toContain(`Read ${join(user, "preferences.md")}`);
 		expect(coordinator?.[1]).toContain("[omp-agents]");
 		const worker = exercise("projects", { agentStart: true, sessionId: "s-w2" }, env).prompt;
 		expect(worker?.[1]).toStartWith('You are worker w2 ("Schema") of the omp-agents project "Billing"');
@@ -174,11 +176,14 @@ describe("projects", () => {
 
 	test.each([
 		["s-c", join(root, "repo", "src", "app.ts"), true],
-		["s-c", join(notes, "testing.md"), false],
+		["s-c", join(notes, "docs", "testing.md"), false],
+		["s-c", join(user, "preferences.md"), false],
+		["s-c", join(user, "workflows", "new-feature.md"), false],
+		["s-c", `${user}-other/x.md`, true],
 		["s-c", `${notes}-other/x.md`, true],
 		["s-c", "local://plan.md", false],
 		["s-c", "artifact://12", false],
-		["s-c", `file://${join(notes, "testing.md")}`, true],
+		["s-c", `file://${join(notes, "docs", "testing.md")}`, true],
 		["s-w2", join(root, "repo", "src", "app.ts"), false],
 		["s-other", join(root, "repo", "src", "app.ts"), false],
 	])("session %s writing %s is blocked: %s", (sessionId, path, blocked) => {
@@ -194,8 +199,8 @@ describe("projects", () => {
 
 	test("a coordinator's hashline edit is checked file by file, and an edit naming no file it can read is refused", () => {
 		const edit = (input: object) => exercise("projects", { edit: input, sessionId: "s-c" }, env).result;
-		expect(edit({ input: `[${join(notes, "README.md")}#1A2B]\nPUT 1.=1:\n+x` })).toBeNull();
-		expect(edit({ input: `[${join(notes, "README.md")}#1A2B]\nPUT 1.=1:\n+x\n[${join(root, "repo", "a.ts")}#3C4D]\nPUT 1.=1:\n+y` })?.block).toBe(true);
+		expect(edit({ input: `[${join(notes, "notes.md")}#1A2B]\nPUT 1.=1:\n+x\n[${join(user, "preferences.md")}#3C4D]\nPUT 1.=1:\n+y` })).toBeNull();
+		expect(edit({ input: `[${join(notes, "notes.md")}#1A2B]\nPUT 1.=1:\n+x\n[${join(root, "repo", "a.ts")}#3C4D]\nPUT 1.=1:\n+y` })?.block).toBe(true);
 		expect(edit({ input: "*** Begin Patch\n*** Update File: src/a.ts" })?.reason).toContain("names no file");
 		expect(exercise("projects", { edit: { input: "anything" }, sessionId: "s-w2" }, env).result).toBeNull();
 	});
