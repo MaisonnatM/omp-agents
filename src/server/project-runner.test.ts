@@ -417,6 +417,37 @@ describe("ProjectRunner", () => {
 		await expect(tool(h, projectId, "end_worker", { worker: "w1" })).rejects.toThrow("w1 does not run");
 	});
 
+	test("a worker the coordinator ends stops without news and frees its slot for the queue", async () => {
+		const h = harness();
+		const { projectId, worker } = await project(h, 0);
+		h.file.apply({ op: "max-workers", id: projectId, max: 1 });
+		await startWorker(h, projectId, { title: "One", prompt: "1.", cwd: null });
+		await startWorker(h, projectId, { title: "Two", prompt: "2.", cwd: null });
+		const w1 = worker(1);
+		w1.status = "idle";
+		await tool(h, projectId, "end_worker", { worker: "w1" });
+		const started = h.until(() => h.file.get(projectId)!.workers.length === 2);
+		h.runner.exited(w1.instanceId);
+		await started;
+		expect(h.file.get(projectId)!.updates).toEqual([]);
+	});
+
+	test("endIdle ends an idle worker as end_worker does, without news, and leaves one that works or asks", async () => {
+		const h = harness();
+		const { projectId, worker } = await project(h, 2);
+		const [w1, w2] = [worker(1), worker(2)];
+		w1.status = "idle";
+		w2.status = "needs-input";
+		expect(h.runner.endIdle(projectId, "w2")).toBe(false);
+		expect(h.runner.endIdle(projectId, "w9")).toBe(false);
+		expect(h.runner.endIdle(projectId, "w1")).toBe(true);
+		await Promise.resolve();
+		expect(h.ended).toEqual([w1.sessionId]);
+		h.runner.exited(w1.instanceId);
+		expect(h.file.get(projectId)!.updates).toEqual([]);
+		expect(h.runner.endIdle(projectId, "w1")).toBe(false);
+	});
+
 	test("after a restart, a coordinator that stopped with the server resumes and hears which workers stopped", async () => {
 		const before = harness();
 		const { projectId, coordinator, worker } = await project(before, 2);

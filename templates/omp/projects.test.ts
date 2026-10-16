@@ -32,7 +32,7 @@ describe("projects extension", () => {
 		expect(findRole([PROJECT], "s-w1")?.worker?.id).toBe("w1");
 	});
 
-	test("the role text gives a worker its learnings step, the coordinator its tools, delegation, and cadence, and a coordinator's subagent its limit", () => {
+	test("the role text gives a worker its learnings step, the coordinator its tools, delegation, cadence, and autonomy, and a coordinator's subagent its limit", () => {
 		const worker = roleText({ project: PROJECT, worker: PROJECT.workers[0], subagent: false }, NOTES, USER);
 		expect(worker).toContain("Before your final report, add to docs/testing.md or docs/research.md");
 		const coordinator = roleText({ project: { ...PROJECT, reviewCadence: "failures only" }, worker: null, subagent: false }, NOTES, USER);
@@ -46,6 +46,11 @@ describe("projects extension", () => {
 			"inbox/; once you have handled it, delete the file or move its line to archived.md",
 			"Promoted in notes.md",
 			"review cadence is: failures only",
+			"start the workers at once",
+			"never for permission to start",
+			"never write a prompt for the user to paste",
+			"call end_worker for it in the same turn",
+			"The user never sees those messages",
 		]) {
 			expect(coordinator).toContain(part);
 		}

@@ -5,6 +5,7 @@
  */
 import type { RpcHostTool } from "../omp/modules";
 import type { Project, ProjectUpdate, Worker, WorkerId, WorkerPhase } from "../shared/projects";
+import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 
 /** How the coordinator asks for a worker; every field but the title and prompt may be `null` for the default. */
 export interface WorkerSpec {
@@ -68,7 +69,10 @@ function workerOf(project: Project, id: string): Worker {
 	return worker;
 }
 
-/** The message that brings `updates` to the coordinator of `project`, in order; a finished turn quotes the worker's last reply. */
+/**
+ * The message that brings `updates` to the coordinator of `project`, in order; a finished turn quotes the worker's last
+ * reply. It starts with {@link DASHBOARD_PROMPT_PREFIX}, so the page hides it from the user.
+ */
 export function updateText(project: Project, updates: readonly ProjectUpdate[]): string {
 	const who = (workerId: WorkerId): string => {
 		const worker = project.workers.find(candidate => candidate.id === workerId);
@@ -99,7 +103,7 @@ export function updateText(project: Project, updates: readonly ProjectUpdate[]):
 			}
 		}
 	});
-	return ["[omp-agents] Project update.", ...lines, "Use read_worker for more, message_worker to reply."].join("\n");
+	return [`${DASHBOARD_PROMPT_PREFIX} Project update.`, ...lines, "Use read_worker for more, message_worker to reply."].join("\n");
 }
 
 /** The tools of project `projectId`'s coordinator. */

@@ -120,6 +120,10 @@ export function roleText({ project, worker, subagent }: Role, notes: string, use
 			"Each outside event, such as a pull request's checks or a Linear issue, is also a file in inbox/; once you have handled it, delete the file or move its line to archived.md.",
 			`The user's review cadence is: ${cadence}. Ask the user to review a pull request only when that cadence calls for it; always ask for a failure you cannot resolve.`,
 			"Updates about your workers and your subscriptions arrive as user messages that start with [omp-agents]; never poll for them.",
+			"The user never sees those messages, so when you act on one, say which worker reported what.",
+			"Once the plan is clear, start the workers at once: never ask the user to approve the plan or to say go, and never write a prompt for the user to paste or start themselves.",
+			"Ask the user only for a decision that is genuinely theirs, such as the scope, a product choice, or a merge when the review cadence calls for it, never for permission to start.",
+			"When a worker's work is done, its pull request merged or closed or its report leaving nothing for it to do, call end_worker for it in the same turn, then report; the dashboard also ends an idle worker on its own once its pull requests are merged.",
 			"Tell the user what the workers found and what is done, and tell them when a worker waits on a question you cannot answer.",
 		].join(" ");
 	}

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { endsMidTurn, sessionFileOf } from "./sessions";
+import { endsMidTurn, readSessionFile, sessionFileOf } from "./sessions";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -36,6 +36,16 @@ function sessionFile(entries: object[]): string {
 	writeFileSync(path, entries.map(entry => `${JSON.stringify(entry)}\n`).join(""));
 	return path;
 }
+
+describe("readSessionFile", () => {
+	const reply = { type: "message", id: "a1", parentId: "u1", timestamp: at, message: { role: "assistant", ...model, content: [{ type: "text", text: "ok" }], stopReason: "stop", timestamp: 2 } };
+
+	test("an untitled session reads as its first prompt, unless the dashboard sent that prompt", async () => {
+		expect((await readSessionFile(sessionFile([header, prompt, reply])))?.title).toBe("run it");
+		const update = { ...prompt, message: { ...prompt.message, content: "[omp-agents] Project update.\n- w1 stopped." } };
+		expect((await readSessionFile(sessionFile([header, update, reply])))?.title).toBeNull();
+	});
+});
 
 describe("endsMidTurn", () => {
 	test("a session whose process was killed during a tool call ended mid-turn", async () => {

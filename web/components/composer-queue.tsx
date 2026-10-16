@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";
 import type { MessageQueue, WithdrawnMessage } from "../../src/shared/sessions";
+import { isDashboardPrompt } from "../../src/shared/transcript";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIsTouch } from "@/hooks/use-is-touch";
 import { useRegionHeight } from "@/hooks/use-region-height";
@@ -30,13 +31,15 @@ export interface QueueEntry {
 	item: QueuedItem;
 }
 
-/** Each id counts the earlier rows with the same text, so a row keeps its key when the one ahead of it is delivered. */
+/**
+ * Each id counts the earlier rows with the same text, so a row keeps its key when the one ahead of it is delivered. A
+ * prompt the dashboard sent in the user's place is not theirs to see, edit, or take back.
+ */
 export function queuedEntries(waiting: MessageQueue | undefined): QueueEntry[] {
 	return QUEUE_TAGS.flatMap(([queue, tag]) =>
-		(waiting?.[queue] ?? []).map((text, index, texts) => ({
-			queue,
-			item: { id: `${queue}:${texts.slice(0, index).filter(t => t === text).length}:${text}`, text, tag },
-		})),
+		(waiting?.[queue] ?? []).flatMap((text, index, texts) =>
+			isDashboardPrompt(text) ? [] : [{ queue, item: { id: `${queue}:${texts.slice(0, index).filter(t => t === text).length}:${text}`, text, tag } }],
+		),
 	);
 }
 

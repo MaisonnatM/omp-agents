@@ -331,6 +331,7 @@ export class Dashboard {
 			detail: pr => loadPullRequestDetail(pr, true),
 			tickets: async () => (await loadTickets(true)).tickets,
 			notify: (projectId, event) => projectRunner.notify(projectId, event),
+			endIdle: (projectId, workerId) => projectRunner.endIdle(projectId, workerId),
 		});
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {

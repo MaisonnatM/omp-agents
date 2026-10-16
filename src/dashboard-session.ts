@@ -15,7 +15,9 @@ import type { PreparedReplay } from "./replay";
 import { launchForReplayResume, replayLaunch, requireReplayReady } from "./omp/replay-launch";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
+import { isDashboardPrompt } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";
+import { textOf } from "./session-entries";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { isUserPrompt, type StartingPrompt, splitSuggestions } from "./transcript";
 import { SerialLane } from "./serial-lane";
@@ -591,8 +593,11 @@ export class DashboardSession implements LiveSession {
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
-		} else if (event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && this.sessionName === null && !this.#titled) {
+		} else if (
+			event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && !isDashboardPrompt(textOf(event.message.content)) && this.sessionName === null && !this.#titled
+		) {
 			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
+			// A prompt the dashboard sent waits for the user's own, which the title should name.
 			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt.
 			// Through the turn gate, `/rename` can land after the turn's last state event, so read the title it made here.
 			this.#titled = true;

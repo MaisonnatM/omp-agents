@@ -11,7 +11,7 @@ import { isObject, str } from "./json";
 import { imagesOf, oneLine, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
 import { splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
-import type { Item } from "./shared/transcript";
+import { isDashboardPrompt, type Item } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -140,7 +140,8 @@ export function splitSuggestions(text: string): { body: string; suggestions: str
 export type MessageItem = Extract<Item, { kind: "user" | "assistant" }>;
 
 /**
- * The prompts and replies one session-file entry holds, as a fold of the whole file shows them. Their ids and text
+ * The prompts and replies one session-file entry holds, as a fold of the whole file shows them, without a prompt the
+ * dashboard sent in the user's place, which the conversation search skips. Their ids and text
  * come from the entry alone (its message's timestamp, else its own id), so one entry folded by itself names them the
  * same, without the thinking, tool calls, and order a whole fold keeps.
  */
@@ -187,11 +188,15 @@ export class Transcript {
 		return removed;
 	}
 
-	/** Show `prompt` as the session's starting prompt in place of the one shown, or none for `null`. Returns the item it added. */
+	/**
+	 * Show `prompt` as the session's starting prompt in place of the one shown, or none for `null` or a prompt the
+	 * dashboard sent. Returns the item it added.
+	 */
 	setStarting(prompt: StartingPrompt | null): Item[] {
-		if ((this.#starting?.id ?? null) === (prompt && `starting:${prompt.id}`)) return [];
+		const shown = prompt && !isDashboardPrompt(prompt.text) ? prompt : null;
+		if ((this.#starting?.id ?? null) === (shown && `starting:${shown.id}`)) return [];
 		if (this.#starting) this.#removed.push(this.#starting.id);
-		this.#starting = prompt && startingItem(prompt);
+		this.#starting = shown && startingItem(shown);
 		return this.#starting ? [this.#starting] : [];
 	}
 
@@ -298,7 +303,9 @@ export class Transcript {
 		switch (message.role) {
 			case "user": {
 				if (message.synthetic) return [];
-				return this.#upsert({ id: key, kind: "user", ...userPrompt(textOf(message.content)), from: null, entryId, ...imagesOf(message.content) });
+				const text = textOf(message.content);
+				if (isDashboardPrompt(text)) return this.#upsert({ id: key, kind: "dashboard", text, entryId });
+				return this.#upsert({ id: key, kind: "user", ...userPrompt(text), from: null, entryId, ...imagesOf(message.content) });
 			}
 			case "custom": {
 				const details = isObject(message.details) ? message.details : {};

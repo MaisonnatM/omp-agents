@@ -53,6 +53,19 @@ test("finds each session by its latest prompt or reply holding every word, not t
 	expect(search(listed(2)).map(hit => hit.sessionId)).toEqual(["b"]);
 });
 
+test("a prompt the dashboard sent in the user's place is not found", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-convo-"));
+	dirs.push(dir);
+	const file = join(dir, "c.jsonl");
+	writeFileSync(file, line("user", "[omp-agents] Project update.\n- w1 finished the login fix.", 1) + line("assistant", "Noted.", 2));
+	const conversations = new Conversations();
+	const index = new SessionFactsIndex(async () => null, async () => null, async () => null, [conversations]);
+	const listed = [{ id: "c", path: file, cwd: dir, modifiedAt: 1 }];
+	await index.refresh(listed);
+	expect(conversations.search(listed, "login fix")).toEqual([]);
+	expect(conversations.search(listed, "noted").map(hit => hit.messageId)).toEqual(["m2:0"]);
+});
+
 test("finds a Claude Code session by its prompt, under the item id its pane shows, and not by a tool's output", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-convo-"));
 	dirs.push(dir);

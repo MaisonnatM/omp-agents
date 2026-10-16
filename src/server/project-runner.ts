@@ -5,7 +5,8 @@
  * project keeps them until it is unarchived.
  * A session's role is keyed by session id on disk, so a resumed coordinator gets its tools again.
  * Every worker joins the project's queue, also saved, and starts once the project has a free slot; it leaves the queue
- * in the same change that adds it to the project.
+ * in the same change that adds it to the project. A worker the coordinator ends, or the runner ends once its pull
+ * requests merged, stops without news.
  */
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -145,6 +146,8 @@ export class ProjectRunner implements ProjectControl {
 	readonly #sending = new Set<string>();
 	/** Queued workers starting now, by queue id, with their project's id; each takes a slot before its session reports its status. */
 	readonly #launching = new Map<string, string>();
+	/** The live workers, by instance id, that the coordinator or the runner is ending, whose exit is no news. */
+	readonly #ending = new Set<string>();
 	/** Set as the dashboard stops: its sessions exit with it, which is no news for a coordinator. */
 	#stopping = false;
 
@@ -239,9 +242,11 @@ export class ProjectRunner implements ProjectControl {
 		const tracked = this.#tracked.get(instanceId);
 		if (!tracked) return;
 		this.#tracked.delete(instanceId);
+		const asked = this.#ending.delete(instanceId);
 		const { role } = tracked;
 		if (role.role !== "worker" || this.#stopping) return;
-		this.#save(role.projectId, [{ kind: "stopped", workerId: role.workerId }]);
+		// An end the coordinator or the runner asked for is no news, but it frees a slot.
+		if (!asked) this.#save(role.projectId, [{ kind: "stopped", workerId: role.workerId }]);
 		this.settle(role.projectId);
 	}
 
@@ -295,7 +300,31 @@ export class ProjectRunner implements ProjectControl {
 
 	async endWorker(worker: Worker): Promise<void> {
 		if (!this.#deps.bySessionId(worker.sessionId)) throw new Error(`${worker.id} does not run.`);
-		await this.#deps.end(worker.sessionId);
+		await this.#end(worker);
+	}
+
+	/**
+	 * Ends worker `workerId` of project `projectId` as end_worker does, when it runs and is idle; whether it began to.
+	 * The watch calls it once the worker's pull requests are all merged or closed, which leaves it nothing to do.
+	 */
+	endIdle(projectId: string, workerId: WorkerId): boolean {
+		const project = this.#deps.file.get(projectId);
+		const worker = project && !project.archived ? project.workers.find(candidate => candidate.id === workerId) : undefined;
+		if (!project || !worker || this.#deps.bySessionId(worker.sessionId)?.status !== "idle") return false;
+		void this.#end(worker).catch((error: unknown) => console.error(`omp-agents: cannot end ${worker.id} of project ${project.name}: ${errorText(error)}`));
+		return true;
+	}
+
+	/** Ends the worker's session; the exit it causes is no news for the coordinator. */
+	async #end(worker: Worker): Promise<void> {
+		const instanceId = [...this.#tracked].find(([, tracked]) => tracked.sessionId === worker.sessionId)?.[0];
+		if (instanceId !== undefined) this.#ending.add(instanceId);
+		try {
+			await this.#deps.end(worker.sessionId);
+		} catch (error) {
+			if (instanceId !== undefined) this.#ending.delete(instanceId);
+			throw error;
+		}
 	}
 
 	/** Every project not archived, as its notices see it. */

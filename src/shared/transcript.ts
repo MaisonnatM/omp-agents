@@ -14,6 +14,12 @@ export interface TextFile {
 	truncated: boolean;
 }
 
+/** How a prompt the dashboard sends in the user's place starts; the agent reads it, the user never sees it as theirs. */
+export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
+
+/** Whether prompt `text` is one the dashboard sent in the user's place. */
+export const isDashboardPrompt = (text: string): boolean => text.startsWith(DASHBOARD_PROMPT_PREFIX);
+
 export type Item =
 	/**
 	 * `skill`: the skill a `/skill:<name>` prompt invoked, with `text` holding only what the user typed after it; `null` for
@@ -23,6 +29,11 @@ export type Item =
 	 * `pending`: a prompt omp admitted whose turn has not shown it yet, which the live user message replaces; absent otherwise.
 	 */
 	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[]; files?: string[]; pending?: true }
+	/**
+	 * A prompt the dashboard sent in the user's place, such as a project's update, which {@link isDashboardPrompt} tells.
+	 * The page shows nothing for it, but it opens a turn as a prompt does. `entryId` as a prompt's.
+	 */
+	| { id: string; kind: "dashboard"; text: string; entryId: string | null }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }

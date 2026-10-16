@@ -36,18 +36,33 @@ function ticket(overrides: Partial<Ticket> = {}): Ticket {
 }
 
 function harness(projects: Project[]) {
-	const state = { detail: detail(), tickets: [] as Ticket[], notified: [] as string[], reads: 0 };
+	const state = {
+		detail: detail(),
+		/** Each pull request's detail by number, else `detail`. */
+		details: new Map<number, PullRequestDetail>(),
+		pullRequests: [PR],
+		tickets: [] as Ticket[],
+		notified: [] as string[],
+		reads: 0,
+		/** Whether `endIdle` finds the worker idle. */
+		idle: true,
+		ended: [] as string[],
+	};
 	const watch = new ProjectWatch({
 		projects: () => projects,
-		pullRequestsOf: sessionId => (sessionId === "s-w1" ? [PR] : []),
-		detail: async () => {
+		pullRequestsOf: sessionId => (sessionId === "s-w1" ? state.pullRequests : []),
+		detail: async pr => {
 			state.reads++;
-			return state.detail;
+			return state.details.get(pr.number) ?? state.detail;
 		},
 		tickets: async () => state.tickets,
 		notify(projectId, event) {
 			state.notified.push(`${projectId} ${event.source}: ${event.title}${event.text ? ` | ${event.text}` : ""}`);
 			return null;
+		},
+		endIdle(projectId, workerId) {
+			if (state.idle) state.ended.push(`${projectId} ${workerId}`);
+			return state.idle;
 		},
 	});
 	/** Two minutes pass, which takes one look. */
@@ -74,11 +89,37 @@ describe("ProjectWatch", () => {
 		expect(state.notified).toEqual([
 			"p1 GitHub: Checks failed on o/r#12 | Failing: lint",
 			"p1 GitHub: ana requested changes on o/r#12 | Rename Y too.",
-			"p1 GitHub: o/r#12 was merged | Rename X",
+			'p1 GitHub: o/r#12 was merged | Rename X\nEnded w1 "Schema": idle, with every pull request merged or closed.',
 			"p1 GitHub: Checks pass again on o/r#12 | Rename X",
 		]);
+		expect(state.ended).toEqual(["p1 w1"]);
 		await look();
 		expect(state.reads).toBe(3);
+		expect(state.ended).toEqual(["p1 w1"]);
+	});
+
+	test("a merge leaves a worker that is not idle, or has another pull request open, and a merge seen at the first look ends none", async () => {
+		const busy = harness([project()]);
+		busy.state.idle = false;
+		await busy.look();
+		busy.state.detail = detail({ state: "merged" });
+		await busy.look();
+		expect(busy.state.notified).toEqual(["p1 GitHub: o/r#12 was merged | Rename X"]);
+
+		const open = harness([project()]);
+		const other = { owner: "o", repo: "r", number: 13 } as LinkedPullRequest;
+		open.state.pullRequests = [PR, other];
+		open.state.details.set(13, detail({ number: 13, title: "Follow-up" }));
+		await open.look();
+		open.state.detail = detail({ state: "merged" });
+		await open.look();
+		expect(open.state.ended).toEqual([]);
+
+		const late = harness([project()]);
+		late.state.detail = detail({ state: "merged" });
+		await late.look();
+		await late.look();
+		expect(late.state.ended).toEqual([]);
 	});
 
 	test("one minute alone takes no look", async () => {

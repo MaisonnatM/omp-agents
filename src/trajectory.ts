@@ -7,6 +7,7 @@ import { FoldedFile, ReadQueue } from "./line-reader";
 import { entryTime, textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { addUsage, type Clipped, NO_USAGE, type TokenUsage, type Turn, type TurnStep } from "./shared/trajectory";
 import { REPLAY_BLOCK } from "./shared/replay";
+import { isDashboardPrompt } from "./shared/transcript";
 import { messageItemsOf } from "./transcript";
 
 const TEXT_MAX = 16_000;
@@ -105,7 +106,9 @@ export class Trajectory {
 			case "user":
 			case "bashExecution":
 				if (!this.#opens(entry)) {
-					this.#waiting.push({ kind: "injection", source: message.synthetic === true ? "synthetic" : String(message.role), attribution: attributionOf(message.attribution), body: clip(textOf(message.content)) });
+					const text = textOf(message.content);
+					const source = message.synthetic === true ? "synthetic" : message.role === "user" && isDashboardPrompt(text) ? "omp-agents" : String(message.role);
+					this.#waiting.push({ kind: "injection", source, attribution: attributionOf(message.attribution), body: clip(text) });
 				}
 				return;
 			case "developer":

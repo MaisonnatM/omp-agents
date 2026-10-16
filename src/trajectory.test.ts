@@ -79,6 +79,17 @@ describe("Trajectory", () => {
 		expect(kinds(turns[2])).toEqual(["injection:skill-prompt", "prompt"]);
 	});
 
+	test("a prompt the dashboard sent opens no turn and reaches the model as an omp-agents injection", () => {
+		const turns = fold(
+			user("p1", "first"),
+			assistant([{ type: "text", text: "Started w1." }], usage(1, 2, 0, 0, 0), "stop"),
+			user("u1", "[omp-agents] Project update.\n- w1 stopped."),
+			assistant([{ type: "text", text: "w1 is done." }], usage(1, 2, 0, 0, 0), "stop"),
+		);
+		expect(turns.map(turn => turn.id)).toEqual(["p1"]);
+		expect(kinds(turns[0])).toEqual(["prompt", "request", "reply", "injection:omp-agents", "request", "reply"]);
+	});
+
 	test("a /skill: prompt's turn shows what the user typed, then the skill's body as an injection", () => {
 		const [turn] = fold(skillPrompt("p1", "mma-mode", "fix the bug", "Full skill instructions"));
 		expect(turn?.steps).toEqual([

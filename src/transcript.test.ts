@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildSkillPromptMessage } from "./omp/prompts";
 import { withFiles } from "./shared/prompt-files";
-import { splitSuggestions, Transcript } from "./transcript";
+import { messageItemsOf, splitSuggestions, Transcript } from "./transcript";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
 	role: "assistant",
@@ -98,6 +98,18 @@ describe("Transcript", () => {
 		expect(t.setStarting(null)).toEqual([]);
 		expect(t.items().map(item => item.id)).toEqual(["m600:0"]);
 		expect(t.takeRemoved()).toEqual(["starting:req_2"]);
+	});
+
+	test("a prompt the dashboard sent is a dashboard item, live and from the file, never a starting prompt, and not a message", () => {
+		const t = new Transcript();
+		const update = "[omp-agents] Project update.\n- w1 stopped.";
+		expect(t.setStarting({ id: "req_1", text: update, images: [] })).toEqual([]);
+		expect(t.items()).toEqual([]);
+		expect(t.applyEvent({ type: "message_end", message: { role: "user", timestamp: 100, content: update } })).toEqual([{ id: "m100", kind: "dashboard", text: update, entryId: null }]);
+		const entry = { type: "message", id: "e1", message: { role: "user", timestamp: 100, content: [text(update)] } };
+		t.applyEntry(entry);
+		expect(t.items()).toEqual([{ id: "m100", kind: "dashboard", text: update, entryId: "e1" }]);
+		expect(messageItemsOf(entry)).toEqual([]);
 	});
 
 	test("a fresh session's first prompt shows at once and stays ahead of its reply when the file catches up", () => {

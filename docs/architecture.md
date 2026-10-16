@@ -134,6 +134,9 @@ Every transcript comes from the session files on this machine, not from a networ
   It renders as that message will: a `/skill:` prompt as the skill and its arguments, attached files by name, images inline.
   Its id is `starting:<request id>`, and the `items` message that brings the live user message lists that id in `removed`, so the page drops it and appends the real prompt in one update.
   A pending prompt is the only item that leaves a transcript, so `removed` is empty in every other `items` message.
+- A user message whose text starts with `[omp-agents]` (`DASHBOARD_PROMPT_PREFIX` in `src/shared/transcript.ts`), such as a project's update, is a prompt the dashboard sent in the user's place.
+  The transcript folds it into a `dashboard` item, never a pending one, which the page renders as nothing but counts as a turn's prompt: the reply before it keeps its copy and fork buttons, the user's prompt before it is no longer the editable last prompt, and a reply before it suggests nothing.
+  `messageItemsOf` leaves it out, so the conversation search skips it and the trajectory folds it as an `omp-agents` injection into the turn before it; it titles no session, neither through the `/rename` a dashboard session sends after its first prompt nor as a past session's first prompt, and the composer's queued rows leave it out.
 - The same read folds each line into the view's changed files as well, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
   The view's socket topic carries them as `work` messages: the whole list with the transcript, then only the files each later read changed, which the page puts in place by path.
   A subagent's view folds its own file, so it shows its own changes.
@@ -671,13 +674,18 @@ A worker's session reports three kinds of news, which the runner saves as update
 1. Its `turn-ended` update saves the reply as the worker's `lastReply`, empty when it had none, and becomes `finished`.
 2. Each roster change, which the server passes to `observe`, reports every question the worker waits on whose request id the runner has not reported for that live session, as `asked`, so a question is reported once.
 3. Its process's exit becomes `stopped`, unless the dashboard is stopping: `Dashboard.stop` calls the runner's `stop` before it ends the sessions, since they exit with the dashboard, which is no news.
+   Nor is the exit of a worker that `end_worker` or `endIdle` ended, which the runner keeps by instance id until the exit; it still settles the project, so a queued worker takes the freed slot.
 
 Two kinds come from elsewhere: `restarted`, which `recover` saves at boot when the owner lock is held, naming the workers `interrupted.json` says stopped with the server, after it resumes a coordinator that did, and `event`, which `notify` saves for the routine runner's `project` task and for `ProjectWatch`.
 `notify` also writes the event into the project's `inbox/` through the runner's `writeInbox`, which `Dashboard` wires to `writeInboxEvent` in `src/server/project-notes.ts`, and logs a write that fails rather than losing the update.
 `ProjectWatch` in `src/server/project-watch.ts` hears the minute tick and looks every `PROJECT_WATCH_MINUTES` (2): for each project not archived, it loads the pull request of each worker's branch and the viewer's Linear issues that match the project's `watch.linear`, keeps a snapshot of each in memory, and reports what changed since; the first look only records.
+When a look sees a pull request merged, it calls the runner's `endIdle` for each worker that worked on it and whose every pull request is now merged or closed, before it reports the merge; `endIdle` ends a worker whose live session is `idle`, as `end_worker` does, and the merge's update names the workers it ended.
+A worker that works or asks, or has a pull request still open or unread, stays, and a merge seen at the first look ends none.
+Ending goes through `endSession`, so a worktree with changes stays and the branch stays.
 
 The runner saves each update in `projects.json` at once and then delivers; an archived project's updates wait until `unarchive`, whose apply calls the runner's `settle`.
 When the coordinator's session runs and its status is `idle`, the runner sends every waiting update, in order, as one prompt that `updateText` builds, starting `[omp-agents] Project update.`, quoting at most `REPLY_QUOTE_CHARS` (2,000) of each finished worker's `lastReply`, and naming each `asked` question's request id for `answer_worker`.
+Its `[omp-agents]` prefix keeps it out of what the page shows as the user's own ([Transcripts](#transcripts)).
 It sends it through `LiveSession.prompt` as a `followUp`, which rejects with `PromptRefused` when the session does not take the message, after showing the refusal in the session.
 Once omp takes it, `delivered` removes those updates, and delivery runs again for the ones that came meanwhile; one delivery per project is in flight at a time.
 When omp refuses it, the updates stay and nothing retries at once: delivery runs again when the coordinator's row changes, when its turn ends, and when it attaches, which is also how what waited while it worked, or while it was stopped, reaches it once it is idle.

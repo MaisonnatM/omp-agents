@@ -1193,6 +1193,13 @@ An action that fails shows its error, and its control becomes available again.
   A project runs at most 3 workers at once, working or asking, unless you change **At most** on its page, up to 20; the coordinator's other workers wait in a queue, listed on the page, and start in order as slots free up.
   `list_workers` lists the workers, their phases, and the queue, `read_worker` reads one worker's whole last reply and the questions it waits on, and `message_worker` sends one a message as you would: a running worker gets it after its current turn, and a stopped one is resumed first.
   `answer_worker` answers a question a worker asks through `ask`, a yes or no, one of its options, or text, and `end_worker` ends a worker that is done.
+- The coordinator starts and ends workers on its own.
+  Once its plan is clear, it starts the workers at once, without asking you to approve the plan or to say go, and never hands you a prompt to paste or start yourself.
+  It asks you only for a decision that is yours, such as the scope, a product choice, or a merge when your review cadence calls for it.
+  When a worker's work is done, its pull request merged or closed or its report leaving it nothing to do, the coordinator ends it in the same turn, then tells you.
+  With **Workers' pull requests** on, the dashboard also ends a worker once it sees one of its pull requests merged, if the worker is idle and every pull request it worked on is merged or closed; the merge's update tells the coordinator.
+  A worker that works or asks stays, and a worker the coordinator or the dashboard ends sends no update that it stopped.
+  Ending a worker removes its worktree only when nothing in it would be lost, as **End session** does, and keeps its branch.
 - The **Sessions** tab lists each project as a collapsible group at the top, under the project's name: the coordinator first, with a **Coordinator** badge, then the workers in order, `w1` first.
   A worker's row reads as the title the coordinator gave it, beside its `w1`, `w2` badge, rather than the title omp generated for the session.
   A project's sessions leave the other groups, **Pinned** included, and the group lists them even in `/tmp`, which the sidebar otherwise hides.
@@ -1213,6 +1220,10 @@ An action that fails shows its error, and its control becomes available again.
 - Workers report back on their own, so the coordinator never polls.
   Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
   Once the coordinator runs and is idle, every waiting update reaches it as one message that starts with `[omp-agents] Project update.`, quoting each finished worker's last reply up to 2,000 characters.
+  You do not see that message: the coordinator's transcript shows only its reply, which says which worker reported what, and the notices bell's **Projects** tab tells you what needs you.
+  Any message that starts with `[omp-agents]` stays out of the transcript, the queued messages above the composer and what ↑ takes back, the conversation search, and a session's title, though the session file keeps it and the model reads it.
+  The **Trajectory** shows it inside the turn before it, as a step injected by `omp-agents`, rather than as a prompt of its own.
+  An edit of your last prompt would drop the updates after it, so once an update follows it, it is not editable; the coordinator's reply before an update still has **Fork from here**.
   When omp does not take that message, the updates keep waiting, and the coordinator's next change of state, such as its next turn ending, sends them again.
   A worker you prompt yourself reports the same way when its turn finishes.
   A worker is told to end each turn on a report that stands alone, since the coordinator reads only its last reply, and to end its turn with a question it needs answered rather than ask it through the `ask` tool.

@@ -215,6 +215,16 @@ describe("DashboardSession turns", () => {
 		expect(client.calls).toEqual(["prompt /rename"]);
 	});
 
+	test("a prompt the dashboard sent in the user's place does not title the session", async () => {
+		const { client } = await startSession();
+		client.fire({ type: "message_end", message: { role: "user", content: "[omp-agents] Project update.\n- w1 stopped." } });
+		await settle();
+		expect(client.calls).toEqual([]);
+		client.fire({ type: "message_end", message: { role: "user", content: "Migrate billing." } });
+		await settle();
+		expect(client.calls).toEqual(["prompt /rename"]);
+	});
+
 	test("an agent_end that is not terminal hands over to a queued follow-up, so the session keeps working", async () => {
 		const { session, client } = await startSession();
 		client.fire({ type: "agent_start" });

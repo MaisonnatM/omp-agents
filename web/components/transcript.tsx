@@ -394,7 +394,7 @@ interface TranscriptProps {
 }
 
 /** A prompt or a reply: the user's and the agent's words. */
-type MessageItem = Exclude<Item, ActivityItem | Extract<Item, { kind: "notice" }>>;
+type MessageItem = Extract<Item, { kind: "user" | "assistant" }>;
 
 /** What a message's copy button copies: a skill prompt as the user typed it, not the skill's text. `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform. */
 const copyText = (item: MessageItem): string =>

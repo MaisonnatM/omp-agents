@@ -209,3 +209,23 @@ describe("suggestions", () => {
 		expect(nextSuggestions([reply(false), prompt], false)).toEqual([]);
 	});
 });
+
+describe("a prompt the dashboard sent", () => {
+	const prompt: Item = { id: "p1", kind: "user", text: "Migrate billing.", skill: null, from: null, entryId: "e1" };
+	const update: Item = { id: "d1", kind: "dashboard", text: "[omp-agents] Project update.\n- w1 stopped.", entryId: "e2" };
+	const reply = (id: string, suggestions: string[] = []): Item => ({ id, kind: "assistant", text: id, streaming: false, suggestions });
+	const items = [prompt, reply("r1"), update, reply("r2", ["Merge it"])];
+
+	test("renders nothing, but ends the turn before it, whose reply keeps its copy and fork buttons", () => {
+		expect(toBlocks(items).map(block => (block.kind === "item" ? block.item.id : block.id))).toEqual(["p1", "r1", "r2"]);
+		expect([...turnReplies(items, false)]).toEqual(["r2", "r1"]);
+		expect(Object.fromEntries(forkPoints(items))).toEqual({ p1: { entryId: "e1", prefill: true }, r1: { entryId: "e2", prefill: false } });
+		expect(outline(items, false).map(turn => turn.prompt)).toEqual(["Migrate billing."]);
+	});
+
+	test("leaves the user's prompt before it not editable, since the edit would drop it, and lets its reply suggest", () => {
+		expect(editablePrompt(items)).toBeNull();
+		expect(nextSuggestions(items, false)).toEqual(["Merge it"]);
+		expect(nextSuggestions([prompt, reply("r1", ["Ship it"]), update], false)).toEqual([]);
+	});
+});

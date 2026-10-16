@@ -5,7 +5,13 @@ export type ToolItem = Extract<Item, { kind: "tool" }>;
 /** A tool call or the thinking that sits with it. Consecutive ones render as one activity group between messages. */
 export type ActivityItem = Extract<Item, { kind: "tool" | "thinking" }>;
 
-export type Block = { kind: "item"; item: Exclude<Item, ActivityItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
+/** A prompt the dashboard sent in the user's place, which counts as a turn's prompt but renders nothing. */
+type DashboardItem = Extract<Item, { kind: "dashboard" }>;
+
+export type Block = { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
+
+/** Whether `item` opens a turn: a prompt, the user's or one the dashboard sent in their place, which shows nothing. */
+const opensTurn = (item: Item): boolean => item.kind === "user" || item.kind === "dashboard";
 
 const blockKey = (block: Block): string => (block.kind === "item" ? block.item.id : block.id);
 
@@ -13,13 +19,15 @@ const sameBlock = (a: Block, b: Block): boolean =>
 	a.kind === "item" ? b.kind === "item" && a.item === b.item : b.kind === "activity" && a.entries.length === b.entries.length && a.entries.every((entry, i) => entry === b.entries[i]);
 
 /**
- * The blocks of `items`. A block of `previous` whose items are the same objects comes back as the same object, so a
- * row of an unchanged message or tool group, memoized on its block, skips the render that a streamed token starts.
+ * The blocks of `items`, without the prompts the dashboard sent. A block of `previous` whose items are the same objects
+ * comes back as the same object, so a row of an unchanged message or tool group, memoized on its block, skips the
+ * render that a streamed token starts.
  */
 export function toBlocks(items: Item[], previous: readonly Block[] = []): Block[] {
 	const blocks: Block[] = [];
 	for (const item of items) {
 		const last = blocks.at(-1);
+		if (item.kind === "dashboard") continue;
 		if (item.kind === "tool" || item.kind === "thinking") {
 			if (last?.kind === "activity") last.entries.push(item);
 			else blocks.push({ kind: "activity", id: item.id, entries: [item] });
@@ -57,7 +65,7 @@ export function turnReplies(items: Item[], working: boolean): Set<string> {
 	let replyFound = working;
 	for (let i = items.length - 1; i >= 0; i--) {
 		const item = items[i];
-		if (item.kind === "user") replyFound = false;
+		if (opensTurn(item)) replyFound = false;
 		else if (item.kind === "assistant" && !replyFound && item.text.trim() !== "") {
 			replyFound = true;
 			replies.add(item.id);
@@ -124,7 +132,7 @@ export function outline(items: Item[], working: boolean): OutlineTurn[] {
 export function nextSuggestions(items: Item[], working: boolean): string[] {
 	if (working) return [];
 	const replies = turnReplies(items, false);
-	const last = items.findLast(item => item.kind === "user" || replies.has(item.id));
+	const last = items.findLast(item => opensTurn(item) || replies.has(item.id));
 	return last?.kind === "assistant" ? last.suggestions : [];
 }
 
@@ -138,7 +146,8 @@ export interface ForkPoint {
 /**
  * Fork points by item id. A prompt forks at itself. A turn's last reply forks at the next prompt,
  * keeping the whole turn; earlier replies in the turn, a reply still streaming, and a reply no
- * forkable prompt follows have none.
+ * forkable prompt follows have none. A prompt the dashboard sent shows nothing to fork from, but a
+ * reply before it forks there.
  */
 export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 	const points = new Map<string, ForkPoint>();
@@ -146,7 +155,10 @@ export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 	let replyFound = false;
 	for (let i = items.length - 1; i >= 0; i--) {
 		const item = items[i];
-		if (item.kind === "user") {
+		if (item.kind === "dashboard") {
+			nextPrompt = item.entryId;
+			replyFound = false;
+		} else if (item.kind === "user") {
 			nextPrompt = item.entryId;
 			replyFound = false;
 			if (item.entryId) points.set(item.id, { entryId: item.entryId, prefill: true });
@@ -160,10 +172,11 @@ export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 
 /**
  * The prompt a double-click edits: the last one, once omp has saved it. omp resends an edit as text alone, so a skill
- * prompt or one that carried images or files is not editable.
+ * prompt or one that carried images or files is not editable. None after a prompt the dashboard sent, which an edit of
+ * the user's prompt before it would drop.
  */
 export function editablePrompt(items: Item[]): { itemId: string; entryId: string } | null {
-	const last = items.findLast(item => item.kind === "user");
+	const last = items.findLast(opensTurn);
 	if (last?.kind !== "user" || !last.entryId || last.skill || last.images?.length || last.files?.length) return null;
 	return { itemId: last.id, entryId: last.entryId };
 }

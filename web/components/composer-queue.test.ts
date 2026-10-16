@@ -17,6 +17,11 @@ describe("queuedEntries", () => {
 		expect(after).toEqual([before[0]]);
 	});
 
+	test("a prompt the dashboard queued in the user's place neither lists nor comes back with ↑", () => {
+		const entries = queuedEntries({ steering: [], followUp: ["[omp-agents] Project update.\n- w1 stopped.", "b"] });
+		expect(entries.map(({ item }) => item.text)).toEqual(["b"]);
+	});
+
 	test("a queue that is not there yet lists nothing", () => {
 		expect(queuedEntries(undefined)).toEqual([]);
 	});
