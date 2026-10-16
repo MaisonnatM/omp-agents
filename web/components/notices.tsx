@@ -1,5 +1,5 @@
-/** The sidebar's notices bell: pull request, Slack, provider, calendar, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
-import { Bell, CalendarClock, CheckCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageSquare, Sparkles, Wallet, X } from "lucide-react";
+/** The sidebar's notices bell: pull request, Slack, provider, calendar, project, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
+import { Bell, CalendarClock, CheckCheck, CircleCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageCircleQuestion, MessageSquare, Sparkles, Users, Wallet, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import type { YourMove } from "../../src/shared/moves";
 import type { Notice } from "../../src/shared/notices";
@@ -29,6 +29,7 @@ const FILTERS: [NoticeSource | "all", string, ReactNode][] = [
 	["slack", "Slack", <BrandMark key="slack" logo={SLACK_LOGO} className={TAB_LOGO} />],
 	["providers", "Providers", <Gauge key="providers" aria-hidden className={TAB_LOGO} />],
 	["calendar", "Calendar", <CalendarClock key="calendar" aria-hidden className={TAB_LOGO} />],
+	["projects", "Projects", <Users key="projects" aria-hidden className={TAB_LOGO} />],
 	["updates", "Updates", <Sparkles key="updates" aria-hidden className={cn(TAB_LOGO, "text-violet-600 dark:text-violet-400")} />],
 ];
 
@@ -39,6 +40,13 @@ const MOVE_BADGE: Record<YourMove, { icon: LucideIcon; tone: string }> = {
 	"fix-ci": { icon: CircleX, tone: "bg-red-500 text-white" },
 	rebase: { icon: GitCompareArrows, tone: "bg-orange-500 text-white" },
 	reply: { icon: MessageSquare, tone: "bg-amber-500 text-white" },
+};
+
+/** What a project notice is about, with the badge its picture carries. */
+const PROJECT_BADGE: Record<Extract<NoticeFace, { kind: "project" }>["about"], { icon: LucideIcon; tone: string }> = {
+	asks: { icon: MessageCircleQuestion, tone: "bg-amber-500 text-white" },
+	stopped: { icon: CircleX, tone: "bg-red-500 text-white" },
+	done: { icon: CircleCheck, tone: "bg-emerald-500 text-white" },
 };
 
 /** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, Google Calendar or this computer's calendar, or omp. */
@@ -58,6 +66,8 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 			return notice.calendar === null
 				? { logo: <CalendarClock aria-hidden className={mark} />, label: "Calendar" }
 				: { logo: <BrandMark logo={GOOGLE_CALENDAR_LOGO} className={mark} />, label: "Google Calendar" };
+		case "project":
+			return { logo: <Users aria-hidden className={mark} />, label: notice.project };
 		default:
 			return { logo: <Sparkles aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />, label: "omp" };
 	}
@@ -90,6 +100,17 @@ function Face({ face }: { face: NoticeFace }) {
 					<CalendarClock aria-hidden className="m-auto size-4" style={{ color: face.color ?? undefined }} />
 				</span>
 			);
+		case "project": {
+			const { icon: Icon, tone } = PROJECT_BADGE[face.about];
+			return (
+				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
+					<Users aria-hidden className="m-auto size-4 text-muted-foreground" />
+					<span className={cn(BADGE, tone)}>
+						<Icon aria-hidden className="size-2.5" strokeWidth={2.5} />
+					</span>
+				</span>
+			);
+		}
 		case "provider": {
 			const Icon = face.window === "plan" ? Gauge : Wallet;
 			return (

@@ -18,7 +18,7 @@ function projectsPath(): string {
 
 const AT = "2026-10-10T08:00:00.000Z";
 const create: ProjectChange = { op: "create", id: "p1", name: "  Billing\n v3 ", cwd: "/work/app", at: AT, coordinator: "s-c" };
-const addWorker = (sessionId: string, title = "Schema"): ProjectChange => ({ op: "add-worker", id: "p1", title, sessionId, cwd: "/work/app", at: AT });
+const addWorker = (sessionId: string, title = "Schema"): ProjectChange => ({ op: "add-worker", id: "p1", queuedId: `q-${sessionId}`, title, sessionId, cwd: "/work/app", at: AT });
 
 function apply(...changes: ProjectChange[]): Project[] {
 	return changes.reduce(applyProject, [] as Project[]);
@@ -28,7 +28,7 @@ describe("applyProject", () => {
 	test("create makes a project with its coordinator, one-line name, and no workers; the same id twice changes nothing", () => {
 		const projects = apply(create);
 		expect(projects).toEqual([
-			{ id: "p1", name: "Billing v3", cwd: "/work/app", createdAt: AT, archived: false, coordinator: { sessionId: "s-c" }, workers: [], updates: [], nextWorker: 1 },
+			{ id: "p1", name: "Billing v3", cwd: "/work/app", createdAt: AT, archived: false, coordinator: { sessionId: "s-c" }, workers: [], updates: [], nextWorker: 1, maxWorkers: 3, queue: [], watch: { pullRequests: true, linear: null }, reviewCadence: "every PR" },
 		]);
 		expect(applyProject(projects, create)).toBe(projects);
 		expect(apply({ ...create, name: " " })[0]?.name).toBe(DEFAULT_PROJECT_NAME);
@@ -52,6 +52,14 @@ describe("applyProject", () => {
 		]);
 		expect(projects[0]?.nextWorker).toBe(3);
 		expect(applyProject(projects, addWorker("s-a"))).toBe(projects);
+	});
+
+	test("a queued worker leaves the queue in the change that adds it", () => {
+		const start = { cwd: "/work/app", prompt: "Go.", branch: null, model: null, thinking: null, skill: null, tools: null };
+		const queued = apply(create, { op: "enqueue", id: "p1", worker: { id: "q-s-a", title: "Copy", at: AT, start } });
+		expect(queued[0]?.queue.map(entry => entry.id)).toEqual(["q-s-a"]);
+		const added = applyProject(queued, addWorker("s-a", "Copy"))[0];
+		expect([added?.queue, added?.workers.map(worker => worker.id)]).toEqual([[], ["w1"]]);
 	});
 
 	test("a relink follows a worker or coordinator to its new session id", () => {

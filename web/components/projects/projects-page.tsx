@@ -1,4 +1,4 @@
-import { Archive, ArrowLeft, Pencil, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Pencil, Plus } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import type { ModelOption } from "../../../src/shared/models";
 import { DEFAULT_PROJECT_NAME, type Project, type ProjectUpdate } from "../../../src/shared/projects";
@@ -17,11 +17,28 @@ import { PageFrame } from "../list-page";
 import { ModelPicker } from "../model-picker";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { DirectoryPicker } from "../workspace-picker";
-import { PHASE_LABEL, ProjectNotesList } from "./project-parts";
+import { FIELD, PHASE_LABEL, ProjectNotesList } from "./project-parts";
+import { MaxWorkersField, ProjectSubscriptions } from "./project-settings";
 
-const FIELD = "rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+/** Who an update waiting for the coordinator is about: a worker's id, the dashboard, or a subscription's source. */
+function updateSource(update: ProjectUpdate): string {
+	switch (update.kind) {
+		case "finished":
+		case "asked":
+		case "stopped":
+			return update.workerId;
+		case "restarted":
+			return "omp-agents";
+		case "event":
+			return update.source;
+		default: {
+			const never: never = update;
+			return never;
+		}
+	}
+}
 
-/** What an update waiting for the coordinator says about its worker. */
+/** What an update waiting for the coordinator says. */
 function updateText(update: ProjectUpdate): string {
 	switch (update.kind) {
 		case "finished":
@@ -30,6 +47,10 @@ function updateText(update: ProjectUpdate): string {
 			return `Asks: ${update.question}`;
 		case "stopped":
 			return "Stopped";
+		case "restarted":
+			return update.workers.length === 0 ? "The dashboard restarted" : `The dashboard restarted and stopped ${update.workers.join(", ")}`;
+		case "event":
+			return update.title;
 		default: {
 			const never: never = update;
 			return never;
@@ -87,7 +108,7 @@ function NewProject({ initial, workspaces, connected, launch, onCancel }: NewPro
 				<div className="space-y-1.5">
 					<p className="block text-sm font-medium">Model</p>
 					<ModelPicker {...models.picker} disabled={starting || !connected} />
-					<p className="text-xs text-muted-foreground">The coordinator's model. Workers start on omp's default model.</p>
+					<p className="text-xs text-muted-foreground">The coordinator's model. Workers start on omp's default model unless the coordinator picks another.</p>
 				</div>
 				<div className="space-y-1.5">
 					<label htmlFor={`${id}-prompt`} className="block text-sm font-medium">
@@ -129,24 +150,27 @@ function NewProject({ initial, workspaces, connected, launch, onCancel }: NewPro
 	);
 }
 
-/** The project's menu: **Rename**, and **Archive**, which asks first in its place. */
-function ProjectActions({ project, connected, onRename }: { project: Project; connected: boolean; onRename: () => void }) {
-	const { send } = useDashboardActions();
+/** The project's menu: **Rename**, and **Archive**, which asks first in its place, or **Unarchive**. */
+function ProjectActions({ project, live, connected, onRename }: { project: Project; live: string[]; connected: boolean; onRename: () => void }) {
+	const { send, end } = useDashboardActions();
 	const [confirming, setConfirming] = useState(false);
+	const archive = (ending: boolean) => {
+		send({ t: "project", change: { op: "archive", id: project.id } });
+		if (ending) for (const instanceId of live) end(instanceId);
+		location.hash = hashForProjects({ kind: "list" });
+	};
 	if (confirming) {
 		return (
 			<div role="group" aria-label={`Archive ${project.name}?`} className="flex shrink-0 items-center gap-2 text-xs">
 				<span>Archive it? Its sessions go back to the session lists, and its coordinator can no longer start, read, or message workers.</span>
-				<Button
-					size="compact"
-					disabled={!connected}
-					onClick={() => {
-						send({ t: "project", change: { op: "archive", id: project.id } });
-						location.hash = hashForProjects({ kind: "list" });
-					}}
-				>
+				<Button size="compact" disabled={!connected} onClick={() => archive(false)}>
 					Archive project
 				</Button>
+				{live.length > 0 && (
+					<Button variant="secondary" size="compact" disabled={!connected} onClick={() => archive(true)}>
+						Archive and end {live.length === 1 ? "its session" : `its ${live.length} sessions`}
+					</Button>
+				)}
 				<Button variant="ghost" size="compact" autoFocus onClick={() => setConfirming(false)}>
 					Cancel
 				</Button>
@@ -159,7 +183,12 @@ function ProjectActions({ project, connected, onRename }: { project: Project; co
 				<Pencil />
 				Rename
 			</MenuItem>
-			{!project.archived && (
+			{project.archived ? (
+				<MenuItem onClick={() => send({ t: "project", change: { op: "unarchive", id: project.id } })}>
+					<ArchiveRestore />
+					Unarchive
+				</MenuItem>
+			) : (
 				<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
 					<Archive />
 					Archive
@@ -229,6 +258,7 @@ function ProjectDetail({ project, hosts, past, connected }: DetailProps) {
 	const [renaming, setRenaming] = useState(false);
 	const coordinator = projectSession(project.coordinator.sessionId, hosts, past);
 	const coordinatorView = coordinator.view;
+	const live = [project.coordinator.sessionId, ...project.workers.map(worker => worker.sessionId)].flatMap(sessionId => hosts.find(host => host.sessionId === sessionId)?.instanceId ?? []);
 	return (
 		<PageFrame
 			title={project.name}
@@ -241,7 +271,7 @@ function ProjectDetail({ project, hosts, past, connected }: DetailProps) {
 					<Button size="compact" disabled={coordinatorView === null} title={`${SPLIT_CLICK} to open in a split`} onClick={event => coordinatorView && open(coordinatorView, modeOf(event))}>
 						Open coordinator
 					</Button>
-					<ProjectActions project={project} connected={connected} onRename={() => setRenaming(true)} />
+					<ProjectActions project={project} live={live} connected={connected} onRename={() => setRenaming(true)} />
 				</>
 			}
 		>
@@ -300,7 +330,20 @@ function ProjectDetail({ project, hosts, past, connected }: DetailProps) {
 							</table>
 						</div>
 					)}
+					{project.queue.length > 0 && (
+						<ol aria-label="Queued workers" className="divide-y divide-border overflow-hidden rounded-md border border-border">
+							{project.queue.map((queued, index) => (
+								<li key={queued.id} className="flex items-baseline gap-3 px-3 py-2 text-sm">
+									<span className="shrink-0 text-xs text-muted-foreground">Queued {index + 1}</span>
+									<span className="min-w-0 flex-1 truncate font-medium">{queued.title}</span>
+									<span className="shrink-0 text-xs tabular-nums text-muted-foreground">{readTime(Date.parse(queued.at))}</span>
+								</li>
+							))}
+						</ol>
+					)}
+					<MaxWorkersField project={project} connected={connected} />
 				</section>
+				<ProjectSubscriptions project={project} connected={connected} />
 				{project.updates.length > 0 && (
 					<section aria-labelledby="project-updates" className="space-y-2">
 						<h3 id="project-updates" className="text-sm font-medium">
@@ -309,7 +352,7 @@ function ProjectDetail({ project, hosts, past, connected }: DetailProps) {
 						<ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
 							{project.updates.map(update => (
 								<li key={update.id} className="flex items-baseline gap-3 px-3 py-2 text-sm">
-									<span className="shrink-0 font-mono text-xs">{update.workerId}</span>
+									<span className="shrink-0 font-mono text-xs">{updateSource(update)}</span>
 									<span className="min-w-0 flex-1 break-words">{updateText(update)}</span>
 									<span className="shrink-0 text-xs tabular-nums text-muted-foreground">{readTime(Date.parse(update.at))}</span>
 								</li>

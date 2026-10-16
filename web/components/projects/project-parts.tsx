@@ -1,9 +1,12 @@
-/** Pieces the Projects page and the coordinator's sidebar share: worker phase labels and the project's notes list. */
+/** Pieces the Projects page and the coordinator's sidebar share: worker phase labels, the form fields' look, and the project's notes list. */
 import { FileText } from "lucide-react";
 import type { Project, ProjectNote, WorkerPhase } from "../../../src/shared/projects";
 import { useRead } from "../../reads";
 import { Age } from "../age";
 import { useDashboardActions } from "../dashboard-context";
+
+/** The look of the Projects page's text and number fields. */
+export const FIELD = "rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
 /** What the Projects page and the coordinator's sidebar call a worker's phase. */
 export const PHASE_LABEL: Record<WorkerPhase, string> = { working: "Working", asking: "Asks you", idle: "Idle", interrupted: "Interrupted", ended: "Ended" };

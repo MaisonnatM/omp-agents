@@ -18,7 +18,7 @@ import { GITHUB_NAME, MAX_COMMENT_BODY, parsePullRequest, type PullRequest, type
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import { type PresetChange, parsePreset } from "../shared/presets";
-import type { ProjectEdit } from "../shared/projects";
+import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "../shared/projects";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import { type AutoPullChange, MERGE_METHODS } from "../shared/source-control";
@@ -112,7 +112,13 @@ function parsePresetChange(value: unknown): Parsed<PresetChange> {
 function parseProjectEdit(value: unknown): Parsed<ProjectEdit> {
 	if (!isObject(value) || !isNonEmpty(value.id)) return null;
 	const { op, id, name } = value;
-	if (op === "archive") return { ok: { op, id } };
+	if (op === "archive" || op === "unarchive") return { ok: { op, id } };
+	if (op === "watch") {
+		const watch = parseWatch(value.watch);
+		return watch && { ok: { op, id, watch } };
+	}
+	if (op === "review-cadence") return typeof value.cadence === "string" && value.cadence.length <= MAX_REVIEW_CADENCE ? { ok: { op, id, cadence: value.cadence } } : null;
+	if (op === "max-workers") return isMaxWorkers(value.max) ? { ok: { op, id, max: value.max } } : null;
 	return op === "rename" && typeof name === "string" && name.length <= MAX_PROJECT_NAME ? { ok: { op, id, name } } : null;
 }
 

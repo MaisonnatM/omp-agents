@@ -14,7 +14,7 @@ import { exitDiagnostics, loader, transcriptEntry } from "./omp/modules";
 import { writeReplayConfig } from "./omp/replay-launch";
 import { REPLAY_CHECK, REPLAY_MARKER, replayMarkerOf, requestCheckOf } from "./shared/replay";
 import type { ReplayComparison, ReplayDetail, ReplayFacts, ReplayMarker } from "./shared/replay";
-import type { ModelOption } from "./shared/models";
+import { type ModelOption, modelOfSelector } from "./shared/models";
 import type { Turn } from "./shared/trajectory";
 import { Trajectory } from "./trajectory";
 
@@ -66,8 +66,7 @@ function originalSettings(cut: PromptCut, request: RebuiltRequest | null): { mod
 		if (entry.type === "model_change" && (!entry.role || entry.role === "default") && typeof entry.model === "string") selector = entry.model;
 		if (entry.type === "thinking_level_change" && typeof entry.thinkingLevel === "string") thinking = entry.thinkingLevel;
 	}
-	const slash = selector?.indexOf("/") ?? -1;
-	return { model: request?.record.provider && request.record.model ? { provider: request.record.provider, id: request.record.model } : selector && slash > 0 ? { provider: selector.slice(0, slash), id: selector.slice(slash + 1) } : null, thinking: request?.record.thinkingLevel ?? thinking };
+	return { model: request?.record.provider && request.record.model ? { provider: request.record.provider, id: request.record.model } : selector ? modelOfSelector(selector) : null, thinking: request?.record.thinkingLevel ?? thinking };
 }
 export async function replayDetail(file: string, entryId: string): Promise<ReplayDetail> {
 	const cut = await openPromptCut(file, entryId);

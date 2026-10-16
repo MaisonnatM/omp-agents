@@ -1,7 +1,7 @@
 /**
  * What the bell lists: a newer omp or routed model, a pull request whose next move is yours, a Slack message that
- * waits on you, a provider that stopped serving: a used-up plan window or prepaid credits that ran out, and a calendar
- * event that starts soon.
+ * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), a calendar
+ * event that starts soon, and a project that needs you.
  */
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
@@ -94,10 +94,24 @@ export interface EventSubject {
 	url: string | null;
 }
 
+/**
+ * A project that needs you: a worker asks a question its coordinator left unanswered, a worker stopped without End
+ * session, or every worker is done and nothing waits for the coordinator.
+ */
+export interface ProjectSubject {
+	kind: "project";
+	projectId: string;
+	project: string;
+	about: "asks" | "stopped" | "done";
+	/** The worker's id and title, `null` for `done`. */
+	worker: { id: string; title: string } | null;
+	text: string;
+}
+
 /** How long before an event starts its notice comes. */
 export const EVENT_LEAD_MS = 10 * 60_000;
 
-export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject;
+export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | ProjectSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -113,6 +127,7 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| SlackSubject
 	| ProviderSubject
 	| EventSubject
+	| ProjectSubject
 );
 
 /** `update` installs the release or rewrites the routing; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */

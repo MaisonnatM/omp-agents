@@ -52,6 +52,8 @@ export function taskWords(task: RoutineTask): string {
 			return firstLine(task.prompt);
 		case "command":
 			return `$ ${firstLine(task.command)}`;
+		case "project":
+			return `To project: ${firstLine(task.prompt)}`;
 		default: {
 			const unhandled: never = task;
 			return unhandled;
@@ -100,6 +102,7 @@ export function runWords(run: RoutineRun): string {
 	if (outcome.kind === "command") return commandWords(outcome.run);
 	const parts = [
 		outcome.kind === "session" && "1 session started",
+		outcome.kind === "project" && "Sent to the project",
 		run.errors.length > 0 && `${run.errors.length} ${run.errors.length === 1 ? "error" : "errors"}`,
 		outcome.kind === "pending" && outcome.queued && "Queued",
 	].filter(part => part !== false);
@@ -152,6 +155,8 @@ export interface RoutineDraft {
 	/** Whether the prompt's session is pinned once it finishes. */
 	pin: boolean;
 	command: string;
+	/** The project whose coordinator a project task's prompt goes to, `null` until one is picked. */
+	projectId: string | null;
 	schedules: ScheduleDraft[];
 }
 
@@ -168,6 +173,7 @@ export function newDraft(id: string, cwd: string, skill: string | null): Routine
 		prompt: "",
 		pin: false,
 		command: "",
+		projectId: null,
 		schedules: [blankSchedule()],
 	};
 }
@@ -193,9 +199,10 @@ export function draftOf(routine: Routine): RoutineDraft {
 		enabled: routine.enabled,
 		preset: routine.preset,
 		task: task.kind,
-		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
+		prompt: task.kind === "command" ? draft.prompt : task.prompt,
 		pin: task.kind === "prompt" ? task.pin : draft.pin,
 		command: task.kind === "command" ? task.command : draft.command,
+		projectId: task.kind === "project" ? task.projectId : draft.projectId,
 		schedules: routine.schedules.map(scheduleDraft),
 	};
 }
@@ -219,6 +226,11 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 			task = { kind: "command", command };
 			break;
 		}
+		case "project":
+			if (draft.projectId === null) return { fix: "Pick the project its prompt goes to." };
+			if (!draft.prompt.trim()) return { fix: "Write the prompt the coordinator gets." };
+			task = { kind: "project", projectId: draft.projectId, prompt: draft.prompt.trim() };
+			break;
 		default: {
 			const unhandled: never = draft.task;
 			return unhandled;
@@ -232,8 +244,8 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	}
 	const schedulesOf = nonEmpty(schedules);
 	if (!schedulesOf) return { fix: "Add a schedule." };
-	const command = task.kind === "command";
-	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill: command ? null : draft.skill, preset: command ? null : draft.preset, task, schedules: schedulesOf } };
+	const session = task.kind === "prompt";
+	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill: session ? draft.skill : null, preset: session ? draft.preset : null, task, schedules: schedulesOf } };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */

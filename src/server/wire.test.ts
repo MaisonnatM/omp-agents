@@ -234,6 +234,14 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "archive", id: "p1", name: "ignored" })).toEqual({ t: "project", change: { op: "archive", id: "p1" } });
 		expect(change({ op: "relink", from: "s1", to: "s2" })).toBeNull();
 		expect(change({ op: "archive", id: "" })).toBeNull();
+		expect(change({ op: "unarchive", id: "p1" })).toEqual({ t: "project", change: { op: "unarchive", id: "p1" } });
+		expect(change({ op: "max-workers", id: "p1", max: 5 })).toEqual({ t: "project", change: { op: "max-workers", id: "p1", max: 5 } });
+		expect(change({ op: "max-workers", id: "p1", max: 0 })).toBeNull();
+		const watch = { pullRequests: false, linear: { team: "ENG", label: null, project: null } };
+		expect(change({ op: "watch", id: "p1", watch })).toEqual({ t: "project", change: { op: "watch", id: "p1", watch } });
+		expect(change({ op: "watch", id: "p1", watch: { pullRequests: "yes", linear: null } })).toBeNull();
+		expect(change({ op: "review-cadence", id: "p1", cadence: "every 3 PRs" })).toEqual({ t: "project", change: { op: "review-cadence", id: "p1", cadence: "every 3 PRs" } });
+		expect(change({ op: "review-cadence", id: "p1", cadence: "x".repeat(201) })).toBeNull();
 	});
 
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
