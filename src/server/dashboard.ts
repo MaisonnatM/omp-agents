@@ -24,7 +24,7 @@ import { connectedRoles } from "../omp/models";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, presetsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, presetsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
@@ -53,7 +53,7 @@ import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UP
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
 import { PresetsFile } from "./presets-file";
-import { seedNotes } from "./project-notes";
+import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
 import { ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
 import { ProjectWatch } from "./project-watch";
 import { ProjectsFile } from "./projects-file";
@@ -320,6 +320,7 @@ export class Dashboard {
 			checkedOut,
 			extensionArgs: projectsExtensionArgs,
 			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),
+			writeInbox: (id, event, at) => writeInboxEvent(projectNotesDir(id), event, at),
 			now: Date.now,
 			newId: randomUUID,
 			onChange: () => broadcasts.pushList("projects"),
@@ -415,6 +416,7 @@ export class Dashboard {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
 				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
+				userNotesDir,
 				replayDetail: async (view, turnId) => {
 					const file = this.#pathFor(view);
 					if (!file) throw new Error("The source session file is unavailable.");
@@ -443,11 +445,14 @@ export class Dashboard {
 	}
 
 	/**
-	 * Starts following omp: watches the session files and the inboxes, takes the owner lock when it is free, lists the
-	 * files and the registry, and starts the loops; `publisher` is the server now listening.
+	 * Starts following omp: seeds the user's notes and moves each project's older notes to their places now, watches the
+	 * session files and the inboxes, takes the owner lock when it is free, lists the files and the registry, and starts
+	 * the loops; `publisher` is the server now listening.
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
+		seedUserNotes(userNotesDir);
+		for (const project of this.#projects.value) moveOldNotes(projectNotesDir(project.id));
 		this.#loops.watch();
 		if (this.#ownerLock.acquire()) {
 			this.#runner.recover();

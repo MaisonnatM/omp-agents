@@ -1,6 +1,7 @@
-/** Pieces the Projects page and the coordinator's sidebar share: worker phase labels, the form fields' look, and the project's notes list. */
-import { FileText } from "lucide-react";
-import type { Project, ProjectNote, WorkerPhase } from "../../../src/shared/projects";
+/** Pieces the Projects page and the coordinator's sidebar share: worker phase labels, the form fields' look, and the notes list, the project's and the user's. */
+import { FileText, Folder } from "lucide-react";
+import type { Project, ProjectNote, ProjectNotesAnswer, WorkerPhase } from "../../../src/shared/projects";
+import { noteRows } from "../../notes-model";
 import { useRead } from "../../reads";
 import { Age } from "../age";
 import { useDashboardActions } from "../dashboard-context";
@@ -11,10 +12,49 @@ export const FIELD = "rounded-md border border-border bg-background px-2 text-sm
 /** What the Projects page and the coordinator's sidebar call a worker's phase. */
 export const PHASE_LABEL: Record<WorkerPhase, string> = { working: "Working", asking: "Asks you", idle: "Idle", interrupted: "Interrupted", ended: "Ended" };
 
-/** The project's notes files, each opening in the file dialog, then their directory; read again whenever the project changes. */
-export function ProjectNotesList({ project }: { project: Project }) {
+/** One group of the notes list: its files as a tree, each opening in the file dialog, then their directory. */
+function NotesTree({ label, dir, notes, empty }: { label: string; dir: string; notes: ProjectNote[]; empty: string }) {
 	const { openFile } = useDashboardActions();
-	const notes = useRead<{ dir: string; notes: ProjectNote[] }>(`/api/project-notes?id=${encodeURIComponent(project.id)}`, project);
+	const rows = noteRows(notes);
+	return (
+		<section aria-label={`${label} notes`} className="space-y-1.5">
+			<h4 className="text-xs font-medium text-muted-foreground">{label}</h4>
+			{rows.length === 0 ? (
+				<p className="text-sm text-muted-foreground">{empty}</p>
+			) : (
+				<ul className="overflow-hidden rounded-md border border-border py-1">
+					{rows.map(row => (
+						<li key={row.kind === "folder" ? `${row.path}/` : row.note.path}>
+							{row.kind === "folder" ? (
+								<div className="flex items-center gap-2 py-1 pr-3 text-sm text-muted-foreground" style={{ paddingLeft: 12 + row.depth * 16 }}>
+									<Folder aria-hidden className="size-3.5 shrink-0" />
+									<span className="min-w-0 flex-1 truncate">{row.name}</span>
+								</div>
+							) : (
+								<button
+									type="button"
+									title={row.note.path}
+									className="flex w-full items-center gap-2 py-1 pr-3 text-left text-sm hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+									style={{ paddingLeft: 12 + row.depth * 16 }}
+									onClick={() => openFile(row.note.path)}
+								>
+									<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+									<span className="min-w-0 flex-1 truncate">{row.name}</span>
+									<Age at={Date.parse(row.note.modifiedAt)} exact className="shrink-0 text-xs tabular-nums text-muted-foreground" />
+								</button>
+							)}
+						</li>
+					))}
+				</ul>
+			)}
+			<p className="font-mono text-xs break-all text-muted-foreground">{dir}</p>
+		</section>
+	);
+}
+
+/** The project's notes and the user's, each a tree of its files under its own heading; read again whenever the project changes. */
+export function ProjectNotesList({ project }: { project: Project }) {
+	const notes = useRead<ProjectNotesAnswer>(`/api/project-notes?id=${encodeURIComponent(project.id)}`, project);
 	if (notes.error !== null && notes.data === null)
 		return (
 			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
@@ -23,23 +63,9 @@ export function ProjectNotesList({ project }: { project: Project }) {
 		);
 	if (notes.data === null) return <p className="text-sm text-muted-foreground">Reading the notes…</p>;
 	return (
-		<>
-			{notes.data.notes.length === 0 ? (
-				<p className="text-sm text-muted-foreground">No notes yet. The coordinator and its workers write them as they go.</p>
-			) : (
-				<ul aria-label="Notes" className="divide-y divide-border overflow-hidden rounded-md border border-border">
-					{notes.data.notes.map(note => (
-						<li key={note.path}>
-							<button type="button" title={note.path} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" onClick={() => openFile(note.path)}>
-								<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-								<span className="min-w-0 flex-1 truncate">{note.name}</span>
-								<Age at={Date.parse(note.modifiedAt)} exact className="shrink-0 text-xs tabular-nums text-muted-foreground" />
-							</button>
-						</li>
-					))}
-				</ul>
-			)}
-			<p className="font-mono text-xs break-all text-muted-foreground">{notes.data.dir}</p>
-		</>
+		<div className="space-y-4">
+			<NotesTree label="Project" dir={notes.data.dir} notes={notes.data.notes} empty="No notes yet. The coordinator and its workers write them as they go." />
+			<NotesTree label="User" dir={notes.data.userDir} notes={notes.data.userNotes} empty="No notes yet. Every project's sessions record here how you work." />
+		</div>
 	);
 }

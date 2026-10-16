@@ -627,7 +627,7 @@ A message whose session runs live on a server that does not own the unattended w
 
 ## Projects
 
-A project is a coordinator session that plans the work and starts worker sessions, which all share one notes directory; see [Projects](usage.md#projects) for what the user sees.
+A project is a coordinator session that plans the work and starts worker sessions, which all share one notes directory, and the user's notes, which every project shares; see [Projects](usage.md#projects) for what the user sees.
 `src/shared/projects.ts` holds what the page reads and sends: `Project`, `Worker`, `ProjectUpdate`, `ProjectEdit`, `DEFAULT_PROJECT_NAME`, and `workerPhase`, which turns a worker's live status, or its absence and whether it was interrupted, into `working`, `asking`, `idle`, `interrupted`, or `ended`.
 The rules only the server applies live in `src/server/projects-file.ts`: `ProjectChange`, the page's `ProjectEdit` plus the runner's changes, `applyProject`, which returns the same array for a change that changes nothing, `ProjectRole`, and `ProjectsFile.roleOf`, which finds a session's project and role by its session id.
 
@@ -673,6 +673,7 @@ A worker's session reports three kinds of news, which the runner saves as update
 3. Its process's exit becomes `stopped`, unless the dashboard is stopping: `Dashboard.stop` calls the runner's `stop` before it ends the sessions, since they exit with the dashboard, which is no news.
 
 Two kinds come from elsewhere: `restarted`, which `recover` saves at boot when the owner lock is held, naming the workers `interrupted.json` says stopped with the server, after it resumes a coordinator that did, and `event`, which `notify` saves for the routine runner's `project` task and for `ProjectWatch`.
+`notify` also writes the event into the project's `inbox/` through the runner's `writeInbox`, which `Dashboard` wires to `writeInboxEvent` in `src/server/project-notes.ts`, and logs a write that fails rather than losing the update.
 `ProjectWatch` in `src/server/project-watch.ts` hears the minute tick and looks every `PROJECT_WATCH_MINUTES` (2): for each project not archived, it loads the pull request of each worker's branch and the viewer's Linear issues that match the project's `watch.linear`, keeps a snapshot of each in memory, and reports what changed since; the first look only records.
 
 The runner saves each update in `projects.json` at once and then delivers; an archived project's updates wait until `unarchive`, whose apply calls the runner's `settle`.
@@ -682,15 +683,23 @@ Once omp takes it, `delivered` removes those updates, and delivery runs again fo
 When omp refuses it, the updates stay and nothing retries at once: delivery runs again when the coordinator's row changes, when its turn ends, and when it attaches, which is also how what waited while it worked, or while it was stopped, reaches it once it is idle.
 Only sessions that attached through the starter are tracked, so a project's session resumed in a terminal reports nothing.
 
-`src/server/project-notes.ts` seeds a new project's notes in `projectNotesDir(id)` from `src/paths.ts`, `$XDG_DATA_HOME/omp-agents/projects/<id>/`, else `~/.local/share/omp-agents/projects/<id>/`: `README.md` with the project's name, its goal (the coordinator's first message), and links to `testing.md`, `preferences.md`, and `research.md`, which it seeds too, and it never overwrites a file already there.
+`src/server/project-notes.ts` seeds a new project's notes in `projectNotesDir(id)` from `src/paths.ts`, `$XDG_DATA_HOME/omp-agents/projects/<id>/`, else `~/.local/share/omp-agents/projects/<id>/`, laid out as Cursor's Project folder: `notes.md` with the project's name, its goal (the coordinator's first message), a `## Decisions` section, the index of the others, and `## Promoted`, then `testing.md` and `research.md` under `docs/`, `internal/checklist.md`, and `archived.md`.
+It writes each file with the `wx` flag, so it never overwrites a file already there, even one another server wrote meanwhile.
+`writeInboxEvent` writes one outside event into `inbox/`, named `<time>-<slug of source and title>.md` with the time's colons as dashes, so the names sort oldest first, and holding the title, the source, the time, the link when there is one, and the text; a second event of the same name takes `-2`, `-3`, and so on.
+`moveOldNotes` moves the files an older version kept, `README.md` to `notes.md`, `testing.md`, `research.md`, and `preferences.md` to `docs/`, and `checklist.md` to `internal/`, each by linking the new name and then unlinking the old one, so a file already in the new place stays and the old one beside it too; any other file stays where it is.
+`seedNotes` calls it before it seeds, and `Dashboard.start` calls it for every project in `projects.json`.
+`Dashboard.start` also seeds the user's notes, `userNotesDir` from `src/paths.ts`, `$XDG_DATA_HOME/omp-agents/user/`, else `~/.local/share/omp-agents/user/`, as Cursor's User folder: `preferences.md` and `workflows/README.md`, through `seedUserNotes`, which never overwrites a file either.
+`listNotes` lists a notes directory's Markdown files at any depth, by name, each named by its path from the directory with `/`, skipping hidden entries and not following a linked directory.
 The notes live outside every repository, so every worktree shares them, and outside the access token's directory, which the file dialog refuses.
 
 `templates/omp/agent/extensions/projects.ts` reads `projects.json` at each prompt and each `edit` or `write` call.
 Both of its handlers find the role by the session id, and for a `task` subagent, whose transcript is `<parent>/<agent>.jsonl` beside its parent's, by its ancestors' session ids (`ancestorSessionIds`), so it acts in its parent's role.
-Its `before_agent_start` handler adds the session's role and the notes' place to the system prompt of every prompt, so they survive compaction.
-Its `tool_call` handler blocks a coordinator's `edit` and `write` calls whose `path`, or a hashline edit's `[path#TAG]` header, resolves outside the notes directory, and fails closed: a call that names no file it can read is blocked too.
+Its `before_agent_start` handler adds the session's role and the places of the project's notes and the user's to the system prompt of every prompt, so they survive compaction.
+The coordinator's role text says its job is to plan, delegate, and report, reading only the notes, the workers' reports, and what a quick look answers, and starting a worker for anything more, with a prompt that says what to report back.
+The extension keeps its own copy of `userNotesDir`, since it cannot import `src/`.
+Its `tool_call` handler blocks a coordinator's `edit` and `write` calls whose `path`, or a hashline edit's `[path#TAG]` header, resolves outside both the project's notes and the user's, the roots `inNotes` takes, and fails closed: a call that names no file it can read is blocked too.
 Only `local://` and `artifact://` paths, the session's scratch space, pass without a check.
-Its shell guard, `shellWrite`, is a nudge rather than a boundary: after unquoting, it blocks a coordinator's `bash` call that redirects or `tee`s to a file outside the notes, runs a git subcommand that writes (skipping `-C` and `-c` values), or runs `gt` other than its read subcommands.
+Its shell guard, `shellWrite`, is a nudge rather than a boundary: after unquoting, it blocks a coordinator's `bash` call that redirects or `tee`s to a file outside the same roots, runs a git subcommand that writes (skipping `-C` and `-c` values), or runs `gt` other than its read subcommands.
 Anything else runs, so a command or script that writes on its own is not caught.
 
 The runner's `noticeFacts` feeds the `projects` notice source (`PROJECT_KINDS`) each project's coordinator status and its workers' phases and questions, and `projectNotices` in `src/server/notices.ts` turns them into notices, each id naming the state it reports: a worker's request once the coordinator is not working, a worker that stopped, and a settled project.
@@ -815,7 +824,8 @@ It folds the session's transcript with `Work` for the files its own `edit` and `
 `GET /api/changes/file?session=<session id>&path=<path>` answers one file of that list in full, `ChangedFileText`, with every line of `git diff --histogram` as numbered rows, or a note for a binary file or one over `MAX_CHANGED_FILE_BYTES` (1 MB).
 It computes the list again and answers 404 for a path the list does not hold, so it reads no file the session and its checkout did not change, and passes the path with `--literal-pathspecs`, so a name such as `app/[id]/page.tsx` is not a glob.
 The dialog reads both routes again whenever the session's own changes grow and when a turn starts or ends.
-`GET /api/project-notes?id=<project id>` answers a project's notes, `{ dir, notes }`, each note a `ProjectNote` (`{ name, path, modifiedAt }`) for a Markdown file in the directory, `README.md` first and then by name, or 404 for a project the server does not know; the page opens a note through `GET /api/file`.
+`GET /api/project-notes?id=<project id>` answers a project's notes and the user's, `ProjectNotesAnswer` (`{ dir, notes, userDir, userNotes }`), each note a `ProjectNote` (`{ name, path, modifiedAt }`) for a Markdown file at any depth in its directory, named by its path from it with `/`, by name, or 404 for a project the server does not know.
+The page lays each list out as a tree through `noteRows` in `web/notes-model.ts` and opens a note through `GET /api/file`, which opens both directories, since they lie outside `DENIED_DIRS`.
 `GET /api/conversations?q=<words>` answers `ConversationSearchAnswer` from `src/shared/sessions.ts`: every saved conversation whose prompts or replies hold every word, the file changed last first, each by its latest such message, with that message's transcript item id, a snippet, and how many messages match; a blank `q` is a 400.
 It waits for the transcript reads asked for so far, then reads nothing itself; the page leaves out the sessions the sidebar hides and lists the first 30.
 `GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub or Graphite PR link.

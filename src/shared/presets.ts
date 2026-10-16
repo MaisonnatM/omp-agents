@@ -6,6 +6,7 @@ import { isNonEmpty, isObject, type Parsed } from "../json";
 import type { BranchChoice } from "./git";
 import type { ModelOption, ModelRole } from "./models";
 import { parseModel, parseSkill, parseThinking, parseTools } from "./sessions";
+import { slug } from "./slug";
 
 /** Where a preset's session works: in the directory as it is, or on a new branch from the checked-out one, in a worktree of its own. */
 export type WorktreePolicy = "here" | "new-branch";
@@ -83,6 +84,5 @@ function stamp(at: Date): string {
  */
 export function presetBranch(preset: Pick<SessionPreset, "name" | "worktree">, checkedOut: string | null, at: Date): BranchChoice | null {
 	if (preset.worktree !== "new-branch" || checkedOut === null) return null;
-	const slug = preset.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "preset";
-	return { kind: "new", name: `${slug}-${stamp(at)}`, base: checkedOut };
+	return { kind: "new", name: `${slug(preset.name, "preset")}-${stamp(at)}`, base: checkedOut };
 }

@@ -110,11 +110,20 @@ export interface Project {
 	reviewCadence: string;
 }
 
-/** A notes file of a project, as `GET /api/project-notes` lists it. */
+/** A notes file of a project or of the user, as `GET /api/project-notes` lists it. */
 export interface ProjectNote {
+	/** Its path from its notes directory, with `/`: `docs/testing.md`. */
 	name: string;
 	path: string;
 	modifiedAt: string;
+}
+
+/** `GET /api/project-notes`: the project's notes and the user's, each directory with its Markdown files. */
+export interface ProjectNotesAnswer {
+	dir: string;
+	notes: ProjectNote[];
+	userDir: string;
+	userNotes: ProjectNote[];
 }
 
 /** What the page shows for a worker; computed from the live sessions, never stored. */

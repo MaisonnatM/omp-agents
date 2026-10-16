@@ -1176,8 +1176,8 @@ An action that fails shows its error, and its control becomes available again.
 ## Projects
 
 - A project is a coordinator session that plans the work and hands it to worker sessions, as Cursor's Projects do.
-  The coordinator never changes the project's code: it starts a worker for each change, follows what the workers report, and tells you what is done and what waits on you.
-  Every session of a project reads and keeps one shared directory of notes.
+  The coordinator plans, delegates, and reports, and never changes the project's code: it starts a worker for each change, and for any investigation, research, review, or browser check beyond a quick look, follows what the workers report, and tells you what is done and what waits on you.
+  Every session of a project reads and keeps one shared directory of notes, and the notes about you that every project shares.
 - The **Projects** page, a `#projects` address, G then P, or **Go to projects** in the command menu, lists the projects.
   On the **Todo** page, G then P picks the focused or open todo's priority instead, as P alone does there; with no todo focused or open, it opens the projects.
   **New project** on that page, the **+** of the sidebar's projects group, or `#projects/new` opens its form: a name, the workspace the coordinator starts in, its model and effort, as on a new session, and its first message, which says what the project is for.
@@ -1196,9 +1196,9 @@ An action that fails shows its error, and its control becomes available again.
   A project's sessions leave the other groups, **Pinned** included, and the group lists them even in `/tmp`, which the sidebar otherwise hides.
   With a workspace selected, a project shows when it started there or one of its sessions runs or ran there.
   A search that matches a project's name keeps all its rows, and one that matches a worker's title keeps that worker.
-- `#projects/<id>` opens one project: its coordinator's status with **Open coordinator**, a table of its workers in order with each one's phase and last reply, the updates still waiting for the coordinator, and its notes files.
+- `#projects/<id>` opens one project: its coordinator's status with **Open coordinator**, a table of its workers in order with each one's phase and last reply, the updates still waiting for the coordinator, and its notes.
   A worker's phase is working, asking while it waits on a question, idle, interrupted when it stopped without **End session**, or ended.
-  Click a notes file to open it in the file dialog.
+  **Notes** shows two trees, **Project** and **User**, each with its folders first and then its files, by name, and its directory under it; click a file to open it in the file dialog.
   **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, its coordinator's tools refuse to start, list, read, or message workers, and its updates wait.
   **Archive and end its sessions** also ends the project's sessions that run.
   **Unarchive** brings an archived project back and delivers what waited.
@@ -1207,7 +1207,7 @@ An action that fails shows its error, and its control becomes available again.
   **Linear issues assigned to me** reports issues assigned to you that are new or changed, filtered by a team, a label, and a project, each a name or key, empty for any.
   The dashboard looks every 2 minutes, and the first look at each pull request or issue only records it.
   **Ask me to review**, `every PR` by default, tells the coordinator how often to ask you to review, in your own words.
-- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** lists the notes files, and **PRs** the pull requests its workers submitted or worked on, each once.
+- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** shows the same **Project** and **User** trees, and **PRs** the pull requests its workers submitted or worked on, each once.
 - Workers report back on their own, so the coordinator never polls.
   Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
   Once the coordinator runs and is idle, every waiting update reaches it as one message that starts with `[omp-agents] Project update.`, quoting each finished worker's last reply up to 2,000 characters.
@@ -1219,12 +1219,16 @@ An action that fails shows its error, and its control becomes available again.
 - The notices bell's **Projects** tab tells you when a worker asks and the coordinator is idle or stopped, when a worker stopped without **End session**, and when a project is done: all its workers idle or ended, nothing queued, and nothing waiting for the coordinator.
 - A routine can **Send to a project**: each run sends its prompt to the project's coordinator as an update from **Routine**, taking no session of its own.
 - A project's notes live in `$XDG_DATA_HOME/omp-agents/projects/<id>/`, `~/.local/share/omp-agents/projects/<id>/` by default, outside every repository, so every worktree the project works in shares them.
-  A new project starts with `README.md`, which holds the goal from the first message and links the others, `testing.md` for how to build, run, and test the work, `preferences.md` for how you want it done, `research.md` for what agents found out, with sources, and `checklist.md`, the coordinator's plan.
-  The coordinator records there what you correct, and each worker ends by recording what it learned; what should outlive the project goes under `## Promoted` in `README.md`.
-  Every session of the project is told to read `README.md` first and to record there what lasts.
-  The coordinator may edit and write only these notes: its `edit` and `write` calls outside them, and calls whose files the extension cannot tell, are refused, and it is told to start a worker instead.
+  A new project starts with `notes.md`, which holds the name, the goal from the first message, a **Decisions** section, the index of the other notes, and a **Promoted** section, `testing.md` under `docs/` for how to build, run, and test the work, `research.md` beside it for what agents found out, with sources, `internal/checklist.md`, the coordinator's plan, and `archived.md`, for finished work moved out of the other notes.
+  `inbox/` holds one Markdown file per outside event, such as a routine's prompt, a pull request's checks, or a Linear issue, named by its time, source, and title, with its source, time, link, and text; the coordinator deletes the file, or moves its line to `archived.md`, once it has handled it, and moves finished checklist items there too.
+  The coordinator records what you decide about the project under **Decisions** in `notes.md`, and each worker ends by recording what it learned; what should outlive the project goes under `## Promoted` in `notes.md`.
+  A project from an older version keeps its files: when the dashboard starts, `README.md` moves to `notes.md`, `testing.md`, `research.md`, and `preferences.md` to `docs/`, and `checklist.md` to `internal/`, each only when its new place is free, and any other file stays where it is.
+- Your own notes, shared by every project, as Cursor's User folder, live in `$XDG_DATA_HOME/omp-agents/user/`, `~/.local/share/omp-agents/user/` by default.
+  The dashboard starts them with `preferences.md`, how you work across every project, and `workflows/README.md`, which says to keep one file per way of working that held across projects, such as a new feature's flow or a quality pass; it never overwrites a file there.
+  Every session of a project is told to read the project's `notes.md` first, then your `preferences.md` and any workflow that fits its task, and to record a preference that holds beyond the project in your notes and one about this project only in the project's `notes.md`.
+- The coordinator may edit and write only the project's notes and yours: its `edit` and `write` calls outside them, and calls whose files the extension cannot tell, are refused, and it is told to start a worker instead.
   Its `local://` and `artifact://` scratch files are allowed.
-  Its `bash` calls that redirect or `tee` output to a file outside the notes, and git and `gt` commands that change the checkout or a branch, are refused.
+  Its `bash` calls that redirect or `tee` output to a file outside those notes, and git and `gt` commands that change the checkout or a branch, are refused.
   That shell check is a reminder, not a wall: other commands, such as a script that writes files, still run.
   A subagent has its project session's role and its limits, a `task` subagent included.
 - The role text and that limit come from the omp extension `~/.omp/agent/extensions/projects.ts`, which `bun run omp-template` installs.

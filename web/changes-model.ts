@@ -2,21 +2,22 @@
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
 import { absoluteFilePath } from "./file-paths";
 
-export interface TreeDir {
-	/** Its name in its parent, which joins a chain of single-directory folders: `src/server`. */
+/** A folder of files, each keyed by its `path` from the root with `/`; a changed file unless `T` says otherwise. */
+export interface TreeDir<T extends { path: string } = ChangedEntry> {
+	/** Its name in its parent, which in the changes explorer joins a chain of single-directory folders: `src/server`. */
 	name: string;
 	/** Its path from the root, which keys its open state. */
 	path: string;
-	dirs: TreeDir[];
-	files: ChangedEntry[];
+	dirs: TreeDir<T>[];
+	files: T[];
 }
 
 /**
- * The files as folders, directories first and each level by name; a folder holding one folder and no file joins it.
+ * The files as folders, directories first and each level by name, which the changes explorer and the notes list share.
  * An absolute path, a file the session changed outside its checkout, hangs under a `/` folder.
  */
-export function fileTree(files: readonly ChangedEntry[]): TreeDir {
-	type Building = { name: string; path: string; dirs: Map<string, Building>; files: ChangedEntry[] };
+export function folderTree<T extends { path: string }>(files: readonly T[]): TreeDir<T> {
+	type Building = { name: string; path: string; dirs: Map<string, Building>; files: T[] };
 	const root: Building = { name: "", path: "", dirs: new Map(), files: [] };
 	for (const file of files) {
 		let node = root;
@@ -32,14 +33,24 @@ export function fileTree(files: readonly ChangedEntry[]): TreeDir {
 		}
 		node.files.push(file);
 	}
-	const settle = (node: Building): TreeDir => {
-		const dirs = [...node.dirs.values()].map(settle).sort((a, b) => a.name.localeCompare(b.name));
-		const files = node.files.toSorted((a, b) => a.path.localeCompare(b.path));
-		const only = dirs[0];
-		if (node.name && files.length === 0 && dirs.length === 1 && only) return { ...only, name: `${node.name === "/" ? "" : node.name}/${only.name}` };
-		return { name: node.name, path: node.path, dirs, files };
-	};
+	const settle = (node: Building): TreeDir<T> => ({
+		name: node.name,
+		path: node.path,
+		dirs: [...node.dirs.values()].map(settle).sort((a, b) => a.name.localeCompare(b.name)),
+		files: node.files.toSorted((a, b) => a.path.localeCompare(b.path)),
+	});
 	return settle(root);
+}
+
+/** The changes explorer's tree: {@link folderTree}, where a folder holding one folder and no file joins it. */
+export function fileTree(files: readonly ChangedEntry[]): TreeDir {
+	const joined = (dir: TreeDir): TreeDir => {
+		const dirs = dir.dirs.map(joined).sort((a, b) => a.name.localeCompare(b.name));
+		const only = dirs[0];
+		if (dir.name && dir.files.length === 0 && dirs.length === 1 && only) return { ...only, name: `${dir.name === "/" ? "" : dir.name}/${only.name}` };
+		return { ...dir, dirs };
+	};
+	return joined(folderTree(files));
 }
 
 /** The files in the explorer's order, which ↓ and ↑ walk. */

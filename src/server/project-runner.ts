@@ -15,6 +15,7 @@ import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
 import { expandHome } from "../paths";
 import { type ModelOption, modelOfSelector } from "../shared/models";
 import type { SessionPreset } from "../shared/presets";
+import { slug } from "../shared/slug";
 import { isBusy, type Project, type ProjectEvent, type QueuedWorker, type Worker, type WorkerId, type WorkerPhase, type WorkerStart, workerPhase } from "../shared/projects";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult, type UserAnswer, type UserRequest } from "../shared/sessions";
 import { type ProjectControl, projectTools, updateText, type WorkerSpec, type WorkerStarted } from "./project-tools";
@@ -82,6 +83,8 @@ export interface ProjectRunnerDeps {
 	extensionArgs(): string[];
 	/** Creates project `id`'s notes for a project named `name` working on `goal`. */
 	seedNotes(id: string, name: string, goal: string): void;
+	/** Writes outside event `event`, which came at `at`, into project `id`'s inbox in its notes. */
+	writeInbox(id: string, event: ProjectEvent, at: string): void;
 	now(): number;
 	newId(): string;
 	/** The projects changed; every socket should hear them. */
@@ -108,17 +111,8 @@ export interface ProjectSpec {
 	thinking: string | null;
 }
 
-/** `text` as a branch name's segment: lower case, dashes between words, at most 40 characters. */
-function slug(text: string): string {
-	return (
-		text
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "")
-			.slice(0, 40)
-			.replace(/-+$/, "") || "worker"
-	);
-}
+/** `text` as a branch name's segment, at most 40 characters. */
+const branchSlug = (text: string): string => slug(text, "worker", 40);
 
 /** `answer` as the reply `request` takes: an option's label, yes or no, or text. */
 function answerFor(request: UserRequest, answer: string): UserAnswer {
@@ -199,11 +193,16 @@ export class ProjectRunner implements ProjectControl {
 		}
 	}
 
-	/** Saves `event` for project `projectId`'s coordinator; why it cannot, or `null` once saved. */
+	/** Saves `event` for project `projectId`'s coordinator, and writes it into the project's inbox; why it cannot, or `null` once saved. */
 	notify(projectId: string, event: ProjectEvent): string | null {
 		const project = this.#deps.file.get(projectId);
 		if (!project) return "its project no longer exists.";
 		if (project.archived) return `project ${project.name} is archived.`;
+		try {
+			this.#deps.writeInbox(projectId, event, this.#now());
+		} catch (error) {
+			console.error(`omp-agents: cannot write ${project.name}'s inbox: ${errorText(error)}`);
+		}
 		this.#save(projectId, [{ kind: "event", ...event }]);
 		this.settle(projectId);
 		return null;
@@ -356,7 +355,7 @@ export class ProjectRunner implements ProjectControl {
 		if (spec.model !== null && !model) throw new Error(`model must read provider/id, such as anthropic/claude-haiku-5-5; got ${JSON.stringify(spec.model)}.`);
 		const wantsBranch = spec.branch === null ? preset?.worktree !== "here" : spec.branch.toLowerCase() !== "none";
 		const base = wantsBranch ? await this.#deps.checkedOut(cwd) : null;
-		const name = spec.branch === null ? `${slug(project.name)}/${slug(spec.title)}-${this.#deps.newId().replace(/-/g, "").slice(0, 6)}` : spec.branch;
+		const name = spec.branch === null ? `${branchSlug(project.name)}/${branchSlug(spec.title)}-${this.#deps.newId().replace(/-/g, "").slice(0, 6)}` : spec.branch;
 		return {
 			cwd,
 			prompt: spec.prompt,
