@@ -54,4 +54,14 @@ test("ArrowDown moves into the list and stops at its last row", () => {
 
 test("a closed list takes no key", () => {
 	expect(suggestionKey(press("1"), { ...list, open: false })).toBeNull();
+	expect(suggestionKey(press("0"), { ...list, open: false })).toBeNull();
+});
+
+test("0 sends every row once there are two, with Shift too", () => {
+	expect(suggestionKey(press("0"), { ...list, count: 2 })).toEqual({ kind: "send-all" });
+	expect(suggestionKey(press("0", true), list)).toEqual({ kind: "send-all" });
+});
+
+test("with one prompt, 0 stays the composer's", () => {
+	expect(suggestionKey(press("0"), { ...list, count: 1 })).toBeNull();
 });
