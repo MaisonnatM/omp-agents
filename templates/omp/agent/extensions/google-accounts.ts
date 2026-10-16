@@ -141,18 +141,18 @@ export default function googleAccounts(pi: ExtensionAPI) {
 	const places = new Map<string, Place>();
 	// Read on every prompt, so an account added or linked mid-session shows in the next turn.
 	pi.on("before_agent_start", (event, ctx) => {
-		const accounts = readJson<AccountsFile>(ACCOUNTS_FILE, { addresses: {}, links: {} });
+		const { addresses = {}, links = {} } = readJson<Partial<AccountsFile>>(ACCOUNTS_FILE, {});
 		// omp's `getMCPConfigPath("user")`.
-		const services = servicesOf(readJson<McpFile>(join(pi.pi.getAgentDir(), "mcp.json"), {}), accounts);
+		const services = servicesOf(readJson<McpFile>(join(pi.pi.getAgentDir(), "mcp.json"), {}), { addresses, links });
 		if (services.every(service => service.accounts.length < 2)) return;
 		let place = places.get(ctx.cwd);
 		if (!place) {
 			place = placeOf(ctx.cwd);
 			places.set(ctx.cwd, place);
 		}
-		const dir = workspaceOf(place, [...new Set(Object.values(accounts.links).flat())]);
-		const addresses = dir === null ? [] : Object.keys(accounts.links).filter(address => accounts.links[address]?.includes(dir));
-		const text = accountsText(services, dir === null ? null : { dir, addresses });
+		const dir = workspaceOf(place, [...new Set(Object.values(links).flat())]);
+		const linked = dir === null ? [] : Object.keys(links).filter(address => links[address]?.includes(dir));
+		const text = accountsText(services, dir === null ? null : { dir, addresses: linked });
 		if (text === null) return;
 		return { systemPrompt: [...event.systemPrompt, text] };
 	});
