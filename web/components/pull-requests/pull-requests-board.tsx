@@ -1,8 +1,8 @@
 /** What the two lists of pull requests share, the sidebar's and the page's: their state, their keys, and the board they render. */
 import { ArrowDownUp, Unplug } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
-import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
+import type { PullRequestActionId } from "../../../src/pull-request-actions";
+import { type PullRequestDetail, type PullRequestEdit, type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
 import { type AgentOn, agentOn, moveOf } from "../../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,9 @@ import {
 	shownPullRequests,
 	stepTarget,
 	type Where,
+	withPullRequestChanged,
 } from "../../pull-requests-model";
+import { putJson } from "../../api";
 import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart } from "../../quick-actions";
@@ -44,7 +46,7 @@ import { type DragItem, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
 import { stepRows } from "../list-page";
-import { type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
+import { type RowChange, type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
 
 // Both keys keep their names from before the page was called Pull requests, so the browser's saved folds and order survive.
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
@@ -83,10 +85,10 @@ function placeOf(list: PullRequestList, pr: PullRequest, agent: AgentOn): { repo
  * ↓ and ↑ move between the rows `shown` lists, or, while the main area shows a pull request's details, show the next or
  * previous one; on its changes page they step through its files instead. With no row focused they enter the list only
  * when `entersList`, so the sidebar's list leaves them to scroll the panes. O opens the pull request on GitHub, `.` opens
- * a row's quick actions, and E runs `giveToAgent` on the focused row's pull request, or the one the main area shows. A
+ * a row's `⋯` menu, and E runs `giveToAgent` on the focused row's pull request, or the one the main area shows. A
  * key that has nothing to act on keeps its usual meaning.
  */
-function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, entersList: boolean, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: PullRequestSummary) => boolean): void {
+function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, entersList: boolean, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: PullRequestSummary) => void): void {
 	const { target } = route;
 	const current = (): number =>
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
@@ -111,7 +113,8 @@ function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, en
 		},
 		pullRequestActions: () => {
 			const pr = target ? undefined : shown[current()];
-			return pr ? openActions(pr) : false;
+			if (!pr) return false;
+			openActions(pr);
 		},
 		giveToAgent: () => {
 			const pr = target ?? shown[current()];
@@ -314,16 +317,20 @@ export function usePullRequestsBoard({ workspace, hosts, past, route, entersList
 		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
 		return true;
 	};
-	/** The row, by {@link rowId}, whose quick actions menu is open. */
+	/** The row, by {@link rowId}, whose `⋯` menu is open. */
 	const [actionsOpen, setActionsOpen] = useState<string | null>(null);
-	const openActions = (pr: PullRequestSummary): boolean => {
-		if (pullRequestActions(pr).length === 0) return false;
-		setActionsOpen(rowId(pr));
-		return true;
-	};
+	const openActions = (pr: PullRequestSummary): void => setActionsOpen(rowId(pr));
 	// The functions every row shares, so a row's props change only with what the row shows.
 	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
 	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
+	const onChange = useCallback(
+		async (pr: PullRequestSummary, change: RowChange) => {
+			await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change } satisfies PullRequestEdit);
+			pullRequestsStore.update(answer => withPullRequestChanged(answer, pr, change, Date.now()), workspace);
+			void pullRequestsStore.refresh(workspace, { fresh: true });
+		},
+		[workspace],
+	);
 	const shown = useMemo(() => (list ? shownPullRequests(list, folds.isFolded, order, agent) : []), [list, folds.isFolded, order, agent]);
 	useTriageKeys(shown, route, entersList, giveToAgent, openActions);
 
@@ -429,13 +436,14 @@ export function usePullRequestsBoard({ workspace, hosts, past, route, entersList
 						onQuickAction,
 						actionsOpen: actionsOpen === rowId(row.pr),
 						onActionsOpenChange,
+						onChange,
 						drag: { ...item, dropAt: edge === row.unit ? null : item.dropAt },
 						moveId,
 					};
 				}),
 			})),
 		}));
-	}, [layout, drag, sessions, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange]);
+	}, [layout, drag, sessions, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange, onChange]);
 
 	return {
 		poll,

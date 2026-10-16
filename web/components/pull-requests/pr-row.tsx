@@ -1,7 +1,7 @@
-/** A pull request's row in the lists, with its move badge, checks icon, review state, and diff size. */
+/** A pull request's row in the lists, with its move badge, checks icon, review state, diff size, and `⋯` menu. */
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
-import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
+import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import type { MoveId } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
@@ -9,17 +9,20 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { type SectionRow, MOVES, moveAction, reason, type StackPlace } from "../../pull-requests-model";
+import { useRead } from "../../reads";
 import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
+import { type Action, useAction } from "../../use-action";
 import { DROP_LINE, type DragItem } from "../../use-drag-order";
 import { Age } from "../age";
 import { BranchLabel } from "../git";
-import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
+import { MergePopover } from "./merge-popover";
+import { PullRequestMenu } from "./pr-menu";
 
 /** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
 function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
@@ -56,6 +59,8 @@ const MOVE_LOOK: Record<MoveId, [string, LucideIcon | null]> = {
 
 const BADGE = "flex h-5 w-16 shrink-0 items-center justify-center gap-1 rounded-[5px] px-1 text-[11px] whitespace-nowrap";
 
+const BADGE_BUTTON = "cursor-pointer outline-none hover:ring-1 hover:ring-current/40 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default";
+
 function BadgeFace({ move }: { move: MoveId }) {
 	const Icon = MOVE_LOOK[move][1];
 	return (
@@ -76,8 +81,42 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 	);
 }
 
-/** A row's move badge: a button that starts the quick action handing the move to an agent, when one applies, else the plain badge. */
-function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+/** A change a row makes to its pull request on GitHub. */
+export type RowChange = Extract<PullRequestChange, { field: "state" | "merge" }>;
+
+/** A row's changes to its pull request, pending until GitHub answers; a refusal shows as a toast. */
+const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): Action<[RowChange]> =>
+	useAction((change: RowChange) => onChange(pr, change), "GitHub refused the change");
+
+/** A **Merge** badge: a button that merges after the same confirmation as the details, reading what the merge needs while it is open. */
+function MergeBadge({ pr, change }: { pr: PullRequestSummary; change: Action<[RowChange]> }) {
+	const [open, setOpen] = useState(false);
+	const target = useRead<PullRequestDetail>(open ? `/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}` : null);
+	const label = `Merge ${pullRequestName(pr)} on GitHub`;
+	return (
+		<MergePopover pr={pr} target={target.data} error={target.error} onMerge={(method, head) => change.run({ field: "merge", method, head })} open={open} onOpenChange={setOpen} tooltip={label} align="start">
+			{() => (
+				<button
+					type="button"
+					aria-label={label}
+					aria-busy={change.pending}
+					disabled={change.pending}
+					className={cn(BADGE, MOVE_LOOK.merge[0], BADGE_BUTTON, change.pending && "motion-safe:animate-pulse")}
+					style={{ fontVariationSettings: fontWeights.semibold }}
+				>
+					<BadgeFace move="merge" />
+				</button>
+			)}
+		</MergePopover>
+	);
+}
+
+/**
+ * A row's move badge: for **Merge**, a button that merges; else a button that starts the quick action handing the move
+ * to an agent, when one applies; else the plain badge.
+ */
+function RowMoveBadge({ pr, move, change, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId; change: Action<[RowChange]> } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+	if (move === "merge") return <MergeBadge pr={pr} change={change} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -89,12 +128,7 @@ function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullReque
 				aria-busy={pending === action}
 				disabled={pending !== null}
 				onClick={() => onQuickAction(pr, cwd, action)}
-				className={cn(
-					BADGE,
-					MOVE_LOOK[move][0],
-					"cursor-pointer outline-none hover:ring-1 hover:ring-current/40 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default",
-					pending === action && "motion-safe:animate-pulse",
-				)}
+				className={cn(BADGE, MOVE_LOOK[move][0], BADGE_BUTTON, pending === action && "motion-safe:animate-pulse")}
 				style={{ fontVariationSettings: fontWeights.semibold }}
 			>
 				<BadgeFace move={move} />
@@ -264,10 +298,12 @@ export interface RowProps {
 	cwd: string;
 	/** The same function for every row, so a row that its props leave unchanged is not drawn again. */
 	onQuickAction: (pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => void;
-	/** Whether the row's quick actions menu is open, which the `.` shortcut also sets. */
+	/** Whether the row's `⋯` menu is open, which the `.` shortcut also sets. */
 	actionsOpen: boolean;
 	/** The same function for every row, like `onQuickAction`. */
 	onActionsOpenChange: (pr: PullRequest, open: boolean) => void;
+	/** Makes `change` on GitHub and shows it in the list; the same function for every row, like `onQuickAction`. */
+	onChange: (pr: PullRequestSummary, change: RowChange) => Promise<void>;
 	drag: DragItem;
 	/** What the move shortcuts name the row by. */
 	moveId: string;
@@ -295,6 +331,7 @@ const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => b
 	onQuickAction: Object.is,
 	actionsOpen: Object.is,
 	onActionsOpenChange: Object.is,
+	onChange: Object.is,
 	drag: (a, b) => a.handle === b.handle && a.target === b.target && a.dropAt === b.dropAt && a.dragging === b.dragging,
 	moveId: Object.is,
 };
@@ -302,16 +339,18 @@ const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => b
 const sameRowProps = (a: RowProps, b: RowProps): boolean =>
 	(Object.keys(PROP_EQUAL) as (keyof RowProps)[]).every(key => (PROP_EQUAL[key] as (x: unknown, y: unknown) => boolean)(a[key], b[key]));
 
-function RowQuickActions({ pr, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary }) {
+function RowMenu({ pr, change, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[RowChange]> }) {
 	return (
-		<QuickActionsMenu
-			actions={pullRequestActions(pr)}
-			pending={pending}
+		<PullRequestMenu
+			pr={pr}
+			state={pr.state}
 			// The menu lists `pullRequestActions(pr)`, so it runs only one of those.
-			onRun={action => onQuickAction(pr, cwd, action as PullRequestActionId)}
+			quick={{ actions: pullRequestActions(pr), pending, onRun: action => onQuickAction(pr, cwd, action as PullRequestActionId) }}
+			onState={to => change.run({ field: "state", state: to })}
+			pending={change.pending}
 			open={actionsOpen}
 			onOpenChange={open => onActionsOpenChange(pr, open)}
-			label="Quick actions: start a session in the background that works on this pull request"
+			label="Pull request actions"
 		/>
 	);
 }
@@ -348,10 +387,11 @@ function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; target
 }
 
 /**
- * A pull request in the sidebar's list: its title and age, then its move and why it waits on it, with its quick
- * actions on hover. A rail on the left joins the rows of a stack.
+ * A pull request in the sidebar's list: its title and age, then its move and why it waits on it, with its `⋯` menu on
+ * hover. A rail on the left joins the rows of a stack.
  */
-export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
+export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, onChange, ...actions }: RowProps) {
+	const change = useRowChange(pr, onChange);
 	return (
 		<li
 			id={rowId(pr)}
@@ -370,7 +410,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<Age at={pr.updatedAt} compact exact className="w-7 shrink-0 text-right text-xs leading-5 tabular-nums text-muted-foreground" />
 				</div>
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-					<RowMoveBadge pr={pr} move={move} {...actions} />
+					<RowMoveBadge pr={pr} move={move} change={change} {...actions} />
 					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<span aria-hidden>·</span>
@@ -385,17 +425,17 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 			<span
 				className={cn(
 					"absolute top-1 right-1 rounded-md bg-sidebar transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
-					actions.pending === null && "opacity-0",
+					actions.pending === null && !change.pending && "opacity-0",
 				)}
 			>
-				<RowQuickActions pr={pr} {...actions} />
+				<RowMenu pr={pr} change={change} {...actions} />
 			</span>
 		</li>
 	);
 }, sameRowProps);
 
 /**
- * The page's columns: move, title, sessions, stack, checks, review, size, age, and quick actions. The sessions, stack,
+ * The page's columns: move, title, sessions, stack, checks, review, size, age, and the `⋯` menu. The sessions, stack,
  * and size columns drop out when the page is too narrow for them.
  */
 const TABLE_COLUMNS =
@@ -404,7 +444,8 @@ const TABLE_COLUMNS =
 const WIDE = "hidden @3xl/pull-requests:flex";
 
 /** A pull request in the Pull requests page's table: one line per column, with the author, number, and reason under its title. */
-export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
+export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, onChange, ...actions }: RowProps) {
+	const change = useRowChange(pr, onChange);
 	// A review's reason names its author, which this row shows already.
 	const why = move === "review" ? null : reason(pr, move);
 	return (
@@ -416,7 +457,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			onClick={event => openFromRow(event, pr)}
 			className={cn("group/row relative cursor-pointer px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<RowMoveBadge pr={pr} move={move} {...actions} />
+			<RowMoveBadge pr={pr} move={move} change={change} {...actions} />
 			<div className="min-w-0">
 				<TitleLink pr={pr} targeted={targeted} className="block truncate" />
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
@@ -446,7 +487,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			</span>
 			<Age at={pr.updatedAt} compact exact className="shrink-0 text-right text-xs tabular-nums text-muted-foreground" />
 			<span className="flex justify-end">
-				<RowQuickActions pr={pr} {...actions} />
+				<RowMenu pr={pr} change={change} {...actions} />
 			</span>
 		</li>
 	);

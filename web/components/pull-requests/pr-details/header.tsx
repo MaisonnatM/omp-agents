@@ -1,24 +1,19 @@
-import { ArrowLeft, Check, CircleDashed, CircleDot, CircleX, Copy, Ellipsis, ExternalLink, FileDiff, GitMerge, Layers, type LucideIcon, MessageSquare, Users, Zap } from "lucide-react";
+import { ArrowLeft, Check, CircleDashed, CircleDot, CircleX, Copy, ExternalLink, FileDiff, GitMerge, Layers, type LucideIcon, MessageSquare, Users } from "lucide-react";
 import { type ReactNode, type RefObject, useState } from "react";
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
-import { MERGE_METHOD_LABELS, type MergeMethod, startingMethod } from "../../../../src/shared/source-control";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useLastMergeMethod, useMergeMethodChoice } from "../../../merge-method";
 import { type PullRequestOptionsRead, ReviewersField, type SavePullRequest, StateField } from "../pr-fields";
 import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, type Reviewer, type ReviewerState, type StackedPullRequest } from "../../../../src/shared/github";
+import { MERGE_METHOD_LABELS } from "../../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { graphiteUrl } from "../../../pull-requests-model";
 import { age, modeOf } from "../../../labels";
-import { QUICK_ACTIONS, type QuickActionId } from "../../../quick-actions";
+import type { QuickActionId } from "../../../quick-actions";
 import { useCopy } from "../../../use-copy";
 import { BranchLabel, BranchName } from "../../git";
-import { OrgIcon } from "../../org-icon";
 import { QuickActionButton, type QuickActionsProps } from "../../quick-actions";
 import { Avatar, IconTip, STATE_ICON } from "../avatars";
+import { MergePopover } from "../merge-popover";
+import { PullRequestMenu } from "../pr-menu";
 import { MoveBadge } from "../pr-row";
 import type { DetailContentProps, NextMove, Placement } from ".";
 import { type PlacedItem, TONE_COLOR, viewOf } from "./status-view";
@@ -76,57 +71,17 @@ function ReviewerInline({ reviewers }: { reviewers: Reviewer[] }) {
 	);
 }
 
-/** Merges on GitHub with the method Settings starts it on, after a confirmation that can switch the method. */
-function MergeButton({ pr, detail, onSave }: { pr: PullRequest; detail: PullRequestDetail; onSave: SavePullRequest }) {
-	const [choice] = useMergeMethodChoice();
-	const [last, setLast] = useLastMergeMethod();
+/** The merge button, whose confirmation waits for the details while GitHub has not answered yet. */
+function MergeButton({ pr, detail, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; onSave: SavePullRequest }) {
 	const [open, setOpen] = useState(false);
-	const [picked, setPicked] = useState<MergeMethod | null>(null);
-	const method = picked && detail.mergeMethods.includes(picked) ? picked : startingMethod(choice, last, detail.mergeMethods);
-	if (!method)
-		return (
-			<Button variant="primary" size="compact" leadingIcon={GitMerge} render={<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" />}>
-				Merge on GitHub
-			</Button>
-		);
-	const merge = (): void => {
-		setLast(method);
-		setOpen(false);
-		onSave({ field: "merge", method, head: detail.headOid }, {});
-	};
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
+		<MergePopover pr={pr} target={detail} onMerge={(method, head) => onSave({ field: "merge", method, head }, {})} open={open} onOpenChange={setOpen}>
+			{method => (
 				<Button variant="primary" size="compact" leadingIcon={GitMerge} active={open}>
-					{MERGE_METHOD_LABELS[method]}
+					{method ? MERGE_METHOD_LABELS[method] : "Merge"}
 				</Button>
-			</PopoverTrigger>
-			<PopoverContent align="end" className="w-72 space-y-3 p-3">
-				<p className="text-[13px] text-pretty">
-					Merge {pullRequestName(pr)} into <span className="font-mono">{detail.base}</span> on GitHub?
-				</p>
-				{detail.mergeMethods.length > 1 && (
-					<RadioGroup aria-label="Merge method" value={method} onValueChange={value => setPicked(detail.mergeMethods.find(allowed => allowed === value) ?? null)} className="space-y-1">
-						{detail.mergeMethods.map(allowed => (
-							<label key={allowed} className="flex cursor-pointer items-center gap-2 text-[13px]">
-								<Radio.Root value={allowed} className="flex size-3.5 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--border)] outline-none focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary">
-									<Radio.Indicator className="size-1.5 rounded-full bg-background" />
-								</Radio.Root>
-								{MERGE_METHOD_LABELS[allowed]}
-							</label>
-						))}
-					</RadioGroup>
-				)}
-				<div className="flex justify-end gap-2">
-					<Button variant="ghost" size="compact" onClick={() => setOpen(false)}>
-						Cancel
-					</Button>
-					<Button variant="primary" size="compact" leadingIcon={GitMerge} onClick={merge}>
-						{MERGE_METHOD_LABELS[method]}
-					</Button>
-				</div>
-			</PopoverContent>
-		</Popover>
+			)}
+		</MergePopover>
 	);
 }
 
@@ -135,14 +90,7 @@ function NextMoveButton({ pr, detail, next, quick, onOpen, onSave }: { pr: PullR
 	const { move, reason, action, session } = next;
 	let button: ReactNode = null;
 	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
-	else if (move === "merge")
-		button = detail ? (
-			<MergeButton pr={pr} detail={detail} onSave={onSave} />
-		) : (
-			<Button variant="primary" size="compact" leadingIcon={GitMerge} render={<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" />}>
-				Merge on GitHub
-			</Button>
-		);
+	else if (move === "merge") button = <MergeButton pr={pr} detail={detail} onSave={onSave} />;
 	else if (session)
 		button = (
 			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
@@ -158,36 +106,6 @@ function NextMoveButton({ pr, detail, next, quick, onOpen, onSave }: { pr: PullR
 			</Tooltip>
 			{button}
 		</span>
-	);
-}
-
-/** The header's `⋯`: the quick actions the Next move does not make, then the pull request elsewhere. */
-function MoreMenu({ pr, actions, quick }: { pr: PullRequest; actions: QuickActionId[]; quick: QuickActionsProps }) {
-	return (
-		<DropdownMenu>
-			<Tooltip content="More actions">
-				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label="More actions" loading={quick.pending !== null} />}>
-					<Ellipsis />
-				</DropdownMenuTrigger>
-			</Tooltip>
-			<DropdownMenuContent align="end" className="min-w-56">
-				{actions.map(id => (
-					<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={() => quick.onRun(id)}>
-						<Zap />
-						{QUICK_ACTIONS[id].label}
-					</MenuItem>
-				))}
-				{actions.length > 0 && <MenuSeparator />}
-				<MenuLinkItem href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
-					<OrgIcon org="github" className="size-4" />
-					Open on GitHub
-				</MenuLinkItem>
-				<MenuLinkItem href={graphiteUrl(pr)} target="_blank" rel="noreferrer">
-					<OrgIcon org="graphite" className="size-4" />
-					Open on Graphite
-				</MenuLinkItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
 	);
 }
 
@@ -242,7 +160,7 @@ export function DetailHeader({ pr, detail, stack, next, actions, quick, placed, 
 				</p>
 				<span className="ml-auto flex shrink-0 items-center gap-1.5">
 					{next && <NextMoveButton pr={pr} detail={detail} next={next} quick={quick} onOpen={onOpen} onSave={onSave} />}
-					<MoreMenu pr={pr} actions={actions} quick={quick} />
+					<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={{ ...quick, actions }} onState={to => onSave({ field: "state", state: to }, { state: to })} pending={false} label="More actions" />
 				</span>
 			</div>
 			<Heading ref={headingRef} tabIndex={-1} className={cn(page ? "text-xl" : "text-base", "leading-snug font-semibold outline-none")}>

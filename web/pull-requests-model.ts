@@ -1,6 +1,6 @@
-/** Pull request links, what each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, and its open review threads. */
+/** Pull request links, what each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type StackedPullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
@@ -306,6 +306,53 @@ export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr:
 
 /** Every pull request `repos` lists, leaving out the repositories GitHub could not read. */
 export const listedPullRequests = (repos: readonly RepoPullRequests[]): PullRequestSummary[] => repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests));
+
+/** A pull request's state changes on GitHub, as its `⋯` menus offer them. */
+export type StateActionId = "ready" | "draft" | "close" | "reopen";
+
+export const STATE_ACTIONS: Record<StateActionId, { label: string; to: SettableState }> = {
+	ready: { label: "Mark ready for review", to: "open" },
+	draft: { label: "Convert to draft", to: "draft" },
+	close: { label: "Close pull request", to: "closed" },
+	reopen: { label: "Reopen pull request", to: "open" },
+};
+
+/** The state changes a pull request in `state` offers, in menu order; a merged one offers none. */
+export function stateActions(state: PullRequestDetail["state"]): StateActionId[] {
+	switch (state) {
+		case "open":
+			return ["draft", "close"];
+		case "draft":
+			return ["ready", "close"];
+		case "closed":
+			return ["reopen"];
+		case "merged":
+			return [];
+		default: {
+			const never: never = state;
+			return never;
+		}
+	}
+}
+
+/**
+ * The list after GitHub took `change` on `pr` at `at`, until the list is read again: a closed pull request leaves it,
+ * since it lists none; a merged one moves to **Recently merged**. Every repository and row it leaves alone stays the same object.
+ */
+export function withPullRequestChanged(list: PullRequestList, pr: PullRequest, change: { field: "state"; state: SettableState } | { field: "merge" }, at: number): PullRequestList {
+	const changed = (row: PullRequestSummary): PullRequestSummary[] => {
+		if (change.field === "merge") return [{ ...row, state: "merged", updatedAt: at }];
+		return change.state === "closed" ? [] : [{ ...row, state: change.state }];
+	};
+	return {
+		...list,
+		repos: list.repos.map(repo =>
+			"error" in repo || !repo.pullRequests.some(row => samePullRequest(row, pr))
+				? repo
+				: { ...repo, pullRequests: repo.pullRequests.flatMap(row => (samePullRequest(row, pr) ? changed(row) : [row])) },
+		),
+	};
+}
 
 /** How many pull requests in the list wait on your move. */
 export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): number => listedPullRequests(repos).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
