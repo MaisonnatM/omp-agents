@@ -1,12 +1,14 @@
-/** Branch widgets: a branch label and copyable name, and the new-session branch picker with the directory it starts in. */
+/** Branch widgets: a branch label and copyable name, releasing a copied branch's worktree, and the new-session branch picker with the directory it starts in. */
 import { Check, GitBranch, GitBranchPlus } from "lucide-react";
 import { useState } from "react";
-import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared/git";
+import { type BranchChoice, type BranchRelease, type GitCheckout, worktreeDir } from "../../src/shared/git";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { errorText, releaseWorktree } from "../api";
 import { folderName } from "../labels";
 import { useCopy } from "../use-copy";
 import { CommandPicker } from "./command-picker";
+import { toasts } from "./toaster";
 
 /** A branch label that keeps both ends visible when space runs out; `title` shows the full name where no tooltip does. */
 export function BranchLabel({ name, title = false, className }: { name: string; title?: boolean; className?: string }) {
@@ -26,8 +28,9 @@ export function BranchLabel({ name, title = false, className }: { name: string; 
 /**
  * A branch name, with its icon, that copies the name when clicked; the icon turns into a check mark once it is copied.
  * `iconOnly` drops the name, which the tooltip and label still give, for a row with no room to show it.
+ * `onCopy` runs once a click has copied the name.
  */
-export function BranchName({ name, iconOnly = false, className }: { name: string; iconOnly?: boolean; className?: string }) {
+export function BranchName({ name, iconOnly = false, onCopy, className }: { name: string; iconOnly?: boolean; onCopy?: () => void; className?: string }) {
 	const { copied, copy } = useCopy();
 	const Icon = copied ? Check : GitBranch;
 	const label = copied ? "Copied" : `Copy branch ${name}`;
@@ -36,13 +39,43 @@ export function BranchName({ name, iconOnly = false, className }: { name: string
 			<button
 				type="button"
 				aria-label={label}
-				onClick={() => copy(name)}
+				onClick={() => void copy(name).then(onCopy)}
 				className={cn("inline-flex min-w-0 max-w-64 items-center gap-0.5 rounded-sm text-left underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring", className)}
 			>
 				<Icon aria-hidden className="size-3 shrink-0" />
 				{!iconOnly && <BranchLabel name={name} />}
 			</button>
 		</Tooltip>
+	);
+}
+
+/** The toast for what releasing `branch` did; none when no linked worktree had it checked out. */
+function releaseToast(branch: string, release: BranchRelease): { title: string; description: string } | null {
+	switch (release.kind) {
+		case "none":
+			return null;
+		case "removed":
+			return { title: `Removed worktree ${release.path}`, description: `${branch} can be checked out elsewhere.` };
+		case "kept":
+			return { title: `Kept worktree ${release.path}`, description: release.why };
+		default: {
+			const unhandled: never = release;
+			return unhandled;
+		}
+	}
+}
+
+/**
+ * Removes the linked worktree of `cwd`'s repository that has `branch` checked out, so the branch can be checked out
+ * elsewhere, and toasts the worktree it removed or kept.
+ */
+export function releaseBranch(cwd: string, branch: string): void {
+	releaseWorktree(cwd, branch).then(
+		release => {
+			const toast = releaseToast(branch, release);
+			if (toast) toasts.add(toast);
+		},
+		(error: unknown) => toasts.add({ title: `Could not remove the worktree of ${branch}`, description: errorText(error) }),
 	);
 }
 

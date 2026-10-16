@@ -24,3 +24,9 @@ export const worktreeDir = (mainWorktree: string, branch: string): string => `${
  * the main one when none has), or a new branch from `base`, always in a new worktree.
  */
 export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; name: string; base: string };
+
+/**
+ * What `PUT /api/worktree/release` did with the linked worktree that has a branch checked out: `none` when no linked worktree
+ * of the repository has it, `removed`, or `kept` with `why`, the checks that kept it or the removal's error.
+ */
+export type BranchRelease = { kind: "none" } | { kind: "removed"; path: string } | { kind: "kept"; path: string; why: string };

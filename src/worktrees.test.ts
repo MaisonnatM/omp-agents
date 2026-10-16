@@ -216,4 +216,34 @@ describe("worktree removal", () => {
 		expect(listed.repositories[1]?.worktrees[1]?.savedSessionIds).toEqual(["s0", "s1", "s3"]);
 		expect(listed.errors.map(error => error.path)).toEqual([outside]);
 	});
+
+	test("releaseBranch removes the clean linked worktree that has the branch checked out", async () => {
+		const { parent, main } = await repo();
+		const path = await linked(parent, main, "copied");
+		expect(await quiet.releaseBranch(main, "copied")).toEqual({ kind: "removed", path });
+		expect(existsSync(path)).toBe(false);
+	});
+
+	test("releaseBranch removes nothing for a branch no linked worktree has checked out, the main checkout's included", async () => {
+		const { parent, main } = await repo();
+		const other = await linked(parent, main, "other");
+		await git(main, "branch", "loose");
+		expect(await quiet.releaseBranch(other, "loose")).toEqual({ kind: "none" });
+		expect(await quiet.releaseBranch(other, "main")).toEqual({ kind: "none" });
+		expect(existsSync(join(main, ".git"))).toBe(true);
+		expect((await git(main, "branch", "--show-current")).trim()).toBe("main");
+		expect(existsSync(other)).toBe(true);
+	});
+
+	test("releaseBranch keeps a dirty worktree and one a live session uses, and says why", async () => {
+		const { parent, main } = await repo();
+		const dirty = await linked(parent, main, "dirty");
+		writeFileSync(join(dirty, "untracked.txt"), "keep\n");
+		const occupied = await linked(parent, main, "occupied");
+		const trees = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: occupied, unknownAgents: false }], serverCwd: "/no/such/dashboard" });
+		expect(await trees.releaseBranch(main, "dirty")).toEqual({ kind: "kept", path: dirty, why: "Tracked modifications or untracked files must be preserved before removal." });
+		expect(existsSync(join(dirty, "untracked.txt"))).toBe(true);
+		expect(await trees.releaseBranch(main, "occupied")).toEqual({ kind: "kept", path: occupied, why: `A live omp session uses ${occupied}, including idle or waiting sessions.` });
+		expect(existsSync(occupied)).toBe(true);
+	});
 });

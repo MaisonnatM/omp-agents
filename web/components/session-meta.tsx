@@ -17,17 +17,41 @@ import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
 import { BranchName } from "./git";
 import { StackRail } from "./pull-requests/pr-details/stack";
 import { OrgIcon } from "./org-icon";
+import { toasts } from "./toaster";
 
 export const PARENT_CRUMB = "font-normal text-muted-foreground";
 export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
 const TicketsIcon = PAGE_ICON.tickets;
 const NO_TICKETS: never[] = [];
 
-/** A session header's controls before its own buttons: the branch it works on, which copies when clicked, its Linear issues, and its pull requests. */
-export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch"> }) {
+const END_OFFER_TOAST = "session-end-offer";
+
+/** Asks whether to end the running session whose worktree has `branch` checked out, which removes that worktree; a later copy takes its place. */
+export function offerEnd(branch: string, end: () => void): void {
+	toasts.add({
+		id: END_OFFER_TOAST,
+		title: `Copied ${branch}`,
+		description: "End the session to remove its worktree.",
+		timeout: 0,
+		actionProps: {
+			children: "End session",
+			onClick: () => {
+				end();
+				toasts.close(END_OFFER_TOAST);
+			},
+		},
+	});
+}
+
+/**
+ * A session header's controls before its own buttons: the branch it works on, which copies when clicked and then calls `onCopy`,
+ * its Linear issues, and its pull requests.
+ */
+export function SessionMeta({ facts, onCopy }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch">; onCopy?: (branch: string) => void }) {
+	const { branch } = facts;
 	return (
 		<>
-			{facts.branch && <BranchName name={facts.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
+			{branch && <BranchName name={branch} onCopy={onCopy && (() => onCopy(branch))} className="max-w-48 font-mono text-xs text-muted-foreground" />}
 			<TicketMenu tickets={facts.tickets} />
 			<PullRequestButton pullRequests={facts.pullRequests} />
 		</>

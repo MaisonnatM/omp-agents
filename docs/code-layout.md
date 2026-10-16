@@ -179,6 +179,7 @@ The server lives in `src/`:
 - `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), the branch a worktree had checked out at a given time (`headHistory`, `branchAt`), and the worktree a new session's branch runs in.
   It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the linked worktree a directory is in, or returns `null` for a main checkout or a directory outside git, waiting up to 15 seconds for a session that just ended to leave it: it polls only which live sessions occupy the checkout, then runs the full preview once.
+  `releaseBranch` removes the linked worktree that has a branch checked out through `removeCheckout` without that wait, and answers a `BranchRelease` from `src/shared/git.ts`, for `PUT /api/worktree/release`.
   The inventory and the snapshot of what uses the checkouts resolve each distinct directory once, and run those realpaths and the per-directory and per-repository git probes `PROBE_PARALLEL` (16) at a time.
   The inventory then reads every repository's checkouts from one queue, four at a time, with one `git rev-parse` for their identity, and `previewAll` previews several targets from one snapshot of what uses them, four at a time; `src/map-limit.ts` holds `mapLimit`, the ordered, bounded `Promise.all` they share, and `limit`, a gate that bounds tasks arriving one by one.
   A preview reports a path that git no longer lists as a worktree with the `unregistered` blocker, which `Worktrees` tells apart from other failures by its `UnregisteredWorktree` error class.
@@ -352,7 +353,7 @@ The page lives in `web/`.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
   `web/components/status-dot.tsx` draws that dot for each session status, and `web/components/ship-step.tsx` a session's /ship stage, as `3/7 · Draft PR`.
 - `web/api.ts`: the page's HTTP client, `errorText`, which says what any failure was, and `socketUrl`, the address of the dashboard's and a terminal's WebSocket, `wss:` when the page is on HTTPS.
-  `settingsUrl` names a settings route for one workspace, or for the user's own files.
+  `settingsUrl` names a settings route for one workspace, or for the user's own files, and `releaseWorktree` asks the server to remove the linked worktree that has a branch checked out.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as a pull request's stack, the settings page's model catalog, or the new-session draft's model list.
   A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.
@@ -375,8 +376,9 @@ The page lives in `web/`.
   A refused edit is undone, and the page names why.
   A pull request's details, a Linear issue's details and its fields, the settings page's omp settings, and the source control section read through it; the settings editors' saves go through its `write`.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
-  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests, the tickets, and a session's header also show; its `iconOnly` form, the icon alone, is the copy-branch button of a pull request's row.
-  `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
+  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests, the tickets, and a session's header also show; its `iconOnly` form, the icon alone, is the copy-branch button of a pull request's row, and its `onCopy` runs once a click has copied.
+  Its `releaseBranch` sends `releaseWorktree` and toasts the worktree it removed or kept, or the failure; a pull request row's branch and a past session's header call it after a copy.
+  `web/use-copy.ts` copies text to the clipboard, resolving once the copy lands, and holds the copied state behind a button's check mark.
   `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft and the **New project** form: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
   Preset selection uses `useDraftModelSelection.choose` to apply a saved model and thinking level together.
@@ -446,6 +448,7 @@ The page lives in `web/`.
 - `web/components/pane.tsx`: a pane, whose view renders inside a `RenderBoundary` from `web/components/render-boundary.tsx`, so a view that throws shows its error in that pane and the rest of the page stays; `web/app.tsx` puts one around the page too, and both clear when the hash names another view.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button, `past-conversation.tsx` a past session's view, which for a Claude Code or Codex session reads `Read-only · <agent>` and offers neither **Resume** nor fork buttons, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` a session header's trail and `SessionMeta`, the controls both session headers share: its copyable branch, its ticket menu, and its pull request button with its popover.
+  Its `onCopy` says what copying the branch does next: a past session's header releases the worktree, and a running session's header that can end it calls `offerEnd`, one toast at a time offering **End session**, which removes the worktree.
   `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses.
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeEditor` and `afterActions` slots.
   `user-request.tsx` shows the open question above the composer through `question-card.tsx`, and binds its number keys while its pane is focused; the card itself handles only its own clicks and keys.

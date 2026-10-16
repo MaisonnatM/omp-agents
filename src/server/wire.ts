@@ -659,6 +659,10 @@ export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalReque
 	return { ok: { action: "remove", plans } };
 }
 
+/** The body of `PUT /api/worktree/release`: `{ cwd, branch }`, an absolute directory in the repository and the branch whose linked worktree goes. */
+export const parseBranchRelease = (body: unknown): Parsed<{ cwd: string; branch: string }> =>
+	isObject(body) && isNonEmpty(body.cwd) && body.cwd.startsWith("/") && isNonEmpty(body.branch) ? { ok: { cwd: body.cwd, branch: body.branch } } : null;
+
 const isWorkspaceOp = oneOf(["add", "hide", "show"] as const);
 
 /** The body of `PUT /api/workspaces`: `{ op, cwd }`. Adding takes any path a new session takes; hiding and showing name an absolute directory. */

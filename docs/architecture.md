@@ -882,6 +882,11 @@ A missing directory is removed the same way, which drops only that registration.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
 Starts that create no worktree, such as a resume or a routine's session, stay parallel and wait only while a removal runs.
 
+`PUT /api/worktree/release` takes `{ cwd, branch }`, an absolute directory in a repository and a branch name, checked by `parseBranchRelease` in `src/server/wire.ts`, and answers 404 when `cwd` is not a directory.
+`Worktrees.releaseBranch` lists the repository's worktrees, picks the linked one that has `branch` checked out, never the main, a bare, or a prunable registration, and removes it through `removeCheckout` without waiting for a session to leave.
+It answers a `BranchRelease` from `src/shared/git.ts`: `{ kind: "none" }` when no linked worktree has the branch, `{ kind: "removed", path }`, or `{ kind: "kept", path, why }` with the blockers' messages or Git's error.
+The page sends it when you copy a branch from a pull request row or a past session's header.
+
 `PUT /api/workspaces` takes a `WorkspaceChange`, `{ op, cwd }` with `op` one of `add`, `hide`, and `show`, checked by `parseWorkspaceChange` in `src/server/wire.ts`.
 `add` resolves `cwd` through `directoryOf` in `src/paths.ts`, which expands `~`, and answers 400 when it is not a directory; `hide` and `show` take an absolute path.
 `applyWorkspace` in `src/shared/workspaces.ts` applies one change: adding also shows a hidden directory, and a directory in both lists is hidden, so **Show** offers an added one again.

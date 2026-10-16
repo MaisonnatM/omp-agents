@@ -51,7 +51,7 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
-import { parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
+import { parseAutoPullChange, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
 import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
@@ -676,6 +676,17 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets) } : { results: await env.worktrees.remove(removal.plans) }),
 	);
 
+	/** `PUT /api/worktree/release` `{ cwd, branch }`: remove the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */
+	const branchRelease = write(
+		async body => {
+			const release = checked(parseBranchRelease(body), "Expected { cwd, branch } with cwd an absolute directory");
+			if (release instanceof Response) return release;
+			const cwd = await directoryOf(release.cwd);
+			return cwd ? { cwd, branch: release.branch } : fail(404, `${release.cwd.trim()} is not a directory.`);
+		},
+		({ cwd, branch }) => env.worktrees.releaseBranch(cwd, branch),
+	);
+
 	const systemLoad = new SystemLoadReader();
 	/** `GET /api/system`: the CPU percent since the previous read, the memory available, and the disk space free, for the status bar. */
 	const system = get(() => answer(() => systemLoad.read()));
@@ -714,6 +725,7 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		"/api/worktrees": { GET: worktreeInventory },
 		"/api/worktrees/metrics": { GET: worktreeMetrics },
 		"/api/worktrees/removal": { PUT: worktreeRemoval },
+		"/api/worktree/release": { PUT: branchRelease },
 		"/api/system": { GET: system },
 		"/api/terminals": { GET: terminals },
 		"/api/image": { GET: image },
