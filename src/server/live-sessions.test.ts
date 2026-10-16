@@ -3,7 +3,7 @@ import type { LiveSession } from "../live-session";
 import type { SessionFacts } from "../shared/sessions";
 import { LiveSessions, withSubject } from "./live-sessions";
 
-const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, worktree: null };
+const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, worktree: null, branch: null };
 
 describe("withSubject", () => {
 	test("puts a quick action's pull request or issue first among the session's links", () => {

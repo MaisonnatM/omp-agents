@@ -8,7 +8,7 @@ import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
-import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestButton, TicketMenu } from "./session-meta";
+import { CRUMB_SEPARATOR, offerEnd, PARENT_CRUMB, SessionMeta } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -31,8 +31,9 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's title, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
- * the connection status; a session's Linear issues and pull requests, its directory in Cursor, and End session, which shows it is
- * ending until the server answers, though the session may leave the roster before then.
+ * the connection status; a session's Linear issues, pull requests, and the branch of the linked worktree it works in, which copies
+ * when clicked and, when the header can end the session, offers to end it and so remove that worktree; its directory in Cursor;
+ * and End session, which shows it is ending until the server answers, though the session may leave the roster before then.
  */
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
@@ -71,8 +72,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 		);
 	return (
 		<Header title={title} trailing={titleAction} status={status} alert={!ending && phase.phase === "ended"}>
-			{subject.kind === "session" && shown && <TicketMenu tickets={shown.tickets} />}
-			{subject.kind === "session" && shown && <PullRequestButton pullRequests={shown.pullRequests} />}
+			{subject.kind === "session" && shown && <SessionMeta facts={shown} onCopy={endable && !ending ? branch => offerEnd(branch, () => onEnd(view.instanceId)) : undefined} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={

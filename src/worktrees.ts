@@ -6,6 +6,7 @@ import { canonical, commonDir, git, worktreeAt, worktreesOf, type Registration }
 import { errorText } from "./json";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { run } from "./proc";
+import type { BranchRelease } from "./shared/git";
 import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
 
 interface Occupant {
@@ -401,5 +402,17 @@ export class Worktrees {
 		const [result] = await this.remove([{ ...target, confirmation: plan.confirmation }]);
 		if (!result) throw new Error("Git worktree removal returned no result.");
 		return result;
+	}
+
+	/**
+	 * Removes the linked worktree of `cwd`'s repository that has `branch` checked out, as {@link removeCheckout} does but without
+	 * waiting for a session to leave, so the branch can be checked out elsewhere. A main checkout is never one.
+	 */
+	async releaseBranch(cwd: string, branch: string): Promise<BranchRelease> {
+		const holder = (await worktreesOf(cwd)).find(registration => !registration.main && !registration.bare && registration.prunable === null && registration.branch === branch);
+		const result = holder ? await this.removeCheckout(holder.path, 0) : null;
+		if (!result) return { kind: "none" };
+		if (result.removed) return { kind: "removed", path: result.path };
+		return { kind: "kept", path: result.path, why: result.error ?? result.blockers.map(blocker => blocker.message).join(" ") };
 	}
 }

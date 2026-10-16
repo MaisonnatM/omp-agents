@@ -443,7 +443,7 @@ export interface ListedSession {
 const SCAN_PARALLEL = PROBE_PARALLEL;
 
 /** The facts of a session before its first scan: one value, so that a caller can tell by identity that they did not change. */
-const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, worktree: null };
+const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null };
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
@@ -474,14 +474,14 @@ export class SessionFactsIndex {
 
 	/**
 	 * What the session in `sessionPath` and its subagents submitted, worked on, and linked, or none before its first scan.
-	 * The /ship stage and the worktree are the session's own transcript's, not its subagents', which run in worktrees of their own.
+	 * The /ship stage, the worktree, and the branch are the session's own transcript's, not its subagents', which run in worktrees of their own.
 	 * Each field keeps its identity until a refresh changes it, so a caller can compare them with `===`.
 	 */
 	factsOf(sessionPath: string): SessionFacts {
 		const session = this.#sessions.get(sessionPath);
 		if (!session) return NO_FACTS;
 		const replay = session.transcripts.get(sessionPath)?.fold.scan.replay.facts();
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree, ...(replay ? { replay } : {}) };
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree, branch: session.branch, ...(replay ? { replay } : {}) };
 	}
 
 	/** Resolves once the refreshes asked for so far are done. */
@@ -491,7 +491,7 @@ export class SessionFactsIndex {
 
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
-	 * Resolves whether any session's pull requests, Linear issues, /ship stage, or worktree changed. Refreshes run one at a time.
+	 * Resolves whether any session's pull requests, Linear issues, /ship stage, worktree, or branch changed. Refreshes run one at a time.
 	 */
 	refresh(sessions: readonly ListedSession[]): Promise<boolean> {
 		const run = this.#chain.then(() => this.#refresh(sessions));
@@ -572,7 +572,10 @@ export class SessionFactsIndex {
 		});
 		touched.forEach((session, i) => {
 			const at = checkouts[i];
-			session.branch = at?.linked ? at.branch : null;
+			const branch = at?.linked ? at.branch : null;
+			if (branch === session.branch) return;
+			session.branch = branch;
+			changed = true;
 		});
 		// One `git` call per directory, and only for sessions that name a PR by number alone or sit on a linked worktree's branch.
 		const unknownRepo = touched.filter(session => session.repo === null && (session.branch !== null || session.refs.some(ref => ref.kind === "number")));
