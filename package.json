@@ -7,6 +7,7 @@
     "start": "bun src/server.ts",
     "desktop": "bun install --cwd desktop --frozen-lockfile && bun run --cwd desktop start",
     "omp-template": "bun templates/omp/install.ts",
+    "prepare": "git config core.hooksPath .githooks",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
