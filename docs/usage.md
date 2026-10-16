@@ -655,7 +655,7 @@ An action that fails shows its error, and its control becomes available again.
   They sort by whose move it is: **Your move**, **Agent on it**, **Approved**, **Waiting on others**, **Drafts**, and **Recently merged**.
   A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, which counts up each minute without a reload, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
-  The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and quick actions at the far right.
+  The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
   A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
@@ -681,13 +681,16 @@ An action that fails shows its error, and its control becomes available again.
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
   The table shows up to two reviewers' pictures and lists the rest under `+N`; with no reviewer, an icon shows the review state.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
-  The lightning button is always visible in the table when quick actions apply; in the sidebar it shows while you hover or focus the row, or while a session starts on it.
+  The row's `⋯` menu is always visible in the table; in the sidebar it shows while you hover or focus the row, while a session starts on it, or while a change goes to GitHub.
+  It holds the quick actions that apply, then **Convert to draft** on an open pull request or **Mark ready for review** on a draft, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change.
+  A state change or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
+  Click a **Merge** badge to merge the pull request after the same confirmation as the details' merge button, which reads the pull request from GitHub while it is open.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
-  Click the row to show the pull request's details in the main area; session chips, move badges, and quick actions keep their own clicks.
+  Click the row to show the pull request's details in the main area; session chips, move badges, and the `⋯` menu keep their own clicks.
   The title remains a link for keyboard and modifier-click navigation.
   The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
   Click a session to open it.
@@ -714,8 +717,9 @@ An action that fails shows its error, and its control becomes available again.
   The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
   **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
   In a session's details sidebar, that session is the one you are in, so its **Open the session** button and its chip under **Sessions** do not show.
-  The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; a pull request not yet read offers **Merge on GitHub**.
-  The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**, each with its logo.
+  The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; while the details are still being read, its confirmation says so and waits.
+  The `⋯` menu beside it holds the other quick actions, then the state changes: **Convert to draft** and **Close pull request** on an open pull request, **Mark ready for review** and **Close pull request** on a draft, and **Reopen pull request** on a closed one.
+  It ends with **Open on GitHub** and **Open on Graphite**, each with its logo.
 - Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, and **Code**.
   Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
@@ -749,13 +753,13 @@ An action that fails shows its error, and its control becomes available again.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.
   While the details show, ↓ and ↑ show the next and previous pull request; while the **Code** tab shows, they open the next and previous file.
   The sidebar's pull request list, which stays while you work in the sessions, takes ↓ and ↑ only once one of its rows has focus, so they keep scrolling a session.
-  O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's quick actions.
+  O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's `⋯` menu.
   E gives the focused row's move, or the move of the pull request whose details show, to an agent, when a quick action makes that move.
 - `#pull-requests/<owner>/<repo>/<number>` shows one pull request's details.
   The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the list does not include that pull request, a note says why, and the details still show.
   `#pull-requests/<owner>/<repo>/<number>/files` opens the details on the **Code** tab at the first file, and `#pull-requests/<owner>/<repo>/<number>/files/<path>` at the file at that path, encoded; choosing **Code** puts that address in the location bar, and another tab takes it out.
-- A lightning button on a row of the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
+- The quick actions in a row's `⋯` menu on the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
   The page stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
   The session also shows in the sessions sidebar.
@@ -1445,7 +1449,7 @@ Alt is Option on macOS.
 | ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
 | ↑ | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
 | O | Pull requests page, outside text fields | Open the pull request on GitHub |
-| . | Pull requests page, outside text fields | Open the pull request's quick actions |
+| . | Pull requests page, outside text fields | Open the pull request's `⋯` menu |
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
 | / | Todo page, outside text fields | Search the todos |
 | ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |

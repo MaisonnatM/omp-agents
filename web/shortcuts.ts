@@ -218,7 +218,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "pullRequestOnGitHub", category: "pull-requests", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
-	{ id: "pullRequestActions", category: "pull-requests", label: "Pull requests: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
+	{ id: "pullRequestActions", category: "pull-requests", label: "Pull requests: open the pull request's actions menu", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
 	{ id: "giveToAgent", category: "pull-requests", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "todoSearch", category: "todo", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "todoNext", category: "todo", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
