@@ -282,7 +282,7 @@ The page lives in `web/`.
   It builds the two dashboard contexts and lays out the sidebars, the page, the command palette, and the dialogs, and leaves each slice of state to a hook of its own.
   `web/use-workspace-scope.ts` holds the visible sessions, the workspaces, the selected workspace, which localStorage keeps, and its pull request poll.
   `web/use-focused-session.ts` holds the focused pane's session, the document title, and the sidebar following a `/move`.
-  `web/use-session-lists.ts` holds the Sessions tab's lists and search, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`.
+  `web/use-session-lists.ts` holds the Sessions tab's lists and search, the session `latestSession` from `web/sessions.ts` picks from the selected workspace's rows, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`, whose Sessions tab opens that session when no pane shows one.
   `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
   `web/use-transcript-display.ts` holds how transcripts show tool calls and thinking, and `web/use-page-shortcuts.ts` the page-wide shortcuts and the commands the palette runs.
   `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.
@@ -293,6 +293,7 @@ The page lives in `web/`.
   `request` resolves or rejects on `done` and keeps waiting across a reconnect, whose `resume` hands the server every request still waiting.
   Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
 - `web/use-action.ts`: guards a control against repeated activation, exposes its pending state, and shows failures through the toast manager.
+- `web/use-open-latest.ts`: `useOpenLatest` opens a list's first item once you arrive at it with nothing open, replacing the list's history entry; the Todo page passes its top row, and the Inbox page its newest conversation.
 - `web/pane-store.ts`: each open view's transcript, changed files, images, turns, and completions, outside the page state.
   `useShowTrajectory` registers a view whose Trajectory a component shows, and `web/use-dashboard.ts` sends those views in `watch`; `retainTrajectories` drops the turns of a view no longer shown.
   A component reads one field through a selector hook (`useTranscript`, `useChangedFiles`, `useMedia`, `useComposerData`, …), built on `useSelect` in `web/keyed-store.ts`, which `web/polled-store.ts` shares, one snapshot and subscription per key, and renders again only when that field changes, so a streamed token renders the transcript and what reads `items`, and not the pane, the composer, or the details.

@@ -637,6 +637,8 @@ An action that fails shows its error, and its control becomes available again.
   **Inbox** shows only once Gmail is connected; see [Inbox](#inbox).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
   The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the workspace that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
+  Choosing **Sessions**, by click or by its number, while no pane is open opens the selected workspace's live session started last, else its past session saved last; with a pane open it keeps the panes.
+  Closing that session leaves the panes empty until you choose **Sessions** again.
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone across the sidebar's width; hover an icon for its name.
   The tabs never spill past the sidebar.
@@ -996,7 +998,9 @@ An action that fails shows its error, and its control becomes available again.
 - **Archive** lists the cleared todos, latest first, with the day each was closed.
   Hover one to put it back last in the list, in its category if that still exists, or to delete it for good; **Empty** deletes them all, after you confirm.
   The todo keys step through its rows as through any list's, and Enter opens the focused one.
-- Click a todo to open its details on the right of the list, as in Linear, and double-click it to rename it in the list; with no todo open, that side says how to open one.
+- Click a todo to open its details on the right of the list, as in Linear, and double-click it to rename it in the list.
+  Arriving at a list, from the **Todo** tab, its number, or a list in the sidebar, opens the todo on its top row.
+  Closing it leaves the list with nothing open, and that side then says how to open one.
   Drag the line between the list and the details, or focus it and use the left and right arrow keys, to size the list; double-click it to reset, and the browser's localStorage keeps the width.
   A page too narrow for both shows the open todo in place of the list, and its **×** goes back to the list.
   The open todo's bar names its category, its parent for a todo under another, and its status; its ↑ and ↓ open the todo above and below in the list, and **×** closes it.
@@ -1102,7 +1106,8 @@ An action that fails shows its error, and its control becomes available again.
 - Each row shows, on three lines, who sent the conversation's last message, how many messages it holds when more than one, and when its last message arrived: the time today, the day earlier this year, and the full date before; then its subject; then a snippet.
   An unread conversation's sender and subject are bold, with a blue dot before them, and the header counts them beside your address.
 - Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at an `#inbox/<thread id>` address; its row shows selected, with a bar on its left edge.
-  With none open, the panel says how to open one.
+  Arriving at the page, from the **Inbox** tab, G then I, or the Inbox's number, opens the newest conversation.
+  Closing it leaves the list with nothing open, and the panel then says how to open one.
   Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.
   With no conversation open, ↓ and ↑ outside text fields focus the next and previous row, and O opens the focused row's conversation in Gmail in a new tab, signed in as the inbox's address.
 - An open conversation's panel has a bar along its top with where the conversation sits in the list, **3 of 50**, and icon buttons, each naming itself and its key on hover: previous and next conversation, **Reply**, **Reply all**, **Delete**, **Expand all** while a message is folded, **Refresh**, which spins while it reads, **Open in Gmail**, and **Close**.

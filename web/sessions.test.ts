@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Project } from "../src/shared/projects";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
-import { defaultCwd, discoverableSessions, listedViews, type ProjectSources, projectSession, searchSessions, sidebarSessions, waitingCount, workspaceSession, workspaceSwitch } from "./sessions";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, type ProjectSources, projectSession, searchSessions, sidebarSessions, waitingCount, workspaceSession, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
@@ -92,6 +92,23 @@ describe("workspaceSession", () => {
 		expect(workspaceSession(null, hosts, "~/other")).toBeNull();
 		expect(workspaceSession("~/app", hosts, "~/app")).toBeNull();
 		expect(workspaceSession("~/idle", hosts, "~/other")).toBeNull();
+	});
+});
+
+describe("latestSession", () => {
+	const running = (sessionId: string, cwd: string, startedAt: number) => ({ ...host(sessionId, cwd), startedAt }) as RosterHost;
+	const saved = (sessionId: string, cwd: string, modifiedAt: number) => ({ ...past(sessionId, cwd, false), modifiedAt }) as PastSession;
+	const latestIn = (hosts: RosterHost[], sessions: PastSession[]) => latestSession(sidebarSessions(hosts, sessions, "~/app", none, NO_PROJECTS));
+	const sessions = [saved("older", "~/app", 10), saved("newer", "~/app", 30), saved("elsewhere", "~/other", 50)];
+
+	test("opens the workspace's live session started last, even when a past one or another workspace's session is newer", () => {
+		const hosts = [running("first", "~/app", 1), running("last", "~/app", 3), running("other", "~/other", 9)];
+		expect(latestIn(hosts, sessions)).toEqual({ kind: "live", instanceId: "i-last", agentId: null });
+	});
+
+	test("opens the workspace's past session saved last when none is live there, and nothing when it has no session", () => {
+		expect(latestIn([running("other", "~/other", 9)], sessions)).toEqual({ kind: "past", sessionId: "newer" });
+		expect(latestIn([], [saved("elsewhere", "~/other", 50)])).toBeNull();
 	});
 });
 
