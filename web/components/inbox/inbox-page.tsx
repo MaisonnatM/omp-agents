@@ -106,7 +106,7 @@ export function InboxPage({ target }: { target: string | null }) {
 	const address = read?.data.address ?? null;
 	const openUrl = address !== null && target !== null ? threadUrl(address, target) : null;
 	useReturnFocus(target, id => id, id => document.getElementById(rowId(id))?.querySelector<HTMLElement>("a"), read);
-	useOpenLatest(hashForInbox, target, read && (threads[0]?.id ?? null));
+	useOpenLatest(hashForInbox, target, threads[0]?.id ?? null, read !== null);
 
 	// Read the next and previous conversations while one is open, so ↓/↑ open them at once.
 	const previous = at > 0 ? threads[at - 1] : undefined;

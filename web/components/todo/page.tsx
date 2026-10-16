@@ -83,7 +83,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 		// A search shows every match, closed ones too.
 		.map(group => ({ ...group, open: query !== "" || !folds.isFolded(group.status) }));
 	const shown = kind.readOnly ? section.todos : groups.flatMap(group => (group.open ? group.todos : []));
-	useOpenLatest(id => hashForTodo(view, id), openId, shown[0]?.id ?? null);
+	useOpenLatest(id => hashForTodo(view, id), openId, shown[0]?.id ?? null, true);
 	const order = shown.flatMap(todo => [todo.id, ...(kind.readOnly ? [] : todo.children.map(child => child.id))]);
 	const at = open ? order.indexOf(open.todo.id) : -1;
 	const startDraft = (status: TodoStatus): void => {
