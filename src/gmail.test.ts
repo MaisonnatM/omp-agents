@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { GmailClient, mailOf, replyOf } from "./gmail";
+import { GmailAccounts, GmailClient, mailOf, replyOf } from "./gmail";
 import { recipientsOf, type MailMessage } from "./shared/gmail";
 import { ApiError, type SignedFetch } from "./signed-fetch";
 
@@ -46,7 +46,7 @@ function clientOf(answers: Record<string, unknown>): { client: GmailClient; read
 		if (answer === undefined) throw new Error(`unexpected read ${url}`);
 		return answer;
 	};
-	return { client: new GmailClient(fetch), reads };
+	return { client: new GmailClient(fetch, "gmail"), reads };
 }
 
 const twoThreads = (): Record<string, unknown> => ({
@@ -68,6 +68,7 @@ test("the inbox lists each thread in Gmail's order with its last sender, first s
 		address: "max+work@example.com",
 		threads: [
 			{
+				account: "gmail",
 				id: "18f2a",
 				from: "Bob Stone",
 				subject: "Draft review",
@@ -78,6 +79,7 @@ test("the inbox lists each thread in Gmail's order with its last sender, first s
 				url: "https://mail.google.com/mail/?authuser=max%2Bwork%40example.com#inbox/18f2a",
 			},
 			{
+				account: "gmail",
 				id: "18e07",
 				from: "receipts@shop.example",
 				subject: "",
@@ -190,6 +192,7 @@ test("a conversation reads each message's people, arrival, unread state, snippet
 		fullMessage("m2", { From: "bob@example.com", To: "Alice Doe <alice@example.com>", Subject: "Re: Draft review" }, ["UNREAD", "INBOX"], "1791003600000", part("text/plain", { text: "Looks good." })),
 	);
 	expect(await client.thread("18f2a")).toEqual({
+		account: "gmail",
 		id: "18f2a",
 		subject: "Draft review",
 		url: "https://mail.google.com/mail/?authuser=max%2Bwork%40example.com#inbox/18f2a",
@@ -367,9 +370,9 @@ test("a reply sends to the last message other than a draft, and a trash moves th
 		if (new URL(url).pathname === INBOX) reads++;
 		return answers[new URL(url).pathname];
 	};
-	const client = new GmailClient(fetch);
+	const client = new GmailClient(fetch, "gmail");
 	await client.inbox();
-	await client.reply({ thread: "18f2a", ...DRAFT });
+	await client.reply({ account: "gmail", thread: "18f2a", ...DRAFT });
 	await client.send({ ...DRAFT, subject: "New" });
 	await client.trash("18e07");
 	await client.inbox();
@@ -385,5 +388,29 @@ test("Google's refusal of a read-only sign-in says to sign in again", async () =
 	const fetch: SignedFetch = async () => {
 		throw new ApiError("Request had insufficient authentication scopes.", 403);
 	};
-	await expect(new GmailClient(fetch).trash("18f2a")).rejects.toThrow("Sign in to Gmail again");
+	await expect(new GmailClient(fetch, "gmail").trash("18f2a")).rejects.toThrow("Sign in to Gmail again");
+});
+
+test("the merged inbox lists every account's threads newest first, and one account failing keeps its error without hiding the others", async () => {
+	const work = clientOf(twoThreads()).client;
+	const broken = new GmailClient(async () => {
+		throw new Error("Gmail refused omp's sign-in");
+	}, "gmail-2");
+	const accounts = new GmailAccounts({
+		signedIn: async () => [
+			{ account: "gmail", client: work },
+			{ account: "gmail-2", client: broken },
+		],
+		get: async account => (account === "gmail" ? work : broken),
+	});
+	const answer = await accounts.inbox();
+	expect(answer.accounts).toEqual([
+		{ account: "gmail", address: "max+work@example.com", error: null },
+		{ account: "gmail-2", address: null, error: "Gmail refused omp's sign-in" },
+	]);
+	expect(answer.threads.map(thread => [thread.account, thread.id])).toEqual([
+		["gmail", "18f2a"],
+		["gmail", "18e07"],
+	]);
+	await expect(new GmailAccounts({ signedIn: async () => [{ account: "gmail-2", client: broken }], get: async () => broken }).inbox()).rejects.toThrow("Gmail refused omp's sign-in");
 });

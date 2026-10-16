@@ -1,6 +1,14 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { callable, decodeIntegrationsAnswer, type IntegrationsAnswer, type McpIntegration } from "../src/shared/accounts";
+import {
+	type AccountId,
+	anyCallable,
+	decodeIntegrationsAnswer,
+	type GoogleAccount,
+	type IntegrationsAnswer,
+	type McpIntegration,
+	visibleAccounts,
+} from "../src/shared/accounts";
 import {
 	type CalendarEventsAnswer,
 	decodeCalendarEventsAnswer,
@@ -22,6 +30,8 @@ import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import { errorText, getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 import { withPullRequestChanged } from "./pull-requests-model";
+import { pickedInbox } from "./inbox-model";
+import { useStoredState } from "./stored-state";
 
 export interface ReadState<T> {
 	data: T | null;
@@ -105,6 +115,7 @@ export function useSearchSources(ticketsWanted: boolean, scope: string | null): 
 }
 
 const NO_THREADS: MailThread[] = [];
+const NO_ACCOUNTS: GoogleAccount[] = [];
 /** How many days from today's midnight the `@` menu lists events of. */
 const MENTION_EVENT_DAYS = 14;
 
@@ -120,34 +131,37 @@ const startOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.fir
 const endOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.lastDay}T00:00`).getTime() + 86_400_000 : when.end);
 
 /**
- * What the `@` menu offers from your inbox and calendars: the inbox's latest conversations while `mailWanted` and
- * Gmail is callable, and the events from today's midnight over the next {@link MENTION_EVENT_DAYS} days while
- * `eventsWanted`, earliest first: Google's while Google Calendar is callable, and this computer's.
+ * What the `@` menu offers from your inbox and calendars, of the accounts `workspace` shows: the inbox's latest
+ * conversations while `mailWanted` and Gmail is callable, and the events from today's midnight over the next
+ * {@link MENTION_EVENT_DAYS} days while `eventsWanted`, earliest first: Google's while Google Calendar is callable, and this computer's.
  */
-export function useMailAndEvents(mailWanted: boolean, eventsWanted: boolean): { threads: MailThread[]; events: MentionEvent[] } {
+export function useMailAndEvents(mailWanted: boolean, eventsWanted: boolean, workspace: string | null): { threads: MailThread[]; events: MentionEvent[] } {
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
-	const gmail = integrations?.gmail.connection;
-	const google = integrations?.["google-calendar"].connection;
-	const threads = gmailStore.usePolling(null, mailWanted && gmail !== undefined && callable(gmail)).read?.data.threads;
+	const mailAccounts = integrations?.gmail.accounts ?? NO_ACCOUNTS;
+	const calendarAccounts = integrations?.["google-calendar"].accounts ?? NO_ACCOUNTS;
+	const threads = gmailStore.usePolling(null, mailWanted && anyCallable(mailAccounts)).read?.data.threads;
 	const now = new Date();
 	const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 	const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + MENTION_EVENT_DAYS).getTime();
 	const span = new URLSearchParams({ from: new Date(from).toISOString(), to: new Date(to).toISOString() }).toString();
-	const googleEvents = calendarEventsStore.usePolling(span, eventsWanted && google !== undefined && callable(google)).read?.data.events;
+	const googleEvents = calendarEventsStore.usePolling(span, eventsWanted && anyCallable(calendarAccounts)).read?.data.events;
 	const localEvents = localEventsStore.usePolling(null, eventsWanted).read?.data.events;
+	const shownMail = useMemo(() => visibleAccounts(mailAccounts, workspace), [mailAccounts, workspace]);
+	const shownCalendars = useMemo(() => visibleAccounts(calendarAccounts, workspace), [calendarAccounts, workspace]);
 	const events = useMemo(
 		() =>
 			eventsWanted
 				? [
-						...(googleEvents ?? []).map(({ title, when, calendar, url }) => ({ title, when, calendar, url })),
+						...(googleEvents ?? []).filter(event => shownCalendars.has(event.account)).map(({ title, when, calendar, url }) => ({ title, when, calendar, url })),
 						...(localEvents ?? []).map(({ title, when }) => ({ title, when, calendar: "This computer", url: null })),
 					]
 						.filter(({ when }) => startOf(when) < to && endOf(when) > from)
 						.sort((a, b) => startOf(a.when) - startOf(b.when))
 				: [],
-		[eventsWanted, googleEvents, localEvents, from, to],
+		[eventsWanted, googleEvents, localEvents, shownCalendars, from, to],
 	);
-	return { threads: (mailWanted && threads) || NO_THREADS, events };
+	const shownThreads = useMemo(() => (threads ?? NO_THREADS).filter(thread => shownMail.has(thread.account)), [threads, shownMail]);
+	return { threads: mailWanted ? shownThreads : NO_THREADS, events };
 }
 
 const NO_HITS: ConversationHit[] = [];
@@ -188,64 +202,105 @@ export const mcpServersStore = createPolledStore<McpServersAnswer>({ url: (_scop
 /** The model providers omp signs in to and the sign-in Settings › Providers runs; kept in memory only, as it names your accounts. */
 export const providersStore = createPolledStore<ProvidersAnswer>({ url: () => "/api/providers" });
 
-/** The calendars checked in your Google Calendar's list, which the Calendar page reads unless you unchecked one in its sidebar. */
+/** The calendars checked in each account's Google Calendar list, which the Calendar page reads unless you unchecked one in its sidebar. */
 export const googleStore = createPolledStore<GoogleStatus>({
 	url: (_, fresh) => `/api/google${fresh ? "?fresh" : ""}`,
 	cache: { key: "omp-agents.google-cache", decode: decodeGoogleStatus },
 });
 
-/** Your Google events over a span, by its `from` and `to` query, which the Calendar page reads a month at a time. */
+/** Every account's Google events over a span, by its `from` and `to` query, which the Calendar page reads a month at a time. */
 export const calendarEventsStore = createPolledStore<CalendarEventsAnswer>({
 	url: (span, fresh) => `/api/calendar/events?${span}${fresh ? "&fresh" : ""}`,
 	cache: { key: "omp-agents.calendar-events-cache", decode: decodeCalendarEventsAnswer },
 });
 
-/**
- * Whether the dashboard can call Google Calendar, and the calendars checked in your Google Calendar's list, read every
- * minute while it can; `calendars` is `null` while it cannot or before the first read.
- */
-export function useGoogleCalendars(): { connected: boolean; calendars: GoogleCalendar[] | null } {
-	const connection = integrationsStore.usePolling().read?.data.integrations["google-calendar"].connection;
-	const connected = connection !== undefined && callable(connection);
-	const calendars = googleStore.usePolling(null, connected).read?.data.calendars ?? null;
-	return { connected, calendars: connected ? calendars : null };
+/** The Google Calendar accounts a page in a workspace reads, and their calendars. */
+export interface GoogleCalendars {
+	/** Whether the dashboard can call any Google Calendar account. */
+	connected: boolean;
+	/** The Google Calendar accounts `workspace` shows. */
+	accounts: GoogleAccount[];
+	/** The calendars of those accounts, read every minute while one is callable; `null` while none is or before the first read. */
+	calendars: GoogleCalendar[] | null;
 }
 
-/** Your Gmail inbox's latest conversations, which the Inbox page and its sidebar tab share. */
+/** The Google Calendar accounts `workspace` shows, `null` for all workspaces, and their calendars. */
+export function useGoogleCalendars(workspace: string | null): GoogleCalendars {
+	const all = integrationsStore.usePolling().read?.data.integrations["google-calendar"].accounts ?? NO_ACCOUNTS;
+	const connected = anyCallable(all);
+	const read = googleStore.usePolling(null, connected).read?.data.calendars ?? null;
+	return useMemo(() => {
+		const shown = visibleAccounts(all, workspace);
+		return { connected, accounts: all.filter(account => shown.has(account.name)), calendars: connected && read ? read.filter(calendar => shown.has(calendar.account)) : null };
+	}, [all, connected, read, workspace]);
+}
+
+/** Every signed-in Gmail account's inbox, merged, which the Inbox page and its sidebar tab share. */
 export const gmailStore = createPolledStore<InboxAnswer>({
 	url: (_, fresh) => `/api/gmail/inbox${fresh ? "?fresh" : ""}`,
 	cache: { key: "omp-agents.gmail-cache", decode: decodeInboxAnswer },
 });
 
-/** Gmail's integration, `null` before the first read, and your inbox with its unread conversations, read every minute while the dashboard can call Gmail. */
-export function useGmailInbox(): { gmail: McpIntegration<"gmail"> | null; inbox: PolledEntry<InboxAnswer>; unread: number } {
-	const gmail = integrationsStore.usePolling().read?.data.integrations.gmail ?? null;
-	const inbox = gmailStore.usePolling(null, gmail !== null && callable(gmail.connection));
-	const unread = inbox.read?.data.threads.filter(thread => thread.unread).length ?? 0;
-	return { gmail, inbox, unread };
+/** The Gmail account the Inbox's picker narrows to; absent for every account. */
+const INBOX_ACCOUNT_KEY = "omp-agents.gmail-account";
+
+const decodeAccount = (raw: string | null): AccountId | null => raw || null;
+const encodeAccount = (account: AccountId | null): string => account ?? "";
+
+/** The Inbox as a workspace shows it. */
+export interface GmailInbox {
+	/** Gmail's integration, `null` before the first read. */
+	gmail: McpIntegration<"gmail"> | null;
+	inbox: PolledEntry<InboxAnswer>;
+	/** The Gmail accounts the workspace shows. */
+	accounts: GoogleAccount[];
+	/** The account the picker narrows to, as {@link pickedInbox} reads the stored choice; `null` for every shown account. */
+	picked: AccountId | null;
+	pick: (account: AccountId | null) => void;
+	/** The conversations of every shown account, newest first, whatever the picker narrows to. */
+	threads: MailThread[];
 }
 
-/** The conversations read since the page loaded, by thread id, in memory only: unlike the inbox's list, their bodies are large and private. */
+/** The inboxes of the Gmail accounts `workspace` shows, `null` for all workspaces, read every minute while one is callable, and the Inbox's account picker. */
+export function useGmailInbox(workspace: string | null): GmailInbox {
+	const gmail = integrationsStore.usePolling().read?.data.integrations.gmail ?? null;
+	const all = gmail?.accounts ?? NO_ACCOUNTS;
+	const inbox = gmailStore.usePolling(null, anyCallable(all));
+	const [stored, pick] = useStoredState(INBOX_ACCOUNT_KEY, decodeAccount, encodeAccount);
+	const listed = inbox.read?.data.threads;
+	return useMemo(() => {
+		const shown = visibleAccounts(all, workspace);
+		const accounts = all.filter(account => shown.has(account.name));
+		const threads = (listed ?? NO_THREADS).filter(thread => shown.has(thread.account));
+		return { gmail, inbox, accounts, picked: pickedInbox(stored, accounts), pick, threads };
+	}, [gmail, all, inbox, stored, pick, listed, workspace]);
+}
+
+/** The {@link mailThreadStore} scope of conversation `id` of Gmail account `account`. */
+export const mailThreadScope = (account: AccountId, id: string): string => new URLSearchParams({ account, id }).toString();
+
+/** The conversations read since the page loaded, by {@link mailThreadScope}, in memory only: unlike the inbox's list, their bodies are large and private. */
 export const mailThreadStore = createPolledStore<ThreadAnswer>({
-	url: (id, fresh) => `/api/gmail/thread?${new URLSearchParams({ id: id ?? "" })}${fresh ? "&fresh" : ""}`,
+	url: (scope, fresh) => `/api/gmail/thread?${scope ?? ""}${fresh ? "&fresh" : ""}`,
 });
 
 /** A thread read: the last answer, whether the latest attempt failed, and whether one is in flight. */
 export type MailThreadRead = PolledEntry<ThreadAnswer>;
 
 /**
- * Conversation `id`, read the first time it is asked for, and again from Gmail once `arrived`, when its last message
- * arrived as the inbox lists it, is later than that read: a reply came since.
+ * Conversation `id` of Gmail account `account`, read the first time it is asked for, and again from Gmail once
+ * `arrived`, when its last message arrived as the inbox lists it, is later than that read: a reply came since.
  */
-export function useMailThread(id: string, arrived: number | null): MailThreadRead {
-	const entry = mailThreadStore.use(id);
+export function useMailThread(account: AccountId, id: string, arrived: number | null): MailThreadRead {
+	const scope = mailThreadScope(account, id);
+	const entry = mailThreadStore.use(scope);
 	const entryRef = useRef(entry);
 	entryRef.current = entry;
 	useEffect(() => {
 		const current = entryRef.current;
-		if (current.read === null) mailThreadStore.ensure(id);
-		else if (arrived !== null && current.read.at < arrived) void mailThreadStore.refresh(id, { fresh: true });
-	}, [id, arrived]);
+		if (current.read === null) mailThreadStore.ensure(scope);
+		else if (arrived !== null && current.read.at < arrived) void mailThreadStore.refresh(scope, { fresh: true });
+	}, [scope, arrived]);
 	return entry;
 }
 

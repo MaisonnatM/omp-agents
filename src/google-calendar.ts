@@ -2,10 +2,13 @@
  * Google Calendar: the calendars checked in your Google Calendar's list and their events, which the Calendar page lists
  * unless you unchecked a calendar there, and the events it adds to and deletes from the calendars you may write to. It
  * calls Google's Calendar API with the token omp holds for its Google Calendar MCP server, the same sign-in and scopes:
- * the server's own tools answer only for OAuth clients in Google's Developer Preview Program.
+ * the server's own tools answer only for OAuth clients in Google's Developer Preview Program. A
+ * {@link GoogleCalendarClient} reads one account; {@link GoogleCalendars} merges every signed-in account's.
  */
 import { type Cache, createCache } from "./cache";
+import type { AccountClients } from "./integrations";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
+import type { AccountId } from "./shared/accounts";
 import type { CalendarEvent, CalendarEventsAnswer, EventWhen, GoogleCalendar, GoogleStatus } from "./shared/calendar";
 import { ApiError, type SignedFetch } from "./signed-fetch";
 
@@ -24,13 +27,14 @@ interface WriteRefusals {
 	readOnly: (name: string) => string;
 }
 
-/** A calendar list entry as the page shows it, or `null` for one unchecked in Google Calendar or without an id. */
-function calendarOf(item: unknown): ListedCalendar | null {
+/** A calendar list entry of `account` as the page shows it, or `null` for one unchecked in Google Calendar or without an id. */
+function calendarOf(item: unknown, account: AccountId): ListedCalendar | null {
 	if (!isObject(item) || item.selected !== true) return null;
 	const id = nonEmptyStr(item.id);
 	if (!id) return null;
 	const color = str(item.backgroundColor);
 	return {
+		account,
 		id,
 		name: nonEmptyStr(item.summaryOverride) ?? nonEmptyStr(item.summary) ?? id,
 		color: color && HEX_COLOR.test(color) ? color : DEFAULT_COLOR,
@@ -62,6 +66,7 @@ function eventOf(item: unknown, calendar: ListedCalendar): CalendarEvent | null 
 	const attendees = Array.isArray(item.attendees) ? item.attendees : [];
 	if (attendees.some(attendee => isObject(attendee) && attendee.self === true && attendee.responseStatus === "declined")) return null;
 	const event = {
+		account: calendar.account,
 		calendarId: calendar.id,
 		eventId,
 		writable: calendar.writable,
@@ -81,12 +86,21 @@ function eventOf(item: unknown, calendar: ListedCalendar): CalendarEvent | null 
 	return end > start ? { ...event, when: { allDay: false, start, end } } : null;
 }
 
+/** The address the sign-in behind `fetch` reads calendars as: Google names your main calendar by it. */
+export async function calendarAddress(fetch: SignedFetch): Promise<string> {
+	const primary = await fetch(`${API}/users/me/calendarList/primary`);
+	const address = isObject(primary) ? nonEmptyStr(primary.id) : undefined;
+	if (!address) throw new Error("Google Calendar did not say which address you signed in with");
+	return address;
+}
+
 /**
- * The calendars your Google Calendar shows, and the events of those the Calendar page shows, each read at most once a
- * minute, and the events it adds and deletes.
+ * The calendars account `account`'s Google Calendar shows, and the events of those the Calendar page shows, each read
+ * at most once a minute, and the events it adds and deletes.
  */
 export class GoogleCalendarClient {
 	readonly #fetch: SignedFetch;
+	readonly #account: AccountId;
 	/** The ids of the calendars the Calendar page's sidebar unchecked. */
 	readonly #hidden: () => ReadonlySet<string>;
 	readonly #lists = createCache<ListedCalendar[]>(60_000);
@@ -95,8 +109,9 @@ export class GoogleCalendarClient {
 	/** Why each calendar's last read failed, by its id. */
 	readonly #errors = new Map<string, string>();
 
-	constructor(fetch: SignedFetch, hidden: () => ReadonlySet<string>) {
+	constructor(fetch: SignedFetch, account: AccountId, hidden: () => ReadonlySet<string>) {
 		this.#fetch = fetch;
+		this.#account = account;
 		this.#hidden = hidden;
 	}
 
@@ -119,16 +134,16 @@ export class GoogleCalendarClient {
 			async () => {
 				const url = new URL(`${API}/users/me/calendarList`);
 				url.searchParams.set("maxResults", "250");
-				return (await this.#items(url)).flatMap(item => calendarOf(item) ?? []);
+				return (await this.#items(url)).flatMap(item => calendarOf(item, this.#account) ?? []);
 			},
 			fresh,
 		);
 	}
 
 	/** The calendars checked in Google Calendar's list, each with whether the Calendar page shows it and why its last read failed. `fresh` lists them again. */
-	async status(fresh = false): Promise<GoogleStatus> {
+	async calendars(fresh = false): Promise<GoogleCalendar[]> {
 		const hidden = this.#hidden();
-		return { calendars: (await this.#calendars(fresh)).map(calendar => ({ ...calendar, shown: !hidden.has(calendar.id), error: this.#errors.get(calendar.id) ?? null })) };
+		return (await this.#calendars(fresh)).map(calendar => ({ ...calendar, shown: !hidden.has(calendar.id), error: this.#errors.get(calendar.id) ?? null }));
 	}
 
 	#events(calendar: ListedCalendar, from: Date, to: Date, fresh: boolean): Promise<CalendarEvent[]> {
@@ -217,5 +232,59 @@ export class GoogleCalendarClient {
 				if (!(err instanceof ApiError && (err.status === 404 || err.status === 410))) throw err;
 			}
 		});
+	}
+}
+
+/** One account's events over a span, or why they could not be read. */
+export type AccountEvents = { account: AccountId; events: CalendarEvent[] } | { account: AccountId; error: string };
+
+/** Every signed-in Google Calendar account's calendars and events merged, and each write sent to the account it names. */
+export class GoogleCalendars {
+	readonly #clients: AccountClients<GoogleCalendarClient>;
+
+	constructor(clients: AccountClients<GoogleCalendarClient>) {
+		this.#clients = clients;
+	}
+
+	/** Each signed-in account's calendars, and each account whose list could not be read. `fresh` lists them again. */
+	async status(fresh = false): Promise<GoogleStatus> {
+		const clients = await this.#clients.signedIn();
+		const reads = await Promise.allSettled(clients.map(({ client }) => client.calendars(fresh)));
+		return {
+			calendars: reads.flatMap(read => (read.status === "fulfilled" ? read.value : [])),
+			failed: clients.flatMap(({ account }, at) => {
+				const read = reads[at]!;
+				return read.status === "rejected" ? [{ account, error: errorText(read.reason) }] : [];
+			}),
+		};
+	}
+
+	/** Each signed-in account's events from `from` to `to`, or why they could not be read. `fresh` reads them again. */
+	async byAccount(from: Date, to: Date, fresh = false): Promise<AccountEvents[]> {
+		const clients = await this.#clients.signedIn();
+		return Promise.all(
+			clients.map(({ account, client }) =>
+				client.events(from, to, fresh).then(
+					({ events }): AccountEvents => ({ account, events }),
+					(err: unknown): AccountEvents => ({ account, error: errorText(err) }),
+				),
+			),
+		);
+	}
+
+	/** Every signed-in account's events from `from` to `to`; an account that cannot be read is left out, unless none can. */
+	async events(from: Date, to: Date, fresh = false): Promise<CalendarEventsAnswer> {
+		const read = await this.byAccount(from, to, fresh);
+		const failed = read.find(account => "error" in account);
+		if (failed && "error" in failed && read.every(account => "error" in account)) throw new Error(failed.error);
+		return { events: read.flatMap(account => ("events" in account ? account.events : [])) };
+	}
+
+	async create(account: AccountId, calendarId: string, title: string, when: EventWhen): Promise<void> {
+		await (await this.#clients.get(account)).create(calendarId, title, when);
+	}
+
+	async delete(account: AccountId, calendarId: string, eventId: string): Promise<void> {
+		await (await this.#clients.get(account)).delete(calendarId, eventId);
 	}
 }

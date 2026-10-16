@@ -52,13 +52,13 @@ async function rowOf(server: ConfiguredMcpServer, remote: McpServer | null, sign
 	const host = remote && new URL(remote.url).host;
 	const transport = config.type === "sse" ? "sse" : config.type === "stdio" || (!config.type && !config.url) ? "stdio" : "http";
 	const integration = integrationOn(host);
-	const signIn = signIns.get(name)?.state() ?? null;
+	const signIn = signIns.get(name)?.state()?.signIn ?? null;
 	let status: McpServerStatus;
 	if (!enabled) status = { kind: "disabled" };
 	else if (integration) status = { kind: "integration", id: integration };
 	else if (transport === "stdio") status = { kind: "local" };
 	else if (!remote) status = { kind: "failing", error: `Its address, ${config.url ?? "missing"}, is not a URL.`, status: null };
-	else status = await signInOf(name).hold(() => remoteStatusOf(remote, { signedIn, signInRequired: false }, fresh));
+	else status = await signInOf(name).hold(null, () => remoteStatusOf(remote, { signedIn, signInRequired: false }, fresh));
 	return {
 		name,
 		transport,
@@ -113,8 +113,8 @@ function signable(server: ConfiguredMcpServer): McpServer {
 /** Starts a sign-in to server `name`, abandoning any under way, and answers once it has the authorization address or has failed. */
 export async function startMcpServerSignIn(name: string): Promise<McpServerRow> {
 	const remote = signable(await configured(name));
-	await signInOf(name).start(async (signal, waiting) => {
-		await signInMcp(remote, { onAuth: waiting, signal });
+	await signInOf(name).start(null, async (signal, waiting) => {
+		await signInMcp({ ...remote, oauth: remote.config.oauth }, { onAuth: waiting, signal });
 	});
 	return rowNamed(name);
 }

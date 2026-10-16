@@ -2,13 +2,16 @@
  * Gmail: the latest conversations of your inbox, which the Inbox page lists, one conversation in full, which its details
  * show, and the mail, replies, and trashing its actions send. It calls Google's Gmail API with the token omp holds for its Gmail
  * MCP server, the same sign-in and scope: the server's own tools answer only for OAuth clients in Google's Developer
- * Preview Program. Reading a conversation here never marks it read.
+ * Preview Program. Reading a conversation here never marks it read. A {@link GmailClient} reads one account;
+ * {@link GmailAccounts} merges every signed-in account's inbox and sends each write to its account.
  */
 import { createCache } from "./cache";
-import { isObject, nonEmptyStr, str } from "./json";
+import type { AccountClients } from "./integrations";
+import { errorText, isObject, nonEmptyStr, str } from "./json";
 import { mapLimit } from "./map-limit";
 import { ApiError, type SignedFetch } from "./signed-fetch";
-import type { InboxAnswer, MailAttachment, MailBody, MailDraft, MailMessage, MailPerson, MailReply, MailThread, ThreadAnswer } from "./shared/gmail";
+import type { AccountId } from "./shared/accounts";
+import type { InboxAnswer, MailAttachment, MailBody, MailDraft, MailMessage, MailPerson, MailReply, MailSend, MailThread, ThreadAnswer } from "./shared/gmail";
 import { threadUrl } from "./shared/gmail";
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -88,8 +91,8 @@ const hasLabel = (message: Record<string, unknown>, label: string): boolean => A
 /** When a message arrived, epoch ms, `NaN` when Gmail gives no time. */
 const arrivalOf = (message: Record<string, unknown>): number => (typeof message.internalDate === "string" ? Number(message.internalDate) : Number.NaN);
 
-/** A thread as the Inbox page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. */
-function threadOf(thread: unknown, snippet: string, address: string): MailThread | null {
+/** A thread of `account` as the Inbox page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. */
+function threadOf(thread: unknown, snippet: string, account: AccountId, address: string): MailThread | null {
 	if (!isObject(thread) || !Array.isArray(thread.messages)) return null;
 	const id = nonEmptyStr(thread.id);
 	const messages = thread.messages.filter(isObject).filter(message => !hasLabel(message, "DRAFT"));
@@ -98,6 +101,7 @@ function threadOf(thread: unknown, snippet: string, address: string): MailThread
 	const at = arrivalOf(last);
 	if (!Number.isFinite(at)) return null;
 	return {
+		account,
 		id,
 		from: senderOf(headerOf(last, "From")),
 		subject: headerOf(first, "Subject").trim(),
@@ -281,22 +285,38 @@ export function replyOf(message: Record<string, unknown>, me: string, draft: Omi
 	return mailOf(me, draft, /^re:/i.test(subject) ? subject : `Re: ${subject}`, threading);
 }
 
-/** Your Gmail inbox's latest conversations, and each conversation in full, each read at most once a minute. */
+/** What one account's inbox read answers: the address it signs in as and its latest conversations, in Gmail's order. */
+export interface AccountInbox {
+	address: string;
+	threads: MailThread[];
+}
+
+/** The address the sign-in behind `fetch` reads mail as, from Gmail's profile. */
+export async function gmailAddress(fetch: SignedFetch): Promise<string> {
+	const profile = await fetch(`${API}/profile`);
+	const address = isObject(profile) ? nonEmptyStr(profile.emailAddress) : undefined;
+	if (!address) throw new Error("Gmail did not say which address you signed in with");
+	return address;
+}
+
+/** Gmail account `account`'s inbox's latest conversations, and each conversation in full, each read at most once a minute. */
 export class GmailClient {
 	readonly #fetch: SignedFetch;
-	readonly #inbox = createCache<InboxAnswer>(KEPT_MS);
+	readonly #account: AccountId;
+	readonly #inbox = createCache<AccountInbox>(KEPT_MS);
 	readonly #address = createCache<string>(KEPT_MS);
 	readonly #threads = createCache<ReadThread>(KEPT_MS);
 
-	constructor(fetch: SignedFetch) {
+	constructor(fetch: SignedFetch, account: AccountId) {
 		this.#fetch = fetch;
+		this.#account = account;
 	}
 
 	/**
 	 * The signed-in address and its inbox's latest conversations, in Gmail's order. `fresh` reads them again.
 	 * One failed thread read fails the whole read.
 	 */
-	inbox(fresh = false): Promise<InboxAnswer> {
+	inbox(fresh = false): Promise<AccountInbox> {
 		return this.#inbox.get("", () => this.#readInbox(fresh), fresh);
 	}
 
@@ -314,7 +334,7 @@ export class GmailClient {
 	}
 
 	/** Sends `reply` in its conversation, read again first so it answers the conversation's latest message. */
-	async reply({ thread, ...draft }: MailReply): Promise<void> {
+	async reply({ thread, account: _, ...draft }: MailReply): Promise<void> {
 		const url = new URL(`${API}/threads/${encodeURIComponent(thread)}`);
 		url.searchParams.set("format", "metadata");
 		for (const header of REPLY_HEADERS) url.searchParams.append("metadataHeaders", header);
@@ -348,16 +368,10 @@ export class GmailClient {
 
 	/** The address you signed in with, which a link into Gmail names; the inbox's read keeps it for a conversation's. */
 	#signedIn(fresh: boolean): Promise<string> {
-		const read = async (): Promise<string> => {
-			const profile = await this.#fetch(`${API}/profile`);
-			const address = isObject(profile) ? nonEmptyStr(profile.emailAddress) : undefined;
-			if (!address) throw new Error("Gmail did not say which address you signed in with");
-			return address;
-		};
-		return this.#address.get("", read, fresh);
+		return this.#address.get("", () => gmailAddress(this.#fetch), fresh);
 	}
 
-	async #readInbox(fresh: boolean): Promise<InboxAnswer> {
+	async #readInbox(fresh: boolean): Promise<AccountInbox> {
 		const list = new URL(`${API}/threads`);
 		list.searchParams.set("labelIds", "INBOX");
 		list.searchParams.set("maxResults", String(INBOX_SIZE));
@@ -372,7 +386,7 @@ export class GmailClient {
 			url.searchParams.set("format", "metadata");
 			url.searchParams.append("metadataHeaders", "From");
 			url.searchParams.append("metadataHeaders", "Subject");
-			return threadOf(await this.#fetch(url.toString()), snippet, address);
+			return threadOf(await this.#fetch(url.toString()), snippet, this.#account, address);
 		});
 		return { address, threads: threads.filter(thread => thread !== null) };
 	}
@@ -386,6 +400,7 @@ export class GmailClient {
 		const read = kept.map(messageOf).filter(message => message !== null);
 		return {
 			answer: {
+				account: this.#account,
 				id,
 				subject: kept[0] ? headerOf(kept[0], "Subject").trim() : "",
 				url: threadUrl(address, id),
@@ -393,5 +408,52 @@ export class GmailClient {
 			},
 			html: new Map(read.flatMap(({ message, html }): [string, string][] => (html === undefined ? [] : [[message.id, html]]))),
 		};
+	}
+}
+
+/** Every signed-in Gmail account's inbox merged, and each conversation and write sent to the account it names. */
+export class GmailAccounts {
+	readonly #clients: AccountClients<GmailClient>;
+
+	constructor(clients: AccountClients<GmailClient>) {
+		this.#clients = clients;
+	}
+
+	/**
+	 * Each signed-in account, and their inboxes' latest conversations, newest first. An account whose read fails keeps
+	 * its error and the others still answer; only when every account fails is it an error.
+	 */
+	async inbox(fresh = false): Promise<InboxAnswer> {
+		const clients = await this.#clients.signedIn();
+		const reads = await Promise.allSettled(clients.map(({ client }) => client.inbox(fresh)));
+		const failure = reads.find(read => read.status === "rejected");
+		if (failure && reads.every(read => read.status === "rejected")) throw failure.reason;
+		return {
+			accounts: clients.map(({ account }, at) => {
+				const read = reads[at]!;
+				return read.status === "fulfilled" ? { account, address: read.value.address, error: null } : { account, address: null, error: errorText(read.reason) };
+			}),
+			threads: reads.flatMap(read => (read.status === "fulfilled" ? read.value.threads : [])).sort((a, b) => b.at - a.at),
+		};
+	}
+
+	async thread(account: AccountId, id: string, fresh = false): Promise<ThreadAnswer> {
+		return (await this.#clients.get(account)).thread(id, fresh);
+	}
+
+	async messageHtml(account: AccountId, thread: string, id: string): Promise<string | undefined> {
+		return (await this.#clients.get(account)).messageHtml(thread, id);
+	}
+
+	async reply(reply: MailReply): Promise<void> {
+		await (await this.#clients.get(reply.account)).reply(reply);
+	}
+
+	async send({ account, ...draft }: MailSend): Promise<void> {
+		await (await this.#clients.get(account)).send(draft);
+	}
+
+	async trash(account: AccountId, thread: string): Promise<void> {
+		await (await this.#clients.get(account)).trash(thread);
 	}
 }

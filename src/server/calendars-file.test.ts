@@ -15,17 +15,27 @@ function calendarsPath(): string {
 	return join(dir, "omp-agents", "calendars.json");
 }
 
+const hiddenOf = (file: CalendarsFile): Record<string, string[]> => Object.fromEntries([...file.value].map(([account, ids]) => [account, [...ids]]));
+
 describe("CalendarsFile", () => {
-	test("hiding or showing a calendar changes only once, and the next server reads the result", () => {
+	test("hiding or showing a calendar changes only its account's list, only once, and the next server reads the result", () => {
 		const path = calendarsPath();
 		const first = new CalendarsFile(path);
-		expect(first.apply("team@group.calendar.google.com", true)).toBe(false);
-		expect(first.apply("team@group.calendar.google.com", false)).toBe(true);
-		expect(first.apply("team@group.calendar.google.com", false)).toBe(false);
-		expect(first.apply("holidays@group.v.calendar.google.com", false)).toBe(true);
-		expect([...new CalendarsFile(path).value]).toEqual(["team@group.calendar.google.com", "holidays@group.v.calendar.google.com"]);
-		expect(first.apply("team@group.calendar.google.com", true)).toBe(true);
-		expect([...new CalendarsFile(path).value]).toEqual(["holidays@group.v.calendar.google.com"]);
+		expect(first.apply("google-calendar", "team@group.calendar.google.com", true)).toBe(false);
+		expect(first.apply("google-calendar", "team@group.calendar.google.com", false)).toBe(true);
+		expect(first.apply("google-calendar", "team@group.calendar.google.com", false)).toBe(false);
+		expect(first.apply("google-calendar-2", "team@group.calendar.google.com", false)).toBe(true);
+		expect(hiddenOf(new CalendarsFile(path))).toEqual({ "google-calendar": ["team@group.calendar.google.com"], "google-calendar-2": ["team@group.calendar.google.com"] });
+		expect(first.apply("google-calendar", "team@group.calendar.google.com", true)).toBe(true);
+		expect(hiddenOf(new CalendarsFile(path))).toEqual({ "google-calendar-2": ["team@group.calendar.google.com"] });
+	});
+
+	test("a file from before accounts reads as the original Google Calendar server's hidden calendars", () => {
+		const path = calendarsPath();
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({ hidden: ["team@group.calendar.google.com"] }));
+		expect(hiddenOf(new CalendarsFile(path))).toEqual({ "google-calendar": ["team@group.calendar.google.com"] });
+		expect(existsSync(`${path}.invalid`)).toBe(false);
 	});
 
 	test("a file holding something else moves aside rather than being written over", () => {
@@ -34,7 +44,7 @@ describe("CalendarsFile", () => {
 		writeFileSync(path, JSON.stringify({ hidden: "team@group.calendar.google.com" }));
 		const file = new CalendarsFile(path);
 		expect(existsSync(`${path}.invalid`)).toBe(true);
-		expect(file.apply("team@group.calendar.google.com", false)).toBe(true);
-		expect([...new CalendarsFile(path).value]).toEqual(["team@group.calendar.google.com"]);
+		expect(file.apply("google-calendar", "team@group.calendar.google.com", false)).toBe(true);
+		expect(hiddenOf(new CalendarsFile(path))).toEqual({ "google-calendar": ["team@group.calendar.google.com"] });
 	});
 });

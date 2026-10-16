@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { InboxThread } from "../../routing";
 
 const WEB_LINK = /^(?:https?|mailto):/i;
 
@@ -43,11 +44,11 @@ function attach(doc: Document, setHeight: (height: number) => void): () => void 
  * The frame is sized once its document is parsed, not on `load`: `load` waits for every image, and a tracking pixel whose
  * server never answers would keep the message zero pixels tall. The observer then grows the frame as images arrive.
  */
-export function MailFrame({ thread, id, title }: { thread: string; id: string; title: string }) {
+export function MailFrame({ thread, id, title }: { thread: InboxThread; id: string; title: string }) {
 	const frame = useRef<HTMLIFrameElement>(null);
 	const check = useRef<() => void>(() => {});
 	const [height, setHeight] = useState(0);
-	const src = `/api/gmail/message?${new URLSearchParams({ thread, id })}`;
+	const src = `/api/gmail/message?${new URLSearchParams({ account: thread.account, thread: thread.thread, id })}`;
 
 	useEffect(() => {
 		let attached: Document | null = null;

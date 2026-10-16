@@ -1,41 +1,42 @@
 import { Mail, SquarePen } from "lucide-react";
-import { useEffect } from "react";
-import { callable } from "../../../src/shared/accounts";
+import { useEffect, useRef, useState } from "react";
+import { type AccountId, anyCallable, callable, type GoogleAccount } from "../../../src/shared/accounts";
 import type { MailThread } from "../../../src/shared/gmail";
 import { threadUrl, type MailSend } from "../../../src/shared/gmail";
 import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
 import { type MailDocument, useMailDraft } from "../../mail-draft";
-import { gmailStore, mailThreadStore, useGmailInbox } from "../../reads";
-import { hashForInbox } from "../../routing";
+import { gmailStore, mailThreadScope, mailThreadStore, useGmailInbox } from "../../reads";
+import { hashForInbox, type InboxRoute } from "../../routing";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useOpenLatest } from "../../use-open-latest";
 import { DisconnectedPage } from "../integrations/disconnected-page";
 import { focusRow, PolledPageFrame, PolledContent, stepRows, useReturnFocus } from "../list-page";
 import { ListSplit } from "../list-split";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MailEditor } from "./mail-editor";
 import { MailTime, ThreadDetail } from "./thread-view";
 
 const TITLE = "Inbox";
-const META = "Your Gmail inbox";
+const META = "Your Gmail inboxes";
 
-/** The target of `#inbox/new`, the page that writes a new mail; Gmail's thread ids are hex, so none reads as it. */
-const COMPOSE = "new";
+const rowId = (thread: Pick<MailThread, "account" | "id">): string => `inbox-row-${thread.account}-${thread.id}`;
+const rowOf = (thread: MailThread): HTMLElement | null => document.getElementById(rowId(thread));
 
-const rowId = (threadId: string): string => `inbox-row-${threadId}`;
-const rowOf = (thread: MailThread): HTMLElement | null => document.getElementById(rowId(thread.id));
+const accountLabel = (account: GoogleAccount): string => account.address ?? account.name;
 
 /**
  * A conversation as Superhuman lists one, on three lines: who sent its last message, how many it holds, and when it
- * arrived; its subject; and its snippet. Its link opens it beside the list.
+ * arrived; its subject; and its snippet, after the address of its inbox when the list holds several. Its link opens it
+ * beside the list.
  */
-function ThreadRow({ thread, open }: { thread: MailThread; open: boolean }) {
+function ThreadRow({ thread, open, inbox }: { thread: MailThread; open: boolean; inbox: string | null }) {
 	return (
-		<li id={rowId(thread.id)}>
+		<li id={rowId(thread)}>
 			<a
-				href={hashForInbox(thread.id)}
+				href={hashForInbox({ account: thread.account, thread: thread.id })}
 				aria-current={open ? "true" : undefined}
 				className={cn(
 					"relative block min-w-0 space-y-0.5 rounded-md px-3 py-2.5 text-sm outline-none",
@@ -53,21 +54,30 @@ function ThreadRow({ thread, open }: { thread: MailThread; open: boolean }) {
 					<MailTime at={thread.at} />
 				</span>
 				<span className={cn("block truncate pl-4", thread.unread && "font-semibold")}>{thread.subject || "(no subject)"}</span>
-				<span className="block truncate pl-4 text-muted-foreground">{thread.snippet}</span>
+				<span className="flex items-baseline gap-2 pl-4 text-muted-foreground">
+					{inbox && (
+						<span className="max-w-[45%] shrink-0 truncate rounded bg-muted px-1.5 text-xs" title={`In ${inbox}`}>
+							{inbox}
+						</span>
+					)}
+					<span className="min-w-0 flex-1 truncate">{thread.snippet}</span>
+				</span>
 			</a>
 		</li>
 	);
 }
 
-/** A new mail in the panel beside the list; sending it or throwing it away goes back to the inbox. */
-function ComposePage({ address }: { address: string | null }) {
+/** A new mail in the panel beside the list, from one of `accounts`, `from` first; sending it or throwing it away goes back to the inbox. */
+function ComposePage({ accounts, from }: { accounts: GoogleAccount[]; from: AccountId | null }) {
 	const mail = useMailDraft("new", NEW_MAIL);
+	const [picked, setPicked] = useState(from);
+	const sender = accounts.find(account => account.name === picked) ?? accounts[0];
 	const back = (): void => {
 		location.hash = hashForInbox(null);
 	};
 	return (
 		<div className="flex h-full min-h-0 flex-col p-4">
-			{mail.draft && (
+			{mail.draft && sender && (
 				<MailEditor
 					draft={mail.draft}
 					edit={mail}
@@ -76,7 +86,7 @@ function ComposePage({ address }: { address: string | null }) {
 					focusPeople
 					expanded
 					onSend={async draft => {
-						await putJson<object>("/api/gmail/send", draft satisfies MailSend);
+						await putJson<object>("/api/gmail/send", { ...draft, account: sender.name } satisfies MailSend);
 					}}
 					onClose={back}
 					onDone={() => {
@@ -85,7 +95,26 @@ function ComposePage({ address }: { address: string | null }) {
 					}}
 				/>
 			)}
-			{address && <p className="mt-2 px-1 text-xs text-muted-foreground">From {address}</p>}
+			{sender &&
+				(accounts.length > 1 ? (
+					<div className="mt-2 flex items-center gap-2 px-1 text-xs text-muted-foreground">
+						From
+						<Select items={accounts.map(account => ({ value: account.name, label: accountLabel(account) }))} value={sender.name} onValueChange={next => next && setPicked(next)}>
+							<SelectTrigger aria-label="From" className="text-foreground">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{accounts.map(account => (
+									<SelectItem key={account.name} value={account.name}>
+										{accountLabel(account)}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+				) : (
+					<p className="mt-2 px-1 text-xs text-muted-foreground">From {accountLabel(sender)}</p>
+				))}
 		</div>
 	);
 }
@@ -93,52 +122,69 @@ function ComposePage({ address }: { address: string | null }) {
 const NEW_MAIL: MailDocument = { to: [], cc: [], bcc: [], subject: "", body: "" };
 
 /**
- * Your Gmail inbox's latest conversations, newest first, beside the conversation `target` names, or Gmail's integration
- * row while omp cannot read it. With no conversation open, ↓ and ↑ focus the next and previous row; with one open, they
- * open the next and previous one and focus its row, which they read ahead. Esc closes it, and O opens the focused row in
- * Gmail, else the open conversation.
+ * The latest conversations of the Gmail inboxes `workspace` shows, newest first, each tagged with its inbox while there
+ * are several and narrowed to one by the sidebar's picker, beside the conversation `target` names, or Gmail's
+ * integration row while omp can read none of them. A conversation that opens from the address while the picker narrows
+ * to another account picks its own. With no conversation open, ↓ and ↑ focus the next and previous row;
+ * with one open, they open the next and previous one and focus its row, which they read ahead. Esc closes it, and O
+ * opens the focused row in Gmail, else the open conversation.
  */
-export function InboxPage({ target }: { target: string | null }) {
-	const { gmail, inbox, unread } = useGmailInbox();
+export function InboxPage({ target, workspace }: { target: InboxRoute["target"]; workspace: string | null }) {
+	const { gmail, inbox, accounts, picked, pick, threads: shownThreads } = useGmailInbox(workspace);
+	const threads = picked === null ? shownThreads : shownThreads.filter(thread => thread.account === picked);
+	const unread = threads.filter(thread => thread.unread).length;
 	const read = inbox.read;
-	const threads = read?.data.threads ?? [];
-	const at = target === null ? -1 : threads.findIndex(thread => thread.id === target);
-	const address = read?.data.address ?? null;
-	const openUrl = address !== null && target !== null ? threadUrl(address, target) : null;
-	useReturnFocus(target, id => id, id => document.getElementById(rowId(id))?.querySelector<HTMLElement>("a"), read);
-	useOpenLatest(hashForInbox, target, threads[0]?.id ?? null, read !== null);
+	const open = target === null || target === "new" ? null : target;
+	const at = open === null ? -1 : threads.findIndex(thread => thread.account === open.account && thread.id === open.thread);
+	const addressOf = (account: AccountId): string | null =>
+		accounts.find(candidate => candidate.name === account)?.address ?? read?.data.accounts.find(candidate => candidate.account === account)?.address ?? null;
+	const openAddress = open && addressOf(open.account);
+	const openUrl = open && openAddress !== null ? threadUrl(openAddress, open.thread) : null;
+	const tagged = picked === null && accounts.length > 1;
+	const openKey = open && rowId({ account: open.account, id: open.thread });
+	useReturnFocus(openKey, id => id, id => document.getElementById(id)?.querySelector<HTMLElement>("a"), read);
+	useOpenLatest(hashForInbox, target, threads[0] ? { account: threads[0].account, thread: threads[0].id } : null, read !== null);
+
+	// Only a conversation that opens picks its account, so a pick made while one is open leaves it open.
+	const openAccount = open?.account ?? null;
+	const arrived = useRef<string | null>(null);
+	useEffect(() => {
+		if (gmail === null || openKey === arrived.current) return;
+		arrived.current = openKey;
+		if (openAccount !== null && picked !== null && openAccount !== picked && accounts.some(account => account.name === openAccount)) pick(openAccount);
+	}, [gmail, openKey, openAccount, picked, accounts, pick]);
 
 	// Read the next and previous conversations while one is open, so ↓/↑ open them at once.
 	const previous = at > 0 ? threads[at - 1] : undefined;
 	const next = at >= 0 ? threads[at + 1] : undefined;
 	useEffect(() => {
-		if (previous) mailThreadStore.ensure(previous.id);
-		if (next) mailThreadStore.ensure(next.id);
+		if (previous) mailThreadStore.ensure(mailThreadScope(previous.account, previous.id));
+		if (next) mailThreadStore.ensure(mailThreadScope(next.account, next.id));
 	}, [previous, next]);
 
-	const open = (thread: MailThread): void => {
-		location.hash = hashForInbox(thread.id);
+	const openThread = (thread: MailThread): void => {
+		location.hash = hashForInbox({ account: thread.account, thread: thread.id });
 		const row = rowOf(thread);
 		if (row) focusRow(row);
 	};
 	const openBy = (by: 1 | -1): void => {
 		const neighbour = at >= 0 ? threads[at + by] : threads[by === 1 ? 0 : threads.length - 1];
-		if (neighbour) open(neighbour);
+		if (neighbour) openThread(neighbour);
 	};
 	const step = (by: 1 | -1): boolean => {
-		if (target === null) return stepRows(threads, rowOf, by);
+		if (open === null && target !== "new") return stepRows(threads, rowOf, by);
 		openBy(by);
 		return true;
 	};
 	useShortcuts({
 		inboxCompose: () => {
-			if (target === COMPOSE) return false;
-			location.hash = hashForInbox(COMPOSE);
+			if (target === "new") return false;
+			location.hash = hashForInbox("new");
 		},
 		inboxNext: () => step(1),
 		inboxPrevious: () => step(-1),
 		inboxClose: () => {
-			if (target === null || target === COMPOSE) return false;
+			if (open === null) return false;
 			location.hash = hashForInbox(null);
 		},
 		inboxOnGmail: () => {
@@ -148,17 +194,21 @@ export function InboxPage({ target }: { target: string | null }) {
 		},
 	});
 
-	if (gmail && !callable(gmail.connection)) return <DisconnectedPage title={TITLE} meta={META} integration={gmail} />;
+	if (gmail && !anyCallable(gmail.accounts)) return <DisconnectedPage title={TITLE} meta={META} integration={gmail} />;
 
+	const pickedAccount = accounts.find(account => account.name === picked);
+	const scope = pickedAccount ? accountLabel(pickedAccount) : accounts.length === 1 && accounts[0] ? accountLabel(accounts[0]) : `${accounts.length} inboxes`;
+	const failed = (read?.data.accounts ?? []).filter(account => account.error !== null && accounts.some(shown => shown.name === account.account) && (picked === null || account.account === picked));
+	const senders = accounts.filter(account => callable(account.connection));
 	return (
 		<PolledPageFrame
 			title={TITLE}
-			meta={read ? `${read.data.address} · ${unread} unread` : META}
+			meta={read ? `${scope} · ${unread} unread` : META}
 			poll={inbox}
 			onRefresh={() => void gmailStore.refresh(null, { fresh: true })}
 			actions={
 				<Tooltip content="New mail" shortcut={shortcutLabels("inboxCompose")}>
-					<Button variant="secondary" size="compact" leadingIcon={SquarePen} render={<a href={hashForInbox(COMPOSE)} />}>
+					<Button variant="secondary" size="compact" leadingIcon={SquarePen} render={<a href={hashForInbox("new")} />}>
 						Compose
 					</Button>
 				</Tooltip>
@@ -167,18 +217,28 @@ export function InboxPage({ target }: { target: string | null }) {
 			<ListSplit
 				widthKey="omp-agents.inbox-list-width"
 				resizeLabel="Resize the conversation list"
-				detailLabel={target === COMPOSE ? "New mail" : "Open conversation"}
+				detailLabel={target === "new" ? "New mail" : "Open conversation"}
 				empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("inboxNext")} and press Enter.` }}
 				list={
 					<div className="space-y-2 p-2">
+						{failed.map(account => (
+							<p key={account.account} role="alert" className="px-3 text-xs text-red-600 dark:text-red-400">
+								Cannot read {addressOf(account.account) ?? account.account}: {account.error}
+							</p>
+						))}
 						<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={inbox}>
-							{answer =>
-								answer.threads.length === 0 ? (
+							{() =>
+								threads.length === 0 ? (
 									<p className="px-3 text-sm text-muted-foreground">Your inbox is empty.</p>
 								) : (
 									<ul aria-label="Conversations" className="space-y-0.5">
-										{answer.threads.map(thread => (
-											<ThreadRow key={thread.id} thread={thread} open={thread.id === target} />
+										{threads.map(thread => (
+											<ThreadRow
+												key={rowId(thread)}
+												thread={thread}
+												open={open !== null && thread.account === open.account && thread.id === open.thread}
+												inbox={tagged ? (addressOf(thread.account) ?? thread.account) : null}
+											/>
 										))}
 									</ul>
 								)
@@ -187,20 +247,20 @@ export function InboxPage({ target }: { target: string | null }) {
 					</div>
 				}
 				detail={
-					target === null ? null : target === COMPOSE ? (
-						<ComposePage address={address} />
+					target === null ? null : target === "new" ? (
+						<ComposePage accounts={senders} from={picked} />
 					) : (
 						<ThreadDetail
-							key={target}
-							id={target}
+							key={rowId({ account: target.account, id: target.thread })}
+							target={target}
 							listed={threads[at] ?? null}
 							position={at >= 0 ? { at, of: threads.length } : null}
-							onPrevious={previous ? () => open(previous) : undefined}
-							onNext={next ? () => open(next) : undefined}
-							address={address}
+							onPrevious={previous ? () => openThread(previous) : undefined}
+							onNext={next ? () => openThread(next) : undefined}
+							address={openAddress}
 							onTrashed={() => {
 								const after = next ?? previous;
-								if (after) open(after);
+								if (after) openThread(after);
 								else location.hash = hashForInbox(null);
 							}}
 						/>

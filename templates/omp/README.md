@@ -53,6 +53,9 @@ Files, in `agent/`:
   It also stops cache warming while the session is idle.
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over, and the omp-agents dashboard removes its worktree as **End session** does, so a prompt such as "Merge on main, then end the session" runs to the end.
+- `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
+  When you linked addresses to the session's workspace in the dashboard's Settings › Integrations, it also tells the session to use those for the workspace's mail and calendar unless you name another account.
+  A session in a linked worktree outside every linked workspace takes the links of its repository's main checkout, and no tool is blocked.
 - `extensions/projects.ts`: tells a session that belongs to an omp-agents project its role, coordinator or worker, and where the project's shared notes are, at every prompt.
   A coordinator's `edit` and `write` calls outside the notes are blocked, so it delegates every code change to a worker.
   The dashboard loads this file from the repository with `-e` while it is not installed, so projects work before you run `bun run omp-template`.

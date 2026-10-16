@@ -1,7 +1,7 @@
 /** The Inbox's open conversation: its action bar, subject, messages folded as Gmail folds them, and the reply. */
 import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw, Reply, ReplyAll, Trash2 } from "lucide-react";
 import { useReducer, useState } from "react";
-import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread } from "../../../src/shared/gmail";
+import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread, MailTrash } from "../../../src/shared/gmail";
 import { MailEditor } from "./mail-editor";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, personLabel, recipientsLine } from "../../inbox-model";
 import { useReplyDraft } from "../../mail-draft";
 import { formatBytes, mailTime } from "../../labels";
-import { gmailStore, mailThreadStore, useMailThread } from "../../reads";
-import { hashForInbox } from "../../routing";
+import { gmailStore, mailThreadScope, mailThreadStore, useMailThread } from "../../reads";
+import { hashForInbox, type InboxThread } from "../../routing";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, type BarAction } from "../list-split";
 import { LoadNote } from "../sheet-details";
@@ -46,7 +46,7 @@ function Attachments({ attachments }: { attachments: MailAttachment[] }) {
 	);
 }
 
-function Body({ message, thread, title }: { message: MailMessage; thread: string; title: string }) {
+function Body({ message, thread, title }: { message: MailMessage; thread: InboxThread; title: string }) {
 	const { body } = message;
 	switch (body.kind) {
 		case "html":
@@ -109,8 +109,8 @@ const ROW = "flex w-full min-w-0 gap-3 rounded-md px-2 text-left outline-none ho
 
 interface MessageProps {
 	message: MailMessage;
-	/** The conversation's id, which with the message's own addresses its HTML. */
-	thread: string;
+	/** The conversation, which with the message's own id addresses its HTML. */
+	thread: InboxThread;
 	/** The inbox's own address, which reads as `me`. */
 	address: string | null;
 	onToggle: () => void;
@@ -176,7 +176,8 @@ function ReplyPrompt({ to, disabled, onReply }: { to: string; disabled: boolean;
 }
 
 interface ThreadDetailProps {
-	id: string;
+	/** The conversation, by its account and thread id. */
+	target: InboxThread;
 	/** The conversation as the inbox lists it, which titles the panel until its read arrives; `null` when the list does not hold it. */
 	listed: MailThread | null;
 	/** Where it sits in the list, `null` when the list does not hold it. */
@@ -185,7 +186,7 @@ interface ThreadDetailProps {
 	onPrevious?: () => void;
 	/** Opens the next listed conversation, `undefined` at the bottom. */
 	onNext?: () => void;
-	/** The inbox's own address, which reads as `me`. */
+	/** The address of the conversation's account, which reads as `me`. */
 	address: string | null;
 	/** Called once the conversation moved to Trash, to open another. */
 	onTrashed: () => void;
@@ -198,8 +199,10 @@ interface ThreadDetailProps {
  * under the messages, and can grow to fill it. Delete moves the conversation to Gmail's Trash. Reading it here does not
  * mark it read.
  */
-export function ThreadDetail({ id, listed, position, onPrevious, onNext, address, onTrashed }: ThreadDetailProps) {
-	const { read, error, refreshing } = useMailThread(id, listed?.at ?? null);
+export function ThreadDetail({ target, listed, position, onPrevious, onNext, address, onTrashed }: ThreadDetailProps) {
+	const { account, thread: id } = target;
+	const scope = mailThreadScope(account, id);
+	const { read, error, refreshing } = useMailThread(account, id, listed?.at ?? null);
 	const thread = read?.data ?? null;
 	const messages = thread?.messages ?? [];
 	const [folds, fold] = useReducer(foldsAfter, NO_FOLDS);
@@ -220,7 +223,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 		setTrashing(true);
 		setActionError(null);
 		try {
-			await putJson<object>("/api/gmail/trash", { thread: id });
+			await putJson<object>("/api/gmail/trash", { account, thread: id } satisfies MailTrash);
 			onTrashed();
 			void gmailStore.refresh(null, { fresh: true });
 		} catch (err) {
@@ -276,7 +279,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 					</Button>
 				)}
 				<Tooltip content={refreshing ? "Refreshing…" : "Refresh"} disabled={refreshing}>
-					<Button variant="ghost" size="icon-compact" aria-label="Refresh" disabled={refreshing} onClick={() => void mailThreadStore.refresh(id, { fresh: true })}>
+					<Button variant="ghost" size="icon-compact" aria-label="Refresh" disabled={refreshing} onClick={() => void mailThreadStore.refresh(scope, { fresh: true })}>
 						<RefreshCw className={cn(refreshing && "animate-spin")} />
 					</Button>
 				</Tooltip>
@@ -306,7 +309,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 									const Message = row.kind === "open" ? OpenMessage : ClosedMessage;
 									return (
 										<li key={row.message.id} className="border-t border-border first:border-t-0">
-											<Message message={row.message} thread={id} address={address} onToggle={() => fold({ kind: "toggle", id: row.message.id })} />
+											<Message message={row.message} thread={target} address={address} onToggle={() => fold({ kind: "toggle", id: row.message.id })} />
 										</li>
 									);
 								}
@@ -345,7 +348,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 							onExpand={setExpanded}
 							onSend={async draft => {
 								const { subject: _, ...body } = draft;
-								await putJson<object>("/api/gmail/reply", { ...body, thread: id } satisfies MailReply);
+								await putJson<object>("/api/gmail/reply", { ...body, account, thread: id } satisfies MailReply);
 							}}
 							onClose={() => {
 								reply.close();
@@ -353,7 +356,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 							}}
 							onDone={() => {
 								setExpanded(false);
-								void mailThreadStore.refresh(id, { fresh: true });
+								void mailThreadStore.refresh(scope, { fresh: true });
 								void gmailStore.refresh(null, { fresh: true });
 							}}
 						/>

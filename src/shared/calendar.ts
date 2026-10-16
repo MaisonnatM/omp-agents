@@ -1,8 +1,11 @@
 /** The Calendar page's events: your Google calendars and their events, the events it adds, and the events kept on this computer. */
 import { arrayOf, decoder, fields, isBoolean, isDay, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, type Parsed } from "../json";
+import type { AccountId } from "./accounts";
 
 /** A calendar shown in your Google Calendar, which the Calendar page reads unless you unchecked it there. */
 export interface GoogleCalendar {
+	/** The Google Calendar account whose list holds it. */
+	account: AccountId;
 	/** Google's id for it: your email for your main calendar, else an address Google made. */
 	id: string;
 	/** Its name in your calendar list. */
@@ -19,13 +22,15 @@ export interface GoogleCalendar {
 	error: string | null;
 }
 
-/** `GET /api/google` and what `PUT /api/google/calendars` answers: the calendars checked in Google Calendar's own list. */
+/** `GET /api/google` and what `PUT /api/google/calendars` answers: the calendars checked in each account's Google Calendar list, and each account whose list could not be read. */
 export interface GoogleStatus {
 	calendars: GoogleCalendar[];
+	failed: { account: AccountId; error: string }[];
 }
 
 /** `PUT /api/google/calendars`: show or hide one calendar's events on the Calendar page. */
 export interface CalendarShownInput {
+	account: AccountId;
 	id: string;
 	shown: boolean;
 }
@@ -43,6 +48,8 @@ export function parseEventWhen(value: unknown): Parsed<EventWhen> {
 
 /** An event of one of your Google calendars. */
 export interface CalendarEvent {
+	/** The Google Calendar account it was read with. */
+	account: AccountId;
 	/** Its calendar's id, as {@link GoogleCalendar} has it. */
 	calendarId: string;
 	/** Google's id for it; each repeat has its own, as Google lists them with `singleEvents`. */
@@ -67,8 +74,8 @@ export interface CalendarEventsAnswer {
 /** The longest title a new event takes. */
 export const MAX_EVENT_TITLE = 500;
 
-/** The calendar a new event goes in: this computer, or a Google calendar you may write to. */
-export type NewEventCalendar = { kind: "local" } | { kind: "google"; calendarId: string };
+/** The calendar a new event goes in: this computer, or a Google calendar you may write to, by its account and id. */
+export type NewEventCalendar = { kind: "local" } | { kind: "google"; account: AccountId; calendarId: string };
 
 /** `PUT /api/calendar/events/new`. */
 export interface NewEvent {
@@ -97,8 +104,8 @@ export interface LocalEventsAnswer {
 /** An event kept on this computer, by its id. */
 export type LocalEventRef = { kind: "local"; id: string };
 
-/** An event of one of your Google calendars, by its calendar's id and its own; a repeat's `eventId` names only that one day's repeat. */
-export type GoogleEventRef = { kind: "google"; calendarId: string; eventId: string };
+/** An event of one of your Google calendars, by its account, its calendar's id, and its own; a repeat's `eventId` names only that one day's repeat. */
+export type GoogleEventRef = { kind: "google"; account: AccountId; calendarId: string; eventId: string };
 
 /** The event `PUT /api/calendar/events/delete` deletes: one kept on this computer, or one of a Google calendar you may write to. */
 export type EventRef = LocalEventRef | GoogleEventRef;
@@ -112,6 +119,7 @@ export const decodeGoogleStatus = decoder(
 	fields<GoogleStatus>({
 		calendars: arrayOf(
 			fields<GoogleCalendar>({
+				account: isString,
 				id: isString,
 				name: isString,
 				color: isString,
@@ -121,6 +129,7 @@ export const decodeGoogleStatus = decoder(
 				error: nullable(isString),
 			}),
 		),
+		failed: arrayOf(fields<GoogleStatus["failed"][number]>({ account: isString, error: isString })),
 	}),
 );
 
@@ -129,6 +138,7 @@ export const decodeCalendarEventsAnswer = decoder(
 	fields<CalendarEventsAnswer>({
 		events: arrayOf(
 			fields<CalendarEvent>({
+				account: isString,
 				calendarId: isString,
 				eventId: isString,
 				writable: isBoolean,

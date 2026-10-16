@@ -1,87 +1,28 @@
-/** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list. */
-import { ExternalLink, KeyRound } from "lucide-react";
+/** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list, or its accounts. */
+import { KeyRound } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import {
-	googleMcpEnableUrl,
-	isGoogleIntegration,
-	MCP_SERVICES,
-	type McpConnection,
-	type McpIntegration,
-	type McpIntegrationId,
-	type SignInState,
-	signedIn,
-} from "../../../src/shared/accounts";
+import { type GoogleAccount, hasAccounts, MCP_SERVICES, type McpIntegration, type SignInState, type SingleService, signedIn } from "../../../src/shared/accounts";
+import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
-import { type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
-import { GOOGLE_TEXT, GoogleClientForm } from "./google-client-form";
+import { GoogleAccountsRow } from "./google-accounts";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
-import {
-	ConnectButton,
-	ConnectionCallout,
-	Reconnecting,
-	ReconnectItem,
-	REMOTE_STATUS,
-	SignOutConfirm,
-	SignOutItem,
-	StatusBadge,
-	type StatusLabel,
-	useToolList,
-	WAITING_STATUS,
-} from "./mcp-connection-controls";
+import { ConnectButton, ConnectionCallout, Reconnecting, ReconnectItem, SignOutConfirm, SignOutItem, StatusBadge, useToolList, WAITING_STATUS } from "./mcp-connection-controls";
+import { SERVICES, STATUS } from "./services";
 import { SlackAppForm } from "./slack-app-form";
 
-interface Service {
-	logo: BrandLogo;
-	/** What the connection gives the dashboard and omp's sessions. */
-	gives: string;
-	/** What the service's own OAuth client is called, for a service that needs one. */
-	client?: string;
-}
-
-export const SERVICES: Record<McpIntegrationId, Service> = {
-	linear: {
-		logo: LINEAR_LOGO,
-		gives: "Your assigned issues on the Tickets tab, and Linear's tools in every omp session.",
-	},
-	slack: {
-		logo: SLACK_LOGO,
-		gives: "Search, read, and send in the conversations you grant, in every omp session.",
-		client: "Dedicated internal app",
-	},
-	"google-calendar": {
-		logo: GOOGLE_CALENDAR_LOGO,
-		gives: "Your calendars' events on the Calendar tab, and Google Calendar's tools in every omp session.",
-		client: "Your Google OAuth client",
-	},
-	gmail: {
-		logo: GMAIL_LOGO,
-		gives: "Your inbox on the Inbox tab, with replies and Delete, and Gmail's tools in every omp session.",
-		client: "Your Google OAuth client",
-	},
-};
-
-export const STATUS: Record<McpConnection["kind"], StatusLabel> = { absent: { label: "Not connected", color: "gray" }, ...REMOTE_STATUS };
-
-/** For a Google row whose MCP server answered 403, the API to turn on and Google's page that turns it on; otherwise `null`. */
-function googleApiOff(integration: McpIntegration, connection: Extract<McpConnection, { kind: "failing" }>): { api: string; url: string } | null {
-	if (!isGoogleIntegration(integration) || connection.status !== 403 || !integration.setup.clientId) return null;
-	const url = googleMcpEnableUrl(connection.server.host, integration.setup.clientId);
-	return url ? { api: GOOGLE_TEXT[integration.id].mcpApi, url } : null;
-}
-
-/** One service whose MCP server omp signs in to: where omp stands with it, the buttons that sign in and out, and `children` below. */
-export function McpIntegrationRow({ integration, children }: { integration: McpIntegration; children?: ReactNode }) {
+/** A service that signs in to one server: where omp stands with it, and the buttons that sign in and out. */
+function ServerIntegrationRow({ integration }: { integration: McpIntegration<SingleService> }) {
 	const { id, connection, setup } = integration;
 	const { label } = MCP_SERVICES[id];
 	const service = SERVICES[id];
 	const needsSetup = setup !== null && !setup.configured;
 	const settingsLabel = id === "slack" ? "app settings" : "OAuth client";
-	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id })).signIn;
+	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id, account: null })).signIn;
 	const signIn = useSignIn(integration.signIn, integrationsStore.refresh, start);
 	const { refreshing } = integrationsStore.use();
 	const [confirming, setConfirming] = useState(false);
@@ -132,7 +73,6 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 		}
 	}
 
-	const apiOff = connection.kind === "failing" ? googleApiOff(integration, connection) : null;
 	const callout = (
 		<ConnectionCallout
 			approveOn={label}
@@ -142,7 +82,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 					<SignOutConfirm
 						name={label}
 						signOut={async () => {
-							await putJson<McpIntegration>("/api/integrations/sign-out", { id });
+							await putJson<McpIntegration>("/api/integrations/remove", { id, account: null });
 							await integrationsStore.refresh();
 						}}
 						onDone={() => setConfirming(false)}
@@ -163,22 +103,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 							}
 						: { message: `${label} refused omp's sign-in. Reconnect to sign in again.` }
 			}
-			failing={
-				connection.kind !== "failing"
-					? null
-					: {
-							message: apiOff
-								? `Google refused ${label}'s tools to omp's sessions (HTTP 403), most often because the ${apiOff.api} is off in your OAuth client's Google Cloud project.`
-								: connection.error,
-							checking: refreshing,
-							check: () => void integrationsStore.refresh(null, { fresh: true }),
-							fix: apiOff && (
-								<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={apiOff.url} target="_blank" rel="noreferrer" />}>
-									Enable {apiOff.api}
-								</Button>
-							),
-						}
-			}
+			failing={connection.kind !== "failing" ? null : { message: connection.error, checking: refreshing, check: () => void integrationsStore.refresh(null, { fresh: true }) }}
 		/>
 	);
 
@@ -229,11 +154,26 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 		>
 			{callout}
 			{formOpen && integration.id === "slack" && <SlackAppForm setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
-			{formOpen && isGoogleIntegration(integration) && (
-				<GoogleClientForm id={integration.id} setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />
-			)}
-			{children}
 			{tools.list}
 		</IntegrationRow>
+	);
+}
+
+interface McpIntegrationRowProps {
+	integration: McpIntegration;
+	/** The workspaces a Google account may be linked to; `null` where links are not edited. */
+	workspaces: Workspace[] | null;
+	/** What shows once above a Google service's accounts, such as why none of their calendars could be listed. */
+	notice?: ReactNode;
+	/** What shows under each Google account, such as its calendars. */
+	details?: (account: GoogleAccount) => ReactNode;
+}
+
+/** One service whose MCP server omp signs in to, or whose accounts it signs in to, one server each. */
+export function McpIntegrationRow({ integration, workspaces, notice, details }: McpIntegrationRowProps) {
+	return hasAccounts(integration) ? (
+		<GoogleAccountsRow integration={integration} workspaces={workspaces} notice={notice} details={details} />
+	) : (
+		<ServerIntegrationRow integration={integration} />
 	);
 }

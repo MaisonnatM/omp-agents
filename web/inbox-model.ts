@@ -1,5 +1,13 @@
-/** The Inbox page's conversation details, as pure transforms: which messages show open, closed, or stacked, and what an open one renders. */
+/**
+ * The Inbox page as pure transforms: which account its picker narrows to, and which messages of a conversation show
+ * open, closed, or stacked, and what an open one renders.
+ */
+import type { AccountId, GoogleAccount } from "../src/shared/accounts";
 import type { MailMessage, MailPerson } from "../src/shared/gmail";
+
+/** The account the Inbox's picker narrows to: `stored` while it is one of two or more `shown` accounts, else `null` for every shown inbox. */
+export const pickedInbox = (stored: AccountId | null, shown: readonly GoogleAccount[]): AccountId | null =>
+	shown.length > 1 && shown.some(account => account.name === stored) ? stored : null;
 
 /** A row of a conversation: a message in full, a message on one line, or a run of closed messages folded into one. */
 export type MailRow = { kind: "open"; message: MailMessage } | { kind: "closed"; message: MailMessage } | { kind: "stack"; ids: string[] };

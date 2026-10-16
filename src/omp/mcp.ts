@@ -1,5 +1,5 @@
 /**
- * omp's MCP servers: finding one by its URL's host, signing in to one as `/mcp reauth` does, removing the sign-ins omp
+ * omp's MCP servers: finding those on a URL's host, signing in to one as `/mcp reauth` does, removing the sign-ins omp
  * manages for one, reading and writing omp's user-level config, listing and calling a server's tools with omp's OAuth
  * sign-in, and handing that sign-in to `signedFetch` for the APIs of the service behind a server.
  */
@@ -46,11 +46,10 @@ export interface McpServer {
 const credentialIdFor = (url: string, configured: string | undefined): string | undefined =>
 	configured ?? mcpCredentials.mcpOAuthCredentialIdsForServerUrl(url)[0];
 
-/** The enabled server in omp's user-level MCP config whose `url` is on `host`, or `null`. */
-export async function findMcpServer(host: string): Promise<McpServer | null> {
+/** The enabled servers in omp's user-level MCP config whose `url` is on `host`, in the config's order. */
+export async function findMcpServers(host: string): Promise<McpServer[]> {
 	const { configs } = await mcpConfig.loadAllMCPConfigs(process.cwd(), { enableProjectConfig: false });
-	const entry = serverOnHost(configs, host);
-	return entry ? credentialFor(entry.name, entry.config) : null;
+	return serversOnHost(configs, host).flatMap(({ name, config }) => credentialFor(name, config) ?? []);
 }
 
 const tokens = createCache<string>(TOKEN_MS);
@@ -84,6 +83,16 @@ export interface McpSignIn {
 	signal: AbortSignal;
 	/** Reject a grant without a refresh token before storing it. */
 	requireRefresh?: boolean;
+	/** The authorization prompt instead of the configured one: `select_account consent` lets you pick another account. */
+	prompt?: string;
+}
+
+/** What {@link signInMcp} signs in to: the server's address, the credential id it stores the sign-in under, and its configured OAuth client. */
+export interface McpSignInTarget {
+	url: string;
+	/** Left out for the id omp files a sign-in for `url` under. */
+	credentialId?: string;
+	oauth?: McpServerConfig["oauth"];
 }
 
 /**
@@ -93,12 +102,12 @@ export interface McpSignIn {
  * `server.credentialId`, else the id omp files a sign-in for its URL under, where `omp token` finds it, refresh
  * material included. The stored client secret is the one registration issued, or the configured secret when it did not.
  */
-export async function signInMcp(server: Pick<McpServer, "url"> & Partial<Pick<McpServer, "credentialId">>, { onAuth, signal, requireRefresh }: McpSignIn): Promise<void> {
+export async function signInMcp(server: McpSignInTarget, { onAuth, signal, requireRefresh, prompt }: McpSignIn): Promise<void> {
 	const credentialId = credentialIdFor(server.url, server.credentialId);
 	if (!credentialId) throw new Error(`omp names no sign-in for ${server.url}`);
 	const oauth = await mcpOAuthDiscovery.discoverOAuthEndpoints(server.url);
 	if (!oauth) throw new Error(`${server.url} names no OAuth endpoints to sign in with`);
-	const configured = await configuredOAuth(server.url);
+	const configured = server.oauth && discoveryHelpers.expandEnvVarsDeep(server.oauth);
 	const configuredClientId = configured?.clientId?.trim() || undefined;
 	const flow = new mcpOAuthFlow.MCPOAuthFlow(
 		{
@@ -109,7 +118,7 @@ export async function signInMcp(server: Pick<McpServer, "url"> & Partial<Pick<Mc
 			clientId: configuredClientId ?? (oauth.registrationUrl ? undefined : oauth.clientId),
 			clientSecret: configured?.clientSecret,
 			scopes: configured?.scope || oauth.scopes,
-			prompt: configured?.prompt,
+			prompt: prompt ?? configured?.prompt,
 			redirectUri: configured?.redirectUri,
 			callbackPort: configured?.callbackPort,
 			callbackPath: configured?.callbackPath,
@@ -142,14 +151,16 @@ export async function signInMcp(server: Pick<McpServer, "url"> & Partial<Pick<Mc
 }
 
 /**
- * Removes the sign-ins omp manages for `server`, as `/mcp unauth` does, under its credential id and under the ids omp
- * files a sign-in for its URL under; omp's config keeps the server and its `auth` block. Throws while omp still holds a
+ * Removes the sign-in omp manages for `server`, as `/mcp unauth` does, under its own credential id, and under every id
+ * omp files a sign-in for its URL under only when its own id is one of them: a server with an id of its own shares the
+ * URL with others whose sign-ins stay. omp's config keeps the server and its `auth` block. Throws while omp still holds a
  * sign-in under the credential id, the one {@link mcpSignedIn} reads.
  */
 export async function signOutMcp(server: McpServer): Promise<void> {
+	const urlIds = mcpCredentials.mcpOAuthCredentialIdsForServerUrl(server.url);
 	const storage = await auth.discoverAuthStorage();
 	try {
-		await mcpCredentials.removeManagedMcpOAuthCredentials(storage, [server.credentialId, ...mcpCredentials.mcpOAuthCredentialIdsForServerUrl(server.url)]);
+		await mcpCredentials.removeManagedMcpOAuthCredentials(storage, urlIds.includes(server.credentialId) ? urlIds : [server.credentialId]);
 		if (storage.credentials.hasOAuth(server.credentialId)) throw new Error(`omp does not manage the sign-in under ${server.credentialId}, so it stays. Remove it from omp's credentials yourself.`);
 	} finally {
 		storage.close();
@@ -276,14 +287,9 @@ function serverHost(server: McpServerConfig | undefined): string | null {
 	return URL.canParse(url) ? new URL(url).host : null;
 }
 
-const userServers = (): Promise<Record<string, McpServerConfig>> => readMcpServers(userMcpConfigPath());
-
-/** The first server of `servers` whose `url` is on `host`, with its name. */
-export function serverOnHost(servers: Record<string, McpServerConfig>, host: string): { name: string; config: McpServerConfig } | undefined {
-	for (const [name, config] of Object.entries(servers)) {
-		if (serverHost(config) === host) return { name, config };
-	}
-	return undefined;
+/** The servers of `servers` whose `url` is on `host`, with their names, in order. */
+export function serversOnHost(servers: Record<string, McpServerConfig>, host: string): { name: string; config: McpServerConfig }[] {
+	return Object.entries(servers).flatMap(([name, config]) => (serverHost(config) === host ? [{ name, config }] : []));
 }
 
 /** The server `config` names as `name`, with the credential id omp holds its sign-in under; `null` without a usable URL. */
@@ -294,13 +300,6 @@ export function credentialFor(name: string, config: McpServerConfig): McpServer 
 	const credentialId = credentialIdFor(config.url, config.auth?.credentialId);
 	if (!credentialId) throw new Error(`omp has no sign-in for its "${name}" MCP server. Run /mcp reauth ${name} in omp.`);
 	return { name, url, credentialId, config };
-}
-
-async function configuredOAuth(serverUrl: string): Promise<NonNullable<McpServerConfig["oauth"]> | undefined> {
-	if (!URL.canParse(serverUrl)) return undefined;
-	const host = new URL(serverUrl).host;
-	const configured = serverOnHost(await userServers(), host)?.config.oauth;
-	return configured ? discoveryHelpers.expandEnvVarsDeep(configured) : undefined;
 }
 
 /** A failed tool call's text is the server's error, sometimes as JSON with a `message`. */

@@ -310,12 +310,12 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="calendar" asChild>
 				<SidebarContent>
-					<CalendarNav routines={routines} current={calendarTab} />
+					<CalendarNav routines={routines} current={calendarTab} workspace={workspace} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="inbox" asChild>
 				<SidebarContent>
-					<InboxNav />
+					<InboxNav workspace={workspace} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="settings" asChild>

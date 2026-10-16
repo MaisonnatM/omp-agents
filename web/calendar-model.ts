@@ -10,7 +10,7 @@ const LOCAL_EVENT_COLOR = "#64748b";
 
 /** An event as the page shows it, from one of your Google calendars or kept on this computer. */
 export interface ShownEvent {
-	/** Unique among the shown events: a Google event's calendar id, a slash, and its own, or a kept event's id. */
+	/** Unique among the shown events: a Google event's account, calendar id, and its own, slash-separated, or a kept event's id. */
 	id: string;
 	title: string;
 	when: EventWhen;
@@ -97,13 +97,13 @@ export function calendarEntries({ routines, todos, tickets, events, localEvents 
 	const last = localDay(to - 1);
 	const inMonth = (day: string | null): day is string => day !== null && day >= first && day < end;
 	const shown: ShownEvent[] = [
-		...(events ?? []).map(({ calendarId, eventId, writable, title, when, color, calendar, url }): ShownEvent => ({
-			id: `${calendarId}/${eventId}`,
+		...(events ?? []).map(({ account, calendarId, eventId, writable, title, when, color, calendar, url }): ShownEvent => ({
+			id: `${account}/${calendarId}/${eventId}`,
 			title,
 			when,
 			color,
 			place: calendar,
-			source: { kind: "google", url, ref: writable ? { kind: "google", calendarId, eventId } : null },
+			source: { kind: "google", url, ref: writable ? { kind: "google", account, calendarId, eventId } : null },
 		})),
 		...(localEvents ?? []).map(({ id, title, when }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", ref: { kind: "local", id } } })),
 	];

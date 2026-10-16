@@ -1,26 +1,44 @@
 /**
  * The services whose MCP server the integrations page signs omp in to: where omp stands with each, checked by listing
- * the server's tools, and the sign-in and sign-out the page starts. A sign-in adds the service's server to omp's
- * user-level MCP config when omp has none.
+ * the server's tools, and the sign-ins and removals the page starts. Linear and Slack sign in to the first server on
+ * their host, and a sign-in adds it to omp's user-level MCP config when omp has none. Gmail and Google Calendar hold an
+ * account per server on their host: an account the page adds gets a server of its own, with a credential id of its own,
+ * once Google granted it. The address each account signs in as, and the workspaces each address is linked to, live in a
+ * {@link GoogleAccountsStore}.
  */
+import { randomBytes } from "node:crypto";
+import { gmailAddress } from "./gmail";
+import { calendarAddress } from "./google-calendar";
 import { clientSetup, type ClientSave, planGoogleSave, planGoogleScope, planSlackSave } from "./mcp-clients";
 import { remoteStatusOf } from "./mcp-status";
 import {
 	addMcpServer,
-	findMcpServer,
+	findMcpServers,
+	listMcpServers,
 	mcpBearer,
 	type McpServer,
+	type McpServerConfig,
+	type McpSignInTarget,
 	mcpSignedIn,
+	mcpSignedInIds,
+	removeMcpServer,
 	signInMcp,
 	signOutMcp,
 	userMcpConfigPath,
 	writeMcpServer,
 } from "./omp/mcp";
 import {
+	type AccountId,
+	type AccountsService,
 	type ClientService,
+	type GoogleAccount,
 	type GoogleClientInput,
+	type GoogleLinks,
 	type GoogleService,
+	holdsAccounts,
+	type IntegrationSignIn,
 	type IntegrationsAnswer,
+	type IntegrationTarget,
 	isGoogleService,
 	MCP_INTEGRATIONS,
 	MCP_SERVICES,
@@ -28,51 +46,221 @@ import {
 	type McpConnection,
 	type McpIntegration,
 	type McpIntegrationId,
+	type McpServerRef,
+	type SingleService,
 	type SlackClientInput,
 } from "./shared/accounts";
 import { createSignIn, type SignIn } from "./sign-in";
 import { type SignedFetch, signedFetch } from "./signed-fetch";
 
+/**
+ * What the dashboard keeps about Google accounts: each account's address, lowercased, by its server's name, and each
+ * lowercased address's linked workspaces.
+ */
+export interface GoogleAccountsState {
+	addresses: ReadonlyMap<AccountId, string>;
+	links: ReadonlyMap<string, readonly string[]>;
+}
+
+/** A change to {@link GoogleAccountsState}: an account's address learned, accounts whose servers are gone, or an address's links replaced. */
+export type GoogleAccountsChange =
+	| { kind: "learn"; account: AccountId; address: string }
+	| { kind: "forget"; accounts: readonly AccountId[] }
+	| { kind: "link"; address: string; workspaces: readonly string[] };
+
+/** Where {@link GoogleAccountsState} is kept: `google-accounts.json`, through `src/server/google-accounts-file.ts`. */
+export interface GoogleAccountsStore {
+	readonly value: GoogleAccountsState;
+	apply(change: GoogleAccountsChange): boolean;
+}
+
+/** Each service's sign-in; its target is the account it signs in to, `null` while it adds one or for a service of one server. */
 const signIns = Object.fromEntries(
-	MCP_INTEGRATIONS.map(id => [id, createSignIn(`${MCP_SERVICES[id].label}'s sign-in page was not completed within 5 minutes. Try again.`)]),
-) as Record<McpIntegrationId, SignIn>;
+	MCP_INTEGRATIONS.map(id => [id, createSignIn<AccountId | null>(`${MCP_SERVICES[id].label}'s sign-in page was not completed within 5 minutes. Try again.`)]),
+) as Record<McpIntegrationId, SignIn<AccountId | null>>;
+
+const ACCOUNTS_SERVICES = MCP_INTEGRATIONS.filter(holdsAccounts);
+
+/**
+ * How many sign-ins and sign-outs of each server finished here. A client made before the latest one calls Google as
+ * whoever signed in before: the original server keeps its credential id, filed under its URL, across them.
+ */
+const grants = new Map<AccountId, number>();
+
+/** What Google asks while the page adds an account: which account, then the grant, so a second account can be picked. */
+const ADD_PROMPT = "select_account consent";
+
+/** omp's `omp token` and `removeManagedMcpOAuthCredentials` manage an id with omp's `mcp_oauth_` prefix; the rest names the dashboard's. */
+const ACCOUNT_ID_PREFIX = "mcp_oauth_omp_agents_";
+
+/** How each service of many accounts learns which address an account signs in as. */
+const ADDRESS_OF: Record<AccountsService, (fetch: SignedFetch) => Promise<string>> = { gmail: gmailAddress, "google-calendar": calendarAddress };
+
+/** Asks Google which address `server`'s sign-in to service `id` reads as. */
+const addressOf =
+	(id: AccountsService) =>
+	(server: McpServer): Promise<string> =>
+		ADDRESS_OF[id](signedFetch(async () => mcpBearer(server)));
+
+/**
+ * The server name `name` as omp mints it into its tool names, `mcp__<this>_<tool>`.
+ * Copied from omp's `sanitizeMCPToolNamePart` (src/mcp/tool-bridge.ts) and from the starter kit's
+ * `extensions/google-accounts.ts`; change all three together.
+ */
+const toolPrefixOf = (name: string): string =>
+	name
+		.toLowerCase()
+		.replace(/[^a-z0-9_]+/g, "_")
+		.replace(/_+/g, "_")
+		.replace(/^_+|_+$/g, "") || "server";
+
+const serversOf = (id: McpIntegrationId): Promise<McpServer[]> => findMcpServers(MCP_SERVICES[id].host);
+
+const refOf = (server: McpServer): McpServerRef => ({ name: server.name, url: server.url, host: new URL(server.url).host });
+
+const targetOf = (server: McpServer): McpSignInTarget => ({ url: server.url, credentialId: server.credentialId, oauth: server.config.oauth });
+
+const regranted = (name: string): void => {
+	grants.set(name, (grants.get(name) ?? 0) + 1);
+};
+
+/** Signs in to `target`, account server `name`'s sign-in. */
+async function grant(name: string, target: McpSignInTarget, options: Parameters<typeof signInMcp>[1]): Promise<void> {
+	await signInMcp(target, options);
+	regranted(name);
+}
+
+/** Signs omp out of account server `server`. */
+async function revoke(server: McpServer): Promise<void> {
+	await signOutMcp(server);
+	regranted(server.name);
+}
 
 /** omp's server for `id`, which reads and writes the service through its tools. */
-export async function integrationServer(id: McpIntegrationId): Promise<McpServer> {
-	const server = await findMcpServer(MCP_SERVICES[id].host);
+export async function integrationServer(id: SingleService): Promise<McpServer> {
+	const [server] = await serversOf(id);
 	if (!server) throw new Error(`${MCP_SERVICES[id].label} is not connected. Connect it in Settings › Integrations.`);
 	return server;
 }
 
 /** Whether omp has a server for `id` and holds a sign-in to it. */
-export async function integrationSignedIn(id: McpIntegrationId): Promise<boolean> {
-	const found = await findServer(id);
-	return !!found && (await mcpSignedIn(found));
+export async function integrationSignedIn(id: SingleService): Promise<boolean> {
+	const [server] = await serversOf(id);
+	return !!server && (await mcpSignedIn(server));
 }
 
-/** Calls the APIs of service `id`, such as Google's or Slack's Web API, with omp's sign-in to its server. */
-export const integrationFetch = (id: McpIntegrationId): SignedFetch => signedFetch(async () => mcpBearer(await integrationServer(id)));
+/** Calls the APIs of service `id`, such as Slack's Web API, with omp's sign-in to its server. */
+export const integrationFetch = (id: SingleService): SignedFetch => signedFetch(async () => mcpBearer(await integrationServer(id)));
+
+/** Server `account` of service `id`. */
+async function accountServer(id: AccountsService, account: AccountId): Promise<McpServer> {
+	const server = (await serversOf(id)).find(candidate => candidate.name === account);
+	if (!server) throw new Error(`${MCP_SERVICES[id].label} has no account "${account}". Add it in Settings › Integrations.`);
+	return server;
+}
+
+/** Calls the APIs of service `id`, such as Google's Gmail API, with omp's sign-in to the server of `account`. */
+export const accountFetch = (id: AccountsService, account: AccountId): SignedFetch => signedFetch(async () => mcpBearer(await accountServer(id, account)));
+
+/** One client of each signed-in account of a service. */
+export interface AccountClients<C> {
+	/** Each account omp holds a sign-in to, in the order of omp's config, with its client. */
+	signedIn(): Promise<{ account: AccountId; client: C }[]>;
+	/** Account `account`'s client; throws when the service has no such account. */
+	get(account: AccountId): Promise<C>;
+}
 
 /**
- * `id`'s integration with `found` as its server, which every service requires a sign-in to: its status is held while a
- * sign-in waits on the browser.
+ * A client per account of `id`, made by `make` on first use. A client is dropped once its server is gone, names another
+ * credential id, or was signed in to or out of here, so a client never calls Google as an account signed in before.
  */
-async function loadIntegration<Id extends McpIntegrationId>(id: Id, found: McpServer | null, fresh: boolean): Promise<McpIntegration<Id>> {
-	const signIn = signIns[id];
-	const connection: McpConnection = found
-		? {
-				...(await signIn.hold(async () => remoteStatusOf(found, { signedIn: await mcpSignedIn(found), signInRequired: true }, fresh))),
-				server: { name: found.name, url: found.url, host: new URL(found.url).host },
-			}
-		: { kind: "absent" };
-	return { id, connection, signIn: signIn.state(), setup: await clientSetup(id) };
+export function accountClients<C>(id: AccountsService, make: (fetch: SignedFetch, account: AccountId) => C): AccountClients<C> {
+	const made = new Map<AccountId, { grant: string; client: C }>();
+	const clientOf = (server: McpServer): C => {
+		const grant = `${server.credentialId} ${grants.get(server.name) ?? 0}`;
+		const kept = made.get(server.name);
+		if (kept?.grant === grant) return kept.client;
+		const client = make(accountFetch(id, server.name), server.name);
+		made.set(server.name, { grant, client });
+		return client;
+	};
+	return {
+		async signedIn() {
+			const servers = await serversOf(id);
+			const held = await mcpSignedInIds(servers.map(server => server.credentialId));
+			for (const name of made.keys()) if (!servers.some(server => server.name === name)) made.delete(name);
+			return servers.filter(server => held.has(server.credentialId)).map(server => ({ account: server.name, client: clientOf(server) }));
+		},
+		get: async account => clientOf(await accountServer(id, account)),
+	};
 }
 
-const findServer = (id: McpIntegrationId): Promise<McpServer | null> => findMcpServer(MCP_SERVICES[id].host);
+/** The address `server`'s sign-in reads as, as `addressOf` asks Google, lowercased, as the store keeps it. */
+const readAddress = async (server: McpServer, addressOf: (server: McpServer) => Promise<string>): Promise<string> => (await addressOf(server)).toLowerCase();
 
-/** Every integration; `fresh` lists each signed-in server's tools again rather than the minute-old list. */
-export async function loadIntegrations(fresh: boolean): Promise<IntegrationsAnswer> {
-	const loaded = await Promise.all(MCP_INTEGRATIONS.map(async id => loadIntegration(id, await findServer(id), fresh)));
+/** The address `server`'s sign-in reads as, kept in `store`: a read that learns an address, never refusing one. */
+async function learnAddress(store: GoogleAccountsStore, server: McpServer, addressOf: (server: McpServer) => Promise<string>): Promise<string> {
+	const address = await readAddress(server, addressOf);
+	store.apply({ kind: "learn", account: server.name, address });
+	return address;
+}
+
+/**
+ * Keeps the address `server`'s new sign-in to `id` reads as, as `addressOf` asks Google, as that account's. Throws
+ * when Google does not say, or when another account of `id` already signs in as it; the caller then drops the sign-in.
+ */
+export async function claimAddress(store: GoogleAccountsStore, id: AccountsService, server: McpServer, addressOf: (server: McpServer) => Promise<string>): Promise<void> {
+	const others = (await serversOf(id)).filter(other => other.name !== server.name);
+	const known = await Promise.all(others.map(other => store.value.addresses.get(other.name) ?? learnAddress(store, other, addressOf).catch(() => null)));
+	const address = await readAddress(server, addressOf);
+	if (known.includes(address)) throw new Error(`${address} is already connected to ${MCP_SERVICES[id].label}.`);
+	store.apply({ kind: "learn", account: server.name, address });
+}
+
+const signInOf = (id: McpIntegrationId): IntegrationSignIn => {
+	const attempt = signIns[id].state();
+	return attempt?.signIn ? { ...attempt.signIn, account: attempt.target } : null;
+};
+
+/** `id`'s integration with its first server, which every service requires a sign-in to: its status is held while a sign-in waits on the browser. */
+async function loadSingle<Id extends SingleService>(id: Id, fresh: boolean): Promise<McpIntegration<Id>> {
+	const [found] = await serversOf(id);
+	const connection: McpConnection = found
+		? { ...(await signIns[id].hold(null, async () => remoteStatusOf(found, { signedIn: await mcpSignedIn(found), signInRequired: true }, fresh))), server: refOf(found) }
+		: { kind: "absent" };
+	return { id, connection, signIn: signInOf(id), setup: await clientSetup(id) };
+}
+
+/**
+ * `id`'s integration with an account per server on its host. An account omp holds a sign-in to whose address is not
+ * known yet asks Google for it. The account a sign-in targets keeps its status while the sign-in waits on the browser.
+ */
+async function loadAccounts<Id extends AccountsService>(store: GoogleAccountsStore, id: Id, fresh: boolean): Promise<McpIntegration<Id>> {
+	const servers = await serversOf(id);
+	const held = await mcpSignedInIds(servers.map(server => server.credentialId));
+	const accounts = await Promise.all(
+		servers.map(async (server): Promise<GoogleAccount> => {
+			const signedIn = held.has(server.credentialId);
+			const status = await signIns[id].hold(server.name, () => remoteStatusOf(server, { signedIn, signInRequired: true }, fresh));
+			const address = store.value.addresses.get(server.name) ?? (signedIn ? await learnAddress(store, server, addressOf(id)).catch(() => null) : null);
+			return { name: server.name, address, connection: { ...status, server: refOf(server) }, workspaces: [...((address && store.value.links.get(address)) || [])] };
+		}),
+	);
+	return { id, accounts, signIn: signInOf(id), setup: await clientSetup(id) };
+}
+
+const loadIntegration = (store: GoogleAccountsStore, id: McpIntegrationId, fresh: boolean): Promise<McpIntegration> =>
+	holdsAccounts(id) ? loadAccounts(store, id, fresh) : loadSingle(id, fresh);
+
+/**
+ * Every integration; `fresh` lists each signed-in server's tools again rather than the minute-old list. The addresses
+ * kept for accounts whose server is gone once the integrations are read are forgotten.
+ */
+export async function loadIntegrations(store: GoogleAccountsStore, fresh: boolean): Promise<IntegrationsAnswer> {
+	const loaded = await Promise.all(MCP_INTEGRATIONS.map(id => loadIntegration(store, id, fresh)));
+	const live = new Set((await Promise.all(ACCOUNTS_SERVICES.map(serversOf))).flat().map(server => server.name));
+	const gone = [...store.value.addresses.keys()].filter(account => !live.has(account));
+	if (gone.length > 0) store.apply({ kind: "forget", accounts: gone });
 	return { integrations: Object.fromEntries(loaded.map(integration => [integration.id, integration])) as IntegrationsAnswer["integrations"] };
 }
 
@@ -81,46 +269,172 @@ const SETUP_ERROR: Record<Exclude<McpClient, "none">, string> = {
 	"google-oauth": "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.",
 };
 
-/**
- * Starts a sign-in to `id`, abandoning any under way, and answers once it has the service's authorization address or
- * has failed. It signs in to omp's server for the service, else adds one once the browser comes back.
- */
-export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpIntegration> {
+/** The first `<base>-<n>` from 2 up whose tool names differ from those of every server omp loads. */
+async function freeName(base: string): Promise<string> {
+	const taken = new Set((await listMcpServers()).map(server => toolPrefixOf(server.name)));
+	for (let n = 2; ; n++) {
+		const name = `${base}-${n}`;
+		if (!taken.has(toolPrefixOf(name))) return name;
+	}
+}
+
+interface Waiting {
+	signal: AbortSignal;
+	waiting: (url: string) => void;
+}
+
+/** Signs in to the first server of `id`, else to its URL and adds its server once the browser comes back. */
+async function signInSingle(id: SingleService, { signal, waiting }: Waiting): Promise<void> {
 	const service = MCP_SERVICES[id];
-	await signIns[id].start(async (signal, waiting) => {
+	const [found] = await serversOf(id);
+	await signInMcp(found ? targetOf(found) : { url: service.url }, { onAuth: waiting, signal, requireRefresh: service.requireRefresh });
+	if (!found) await addMcpServer(service.serverName, { type: "http", url: service.url });
+}
+
+/**
+ * Signs in to account `account` of `id` again under its own credential id, or adds one when `account` is `null`. The
+ * only server on the host while it holds no sign-in, the one that keeps the OAuth client, takes the new account; any
+ * other gets a new server with the first server's client and a credential id of its own. The grant is stored under
+ * that id before the server is written, so omp never loads a server whose sign-in is missing, which it would answer
+ * with the sign-in filed under the URL, another account's. A sign-in is kept only once {@link claimAddress} keeps its address.
+ */
+async function signInAccount(store: GoogleAccountsStore, id: AccountsService, account: AccountId | null, { signal, waiting }: Waiting): Promise<void> {
+	const service = MCP_SERVICES[id];
+	const servers = await serversOf(id);
+	const options = { onAuth: waiting, signal, requireRefresh: service.requireRefresh };
+	if (account !== null) {
+		const server = servers.find(candidate => candidate.name === account);
+		if (!server) throw new Error(`${service.label} has no account "${account}".`);
+		await grant(server.name, targetOf(server), options);
+		await keepSignIn(store, id, server, addressOf(id));
+		return;
+	}
+	const [first] = servers;
+	if (!first) throw new Error(SETUP_ERROR["google-oauth"]);
+	if (servers.length === 1 && !(await mcpSignedIn(first))) {
+		await grant(first.name, targetOf(first), { ...options, prompt: ADD_PROMPT });
+		await keepSignIn(store, id, first, addressOf(id));
+		return;
+	}
+	const name = await freeName(service.serverName);
+	const credentialId = `${ACCOUNT_ID_PREFIX}${randomBytes(8).toString("hex")}`;
+	const config: McpServerConfig = { type: "http", url: service.url, oauth: first.config.oauth, auth: { type: "oauth", credentialId } };
+	await grant(name, { url: service.url, credentialId, oauth: config.oauth }, { ...options, prompt: ADD_PROMPT });
+	await keepAddedAccount(store, id, { name, url: service.url, credentialId, config }, addressOf(id));
+}
+
+/** The step after a new sign-in to `server`, an account of `id` in omp's config: signs it out unless its address is claimed. */
+export async function keepSignIn(store: GoogleAccountsStore, id: AccountsService, server: McpServer, addressOf: (server: McpServer) => Promise<string>): Promise<void> {
+	try {
+		await claimAddress(store, id, server, addressOf);
+	} catch (err) {
+		await revoke(server);
+		throw err;
+	}
+}
+
+/**
+ * The step after a grant for a new account of `id` is stored under `added`'s credential id: claims its address, then
+ * writes `added` to omp's config. Any failure before the server is written forgets the address and removes the grant,
+ * so a refused or failed add leaves neither a server nor a sign-in.
+ */
+export async function keepAddedAccount(store: GoogleAccountsStore, id: AccountsService, added: McpServer, addressOf: (server: McpServer) => Promise<string>): Promise<void> {
+	try {
+		await claimAddress(store, id, added, addressOf);
+		await addMcpServer(added.name, added.config);
+	} catch (err) {
+		store.apply({ kind: "forget", accounts: [added.name] });
+		await revoke(added);
+		throw err;
+	}
+}
+
+/**
+ * Starts the sign-in `target` names, abandoning any of its service under way, and answers once it has the service's
+ * authorization address or has failed.
+ */
+export async function startIntegrationSignIn(store: GoogleAccountsStore, { id, account }: IntegrationTarget): Promise<McpIntegration> {
+	const service = MCP_SERVICES[id];
+	await signIns[id].start(holdsAccounts(id) ? account : null, async (signal, waiting) => {
 		if (service.client !== "none" && !(await clientSetup(id))?.configured) throw new Error(SETUP_ERROR[service.client]);
 		if (isGoogleService(id)) {
-			const rescoped = await planGoogleScope(userMcpConfigPath(), id);
-			if (rescoped) await writeMcpServer(userMcpConfigPath(), rescoped.name, rescoped.server);
+			for (const { name, server } of await planGoogleScope(userMcpConfigPath(), id)) await writeMcpServer(userMcpConfigPath(), name, server);
 		}
-		const found = await findServer(id);
-		await signInMcp(found ?? { url: service.url }, { onAuth: waiting, signal, requireRefresh: service.requireRefresh });
-		if (!found) await addMcpServer(service.serverName, { type: "http", url: service.url });
+		if (holdsAccounts(id)) await signInAccount(store, id, account, { signal, waiting });
+		else await signInSingle(id, { signal, waiting });
 	});
-	return loadIntegration(id, await findServer(id), false);
+	return loadIntegration(store, id, false);
+}
+
+/**
+ * Removes `server` of service `id` and its sign-in, the server first, so omp never loads it without its sign-in and
+ * falls back to the one filed under the URL.
+ */
+async function removeAccountServer(store: GoogleAccountsStore, server: McpServer): Promise<void> {
+	await removeMcpServer(server.name);
+	store.apply({ kind: "forget", accounts: [server.name] });
+	await revoke(server);
+}
+
+/**
+ * Drops the sign-ins made with a client that changed. A service of one server signs out of it. A service of many
+ * accounts removes every server but one with its sign-in, and signs out of the one it keeps, which holds the client:
+ * the original server, filed under its URL, else the first.
+ */
+async function dropSignIns(store: GoogleAccountsStore, id: ClientService): Promise<void> {
+	const servers = await serversOf(id);
+	if (!holdsAccounts(id)) {
+		if (servers[0]) await signOutMcp(servers[0]);
+		return;
+	}
+	const kept = servers.find(server => !server.config.auth?.credentialId) ?? servers[0];
+	for (const server of servers) if (server !== kept) await removeAccountServer(store, server);
+	if (kept) await revoke(kept);
 }
 
 /**
  * Saves `id`'s OAuth client, as `plan` makes it from the user MCP config, and answers the integration.
- * A waiting sign-in is cancelled. A new client ID or secret also drops the credentials omp manages for that server.
+ * A waiting sign-in is cancelled. A new client ID or secret also drops the sign-ins made with the old one.
  */
-async function saveClient(id: ClientService, plan: (path: string) => Promise<ClientSave>): Promise<McpIntegration> {
+async function saveClient(store: GoogleAccountsStore, id: ClientService, plan: (path: string) => Promise<ClientSave>): Promise<McpIntegration> {
 	const path = userMcpConfigPath();
 	const planned = await plan(path);
 	signIns[id].cancel();
-	if (planned.dropCredentials && planned.credential) await signOutMcp(planned.credential);
-	await writeMcpServer(path, planned.name, planned.server);
-	return loadIntegration(id, await findServer(id), false);
+	for (const { name, server } of planned.writes) await writeMcpServer(path, name, server);
+	if (planned.dropCredentials) await dropSignIns(store, id);
+	return loadIntegration(store, id, false);
 }
 
-export const saveSlackClient = (input: SlackClientInput): Promise<McpIntegration> => saveClient("slack", path => planSlackSave(path, input));
+export const saveSlackClient = (store: GoogleAccountsStore, input: SlackClientInput): Promise<McpIntegration> =>
+	saveClient(store, "slack", path => planSlackSave(path, input));
 
-export const saveGoogleClient = (id: GoogleService, input: GoogleClientInput): Promise<McpIntegration> => saveClient(id, path => planGoogleSave(path, id, input));
+export const saveGoogleClient = (store: GoogleAccountsStore, id: GoogleService, input: GoogleClientInput): Promise<McpIntegration> =>
+	saveClient(store, id, path => planGoogleSave(path, id, input));
 
-/** Abandons a sign-in to `id` under way and signs omp out of its server, which stays in omp's config. */
-export async function signOutIntegration(id: McpIntegrationId): Promise<McpIntegration> {
-	signIns[id].cancel();
-	const found = await findServer(id);
-	if (found) await signOutMcp(found);
-	return loadIntegration(id, found, false);
+/**
+ * Abandons a sign-in under way to what `target` names and signs omp out of it. A service of one server keeps its
+ * server in omp's config. An account's server is removed with its sign-in, except the last one on its host, which
+ * keeps the OAuth client and stays signed out.
+ */
+export async function removeIntegration(store: GoogleAccountsStore, { id, account }: IntegrationTarget): Promise<McpIntegration> {
+	if (!holdsAccounts(id)) {
+		signIns[id].cancel();
+		const [found] = await serversOf(id);
+		if (found) await signOutMcp(found);
+		return loadIntegration(store, id, false);
+	}
+	if (account === null) throw new Error(`Name the ${MCP_SERVICES[id].label} account to remove.`);
+	if (signIns[id].state()?.target === account) signIns[id].cancel();
+	const servers = await serversOf(id);
+	const server = servers.find(candidate => candidate.name === account);
+	if (!server) throw new Error(`${MCP_SERVICES[id].label} has no account "${account}".`);
+	if (servers.length > 1) await removeAccountServer(store, server);
+	else await revoke(server);
+	return loadIntegration(store, id, false);
+}
+
+/** Links Google address `address`'s accounts, Gmail's and Google Calendar's, to `workspaces`, and answers every integration. */
+export async function linkGoogleAccount(store: GoogleAccountsStore, { address, workspaces }: GoogleLinks): Promise<IntegrationsAnswer> {
+	store.apply({ kind: "link", address: address.toLowerCase(), workspaces });
+	return loadIntegrations(store, false);
 }

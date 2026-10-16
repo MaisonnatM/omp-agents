@@ -54,6 +54,9 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   A month of routine runs, due todos and Linear tickets, and your Google Calendar's events, read with omp's sign-in to Google Calendar's MCP server.
 - **Inbox.**
   Your Gmail inbox's latest conversations, with a rich-text editor to reply and write new mail, and Delete to Trash, each opening in Gmail, read with omp's sign-in to Gmail's MCP server.
+- **Several Google accounts.**
+  Connect more than one Gmail and Google Calendar account; the Inbox and the Calendar merge them, tagged by address, and an address you link to workspaces shows only in those and under **All workspaces**.
+  omp sessions are told, through the starter kit's `google-accounts` extension, which account each MCP server signs in as and which one their workspace links.
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
   A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool and check off a todo once they finish its work.
