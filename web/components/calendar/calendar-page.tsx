@@ -315,10 +315,12 @@ interface CalendarPageProps {
 	todos: UserTodoList | null;
 	/** The dashboard can read Linear, so tickets with a due date show. */
 	ticketsShown: boolean;
+	/** The sidebar's workspace, whose Google Calendar accounts the page shows; `null` for all workspaces. */
+	workspace: string | null;
 }
 
-/** A month of Google events and events kept on this computer, routine runs, and due todos and Linear tickets, with one day's list beside it. */
-export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProps) {
+/** A month of Google events of the accounts `workspace` shows and events kept on this computer, routine runs, and due todos and Linear tickets, with one day's list beside it. */
+export function CalendarPage({ routines, todos, ticketsShown, workspace }: CalendarPageProps) {
 	const now = useMinute();
 	const [month, setMonth] = useCalendarMonth();
 	const [year, setYear] = useCalendarYear();
@@ -327,10 +329,14 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	const [newEventDay, setNewEventDay] = useState<string | null>(null);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
-	const { connected } = useGoogleCalendars();
+	const { connected, accounts } = useGoogleCalendars(workspace);
 	const span = monthSpan(year, month);
 	const eventsRead = calendarEventsStore.usePolling(span, connected);
-	const events = connected ? (eventsRead.read?.data.events ?? null) : null;
+	const read = eventsRead.read?.data.events;
+	const events = useMemo(() => {
+		const shown = new Set(accounts.map(account => account.name));
+		return connected && read ? read.filter(event => shown.has(event.account)) : null;
+	}, [connected, read, accounts]);
 	const localRead = localEventsStore.usePolling();
 	const localEvents = localRead.read?.data.events ?? null;
 	const byDay = useMemo(() => {
@@ -439,7 +445,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 				</CalendarProvider>
 				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} onDelete={deleteEvent} />
 			</div>
-			{newEventDay !== null && <NewEventDialog day={newEventDay} onClose={() => setNewEventDay(null)} onCreated={created} />}
+			{newEventDay !== null && <NewEventDialog day={newEventDay} workspace={workspace} onClose={() => setNewEventDay(null)} onCreated={created} />}
 		</PageFrame>
 	);
 }

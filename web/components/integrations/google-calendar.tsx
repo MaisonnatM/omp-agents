@@ -1,19 +1,26 @@
 import { CircleAlert } from "lucide-react";
+import type { AccountId } from "../../../src/shared/accounts";
 import type { GoogleStatus } from "../../../src/shared/calendar";
 import { cn } from "@/lib/utils";
 import type { PolledEntry } from "../../polled-store";
 import { Callout } from "./integration-row";
 
-/** The calendars checked in Google Calendar's list, each with why its last read failed, one unchecked in the Calendar page's sidebar muted. */
-export function GoogleCalendarList({ entry }: { entry: PolledEntry<GoogleStatus> }) {
-	const calendars = entry.read?.data.calendars;
-	if (!calendars) {
-		return entry.error ? (
+/**
+ * The calendars checked in account `account`'s Google Calendar list, each with why its last read failed, one unchecked
+ * in the Calendar page's sidebar muted; why the list could not be read when it could not.
+ */
+export function GoogleCalendarList({ entry, account }: { entry: PolledEntry<GoogleStatus>; account: AccountId }) {
+	const status = entry.read?.data;
+	const failed = status?.failed.find(listed => listed.account === account)?.error ?? (status ? null : entry.error);
+	if (failed) {
+		return (
 			<Callout tone="danger" icon={CircleAlert}>
-				Cannot list your calendars: {entry.error}
+				Cannot list your calendars: {failed}
 			</Callout>
-		) : null;
+		);
 	}
+	if (!status) return null;
+	const calendars = status.calendars.filter(calendar => calendar.account === account);
 	if (calendars.length === 0) {
 		return <p className="text-[13px] text-muted-foreground">No calendar is checked in Google Calendar's list. Check one there to see its events on the Calendar page.</p>;
 	}

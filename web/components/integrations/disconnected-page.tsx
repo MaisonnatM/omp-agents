@@ -9,7 +9,7 @@ export function DisconnectedPage({ title, meta, integration }: { title: string; 
 		<PageFrame title={title} meta={meta}>
 			<div className="mx-auto w-full max-w-3xl px-6 py-6">
 				<IntegrationList label={`${MCP_SERVICES[integration.id].label} connection`}>
-					<McpIntegrationRow integration={integration} />
+					<McpIntegrationRow integration={integration} workspaces={null} />
 				</IntegrationList>
 			</div>
 		</PageFrame>

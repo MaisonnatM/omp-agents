@@ -162,16 +162,19 @@ describe("layout hash", () => {
 		expect(routeFromHash("#routinesx").kind).toBe("panes");
 	});
 
-	test("the inbox hash opens the list or one conversation, round-trips a thread id, and is not read as a layout", () => {
+	test("the inbox hash opens the list, a new mail, or one account's conversation, round-trips both ids, and is not read as a layout", () => {
 		const list: Route = { kind: "page", page: { kind: "inbox", target: null } };
 		expect(hashForInbox(null)).toBe("#inbox");
-		expect(hashForInbox("18f2a3c4d5e6f708")).toBe("#inbox/18f2a3c4d5e6f708");
-		expect(hashForInbox("a/b c")).toBe("#inbox/a%2Fb%20c");
+		expect(hashForInbox("new")).toBe("#inbox/new");
+		expect(hashForInbox({ account: "gmail-2", thread: "18f2a3c4d5e6f708" })).toBe("#inbox/gmail-2/18f2a3c4d5e6f708");
+		expect(hashForInbox({ account: "a/b", thread: "c d" })).toBe("#inbox/a%2Fb/c%20d");
 		expect(routeFromHash("#inbox")).toEqual(list);
 		expect(routeFromHash("#inbox/")).toEqual(list);
-		expect(routeFromHash("#inbox/18f2a3c4d5e6f708")).toEqual({ kind: "page", page: { kind: "inbox", target: "18f2a3c4d5e6f708" } });
-		expect(routeFromHash(hashForInbox("a/b c"))).toEqual({ kind: "page", page: { kind: "inbox", target: "a/b c" } });
-		expect(routeFromHash("#inbox/%E0")).toEqual(list);
+		expect(routeFromHash("#inbox/new")).toEqual({ kind: "page", page: { kind: "inbox", target: "new" } });
+		expect(routeFromHash("#inbox/gmail/18f2a3c4d5e6f708")).toEqual({ kind: "page", page: { kind: "inbox", target: { account: "gmail", thread: "18f2a3c4d5e6f708" } } });
+		expect(routeFromHash(hashForInbox({ account: "a/b", thread: "c d" }))).toEqual({ kind: "page", page: { kind: "inbox", target: { account: "a/b", thread: "c d" } } });
+		expect(routeFromHash("#inbox/18f2a3c4d5e6f708")).toEqual(list);
+		expect(routeFromHash("#inbox/gmail/%E0")).toEqual(list);
 		expect(routeFromHash("#inboxes").kind).toBe("panes");
 	});
 

@@ -139,7 +139,7 @@ export function SettingsPage({
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		presets: <PresetsTab presets={presets} cwd={cwd ?? defaultCwd} connected={connected} />,
-		integrations: <IntegrationsTab active={section === "integrations"} />,
+		integrations: <IntegrationsTab active={section === "integrations"} workspaces={workspaces} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} />,

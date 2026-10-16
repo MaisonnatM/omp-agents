@@ -25,7 +25,7 @@ import {
 	useToolList,
 	WAITING_STATUS,
 } from "./mcp-connection-controls";
-import { SERVICES, STATUS as INTEGRATION_STATUS } from "./mcp-integration";
+import { SERVICES, STATUS as INTEGRATION_STATUS } from "./services";
 import { MCP_LOGOS } from "./mcp-logos";
 
 const refresh = (): Promise<void> => mcpServersStore.refresh();
@@ -50,10 +50,11 @@ const SourceMeta = ({ server }: { server: McpServerRow }) =>
 		</>
 	);
 
-/** A server that is one of Settings › Integrations' services, which that section checks and signs in to. */
+/** A server that is one of Settings › Integrations' services, or one account of it, which that section checks and signs in to. */
 function IntegrationServerRow({ server, id }: { server: McpServerRow; id: McpIntegrationId }) {
 	const { label } = MCP_SERVICES[id];
-	const connection = integrationsStore.use().read?.data.integrations[id].connection;
+	const integration = integrationsStore.use().read?.data.integrations[id];
+	const connection = integration && ("accounts" in integration ? integration.accounts.find(account => account.name === server.name)?.connection : integration.connection);
 	return (
 		<IntegrationRow
 			name={server.name}
