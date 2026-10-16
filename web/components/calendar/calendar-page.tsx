@@ -122,20 +122,14 @@ interface EntryLinkProps {
 	entry: CalendarEntry;
 	className: string;
 	style?: CSSProperties;
-	/** What clicking an entry without a link does, such as choosing its day; without it, that entry is plain text. */
-	onSelect?: () => void;
 	children: ReactNode;
 }
 
 /** An entry as a link to what it shows, a Google event in a new tab; an event kept on this computer links nowhere. */
-function EntryLink({ entry, className, style, onSelect, children }: EntryLinkProps) {
+function EntryLink({ entry, className, style, children }: EntryLinkProps) {
 	const href = entryHref(entry);
 	if (href === null) {
-		return onSelect ? (
-			<button type="button" onClick={onSelect} className={cn("w-full text-left", className)} style={style}>
-				{children}
-			</button>
-		) : (
+		return (
 			<div className={className} style={style}>
 				{children}
 			</div>
@@ -165,13 +159,12 @@ function EntryText({ entry, className }: { entry: CalendarEntry; className?: str
 	);
 }
 
-/** One line of a day cell: an all-day event as a band in its color, anything else as a dot and its text. `onSelect` chooses the cell's day. */
-function CellEntry({ entry, onSelect }: { entry: CalendarEntry; onSelect: () => void }) {
+/** One line of a day cell: an all-day event as a band in its color, anything else as a dot and its text. */
+function CellEntry({ entry }: { entry: CalendarEntry }) {
 	if (entry.kind === "event" && entry.event.when.allDay) {
 		return (
 			<EntryLink
 				entry={entry}
-				onSelect={onSelect}
 				className="flex h-5 items-center rounded-sm bg-[color-mix(in_oklab,var(--event)_16%,transparent)] px-1.5 text-[11px] font-medium text-foreground hover:bg-[color-mix(in_oklab,var(--event)_26%,transparent)]"
 				style={{ "--event": entry.event.color } as CSSProperties}
 			>
@@ -180,7 +173,7 @@ function CellEntry({ entry, onSelect }: { entry: CalendarEntry; onSelect: () => 
 		);
 	}
 	return (
-		<EntryLink entry={entry} onSelect={onSelect} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover">
+		<EntryLink entry={entry} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover">
 			<EntryDot entry={entry} />
 			<EntryText entry={entry} />
 		</EntryLink>
@@ -269,13 +262,15 @@ interface DayCellProps {
 /** One day of the month: its number, its first entries and **+N more**, and, while hovered, a card with all of them. */
 function DayCell({ date, entries, today, selected, onSelect, className }: DayCellProps) {
 	const cell = (
-		<div className={cn("flex min-w-0 flex-col gap-px p-1.5 transition-colors duration-150", selected ? "bg-accent" : "hover:bg-hover", className)}>
+		<div
+			onClick={() => onSelect(date)}
+			className={cn("flex min-w-0 cursor-pointer flex-col gap-px p-1.5 transition-colors duration-150", selected ? "bg-accent" : "hover:bg-hover", className)}
+		>
 			<button
 				type="button"
 				aria-label={date.toDateString()}
 				aria-pressed={selected}
 				aria-current={today ? "date" : undefined}
-				onClick={() => onSelect(date)}
 				className={cn(
 					"mb-0.5 flex size-6 items-center justify-center rounded-full text-xs tabular-nums transition-colors",
 					today ? "bg-foreground font-semibold text-background" : selected ? "font-semibold text-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
@@ -284,12 +279,12 @@ function DayCell({ date, entries, today, selected, onSelect, className }: DayCel
 				{date.getDate()}
 			</button>
 			{entries.slice(0, CELL_ENTRIES).map(entry => (
-				<CellEntry key={entryKey(entry)} entry={entry} onSelect={() => onSelect(date)} />
+				<CellEntry key={entryKey(entry)} entry={entry} />
 			))}
 			{entries.length > CELL_ENTRIES && (
-				<button type="button" onClick={() => onSelect(date)} className="self-start rounded-sm px-1 text-[11px] text-muted-foreground hover:bg-hover hover:text-foreground">
+				<span className="self-start rounded-sm px-1 text-[11px] text-muted-foreground hover:bg-hover hover:text-foreground">
 					+{entries.length - CELL_ENTRIES} more
-				</button>
+				</span>
 			)}
 		</div>
 	);
