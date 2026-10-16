@@ -23,13 +23,13 @@ Suggestions:
 2. Add a test for the empty draft
 
 - One to three prompts, best first, each one the user could send you as is: imperative, in their words, under 80 characters.
+- Each prompt names work this session can do now from its own checkout.
 - Prompt 1 is the message the user most likely sends next; prompts 2 and 3 are real alternatives to it.
 - For this user that is "Merge on main, then end the session" once the work is verified, and "End the session" once it is merged.
 - When two or more prompts are independent, prompt 1 runs them all, in the user's words, such as "Fix all, then merge".
 - After a UI change, show a screenshot, and until the user approves the look, make prompt 1 the likeliest design follow-up and merging prompt 2.
-- Never offer "Create a draft PR", "Review the changes", or "Smoke test it in the browser": run the check yourself, or leave it to the user to ask.
+- Never offer "Create a draft PR", "Review the changes", or "Smoke test it in the browser": run the review or the smoke test yourself, and leave a draft PR for the user to ask for.
 - When the user asks for ideas, offer product moves drawn from how they use the product, not only code tasks.
-- Each prompt names work this session can do now from its own checkout.
 - A prompt may end the session: do its work, call `end_session`, which also removes the session's worktree, then reply.
 - Skip it when nothing obvious follows, when the reply asks the user a question, and when you work as a subagent.
 - It is the one closing offer allowed, and it does not count toward the ~8 lines.
