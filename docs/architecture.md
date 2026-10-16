@@ -174,6 +174,8 @@ Every transcript comes from the session files on this machine, not from a networ
   A UUID is left out, since the tickets page opens an issue by identifier.
   The `/ship` state's `issue` counts too.
   Session rows carry them as `tickets`, the session's own first.
+- The same scan reads the branch checked out in the linked worktree each session that wrote works in, its worktree else its directory, through `worktreeAt` in `src/git.ts`.
+  Session rows carry it as `branch`, `null` in a repository's main checkout, on a detached HEAD, or outside git, and a branch switch changes the row at the session's next write.
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
 

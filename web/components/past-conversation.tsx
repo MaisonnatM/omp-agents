@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { pastLabel, SOURCE_LABELS } from "../labels";
+import { BranchName } from "./git";
 import { Header } from "./page-header";
 import { PullRequestButton, TicketMenu } from "./session-meta";
 import { Trajectory } from "./trajectory";
@@ -37,7 +38,13 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
-				<Header title={title} trailing={foreign ? undefined : titleAction} status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"} alert={false}>
+				<Header
+					title={title}
+					meta={session?.branch ? <BranchName name={session.branch} className="max-w-full font-mono" /> : undefined}
+					trailing={foreign ? undefined : titleAction}
+					status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"}
+					alert={false}
+				>
 					{session && (
 						<>
 							<TicketMenu tickets={session.tickets} />

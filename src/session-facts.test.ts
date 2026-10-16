@@ -345,7 +345,7 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).worktree).toBeNull();
 	});
 
-	test("links the PR that heads the branch of the linked worktree a session works in, not the main checkout's, and follows a branch switch", async () => {
+	test("names and links the PR that heads the branch of the linked worktree a session works in, not the main checkout's, and follows a branch switch", async () => {
 		const parent = realpathSync(sessionDir());
 		const main = await repoWithWorktrees(parent);
 		const inWorktree = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
@@ -370,6 +370,7 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(inWorktree).pullRequests).toEqual(linked(1));
 		expect(index.factsOf(intoWorktree).pullRequests).toEqual(linked(2));
 		expect(index.factsOf(inMain).pullRequests).toEqual([]);
+		expect([inWorktree, intoWorktree, inMain].map(path => index.factsOf(path).branch)).toEqual(["wip", "done", null]);
 
 		await git(join(parent, "app-wip"), "switch", "-q", "-c", "next");
 		await git(join(parent, "app-done"), "switch", "-q", "--detach");
@@ -378,11 +379,16 @@ describe("SessionFactsIndex", () => {
 		expect(await index.refresh(listed(2))).toBe(true);
 		expect(index.factsOf(inWorktree).pullRequests).toEqual(linked(4));
 		expect(index.factsOf(intoWorktree).pullRequests).toEqual([]);
+		expect([inWorktree, intoWorktree].map(path => index.factsOf(path).branch)).toEqual(["next", null]);
 
 		const offGitHub = new SessionFactsIndex(async () => null, worktreeAt, headHistory);
 		await offGitHub.refresh(listed(1));
 		offGitHub.learnHeads(repo, heads);
 		expect(offGitHub.factsOf(inWorktree).pullRequests).toEqual([]);
+		await git(join(parent, "app-wip"), "switch", "-q", "wip");
+		appendFileSync(inWorktree, `${ran(".")}\n`);
+		expect(await offGitHub.refresh(listed(3))).toBe(true);
+		expect(offGitHub.factsOf(inWorktree).branch).toBe("wip");
 	});
 
 	test("links the PR of the branch each gt submit submitted, printed or not, as checked out where and when it ran, and no dry run", async () => {

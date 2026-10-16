@@ -17,7 +17,7 @@ import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { type Action, useAction } from "../../use-action";
 import { DROP_LINE, type DragItem } from "../../use-drag-order";
 import { Age } from "../age";
-import { BranchLabel } from "../git";
+import { BranchLabel, BranchName } from "../git";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
@@ -366,6 +366,9 @@ function openFromRow(event: MouseEvent<HTMLElement>, pr: PullRequest): void {
 	}));
 }
 
+/** Shown while the pointer is on the row or focus is in it, and always on a touch screen; it stays in the tab order. */
+const ON_ROW_HOVER = "opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100";
+
 /** The pull request's title link remains the keyboard and modifier-click target. */
 function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; targeted: boolean; className: string }) {
 	return (
@@ -410,6 +413,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<RowMoveBadge pr={pr} move={move} change={change} {...actions} />
 					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
+					<BranchName name={pr.head} iconOnly className={cn("shrink-0", ON_ROW_HOVER)} />
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
 					<span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
@@ -463,6 +467,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					<span aria-hidden>·</span>
 					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
+					<BranchName name={pr.head} iconOnly className={cn("shrink-0", ON_ROW_HOVER)} />
 					{why && (
 						<>
 							<span aria-hidden>·</span>

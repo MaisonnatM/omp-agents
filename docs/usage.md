@@ -327,6 +327,8 @@ An action that fails shows its error, and its control becomes available again.
 - A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
+  Under the title, the header of a live or past session shows the branch checked out in the linked worktree the session works in, such as `me/fix-login`.
+  A session in a repository's main checkout, on a detached HEAD, or outside git shows no branch.
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
 - Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
@@ -337,8 +339,8 @@ An action that fails shows its error, and its control becomes available again.
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
   Hover it to see the full model selector.
   The settings page labels models the same way.
-- Click the branch of a pull request's details or of a Linear issue's detail view to copy its name; its icon turns into a check mark for a moment.
-  A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
+- Click the branch of a pull request's details, of a session's header, or of a Linear issue's detail view to copy its name; its icon turns into a check mark for a moment.
+  A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a session's header, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 
@@ -657,6 +659,7 @@ An action that fails shows its error, and its control becomes available again.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
   The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
   A narrow page drops the sessions, stack, and line columns.
+  While you hover or focus a row, in the sidebar and in the table, a branch icon after its number copies the pull request's branch, which its tooltip names, without opening the pull request.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
   A pull request that a running session asks you about is **Answer**, and one that a running session works on is **Working**.

@@ -61,7 +61,7 @@ export interface ShipProgress {
 	pr?: number;
 }
 
-/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, and its worktree. */
+/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, its worktree, and its branch. */
 export interface SessionFacts {
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
@@ -73,6 +73,8 @@ export interface SessionFacts {
 	 * than the checkout its working directory is in; `null` when it works in that checkout.
 	 */
 	worktree: string | null;
+	/** The branch checked out in the linked git worktree the session works in (its `worktree`, else its `cwd`); `null` in a repository's main checkout, on a detached HEAD, or outside git. */
+	branch: string | null;
 	replay?: ReplayFacts;
 }
 

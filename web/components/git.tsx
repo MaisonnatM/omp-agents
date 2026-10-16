@@ -23,20 +23,24 @@ export function BranchLabel({ name, title = false, className }: { name: string; 
 	);
 }
 
-/** A branch name, with its icon, that copies the name when clicked; the icon turns into a check mark once it is copied. */
-export function BranchName({ name, className }: { name: string; className?: string }) {
+/**
+ * A branch name, with its icon, that copies the name when clicked; the icon turns into a check mark once it is copied.
+ * `iconOnly` drops the name, which the tooltip and label still give, for a row with no room to show it.
+ */
+export function BranchName({ name, iconOnly = false, className }: { name: string; iconOnly?: boolean; className?: string }) {
 	const { copied, copy } = useCopy();
 	const Icon = copied ? Check : GitBranch;
+	const label = copied ? "Copied" : `Copy branch ${name}`;
 	return (
-		<Tooltip content={copied ? "Copied" : `Copy branch ${name}`}>
+		<Tooltip content={label}>
 			<button
 				type="button"
-				aria-label={`Copy branch ${name}`}
+				aria-label={label}
 				onClick={() => copy(name)}
 				className={cn("inline-flex min-w-0 max-w-64 items-center gap-0.5 rounded-sm text-left underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring", className)}
 			>
 				<Icon aria-hidden className="size-3 shrink-0" />
-				<BranchLabel name={name} />
+				{!iconOnly && <BranchLabel name={name} />}
 			</button>
 		</Tooltip>
 	);

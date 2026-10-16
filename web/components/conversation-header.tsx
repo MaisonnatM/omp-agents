@@ -7,6 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { BranchName } from "./git";
 import { Header } from "./page-header";
 import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestButton, TicketMenu } from "./session-meta";
 import type { Subject } from "./subject";
@@ -31,8 +32,9 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's title, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
- * the connection status; a session's Linear issues and pull requests, its directory in Cursor, and End session, which shows it is
- * ending until the server answers, though the session may leave the roster before then.
+ * under a session's title, the branch of the linked worktree it works in, which copies when clicked; the connection status; a
+ * session's Linear issues and pull requests, its directory in Cursor, and End session, which shows it is ending until the server
+ * answers, though the session may leave the roster before then.
  */
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
@@ -70,7 +72,13 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			(shown ? hostLabel(shown) : view.instanceId)
 		);
 	return (
-		<Header title={title} trailing={titleAction} status={status} alert={!ending && phase.phase === "ended"}>
+		<Header
+			title={title}
+			meta={subject.kind === "session" && shown?.branch ? <BranchName name={shown.branch} className="max-w-full font-mono" /> : undefined}
+			trailing={titleAction}
+			status={status}
+			alert={!ending && phase.phase === "ended"}
+		>
 			{subject.kind === "session" && shown && <TicketMenu tickets={shown.tickets} />}
 			{subject.kind === "session" && shown && <PullRequestButton pullRequests={shown.pullRequests} />}
 			{subject.kind === "session" && endable && (

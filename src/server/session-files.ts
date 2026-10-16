@@ -12,7 +12,7 @@ const sameSession = (a: SavedSession, b: SavedSession): boolean =>
 
 /** Whether two answers of `factsOf` are the same facts: each field keeps its identity until it changes. */
 const sameFacts = (a: SessionFacts, b: SessionFacts): boolean =>
-	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree && a.replay === b.replay;
+	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree && a.branch === b.branch && a.replay === b.replay;
 
 /** A past-list row and what it was built from. */
 interface PastRow {
@@ -51,10 +51,10 @@ export class SessionFiles {
 	/** Session `sessionId`'s listed file, or `null` while it is not listed. */
 	readonly savedOf = (sessionId: string): SavedSession | null => this.#byId.get(sessionId) ?? null;
 
-	/** What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, and worktree. */
+	/** What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, worktree, and branch. */
 	readonly factsOf = (sessionId: string): SessionFacts => {
 		const path = this.pathOf(sessionId);
-		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null, worktree: null };
+		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null };
 	};
 
 	/** Directories sessions ran in, newest first. Sessions from old omp versions recorded none. */

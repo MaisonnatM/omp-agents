@@ -107,7 +107,7 @@ The server lives in `src/`:
   `mcp-status.ts` holds `McpRemoteStatus` and `McpTool`, where omp stands with a remote MCP server, which an integration's `McpConnection` in `accounts.ts` and a server's `McpServerStatus` in `mcp-servers.ts` both build on.
   `gmail.ts` holds `MailThread` and `InboxAnswer`, the Inbox page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
   `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, the routine runner, and their tests.
-  `SessionFacts` in `sessions.ts` declares a session's pull requests, Linear issues, /ship stage, and worktree once, and `RosterHost` and `PastSession` extend it.
+  `SessionFacts` in `sessions.ts` declares a session's pull requests, Linear issues, /ship stage, worktree, and branch once, and `RosterHost` and `PastSession` extend it.
   `parseNewSessionRequest` there checks one, with `parseImages`, `parseModel`, `parseThinking`, and `parseSkill`, for the socket's `start` and a start kept in `scheduled.json`; `parsePullRequest` in `github.ts` checks a pull request's owner, repository, and number.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `src/shared/presets.ts` defines `SessionPreset`, its validation, starter presets, reducer, and generated branch policy.
@@ -164,7 +164,7 @@ The server lives in `src/`:
   `src/shared/replay.ts` defines replay details, markers, check evidence and comparison data, plus ordered tool and complete final-text comparison.
   `templates/omp/agent/extensions/replay-guard.ts` installs the persistent model tool policy and the pre-send check.
   Its `replay/` helpers contain pure local target policy, narrow root normalization, metadata validation, complete-envelope checking, and the request-log reader that `request-log.ts` also exports.
-- `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
+- `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in with that worktree's branch; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
   Its read of a session's own file also feeds the `OwnFileFolds` it was constructed with, and it knows nothing of what those folds keep.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
   `git.ts`'s `worktreeAt`, the repository's `git remote`, and the head history each answer a directory once per refresh, and every per-session step of a refresh, transcript scans and git probes alike, runs at most `PROBE_PARALLEL` (16, from `src/map-limit.ts`) at a time, so a first scan of hundreds of sessions starts no burst of git processes.
@@ -375,7 +375,7 @@ The page lives in `web/`.
   A refused edit is undone, and the page names why.
   A pull request's details, a Linear issue's details and its fields, the settings page's omp settings, and the source control section read through it; the settings editors' saves go through its `write`.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
-  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests and tickets also show.
+  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests, the tickets, and a session's header also show; its `iconOnly` form, the icon alone, is the copy-branch button of a pull request's row.
   `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
   `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft and the **New project** form: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
@@ -488,7 +488,7 @@ The page lives in `web/`.
   `pr-fields.tsx` holds the header's state and reviewers pickers and the **Summary**'s labels picker, and the `SavePullRequest` and `SendPullRequest` callbacks the tabs take; `pr-files-dialog.tsx` holds the dialog in which the sidebar's file list opens the explorer, whose `onPick` opens another file in place of changing the address.
   `pr-details/comments.tsx` is the **Comments** tab: the review threads, unresolved first and resolved folded, each with Resolve or Unresolve and a reply box, then the conversation and a box to comment, both boxes sending with Cmd+Enter through `isSubmitChord` from `web/components/form-dialog.tsx`.
   `pr-timeline.tsx` is the **Timeline**: commits, comments, reviews, and unresolved threads in one list by day, with the **New** line from the last visit it keeps in localStorage; it exports the message row, a comment's or review's body, and a thread's `path:line` link, which **Comments** draws too.
-  `pr-row.tsx` draws the sidebar row and the table row, and exports the DOM lookups of a row and its link that the board's keys use.
+  `pr-row.tsx` draws the sidebar row and the table row, each with the copy-branch button that shows on hover or focus, and exports the DOM lookups of a row and its link that the board's keys use.
   `pr-menu.tsx` holds `PullRequestMenu`, the `⋯` menu of a row and of the details' header: the quick actions, the state changes, and the links to GitHub and Graphite.
   `merge-popover.tsx` holds `MergePopover`, the confirmation before a merge that the header's merge button and a row's **Merge** badge open; it waits while the pull request is read.
   `web/use-drag-order.ts` drags the pull request list's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
