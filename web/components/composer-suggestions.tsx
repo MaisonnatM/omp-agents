@@ -80,10 +80,10 @@ function KeyBadge({ filled, children }: { filled: boolean; children: ReactNode }
 	);
 }
 
-/** Row geometry shared by the prompts and the hint under them. Text size mirrors the composer's text field: the rows read as prompt candidates, not metadata. */
-function rowClass(compactStep: boolean): string {
-	return cn("relative flex cursor-pointer items-center gap-2", compactStep ? "h-7 px-2 text-[13px]" : "h-8 px-2.5 text-[14px]", "transition-colors duration-80");
-}
+/** Row geometry shared by the prompts and the hint under them. */
+const ROW = "relative flex cursor-pointer items-center gap-2 transition-colors duration-80";
+/** Text size mirrors the composer's text field: the rows read as prompt candidates, not metadata. */
+const ROW_SIZE: Record<"default" | "compact", string> = { default: "h-8 px-2.5 text-[14px]", compact: "h-7 px-2 text-[13px]" };
 
 interface SuggestionRowProps {
 	text: string;
@@ -103,7 +103,7 @@ interface SuggestionRowProps {
  */
 function SuggestionRow({ text, index, active, marked, optionId, registerItem, onPick }: SuggestionRowProps) {
 	const EnterIcon = useIcon("corner-down-left");
-	const compactStep = useSize().variant === "compact";
+	const size = useSize().variant;
 	const ref = useRef<HTMLDivElement>(null);
 
 	useRegisterFluidHoverItem(registerItem, index, ref);
@@ -115,7 +115,7 @@ function SuggestionRow({ text, index, active, marked, optionId, registerItem, on
 			role="option"
 			aria-selected={marked}
 			onClick={event => onPick(modHeld(event))}
-			className={cn(rowClass(compactStep), active || marked ? "text-foreground" : "text-muted-foreground")}
+			className={cn(ROW, ROW_SIZE[size], active || marked ? "text-foreground" : "text-muted-foreground")}
 			style={{ fontVariationSettings: fontWeights.normal }}
 		>
 			<KeyBadge filled={marked}>{index + 1}</KeyBadge>
@@ -132,12 +132,12 @@ function SuggestionRow({ text, index, active, marked, optionId, registerItem, on
  * hint, not an option, and the hover's gap click would send the nearest row instead.
  */
 function SendAllHint({ onSend }: { onSend: () => void }) {
-	const compactStep = useSize().variant === "compact";
+	const size = useSize().variant;
 	return (
 		<div
 			aria-hidden="true"
 			onClick={onSend}
-			className={cn(rowClass(compactStep), "text-muted-foreground hover:text-foreground")}
+			className={cn(ROW, ROW_SIZE[size], "text-muted-foreground hover:text-foreground")}
 			style={{ fontVariationSettings: fontWeights.normal }}
 		>
 			<KeyBadge filled={false}>0</KeyBadge>
