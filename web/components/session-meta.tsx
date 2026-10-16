@@ -44,14 +44,14 @@ export function offerEnd(branch: string, end: () => void): void {
 }
 
 /**
- * A session header's controls before its own buttons: the branch it works on, which copies when clicked and then calls `onCopy`,
- * its Linear issues, and its pull requests.
+ * A session header's controls before its own buttons: the branch it works on, which copies when clicked and, for a linked
+ * worktree's branch, then calls `onCopy` to free that worktree; its Linear issues; and its pull requests.
  */
 export function SessionMeta({ facts, onCopy }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch">; onCopy?: (branch: string) => void }) {
 	const { branch } = facts;
 	return (
 		<>
-			{branch && <BranchName name={branch} onCopy={onCopy && (() => onCopy(branch))} className="max-w-48 font-mono text-xs text-muted-foreground" />}
+			{branch && <BranchName name={branch.name} onCopy={branch.linked && onCopy ? () => onCopy(branch.name) : undefined} className="max-w-48 font-mono text-xs text-muted-foreground" />}
 			<TicketMenu tickets={facts.tickets} />
 			<PullRequestButton pullRequests={facts.pullRequests} />
 		</>
