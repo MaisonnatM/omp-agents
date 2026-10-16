@@ -503,6 +503,8 @@ The default `agent/AGENTS.md` keeps worktree and force-push safety inline and li
 The profile's `templates/omp/maintainer/docs/git-workflow.md` detects Graphite with `git rev-parse --path-format=absolute --git-common-dir`, so the same procedure works from a checkout, a linked worktree, or a nested directory.
 The repository's agent guide links to the [coding standards](../CODING_STANDARDS.md), which every contributor follows, and to [agent smoke checks](agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
 [Getting started](getting-started.md) walks a new user through a first session and each integration's sign-in, and `docs/images/` holds the README's screenshot.
+`patches/omp-18.11.1-paid-cursor-fallback.patch` preserves the external OMP runtime's paid Cursor fallback implementation and regression tests against upstream `v18.11.1`.
+It is not loaded or applied by the dashboard; [omp modules](architecture.md#omp-modules) describes its base, application, and installation boundary.
 
 ## Desktop
 

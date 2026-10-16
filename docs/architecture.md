@@ -36,6 +36,19 @@ The server imports omp's own modules from the installed package, so it does not 
 `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 
+Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.11.1-paid-cursor-fallback.patch`](../patches/omp-18.11.1-paid-cursor-fallback.patch) with its regression tests.
+Its base is upstream tag `v18.11.1`, commit `7cc912940b107eb2d771b0d106c640a8eddc9edf`; do not apply it to another release without porting and verifying it.
+From a clean checkout of that release, check and apply the patch:
+
+```sh
+git apply --check /absolute/path/to/omp-agents/patches/omp-18.11.1-paid-cursor-fallback.patch
+git apply /absolute/path/to/omp-agents/patches/omp-18.11.1-paid-cursor-fallback.patch
+```
+
+Build and install both patched packages, `@oh-my-pi/pi-ai` and `@oh-my-pi/pi-coding-agent`, including the CLI bundle and SDK sources and declarations.
+The dashboard does not apply this patch at startup, and installing or upgrading stock OMP removes the runtime changes.
+The [routing policy](../templates/omp/agent/docs/model-routing.md) describes the opt-in `retry.paidFallback` setting and its billing limits.
+
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
 The main ones:
