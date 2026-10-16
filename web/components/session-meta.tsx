@@ -1,7 +1,8 @@
-/** The subagent header's crumb styles, the button of a session's pull requests, and the menu of its Linear issues. */
+/** The subagent header's crumb styles, and a session header's controls: its Linear issues, its pull requests, and its branch. */
 import { ChevronDown, GitPullRequest, Layers } from "lucide-react";
 import { Fragment, type MouseEvent, useEffect, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest } from "../../src/shared/github";
+import type { SessionFacts } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,6 +14,7 @@ import { ticketsStore, useRead } from "../reads";
 import { hashForPullRequests, hashForTickets } from "../routing";
 import { linearUrlOf } from "../tickets-model";
 import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
+import { BranchName } from "./git";
 import { StackRail } from "./pull-requests/pr-details/stack";
 import { OrgIcon } from "./org-icon";
 
@@ -21,11 +23,22 @@ export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
 const TicketsIcon = PAGE_ICON.tickets;
 const NO_TICKETS: never[] = [];
 
+/** A session header's controls before its own buttons: its Linear issues, its pull requests, and the branch it works on, which copies when clicked. */
+export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch"> }) {
+	return (
+		<>
+			<TicketMenu tickets={facts.tickets} />
+			<PullRequestButton pullRequests={facts.pullRequests} />
+			{facts.branch && <BranchName name={facts.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
+		</>
+	);
+}
+
 /**
  * The PRs a session submitted or worked on, behind one button whose popover lists them, each opening in its details on the Pull requests page, on GitHub,
  * or on Graphite. When two or more of them stack, the button says so and the popover shows the stack on its rail, the session's other PRs below it.
  */
-export function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
+function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	const [open, setOpen] = useState(false);
 	const [first] = pullRequests;
 	const query = first && pullRequests.length > 1 ? new URLSearchParams({ owner: first.owner, repo: first.repo, number: String(first.number) }) : null;
@@ -108,7 +121,7 @@ function ExternalLinks({ pr }: { pr: PullRequest }) {
  * The Linear issues a session worked on, behind one button: each opens on Linear, when the assigned issues name its
  * workspace, or on the Tickets page.
  */
-export function TicketMenu({ tickets }: { tickets: string[] }) {
+function TicketMenu({ tickets }: { tickets: string[] }) {
 	const [open, setOpen] = useState(false);
 	const listed = ticketsStore.use().read?.data.tickets ?? NO_TICKETS;
 	const [first] = tickets;

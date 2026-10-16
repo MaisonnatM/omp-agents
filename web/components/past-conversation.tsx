@@ -7,9 +7,8 @@ import { cn } from "@/lib/utils";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { pastLabel, SOURCE_LABELS } from "../labels";
-import { BranchName } from "./git";
 import { Header } from "./page-header";
-import { PullRequestButton, TicketMenu } from "./session-meta";
+import { SessionMeta } from "./session-meta";
 import { Trajectory } from "./trajectory";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
@@ -41,9 +40,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 				<Header title={title} trailing={foreign ? undefined : titleAction} status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"} alert={false}>
 					{session && (
 						<>
-							<TicketMenu tickets={session.tickets} />
-							<PullRequestButton pullRequests={session.pullRequests} />
-							{session.branch && <BranchName name={session.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
+							<SessionMeta facts={session} />
 							{!foreign && (
 								<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 									<Button

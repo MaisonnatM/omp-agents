@@ -7,9 +7,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { BranchName } from "./git";
 import { Header } from "./page-header";
-import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestButton, TicketMenu } from "./session-meta";
+import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionMeta } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -73,9 +72,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 		);
 	return (
 		<Header title={title} trailing={titleAction} status={status} alert={!ending && phase.phase === "ended"}>
-			{subject.kind === "session" && shown && <TicketMenu tickets={shown.tickets} />}
-			{subject.kind === "session" && shown && <PullRequestButton pullRequests={shown.pullRequests} />}
-			{subject.kind === "session" && shown?.branch && <BranchName name={shown.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
+			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={
