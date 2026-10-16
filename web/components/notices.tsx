@@ -1,6 +1,7 @@
 /** The sidebar's notices bell: pull request, Slack, provider, calendar, project, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
 import { Bell, CalendarClock, CheckCheck, CircleCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageCircleQuestion, MessageSquare, Sparkles, Users, Wallet, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
+import type { PullRequestSummary } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
 import type { Notice } from "../../src/shared/notices";
 import type { ClientMsg } from "../../src/shared/protocol";
@@ -8,15 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { MergeMethod } from "../../src/shared/source-control";
 import { type NoticeAction as Action, type NoticeFace, type NoticeSource, presentNotice } from "../notice-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { providerLabel, providerOrg } from "../labels";
+import { writePullRequest } from "../reads";
 import { hashForPullRequests } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { useAction } from "../use-action";
 import { BrandMark, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
+import { MergePopover, useMergeTarget } from "./pull-requests/merge-popover";
 
 type Send = (msg: ClientMsg) => void;
 
@@ -165,7 +170,27 @@ function Avatar({ person, children }: { person: { name: string; avatarUrl: strin
 	);
 }
 
-/** A notice's button: **Update**, the quick action that makes a pull request's move, or **Merge on GitHub**. */
+/** **Merge**: merges after the same confirmation as a pull request's details, and marks the notice read once GitHub took it. */
+function NoticeMerge({ pr, onMerged }: { pr: PullRequestSummary; onMerged: () => void }) {
+	const { connected, pullRequestsScope } = useDashboardStatus();
+	const [open, setOpen] = useState(false);
+	const target = useMergeTarget(pr, open);
+	const merge = useAction(async (method: MergeMethod, head: string) => {
+		await writePullRequest(pullRequestsScope, pr, { field: "merge", method, head });
+		onMerged();
+	}, "GitHub refused the merge");
+	return (
+		<MergePopover pr={pr} target={target.data} error={target.error} onMerge={merge.run} open={open} onOpenChange={setOpen} align="start">
+			{() => (
+				<Button variant="secondary" size="compact" leadingIcon={GitMerge} loading={merge.pending} disabled={!connected}>
+					Merge
+				</Button>
+			)}
+		</MergePopover>
+	);
+}
+
+/** A notice's button: **Update**, the quick action that makes a pull request's move, or **Merge**. */
 function NoticeAction({ id, action, send, onDone }: { id: string; action: Action; send: Send; onDone: () => void }) {
 	const { start } = useDashboardActions();
 	const { connected, starts } = useDashboardStatus();
@@ -181,19 +206,13 @@ function NoticeAction({ id, action, send, onDone }: { id: string; action: Action
 			);
 		case "merge":
 			return (
-				<Button variant="secondary" size="compact" asChild>
-					<a
-						href={action.url}
-						target="_blank"
-						rel="noreferrer"
-						onClick={() => {
-							read();
-							onDone();
-						}}
-					>
-						Merge on GitHub
-					</a>
-				</Button>
+				<NoticeMerge
+					pr={action.pr}
+					onMerged={() => {
+						read();
+						onDone();
+					}}
+				/>
 			);
 		case "quick": {
 			const { pr, cwd } = action;

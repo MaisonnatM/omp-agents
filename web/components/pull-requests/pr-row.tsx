@@ -1,7 +1,7 @@
 /** A pull request's row in the lists, with its move badge, checks icon, review state, diff size, and `⋯` menu. */
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
-import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestDetail, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
+import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import type { MoveId } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
@@ -9,7 +9,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace } from "../../pull-requests-model";
-import { useRead } from "../../reads";
 import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
@@ -21,7 +20,7 @@ import { BranchLabel, BranchName, releaseBranch } from "../git";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
-import { MergePopover } from "./merge-popover";
+import { MergePopover, useMergeTarget } from "./merge-popover";
 import { PullRequestMenu } from "./pr-menu";
 
 /** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
@@ -88,7 +87,7 @@ const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): A
 /** A **Merge** badge: a button that merges after the same confirmation as the details, reading what the merge needs while it is open. */
 function MergeBadge({ pr, change }: { pr: PullRequestSummary; change: Action<[ListChange]> }) {
 	const [open, setOpen] = useState(false);
-	const target = useRead<PullRequestDetail>(open ? `/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}` : null);
+	const target = useMergeTarget(pr, open);
 	const label = `Merge ${pullRequestName(pr)} on GitHub`;
 	return (
 		<MergePopover pr={pr} target={target.data} error={target.error} onMerge={(method, head) => change.run({ field: "merge", method, head })} open={open} onOpenChange={setOpen} tooltip={label} align="start">
