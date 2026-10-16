@@ -1,4 +1,4 @@
-/** The subagent header's crumb styles, and a session header's controls: its Linear issues, its pull requests, and its branch. */
+/** The subagent header's crumb styles, and a session header's controls: its branch, its Linear issues, and its pull requests. */
 import { ChevronDown, GitPullRequest, Layers } from "lucide-react";
 import { Fragment, type MouseEvent, useEffect, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest } from "../../src/shared/github";
@@ -23,13 +23,13 @@ export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
 const TicketsIcon = PAGE_ICON.tickets;
 const NO_TICKETS: never[] = [];
 
-/** A session header's controls before its own buttons: its Linear issues, its pull requests, and the branch it works on, which copies when clicked. */
+/** A session header's controls before its own buttons: the branch it works on, which copies when clicked, its Linear issues, and its pull requests. */
 export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch"> }) {
 	return (
 		<>
+			{facts.branch && <BranchName name={facts.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
 			<TicketMenu tickets={facts.tickets} />
 			<PullRequestButton pullRequests={facts.pullRequests} />
-			{facts.branch && <BranchName name={facts.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
 		</>
 	);
 }

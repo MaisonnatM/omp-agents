@@ -327,7 +327,7 @@ An action that fails shows its error, and its control becomes available again.
 - A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
-  Left of **End session**, or of **Resume** for a past session, the header shows the branch checked out in the linked worktree the session works in, such as `me/fix-login`.
+  First among the controls on the right, before the ticket and pull request buttons and **End session**, or **Resume** for a past session, the header shows the branch checked out in the linked worktree the session works in, such as `me/fix-login`.
   A session in a repository's main checkout, on a detached HEAD, or outside git shows no branch.
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
