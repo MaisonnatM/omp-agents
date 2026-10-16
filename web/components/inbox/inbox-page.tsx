@@ -9,6 +9,7 @@ import { type MailDocument, useMailDraft } from "../../mail-draft";
 import { gmailStore, mailThreadStore, useGmailInbox } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
+import { useOpenLatest } from "../../use-open-latest";
 import { DisconnectedPage } from "../integrations/disconnected-page";
 import { focusRow, PolledPageFrame, PolledContent, stepRows, useReturnFocus } from "../list-page";
 import { ListSplit } from "../list-split";
@@ -105,6 +106,7 @@ export function InboxPage({ target }: { target: string | null }) {
 	const address = read?.data.address ?? null;
 	const openUrl = address !== null && target !== null ? threadUrl(address, target) : null;
 	useReturnFocus(target, id => id, id => document.getElementById(rowId(id))?.querySelector<HTMLElement>("a"), read);
+	useOpenLatest(hashForInbox, target, read && (threads[0]?.id ?? null));
 
 	// Read the next and previous conversations while one is open, so ↓/↑ open them at once.
 	const previous = at > 0 ? threads[at - 1] : undefined;

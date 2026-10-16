@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { listedViews, type ProjectSources, searchSessions, type SidebarSessions, sidebarSessions, waitingCount } from "./sessions";
+import { latestSession, listedViews, type ProjectSources, searchSessions, type SidebarSessions, sidebarSessions, waitingCount } from "./sessions";
 import type { PinChange } from "../src/shared/pins";
 import type { View } from "../src/shared/sessions";
 import type { WorkspaceScope } from "./use-workspace-scope";
@@ -19,6 +19,8 @@ export interface SessionLists {
 	listed: View[];
 	/** Live sessions in the selected workspace that wait on your move. */
 	waiting: number;
+	/** The session the Sessions tab opens when no pane shows one, from the selected workspace's rows before the search; `null` for none. */
+	latest: View | null;
 }
 
 /** The sidebar's session lists for the selected workspace, its search, and the server's pins, which `changePins` changes; `sources` lists the projects' sessions wherever they run. */
@@ -40,5 +42,6 @@ export function useSessionLists(
 	const lists = useMemo(() => searchSessions(workspaceLists, query), [workspaceLists, query]);
 	const listed = useMemo(() => listedViews(lists), [lists]);
 	const waiting = useMemo(() => waitingCount(workspaceLists), [workspaceLists]);
-	return useMemo(() => ({ pinned, togglePin, query, setQuery, lists, listed, waiting }), [pinned, togglePin, query, lists, listed, waiting]);
+	const latest = useMemo(() => latestSession(workspaceLists), [workspaceLists]);
+	return useMemo(() => ({ pinned, togglePin, query, setQuery, lists, listed, waiting, latest }), [pinned, togglePin, query, lists, listed, waiting, latest]);
 }
