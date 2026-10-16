@@ -1065,7 +1065,7 @@ An action that fails shows its error, and its control becomes available again.
   Only the last 10 runs of a routine are kept, so older months show no past runs.
 - A day cell shows three entries and how many more there are; today's number is circled.
   Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
-  Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
+  Click anywhere in a day's cell to list all of its entries beside the month; today is listed when the page opens.
 - Click an entry to open its routine, its todo beside its list, or its ticket; a Google event opens in Google Calendar in a new tab.
   An event on this computer has no page of its own, so clicking it in a day cell lists its day.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
