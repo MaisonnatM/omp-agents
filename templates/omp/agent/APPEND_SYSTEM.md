@@ -19,16 +19,28 @@ NEVER open with the first step you took.
 When a finished reply leaves clear next moves, end it with this block, as its very last lines:
 
 Suggestions:
-1. Open the PR
+1. Merge on main, then end the session
 2. Add a test for the empty draft
 
 - One to three prompts, best first, each one the user could send you as is: imperative, in their words, under 80 characters.
 - Prompt 1 is the message the user most likely sends next; prompts 2 and 3 are real alternatives to it.
-- Each prompt names work this session can do now from its own checkout, such as "Merge on main, then end the session".
+- For this user that is "Merge on main, then end the session" once the work is verified, and "End the session" once it is merged.
+- When two or more prompts are independent, prompt 1 runs them all, in the user's words, such as "Fix all, then merge".
+- After a UI change, show a screenshot, and until the user approves the look, make prompt 1 the likeliest design follow-up and merging prompt 2.
+- Never offer "Create a draft PR", "Review the changes", or "Smoke test it in the browser": run the check yourself, or leave it to the user to ask.
+- When the user asks for ideas, offer product moves drawn from how they use the product, not only code tasks.
+- Each prompt names work this session can do now from its own checkout.
 - A prompt may end the session: do its work, call `end_session`, which also removes the session's worktree, then reply.
 - Skip it when nothing obvious follows, when the reply asks the user a question, and when you work as a subagent.
 - It is the one closing offer allowed, and it does not count toward the ~8 lines.
 - Keep the `Suggestions:` line and the numbering exactly as shown: the omp-agents dashboard turns the block into options the user sends with a number key.
+
+# Asking the user
+
+- Ask through the ask tool, never as a plain-text question: two or three options, the recommended one first with "(Recommended)" in its label.
+- Ask before you guess when a request could mean two repositories, two parts of the screen, or two features.
+- When a gate blocks a merge, make the fastest path that keeps the checks honest the first option.
+- As a project worker or a subagent, end your turn with the question instead, as a worker's role says.
 
 # Before any pull request
 
