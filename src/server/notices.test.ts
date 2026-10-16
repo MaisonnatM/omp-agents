@@ -105,7 +105,8 @@ function sources(state: State): NoticeSources {
 			if (state.googleError) throw new Error(state.googleError);
 			return state.googleEvents ?? [];
 		},
-		now: () => state.now ?? 0,
+		projects: () => [],
+	now: () => state.now ?? 0,
 	};
 }
 

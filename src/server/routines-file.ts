@@ -40,6 +40,7 @@ function parseRun(value: unknown): RoutineRun | null {
 		let parsed: RoutineOutcome | null = null;
 		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = { kind: "pending", queued: outcome.queued };
 		if (outcome.kind === "session" && typeof outcome.instanceId === "string" && typeof outcome.sessionId === "string") parsed = { kind: "session", instanceId: outcome.instanceId, sessionId: outcome.sessionId };
+		if (outcome.kind === "project" && typeof outcome.projectId === "string") parsed = { kind: "project", projectId: outcome.projectId };
 		if (outcome.kind === "command") {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
@@ -115,6 +116,11 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 	/** Records the command of the run at `at` as it launches and again as it ends. */
 	command(id: string, at: number, command: CommandRun): void {
 		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "command", run: command } }));
+	}
+
+	/** The run at `at` sent its prompt to project `projectId`. */
+	notified(id: string, at: number, projectId: string): void {
+		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "project", projectId } }));
 	}
 
 	/** Records why the run at `at` could not start something; the same error twice in a row records once, so a retry each tick does not pile up. */

@@ -320,7 +320,7 @@ export function parseTools(value: unknown): Parsed<string[] | null> {
 }
 
 /** `{ ok: null }` for no branch. */
-function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
+export function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
 	if (value === null || value === undefined) return { ok: null };
 	if (!isObject(value) || !isNonEmpty(value.name)) return null;
 	if (value.kind === "existing") return { ok: { kind: "existing", name: value.name } };

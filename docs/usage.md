@@ -1183,10 +1183,14 @@ An action that fails shows its error, and its control becomes available again.
   **New project** on that page, the **+** of the sidebar's projects group, or `#projects/new` opens its form: a name, the workspace the coordinator starts in, its model and effort, as on a new session, and its first message, which says what the project is for.
   **Create** starts the coordinator on that message and opens its pane; a name left empty becomes **New project**.
   The project exists once its coordinator runs, so a start that fails leaves none behind.
-- The coordinator has four tools that the dashboard serves it, and only it has them.
+- The coordinator has six tools that the dashboard serves it, and only it has them.
   `start_worker` starts a worker: a new dashboard session on a prompt that stands alone, with a short title, in the project's workspace or a directory the coordinator names, absolute, `~/`, or relative to the workspace.
-  Workers are numbered `w1`, `w2`, and so on in the order their sessions start, and run on omp's default model.
-  `list_workers` lists the workers and their phases, `read_worker` reads one worker's whole last reply and the questions it waits on, and `message_worker` sends one a message as you would: a running worker gets it after its current turn, and a stopped one is resumed first.
+  It may also name a model as `provider/id`, an effort, a skill, a session preset, and a branch; a preset fills what it leaves out.
+  In a git checkout a worker gets a branch of its own from the checked-out one, `<project>/<title>-<id>`, unless the coordinator names one, says `none`, or picks a preset that works in the checkout itself.
+  Workers are numbered `w1`, `w2`, and so on in the order their sessions start.
+  A project runs at most 3 workers at once, working or asking, unless you change **At most** on its page, up to 20; the coordinator's other workers wait in a queue, listed on the page, and start in order as slots free up.
+  `list_workers` lists the workers, their phases, and the queue, `read_worker` reads one worker's whole last reply and the questions it waits on, and `message_worker` sends one a message as you would: a running worker gets it after its current turn, and a stopped one is resumed first.
+  `answer_worker` answers a question a worker asks through `ask`, a yes or no, one of its options, or text, and `end_worker` ends a worker that is done.
 - The **Sessions** tab lists each project as a collapsible group at the top, under the project's name: the coordinator first, with a **Coordinator** badge, then the workers in order, `w1` first.
   A worker's row reads as the title the coordinator gave it, beside its `w1`, `w2` badge, rather than the title omp generated for the session.
   A project's sessions leave the other groups, **Pinned** included, and the group lists them even in `/tmp`, which the sidebar otherwise hides.
@@ -1195,7 +1199,14 @@ An action that fails shows its error, and its control becomes available again.
 - `#projects/<id>` opens one project: its coordinator's status with **Open coordinator**, a table of its workers in order with each one's phase and last reply, the updates still waiting for the coordinator, and its notes files.
   A worker's phase is working, asking while it waits on a question, idle, interrupted when it stopped without **End session**, or ended.
   Click a notes file to open it in the file dialog.
-  **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, and its coordinator's tools refuse to start, list, read, or message workers.
+  **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, its coordinator's tools refuse to start, list, read, or message workers, and its updates wait.
+  **Archive and end its sessions** also ends the project's sessions that run.
+  **Unarchive** brings an archived project back and delivers what waited.
+- **Subscriptions** on a project's page says what the coordinator hears about on its own, each saved as it changes.
+  **Workers' pull requests**, on by default, reports checks that fail or pass again, new comments and reviews, a merge, and a close on the pull requests of the workers' branches.
+  **Linear issues assigned to me** reports issues assigned to you that are new or changed, filtered by a team, a label, and a project, each a name or key, empty for any.
+  The dashboard looks every 2 minutes, and the first look at each pull request or issue only records it.
+  **Ask me to review**, `every PR` by default, tells the coordinator how often to ask you to review, in your own words.
 - With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** lists the notes files, and **PRs** the pull requests its workers submitted or worked on, each once.
 - Workers report back on their own, so the coordinator never polls.
   Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
@@ -1203,13 +1214,19 @@ An action that fails shows its error, and its control becomes available again.
   When omp does not take that message, the updates keep waiting, and the coordinator's next change of state, such as its next turn ending, sends them again.
   A worker you prompt yourself reports the same way when its turn finishes.
   A worker is told to end each turn on a report that stands alone, since the coordinator reads only its last reply, and to end its turn with a question it needs answered rather than ask it through the `ask` tool.
-  A question a worker still asks through `ask` waits for you in the dashboard: the coordinator cannot answer it, and its update tells the coordinator to tell you.
+  A question a worker still asks through `ask` reaches the coordinator with its request id: it answers it with `answer_worker` when the notes or your preferences settle it, and tells you otherwise.
+  The update also says when the dashboard restarted and stopped workers; a coordinator that stopped with the dashboard resumes on its own.
+- The notices bell's **Projects** tab tells you when a worker asks and the coordinator is idle or stopped, when a worker stopped without **End session**, and when a project is done: all its workers idle or ended, nothing queued, and nothing waiting for the coordinator.
+- A routine can **Send to a project**: each run sends its prompt to the project's coordinator as an update from **Routine**, taking no session of its own.
 - A project's notes live in `$XDG_DATA_HOME/omp-agents/projects/<id>/`, `~/.local/share/omp-agents/projects/<id>/` by default, outside every repository, so every worktree the project works in shares them.
-  A new project starts with `README.md`, which holds the goal from the first message and links the others, `testing.md` for how to build, run, and test the work, `preferences.md` for how you want it done, and `research.md` for what agents found out, with sources.
+  A new project starts with `README.md`, which holds the goal from the first message and links the others, `testing.md` for how to build, run, and test the work, `preferences.md` for how you want it done, `research.md` for what agents found out, with sources, and `checklist.md`, the coordinator's plan.
+  The coordinator records there what you correct, and each worker ends by recording what it learned; what should outlive the project goes under `## Promoted` in `README.md`.
   Every session of the project is told to read `README.md` first and to record there what lasts.
   The coordinator may edit and write only these notes: its `edit` and `write` calls outside them, and calls whose files the extension cannot tell, are refused, and it is told to start a worker instead.
   Its `local://` and `artifact://` scratch files are allowed.
-  A subagent that runs in a project session's own session, such as an advisor, has its role and its limit; one with a session of its own, such as a `task` subagent, has neither.
+  Its `bash` calls that redirect or `tee` output to a file outside the notes, and git and `gt` commands that change the checkout or a branch, are refused.
+  That shell check is a reminder, not a wall: other commands, such as a script that writes files, still run.
+  A subagent has its project session's role and its limits, a `task` subagent included.
 - The role text and that limit come from the omp extension `~/.omp/agent/extensions/projects.ts`, which `bun run omp-template` installs.
   When it is not installed, the dashboard loads this repository's copy with `-e` for each project session, so a project works either way.
   The extension adds the session's role and the notes' place to every prompt, so they survive compaction.
@@ -1218,11 +1235,6 @@ An action that fails shows its error, and its control becomes available again.
   A `/move` or an edited prompt, which gives a session a new id, keeps it in its project, and a fork of a project's session belongs to no project.
 - The server keeps the projects and their waiting updates in `projects.json` beside its access token, so no update is lost while the coordinator is stopped or the dashboard restarts.
   Quitting the dashboard stops its sessions without telling any coordinator.
-- This first version has limits.
-  The coordinator cannot answer a worker's question; only you can, in the dashboard.
-  No tool ends a worker, so end one yourself with **End session**.
-  The coordinator's limit covers its `edit` and `write` calls, not its shell commands.
-  **Archive** cannot be undone, and an archived project's workers still report to its coordinator, which can no longer act on what they say.
 
 ## Settings
 

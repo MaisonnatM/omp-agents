@@ -188,6 +188,10 @@ describe("sidebarSessions", () => {
 			],
 			updates: [],
 			nextWorker: 3,
+			maxWorkers: 3,
+			queue: [],
+			watch: { pullRequests: true, linear: null },
+			reviewCadence: "every PR",
 		});
 		// The sidebar hides `/tmp`, so the worker there comes only from the unfiltered sources.
 		const all = { hosts: [host("w1s", "/tmp/job"), host("c", "~/a"), ...hosts], past: sessions };

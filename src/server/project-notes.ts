@@ -19,11 +19,17 @@ function seeds(name: string, goal: string): Record<string, string> {
 			"- [testing.md](testing.md): how to build, run, and test the work.",
 			"- [preferences.md](preferences.md): how the user wants the work done.",
 			"- [research.md](research.md): what agents found out, with sources.",
+			"- [checklist.md](checklist.md): the items of work that spans several pull requests, and where each stands.",
+			"",
+			"## Promoted",
+			"",
+			"Notes moved into the repository, as AGENTS.md lines or skills, so sessions outside the project have them too.",
 			"",
 		].join("\n"),
 		"testing.md": "# Testing\n\nHow to build, run, and test the work, as agents find out.\n",
 		"preferences.md": "# Preferences\n\nHow the user wants the work done, as they say it.\n",
 		"research.md": "# Research\n\nWhat agents found out, with sources.\n",
+		"checklist.md": "# Checklist\n\n| Item | Status | Worker | Pull request |\n| --- | --- | --- | --- |\n",
 	};
 }
 

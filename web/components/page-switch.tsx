@@ -198,6 +198,7 @@ export const PageSwitch = memo(function PageSwitch({
 					key={routinesTarget ?? ""}
 					routines={routines}
 					presets={presets}
+					projects={projects}
 					target={routinesTarget}
 					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.
 					hosts={hosts}

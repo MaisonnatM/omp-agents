@@ -5,26 +5,46 @@
  */
 import { ReducerFile } from "../fs";
 import { isObject, parseAll } from "../json";
-import { DEFAULT_PROJECT_NAME, type Project, type ProjectEdit, type ProjectUpdate, type Worker, type WorkerId } from "../shared/projects";
+import { parseBranchChoice, parseModel, parseSkill, parseThinking, parseTools } from "../shared/sessions";
+import {
+	DEFAULT_MAX_WORKERS,
+	DEFAULT_PROJECT_NAME,
+	DEFAULT_REVIEW_CADENCE,
+	DEFAULT_WATCH,
+	isMaxWorkers,
+	type Project,
+	type ProjectEdit,
+	type ProjectUpdate,
+	type QueuedWorker,
+	parseWatch,
+	reviewCadence,
+	type Worker,
+	type WorkerId,
+	type WorkerStart,
+} from "../shared/projects";
 
 /** A session's place in a project. */
 export type ProjectRole = { projectId: string; role: "coordinator" } | { projectId: string; role: "worker"; workerId: WorkerId };
 
-/** What a worker tells its coordinator, before it is saved as a {@link ProjectUpdate}. */
-export type ProjectNews = { kind: "finished" } | { kind: "asked"; requestId: string; question: string } | { kind: "stopped" };
+/** A {@link ProjectUpdate} before it gets its id and time. */
+export type UpdateBody = BodyOf<ProjectUpdate>;
+type BodyOf<U> = U extends unknown ? Omit<U, "id" | "at"> : never;
 
 /** The changes the project runner makes; the page makes only {@link ProjectEdit}s. */
 type RunnerChange =
 	/** A new project whose coordinator already runs as `coordinator`. */
 	| { op: "create"; id: string; name: string; cwd: string; at: string; coordinator: string }
-	/** A worker that already runs as `sessionId`, which takes the project's next worker id. */
-	| { op: "add-worker"; id: string; title: string; sessionId: string; cwd: string; at: string }
+	/** Queued worker `queuedId` runs as `sessionId`: it leaves the queue and takes the project's next worker id. */
+	| { op: "add-worker"; id: string; queuedId: string; title: string; sessionId: string; cwd: string; at: string }
 	/** Session `from` of any project now goes by `to`, after a `/move` or an edited prompt. */
 	| { op: "relink"; from: string; to: string }
 	| { op: "reply"; id: string; workerId: WorkerId; reply: { at: string; text: string } }
 	| { op: "update"; id: string; update: ProjectUpdate }
 	/** The updates `updateIds` reached the coordinator. */
-	| { op: "delivered"; id: string; updateIds: string[] };
+	| { op: "delivered"; id: string; updateIds: string[] }
+	| { op: "enqueue"; id: string; worker: QueuedWorker }
+	/** Queued worker `queuedId` failed to start. */
+	| { op: "dequeue"; id: string; queuedId: string };
 
 export type ProjectChange = ProjectEdit | RunnerChange;
 
@@ -45,7 +65,26 @@ export function applyProject(projects: Project[], change: ProjectChange): Projec
 		case "create": {
 			const { id, name, cwd, at, coordinator } = change;
 			if (projects.some(project => project.id === id)) return projects;
-			return [...projects, { id, name: projectName(name), cwd, createdAt: at, archived: false, coordinator: { sessionId: coordinator }, workers: [], updates: [], nextWorker: 1 }];
+			return [
+				...projects,
+				{ id, name: projectName(name), cwd, createdAt: at, archived: false, coordinator: { sessionId: coordinator }, workers: [], updates: [], nextWorker: 1, maxWorkers: DEFAULT_MAX_WORKERS, queue: [], watch: DEFAULT_WATCH, reviewCadence: DEFAULT_REVIEW_CADENCE },
+			];
+		}
+		case "max-workers": {
+			const { max } = change;
+			if (!isMaxWorkers(max)) return projects;
+			return editProject(projects, change.id, project => (project.maxWorkers === max ? project : { ...project, maxWorkers: max }));
+		}
+		case "enqueue": {
+			const { worker } = change;
+			return editProject(projects, change.id, project => (project.queue.some(queued => queued.id === worker.id) ? project : { ...project, queue: [...project.queue, worker] }));
+		}
+		case "dequeue": {
+			const { queuedId } = change;
+			return editProject(projects, change.id, project => {
+				const queue = project.queue.filter(queued => queued.id !== queuedId);
+				return queue.length === project.queue.length ? project : { ...project, queue };
+			});
 		}
 		case "rename": {
 			const name = projectName(change.name);
@@ -53,12 +92,28 @@ export function applyProject(projects: Project[], change: ProjectChange): Projec
 		}
 		case "archive":
 			return editProject(projects, change.id, project => (project.archived ? project : { ...project, archived: true }));
+		case "unarchive":
+			return editProject(projects, change.id, project => (project.archived ? { ...project, archived: false } : project));
+		case "watch": {
+			const { watch } = change;
+			const { pullRequests, linear } = watch;
+			return editProject(projects, change.id, project => {
+				const before = project.watch;
+				const sameLinear = before.linear === null || linear === null ? before.linear === linear : before.linear.team === linear.team && before.linear.label === linear.label && before.linear.project === linear.project;
+				return before.pullRequests === pullRequests && sameLinear ? project : { ...project, watch };
+			});
+		}
+		case "review-cadence": {
+			const cadence = reviewCadence(change.cadence);
+			return editProject(projects, change.id, project => (project.reviewCadence === cadence ? project : { ...project, reviewCadence: cadence }));
+		}
 		case "add-worker": {
-			const { title, sessionId, cwd, at } = change;
+			const { queuedId, title, sessionId, cwd, at } = change;
 			return editProject(projects, change.id, project => {
 				if (project.workers.some(worker => worker.sessionId === sessionId)) return project;
 				const worker: Worker = { id: `w${project.nextWorker}`, title, sessionId, cwd, startedAt: at, lastReply: null };
-				return { ...project, workers: [...project.workers, worker], nextWorker: project.nextWorker + 1 };
+				const queue = project.queue.filter(queued => queued.id !== queuedId);
+				return { ...project, workers: [...project.workers, worker], nextWorker: project.nextWorker + 1, queue };
 			});
 		}
 		case "relink": {
@@ -118,27 +173,53 @@ function parseWorker(value: unknown): Worker | null {
 function parseUpdate(value: unknown): ProjectUpdate | null {
 	if (!isObject(value)) return null;
 	const { id, workerId, at, kind } = value;
-	if (!isText(id) || !isText(workerId) || !isText(at)) return null;
+	if (!isText(id) || !isText(at)) return null;
 	switch (kind) {
 		case "finished":
 		case "stopped":
-			return { id, workerId, at, kind };
+			return isText(workerId) ? { id, workerId, at, kind } : null;
 		case "asked":
-			return isText(value.requestId) && isText(value.question) ? { id, workerId, at, kind, requestId: value.requestId, question: value.question } : null;
+			return isText(workerId) && isText(value.requestId) && isText(value.question) ? { id, workerId, at, kind, requestId: value.requestId, question: value.question } : null;
+		case "restarted":
+			return Array.isArray(value.workers) && value.workers.every(isText) ? { id, at, kind, workers: value.workers } : null;
+		case "event": {
+			const { source, title, text, url } = value;
+			return isText(source) && isText(title) && isText(text) && (url === null || isText(url)) ? { id, at, kind, source, title, text, url } : null;
+		}
 		default:
 			return null;
 	}
 }
 
+function parseWorkerStart(value: unknown): WorkerStart | null {
+	if (!isObject(value) || !isText(value.cwd) || !isText(value.prompt)) return null;
+	const branch = parseBranchChoice(value.branch);
+	const model = value.model === null ? { ok: null } : parseModel(value.model);
+	const thinking = parseThinking(value.thinking);
+	const skill = parseSkill(value.skill);
+	const tools = parseTools(value.tools);
+	if (!branch || !model || !thinking || !skill || !tools) return null;
+	return { cwd: value.cwd, prompt: value.prompt, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, tools: tools.ok };
+}
+
+function parseQueued(value: unknown): QueuedWorker | null {
+	if (!isObject(value) || !isText(value.id) || !isText(value.title) || !isText(value.at)) return null;
+	const start = parseWorkerStart(value.start);
+	return start && { id: value.id, title: value.title, at: value.at, start };
+}
+
 function parseProject(value: unknown): Project | null {
 	if (!isObject(value)) return null;
-	const { id, name, cwd, createdAt, archived, coordinator, nextWorker } = value;
+	const { id, name, cwd, createdAt, archived, coordinator, nextWorker, maxWorkers = DEFAULT_MAX_WORKERS, reviewCadence: cadence = DEFAULT_REVIEW_CADENCE } = value;
 	if (!isText(id) || !isText(name) || !isText(cwd) || !isText(createdAt) || typeof archived !== "boolean") return null;
 	if (!isObject(coordinator) || !isText(coordinator.sessionId) || typeof nextWorker !== "number" || !Number.isSafeInteger(nextWorker)) return null;
+	const watch = value.watch === undefined ? DEFAULT_WATCH : parseWatch(value.watch);
+	if (!isMaxWorkers(maxWorkers) || !watch || !isText(cadence)) return null;
 	const workers = parseAll(value.workers, parseWorker);
 	const updates = parseAll(value.updates, parseUpdate);
-	if (!workers || !updates) return null;
-	return { id, name, cwd, createdAt, archived, coordinator: { sessionId: coordinator.sessionId }, workers, updates, nextWorker };
+	const queue = value.queue === undefined ? [] : parseAll(value.queue, parseQueued);
+	if (!workers || !updates || !queue) return null;
+	return { id, name, cwd, createdAt, archived, coordinator: { sessionId: coordinator.sessionId }, workers, updates, nextWorker, maxWorkers, queue, watch, reviewCadence: reviewCadence(cadence) };
 }
 
 export function parseProjects(value: unknown): Project[] | null {
