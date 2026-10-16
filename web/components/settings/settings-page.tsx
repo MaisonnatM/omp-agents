@@ -162,7 +162,8 @@ export function SettingsPage({
 			) : (
 				<Header title={label} />
 			)}
-			<div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+			{/* Relative, so an absolute child such as a table's `sr-only` caption stays in this scroll and never makes the document scroll. */}
+			<div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">{body}</div>
 			</div>
 		</div>
