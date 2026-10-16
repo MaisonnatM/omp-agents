@@ -17,6 +17,8 @@ let tool;
 let confirmations = 0;
 const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
 extension({
+	// Importing omp's exports takes about a second, so only a test that reads them asks for them.
+	pi: input.omp ? await import(process.argv[2]) : undefined,
 	zod: z,
 	on(name, handler) {
 		if (name === "tool_call") gate = handler;
@@ -38,7 +40,7 @@ if (input.command) {
 	const result = await gate(call, { cwd: process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
 	console.log(JSON.stringify({ result: result ?? null }));
 } else if (input.agentStart) {
-	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
+	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false });
@@ -49,7 +51,7 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "worktree-guard" | "projects", input: object, env: Record<string, string> = {}): {
+function exercise(name: "ship" | "todos" | "worktree-guard" | "projects" | "google-accounts", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
@@ -203,5 +205,37 @@ describe("projects", () => {
 		expect(edit({ input: `[${join(notes, "notes.md")}#1A2B]\nPUT 1.=1:\n+x\n[${join(root, "repo", "a.ts")}#3C4D]\nPUT 1.=1:\n+y` })?.block).toBe(true);
 		expect(edit({ input: "*** Begin Patch\n*** Update File: src/a.ts" })?.reason).toContain("names no file");
 		expect(exercise("projects", { edit: { input: "anything" }, sessionId: "s-w2" }, env).result).toBeNull();
+	});
+});
+
+describe("google accounts", () => {
+	const root = mkdtempSync(join(tmpdir(), "google-accounts-extension-"));
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+	const env = { XDG_CONFIG_HOME: join(root, "config"), PI_CODING_AGENT_DIR: join(root, "agent") };
+	const work = join(root, "work");
+	mkdirSync(join(root, "config", "omp-agents"), { recursive: true });
+	mkdirSync(join(root, "agent"));
+	mkdirSync(join(work, "app"), { recursive: true });
+	writeFileSync(
+		join(root, "config", "omp-agents", "google-accounts.json"),
+		JSON.stringify({ addresses: { gmail: "ana@example.com", "gmail-2": "ana@work.example" }, links: { "ana@work.example": [work] } }),
+	);
+	const servers = (names: string[]) =>
+		writeFileSync(join(root, "agent", "mcp.json"), JSON.stringify({ mcpServers: Object.fromEntries(names.map(name => [name, { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1" }])) }));
+
+	test("a session in a linked workspace hears each account of omp's mcp.json and the one linked to it; one account tells nothing", () => {
+		servers(["gmail", "gmail-2"]);
+		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(work, "app") }, env).prompt).toEqual([
+			"base",
+			[
+				"omp is signed in to several Google accounts, one MCP server each, and each server's tools start with its prefix.",
+				"Gmail:",
+				"- gmail: ana@example.com, tools `mcp__gmail_`",
+				"- gmail-2: ana@work.example, tools `mcp__gmail_2_`",
+				`The user linked this workspace, ${work}, to ana@work.example: use that account for this workspace's mail and calendar unless the user names another account.`,
+			].join("\n"),
+		]);
+		servers(["gmail"]);
+		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(work, "app") }, env).prompt).toBeNull();
 	});
 });
