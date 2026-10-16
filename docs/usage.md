@@ -888,13 +888,15 @@ An action that fails shows its error, and its control becomes available again.
   A new OAuth client ID or secret removes every added account and signs out the remaining one, since Google ties sign-ins to the client.
 - Each Google account's workspace picker links its address to workspaces, which covers that address's Gmail and Google Calendar accounts.
   While the sidebar picks a workspace, the Inbox, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with **All workspaces** they show every account.
+  With the starter kit's `extensions/google-accounts.ts` installed (`bun run omp-template`), an omp session whose service has two or more accounts is told at each prompt each account's address and tool prefix, and, when its workspace has linked addresses, to use those for its mail and calendar unless you name another account.
+  A session in a linked worktree counts as in its repository's main checkout when its own directory is in no linked workspace; every account's tools stay available to it.
 - omp's own `/mcp reauth` or `/mcp unauth` on an added account writes it back under its URL and can merge two accounts into one; reconnect it from this page instead.
 - **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   Slack sends the browser to the HTTPS redirect saved for the app, and omp listens for HTTP on the saved callback port.
   Google Calendar and Gmail send the browser back to `localhost` on the saved callback port, 3119 unless you change it.
   While it waits, the row says so, links to the sign-in page again, and hides its other buttons.
-- A connected row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
+- A connected Linear or Slack row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
   **Sign out** asks first, then removes the sign-ins omp manages for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
   When the sign-out fails, the question stays with the reason, to try again or cancel.
 - Slack shows **Not set up** and **Set up** until its app settings are saved.
