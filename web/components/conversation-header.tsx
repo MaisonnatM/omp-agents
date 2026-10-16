@@ -32,9 +32,9 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's title, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
- * under a session's title, the branch of the linked worktree it works in, which copies when clicked; the connection status; a
- * session's Linear issues and pull requests, its directory in Cursor, and End session, which shows it is ending until the server
- * answers, though the session may leave the roster before then.
+ * the connection status; a session's Linear issues, pull requests, and the branch of the linked worktree it works in, which copies
+ * when clicked; its directory in Cursor; and End session, which shows it is ending until the server answers, though the session
+ * may leave the roster before then.
  */
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
@@ -72,15 +72,10 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			(shown ? hostLabel(shown) : view.instanceId)
 		);
 	return (
-		<Header
-			title={title}
-			meta={subject.kind === "session" && shown?.branch ? <BranchName name={shown.branch} className="max-w-full font-mono" /> : undefined}
-			trailing={titleAction}
-			status={status}
-			alert={!ending && phase.phase === "ended"}
-		>
+		<Header title={title} trailing={titleAction} status={status} alert={!ending && phase.phase === "ended"}>
 			{subject.kind === "session" && shown && <TicketMenu tickets={shown.tickets} />}
 			{subject.kind === "session" && shown && <PullRequestButton pullRequests={shown.pullRequests} />}
+			{subject.kind === "session" && shown?.branch && <BranchName name={shown.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={

@@ -38,17 +38,12 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
-				<Header
-					title={title}
-					meta={session?.branch ? <BranchName name={session.branch} className="max-w-full font-mono" /> : undefined}
-					trailing={foreign ? undefined : titleAction}
-					status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"}
-					alert={false}
-				>
+				<Header title={title} trailing={foreign ? undefined : titleAction} status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"} alert={false}>
 					{session && (
 						<>
 							<TicketMenu tickets={session.tickets} />
 							<PullRequestButton pullRequests={session.pullRequests} />
+							{session.branch && <BranchName name={session.branch} className="max-w-48 font-mono text-xs text-muted-foreground" />}
 							{!foreign && (
 								<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 									<Button
