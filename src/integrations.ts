@@ -85,6 +85,12 @@ const ACCOUNT_ID_PREFIX = "mcp_oauth_omp_agents_";
 /** How each service of many accounts learns which address an account signs in as. */
 const ADDRESS_OF: Record<AccountsService, (fetch: SignedFetch) => Promise<string>> = { gmail: gmailAddress, "google-calendar": calendarAddress };
 
+/** Asks Google which address `server`'s sign-in to service `id` reads as. */
+const addressOf =
+	(id: AccountsService) =>
+	(server: McpServer): Promise<string> =>
+		ADDRESS_OF[id](signedFetch(async () => mcpBearer(server)));
+
 /**
  * The server name `name` as omp mints it into its tool names, `mcp__<this>_<tool>`.
  * Copied from omp's `sanitizeMCPToolNamePart` (src/mcp/tool-bridge.ts) and from the starter kit's
@@ -161,9 +167,9 @@ export function accountClients<C>(id: AccountsService, make: (fetch: SignedFetch
 	};
 }
 
-/** The address `server`'s sign-in reads as, from Google, kept in `store`. */
-async function learnAddress(store: GoogleAccountsStore, id: AccountsService, server: McpServer): Promise<string> {
-	const address = await ADDRESS_OF[id](signedFetch(async () => mcpBearer(server)));
+/** The address `server`'s sign-in reads as, as `addressOf` learns it, kept in `store`. */
+async function learnAddress(store: GoogleAccountsStore, server: McpServer, addressOf: (server: McpServer) => Promise<string>): Promise<string> {
+	const address = await addressOf(server);
 	store.apply({ kind: "learn", account: server.name, address });
 	return address;
 }
@@ -194,7 +200,7 @@ async function loadAccounts(store: GoogleAccountsStore, id: AccountsService, fre
 			const signedIn = held.has(server.credentialId);
 			const read = () => remoteStatusOf(server, { signedIn, signInRequired: true }, fresh);
 			const status = signInTargets[id] === server.name ? await signIns[id].hold(read) : await read();
-			const address = store.value.addresses.get(server.name) ?? (signedIn ? await learnAddress(store, id, server).catch(() => null) : null);
+			const address = store.value.addresses.get(server.name) ?? (signedIn ? await learnAddress(store, server, addressOf(id)).catch(() => null) : null);
 			return { name: server.name, address, connection: { ...status, server: refOf(server) }, workspaces: [...((address && store.value.links.get(address)) || [])] };
 		}),
 	);
@@ -259,32 +265,46 @@ async function signInAccount(store: GoogleAccountsStore, id: AccountsService, ac
 		const server = servers.find(candidate => candidate.name === account);
 		if (!server) throw new Error(`${service.label} has no account "${account}".`);
 		await signInMcp(targetOf(server), options);
-		await learnAddress(store, id, server).catch(() => null);
+		await learnAddress(store, server, addressOf(id)).catch(() => null);
 		return;
 	}
 	const [first] = servers;
 	if (!first) throw new Error(SETUP_ERROR["google-oauth"]);
 	if (servers.length === 1 && !(await mcpSignedIn(first))) {
 		await signInMcp(targetOf(first), { ...options, prompt: ADD_PROMPT });
-		await learnAddress(store, id, first).catch(() => null);
+		await learnAddress(store, first, addressOf(id)).catch(() => null);
 		return;
 	}
 	const name = await freeName(service.serverName);
 	const credentialId = `${ACCOUNT_ID_PREFIX}${randomBytes(8).toString("hex")}`;
 	const config: McpServerConfig = { type: "http", url: service.url, oauth: first.config.oauth, auth: { type: "oauth", credentialId } };
 	await signInMcp({ url: service.url, credentialId, oauth: config.oauth }, { ...options, prompt: ADD_PROMPT });
-	const added: McpServer = { name, url: service.url, credentialId, config };
+	await keepAddedAccount(store, id, servers, { name, url: service.url, credentialId, config }, addressOf(id));
+}
+
+/**
+ * The step after a grant for a new account of `id` is stored under `added`'s credential id: writes `added` to omp's
+ * config and keeps its address, as `addressOf` learns it. An address that another account of `servers` already signs
+ * in as is refused, and the grant removed, so a refused or failed add leaves neither a server nor a sign-in.
+ */
+export async function keepAddedAccount(
+	store: GoogleAccountsStore,
+	id: AccountsService,
+	servers: readonly McpServer[],
+	added: McpServer,
+	addressOf: (server: McpServer) => Promise<string>,
+): Promise<void> {
 	let address: string;
 	try {
-		const known = await Promise.all(servers.map(server => store.value.addresses.get(server.name) ?? learnAddress(store, id, server).catch(() => null)));
-		address = await ADDRESS_OF[id](signedFetch(async () => mcpBearer(added)));
-		if (known.some(other => other?.toLowerCase() === address.toLowerCase())) throw new Error(`${address} is already connected to ${service.label}.`);
+		const known = await Promise.all(servers.map(server => store.value.addresses.get(server.name) ?? learnAddress(store, server, addressOf).catch(() => null)));
+		address = await addressOf(added);
+		if (known.some(other => other?.toLowerCase() === address.toLowerCase())) throw new Error(`${address} is already connected to ${MCP_SERVICES[id].label}.`);
 	} catch (err) {
 		await signOutMcp(added);
 		throw err;
 	}
-	await addMcpServer(name, config);
-	store.apply({ kind: "learn", account: name, address });
+	await addMcpServer(added.name, added.config);
+	store.apply({ kind: "learn", account: added.name, address });
 }
 
 /**
