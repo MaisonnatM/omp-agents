@@ -14,11 +14,11 @@ const integrations: IntegrationsAnswer = {
 		slack: {
 			id: "slack",
 			connection: { kind: "failing", server, error: "timeout", status: null },
-			signIn: { phase: "waiting", url: "https://slack.com/oauth" },
+			signIn: { phase: "waiting", url: "https://slack.com/oauth", account: null },
 			setup: { clientId: "1.2", hasClientSecret: true, redirectUri: "https://example.com/callback", callbackPort: 3120, scope: "chat:write", configured: true },
 		},
-		"google-calendar": { id: "google-calendar", connection: { kind: "absent" }, signIn: { phase: "failed", error: "denied" }, setup: googleSetup },
-		gmail: { id: "gmail", connection: { kind: "signed-out", server }, signIn: null, setup: googleSetup },
+		"google-calendar": { id: "google-calendar", accounts: [], signIn: { phase: "failed", error: "denied", account: null }, setup: googleSetup },
+		gmail: { id: "gmail", accounts: [{ name: "gmail-2", address: "me@example.com", connection: { kind: "signed-out", server }, workspaces: ["/repo"] }], signIn: null, setup: googleSetup },
 	},
 };
 
@@ -36,20 +36,20 @@ const analytics: Analytics = {
 	sessions: [{ sessionId: "s", title: null, listed: true, cwd: "/tmp", usage, subagentTokens: 0, models: ["anthropic/claude"], lastAt: 1 }],
 };
 
-const google: GoogleStatus = { calendars: [{ id: "me@example.com", name: "Me", color: "#123456", group: "mine", writable: true, shown: true, error: null }] };
+const google: GoogleStatus = { failed: [{ account: "google-calendar-2", error: "refused" }], calendars: [{ account: "google-calendar", id: "me@example.com", name: "Me", color: "#123456", group: "mine", writable: true, shown: true, error: null }] };
 
 const events: CalendarEventsAnswer = {
 	events: [
-		{ calendarId: "me@example.com", eventId: "e1", writable: true, title: "Standup", calendar: "Me", color: "#123456", url: "https://calendar.google.com/e1", when: { allDay: false, start: 1, end: 2 } },
-		{ calendarId: "me@example.com", eventId: "e2", writable: false, title: "Holiday", calendar: "Me", color: "#123456", url: "https://calendar.google.com/e2", when: { allDay: true, firstDay: "2026-10-13", lastDay: "2026-10-13" } },
+		{ account: "google-calendar", calendarId: "me@example.com", eventId: "e1", writable: true, title: "Standup", calendar: "Me", color: "#123456", url: "https://calendar.google.com/e1", when: { allDay: false, start: 1, end: 2 } },
+		{ account: "google-calendar", calendarId: "me@example.com", eventId: "e2", writable: false, title: "Holiday", calendar: "Me", color: "#123456", url: "https://calendar.google.com/e2", when: { allDay: true, firstDay: "2026-10-13", lastDay: "2026-10-13" } },
 	],
 };
 
 const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 } }] };
 
 const inbox: InboxAnswer = {
-	address: "me@example.com",
-	threads: [{ id: "t1", from: "Ada", subject: "Hi", snippet: "Hello", at: 1, unread: true, count: 2, url: "https://mail.google.com/t1" }],
+	accounts: [{ account: "gmail", address: "me@example.com", error: null }],
+	threads: [{ account: "gmail", id: "t1", from: "Ada", subject: "Hi", snippet: "Hello", at: 1, unread: true, count: 2, url: "https://mail.google.com/t1" }],
 };
 
 const tickets: TicketsAnswer = {
@@ -107,7 +107,8 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 		partial: {
 			"every integration an empty record": { integrations: { linear: {}, slack: {}, "google-calendar": {}, gmail: {} } },
 			"an integration without its connection": { integrations: { ...integration, linear: { ...integration.linear, connection: undefined } } },
-			"a connection of an unknown kind": { integrations: { ...integration, gmail: { ...integration.gmail, connection: { kind: "maybe", server } } } },
+			"a connection of an unknown kind": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "maybe", server } } } },
+			"an account's connection that is absent": { integrations: { ...integration, gmail: { ...integration.gmail, accounts: [{ name: "gmail", address: null, connection: { kind: "absent" }, workspaces: [] }] } } },
 			"a ready connection without its server": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", tools: [] } } } },
 			"a ready connection that lists tool names": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", server, tools: ["list_issues"] } } } },
 			"a Google setup without its callback port": { integrations: { ...integration, gmail: { ...integration.gmail, setup: { ...googleSetup, callbackPort: undefined } } } },

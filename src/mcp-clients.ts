@@ -1,8 +1,8 @@
 /**
  * The OAuth client of the Slack, Google Calendar, and Gmail apps that Settings › Integrations saves: the setup the page
- * shows, read from the user MCP config, and the server entry a save would write, planned from it without writing.
+ * shows, read from the user MCP config, and the server entries a save would write, planned from it without writing.
  */
-import { type McpServer, type McpServerConfig, credentialFor, readMcpServers, serverOnHost, userMcpConfigPath } from "./omp/mcp";
+import { type McpServerConfig, readMcpServers, serversOnHost, userMcpConfigPath } from "./omp/mcp";
 import {
 	type ClientService,
 	type ClientSetups,
@@ -28,11 +28,17 @@ const DEFAULT_SLACK_CALLBACK_PORT = 3000;
 /** A service's OAuth client settings that cannot be saved as given. */
 export class ClientConfigError extends Error {}
 
-export interface ClientSave {
+/** A server entry a save writes, under its name in omp's MCP config. */
+export interface ServerWrite {
 	name: string;
 	server: McpServerConfig;
+}
+
+export interface ClientSave {
+	/** The service's servers with the new client: the first on its host, or each account's; the one a first save adds. */
+	writes: ServerWrite[];
+	/** The client ID or secret changed, so the sign-ins made with the old client no longer refresh. */
 	dropCredentials: boolean;
-	credential: McpServer | null;
 }
 
 function validPort(port: number | undefined): port is number {
@@ -72,7 +78,7 @@ export function googleSetupFrom(server: McpServerConfig | undefined): GoogleSetu
 	return { clientId, hasClientSecret, callbackPort, configured: clientId !== null && hasClientSecret && validPort(storedPort) };
 }
 
-const savedServer = async (host: string): Promise<McpServerConfig | undefined> => serverOnHost(await readMcpServers(userMcpConfigPath()), host)?.config;
+const savedServer = async (host: string): Promise<McpServerConfig | undefined> => serversOnHost(await readMcpServers(userMcpConfigPath()), host)[0]?.config;
 
 const SETUP_OF: { [C in McpClient]: (host: string) => Promise<ClientSetups[C]> } = {
 	none: async () => null,
@@ -90,13 +96,15 @@ export function clientSetup<Id extends McpIntegrationId>(id: Id): Promise<McpSet
 }
 
 /**
- * The next server entry for `id` with the client `clientId` and the OAuth settings `oauth`, without writing it.
+ * The next server entries for `id` with the client `clientId` and the OAuth settings `oauth`, without writing them: every
+ * server on its host for a service of many accounts, since each account signs in with the same client.
  * An omitted secret is copied from the same client ID. Changing the client ID without a new secret throws.
  */
 async function planClientSave(filePath: string, id: ClientService, clientId: string, submitted: string | undefined, oauth: NonNullable<McpServerConfig["oauth"]>): Promise<ClientSave> {
-	const { label, host, url, serverName } = MCP_SERVICES[id];
+	const { label, host, url, serverName, accounts } = MCP_SERVICES[id];
 	const servers = await readMcpServers(filePath);
-	const current = serverOnHost(servers, host);
+	const onHost = serversOnHost(servers, host);
+	const current = onHost[0];
 	if (!current && servers[serverName]) {
 		throw new ClientConfigError(`omp already has an MCP server named "${serverName}" for a different address. Rename that server, then save the ${label} app.`);
 	}
@@ -109,10 +117,14 @@ async function planClientSave(filePath: string, id: ClientService, clientId: str
 	}
 	const clientSecret = submittedSecret ?? existingSecret;
 	if (!clientSecret) throw new ClientConfigError(`${label} needs the app's client secret.`);
-	const server: McpServerConfig = { ...current?.config, type: "http", url: current?.config.url ?? url, oauth: { ...existing, ...oauth, clientId, clientSecret } };
-	if (server.auth) server.auth = { ...server.auth, clientId, clientSecret };
+	const targets = current === undefined ? [{ name: serverName, config: undefined }] : accounts === "many" ? onHost : [current];
+	const writes = targets.map(({ name, config }): ServerWrite => {
+		const server: McpServerConfig = { ...config, type: "http", url: config?.url ?? url, oauth: { ...existing, ...config?.oauth, ...oauth, clientId, clientSecret } };
+		if (server.auth) server.auth = { ...server.auth, clientId, clientSecret };
+		return { name, server };
+	});
 	const dropCredentials = current !== undefined && (existingId !== clientId || (submittedSecret !== undefined && submittedSecret !== existingSecret));
-	return { name: current?.name ?? serverName, server, dropCredentials, credential: current ? credentialFor(current.name, current.config) : null };
+	return { writes, dropCredentials };
 }
 
 /** The next Slack server entry for validated `input`, without writing it. */
@@ -133,13 +145,13 @@ export const planGoogleSave = (filePath: string, id: GoogleService, input: Googl
 	});
 
 /**
- * The server entry of Google service `id` with its scope set to the one the dashboard now needs, or `null` when the
- * saved entry already asks for it or there is none. A sign-in writes it first, so a client saved before the dashboard
- * needed more of Google, such as Gmail before it sent replies, asks for the wider grant once you sign in again.
+ * Each server entry of Google service `id` with its scope set to the one the dashboard now needs, leaving out those that
+ * already ask for it. A sign-in writes them first, so a client saved before the dashboard needed more of Google, such as
+ * Gmail before it sent replies, asks for the wider grant once you sign in again.
  */
-export async function planGoogleScope(filePath: string, id: GoogleService): Promise<{ name: string; server: McpServerConfig } | null> {
-	const current = serverOnHost(await readMcpServers(filePath), MCP_SERVICES[id].host);
+export async function planGoogleScope(filePath: string, id: GoogleService): Promise<ServerWrite[]> {
 	const scope = GOOGLE_SCOPES[id].join(" ");
-	if (!current?.config.oauth || current.config.oauth.scope === scope) return null;
-	return { name: current.name, server: { ...current.config, oauth: { ...current.config.oauth, scope } } };
+	return serversOnHost(await readMcpServers(filePath), MCP_SERVICES[id].host).flatMap(({ name, config }) =>
+		!config.oauth || config.oauth.scope === scope ? [] : [{ name, server: { ...config, oauth: { ...config.oauth, scope } } }],
+	);
 }

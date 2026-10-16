@@ -114,7 +114,7 @@ function signable(server: ConfiguredMcpServer): McpServer {
 export async function startMcpServerSignIn(name: string): Promise<McpServerRow> {
 	const remote = signable(await configured(name));
 	await signInOf(name).start(async (signal, waiting) => {
-		await signInMcp(remote, { onAuth: waiting, signal });
+		await signInMcp({ ...remote, oauth: remote.config.oauth }, { onAuth: waiting, signal });
 	});
 	return rowNamed(name);
 }
