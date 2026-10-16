@@ -13,14 +13,15 @@ import {
 } from "../src/shared/calendar";
 import { decodeInboxAnswer, type InboxAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
-import { decodePullRequestList, type PullRequestList, type RepoPullRequests } from "../src/shared/github";
+import { decodePullRequestList, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestEdit, type PullRequestList, type RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
 import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/shared/tickets";
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
-import { errorText, getJson } from "./api";
+import { errorText, getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
+import { withPullRequestChanged } from "./pull-requests-model";
 
 export interface ReadState<T> {
 	data: T | null;
@@ -71,6 +72,17 @@ export const pullRequestsStore = createPolledStore<PullRequestList>({
 	},
 	cache: { key: "omp-agents.inbox-cache", decode: decodePullRequestList },
 });
+
+/**
+ * Makes `change` on GitHub and answers the pull request as GitHub has it after. A state change or a merge shows in
+ * `workspace`'s list at once, so the rows and the details that read it agree, and the list is read again either way.
+ */
+export async function writePullRequest(workspace: string | null, pr: PullRequest, change: PullRequestChange): Promise<PullRequestDetail> {
+	const detail = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change } satisfies PullRequestEdit);
+	if (change.field === "state" || change.field === "merge") pullRequestsStore.update(list => withPullRequestChanged(list, pr, change, Date.now()), workspace);
+	void pullRequestsStore.refresh(workspace, { fresh: true });
+	return detail;
+}
 
 /** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per workspace, so there is one entry. */
 export const ticketsStore = createPolledStore<TicketsAnswer>({

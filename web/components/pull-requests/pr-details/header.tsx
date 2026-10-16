@@ -71,11 +71,11 @@ function ReviewerInline({ reviewers }: { reviewers: Reviewer[] }) {
 	);
 }
 
-/** The merge button, whose confirmation waits for the details while GitHub has not answered yet. */
-function MergeButton({ pr, detail, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; onSave: SavePullRequest }) {
+/** The merge button, whose confirmation waits for the details while GitHub has not answered yet, or says why it did not. */
+function MergeButton({ pr, detail, readError, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; onSave: SavePullRequest }) {
 	const [open, setOpen] = useState(false);
 	return (
-		<MergePopover pr={pr} target={detail} onMerge={(method, head) => onSave({ field: "merge", method, head }, {})} open={open} onOpenChange={setOpen}>
+		<MergePopover pr={pr} target={detail} error={readError} onMerge={(method, head) => onSave({ field: "merge", method, head }, {})} open={open} onOpenChange={setOpen}>
 			{method => (
 				<Button variant="primary" size="compact" leadingIcon={GitMerge} active={open}>
 					{method ? MERGE_METHOD_LABELS[method] : "Merge"}
@@ -86,11 +86,11 @@ function MergeButton({ pr, detail, onSave }: { pr: PullRequest; detail: PullRequ
 }
 
 /** The Next move's one button, as the header's primary action. */
-function NextMoveButton({ pr, detail, next, quick, onOpen, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onSave: SavePullRequest }) {
+function NextMoveButton({ pr, detail, readError, next, quick, onOpen, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onSave: SavePullRequest }) {
 	const { move, reason, action, session } = next;
 	let button: ReactNode = null;
 	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
-	else if (move === "merge") button = <MergeButton pr={pr} detail={detail} onSave={onSave} />;
+	else if (move === "merge") button = <MergeButton pr={pr} detail={detail} readError={readError} onSave={onSave} />;
 	else if (session)
 		button = (
 			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
@@ -126,6 +126,8 @@ interface DetailHeaderProps {
 	pr: PullRequest;
 	/** What GitHub says of it; `null` until it answers. */
 	detail: PullRequestDetail | null;
+	/** Why GitHub did not answer, if it did not. */
+	readError: string | null;
 	stack: StackedPullRequest[];
 	next: NextMove | null;
 	/** The quick actions for the `⋯` menu. */
@@ -142,7 +144,7 @@ interface DetailHeaderProps {
 }
 
 /** The header: the pull request's name, author, branches, size, status, and reviewers, with the Next move's button and the `⋯` menu. */
-export function DetailHeader({ pr, detail, stack, next, actions, quick, placed, options, onOpen, onSave, placement, headingRef }: DetailHeaderProps) {
+export function DetailHeader({ pr, detail, readError, stack, next, actions, quick, placed, options, onOpen, onSave, placement, headingRef }: DetailHeaderProps) {
 	const page = placement === "page";
 	const Heading = page ? "h1" : "h3";
 	const stackedBase = detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
@@ -159,8 +161,8 @@ export function DetailHeader({ pr, detail, stack, next, actions, quick, placed, 
 					</a>
 				</p>
 				<span className="ml-auto flex shrink-0 items-center gap-1.5">
-					{next && <NextMoveButton pr={pr} detail={detail} next={next} quick={quick} onOpen={onOpen} onSave={onSave} />}
-					<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={{ ...quick, actions }} onState={to => onSave({ field: "state", state: to }, { state: to })} pending={false} label="More actions" />
+					{next && <NextMoveButton pr={pr} detail={detail} readError={readError} next={next} quick={quick} onOpen={onOpen} onSave={onSave} />}
+					<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={{ ...quick, actions }} onState={to => onSave({ field: "state", state: to }, { state: to })} label="More actions" />
 				</span>
 			</div>
 			<Heading ref={headingRef} tabIndex={-1} className={cn(page ? "text-xl" : "text-base", "leading-snug font-semibold outline-none")}>

@@ -7,12 +7,11 @@ import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { commentCount, moveAction, openThreads, pullRequestStatus, reason } from "../../../pull-requests-model";
-import { putJson } from "../../../api";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { type AgentState, actionFacts, type MoveId, moveOf } from "../../../../src/shared/moves";
 import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../../../routing";
 import { useEditableRead } from "../../../editable-read";
-import { useRead } from "../../../reads";
+import { useRead, writePullRequest } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
 import { ERROR_TEXT } from "../../form-dialog";
 import { usePullRequestOptions } from "../pr-fields";
@@ -65,8 +64,8 @@ export interface DetailContentProps {
 	files?: { path: string | null } | null;
 	/** Shows another pull request of its stack or of the session in place; without it, each of its stack links to its page. */
 	onPick?: (pr: PullRequest) => void;
-	/** GitHub took a change made here. */
-	onSaved?: () => void;
+	/** The workspace whose pull request list a change here shows in at once. */
+	workspace: string | null;
 }
 
 export type Placement = "page" | "sidebar";
@@ -84,18 +83,15 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
  * of the other actions; then Summary, Comments, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, onSaved }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
-	const { data: detail, error, saveError, edit, write } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, version);
+	// The list's state of it joins `version`, so a change made from its row, or one the list reads from GitHub, reads the details again.
+	const { data: detail, error, saveError, edit, write } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, `${String(version)}:${listed?.state ?? "unlisted"}`);
 	const stackRead = useRead<StackedPullRequest[]>(`/api/pull-request/stack?${query}`, version);
 	const stack = stackRead.data ?? [];
 	// Until the stack is read, its members would flash in the list of the others.
 	const others = stackRead.data || stackRead.error ? session.filter(other => !samePullRequest(other, pr) && !stack.some(member => samePullRequest(member, other))) : [];
-	const put = async (change: PullRequestChange): Promise<PullRequestDetail> => {
-		const answer = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change });
-		onSaved?.();
-		return answer;
-	};
+	const put = (change: PullRequestChange): Promise<PullRequestDetail> => writePullRequest(workspace, pr, change);
 	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
 		if (detail) edit(shown, () => put(change));
 	};
@@ -131,7 +127,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
-				<DetailHeader pr={pr} detail={detail} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
+				<DetailHeader pr={pr} detail={detail} readError={error} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
 				<div className={cn("flex flex-wrap items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
 						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>

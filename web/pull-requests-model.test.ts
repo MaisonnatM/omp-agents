@@ -473,7 +473,7 @@ describe("pull request list after a change", () => {
 	});
 
 	test("a merge marks the row merged and updated at the merge's time", () => {
-		expect(withPullRequestChanged(list, two, { field: "merge" }, 1234).repos[0]).toEqual(repo("webapp", [one, pr(2, { state: "merged", updatedAt: 1234 })]));
+		expect(withPullRequestChanged(list, two, { field: "merge", method: "squash", head: "abc123" }, 1234).repos[0]).toEqual(repo("webapp", [one, pr(2, { state: "merged", updatedAt: 1234 })]));
 	});
 
 	test("a closed pull request leaves the list", () => {

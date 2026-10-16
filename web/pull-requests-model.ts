@@ -1,6 +1,6 @@
 /** Pull request links, what each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestCheck, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
@@ -335,11 +335,14 @@ export function stateActions(state: PullRequestDetail["state"]): StateActionId[]
 	}
 }
 
+/** A change that moves a pull request in the list: a state change or a merge. */
+export type ListChange = Extract<PullRequestChange, { field: "state" | "merge" }>;
+
 /**
  * The list after GitHub took `change` on `pr` at `at`, until the list is read again: a closed pull request leaves it,
  * since it lists none; a merged one moves to **Recently merged**. Every repository and row it leaves alone stays the same object.
  */
-export function withPullRequestChanged(list: PullRequestList, pr: PullRequest, change: { field: "state"; state: SettableState } | { field: "merge" }, at: number): PullRequestList {
+export function withPullRequestChanged(list: PullRequestList, pr: PullRequest, change: ListChange, at: number): PullRequestList {
 	const changed = (row: PullRequestSummary): PullRequestSummary[] => {
 		if (change.field === "merge") return [{ ...row, state: "merged", updatedAt: at }];
 		return change.state === "closed" ? [] : [{ ...row, state: change.state }];

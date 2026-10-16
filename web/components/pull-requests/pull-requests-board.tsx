@@ -2,7 +2,7 @@
 import { ArrowDownUp, Unplug } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
-import { type PullRequestDetail, type PullRequestEdit, type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
+import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
 import { type AgentOn, agentOn, moveOf } from "../../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
 	decodeOrder,
 	foldedByDefault,
 	PULL_REQUEST_SORTS,
+	type ListChange,
 	type PullRequestOrder,
 	type SectionRow,
 	type PullRequestSection,
@@ -30,14 +31,12 @@ import {
 	shownPullRequests,
 	stepTarget,
 	type Where,
-	withPullRequestChanged,
 } from "../../pull-requests-model";
-import { putJson } from "../../api";
 import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart } from "../../quick-actions";
 import type { PolledEntry } from "../../polled-store";
-import { pullRequestsStore } from "../../reads";
+import { pullRequestsStore, writePullRequest } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { type SectionTarget, sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
@@ -46,7 +45,7 @@ import { type DragItem, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
 import { stepRows } from "../list-page";
-import { type RowChange, type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
+import { type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
 
 // Both keys keep their names from before the page was called Pull requests, so the browser's saved folds and order survive.
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
@@ -324,10 +323,8 @@ export function usePullRequestsBoard({ workspace, hosts, past, route, entersList
 	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
 	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
 	const onChange = useCallback(
-		async (pr: PullRequestSummary, change: RowChange) => {
-			await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change } satisfies PullRequestEdit);
-			pullRequestsStore.update(answer => withPullRequestChanged(answer, pr, change, Date.now()), workspace);
-			void pullRequestsStore.refresh(workspace, { fresh: true });
+		async (pr: PullRequestSummary, change: ListChange) => {
+			await writePullRequest(workspace, pr, change);
 		},
 		[workspace],
 	);

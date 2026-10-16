@@ -17,8 +17,8 @@ interface PullRequestMenuProps {
 	state: PullRequestDetail["state"] | null;
 	quick: QuickActionsProps;
 	onState: (to: SettableState) => void;
-	/** A state change or merge is on its way to GitHub. */
-	pending: boolean;
+	/** A state change or merge is on its way to GitHub; the details show theirs at once instead, so they leave it out. */
+	pending?: boolean;
 	/** With `onOpenChange`, lets a keyboard shortcut open it; without them it keeps its own state. */
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
@@ -26,7 +26,7 @@ interface PullRequestMenuProps {
 }
 
 /** The quick actions, then the state changes GitHub takes, then the pull request on GitHub and Graphite. */
-export function PullRequestMenu({ pr, state, quick, onState, pending, open, onOpenChange, label }: PullRequestMenuProps) {
+export function PullRequestMenu({ pr, state, quick, onState, pending = false, open, onOpenChange, label }: PullRequestMenuProps) {
 	const changes = state ? stateActions(state) : [];
 	return (
 		<DropdownMenu open={open} onOpenChange={onOpenChange}>

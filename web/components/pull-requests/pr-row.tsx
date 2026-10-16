@@ -1,14 +1,14 @@
 /** A pull request's row in the lists, with its move badge, checks icon, review state, diff size, and `⋯` menu. */
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
-import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
+import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestDetail, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import type { MoveId } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { type SectionRow, MOVES, moveAction, reason, type StackPlace } from "../../pull-requests-model";
+import { type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace } from "../../pull-requests-model";
 import { useRead } from "../../reads";
 import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
@@ -81,15 +81,12 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 	);
 }
 
-/** A change a row makes to its pull request on GitHub. */
-export type RowChange = Extract<PullRequestChange, { field: "state" | "merge" }>;
-
 /** A row's changes to its pull request, pending until GitHub answers; a refusal shows as a toast. */
-const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): Action<[RowChange]> =>
-	useAction((change: RowChange) => onChange(pr, change), "GitHub refused the change");
+const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): Action<[ListChange]> =>
+	useAction((change: ListChange) => onChange(pr, change), "GitHub refused the change");
 
 /** A **Merge** badge: a button that merges after the same confirmation as the details, reading what the merge needs while it is open. */
-function MergeBadge({ pr, change }: { pr: PullRequestSummary; change: Action<[RowChange]> }) {
+function MergeBadge({ pr, change }: { pr: PullRequestSummary; change: Action<[ListChange]> }) {
 	const [open, setOpen] = useState(false);
 	const target = useRead<PullRequestDetail>(open ? `/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}` : null);
 	const label = `Merge ${pullRequestName(pr)} on GitHub`;
@@ -115,7 +112,7 @@ function MergeBadge({ pr, change }: { pr: PullRequestSummary; change: Action<[Ro
  * A row's move badge: for **Merge**, a button that merges; else a button that starts the quick action handing the move
  * to an agent, when one applies; else the plain badge.
  */
-function RowMoveBadge({ pr, move, change, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId; change: Action<[RowChange]> } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+function RowMoveBadge({ pr, move, change, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId; change: Action<[ListChange]> } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
 	if (move === "merge") return <MergeBadge pr={pr} change={change} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
@@ -303,7 +300,7 @@ export interface RowProps {
 	/** The same function for every row, like `onQuickAction`. */
 	onActionsOpenChange: (pr: PullRequest, open: boolean) => void;
 	/** Makes `change` on GitHub and shows it in the list; the same function for every row, like `onQuickAction`. */
-	onChange: (pr: PullRequestSummary, change: RowChange) => Promise<void>;
+	onChange: (pr: PullRequestSummary, change: ListChange) => Promise<void>;
 	drag: DragItem;
 	/** What the move shortcuts name the row by. */
 	moveId: string;
@@ -339,7 +336,7 @@ const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => b
 const sameRowProps = (a: RowProps, b: RowProps): boolean =>
 	(Object.keys(PROP_EQUAL) as (keyof RowProps)[]).every(key => (PROP_EQUAL[key] as (x: unknown, y: unknown) => boolean)(a[key], b[key]));
 
-function RowMenu({ pr, change, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[RowChange]> }) {
+function RowMenu({ pr, change, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[ListChange]> }) {
 	return (
 		<PullRequestMenu
 			pr={pr}

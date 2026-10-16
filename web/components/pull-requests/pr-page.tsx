@@ -87,7 +87,7 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 				version={version}
 				files={files}
 				onPick={onPick}
-				onSaved={() => void pullRequestsStore.refresh(workspace, { fresh: true })}
+				workspace={workspace}
 			/>
 		</>
 	);
