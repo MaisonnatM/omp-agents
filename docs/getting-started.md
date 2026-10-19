@@ -11,7 +11,7 @@ Your first session, then the integrations that each need a sign-in.
 
 ## Your first session
 
-1. Click **New session** at the top of the **Sessions** tab, or press Cmd+Shift+O (Ctrl+Shift+O on Linux and Windows).
+1. Click **New session** at the top of the **Sessions** tab, or press Cmd+N (Ctrl+N on Linux and Windows) in the desktop app, or S outside a text field.
 2. Pick the workspace omp runs in, and a branch or a new worktree if the folder is a git repository.
 3. Type a prompt and press Enter.
    omp starts when you send the first message, so a draft you leave starts nothing.

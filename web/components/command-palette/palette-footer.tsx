@@ -6,16 +6,15 @@ import { ENTER } from "../../command-palette";
 import { chordLabel } from "../../shortcuts";
 
 /** A key chip, as the shortcuts dialog draws them. */
-export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
+export function Kbd({ className, ...props }: ComponentProps<"kbd">) {
 	return (
 		<kbd
 			className={cn(
 				"inline-flex h-[22px] min-w-[22px] shrink-0 items-center justify-center rounded-[5px] border border-border bg-background px-1.5 font-sans text-xs text-muted-foreground",
 				className,
 			)}
-		>
-			{children}
-		</kbd>
+			{...props}
+		/>
 	);
 }
 

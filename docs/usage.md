@@ -55,8 +55,11 @@ An action that fails shows its error, and its control becomes available again.
   The choice is saved in the browser's localStorage.
   If no session from the saved directory is left, the sidebar lists every session.
 - **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
+  It shows its key, Cmd+N, on its right.
 - The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
+  While empty, it shows its key, Cmd+F, on its right.
+  Cmd+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, the browser's Find keeps Cmd+F.
   Cmd+K opens the command menu, which searches every workspace instead.
 - Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.
@@ -1443,7 +1446,8 @@ Alt is Option on macOS.
 | Shift+Tab | Composer | Cycle the thinking level |
 | ↑ | Empty composer | Move the last queued message back into the composer |
 | Cmd+K | Anywhere | Open the command menu |
-| Cmd+Shift+O | Anywhere | Start a new session |
+| Cmd+N / S | Anywhere / outside text fields | Start a new session |
+| Cmd+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+Shift+X | Anywhere | End the focused session |
 | Cmd+[ | Anywhere | Open the previous session in the sidebar |
 | Cmd+] | Anywhere | Open the next session in the sidebar |
@@ -1529,7 +1533,8 @@ Alt is Option on macOS.
   Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑ do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
-- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
+- Cmd+N opens the new-session draft, as **New session** at the top of the session list does.
+  A browser keeps Cmd+N for a new window, so in a browser tab S outside a text field does it; on the Todo page, S changes a focused or open todo's status instead.
   Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
   It does nothing in a subagent, a read-only room, or a past session.
   `/` or Cmd+I puts the cursor in the focused pane's composer.

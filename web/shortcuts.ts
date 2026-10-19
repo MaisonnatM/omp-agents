@@ -12,6 +12,7 @@ export type ShortcutId =
 	| "dequeue"
 	| "switcher"
 	| "newSession"
+	| "sessionSearch"
 	| "endSession"
 	| "previousSession"
 	| "nextSession"
@@ -139,7 +140,17 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "dequeue", category: "sessions", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
 	{ id: "switcher", category: "general", label: "Open the command menu", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
-	{ id: "newSession", category: "sessions", label: "Start a new session", command: "New session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] },
+	{
+		id: "newSession",
+		category: "sessions",
+		label: "Start a new session",
+		command: "New session",
+		keys: [
+			{ chord: { key: "n", mod: true }, scope: "anywhere" },
+			{ chord: { key: "s" }, scope: "outside-fields" },
+		],
+	},
+	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: { key: "x", mod: true, shift: true }, scope: "anywhere" }] },
 	{
 		id: "previousSession",
@@ -320,7 +331,7 @@ const KEY_LABEL: Record<string, string> = {
 	Tab: IS_MAC ? "⇥" : "Tab",
 };
 
-/** `⇧⌘O` on macOS, `Ctrl+Shift+O` elsewhere. */
+/** `⇧⌘X` on macOS, `Ctrl+Shift+X` elsewhere. */
 export function chordLabel({ key, mod, ctrl, alt, shift }: Chord): string {
 	const name = KEY_LABEL[key] ?? key.toUpperCase();
 	if (IS_MAC) return `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${shift ? "⇧" : ""}${mod ? "⌘" : ""}${name}`;

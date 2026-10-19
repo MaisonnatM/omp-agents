@@ -22,7 +22,12 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("b", "KeyB", { ctrl: true, alt: true })).toEqual(["detailsSidebar"]);
 	expect(pressOn(true, "b", "KeyB", { meta: true, alt: true })).toEqual(["detailsSidebar"]);
 	expect(press("B", "KeyB", { ctrl: true, shift: true })).toEqual([]);
-	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual(["newSession"]);
+	expect(press("n", "KeyN", { ctrl: true })).toEqual(["newSession"]);
+	expect(pressOn(true, "n", "KeyN", { meta: true })).toEqual(["newSession"]);
+	expect(pressOn(true, "n", "KeyN", { ctrl: true })).toEqual([]);
+	expect(press("f", "KeyF", { ctrl: true })).toEqual(["sessionSearch"]);
+	expect(pressOn(true, "f", "KeyF", { meta: true })).toEqual(["sessionSearch"]);
+	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual([]);
 	expect(press("k", "KeyK", { ctrl: true })).toEqual(["switcher"]);
 	expect(press("e", "KeyE", { ctrl: true })).toEqual(["tools"]);
 	expect(press("E", "KeyE", { ctrl: true, shift: true })).toEqual(["hideTools"]);
@@ -41,10 +46,10 @@ test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's wind
 	expect(pressOn(true, "`", "Backquote", { ctrl: true, meta: true })).toEqual([]);
 });
 
-test("browser-reserved chords stay the browser's", () => {
+test("browser-reserved chords stay the browser's, apart from Cmd+N, which only the desktop window ever receives", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 	}
@@ -105,6 +110,10 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	]);
 	expect(shortcutsFor(keyEvent("i", "KeyI", { ctrl: true }), null, false)).toEqual([{ id: "focusComposer", scope: "anywhere", key: 1 }]);
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
+	expect(shortcutsFor(keyEvent("s", "KeyS"), null, false)).toEqual([
+		{ id: "newSession", scope: "outside-fields", key: 1 },
+		{ id: "todoStatus", scope: "outside-fields", key: 0 },
+	]);
 });
 
 test("↓ and ↑ step through sessions, pull requests, todos, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
