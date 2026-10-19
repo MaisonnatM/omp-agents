@@ -31,8 +31,8 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's title, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
- * the connection status; a session's Linear issues, pull requests, and the branch of the linked worktree it works in, which copies
- * when clicked and, when the header can end the session, offers to end it and so remove that worktree; its directory in Cursor;
+ * the connection status; a session's Linear issues, pull requests, and the branch it works on, which copies when clicked and, for
+ * a linked worktree's branch when the header can end the session, offers to end it and so remove that worktree; its directory in Cursor;
  * and End session, which shows it is ending until the server answers, though the session may leave the roster before then.
  */
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {

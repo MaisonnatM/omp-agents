@@ -247,6 +247,11 @@ describe("parseListAnswer", () => {
 		]);
 	});
 
+	test("leaves out a pull request that an open search still returns after it closed", () => {
+		const prs = parseListAnswer({ data: { authored: { nodes: [node(1, { state: "CLOSED" }), node(2, {})] }, reviewing: { nodes: [node(3, { state: "CLOSED" })] } } }, repo);
+		expect(prs.map(pr => [pr.number, pr.state])).toEqual([[2, "open"]]);
+	});
+
 	test("an answer without data reports GitHub's errors", () => {
 		expect(() => parseListAnswer({ errors: [{ message: "Could not resolve to a Repository" }] }, repo)).toThrow("Could not resolve to a Repository");
 	});

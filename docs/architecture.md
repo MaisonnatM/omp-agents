@@ -174,8 +174,9 @@ Every transcript comes from the session files on this machine, not from a networ
   A UUID is left out, since the tickets page opens an issue by identifier.
   The `/ship` state's `issue` counts too.
   Session rows carry them as `tickets`, the session's own first.
-- The same scan reads the branch checked out in the linked worktree each session that wrote works in, its worktree else its directory, through `worktreeAt` in `src/git.ts`.
-  Session rows carry it as `branch`, `null` in a repository's main checkout, on a detached HEAD, or outside git, and a branch switch changes the row at the session's next write.
+- The same scan reads the branch each session that wrote works on, in its worktree else its directory, through `worktreeAt` in `src/git.ts`.
+  In a linked worktree that is the branch checked out now; in a repository's main checkout it is the branch `headHistory` and `branchAt` in `src/git.ts` find checked out at the session file's last write, from the HEAD reflog.
+  Session rows carry it as `branch`, a `SessionBranch` `{ name, linked }` from `src/shared/sessions.ts`, `null` on a detached HEAD, outside git, or once the directory is gone, and a branch switch changes the row at the session's next write.
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
 
@@ -885,7 +886,7 @@ Starts that create no worktree, such as a resume or a routine's session, stay pa
 `PUT /api/worktree/release` takes `{ cwd, branch }`, an absolute directory in a repository and a branch name, checked by `parseBranchRelease` in `src/server/wire.ts`, and answers 404 when `cwd` is not a directory.
 `Worktrees.releaseBranch` lists the repository's worktrees, picks the linked one that has `branch` checked out, never the main, a bare, or a prunable registration, and removes it through `removeCheckout` without waiting for a session to leave.
 It answers a `BranchRelease` from `src/shared/git.ts`: `{ kind: "none" }` when no linked worktree has the branch, `{ kind: "removed", path }`, or `{ kind: "kept", path, why }` with the blockers' messages or Git's error.
-The page sends it when you copy a branch from a pull request row or a past session's header.
+The page sends it when you copy a branch from a pull request row or a past session's header, the latter only for a linked worktree's branch.
 
 `PUT /api/workspaces` takes a `WorkspaceChange`, `{ op, cwd }` with `op` one of `add`, `hide`, and `show`, checked by `parseWorkspaceChange` in `src/server/wire.ts`.
 `add` resolves `cwd` through `directoryOf` in `src/paths.ts`, which expands `~`, and answers 400 when it is not a directory; `hide` and `show` take an absolute path.

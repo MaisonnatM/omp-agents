@@ -29,7 +29,7 @@ import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo } from "./shared/github";
 import { ReplayFold } from "./replay";
-import { SHIP_STAGES, SHIP_WORK, type SessionFacts, type ShipProgress } from "./shared/sessions";
+import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
 import { TICKET_ID } from "./shared/tickets";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)` */
@@ -384,8 +384,8 @@ interface SessionScan {
 	workDirs: string[];
 	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
 	worktree: string | null;
-	/** The branch checked out in the linked worktree it works in, `worktree` or else `cwd`'s; `null` in a main checkout or on a detached HEAD. */
-	branch: string | null;
+	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it. */
+	branch: SessionBranch | null;
 }
 
 const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
@@ -401,6 +401,25 @@ function once<T>(ask: (dir: string) => Promise<T>): (dir: string) => Promise<T> 
 		if (!answer) asked.set(dir, (answer = ask(dir)));
 		return answer;
 	};
+}
+
+/**
+ * The branch a session that last wrote at `at`, in ms, works on in `dir`: in a linked worktree the one checked out now,
+ * in a main checkout the one checked out at `at`; `null` on a detached HEAD, outside git, or once `dir` is gone.
+ */
+async function sessionBranch(
+	dir: string,
+	at: number,
+	worktreeAt: (dir: string) => Promise<WorktreeAt | null>,
+	historyOf: (dir: string) => Promise<HeadHistory | null>,
+): Promise<SessionBranch | null> {
+	if (!(await exists(dir))) return null;
+	const checkout = await worktreeAt(dir);
+	if (!checkout) return null;
+	if (checkout.linked) return checkout.branch === null ? null : { name: checkout.branch, linked: true };
+	const history = await historyOf(dir);
+	const name = history && branchAt(history, at);
+	return name ? { name, linked: false } : null;
 }
 
 /** The branch a `gt submit` from session directory `cwd` submitted, in the repository `origin` names where it ran; `null` once that directory is gone. */
@@ -521,7 +540,7 @@ export class SessionFactsIndex {
 			const submitted = session.submitted.get(refKey(ref));
 			return submitted ? [submitted] : [];
 		});
-		const pullRequests = resolveLinks(repo && branch !== null ? [...refs, { kind: "branch", ...repo, branch, link: "worked" }] : refs, repo, this.#heads);
+		const pullRequests = resolveLinks(repo && branch?.linked ? [...refs, { kind: "branch", ...repo, branch: branch.name, link: "worked" }] : refs, repo, this.#heads);
 		const before = session.pullRequests;
 		const same = pullRequests.length === before.length && pullRequests.every((pr, i) => prKey(pr) === prKey(before[i]!) && pr.link === before[i]!.link);
 		if (same) return false;
@@ -565,20 +584,16 @@ export class SessionFactsIndex {
 			session.worktree = worktrees[i]!;
 			changed = true;
 		});
-		// A session that wrote to its transcript may have switched its worktree's branch since: two `git` calls per writing session's directory per refresh.
-		const checkouts = await mapLimit(touched, SCAN_PARALLEL, async session => {
-			const dir = session.worktree ?? session.cwd;
-			return (await exists(dir)) ? worktreeAt(dir) : null;
-		});
-		touched.forEach((session, i) => {
-			const at = checkouts[i];
-			const branch = at?.linked ? at.branch : null;
-			if (branch === session.branch) return;
+		// A session that wrote to its transcript may have switched branch since: two `git` calls per writing session's directory per refresh, and two more for a main checkout's HEAD reflog.
+		const branches = await mapLimit(scans, SCAN_PARALLEL, ({ session, writtenAt }) => sessionBranch(session.worktree ?? session.cwd, writtenAt, worktreeAt, historyOf));
+		scans.forEach(({ session }, i) => {
+			const branch = branches[i]!;
+			if (branch?.name === session.branch?.name && branch?.linked === session.branch?.linked) return;
 			session.branch = branch;
 			changed = true;
 		});
 		// One `git` call per directory, and only for sessions that name a PR by number alone or sit on a linked worktree's branch.
-		const unknownRepo = touched.filter(session => session.repo === null && (session.branch !== null || session.refs.some(ref => ref.kind === "number")));
+		const unknownRepo = touched.filter(session => session.repo === null && (session.branch?.linked || session.refs.some(ref => ref.kind === "number")));
 		await mapLimit(unknownRepo, SCAN_PARALLEL, async session => {
 			session.repo = await repoOf(session.cwd);
 		});
@@ -592,8 +607,11 @@ export class SessionFactsIndex {
 		return changed;
 	}
 
-	/** Read what session `path` and its subagents appended: whether its /ship stage or Linear issues changed, and whether its worktree needs asking again. */
-	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; moved: boolean }> {
+	/**
+	 * Read what session `path` and its subagents appended: whether its /ship stage or Linear issues changed, whether its worktree
+	 * needs asking again, and `writtenAt`, its listed last write, in ms.
+	 */
+	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; moved: boolean; writtenAt: number }> {
 		let session = this.#sessions.get(path);
 		const previousShip = session?.transcripts.get(path)?.fold.scan.ship;
 		session ??= {
@@ -614,6 +632,6 @@ export class SessionFactsIndex {
 		const moved = !same || (session.worktree !== null && !(await exists(session.worktree)));
 		session.workDirs = workDirs;
 		const ticketsChanged = this.#gather(session);
-		return { session, changed: shipChanged || ticketsChanged, moved };
+		return { session, changed: shipChanged || ticketsChanged, moved, writtenAt: modifiedAt };
 	}
 }
