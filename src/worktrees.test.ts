@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runChecked } from "./proc";
 import { Worktrees } from "./worktrees";
+import type { MergedPullRequest } from "./pull-requests";
 import type { WorktreeRemovalPlan } from "./worktrees-shared";
 
 const dirs: string[] = [];
@@ -32,11 +33,15 @@ async function linked(parent: string, main: string, name = "wip"): Promise<strin
 	return path;
 }
 
+/** GitHub with no merged pull requests. */
+const noPullRequests = async (): Promise<Map<string, MergedPullRequest>> => new Map();
+
 const quiet = new Worktrees({
 	knownCwds: () => [],
 	activity: () => [],
 	live: () => [],
 	serverCwd: "/no/such/dashboard",
+	mergedPullRequests: noPullRequests,
 });
 
 /** A plan the server could read, which carries its confirmation. */
@@ -49,7 +54,7 @@ describe("worktree removal", () => {
 	test("lists every registered worktree of a known repository and refuses the main checkout", async () => {
 		const { parent, main } = await repo();
 		const path = await linked(parent, main);
-		const listed = await new Worktrees({ knownCwds: () => [main], activity: () => [{ id: "s", cwd: path, modifiedAt: 50 }], live: () => [], serverCwd: "/no/such/dashboard" }).inventory(null);
+		const listed = await new Worktrees({ knownCwds: () => [main], activity: () => [{ id: "s", cwd: path, modifiedAt: 50 }], live: () => [], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests }).inventory(null);
 		expect(listed.repositories.map(item => item.worktrees.map(entry => entry.path))).toEqual([[main, path]]);
 		expect(listed.repositories[0]?.worktrees[1]?.lastActivity).toBe(50);
 		const repository = listed.repositories[0]?.repository ?? "";
@@ -83,13 +88,14 @@ describe("worktree removal", () => {
 			activity: () => [],
 			live: () => (leaving-- > 0 ? [{ cwd: join(path, "src"), unknownAgents: false }] : []),
 			serverCwd: "/no/such/dashboard",
+			mergedPullRequests: noPullRequests,
 		});
 		expect((await worktrees.removeCheckout(join(path, ".")))?.removed).toBe(true);
 		expect(existsSync(path)).toBe(false);
 		expect(await worktrees.removeCheckout(main)).toBeNull();
 		expect(await worktrees.removeCheckout(parent)).toBeNull();
 		const stuck = await linked(parent, main, "stuck");
-		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: stuck, unknownAgents: false }], serverCwd: "/no/such/dashboard" });
+		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: stuck, unknownAgents: false }], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
 		expect((await busy.removeCheckout(stuck, 0))?.blockers.map(blocker => blocker.code)).toEqual(["occupied"]);
 	});
 
@@ -109,6 +115,7 @@ describe("worktree removal", () => {
 				{ cwd: main, unknownAgents: true },
 			],
 			serverCwd: locked,
+			mergedPullRequests: noPullRequests,
 		});
 		const repository = await common(main);
 		expect((await trees.preview({ repository, path: dirty })).blockers.some(blocker => blocker.code === "changed")).toBe(true);
@@ -210,6 +217,7 @@ describe("worktree removal", () => {
 			activity: () => [...sessions, { id: "gone", cwd: join(outside, "missing", "deeper"), modifiedAt: 9 }],
 			live: () => [],
 			serverCwd: "/no/such/dashboard",
+			mergedPullRequests: noPullRequests,
 		}).inventory(null);
 		expect(listed.repositories.map(item => item.path)).toEqual([second.main, first.main]);
 		expect(listed.repositories[1]?.worktrees.map(entry => entry.path)).toEqual([first.main, wip]);
@@ -241,10 +249,78 @@ describe("worktree removal", () => {
 		const dirty = await linked(parent, main, "dirty");
 		writeFileSync(join(dirty, "untracked.txt"), "keep\n");
 		const occupied = await linked(parent, main, "occupied");
-		const trees = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: occupied, unknownAgents: false }], serverCwd: "/no/such/dashboard" });
+		const trees = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: occupied, unknownAgents: false }], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
 		expect(await trees.releaseBranch(main, "dirty")).toEqual({ kind: "kept", path: dirty, why: "Tracked modifications or untracked files must be preserved before removal." });
 		expect(existsSync(join(dirty, "untracked.txt"))).toBe(true);
 		expect(await trees.releaseBranch(main, "occupied")).toEqual({ kind: "kept", path: occupied, why: `A live omp session uses ${occupied}, including idle or waiting sessions.` });
 		expect(existsSync(occupied)).toBe(true);
+	});
+
+	test("flags a linked worktree merged when origin's default branch has its commit or its newest pull request merged after its last commit, and Remove merged keeps the rest", async () => {
+		const { parent, main } = await repo();
+		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		const landed = await linked(parent, main, "landed");
+		const loose = join(parent, "loose");
+		await git(main, "worktree", "add", "-q", "--detach", loose, "HEAD");
+		const branches: Record<string, string> = {};
+		for (const name of ["squashed", "reopened", "open"]) {
+			branches[name] = await linked(parent, main, name);
+			await git(branches[name]!, "commit", "-q", "--allow-empty", "-m", name);
+		}
+		const asked: string[][] = [];
+		const trees = new Worktrees({
+			knownCwds: () => [main],
+			activity: () => [],
+			live: () => [],
+			serverCwd: "/no/such/dashboard",
+			mergedPullRequests: async (_, names) => {
+				asked.push(names);
+				return new Map([
+					["squashed", { number: 7, mergedAt: Date.now() + 60_000 }],
+					["reopened", { number: 8, mergedAt: 0 }],
+				]);
+			},
+		});
+		const listed = await trees.inventory(null);
+		expect(listed.errors).toEqual([]);
+		const mergedOf = new Map(listed.repositories[0]?.worktrees.map(entry => [entry.path, entry.merged]));
+		expect(mergedOf).toEqual(
+			new Map([
+				[main, null],
+				[landed, { by: "default-branch", branch: "origin/main" }],
+				[loose, { by: "default-branch", branch: "origin/main" }],
+				[branches.squashed!, { by: "pull-request", number: 7 }],
+				[branches.reopened!, null],
+				[branches.open!, null],
+			]),
+		);
+		expect(asked.map(names => names.toSorted())).toEqual([["open", "reopened", "squashed"]]);
+		const targets = listed.repositories[0]?.worktrees ?? [];
+		const unmergedOf = (plans: WorktreeRemovalPlan[]): string[] => plans.flatMap(plan => (plan.blockers.some(blocker => blocker.code === "unmerged") ? [plan.path] : []));
+		expect(unmergedOf(await trees.previewAll(targets, true)).toSorted()).toEqual([branches.open!, branches.reopened!].toSorted());
+		expect(unmergedOf(await trees.previewAll(targets, false))).toEqual([]);
+	});
+
+	test("Remove merged keeps every branch GitHub cannot answer for, and still trusts the default branch", async () => {
+		const { parent, main } = await repo();
+		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		const landed = await linked(parent, main, "landed");
+		const open = await linked(parent, main, "open");
+		await git(open, "commit", "-q", "--allow-empty", "-m", "open");
+		const trees = new Worktrees({
+			knownCwds: () => [main],
+			activity: () => [],
+			live: () => [],
+			serverCwd: "/no/such/dashboard",
+			mergedPullRequests: () => Promise.reject(new Error("gh is down")),
+		});
+		const listed = await trees.inventory(null);
+		expect(listed.errors).toEqual([{ path: main, error: "Cannot tell which worktrees merged: gh is down" }]);
+		expect(listed.repositories[0]?.worktrees.map(entry => entry.merged)).toEqual([null, { by: "default-branch", branch: "origin/main" }, null]);
+		const repository = listed.repositories[0]?.repository ?? "";
+		const plans = await trees.previewAll([{ repository, path: landed }, { repository, path: open }], true);
+		expect(plans.map(plan => plan.blockers)).toEqual([[], [{ code: "unmerged", message: "Cannot tell whether this worktree merged: gh is down" }]]);
 	});
 });

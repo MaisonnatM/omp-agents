@@ -45,6 +45,7 @@ import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
+import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
 import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
@@ -665,10 +666,10 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		return answer(() => env.worktrees.metrics({ repository, path }, req.signal));
 	});
 
-	/** `PUT /api/worktrees/removal`: preview a removal, or remove checkouts whose confirmation still matches. */
+	/** `PUT /api/worktrees/removal`: preview a removal, only of merged work when `merged` is set, or remove checkouts whose confirmation still matches. */
 	const worktreeRemoval = write(
-		body => checked(parseWorktreeRemoval(body), "Expected a preview with targets or removal with confirmed plans, up to 100 worktrees."),
-		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets) } : { results: await env.worktrees.remove(removal.plans) }),
+		body => checked(parseWorktreeRemoval(body), `Expected a preview with targets or removal with confirmed plans, up to ${MAX_WORKTREE_BATCH} worktrees.`),
+		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets, removal.merged) } : { results: await env.worktrees.remove(removal.plans) }),
 	);
 
 	/** `PUT /api/worktree/release` `{ cwd, branch }`: remove the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */

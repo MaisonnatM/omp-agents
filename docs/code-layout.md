@@ -49,6 +49,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Projects: `web/components/projects/projects-page.tsx`; a project's **Project** and **User** notes trees are `ProjectNotesList` in `project-parts.tsx` beside it, over `noteRows` in `web/notes-model.ts`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
+    Settings › Worktrees, with its **Merged** marks and **Remove merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry; change them only as `web/components/ui/PATCHES.md` describes.
 
@@ -165,6 +166,7 @@ The server lives in `src/`:
   `factsOf` answers one shared empty `SessionFacts` for a session it does not know, and a known session's own arrays, so the facts of an unchanged session stay the same objects.
   A `gt submit` call's branch is the one its `--branch` names, else `branchAt` over `git.ts`'s `headHistory` of the directory it ran in: the branch that the first checkout after the call moved from, else the one checked out now.
 - `src/pull-requests.ts`: maps each workspace to its GitHub repository, reads the pull request list with one `gh api graphql` call per repository, and reads one pull request's details with one more.
+  `mergedPullRequests` asks one `gh api graphql` call for the newest pull request from each of a repository's branches, with one alias per branch, and keeps the merged ones with their merge time, for `src/worktrees.ts`.
   `loadPullRequestTitle` reads only a linked PR's title through a separate 30-second cache, without loading its details.
   `src/github.ts`'s `repoOf` keeps each workspace's repository, or its lack of one, for ten minutes in a `createCache` from `src/cache.ts`, and runs at most eight `git remote` lookups at once through a `limit` gate from `src/map-limit.ts`.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
@@ -178,6 +180,9 @@ The server lives in `src/`:
   The inventory and the snapshot of what uses the checkouts resolve each distinct directory once, and run those realpaths and the per-directory and per-repository git probes `PROBE_PARALLEL` (16) at a time.
   The inventory then reads every repository's checkouts from one queue, four at a time, with one `git rev-parse` for their identity, and `previewAll` previews several targets from one snapshot of what uses them, four at a time; `src/map-limit.ts` holds `mapLimit`, the ordered, bounded `Promise.all` they share, and `limit`, a gate that bounds tasks arriving one by one.
   A preview reports a path that git no longer lists as a worktree with the `unregistered` blocker, which `Worktrees` tells apart from other failures by its `UnregisteredWorktree` error class.
+  The inventory marks each linked checkout's `merged`: `git merge-base --is-ancestor` against `refs/remotes/origin/HEAD` for each distinct commit, then one `mergedPullRequests` call per repository, through the `WorktreesEnv` seam that tests fake, for the branches the default branch lacks.
+  A merged pull request counts only when the branch's last commit is no newer than the merge, read with one `git log --no-walk` call.
+  `previewAll(targets, true)`, for **Remove merged**, runs the same check and adds the `unmerged` blocker to each target it cannot show merged; removal needs no second check, since the confirmation pins the branch and commit.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows, and outside the sign-in and config directories in `DENIED_DIRS`.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/changes.ts`: the session changes dialog's reads for `GET /api/changes` and `GET /api/changes/file`, a session's checkout diff merged with its own changed files, the last scan of each place kept for three seconds so that reading a file does not list every change again, and each session transcript folded into its changed files once, by the lines it gained since; `src/shared/changes.ts` holds the shapes the page shares, `parseFullDiff`, which numbers the rows of a whole-file diff, and `patchRows`, which fills GitHub's patch out to the whole file.
@@ -323,7 +328,7 @@ The page lives in `web/`.
   `preferences-tab.tsx` holds the dashboard's browser-local choices, and `routing-tab.tsx` the Models section: roles, model chains, provider order, and retries.
   `workspaces-tab.tsx` lists the workspaces with **Hide**, the hidden ones with **Show**, and adds a directory by path through `PUT /api/workspaces`; the list it shows comes back as the `workspaces` socket message.
   `source-control-tab.tsx` shows the `gh` and `gt` rows, the automatic pull switch, each repository's override with its last pull, and the default merge method, which `web/merge-method.ts` keeps in localStorage with the method last picked on a merge button.
-  `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each, and removes them.
+  `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each and which merged, and removes them one by one or, through **Remove merged**, every merged one nothing blocks, previewing and removing in batches of `MAX_WORKTREE_BATCH`.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section; `context-sources.tsx` renders the context-source table with its workspace and session filters.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.

@@ -1313,6 +1313,13 @@ An action that fails shows its error, and its control becomes available again.
   A detached commit that no branch contains is named before its registration can be removed.
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
   Disk use is approximate, and removing a checkout may free less than the number shown.
+  A row whose work has merged says **Merged** after its branch, with the pull request's number when GitHub's newest pull request from that branch merged.
+  A worktree counts as merged when `origin`'s default branch contains its commit, which also covers a detached checkout, or when its branch's newest pull request merged and the branch has no commit made after the merge, which covers squash merges such as Graphite's.
+  The main checkout is never flagged, and a repository GitHub cannot answer for says so above the list, while the default branch still flags what it contains.
+  **Remove merged** previews every merged row the search shows and lists the ones it will remove and the ones it keeps, each with the reason.
+  It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses.
+  Confirming removes only the worktrees it listed for removal, keeps their branches, and reports how many it removed, kept, and failed to remove.
+  Nothing is removed until you confirm.
 - **Models** shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
   A role without its own chain says that it uses the `default` role's chain.
   Chains keyed by a model or a `provider/*` wildcard appear in their own table, and the `modelProviderOrder` follows.

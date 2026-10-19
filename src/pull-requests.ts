@@ -312,6 +312,44 @@ export function loadPullRequestTitle(pr: PullRequest): Promise<Pick<PullRequestD
 	});
 }
 
+/** A branch's newest pull request, once it merged. */
+export interface MergedPullRequest {
+	number: number;
+	mergedAt: number;
+}
+
+/** The newest pull request from each of `branches`, by its alias `b<index>` in the answer to {@link mergedQuery}, kept when it merged. */
+export function parseMergedAnswer(answer: unknown, branches: string[]): Map<string, MergedPullRequest> {
+	const data = dataOf(answer);
+	const repository = isObject(data.repository) ? data.repository : {};
+	const merged = new Map<string, MergedPullRequest>();
+	branches.forEach((branch, index) => {
+		const node = nodesOf(repository[`b${index}`])[0];
+		const mergedAt = isObject(node) ? Date.parse(str(node.mergedAt) ?? "") : Number.NaN;
+		if (isObject(node) && node.state === "MERGED" && typeof node.number === "number" && !Number.isNaN(mergedAt)) merged.set(branch, { number: node.number, mergedAt });
+	});
+	return merged;
+}
+
+/** One query for the newest pull request from each of `count` head branches, named `$b<index>`; an older merged one does not count once a branch opens another. */
+const mergedQuery = (count: number): string => {
+	const indexes = Array.from({ length: count }, (_, index) => index);
+	return `query($owner: String!, $repo: String!, ${indexes.map(index => `$b${index}: String!`).join(", ")}) { repository(owner: $owner, name: $repo) {
+	${indexes.map(index => `b${index}: pullRequests(headRefName: $b${index}, first: 1, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { number state mergedAt } }`).join("\n\t")}
+} }`;
+};
+
+/** The branches of `branches` whose newest pull request in `cwd`'s GitHub repository merged, from one `gh` call; empty when `origin` is not on GitHub. */
+export async function mergedPullRequests(cwd: string, branches: string[]): Promise<Map<string, MergedPullRequest>> {
+	const repo = await repoOf(cwd);
+	if (!repo || branches.length === 0) return new Map();
+	const vars: Record<string, string> = { owner: repo.owner, repo: repo.repo };
+	branches.forEach((branch, index) => {
+		vars[`b${index}`] = branch;
+	});
+	return parseMergedAnswer(await ghGraphql(mergedQuery(branches.length), vars), branches);
+}
+
 /**
  * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.

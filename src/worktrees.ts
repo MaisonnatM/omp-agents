@@ -6,8 +6,9 @@ import { canonical, commonDir, git, repositoryAt, worktreeAt, worktreesOf, type 
 import { errorText } from "./json";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { run } from "./proc";
+import type { MergedPullRequest } from "./pull-requests";
 import type { BranchRelease } from "./shared/git";
-import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
+import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMerge, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
 
 interface Occupant {
 	cwd: string;
@@ -19,6 +20,8 @@ interface WorktreesEnv {
 	activity(): { id: string; cwd: string; modifiedAt: number }[];
 	live(): Occupant[];
 	serverCwd: string;
+	/** The branches of `branches` whose newest pull request in `repository`'s GitHub repository merged. */
+	mergedPullRequests(repository: string, branches: string[]): Promise<Map<string, MergedPullRequest>>;
 }
 
 interface HostUse {
@@ -31,6 +34,18 @@ interface HostUse {
 interface UseSnapshot {
 	hosts: HostUse[];
 	activity: { id: string; path: string; modifiedAt: number }[];
+}
+
+/** A registered checkout before the inventory says whether its work merged. */
+type Checkout = Omit<WorktreeEntry, "merged">;
+
+/** A checkout's branch and commit, which decide whether its work merged. */
+type Tip = Pick<WorktreeEntry, "path" | "branch" | "head">;
+
+/** The merged checkouts of one repository, by path, and why GitHub could not say, when it could not. */
+interface Merges {
+	merged: Map<string, WorktreeMerge>;
+	error: string | null;
 }
 
 /** Most checkouts read at once, each by a git call or a few. */
@@ -170,7 +185,7 @@ export class Worktrees {
 		return blockers;
 	}
 
-	async #detachedLoss(entry: WorktreeEntry): Promise<boolean> {
+	async #detachedLoss(entry: Checkout): Promise<boolean> {
 		if (entry.branch !== null || !entry.head) return false;
 		const cwd = entry.missing ? entry.repository : entry.path;
 		const contains = entry.missing ? entry.head : "HEAD";
@@ -187,7 +202,7 @@ export class Worktrees {
 		return { common: await canonical(lines[0]!.trim()), top: await canonical(lines[1]!.trim()) };
 	}
 
-	async #entry(repository: string, registration: Registration, mainPath: string, serverPath: string, snapshot: UseSnapshot | null): Promise<WorktreeEntry> {
+	async #entry(repository: string, registration: Registration, mainPath: string, serverPath: string, snapshot: UseSnapshot | null): Promise<Checkout> {
 		const path = await canonical(registration.path);
 		const blockers: WorktreeBlocker[] = [];
 		if (registration.main || registration.bare) blockers.push({ code: "main", message: "The main or bare worktree cannot be removed here." });
@@ -219,6 +234,46 @@ export class Worktrees {
 		};
 	}
 
+	/**
+	 * Which of `tips`, all in `repository`, merged: a commit that `origin`'s default branch contains, or a branch whose newest
+	 * pull request merged, which a squash merge leaves outside the default branch, unless the branch has a commit made after.
+	 * `error` says why the rest could not be told, such as GitHub failing to answer; what was told before it stays.
+	 */
+	async #merges(repository: string, tips: Tip[]): Promise<Merges> {
+		const merged = new Map<string, WorktreeMerge>();
+		try {
+			const trunk = await run(["git", "-C", repository, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+			if (trunk.code === 0) {
+				const branch = trunk.stdout.trim();
+				const contained = await probeEach(tips.flatMap(tip => (tip.head ? [tip.head] : [])), async head => (await run(["git", "-C", repository, "merge-base", "--is-ancestor", head, "refs/remotes/origin/HEAD"])).code === 0);
+				for (const tip of tips) {
+					const probed = contained.get(tip.head);
+					if (probed?.ok && probed.value) merged.set(tip.path, { by: "default-branch", branch });
+				}
+			}
+			const rest = tips.flatMap(tip => (tip.branch !== null && tip.head && !merged.has(tip.path) ? [{ path: tip.path, branch: tip.branch, head: tip.head }] : []));
+			if (!rest.length) return { merged, error: null };
+			const pulls = await this.env.mergedPullRequests(repository, [...new Set(rest.map(tip => tip.branch))]);
+			const ended = rest.flatMap(tip => {
+				const pull = pulls.get(tip.branch);
+				return pull ? [{ ...tip, pull }] : [];
+			});
+			if (!ended.length) return { merged, error: null };
+			const log = await git(repository, "log", "--no-walk=unsorted", "--format=%H %ct", ...new Set(ended.map(tip => tip.head)));
+			const madeAt = new Map(log.trim().split("\n").map(line => {
+				const [commit = "", seconds = ""] = line.split(" ");
+				return [commit, Number(seconds) * 1000];
+			}));
+			for (const tip of ended) {
+				const at = madeAt.get(tip.head);
+				if (at !== undefined && at <= tip.pull.mergedAt) merged.set(tip.path, { by: "pull-request", number: tip.pull.number });
+			}
+			return { merged, error: null };
+		} catch (err) {
+			return { merged, error: errorText(err) };
+		}
+	}
+
 	async inventory(scope: string | null): Promise<WorktreeInventory> {
 		const result: WorktreeInventory = { repositories: [], errors: [] };
 		const snapshot = await this.#snapshot();
@@ -237,6 +292,9 @@ export class Worktrees {
 		const reads = [...listingOf].flatMap(([repository, probed]) => (probed.ok ? probed.value.listed.map(registration => ({ repository, registration, mainPath: probed.value.mainPath })) : []));
 		const read = await mapLimit(reads, READ_CONCURRENCY, ({ repository, registration, mainPath }) => settle(this.#entry(repository, registration, mainPath, serverPath, snapshot)));
 		const entriesOf = Map.groupBy(read, (_, index) => reads[index]!.repository);
+		const mergesOf = await probeEach(repositories, repository =>
+			this.#merges(repository, (entriesOf.get(repository) ?? []).flatMap(probed => (probed.ok && !probed.value.main && !probed.value.bare ? [probed.value] : []))),
+		);
 		const known = new Set<string>();
 		for (const cwd of cwds) {
 			try {
@@ -249,8 +307,11 @@ export class Worktrees {
 				if (known.has(repository)) continue;
 				known.add(repository);
 				const { listed } = unwrap(listingOf.get(repository));
-				const worktrees = (entriesOf.get(repository) ?? []).map(unwrap);
-				result.repositories.push({ repository, path: listed[0]?.path ?? cwd, name: basename(listed[0]?.path ?? cwd), worktrees });
+				const path = listed[0]?.path ?? cwd;
+				const { merged, error } = unwrap(mergesOf.get(repository));
+				if (error) result.errors.push({ path, error: `Cannot tell which worktrees merged: ${error}` });
+				const worktrees = (entriesOf.get(repository) ?? []).map(unwrap).map(entry => ({ ...entry, merged: merged.get(entry.path) ?? null }));
+				result.repositories.push({ repository, path, name: basename(path), worktrees });
 			} catch (err) {
 				result.errors.push({ path: cwd, error: errorText(err) });
 			}
@@ -258,7 +319,7 @@ export class Worktrees {
 		return result;
 	}
 
-	async #find(target: WorktreeTarget, snapshot: UseSnapshot | null): Promise<WorktreeEntry> {
+	async #find(target: WorktreeTarget, snapshot: UseSnapshot | null): Promise<Checkout> {
 		const repository = await canonical(target.repository);
 		if ((await commonDir(repository)) !== repository) throw new Error("Repository identity changed.");
 		const listed = await worktreesOf(repository);
@@ -315,10 +376,23 @@ export class Worktrees {
 		return result;
 	}
 
-	/** The plans for `targets`, in their order, read concurrently from one snapshot of what uses them. */
-	async previewAll(targets: WorktreeTarget[]): Promise<WorktreeRemovalPlan[]> {
+	/**
+	 * The plans for `targets`, in their order, read concurrently from one snapshot of what uses them. `merged` blocks each
+	 * target whose work has not merged; the confirmation pins the branch and commit this checked, so removal need not ask again.
+	 */
+	async previewAll(targets: WorktreeTarget[], merged: boolean): Promise<WorktreeRemovalPlan[]> {
 		const snapshot = await this.#snapshot();
-		return mapLimit(targets, READ_CONCURRENCY, target => this.preview(target, snapshot));
+		const plans = await mapLimit(targets, READ_CONCURRENCY, target => this.preview(target, snapshot));
+		if (!merged) return plans;
+		const readable = plans.flatMap(plan => (plan.kind === "unreadable" ? [] : [plan]));
+		const mergesOf = await probeEach(readable.map(plan => plan.repository), repository => this.#merges(repository, readable.filter(plan => plan.repository === repository)));
+		return plans.map(plan => {
+			if (plan.kind === "unreadable") return plan;
+			const { merged: done, error } = unwrap(mergesOf.get(plan.repository));
+			if (done.has(plan.path)) return plan;
+			const message = error ? `Cannot tell whether this worktree merged: ${error}` : "Not merged: the default branch lacks this commit, and no merged pull request took it.";
+			return { ...plan, blockers: [...plan.blockers, { code: "unmerged", message }] };
+		});
 	}
 
 	async preview(target: WorktreeTarget, snapshot?: UseSnapshot): Promise<WorktreeRemovalPlan> {

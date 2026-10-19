@@ -59,7 +59,7 @@ export const readWorktrees = (cwd: string | null, signal?: AbortSignal): Promise
 export const readWorktreeMetrics = (target: WorktreeTarget, signal?: AbortSignal): Promise<WorktreeMetrics> =>
 	getJson(`/api/worktrees/metrics?${new URLSearchParams({ repository: target.repository, path: target.path })}`, signal);
 
-export async function changeWorktrees(request: { action: "preview"; targets: WorktreeTarget[] }, signal?: AbortSignal): Promise<{ plans: WorktreeRemovalPlan[] }>;
+export async function changeWorktrees(request: { action: "preview"; targets: WorktreeTarget[]; merged: boolean }, signal?: AbortSignal): Promise<{ plans: WorktreeRemovalPlan[] }>;
 export async function changeWorktrees(request: { action: "remove"; plans: WorktreeConfirmation[] }, signal?: AbortSignal): Promise<{ results: WorktreeRemovalResult[] }>;
 export async function changeWorktrees(request: WorktreeRemovalRequest, signal?: AbortSignal): Promise<{ plans: WorktreeRemovalPlan[] } | { results: WorktreeRemovalResult[] }> {
 	return putJson("/api/worktrees/removal", request, signal);

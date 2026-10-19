@@ -28,7 +28,7 @@ import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues
 import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { isTodoId, parseTodoChange } from "../user-todos-parse";
-import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
+import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequest, type WorktreeTarget } from "../worktrees-shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -623,20 +623,20 @@ export const SHA256 = /^[0-9a-f]{64}$/;
 const parseWorktreeTarget = (value: unknown): Parsed<WorktreeTarget> =>
 	isObject(value) && isNonEmpty(value.repository) && isNonEmpty(value.path) ? { ok: { repository: value.repository, path: value.path } } : null;
 
-/** The body of `PUT /api/worktrees/removal`: a preview of up to 100 registered checkouts, or the confirmations from such a preview. */
+/** The body of `PUT /api/worktrees/removal`: a preview of up to `MAX_WORKTREE_BATCH` registered checkouts, `merged` for **Remove merged**, or the confirmations from such a preview. */
 export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalRequest> {
 	if (!isObject(body)) return null;
 	if (body.action === "preview") {
-		if (!Array.isArray(body.targets) || body.targets.length === 0 || body.targets.length > 100) return null;
+		if (!Array.isArray(body.targets) || body.targets.length === 0 || body.targets.length > MAX_WORKTREE_BATCH) return null;
 		const targets: WorktreeTarget[] = [];
 		for (const item of body.targets) {
 			const target = parseWorktreeTarget(item);
 			if (!target) return null;
 			targets.push(target.ok);
 		}
-		return { ok: { action: "preview", targets } };
+		return { ok: { action: "preview", targets, merged: body.merged === true } };
 	}
-	if (body.action !== "remove" || !Array.isArray(body.plans) || body.plans.length === 0 || body.plans.length > 100) return null;
+	if (body.action !== "remove" || !Array.isArray(body.plans) || body.plans.length === 0 || body.plans.length > MAX_WORKTREE_BATCH) return null;
 	const plans: WorktreeConfirmation[] = [];
 	for (const item of body.plans) {
 		const target = parseWorktreeTarget(item);

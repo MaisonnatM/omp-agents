@@ -13,7 +13,7 @@ import { flushJsonFiles } from "../fs";
 import { gitCheckout } from "../git";
 import { GmailClient } from "../gmail";
 import { GoogleCalendarClient } from "../google-calendar";
-import { loadPullRequestDetail, loadPullRequests } from "../pull-requests";
+import { loadPullRequestDetail, loadPullRequests, mergedPullRequests } from "../pull-requests";
 import { loadTickets } from "../tickets";
 import { integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
@@ -227,6 +227,7 @@ export class Dashboard {
 			knownCwds: () => this.knownCwds(),
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
+			mergedPullRequests,
 			live() {
 				return sessions.rows(files.factsOf).map(host => ({
 					cwd: host.cwd,

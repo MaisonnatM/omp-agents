@@ -850,9 +850,11 @@ A pull, from that change or from the pull loop every five minutes, waits for the
 It reads the default branch from `origin/HEAD`, fetches it, and moves the local branch only when it is behind `origin`'s with no commits of its own: through `merge --ff-only` in the worktree that has it checked out, skipped when that worktree has changes to tracked files, else through `update-ref`.
 
 `GET /api/worktrees` lists the worktrees of every repository a session ran in, or of `?cwd=` when that directory is in a repository.
-Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, and why removal is refused.
+Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, why removal is refused, and `merged`: `{ by: "pull-request", number }`, `{ by: "default-branch", branch }`, or `null`.
+A linked checkout is merged when `origin`'s default branch contains its commit, or when its branch's newest pull request merged no earlier than the branch's last commit; the pull requests come from one `gh api graphql` call per repository, and a failed call becomes an entry in `errors`.
 `GET /api/worktrees/metrics?repository=&path=` reads approximate allocated disk use, the last commit time, and the modified and untracked counts for one registered checkout.
-`PUT /api/worktrees/removal` previews a removal or performs one whose confirmation still matches that preview.
+`PUT /api/worktrees/removal` previews a removal or performs one whose confirmation still matches that preview, up to `MAX_WORKTREE_BATCH` (100) worktrees per request.
+A preview with `merged: true`, which **Remove merged** sends, adds the `unmerged` blocker to every target the same check cannot show merged, so the page removes only the merged ones nothing else blocks.
 Removal uses `git worktree remove` without `--force`, so Git keeps the branch and still refuses a dirty or locked checkout.
 A missing directory is removed the same way, which drops only that registration.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.

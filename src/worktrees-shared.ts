@@ -9,7 +9,8 @@ export type WorktreeBlockerCode =
 	| "changed"
 	| "nested-repository"
 	| "drift"
-	| "unregistered";
+	| "unregistered"
+	| "unmerged";
 
 export interface WorktreeBlocker {
 	code: WorktreeBlockerCode;
@@ -20,6 +21,12 @@ export interface WorktreeTarget {
 	repository: string;
 	path: string;
 }
+
+/** The most worktrees one removal request previews or removes. */
+export const MAX_WORKTREE_BATCH = 100;
+
+/** Why a checkout's work counts as merged: its branch's newest pull request merged, or the default branch contains its commit. */
+export type WorktreeMerge = { by: "pull-request"; number: number } | { by: "default-branch"; branch: string };
 
 export interface WorktreeEntry extends WorktreeTarget {
 	branch: string | null;
@@ -32,6 +39,8 @@ export interface WorktreeEntry extends WorktreeTarget {
 	lastActivity: number | null;
 	savedSessionIds: string[];
 	blockers: WorktreeBlocker[];
+	/** `null` for a main or bare checkout, and for one nothing shows merged. */
+	merged: WorktreeMerge | null;
 }
 
 export interface WorktreeInventory {
@@ -71,4 +80,5 @@ export interface WorktreeConfirmation extends WorktreeTarget {
 	confirmation: string;
 }
 
-export type WorktreeRemovalRequest = { action: "preview"; targets: WorktreeTarget[] } | { action: "remove"; plans: WorktreeConfirmation[] };
+/** `merged` adds the `unmerged` blocker to every target whose work is not merged, for **Remove merged**. */
+export type WorktreeRemovalRequest = { action: "preview"; targets: WorktreeTarget[]; merged: boolean } | { action: "remove"; plans: WorktreeConfirmation[] };
