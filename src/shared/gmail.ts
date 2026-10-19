@@ -1,8 +1,11 @@
 /** The Inbox page's mail: the latest conversations of your Gmail inbox, one conversation in full, and the mail and trashing it sends. */
-import { arrayOf, decoder, fields, isBoolean, isNumber, isString } from "../json";
+import { arrayOf, decoder, fields, isBoolean, isNumber, isString, nullable } from "../json";
+import type { AccountId } from "./accounts";
 
 /** One conversation in your Gmail inbox, as the Inbox page lists it. */
 export interface MailThread {
+	/** The Gmail account whose inbox holds it. */
+	account: AccountId;
 	id: string;
 	/** Who sent the thread's last message: their display name, else their address. */
 	from: string;
@@ -20,18 +23,34 @@ export interface MailThread {
 	url: string;
 }
 
-/** `GET /api/gmail/inbox[?fresh]`: the signed-in address and its inbox's latest conversations. */
+/** One Gmail account the inbox read, and why its read failed, `null` when it worked; its address is its integration account's. */
+export interface InboxAccount {
+	account: AccountId;
+	error: string | null;
+}
+
+/** `GET /api/gmail/inbox[?fresh]`: each signed-in Gmail account and the latest conversations of their inboxes, newest first. */
 export interface InboxAnswer {
-	address: string;
+	accounts: InboxAccount[];
 	threads: MailThread[];
 }
 
-/** A kept {@link InboxAnswer} with every conversation whole, or `null`. */
+/** A kept {@link InboxAnswer} with every account and conversation whole, or `null`. */
 export const decodeInboxAnswer = decoder(
 	fields<InboxAnswer>({
-		address: isString,
+		accounts: arrayOf(fields<InboxAccount>({ account: isString, error: nullable(isString) })),
 		threads: arrayOf(
-			fields<MailThread>({ id: isString, from: isString, subject: isString, snippet: isString, at: isNumber, unread: isBoolean, count: isNumber, url: isString }),
+			fields<MailThread>({
+				account: isString,
+				id: isString,
+				from: isString,
+				subject: isString,
+				snippet: isString,
+				at: isNumber,
+				unread: isBoolean,
+				count: isNumber,
+				url: isString,
+			}),
 		),
 	}),
 );
@@ -79,8 +98,9 @@ export interface MailMessage {
 	attachments: MailAttachment[];
 }
 
-/** `GET /api/gmail/thread?id=<id>[&fresh]`: one conversation in full. */
+/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: one conversation in full. */
 export interface ThreadAnswer {
+	account: AccountId;
 	id: string;
 	/** The first message's subject; `""` when it has none. */
 	subject: string;
@@ -103,14 +123,15 @@ export interface MailDraft {
 	text: string;
 }
 
-/** `PUT /api/gmail/send`: a new mail, which starts a conversation of its own. */
-export type MailSend = MailDraft;
+/** `PUT /api/gmail/send`: a new mail from Gmail account `account`, which starts a conversation of its own. */
+export type MailSend = MailDraft & { account: AccountId };
 
-/** `PUT /api/gmail/reply`: a reply to the last message of conversation `thread`, under the conversation's subject. */
-export type MailReply = Omit<MailDraft, "subject"> & { thread: string };
+/** `PUT /api/gmail/reply`: a reply to the last message of conversation `thread` of Gmail account `account`, under the conversation's subject. */
+export type MailReply = Omit<MailDraft, "subject"> & { account: AccountId; thread: string };
 
-/** `PUT /api/gmail/trash`: moves conversation `thread` to Gmail's Trash, where Gmail keeps it 30 days. */
+/** `PUT /api/gmail/trash`: moves conversation `thread` of Gmail account `account` to Gmail's Trash, where Gmail keeps it 30 days. */
 export interface MailTrash {
+	account: AccountId;
 	thread: string;
 }
 

@@ -104,7 +104,7 @@ function sources(state: State): NoticeSources {
 		localEvents: () => state.localEvents ?? [],
 		googleEvents: async () => {
 			if (state.googleError) throw new Error(state.googleError);
-			return state.googleEvents ?? [];
+			return [{ account: "google-calendar", events: state.googleEvents ?? [] }];
 		},
 		projects: () => [],
 	now: () => state.now ?? 0,

@@ -1,36 +1,21 @@
 import { useState } from "react";
 import { errorText } from "../../../src/json";
-import { type EventWhen, type GoogleCalendar, type LocalEvent, MAX_EVENT_TITLE, type NewEvent, type NewEventAnswer, type NewEventCalendar } from "../../../src/shared/calendar";
+import { type EventWhen, type LocalEvent, MAX_EVENT_TITLE, type NewEvent, type NewEventAnswer } from "../../../src/shared/calendar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { putJson } from "../../api";
+import { calendarChoices, keptChoice } from "../../calendar-model";
 import { dateOfDay, localDay, minutesOfTimeInput, timeInputValue } from "../../days";
 import { useGoogleCalendars } from "../../reads";
 import { chordLabel } from "../../shortcuts";
 import { ERROR_TEXT, FormDialog, FormDialogHeader, isSubmitChord, type Submit } from "../form-dialog";
 
-/** The calendar the last new event went in, as its {@link CalendarChoice} `value`. */
+/** The calendar the last new event went in, as its picker choice's `value`, which {@link keptChoice} reads back. */
 const LAST_CALENDAR_KEY = "omp-agents.new-event-calendar";
 
 const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 const LAST_MINUTE = 23 * 60 + 59;
-
-/** A calendar the picker offers, by the value that names it. */
-interface CalendarChoice {
-	value: string;
-	label: string;
-	calendar: NewEventCalendar;
-}
-
-const LOCAL_CHOICE: CalendarChoice = { value: "local", label: "This computer", calendar: { kind: "local" } };
-
-/** The picker's choices: the shown Google calendars you may write to, yours first, then this computer. */
-function calendarChoices(calendars: GoogleCalendar[]): CalendarChoice[] {
-	const writable = calendars.filter(calendar => calendar.shown && calendar.writable);
-	const mineFirst = [...writable.filter(calendar => calendar.group === "mine"), ...writable.filter(calendar => calendar.group === "other")];
-	return [...mineFirst.map(({ id, name }): CalendarChoice => ({ value: `google:${id}`, label: name, calendar: { kind: "google", calendarId: id } })), LOCAL_CHOICE];
-}
 
 /** Epoch ms of `minutes` after the local midnight that starts `day`. */
 function atMinutes(day: string, minutes: number): number {
@@ -66,6 +51,8 @@ function eventWhen(allDay: boolean, { day, lastDay, start, end }: Times): EventW
 interface NewEventDialogProps {
 	/** The day the event starts on, `YYYY-MM-DD`, until another is picked. */
 	day: string;
+	/** The sidebar's workspace, whose Google Calendar accounts the picker offers; `null` for all workspaces. */
+	workspace: string | null;
 	onClose: () => void;
 	/** The event was added: its first day, and the event as kept on this computer, or `null` for one added to a Google calendar. */
 	onCreated: (day: string, kept: LocalEvent | null) => void;
@@ -75,8 +62,8 @@ interface NewEventDialogProps {
  * The Calendar page's new-event dialog: a title, all day or a start and end time, and the calendar it goes in, a Google
  * calendar you may write to or this computer, the last one used first.
  */
-export function NewEventDialog({ day: initialDay, onClose, onCreated }: NewEventDialogProps) {
-	const { calendars } = useGoogleCalendars();
+export function NewEventDialog({ day: initialDay, workspace, onClose, onCreated }: NewEventDialogProps) {
+	const { calendars, accounts } = useGoogleCalendars(workspace);
 	const [title, setTitle] = useState("");
 	const [allDay, setAllDay] = useState(false);
 	const [times, setTimes] = useState<Times>(() => {
@@ -86,8 +73,8 @@ export function NewEventDialog({ day: initialDay, onClose, onCreated }: NewEvent
 	const [picked, setPicked] = useState<string | null>(() => localStorage.getItem(LAST_CALENDAR_KEY));
 	const [submit, setSubmit] = useState<Submit>({ kind: "writing" });
 
-	const choices = calendarChoices(calendars ?? []);
-	const choice = choices.find(candidate => candidate.value === picked) ?? choices[0]!;
+	const choices = calendarChoices(calendars ?? [], accounts);
+	const choice = keptChoice(choices, picked);
 	const when = eventWhen(allDay, times);
 	const creating = submit.kind === "creating";
 	const ready = title.trim() !== "" && !("error" in when) && !creating;

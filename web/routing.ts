@@ -39,10 +39,17 @@ export interface TicketsRoute {
 	target: string | null;
 }
 
-/** The Inbox list, or the Gmail conversation whose details replace it when `target` is non-null. */
-export interface InboxRoute {
+/** A Gmail conversation, by the account whose inbox holds it and its thread id. */
+export interface InboxThread {
+	/** The account's server name in omp's config: `gmail`, `gmail-2`. */
+	account: string;
 	/** Gmail's thread id: `18f2a3c4d5e6f708`. */
-	target: string | null;
+	thread: string;
+}
+
+/** The Inbox list, beside the Gmail conversation `target` names, or the new mail when it is `new`. */
+export interface InboxRoute {
+	target: InboxThread | "new" | null;
 }
 
 /**
@@ -162,8 +169,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
- * - `#inbox` opens the Inbox page, your Gmail inbox's latest conversations, and `#inbox/<thread id>` opens that
- *   conversation in full in the main content.
+ * - `#inbox` opens the Inbox page, your Gmail inboxes' latest conversations, `#inbox/new` a new mail, and
+ *   `#inbox/<account>/<thread id>` that account's conversation in full in the main content.
  * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
@@ -193,7 +200,11 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "projects", target: rest === "new" ? { kind: "new" } : id ? { kind: "project", id } : { kind: "list" } };
 	},
 	calendar: () => ({ kind: "calendar" }),
-	inbox: rest => ({ kind: "inbox", target: rest ? decodeSegment(rest) : null }),
+	inbox: rest => {
+		if (rest === "new") return { kind: "inbox", target: "new" };
+		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
+		return { kind: "inbox", target: account && thread && more.length === 0 ? { account, thread } : null };
+	},
 };
 
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
@@ -216,8 +227,9 @@ function restOfPage(page: Page): string | null {
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "routines":
-		case "inbox":
 			return page.target === null ? null : encodeURIComponent(page.target);
+		case "inbox":
+			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
 		case "projects":
@@ -263,7 +275,7 @@ export function hashForPage(page: Page): string {
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
-export const hashForInbox = (target: string | null): string => hashForPage({ kind: "inbox", target });
+export const hashForInbox = (target: InboxRoute["target"]): string => hashForPage({ kind: "inbox", target });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
 export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);

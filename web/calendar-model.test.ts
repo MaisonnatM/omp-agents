@@ -1,9 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import type { Routine, RoutineRun, Schedule } from "../src/routines";
-import type { CalendarEvent, LocalEvent } from "../src/shared/calendar";
+import type { GoogleAccount } from "../src/shared/accounts";
+import type { CalendarEvent, GoogleCalendar, LocalEvent } from "../src/shared/calendar";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
-import { type CalendarEntry, calendarEntries } from "./calendar-model";
+import { type CalendarEntry, calendarChoices, calendarEntries, keptChoice } from "./calendar-model";
 
 // Weekly slots are local wall-clock times; Paris leaves DST on 2026-10-25, inside the month below.
 const savedTz = process.env.TZ;
@@ -141,7 +142,7 @@ describe("todos and tickets", () => {
 
 describe("Google events", () => {
 	const event = (when: CalendarEvent["when"], eventId = "one", writable = true): CalendarEvent => ({
-		calendarId: "personal", eventId, writable, title: "Birthday", calendar: "Personal", color: "#4285f4", url: "https://calendar.google.com/calendar/event?eid=one", when,
+		account: "google-calendar", calendarId: "personal", eventId, writable, title: "Birthday", calendar: "Personal", color: "#4285f4", url: "https://calendar.google.com/calendar/event?eid=one", when,
 	});
 
 	test("an all-day event spanning the previous month and the next shows once on every day of October", () => {
@@ -165,12 +166,12 @@ describe("Google events", () => {
 		]);
 	});
 
-	test("an event of a calendar you may write to is deleted by its calendar's id and its own, and one of a calendar you may only read cannot be", () => {
+	test("an event of a calendar you may write to is deleted by its account, its calendar's id, and its own, and one of a calendar you may only read cannot be", () => {
 		const day = { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" } as const;
 		const entries = october({ events: [event(day), event(day, "team", false)] });
 		expect(entries.map(entry => entry.kind === "event" && [entry.event.id, entry.event.source.ref])).toEqual([
-			["personal/one", { kind: "google", calendarId: "personal", eventId: "one" }],
-			["personal/team", null],
+			['["google-calendar","personal"]/one', { kind: "google", account: "google-calendar", calendarId: "personal", eventId: "one" }],
+			['["google-calendar","personal"]/team', null],
 		]);
 	});
 });
@@ -184,11 +185,32 @@ describe("events kept on this computer", () => {
 	});
 
 	test("a timed event shows on its local day, at its start, beside a Google event of the same day, in slate as on this computer", () => {
-		const google: CalendarEvent = { calendarId: "personal", eventId: "one", writable: true, title: "Birthday", calendar: "Personal", color: "#4285f4", url: "https://calendar.google.com/calendar/event?eid=one", when: { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" } };
+		const google: CalendarEvent = { account: "google-calendar", calendarId: "personal", eventId: "one", writable: true, title: "Birthday", calendar: "Personal", color: "#4285f4", url: "https://calendar.google.com/calendar/event?eid=one", when: { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" } };
 		const entries = october({ events: [google], localEvents: [local({ allDay: false, start: at("2026-10-08T23:30:00Z"), end: at("2026-10-09T00:15:00Z") })] });
 		expect(entries).toEqual([
-			{ kind: "event", day: "2026-10-09", at: null, event: { id: "personal/one", title: "Birthday", when: { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" }, color: "#4285f4", place: "Personal", source: { kind: "google", url: "https://calendar.google.com/calendar/event?eid=one", ref: { kind: "google", calendarId: "personal", eventId: "one" } } } },
+			{ kind: "event", day: "2026-10-09", at: null, event: { id: '["google-calendar","personal"]/one', title: "Birthday", when: { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" }, color: "#4285f4", place: "Personal", source: { kind: "google", url: "https://calendar.google.com/calendar/event?eid=one", ref: { kind: "google", account: "google-calendar", calendarId: "personal", eventId: "one" } } } },
 			{ kind: "event", day: "2026-10-09", at: at("2026-10-09T01:30:00+02:00"), event: { id: "e1", title: "Dentist", when: { allDay: false, start: at("2026-10-08T23:30:00Z"), end: at("2026-10-09T00:15:00Z") }, color: "#64748b", place: "This computer", source: { kind: "local", ref: { kind: "local", id: "e1" } } } },
 		]);
+	});
+});
+
+describe("the new event's calendars", () => {
+	const account = (name: string): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "signed-out", server: { name, url: "https://calendarmcp.googleapis.com/mcp/v1", host: "calendarmcp.googleapis.com" } }, workspaces: [] });
+	const calendar = (account: string, id: string, group: GoogleCalendar["group"] = "mine"): GoogleCalendar => ({ account, id, name: id, color: "#4285f4", group, writable: true, shown: true, error: null });
+	const choices = calendarChoices([calendar("google-calendar", "team", "other"), calendar("google-calendar", "me"), calendar("google-calendar-2", "team")], [account("google-calendar"), account("google-calendar-2")]);
+	const named = (choice: { label: string }) => choice.label;
+
+	test("go account by account, yours first in each, each named with its account's address, then this computer", () => {
+		expect(choices.map(named)).toEqual(["me · google-calendar@example.com", "team · google-calendar@example.com", "team · google-calendar-2@example.com", "This computer"]);
+	});
+
+	test("the kept choice is the one its value names, and the same calendar of two accounts stays apart", () => {
+		expect(named(keptChoice(choices, choices[2]!.value))).toBe("team · google-calendar-2@example.com");
+		expect(named(keptChoice(choices, "local"))).toBe("This computer");
+	});
+
+	test("a value kept from before accounts names its calendar in the first account offering it, and an unknown one the first choice", () => {
+		expect(named(keptChoice(choices, "google:team"))).toBe("team · google-calendar@example.com");
+		expect(named(keptChoice(choices, "google:gone"))).toBe("me · google-calendar@example.com");
 	});
 });

@@ -5,7 +5,7 @@ import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseMcpServerAdd, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -439,27 +439,28 @@ describe("parseRepoQuery", () => {
 	});
 });
 
-describe("parseIntegrationId", () => {
-	test("takes the id of an MCP integration and nothing else", () => {
-		expect(parseIntegrationId({ id: "linear" })?.ok).toBe("linear");
-		expect(parseIntegrationId({ id: "slack" })?.ok).toBe("slack");
-		expect(parseIntegrationId({ id: "google-calendar" })?.ok).toBe("google-calendar");
-		expect(parseIntegrationId({ id: "gmail" })?.ok).toBe("gmail");
-		expect(parseIntegrationId({ id: "Linear" })).toBeNull();
-		expect(parseIntegrationId({ id: "google" })).toBeNull();
-		expect(parseIntegrationId({})).toBeNull();
-		expect(parseIntegrationId("linear")).toBeNull();
-		expect(parseIntegrationId(null)).toBeNull();
+describe("parseIntegrationTarget", () => {
+	test("takes an MCP integration, an account only for Gmail or Google Calendar, and null to add one", () => {
+		expect(parseIntegrationTarget({ id: "linear" })?.ok).toEqual({ id: "linear", account: null });
+		expect(parseIntegrationTarget({ id: "slack", account: null })?.ok).toEqual({ id: "slack", account: null });
+		expect(parseIntegrationTarget({ id: "gmail", account: "gmail-2" })?.ok).toEqual({ id: "gmail", account: "gmail-2" });
+		expect(parseIntegrationTarget({ id: "google-calendar", account: null })?.ok).toEqual({ id: "google-calendar", account: null });
+		expect(parseIntegrationTarget({ id: "linear", account: "linear" })).toBeNull();
+		expect(parseIntegrationTarget({ id: "gmail", account: "" })).toBeNull();
+		expect(parseIntegrationTarget({ id: "Linear" })).toBeNull();
+		expect(parseIntegrationTarget({ id: "google" })).toBeNull();
+		expect(parseIntegrationTarget("linear")).toBeNull();
+		expect(parseIntegrationTarget(null)).toBeNull();
 	});
 });
 
 describe("parseCalendarShown", () => {
-	test("takes a calendar id and a boolean, and refuses an empty id or another value for shown", () => {
-		expect(parseCalendarShown({ id: "team@group.calendar.google.com", shown: false })?.ok).toEqual({ id: "team@group.calendar.google.com", shown: false });
-		expect(parseCalendarShown({ id: "max@example.com", shown: true, extra: 1 })?.ok).toEqual({ id: "max@example.com", shown: true });
-		expect(parseCalendarShown({ id: "", shown: true })).toBeNull();
-		expect(parseCalendarShown({ id: "max@example.com", shown: "false" })).toBeNull();
-		expect(parseCalendarShown({ id: "max@example.com" })).toBeNull();
+	test("takes an account, a calendar id, and a boolean, and refuses an empty id or another value for shown", () => {
+		expect(parseCalendarShown({ account: "google-calendar", id: "team@group.calendar.google.com", shown: false })?.ok).toEqual({ account: "google-calendar", id: "team@group.calendar.google.com", shown: false });
+		expect(parseCalendarShown({ account: "google-calendar-2", id: "max@example.com", shown: true, extra: 1 })?.ok).toEqual({ account: "google-calendar-2", id: "max@example.com", shown: true });
+		expect(parseCalendarShown({ id: "max@example.com", shown: true })).toBeNull();
+		expect(parseCalendarShown({ account: "google-calendar", id: "", shown: true })).toBeNull();
+		expect(parseCalendarShown({ account: "google-calendar", id: "max@example.com", shown: "false" })).toBeNull();
 	});
 });
 
@@ -472,10 +473,10 @@ describe("parseNewEvent", () => {
 			when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" },
 			calendar: { kind: "local" },
 		});
-		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", calendarId: "max@example.com" } })?.ok).toEqual({
+		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", account: "google-calendar", calendarId: "max@example.com" } })?.ok).toEqual({
 			title: "Retro",
 			when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") },
-			calendar: { kind: "google", calendarId: "max@example.com" },
+			calendar: { kind: "google", account: "google-calendar", calendarId: "max@example.com" },
 		});
 		expect(parseNewEvent({ title: "One day", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-14" }, calendar: { kind: "local" } })?.ok.title).toBe("One day");
 	});
@@ -499,8 +500,9 @@ describe("parseNewEvent", () => {
 describe("parseEventRef", () => {
 	test("names an event kept on this computer by its id, or a Google event by its calendar's id and its own", () => {
 		expect(parseEventRef({ kind: "local", id: "e1", extra: 1 })?.ok).toEqual({ kind: "local", id: "e1" });
-		expect(parseEventRef({ kind: "google", calendarId: "max@example.com", eventId: "standup_20261005T073000Z" })?.ok).toEqual({
+		expect(parseEventRef({ kind: "google", account: "google-calendar", calendarId: "max@example.com", eventId: "standup_20261005T073000Z" })?.ok).toEqual({
 			kind: "google",
+			account: "google-calendar",
 			calendarId: "max@example.com",
 			eventId: "standup_20261005T073000Z",
 		});

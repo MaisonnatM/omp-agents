@@ -5,9 +5,19 @@
  * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
  * A shape the server also keeps in a file, such as a routine, a scheduled send, or an event's time, is parsed by its domain module.
  */
-import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, oneOf, type Parsed, str } from "../json";
+import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
-import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
+import {
+	GOOGLE_CLIENT_ID,
+	type GoogleClientInput,
+	type GoogleLinks,
+	holdsAccounts,
+	type IntegrationTarget,
+	MCP_INTEGRATIONS,
+	normalizeSlackScope,
+	type SlackClientInput,
+	slackRedirectError,
+} from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
 import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
@@ -386,8 +396,22 @@ export function parseRepoQuery(params: URLSearchParams): Parsed<Repo> {
 
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
-/** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
-export const parseIntegrationId = (body: unknown): Parsed<McpIntegrationId> => (isObject(body) && isMcpIntegration(body.id) ? { ok: body.id } : null);
+/**
+ * The body of `PUT /api/integrations/sign-in` and `/remove`: `{ id, account }`, an MCP integration and, for one of
+ * many accounts, the account's server name, or `null` to add one; a service of one server takes no account.
+ */
+export function parseIntegrationTarget(body: unknown): Parsed<IntegrationTarget> {
+	if (!isObject(body) || !isMcpIntegration(body.id)) return null;
+	const account = body.account ?? null;
+	if (account === null) return { ok: { id: body.id, account } };
+	return holdsAccounts(body.id) && isNonEmpty(account) ? { ok: { id: body.id, account } } : null;
+}
+
+/** The body of `PUT /api/integrations/google-links`: `{ address, workspaces }`, an address and the absolute workspace directories its accounts are linked to. */
+export const parseGoogleLinks = (body: unknown): Parsed<GoogleLinks> =>
+	isObject(body) && isNonEmpty(body.address) && body.address.includes("@") && isTexts(body.workspaces) && body.workspaces.every(cwd => cwd.startsWith("/"))
+		? { ok: { address: body.address, workspaces: body.workspaces } }
+		: null;
 
 /** The body of `PUT /api/mcp-servers/sign-in`, `/sign-out`, and `/remove`: `{ name }` naming a server omp loads. */
 export const parseMcpServerName = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.name) ? { ok: body.name } : null);
@@ -441,14 +465,14 @@ export const parseLoginAnswer = (body: unknown): Parsed<{ prompt: number; value:
 export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; credentialId: number }> =>
 	isObject(body) && isNonEmpty(body.provider) && isSafeInteger(body.credentialId) ? { ok: { provider: body.provider, credentialId: body.credentialId } } : null;
 
-/** The body of `PUT /api/google/calendars`: `{ id, shown }`, a Google calendar's id and whether the Calendar page shows it. */
+/** The body of `PUT /api/google/calendars`: `{ account, id, shown }`, a Google calendar's account and id and whether the Calendar page shows it. */
 export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
-	isObject(body) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { id: body.id, shown: body.shown } } : null;
+	isObject(body) && isNonEmpty(body.account) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { account: body.account, id: body.id, shown: body.shown } } : null;
 
 function parseNewEventCalendar(value: unknown): Parsed<NewEventCalendar> {
 	if (!isObject(value)) return null;
 	if (value.kind === "local") return { ok: { kind: "local" } };
-	return value.kind === "google" && isNonEmpty(value.calendarId) ? { ok: { kind: "google", calendarId: value.calendarId } } : null;
+	return value.kind === "google" && isNonEmpty(value.account) && isNonEmpty(value.calendarId) ? { ok: { kind: "google", account: value.account, calendarId: value.calendarId } } : null;
 }
 
 /** The body of `PUT /api/calendar/events/new`: a trimmed title of at most {@link MAX_EVENT_TITLE} characters, when it happens, and the calendar it goes in. */
@@ -460,11 +484,15 @@ export function parseNewEvent(body: unknown): Parsed<NewEvent> {
 	return title.length <= MAX_EVENT_TITLE && when && calendar ? { ok: { title, when: when.ok, calendar: calendar.ok } } : null;
 }
 
-/** The body of `PUT /api/calendar/events/delete`: an event kept on this computer by its id, or a Google event by its calendar's id and its own. */
+/** The body of `PUT /api/calendar/events/delete`: an event kept on this computer by its id, or a Google event by its account, its calendar's id, and its own. */
 export function parseEventRef(body: unknown): Parsed<EventRef> {
 	if (!isObject(body)) return null;
 	if (body.kind === "local") return isNonEmpty(body.id) ? { ok: { kind: "local", id: body.id } } : null;
-	if (body.kind === "google") return isNonEmpty(body.calendarId) && isNonEmpty(body.eventId) ? { ok: { kind: "google", calendarId: body.calendarId, eventId: body.eventId } } : null;
+	if (body.kind === "google") {
+		return isNonEmpty(body.account) && isNonEmpty(body.calendarId) && isNonEmpty(body.eventId)
+			? { ok: { kind: "google", account: body.account, calendarId: body.calendarId, eventId: body.eventId } }
+			: null;
+	}
 	return null;
 }
 
@@ -491,22 +519,23 @@ function draftIn(body: Record<string, unknown>): Omit<MailDraft, "subject"> | nu
 	return { to, cc, bcc, html: body.html, text: body.text };
 }
 
-/** The body of `PUT /api/gmail/reply`: the conversation to answer and the reply. */
+/** The body of `PUT /api/gmail/reply`: the account and conversation to answer, and the reply. */
 export function parseMailReply(body: unknown): Parsed<MailReply> {
-	if (!isObject(body) || !isNonEmpty(body.thread)) return null;
+	if (!isObject(body) || !isNonEmpty(body.account) || !isNonEmpty(body.thread)) return null;
 	const draft = draftIn(body);
-	return draft && { ok: { ...draft, thread: body.thread } };
+	return draft && { ok: { ...draft, account: body.account, thread: body.thread } };
 }
 
-/** The body of `PUT /api/gmail/send`: a new mail, its subject on one line. */
+/** The body of `PUT /api/gmail/send`: a new mail from an account, its subject on one line. */
 export function parseMailSend(body: unknown): Parsed<MailSend> {
-	if (!isObject(body) || typeof body.subject !== "string" || body.subject.length > 1000) return null;
+	if (!isObject(body) || !isNonEmpty(body.account) || typeof body.subject !== "string" || body.subject.length > 1000) return null;
 	const draft = draftIn(body);
-	return draft && { ok: { ...draft, subject: body.subject.replace(/[\r\n]/g, " ") } };
+	return draft && { ok: { ...draft, account: body.account, subject: body.subject.replace(/[\r\n]/g, " ") } };
 }
 
-/** The body of `PUT /api/gmail/trash`: the conversation to move to Trash. */
-export const parseMailTrash = (body: unknown): Parsed<MailTrash> => (isObject(body) && isNonEmpty(body.thread) ? { ok: { thread: body.thread } } : null);
+/** The body of `PUT /api/gmail/trash`: the account and conversation to move to Trash. */
+export const parseMailTrash = (body: unknown): Parsed<MailTrash> =>
+	isObject(body) && isNonEmpty(body.account) && isNonEmpty(body.thread) ? { ok: { account: body.account, thread: body.thread } } : null;
 
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 

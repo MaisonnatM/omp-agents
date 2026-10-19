@@ -218,9 +218,9 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		case "calendar":
-			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} />;
+			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
 		case "inbox":
-			return <InboxPage target={page.target} />;
+			return <InboxPage target={page.target} workspace={workspace} />;
 		case undefined:
 			if (layout.panes.length > 0) {
 				return (

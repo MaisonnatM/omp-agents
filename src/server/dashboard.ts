@@ -11,18 +11,20 @@ import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
 import { gitCheckout } from "../git";
-import { GmailClient } from "../gmail";
-import { GoogleCalendarClient } from "../google-calendar";
+import { GmailAccounts, GmailClient } from "../gmail";
+import { accountClients, createGoogleAccounts } from "../google-accounts";
+import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
 import { loadPullRequestDetail, loadPullRequests, mergedPullRequests } from "../pull-requests";
 import { loadTickets } from "../tickets";
-import { integrationFetch, integrationSignedIn } from "../integrations";
+import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
+import { findMcpServers } from "../omp/mcp";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
@@ -30,6 +32,7 @@ import { SourceControl } from "../source-control";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
+import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
@@ -43,6 +46,7 @@ import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { ListRegistry } from "./list-registry";
+import { GoogleAccountsFile } from "./google-accounts-file";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops } from "./loops";
@@ -72,6 +76,9 @@ import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
 /** What the dashboard publishes through once the server listens. */
 type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 
+/** The hidden calendars of an account that hid none. */
+const NO_HIDDEN: ReadonlySet<string> = new Set();
+
 /** Everything the server serves, built once at startup; {@link Dashboard.start} sets it going and {@link Dashboard.stop} stops it. */
 export class Dashboard {
 	readonly #files = new SessionFiles();
@@ -85,6 +92,7 @@ export class Dashboard {
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
+	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
 	readonly #localEvents = new LocalEventsFile(localEventsFile);
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
 	readonly terminals = new Terminals();
@@ -92,8 +100,8 @@ export class Dashboard {
 	readonly #stopping = new AbortController();
 	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo inbox. */
 	readonly #ownerLock: OwnerLock;
-	readonly #google: GoogleCalendarClient;
-	readonly #gmail = new GmailClient(integrationFetch("gmail"));
+	readonly #google: GoogleCalendars;
+	readonly #gmail = new GmailAccounts(accountClients("gmail", (fetch, account) => new GmailClient(fetch, account)));
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
 	readonly #pathFor: (view: View) => string | null;
@@ -135,7 +143,7 @@ export class Dashboard {
 		// The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 		rmSync(oldGoogleFile, { force: true });
 		const calendars = this.#calendars;
-		this.#google = new GoogleCalendarClient(integrationFetch("google-calendar"), () => calendars.value);
+		this.#google = new GoogleCalendars(accountClients("google-calendar", (fetch, account) => new GoogleCalendarClient(fetch, account, () => calendars.value.get(account) ?? NO_HIDDEN)));
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -163,13 +171,16 @@ export class Dashboard {
 				creditRuns: () => readCreditRuns(Date.now()),
 				localEvents: () =>
 					this.#localEvents.value.flatMap(({ id, title, when }) => (when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null }])),
-				googleEvents: async (from, to) => {
-					if (!(await integrationSignedIn("google-calendar"))) return [];
-					const { events } = await this.#google.events(new Date(from), new Date(to));
-					return events.flatMap(({ calendarId, eventId, title, calendar, color, url, when }) =>
-						when.allDay ? [] : [{ ref: `google/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url }],
-					);
-				},
+				googleEvents: async (from, to) =>
+					(await this.#google.byAccount(new Date(from), new Date(to))).map(read => ({
+						account: read.account,
+						events:
+							"error" in read
+								? null
+								: read.events.flatMap(({ account, calendarId, eventId, title, calendar, color, url, when }) =>
+										when.allDay ? [] : [{ ref: `google/${account}/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url }],
+									),
+					})),
 				projects: () => this.#projectRunner.noticeFacts(),
 				now: Date.now,
 			},
@@ -418,9 +429,10 @@ export class Dashboard {
 					if (this.#sourceControl.apply(change) && this.#ownerLock.held) void this.#sourceControl.pull(this.#workspaceCwds());
 				},
 			},
+			integrations: this.#integrations,
 			calendar: {
 				google: this.#google,
-				setCalendarShown: (id, shown) => this.#calendars.apply(id, shown),
+				setCalendarShown: (account, id, shown) => this.#calendars.apply(account, id, shown),
 				localEvents: this.#localEvents,
 			},
 			gmail: this.#gmail,
@@ -450,6 +462,8 @@ export class Dashboard {
 		this.#todoInbox.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
+		const [calendarServer] = await findMcpServers(MCP_SERVICES["google-calendar"].host);
+		if (calendarServer) this.#calendars.adopt(calendarServer.name);
 		await this.#listRegistry();
 		if (this.#ownerLock.held) this.#clearOldDone();
 		this.#loops.start();

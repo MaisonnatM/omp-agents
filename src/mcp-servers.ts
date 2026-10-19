@@ -22,17 +22,17 @@ import {
 import { integrationOn, MCP_SERVICES } from "./shared/accounts";
 import { catalogEntry, catalogEntryOn } from "./shared/mcp-catalog";
 import type { McpServerAdd, McpServerRow, McpServerStatus, McpServersAnswer } from "./shared/mcp-servers";
-import { createSignIn, type SignIn } from "./sign-in";
+import { createServerSignIn, type ServerSignIn } from "./sign-in";
 
 /** A change the page asked for that omp's config does not allow, answered as a 400 with its message. */
 export class McpServerRejected extends Error {}
 
-const signIns = new Map<string, SignIn>();
+const signIns = new Map<string, ServerSignIn>();
 
-function signInOf(name: string): SignIn {
+function signInOf(name: string): ServerSignIn {
 	let signIn = signIns.get(name);
 	if (!signIn) {
-		signIn = createSignIn(`${name}'s sign-in page was not completed within 5 minutes. Try again.`);
+		signIn = createServerSignIn(`${name}'s sign-in page was not completed within 5 minutes. Try again.`);
 		signIns.set(name, signIn);
 	}
 	return signIn;
@@ -114,7 +114,7 @@ function signable(server: ConfiguredMcpServer): McpServer {
 export async function startMcpServerSignIn(name: string): Promise<McpServerRow> {
 	const remote = signable(await configured(name));
 	await signInOf(name).start(async (signal, waiting) => {
-		await signInMcp(remote, { onAuth: waiting, signal });
+		await signInMcp({ ...remote, oauth: remote.config.oauth }, { onAuth: waiting, signal });
 	});
 	return rowNamed(name);
 }

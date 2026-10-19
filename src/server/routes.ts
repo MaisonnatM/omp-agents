@@ -11,10 +11,10 @@ import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import type { FileUsage } from "../foreign/usage";
 import { gitCheckout } from "../git";
-import type { GoogleCalendarClient } from "../google-calendar";
-import type { GmailClient } from "../gmail";
+import type { GoogleCalendars } from "../google-calendar";
+import type { GmailAccounts } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from "../pull-requests";
-import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
+import type { Integrations } from "../integrations";
 import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
 import { blobsDir } from "../omp/config";
@@ -30,7 +30,7 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
-import { GOOGLE_SERVICES, type GoogleService, type McpIntegration, type McpIntegrationId } from "../shared/accounts";
+import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
@@ -51,7 +51,7 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
-import { parseAutoPullChange, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
+import { parseAutoPullChange, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
 import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
@@ -89,11 +89,11 @@ export interface SessionRoutesEnv {
 	replayComparison(view: View): Promise<ReplayComparison>;
 }
 
-/** What the calendar routes read: Google Calendar, the calendars it shows, and the events kept on this computer. */
+/** What the calendar routes read: every Google Calendar account, the calendars each shows, and the events kept on this computer. */
 export interface CalendarRoutesEnv {
-	google: GoogleCalendarClient;
-	/** Show or hide Google calendar `id`'s events on the Calendar page, and save the choice. */
-	setCalendarShown(id: string, shown: boolean): void;
+	google: GoogleCalendars;
+	/** Show or hide calendar `id` of Google Calendar account `account` on the Calendar page, and save the choice. */
+	setCalendarShown(account: AccountId, id: string, shown: boolean): void;
 	localEvents: LocalEventsFile;
 }
 
@@ -110,8 +110,10 @@ export type TodoRoutesEnv = Omit<TodoTicketEnv, "createTicket">;
 export interface RouteEnv {
 	guards: Guards;
 	sessions: SessionRoutesEnv;
+	/** The MCP integrations, Gmail's and Google Calendar's accounts included. */
+	integrations: Integrations;
 	calendar: CalendarRoutesEnv;
-	gmail: GmailClient;
+	gmail: GmailAccounts;
 	files: FileRoutesEnv;
 	todos: TodoRoutesEnv;
 }
@@ -345,27 +347,33 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 }
 
 /** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
-function integrationRoutes({ get, write }: RouteKit): Routes {
-	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server, and the sign-in the page last started. */
-	const integrations = get(params => answer(() => loadIntegrations(params.has("fresh"))));
+function integrationRoutes({ get, write }: RouteKit, integrations: Integrations): Routes {
+	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server or accounts, and the sign-in the page last started. */
+	const loaded = get(params => answer(() => integrations.load(params.has("fresh"))));
 
-	/** A write of `{ id }` naming an MCP integration, answered with that integration as `act` leaves it. */
-	const integrationWrite = (act: (id: McpIntegrationId) => Promise<McpIntegration>): Handler =>
-		write(body => checked(parseIntegrationId(body), "Expected { id } naming an integration"), act);
+	/** A write of `{ id, account }` naming an MCP integration and one of its accounts, answered with that integration as `act` leaves it. */
+	const integrationWrite = (act: (target: IntegrationTarget) => Promise<McpIntegration>): Handler =>
+		write(body => checked(parseIntegrationTarget(body), "Expected { id, account } naming an integration and, for Gmail or Google Calendar, an account or null"), act);
 
-	/** `PUT /api/integrations/sign-in`: starts a sign-in and answers with its authorization address to open. */
-	const integrationSignIn = integrationWrite(startIntegrationSignIn);
+	/** `PUT /api/integrations/sign-in`: starts a sign-in to an account, or adds one, and answers with its authorization address to open. */
+	const integrationSignIn = integrationWrite(integrations.startSignIn);
 
-	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
-	const integrationSignOut = integrationWrite(signOutIntegration);
+	/** `PUT /api/integrations/remove`: signs out of the integration's server, as `/mcp unauth` does, and removes an account's server unless it is the last. */
+	const integrationRemove = integrationWrite(integrations.remove);
+
+	/** `PUT /api/integrations/google-links`: `{ address, workspaces }`, the workspaces a Google address's accounts are linked to; answers every integration. */
+	const googleLinks = write(
+		body => checked(parseGoogleLinks(body), "Expected { address, workspaces } naming a Google address and absolute workspace directories"),
+		integrations.linkGoogleAccount,
+	);
 
 	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
 	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
-	const slackClient = write(body => checked(parseSlackClient(body)), saveSlackClient, refuseClient);
+	const slackClient = write(body => checked(parseSlackClient(body)), integrations.saveSlackClient, refuseClient);
 
 	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
-	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => saveGoogleClient(id, input), refuseClient);
+	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => integrations.saveGoogleClient(id, input), refuseClient);
 
 	/** `GET /api/mcp-servers[?fresh]`: every user-level MCP server omp loads, where omp stands with each, and its sign-in under way. */
 	const mcpServers = get(params => answer(() => loadMcpServers(params.has("fresh"))));
@@ -438,9 +446,10 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 	});
 
 	return {
-		"/api/integrations": { GET: integrations },
+		"/api/integrations": { GET: loaded },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
-		"/api/integrations/sign-out": { PUT: integrationSignOut },
+		"/api/integrations/remove": { PUT: integrationRemove },
+		"/api/integrations/google-links": { PUT: googleLinks },
 		"/api/mcp-servers": { GET: mcpServers },
 		"/api/mcp-servers/add": { PUT: mcpServerAdd },
 		"/api/mcp-servers/sign-in": { PUT: mcpServerWrite(startMcpServerSignIn) },
@@ -470,23 +479,23 @@ function todoRoutes({ write }: RouteKit, env: TodoRoutesEnv): Routes {
 	return { "/api/todo/ticket": { PUT: todoTicket } };
 }
 
-/** Google Calendar's calendars and events, the events the Calendar page adds and deletes, and the events kept on this computer. */
+/** Google Calendar's calendars and events of every account, the events the Calendar page adds and deletes, and the events kept on this computer. */
 function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Routes {
 	const { google, localEvents } = env;
 
-	/** `GET /api/google[?fresh]`: the calendars checked in your Google Calendar's list, with why each one's last read failed. */
+	/** `GET /api/google[?fresh]`: the calendars checked in each account's Google Calendar list, with why each one's last read failed. */
 	const googleStatus = get(params => answer(() => google.status(params.has("fresh"))));
 
-	/** `PUT /api/google/calendars` `{ id, shown }`: show or hide one calendar's events on the Calendar page; answers the calendars after it. */
+	/** `PUT /api/google/calendars` `{ account, id, shown }`: show or hide one calendar's events on the Calendar page; answers the calendars after it. */
 	const calendarShown = write(
-		body => checked(parseCalendarShown(body), "Expected { id, shown } naming a calendar"),
-		async ({ id, shown }) => {
-			env.setCalendarShown(id, shown);
+		body => checked(parseCalendarShown(body), "Expected { account, id, shown } naming a calendar"),
+		async ({ account, id, shown }) => {
+			env.setCalendarShown(account, id, shown);
 			return google.status();
 		},
 	);
 
-	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown Google calendars in that span. */
+	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of every account's shown Google calendars in that span. */
 	const calendarEvents = get(params => {
 		const from = new Date(params.get("from") ?? "");
 		const to = new Date(params.get("to") ?? "");
@@ -506,7 +515,7 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 				case "local":
 					return { kept: localEvents.add(title, when) };
 				case "google":
-					await google.create(calendar.calendarId, title, when);
+					await google.create(calendar.account, calendar.calendarId, title, when);
 					return { kept: null };
 				default: {
 					const unhandled: never = calendar;
@@ -518,14 +527,14 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 
 	/** `PUT /api/calendar/events/delete`: `EventRef`, deletes an event kept on this computer or of a Google calendar you may write to; answers `{}`. */
 	const eventDelete = write(
-		body => checked(parseEventRef(body), 'Expected { kind: "local", id } or { kind: "google", calendarId, eventId } naming an event'),
+		body => checked(parseEventRef(body), 'Expected { kind: "local", id } or { kind: "google", account, calendarId, eventId } naming an event'),
 		async (event): Promise<object> => {
 			switch (event.kind) {
 				case "local":
 					localEvents.apply({ op: "remove", id: event.id });
 					return {};
 				case "google":
-					await google.delete(event.calendarId, event.eventId);
+					await google.delete(event.account, event.calendarId, event.eventId);
 					return {};
 				default: {
 					const unhandled: never = event;
@@ -545,39 +554,41 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 	};
 }
 
-/** Your Gmail inbox: its conversations, and the replies and trashing the Inbox page sends. */
-function gmailRoutes({ get, write }: RouteKit, gmail: GmailClient): Routes {
-	/** `GET /api/gmail/inbox[?fresh]`: the signed-in address and its inbox's latest conversations. */
+/** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Inbox page sends. */
+function gmailRoutes({ get, write }: RouteKit, gmail: GmailAccounts): Routes {
+	/** `GET /api/gmail/inbox[?fresh]`: each signed-in account and their inboxes' latest conversations, newest first. */
 	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
-	/** `GET /api/gmail/thread?id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
+	/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
 	const thread = get(params => {
+		const account = params.get("account");
 		const id = params.get("id");
-		return id ? answer(() => gmail.thread(id, params.has("fresh"))) : fail(400, "Expected ?id= naming a Gmail conversation");
+		return account && id ? answer(() => gmail.thread(account, id, params.has("fresh"))) : fail(400, "Expected ?account= and ?id= naming a Gmail conversation");
 	});
-	/** `GET /api/gmail/message?thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Inbox page frames. */
+	/** `GET /api/gmail/message?account=<account>&thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Inbox page frames. */
 	const message = get(async params => {
+		const account = params.get("account");
 		const threadId = params.get("thread");
 		const id = params.get("id");
-		if (!threadId || !id) return fail(400, "Expected ?thread= and ?id= naming a Gmail message");
-		const html = await gmail.messageHtml(threadId, id).catch((err: unknown) => fail(500, errorText(err)));
+		if (!account || !threadId || !id) return fail(400, "Expected ?account=, ?thread=, and ?id= naming a Gmail message");
+		const html = await gmail.messageHtml(account, threadId, id).catch((err: unknown) => fail(500, errorText(err)));
 		if (html instanceof Response) return html;
 		return html === undefined ? fail(404, `Conversation ${threadId} holds no HTML message ${id}`) : mailDocument(html);
 	});
 	const DRAFT = "{ to, cc, bcc } of { name, address } naming someone, html, and text that is not blank";
 	/** `PUT /api/gmail/reply`: `MailReply`, sent in its conversation; answers `{}`. */
 	const reply = write(
-		body => checked(parseMailReply(body), `Expected { thread } naming a Gmail conversation, with ${DRAFT}`),
+		body => checked(parseMailReply(body), `Expected { account, thread } naming a Gmail conversation, with ${DRAFT}`),
 		async input => (await gmail.reply(input), {}),
 	);
-	/** `PUT /api/gmail/send`: `MailSend`, sent as a new mail; answers `{}`. */
+	/** `PUT /api/gmail/send`: `MailSend`, sent from its account as a new mail; answers `{}`. */
 	const send = write(
-		body => checked(parseMailSend(body), `Expected { subject }, with ${DRAFT}`),
+		body => checked(parseMailSend(body), `Expected { account, subject }, with ${DRAFT}`),
 		async input => (await gmail.send(input), {}),
 	);
 	/** `PUT /api/gmail/trash`: `MailTrash`, moved to Gmail's Trash; answers `{}`. */
 	const trash = write(
-		body => checked(parseMailTrash(body), "Expected { thread } naming a Gmail conversation"),
-		async ({ thread }) => (await gmail.trash(thread), {}),
+		body => checked(parseMailTrash(body), "Expected { account, thread } naming a Gmail conversation"),
+		async ({ account, thread }) => (await gmail.trash(account, thread), {}),
 	);
 	return {
 		"/api/gmail/inbox": { GET: inbox },
@@ -752,7 +763,7 @@ export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
 	return {
 		...sessionRoutes(kit, env.sessions),
-		...integrationRoutes(kit),
+		...integrationRoutes(kit, env.integrations),
 		...providerRoutes(kit),
 		...calendarRoutes(kit, env.calendar),
 		...gmailRoutes(kit, env.gmail),

@@ -5,14 +5,15 @@ import { useEffect, useRef } from "react";
  * The first answer once `ready`, or an item you open, settles the arrival, so an item added later, or closing the open
  * one, leaves the list as it is.
  */
-export function useOpenLatest(hashFor: (id: string | null) => string, openId: string | null, latestId: string | null, ready: boolean): void {
+export function useOpenLatest<T>(hashFor: (target: T | null) => string, open: T | null, latestTarget: T | null, ready: boolean): void {
 	const list = hashFor(null);
-	const latest = latestId === null ? null : hashFor(latestId);
+	const latest = latestTarget === null ? null : hashFor(latestTarget);
+	const closed = open === null;
 	const settled = useRef<string | null>(null);
 	useEffect(() => {
-		if (settled.current === list || (openId === null && !ready)) return;
+		if (settled.current === list || (closed && !ready)) return;
 		settled.current = list;
 		// Replaces the list's history entry, so Back leaves the page instead of landing on it with nothing open.
-		if (openId === null && latest !== null) location.replace(latest);
-	}, [list, openId, latest, ready]);
+		if (closed && latest !== null) location.replace(latest);
+	}, [list, closed, latest, ready]);
 }

@@ -90,7 +90,7 @@ function clientOf(
 		if (answer === undefined) throw new Error(`unexpected read ${key}`);
 		return answer;
 	};
-	return { client: new GoogleCalendarClient(fetch, () => hidden), reads, posts, deletes };
+	return { client: new GoogleCalendarClient(fetch, "google-calendar", () => hidden), reads, posts, deletes };
 }
 
 const LIST = "/calendar/v3/users/me/calendarList";
@@ -101,9 +101,9 @@ test("the shown calendars' events keep each repeat, link to the event, end all-d
 	const { client, reads } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: { items: [] } });
 	expect(await client.events(...OCTOBER)).toEqual({
 		events: [
-			{ calendarId: "max@example.com", eventId: "standup_20261005T073000Z", writable: true, title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup1", when: { allDay: false, start: Date.parse("2026-10-05T07:30:00Z"), end: Date.parse("2026-10-05T08:00:00Z") } },
-			{ calendarId: "max@example.com", eventId: "standup_20261026T083000Z", writable: true, title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup2", when: { allDay: false, start: Date.parse("2026-10-26T08:30:00Z"), end: Date.parse("2026-10-26T09:00:00Z") } },
-			{ calendarId: "max@example.com", eventId: "offsite", writable: true, title: "Offsite", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=offsite", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" } },
+			{ account: "google-calendar", calendarId: "max@example.com", eventId: "standup_20261005T073000Z", writable: true, title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup1", when: { allDay: false, start: Date.parse("2026-10-05T07:30:00Z"), end: Date.parse("2026-10-05T08:00:00Z") } },
+			{ account: "google-calendar", calendarId: "max@example.com", eventId: "standup_20261026T083000Z", writable: true, title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup2", when: { allDay: false, start: Date.parse("2026-10-26T08:30:00Z"), end: Date.parse("2026-10-26T09:00:00Z") } },
+			{ account: "google-calendar", calendarId: "max@example.com", eventId: "offsite", writable: true, title: "Offsite", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=offsite", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" } },
 		],
 	});
 	const work = new URL(reads.find(url => url.includes("max%40example.com"))!);
@@ -119,14 +119,14 @@ test("a long calendar list and event list are read to their last page", async ()
 		[`${WORK}#e2`]: { items: [WORK_EVENTS.items[1]] },
 		[TEAM]: { items: [] },
 	});
-	expect((await client.status()).calendars.map(calendar => calendar.name)).toEqual(["max@example.com", "Eng team"]);
+	expect((await client.calendars()).map(calendar => calendar.name)).toEqual(["max@example.com", "Eng team"]);
 	expect((await client.events(...OCTOBER)).events.map(event => event.eventId)).toEqual(["standup_20261005T073000Z", "standup_20261026T083000Z"]);
 });
 
 test("a calendar that cannot be read keeps its error for the settings while the others answer, and fails the read only when none can", async () => {
 	const { client } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: new Error("Not Found") });
 	expect((await client.events(...OCTOBER)).events).toHaveLength(3);
-	expect((await client.status()).calendars.map(({ name, error }) => ({ name, error }))).toEqual([
+	expect((await client.calendars()).map(({ name, error }) => ({ name, error }))).toEqual([
 		{ name: "max@example.com", error: null },
 		{ name: "Eng team", error: "Not Found" },
 	]);
@@ -142,13 +142,13 @@ test("a calendar unchecked on the Calendar page is not read and its events are l
 	const { client, reads } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, hidden);
 	expect(await client.events(...OCTOBER)).toEqual({
 		events: [
-			{ calendarId: "team@group.calendar.google.com", eventId: "retro", writable: false, title: "Retro", calendar: "Eng team", color: "#b99aff", url: "https://www.google.com/calendar/event?eid=retro", when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") } },
+			{ account: "google-calendar", calendarId: "team@group.calendar.google.com", eventId: "retro", writable: false, title: "Retro", calendar: "Eng team", color: "#b99aff", url: "https://www.google.com/calendar/event?eid=retro", when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") } },
 		],
 	});
 	expect(reads.some(url => url.includes("max%40example.com"))).toBe(false);
-	expect((await client.status()).calendars).toEqual([
-		{ id: "max@example.com", name: "max@example.com", color: "#9fe1e7", group: "mine", writable: true, shown: false, error: null },
-		{ id: "team@group.calendar.google.com", name: "Eng team", color: "#b99aff", group: "other", writable: false, shown: true, error: null },
+	expect(await client.calendars()).toEqual([
+		{ account: "google-calendar", id: "max@example.com", name: "max@example.com", color: "#9fe1e7", group: "mine", writable: true, shown: false, error: null },
+		{ account: "google-calendar", id: "team@group.calendar.google.com", name: "Eng team", color: "#b99aff", group: "other", writable: false, shown: true, error: null },
 	]);
 
 	hidden.delete("max@example.com");
@@ -172,7 +172,7 @@ const FAMILY_EVENTS = "/calendar/v3/calendars/family%40group.calendar.google.com
 test("a new event posts to its calendar, all day with Google's exclusive end or timed in ISO times, and the next read of that calendar asks Google again", async () => {
 	const answers: Record<string, unknown> = { [LIST]: { items: [CALENDARS.items[0], FAMILY] }, [WORK]: { items: [] }, [FAMILY_EVENTS]: { items: [] } };
 	const { client, posts } = clientOf(answers);
-	expect((await client.status()).calendars.map(({ name, writable }) => ({ name, writable }))).toEqual([
+	expect((await client.calendars()).map(({ name, writable }) => ({ name, writable }))).toEqual([
 		{ name: "max@example.com", writable: true },
 		{ name: "Family", writable: true },
 	]);

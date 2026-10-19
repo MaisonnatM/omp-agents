@@ -1,7 +1,7 @@
 /** The sidebar's tab bar as the user arranged it in Settings › Preferences: the tabs' order, which ones it leaves out, and the keys they take. */
 import { useMemo } from "react";
 import { isObject } from "../src/json";
-import { type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
+import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import { integrationsStore } from "./reads";
 import { SIDEBAR_TABS, type SidebarTab } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
@@ -69,9 +69,9 @@ export function hideTab(layout: TabLayout, tab: SidebarTab, hidden: boolean): Ta
 export const shownTabs = (layout: TabLayout, signedOut: ReadonlySet<SidebarTab>): SidebarTab[] =>
 	layout.filter(({ tab, hidden }) => !hidden && !signedOut.has(tab)).map(({ tab }) => tab);
 
-/** The tabs whose service omp holds no sign-in to, which then neither show nor take their shortcuts; all of them until the integrations answer. */
+/** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
-	SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && signedIn(integrations[row.integration].connection)) ? [row.value] : []));
+	SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && connectionsOf(integrations[row.integration]).some(signedIn)) ? [row.value] : []));
 
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.

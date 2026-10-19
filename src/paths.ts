@@ -43,6 +43,8 @@ export const userNotesDir = join(dataDir, "user");
 export const pinsFile = join(configDir, "pins.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
+/** The address each Google account signs in as and the workspaces each address is linked to, beside {@link tokenFile}. */
+export const googleAccountsFile = join(configDir, "google-accounts.json");
 /** The events the Calendar page keeps on this computer, beside {@link tokenFile}. */
 export const localEventsFile = join(configDir, "events.json");
 /** The notices the bell's user saw or cleared, beside {@link tokenFile}. */

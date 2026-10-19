@@ -213,8 +213,8 @@ test.each([
 	const integrations = {
 		linear: { id: "linear", connection, signIn: null, setup: null },
 		slack: { id: "slack", connection: { kind: "absent" }, signIn: null, setup: { ...setup, redirectUri: null, scope: "chat:write" } },
-		"google-calendar": { id: "google-calendar", connection: { kind: "absent" }, signIn: null, setup },
-		gmail: { id: "gmail", connection: { kind: "absent" }, signIn: null, setup },
+		"google-calendar": { id: "google-calendar", accounts: [], signIn: null, setup },
+		gmail: { id: "gmail", accounts: [], signIn: null, setup },
 	};
 	const child = Bun.spawn([process.execPath, "--eval", integrationsScenario], {
 		cwd: import.meta.dir,
@@ -299,7 +299,7 @@ const { useMailThread } = await import("./reads.ts");
 
 const seen = [];
 function Probe({ arrived }) {
-	const { read, refreshing } = useMailThread("18f2a", arrived);
+	const { read, refreshing } = useMailThread("gmail-2", "18f2a", arrived);
 	const state = JSON.stringify({ subject: read?.data.subject ?? null, refreshing });
 	if (seen.at(-1) !== state) seen.push(state);
 	return null;
@@ -320,7 +320,7 @@ test("a conversation is read once and again when the inbox lists a later message
 	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
 	expect(JSON.parse(stdout)).toEqual({
-		urls: ["/api/gmail/thread?id=18f2a", "/api/gmail/thread?id=18f2a&fresh"],
+		urls: ["/api/gmail/thread?account=gmail-2&id=18f2a", "/api/gmail/thread?account=gmail-2&id=18f2a&fresh"],
 		seen: [
 			{ subject: null, refreshing: false },
 			{ subject: null, refreshing: true },

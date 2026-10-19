@@ -13,8 +13,14 @@ import type { Project, Worker, WorkerPhase } from "../shared/projects";
 import type { HostStatus } from "../shared/sessions";
 import type { SlackFound } from "../slack-messages";
 
-/** A timed calendar event; `ref` names it among the events: `local/<id>`, or `google/<calendar id>/<event id>`. */
+/** A timed calendar event; `ref` names it among the events: `local/<id>`, or `google/<account>/<calendar id>/<event id>`. */
 export type FoundEvent = Omit<EventSubject, "kind"> & { ref: string };
+
+/** One Google Calendar account's timed events, `null` when the account did not answer. */
+export interface AccountFoundEvents {
+	account: string;
+	events: FoundEvent[] | null;
+}
 
 /** A project not archived as its notices see it: its coordinator's live status, `null` when it does not run, and each worker's phase and open questions. */
 export interface ProjectFacts {
@@ -42,8 +48,8 @@ export interface NoticeSources {
 	creditRuns(): Promise<Omit<CreditsSubject, "kind">[]>;
 	/** The timed events kept on this computer. */
 	localEvents(): FoundEvent[];
-	/** The timed events of the shown Google calendars that overlap `from` to `to`, epoch ms; none while Google Calendar is not connected. */
-	googleEvents(from: number, to: number): Promise<FoundEvent[]>;
+	/** The timed events of each signed-in Google Calendar account's shown calendars that overlap `from` to `to`, epoch ms. */
+	googleEvents(from: number, to: number): Promise<AccountFoundEvents[]>;
 	/** Every project not archived, as its notices see it. */
 	projects(): ProjectFacts[];
 	now(): number;
@@ -152,17 +158,19 @@ function planNotices(plans: PlanUsage[], at: number): Unscoped[] {
 
 /**
  * A notice for each event of `local` and `google` that starts within {@link EVENT_LEAD_MS} of `now` or runs then, dated
- * that lead before its start. `google` is `null` when Google Calendar did not answer, which keeps its events' notices as
- * they were, as the Calendar page shows why.
+ * that lead before its start. Each Google Calendar account is a scope of its own: an account that did not answer, or
+ * all of them when `google` is `null`, keeps its events' notices as they were, as the Calendar page shows why. The scope
+ * every Google event had before accounts counts as answered, so notices kept from then clear.
  */
-function eventNotices(local: FoundEvent[], google: FoundEvent[] | null, now: number): Checked {
+function eventNotices(local: FoundEvent[], google: AccountFoundEvents[] | null, now: number): Checked {
 	const scoped = (events: FoundEvent[], scope: string): Found[] =>
 		events
 			.filter(({ start, end }) => start - EVENT_LEAD_MS <= now && now < end)
 			.map(({ ref, ...event }) => ({ id: `event:${ref}:${event.start}`, at: event.start - EVENT_LEAD_MS, scope, kind: "event" as const, ...event }));
+	const answered = (google ?? []).flatMap(({ account, events }) => (events === null ? [] : [{ scope: `event:google/${account}`, events }]));
 	return {
-		found: [...scoped(local, "event:local"), ...scoped(google ?? [], "event:google")],
-		scopes: new Set(google === null ? ["event:local"] : ["event:local", "event:google"]),
+		found: [...scoped(local, "event:local"), ...answered.flatMap(({ scope, events }) => scoped(events, scope))],
+		scopes: new Set(["event:local", ...(google === null ? [] : ["event:google"]), ...answered.map(({ scope }) => scope)]),
 		dated: true,
 	};
 }

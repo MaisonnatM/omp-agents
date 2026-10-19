@@ -101,8 +101,9 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 
 	const token = menu?.token ?? null;
 	const query = token && mentionQuery(token);
-	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), useDashboardStatus().pullRequestsScope);
-	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"));
+	const { pullRequestsScope } = useDashboardStatus();
+	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), pullRequestsScope);
+	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"), pullRequestsScope);
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =
 		menu === null
