@@ -340,9 +340,9 @@ describe("ProjectRunner", () => {
 		expect([...h.sessions.values()].at(-1)?.prompts).toEqual(["Use PKCE."]);
 	});
 
-	test("a stopped worker is news unless the dashboard is stopping, and a move follows the worker to its new session id", async () => {
+	test("a stopped worker is news, and a move follows the worker to its new session id", async () => {
 		const h = harness();
-		const { projectId, worker } = await project(h, 2);
+		const { projectId, worker } = await project(h, 1);
 		const w1 = worker(1);
 		w1.sessionId = "s-moved";
 		h.runner.switched(w1.instanceId);
@@ -350,9 +350,6 @@ describe("ProjectRunner", () => {
 		w1.alive = false;
 		h.runner.exited(w1.instanceId);
 		expect(h.file.get(projectId)!.updates).toMatchObject([{ workerId: "w1", kind: "stopped" }]);
-		h.runner.stop();
-		h.runner.exited(worker(2).instanceId);
-		expect(h.file.get(projectId)!.updates).toHaveLength(1);
 	});
 
 	test("in a git checkout a worker gets a new branch from the checked-out one, a named one, or none", async () => {

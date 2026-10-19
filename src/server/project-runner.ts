@@ -145,7 +145,7 @@ export class ProjectRunner implements ProjectControl {
 	readonly #launching = new Map<string, string>();
 	/** The live workers, by instance id, that the coordinator or the runner is ending, whose exit is no news. */
 	readonly #ending = new Set<string>();
-	/** Set as the dashboard stops: its sessions exit with it, which is no news for a coordinator. */
+	/** Set as the dashboard stops, so it starts no worker that it would leave behind half-launched. */
 	#stopping = false;
 
 	constructor(deps: ProjectRunnerDeps) {
@@ -241,7 +241,7 @@ export class ProjectRunner implements ProjectControl {
 		this.#tracked.delete(instanceId);
 		const asked = this.#ending.delete(instanceId);
 		const { role } = tracked;
-		if (role.role !== "worker" || this.#stopping) return;
+		if (role.role !== "worker") return;
 		// An end the coordinator or the runner asked for is no news, but it frees a slot.
 		if (!asked) this.#save(role.projectId, [{ kind: "stopped", workerId: role.workerId }]);
 		this.settle(role.projectId);
@@ -257,7 +257,7 @@ export class ProjectRunner implements ProjectControl {
 		this.#deps.onChange();
 	}
 
-	/** The dashboard stops: the sessions that exit now report no news. */
+	/** The dashboard stops: it starts no more workers. Its sessions run on, and the next server attaches to them. */
 	stop(): void {
 		this.#stopping = true;
 	}

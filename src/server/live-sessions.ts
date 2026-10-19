@@ -45,9 +45,11 @@ export class LiveSessions {
 		return session instanceof DashboardSession ? session : undefined;
 	}
 
-	/** An instance id with the emitter its session reports through, decided before the session spawns so that nothing it reports precedes it. */
-	allocate(): { instanceId: string; emit: (update: SessionUpdate) => void } {
-		const instanceId = newInstanceId();
+	/**
+	 * An instance id with the emitter its session reports through, decided before the session spawns so that nothing it
+	 * reports precedes it; a session a previous server started keeps its `instanceId`.
+	 */
+	allocate(instanceId = newInstanceId()): { instanceId: string; emit: (update: SessionUpdate) => void } {
 		return {
 			instanceId,
 			emit: update => {

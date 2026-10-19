@@ -66,6 +66,6 @@ export interface LiveSession {
 	 * when it ended while its host stays listed and waited long enough that the server joins that host again.
 	 */
 	finished(now: number): boolean;
-	/** Let go of the session as the dashboard shuts down: a terminal session keeps running, one this dashboard started stops. */
+	/** Let go of the session as the dashboard shuts down. Every session keeps running: the next server joins a terminal one and attaches to one it started. */
 	dispose(): Promise<void>;
 }

@@ -4,7 +4,7 @@ import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
-import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
+import { keptSessions, PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
 import { prepareReplay } from "../replay";
 import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
@@ -139,4 +139,27 @@ export function createStarter(env: StartEnv): Starter {
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
 	};
+}
+
+/**
+ * Attaches to every session a previous server started whose omp still runs, and lists it again in its project, under
+ * the instance id it had. One it reaches but cannot attach to stops, so that no session runs that no server drives.
+ * Resolves with the session ids of the sessions that survived.
+ */
+export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"]): Promise<Set<string>> {
+	const survived = new Set<string>();
+	await Promise.all(
+		keptSessions().map(async instanceId => {
+			const { emit } = sessions.allocate(instanceId);
+			try {
+				const session = await DashboardSession.reattach(instanceId, sessionId => projects.launchFor({ kind: "resume", sessionId }, null).rpc.tools, emit);
+				if (!sessions.add(session, null)) return;
+				projects.launchFor({ kind: "resume", sessionId: session.sessionId }, null).attach(session);
+				survived.add(session.sessionId);
+			} catch (err) {
+				console.error(`omp-agents: cannot attach to session ${instanceId}: ${errorText(err)}`);
+			}
+		}),
+	);
+	return survived;
 }

@@ -98,7 +98,7 @@ The server lives in `src/`:
   `Loops.stop` stops every loop, closes the watchers, and drops a pending re-read; a file change reported after it is ignored.
 - `src/server/session-files.ts`: the session files on disk, omp's, Claude Code's, and Codex's, re-read file by file as the watchers report them, and the past list, each row with its `source`.
   It asks each format in `src/session-formats.ts` whether a changed path is its session file, and lists and reads through the format that owns the file.
-  `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
+  `src/server/interrupted.ts` keeps which dashboard sessions were interrupted, once `recover` learned which of those that ran when the last server stopped survived it.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
   It applies a session's starting prompt to that session's main view with each of its live events, so a live user message and the removal of the prompt it replaces go out together.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
@@ -129,7 +129,8 @@ The server lives in `src/`:
   `src/json.ts` also holds `Parsed<T>`, the `{ ok }` or refusal every parser returns, and `BASE64`, which the socket's parsers and the domain parsers share.
   `src/paths.ts` names these files beside the access token, the old `google.json` the server deletes, and, under the data directory, each project's notes (`projectNotesDir`) and the user's (`userNotesDir`).
   `src/json.ts` also composes guards of whole shapes (`fields`, `tagged`, `arrayOf`, `nullable`), which `decoder` turns into decoders.
-- `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
+- `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes; `reattach` opens one a previous server started, and `dispose` hangs up without stopping omp.
+  `src/keeper.ts` is the session keeper, the detached process that holds one session's omp and lends its stdio to one server at a time over a Unix socket, so the session outlives the server; `src/keeper-link.ts` is the server's side, which starts, lists, and connects to keepers, and `reattachAll` in `src/server/start.ts` attaches to them at startup.
   `src/prompt-turn.ts` holds its `PromptTurn`: whether the main agent's turn runs and which prompt omp admitted while idle has not shown yet, with one method per event that moves them.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).

@@ -9,10 +9,10 @@ import { errorText, isObject, isTexts } from "./json";
 import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
-import { type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
+import { attachRpc, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import type { PreparedReplay } from "./replay";
-import { launchForReplayResume, replayLaunch, requireReplayReady } from "./omp/replay-launch";
+import { launchForReplayResume, readReplayMarker, replayLaunch, requireReplayReady } from "./omp/replay-launch";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { isDashboardPrompt } from "./shared/transcript";
@@ -95,7 +95,7 @@ function withdrawn({ text, images = [] }: { text: string; images?: readonly Prom
 
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
-	readonly startedAt = Date.now();
+	readonly startedAt: number;
 	/** Where omp works; a `/move` changes it. */
 	cwd: string;
 	readonly pid: number;
@@ -120,10 +120,12 @@ export class DashboardSession implements LiveSession {
 	readonly #emit: (update: DashboardUpdate) => void;
 	/** Whether the last prompt the user sent was a `/` command, whose `command_output` frames the conversation shows. */
 	#userCommand = false;
-	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
+	/** Whether **End session** stopped the process, rather than omp exiting on its own. */
 	#ended = false;
 	/** Whether the process exited, however it came to. */
 	#exited = false;
+	/** Whether this server hung up on omp as it shut down, leaving omp to run for the next server. */
+	#detached = false;
 	/** Prompt, dequeue, promote, interrupt, flush, and edit, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new SerialLane();
 	/** Model setters and state reads share a lane, separate from ordered turn commands. */
@@ -145,11 +147,14 @@ export class DashboardSession implements LiveSession {
 		this.#child = child;
 		this.#requests = requests;
 		this.pid = child.pid;
+		this.startedAt = child.meta.startedAt;
 		this.#emit = emit;
 		this.sessionId = state.sessionId;
 		this.sessionFile = state.sessionFile ?? null;
 		this.#applyState(state);
 		this.queue = state.queuedMessages;
+		// A session this server attached to may be in the middle of a turn that an earlier server started.
+		if (state.isStreaming) this.#prompt.turnStarted();
 
 		const { client } = child;
 		client.onSessionEvent(event => this.#onEvent(event));
@@ -162,6 +167,7 @@ export class DashboardSession implements LiveSession {
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
 		void child.exited.then(() => {
 			this.#exited = true;
+			if (this.#detached) return;
 			this.#change(() => this.#prompt.release());
 			requests.clear();
 			emit({ kind: "exited", ended: this.#ended });
@@ -243,13 +249,46 @@ export class DashboardSession implements LiveSession {
 		return session;
 	}
 
+	/**
+	 * Attach to session `instanceId`, whose omp a previous server started and left running, as it stands now: in the
+	 * middle of a turn, with its questions and its subagents. `toolsFor` names the tools this server serves the session.
+	 */
+	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"], emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		let protectedReplay = false;
+		const session = await DashboardSession.#open(instanceId, emit, onFrame => attachRpc(instanceId, onFrame), async child => {
+			const { sessionId, sessionFile } = await child.client.getState();
+			const tools = toolsFor(sessionId);
+			if (tools.length > 0) await child.client.setCustomTools(tools);
+			if (!sessionFile || !(await stat(sessionFile).catch(() => null))) return child.meta.cwd;
+			protectedReplay = (await readReplayMarker(sessionFile)) !== null;
+			return recordedCwd(sessionFile);
+		});
+		session.#protectedReplay = protectedReplay;
+		// Whether a running turn is a replay's first one is not known here, so it holds prompts back as the first one would.
+		if (protectedReplay && session.#prompt.running) session.#replayInitial = "running";
+		return session;
+	}
+
 	/** Listens only once `prepare` is done, so the session reports the state `prepare` left it in. Questions count from spawn. */
-	static async #spawn(
+	static #spawn(
 		instanceId: string,
 		cwd: string,
 		launch: RpcLaunch,
 		emit: (update: DashboardUpdate) => void,
 		prepare: (client: RpcClient) => Promise<void>,
+	): Promise<DashboardSession> {
+		return DashboardSession.#open(instanceId, emit, onFrame => startRpc(instanceId, cwd, onFrame, launch), async child => {
+			await prepare(child.client);
+			return cwd;
+		});
+	}
+
+	/** Opens the session on the omp `connect` reaches, once `prepare` readied it and named the directory it works in. */
+	static async #open(
+		instanceId: string,
+		emit: (update: DashboardUpdate) => void,
+		connect: (onFrame: (frame: Record<string, unknown>) => void) => Promise<RpcChild>,
+		prepare: (child: RpcChild) => Promise<string>,
 	): Promise<DashboardSession> {
 		const requests = new PendingRequests(() => emit({ kind: "roster" }));
 		let session: DashboardSession | undefined;
@@ -267,12 +306,14 @@ export class DashboardSession implements LiveSession {
 			if (change?.kind === "add") requests.add(change.request);
 			else if (change?.kind === "cancel") requests.remove(change.id);
 		};
-		const child = await startRpc(cwd, onFrame, launch);
+		const child = await connect(onFrame);
 		try {
 			await child.client.setSubagentSubscription("progress");
-			await prepare(child.client);
+			const cwd = await prepare(child);
 			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit);
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
+			// omp's snapshot has the fields of a lifecycle frame.
+			for (const agent of await child.client.getSubagents()) session.#onSubagent(SUBAGENT_LIFECYCLE, agent);
 			return session;
 		} catch (err) {
 			// Stop omp before anything else can throw, or the process outlives the failed start.
@@ -317,9 +358,10 @@ export class DashboardSession implements LiveSession {
 		return this.#exited;
 	}
 
-	/** The process stops, but the session counts as interrupted, to resume once the dashboard runs again. */
-	dispose(): Promise<void> {
-		return this.#child.client.stop();
+	/** omp keeps running, turn and all, and the next server attaches to it again ({@link reattach}). */
+	async dispose(): Promise<void> {
+		this.#detached = true;
+		this.#child.detach();
 	}
 
 	/** `working` from the ack of a prompt sent while idle, through its turn; `needs-input` over that while a question waits. */

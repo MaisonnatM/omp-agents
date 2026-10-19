@@ -53,7 +53,7 @@ const OLD_LOGIN_AGENT = /^dev\.omp-agents\.desktop\.port-\d+\.plist$/;
 /** The server builds the page before it listens. */
 const READY_TIMEOUT_MS = 60_000;
 const PROBE_TIMEOUT_MS = 2_000;
-/** How long the server gets to end its dashboard sessions after SIGTERM. */
+/** How long the server gets after SIGTERM to write its stores and let go of its sessions, which keep running. */
 const STOP_TIMEOUT_MS = 10_000;
 /** The server output an error page shows. */
 const LOG_LINES = 40;
@@ -390,7 +390,7 @@ if (!app.requestSingleInstanceLock()) {
 	app.on("before-quit", event => {
 		quitting = true;
 		if (!server) return;
-		// Hold the quit until the server has ended its sessions, so none outlives the app.
+		// Hold the quit until the server wrote its stores and let go of its sessions, which run on for the next launch.
 		event.preventDefault();
 		void stopServer().then(() => app.quit());
 	});
