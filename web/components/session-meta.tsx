@@ -14,7 +14,7 @@ import { ticketsStore, useRead } from "../reads";
 import { hashForPullRequests, hashForTickets } from "../routing";
 import { linearUrlOf } from "../tickets-model";
 import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
-import { BranchName } from "./git";
+import { BranchName, releaseBranch } from "./git";
 import { StackRail } from "./pull-requests/pr-details/stack";
 import { OrgIcon } from "./org-icon";
 
@@ -23,22 +23,16 @@ export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
 const TicketsIcon = PAGE_ICON.tickets;
 const NO_TICKETS: never[] = [];
 
-/** A session header's controls before its own buttons: the branch it works on, which copies a `cd` into its linked worktree when clicked, else its name; its Linear issues; and its pull requests. */
-export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch" | "worktree"> }) {
-	const { branch, worktree } = facts;
-	const cd = branch?.linked && worktree ? `cd ${shellQuote(worktree)}` : null;
+/** A session header's controls before its own buttons: the branch it works on, which copies its name and removes its linked worktree when clicked; its Linear issues; and its pull requests. */
+export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch"> & { cwd: string } }) {
+	const { branch, cwd } = facts;
 	return (
 		<>
-			{branch && <BranchName name={branch.name} text={cd ?? undefined} what={cd ? `${cd} to test ${branch.name}` : undefined} className="max-w-48 font-mono text-xs text-muted-foreground" />}
+			{branch && <BranchName name={branch.name} onCopy={() => releaseBranch(cwd, branch.name)} className="max-w-48 font-mono text-xs text-muted-foreground" />}
 			<TicketMenu tickets={facts.tickets} />
 			<PullRequestButton pullRequests={facts.pullRequests} />
 		</>
 	);
-}
-
-/** `path` as one POSIX shell word. */
-function shellQuote(path: string): string {
-	return /^[\w@%+=:,./~-]+$/.test(path) ? path : `'${path.replaceAll("'", `'\\''`)}'`;
 }
 
 /**
