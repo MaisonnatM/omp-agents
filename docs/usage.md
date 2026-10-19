@@ -91,6 +91,7 @@ An action that fails shows its error, and its control becomes available again.
   The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
 - The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because omp exited on its own, or stopped while no dashboard ran, as when the computer restarted.
   A session the dashboard started keeps running when the dashboard server stops, restarts, or crashes, turn, background jobs, and subagents included, and the next server shows it live again, so it never shows here for that.
+  It shows as working again when its turn ran, compacted, or waited on a background job's result as the server stopped.
   The group shows only while it has a row.
   Its **Resume all** button resumes every session it lists, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
@@ -553,7 +554,8 @@ An action that fails shows its error, and its control becomes available again.
   A conversation of greetings or acknowledgements only, such as `hi`, stays untitled until a later message.
   omp counts that title as one that you set, as it counts a `/rename` in a terminal.
 - A running session shows **End session** in its header, unless its room is read-only.
-  **End session** stops its omp process: one that the dashboard started stops over its pipe, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
+  **End session** stops its omp process: one that the dashboard started stops with every process it started, its background jobs, kernels, and subagents included, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
+  A session the dashboard started that exits on its own takes those processes with it too.
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
   The dashboard then removes the linked git worktree the session works in, the one whose branch its header names, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
   A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.

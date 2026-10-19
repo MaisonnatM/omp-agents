@@ -143,7 +143,7 @@ export function createStarter(env: StartEnv): Starter {
 
 /**
  * Attaches to every session a previous server started whose omp still runs, and lists it again in its project, under
- * the instance id it had. One it reaches but cannot attach to stops, so that no session runs that no server drives.
+ * the instance id it had. One it reaches but cannot attach to runs on unlisted, and the next server tries again.
  * Resolves with the session ids of the sessions that survived.
  */
 export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"]): Promise<Set<string>> {

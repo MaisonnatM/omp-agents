@@ -66,9 +66,10 @@ The main ones:
 - RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`.
   `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of omp's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
   `RpcClient`'s `spawn` option may return any process with `pid`, `exited`, `stdin`, `stdout`, `peekStderr`, and `kill` (`RpcAgentProcess`); `start()` waits for omp's `ready` line, sends `negotiate_protocol` when it offers protocol 2, then `set_host_tools`, and a stdout that ends makes it call `kill`; see [Session keepers](#session-keepers).
-  omp answers `negotiate_protocol` again whenever it is sent (`rpc-mode.ts`), and `RpcFrameDecoder` throws on a chunk sequence that does not start at index 0.
-  `get_state` reports `isStreaming`, and `get_subagents` returns `RpcSubagentSnapshot`s with the fields of a subagent lifecycle frame.
+  omp answers `negotiate_protocol` again whenever it is sent (`rpc-mode.ts`), and `RpcFrameDecoder` throws on a chunk sequence that does not start at index 0 or that another frame interrupts; omp writes a frame over 1 MB as such a sequence.
+  `get_state` reports `isStreaming`, `isCompacting`, and `hasPendingAsyncWork` (`AgentSession.hasPendingAsyncWork`, a running background job whose result will start the agent again), and `get_subagents` returns `RpcSubagentSnapshot`s with the fields of a subagent lifecycle frame.
   `agent_end` carries `isTerminal: false` while an async delivery remains, such as a background job, so a turn that started one stays running until the job delivers.
+  omp's eval kernels and subagents spawn with Bun's `detached`, as session leaders of their own (`pi-coding-agent/src/eval/kernel-base.ts`, `task/executor.ts`), and its background jobs lead process groups of their own, so only a walk of the process tree finds them, and only while omp runs.
   `get_available_models` returns omp's whole `Model` objects, with `name`, `contextWindow`, `api`, `identity`, and `serviceTiers`; `get_state` adds `fastModeEnabled` and `fastModeActive`, and `setFastMode` sends `set_fast_mode`.
   `RpcClient.prompt` resolves with the request id once omp admitted the prompt, and `onPromptResult` delivers that prompt's `prompt_result` (`rpc-prompt-results.ts`); see [Dashboard sessions](#dashboard-sessions).
   Host tools: `RpcClient`'s `customTools` option (`RpcClientCustomTool`), which `start()` sends as `set_host_tools`, so a new process for the same session gets them again, and `setCustomTools`, which replaces them for a session the server attached to; `pi-coding-agent/src/modes/rpc/host-tools.ts` runs them as strict tools, sending `host_tool_call` and waiting on `host_tool_result` or its own `host_tool_cancel`, and `defaultLoadModeForToolName` in `pi-coding-agent/src/tools/essential-tools.ts` makes one without `loadMode: "essential"` only discoverable.
@@ -323,19 +324,23 @@ omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits
 A keeper (`src/keeper.ts`) holds one session's omp: it runs omp with piped stdio, and lends that stdio to one server at a time through a Unix socket, `sessions/<port>/<instance id>.sock` beside the access token, with omp's stderr in the `.log` beside it.
 The directory is per port, so a server on another port, such as a smoke run, never takes over this one's sessions.
 `startKeeper` in `src/keeper-link.ts` starts it through `/bin/sh`, which backgrounds it and exits, and Bun's `detached` makes it a session leader: no signal to the server's process group, and no kill of the server's process tree, reaches it.
-The keeper loads none of omp's modules; the packaged app ships it as `keeper.js` beside `server.js` (`keeperScript` in `src/server/resources.ts`).
+Of omp's modules the keeper loads only `rpc-frame.ts`, whose path the server passes it (`rpcFrameFile` in `src/omp/modules.ts`); the packaged app ships the keeper as `keeper.js` beside `server.js` (`keeperScript` in `src/server/resources.ts`).
 
 Each connection starts with the keeper's greeting, `omp_agents_keeper` with omp's pid and the `meta` the server passed at the start (`startedAt` and the directory omp started in), then omp's own `ready` line again.
 So `startRpc` and `attachRpc` in `src/omp/rpc.ts` both hand omp's `RpcClient` the connection as the process its `spawn` option returns, and the client starts on it as on a fresh omp.
-The keeper negotiated protocol 2 with omp itself and answers each client's `negotiate_protocol`, then sends the questions omp still waits on (`extension_ui_request` dialogs not yet answered or cancelled, with what remains of a timeout), then omp's output from the next whole frame on, never from the middle of an `rpc_chunk` sequence.
-omp's output while no server listens is dropped; the attaching server reads omp's state instead: `DashboardSession.reattach` counts a turn as running when `get_state` reports `isStreaming`, lists the subagents `get_subagents` reports, and serves the session's project tools again with `set_host_tools`.
-A host tool call that no server can answer, because none listens or the one that ran it hung up, fails at once with a note that the dashboard restarted, so omp's turn goes on.
-A new connection replaces the old one.
+The keeper negotiated protocol 2 with omp itself and answers a connection's `negotiate_protocol`, which makes that connection the one omp talks to; until then the connection can neither write to omp nor stop it.
+The joining connection first hears the questions omp still waits on (`extension_ui_request` dialogs not yet answered or cancelled, with what remains of a timeout).
+The keeper reads omp's output one logical frame at a time through omp's `RpcFrameDecoder`, so an `rpc_chunk` sequence counts as the frame it carries, and forwards each whole frame, with all its lines, to the connection that joined.
+omp's output while no server listens is dropped; the attaching server reads omp's state instead: `DashboardSession.reattach` counts a turn as running when `get_state` reports `isStreaming`, `isCompacting`, or `hasPendingAsyncWork`, lists the subagents `get_subagents` reports, and serves the session's project tools again with `set_host_tools`.
+A host tool call that no server hears, because none has joined, fails at once with a note that the dashboard restarted, so omp's turn goes on; so do the calls a server heard and did not answer before it hung up or another joined.
 
 The server's shutdown calls `DashboardSession.dispose`, which hangs up without stopping omp and reports no exit.
-At startup `reattachAll` in `src/server/start.ts` connects to every socket in the directory under the instance id it had, and lists each session again, in its project, before the runners recover; a socket nobody listens on loses its files, and a session it reaches but cannot attach to is stopped, so no session runs that no server drives.
-**End session** sends the keeper `omp_agents_keeper_stop`: it sends SIGTERM to omp and every process under it, background jobs that lead their own process groups included, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
-A keeper exits whenever omp does, and omp exits when its keeper dies, since its stdin closes.
+At startup `reattachAll` in `src/server/start.ts` connects to every socket in the directory under the instance id it had, and lists each session again, in its project, before the runners recover; a socket nobody listens on loses its files.
+Attaching never stops omp: a session file without a readable header leaves the session in the directory omp started in, a replay marker that cannot be read counts as a replay, and a session that fails to attach is left running, unlisted, for the next server.
+**End session** sends the keeper `omp_agents_keeper_stop`, and omp exiting on its own ends the same way: the keeper sends SIGTERM to omp and every process omp started, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
+omp's background jobs, kernels and subagents lead process groups or sessions of their own and are reparented once omp exits, so the keeper notes the processes under omp with `ps` a second after a tool call ends, since an async call starts its job just after it returns, and every 10 seconds, each with its start time so that a reused pid is never signalled; a process omp started since the last note escapes an omp that is killed.
+A `ps` that fails is logged with the pids that may still run, rather than read as nothing left.
+A keeper exits whenever omp does, and omp exits when its keeper dies, since its stdin closes, and stops its own background jobs as it exits.
 
 ## Replay from here
 

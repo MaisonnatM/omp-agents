@@ -8,7 +8,7 @@ import { keepersDir } from "../paths";
 import type { Frame } from "./collab";
 import { childEnv } from "../proc";
 import { ompCommand } from "./install";
-import { type RpcHostTool, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
+import { type RpcHostTool, rpc, rpcFrameFile, rpcFrames, type ServiceTierModel, utils } from "./modules";
 
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {
@@ -34,6 +34,10 @@ export interface RpcState {
 	fastModeActive: boolean;
 	/** Whether a turn runs. */
 	isStreaming: boolean;
+	/** Whether omp compacts the context, which a turn's own maintenance does before it goes on. */
+	isCompacting: boolean;
+	/** Whether a background job's result will start the agent again once it arrives. */
+	hasPendingAsyncWork: boolean;
 	/** omp's displayable steering and follow-up queues, as its `queue_update` event reports them. */
 	queuedMessages: { steering: string[]; followUp: string[] };
 }
@@ -179,7 +183,11 @@ async function drive(link: (agentArgs: string[]) => Promise<KeeperLink>, onFrame
  * session opens is not lost.
  */
 export function startRpc(instanceId: string, cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
-	return drive(agentArgs => startKeeper(keepersDir, instanceId, cwd, [...ompCommand, ...agentArgs], childEnv(), { startedAt: Date.now(), cwd }), onFrame, launch);
+	return drive(
+		agentArgs => startKeeper(keepersDir, instanceId, { cwd, argv: [...ompCommand, ...agentArgs], env: childEnv(), frameModule: rpcFrameFile, meta: { startedAt: Date.now(), cwd } }),
+		onFrame,
+		launch,
+	);
 }
 
 /**

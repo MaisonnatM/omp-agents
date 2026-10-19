@@ -645,7 +645,9 @@ export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc
 	// Sends the constructor's `customTools`, and a reattached session's; the option itself cannot be checked.
 	"RpcClient.prototype.setCustomTools": "function",
 });
-export const rpcFrames = await load<RpcFrameModule>(join(srcDir, "modes", "rpc", "rpc-frame.ts"), { RpcFrameDecoder: "function" });
+/** omp's frame codec, which a session keeper (`src/keeper.ts`) also loads to read omp's output frame by frame. */
+export const rpcFrameFile = join(srcDir, "modes", "rpc", "rpc-frame.ts");
+export const rpcFrames = await load<RpcFrameModule>(rpcFrameFile, { RpcFrameDecoder: "function" });
 export const utils = await load<UtilsModule>(join(utilsSrc, "index.ts"), { readJsonl: "function" });
 
 export const autocomplete = await load<AutocompleteModule>(join(dirname(packageDir), "pi-tui", "src", "autocomplete.ts"), {

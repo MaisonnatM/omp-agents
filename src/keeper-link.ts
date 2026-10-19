@@ -142,11 +142,20 @@ function connect(dir: string, instanceId: string): Promise<KeeperLink> {
 	return promise;
 }
 
+/** What a keeper runs: omp's `argv` in `cwd` with `env`, reading omp's output through omp's `rpc-frame.ts` at `frameModule`. */
+export interface KeeperLaunch {
+	cwd: string;
+	argv: string[];
+	env: Record<string, string | undefined>;
+	frameModule: string;
+	meta: KeeperMeta;
+}
+
 /**
- * Starts a keeper for session `instanceId` in `dir`, which runs `argv` in `cwd` with `env`, and connects to it once it
- * listens. Detached, in its own session, so neither the server's exit nor a signal to its process group reaches it.
+ * Starts a keeper for session `instanceId` in `dir`, and connects to it once it listens. Detached, in its own session,
+ * so neither the server's exit nor a signal to its process group reaches it.
  */
-export async function startKeeper(dir: string, instanceId: string, cwd: string, argv: string[], env: Record<string, string | undefined>, meta: KeeperMeta): Promise<KeeperLink> {
+export async function startKeeper(dir: string, instanceId: string, { cwd, argv, env, frameModule, meta }: KeeperLaunch): Promise<KeeperLink> {
 	const socket = socketOf(dir, instanceId);
 	if (Buffer.byteLength(socket) > MAX_SOCKET_PATH_BYTES) throw new Error(`The session socket path is too long for macOS: ${socket}. Set a shorter XDG_CONFIG_HOME.`);
 	mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -156,7 +165,7 @@ export async function startKeeper(dir: string, instanceId: string, cwd: string, 
 	try {
 		// The shell starts the keeper in the background and exits, so the keeper is no child of the server's: whatever
 		// stops the server's process tree, not only its process group, misses it.
-		shell = Bun.spawn(["/bin/sh", "-c", '"$@" >&2 </dev/null & echo $!', "keeper", process.execPath, keeperScript, socket, JSON.stringify(meta), ...argv], { cwd, env, stdin: "ignore", stdout: "pipe", stderr: fd, detached: true });
+		shell = Bun.spawn(["/bin/sh", "-c", '"$@" >&2 </dev/null & echo $!', "keeper", process.execPath, keeperScript, socket, JSON.stringify(meta), frameModule, ...argv], { cwd, env, stdin: "ignore", stdout: "pipe", stderr: fd, detached: true });
 	} finally {
 		closeSync(fd);
 	}

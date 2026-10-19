@@ -93,6 +93,30 @@ function withdrawn({ text, images = [] }: { text: string; images?: readonly Prom
 	return { text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) };
 }
 
+/** How a session reaches its omp, which decides what a failed opening does to it. */
+type Opening =
+	/** A new omp in `cwd` with `launch`, which a failed opening stops, so no process outlives a failed start. */
+	| { kind: "spawn"; cwd: string; launch: RpcLaunch }
+	/** The omp a previous server started, which a failed opening leaves running, turn and all, for the next server. */
+	| { kind: "attach" };
+
+async function reach(instanceId: string, opening: Opening, onFrame: (frame: Record<string, unknown>) => void): Promise<{ child: RpcChild; abandon: () => Promise<void> }> {
+	switch (opening.kind) {
+		case "spawn": {
+			const child = await startRpc(instanceId, opening.cwd, onFrame, opening.launch);
+			return { child, abandon: () => child.client.stop() };
+		}
+		case "attach": {
+			const child = await attachRpc(instanceId, onFrame);
+			return { child, abandon: async () => child.detach() };
+		}
+		default: {
+			const unhandled: never = opening;
+			return unhandled;
+		}
+	}
+}
+
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
 	readonly startedAt: number;
@@ -153,8 +177,9 @@ export class DashboardSession implements LiveSession {
 		this.sessionFile = state.sessionFile ?? null;
 		this.#applyState(state);
 		this.queue = state.queuedMessages;
-		// A session this server attached to may be in the middle of a turn that an earlier server started.
-		if (state.isStreaming) this.#prompt.turnStarted();
+		// A session this server attached to may be in a turn an earlier server started: streaming, compacting, or waiting
+		// on a background job, whose result goes on with the turn and ends it with the terminal `agent_end`.
+		if (state.isStreaming || state.isCompacting || state.hasPendingAsyncWork) this.#prompt.turnStarted();
 
 		const { client } = child;
 		client.onSessionEvent(event => this.#onEvent(event));
@@ -255,13 +280,15 @@ export class DashboardSession implements LiveSession {
 	 */
 	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"], emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		let protectedReplay = false;
-		const session = await DashboardSession.#open(instanceId, emit, onFrame => attachRpc(instanceId, onFrame), async child => {
+		const session = await DashboardSession.#open(instanceId, emit, { kind: "attach" }, async child => {
 			const { sessionId, sessionFile } = await child.client.getState();
 			const tools = toolsFor(sessionId);
 			if (tools.length > 0) await child.client.setCustomTools(tools);
+			// omp runs already, so its session file decides only how this server shows it, never whether it runs.
 			if (!sessionFile || !(await stat(sessionFile).catch(() => null))) return child.meta.cwd;
-			protectedReplay = (await readReplayMarker(sessionFile)) !== null;
-			return recordedCwd(sessionFile);
+			// A marker that cannot be read holds prompts back as a replay's would.
+			protectedReplay = (await readReplayMarker(sessionFile).catch(() => "unreadable")) !== null;
+			return recordedCwd(sessionFile).catch(() => child.meta.cwd);
 		});
 		session.#protectedReplay = protectedReplay;
 		// Whether a running turn is a replay's first one is not known here, so it holds prompts back as the first one would.
@@ -277,17 +304,17 @@ export class DashboardSession implements LiveSession {
 		emit: (update: DashboardUpdate) => void,
 		prepare: (client: RpcClient) => Promise<void>,
 	): Promise<DashboardSession> {
-		return DashboardSession.#open(instanceId, emit, onFrame => startRpc(instanceId, cwd, onFrame, launch), async child => {
+		return DashboardSession.#open(instanceId, emit, { kind: "spawn", cwd, launch }, async child => {
 			await prepare(child.client);
 			return cwd;
 		});
 	}
 
-	/** Opens the session on the omp `connect` reaches, once `prepare` readied it and named the directory it works in. */
+	/** Opens the session on the omp `opening` reaches, once `prepare` readied it and named the directory it works in. */
 	static async #open(
 		instanceId: string,
 		emit: (update: DashboardUpdate) => void,
-		connect: (onFrame: (frame: Record<string, unknown>) => void) => Promise<RpcChild>,
+		opening: Opening,
 		prepare: (child: RpcChild) => Promise<string>,
 	): Promise<DashboardSession> {
 		const requests = new PendingRequests(() => emit({ kind: "roster" }));
@@ -306,7 +333,7 @@ export class DashboardSession implements LiveSession {
 			if (change?.kind === "add") requests.add(change.request);
 			else if (change?.kind === "cancel") requests.remove(change.id);
 		};
-		const child = await connect(onFrame);
+		const { child, abandon } = await reach(instanceId, opening, onFrame);
 		try {
 			await child.client.setSubagentSubscription("progress");
 			const cwd = await prepare(child);
@@ -316,8 +343,7 @@ export class DashboardSession implements LiveSession {
 			for (const agent of await child.client.getSubagents()) session.#onSubagent(SUBAGENT_LIFECYCLE, agent);
 			return session;
 		} catch (err) {
-			// Stop omp before anything else can throw, or the process outlives the failed start.
-			await child.client.stop();
+			await abandon();
 			requests.clear();
 			throw err;
 		}

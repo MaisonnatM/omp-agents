@@ -17,7 +17,7 @@ import type { ServerMsg } from "./shared/protocol";
 import * as replayLaunch from "./omp/replay-launch";
 import type { PreparedReplay } from "./replay";
 
-const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, isStreaming: false, queuedMessages: { steering: [], followUp: [] } };
+const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
 
 /** An omp RPC client whose methods answer at once, records what the session sends omp, and lets a test play omp's events. */
 class FakeClient implements RpcClient {
@@ -690,6 +690,53 @@ describe("DashboardSession reattach", () => {
 		await session.end();
 		await settle();
 		expect(updates.filter(update => update.kind === "exited")).toEqual([{ kind: "exited", ended: true }]);
+	});
+
+	test("a session attached while it waits on a background job works until the job's result ends its turn", async () => {
+		const client = new FakeClient();
+		keptOmp(client);
+		client.getState = async () => ({ ...STATE, hasPendingAsyncWork: true });
+		const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
+		session.answer("q1", { kind: "confirm", confirmed: true });
+		expect(session.status).toBe("working");
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "agent_end", messages: [], isTerminal: false });
+		await settle();
+		expect(session.status).toBe("working");
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect(session.status).toBe("idle");
+	});
+
+	test("a session file with no directory in its header and a broken replay marker attaches where omp started, as a replay", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-reattach-"));
+		try {
+			const file = join(dir, "session.jsonl");
+			const at = new Date(0).toISOString();
+			writeFileSync(file, `${JSON.stringify({ type: "session", version: 3, id: "kept-1", timestamp: at })}\n${JSON.stringify({ type: "custom", id: "e1", parentId: null, timestamp: at, customType: "omp-agents-replay", data: {} })}\n`);
+			const client = new FakeClient();
+			keptOmp(client);
+			client.getState = async () => ({ ...STATE, sessionFile: file });
+			const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
+			expect(session.row().cwd).toBe("/tmp/kept");
+			await expect(session.prompt("a1", "hi", [], "steer")).rejects.toThrow("Subagent prompts are blocked in a replay.");
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	test("an attach that fails hangs up and leaves omp running for the next server", async () => {
+		const client = new FakeClient();
+		const { hungUp } = keptOmp(client);
+		const stops: string[] = [];
+		client.stop = async () => {
+			stops.push("stop");
+		};
+		client.getSubagents = async () => {
+			throw new Error("omp did not answer");
+		};
+		await expect(DashboardSession.reattach("inst-kept", () => [], () => {})).rejects.toThrow("omp did not answer");
+		expect([hungUp, stops]).toEqual([["detach"], []]);
 	});
 });
 
