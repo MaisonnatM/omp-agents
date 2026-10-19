@@ -7,7 +7,6 @@
  */
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
-import { homedir } from "node:os";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
@@ -15,18 +14,17 @@ import { gitCheckout } from "../git";
 import { GmailAccounts, GmailClient } from "../gmail";
 import { accountClients, createGoogleAccounts } from "../google-accounts";
 import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
-import { loadPullRequestDetail, loadPullRequests } from "../pull-requests";
+import { loadPullRequestDetail, loadPullRequests, mergedPullRequests } from "../pull-requests";
 import { loadTickets } from "../tickets";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { findMcpServers } from "../omp/mcp";
-import { connectedRoles } from "../omp/models";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, presetsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
@@ -36,7 +34,6 @@ import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
-import { type SessionPreset, starterPresets } from "../shared/presets";
 import type { ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
@@ -56,7 +53,6 @@ import { Loops } from "./loops";
 import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
-import { PresetsFile } from "./presets-file";
 import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
 import { ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
 import { ProjectWatch } from "./project-watch";
@@ -94,7 +90,6 @@ export class Dashboard {
 	readonly #workspaces: WorkspacesFile;
 	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
-	readonly #presets = new PresetsFile(presetsFile);
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
@@ -143,7 +138,6 @@ export class Dashboard {
 		const routines = this.#routines;
 		const scheduled = this.#scheduled;
 		const pins = this.#pins;
-		const presets = this.#presets;
 		const interrupted = this.#interrupted;
 		const ownerLock = (this.#ownerLock = new OwnerLock(serverLockFile, port));
 		// The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
@@ -204,7 +198,6 @@ export class Dashboard {
 				apply: change => workspaces.apply(change),
 			},
 			pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
-			presets: { msg: () => ({ t: "presets", presets: presets.value }), apply: change => presets.apply(change) },
 			projects: {
 				msg: () => ({ t: "projects", projects: projects.value }),
 				apply: change => {
@@ -245,6 +238,7 @@ export class Dashboard {
 			knownCwds: () => this.knownCwds(),
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
+			mergedPullRequests,
 			live() {
 				return sessions.rows(files.factsOf).map(host => ({
 					cwd: host.cwd,
@@ -273,11 +267,6 @@ export class Dashboard {
 				return true;
 			},
 		});
-		/** The saved preset `id`, read fresh, or `null` when there is none. */
-		const preset = (id: string): SessionPreset | null => {
-			presets.reload();
-			return presets.value.find(candidate => candidate.id === id) ?? null;
-		};
 		/** The branch checked out in `cwd`, or `null` outside git or on a detached head. */
 		const checkedOut = async (cwd: string): Promise<string | null> => {
 			const dir = await directoryOf(cwd);
@@ -299,8 +288,6 @@ export class Dashboard {
 			},
 			onChange: () => broadcasts.pushList("routines"),
 			changePins: change => void lists.apply("pins", change),
-			preset,
-			checkedOut,
 			notifyProject: (projectId, event) => this.#projectRunner.notify(projectId, event),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
@@ -327,7 +314,6 @@ export class Dashboard {
 			},
 			interrupted: sessionId => interrupted.has(sessionId),
 			stoppedWithServer: sessionId => interrupted.stoppedWithServer(sessionId),
-			preset,
 			checkedOut,
 			extensionArgs: projectsExtensionArgs,
 			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),
@@ -365,8 +351,6 @@ export class Dashboard {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
 				broadcasts.pushList("scheduled");
-				presets.reload();
-				broadcasts.pushList("presets");
 				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -481,7 +465,6 @@ export class Dashboard {
 		const [calendarServer] = await findMcpServers(MCP_SERVICES["google-calendar"].host);
 		if (calendarServer) this.#calendars.adopt(calendarServer.name);
 		await this.#listRegistry();
-		void this.#seedPresets();
 		if (this.#ownerLock.held) this.#clearOldDone();
 		this.#loops.start();
 	}
@@ -638,11 +621,6 @@ export class Dashboard {
 	/** List every session file again, for the changes the watcher did not report. */
 	async #rescanFiles(): Promise<void> {
 		if (await this.#files.scan()) this.#onFilesChanged();
-	}
-
-	async #seedPresets(): Promise<void> {
-		const roles = await connectedRoles(homedir()).catch(() => []);
-		if (this.#presets.seed(starterPresets(roles))) this.#broadcasts.pushList("presets");
 	}
 
 	/** Lists the registry and follows it; its changes reach every socket. */

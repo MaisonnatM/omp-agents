@@ -148,8 +148,6 @@ export interface RoutineDraft {
 	cwd: string;
 	enabled: boolean;
 	skill: string | null;
-	/** The preset whose model, tools, and branch each run starts with, `null` for none. */
-	preset: string | null;
 	task: RoutineTask["kind"];
 	prompt: string;
 	/** Whether the prompt's session is pinned once it finishes. */
@@ -168,7 +166,6 @@ export function newDraft(id: string, cwd: string, skill: string | null): Routine
 		cwd,
 		enabled: true,
 		skill,
-		preset: null,
 		task: "prompt",
 		prompt: "",
 		pin: false,
@@ -197,7 +194,6 @@ export function draftOf(routine: Routine): RoutineDraft {
 		...draft,
 		name: routine.name,
 		enabled: routine.enabled,
-		preset: routine.preset,
 		task: task.kind,
 		prompt: task.kind === "command" ? draft.prompt : task.prompt,
 		pin: task.kind === "prompt" ? task.pin : draft.pin,
@@ -244,8 +240,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	}
 	const schedulesOf = nonEmpty(schedules);
 	if (!schedulesOf) return { fix: "Add a schedule." };
-	const session = task.kind === "prompt";
-	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill: session ? draft.skill : null, preset: session ? draft.preset : null, task, schedules: schedulesOf } };
+	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill: task.kind === "prompt" ? draft.skill : null, task, schedules: schedulesOf } };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */

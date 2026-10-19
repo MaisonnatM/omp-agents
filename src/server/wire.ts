@@ -27,7 +27,6 @@ import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../sh
 import { GITHUB_NAME, MAX_COMMENT_BODY, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
-import { type PresetChange, parsePreset } from "../shared/presets";
 import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "../shared/projects";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
@@ -39,7 +38,7 @@ import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues
 import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { isTodoId, parseTodoChange } from "../user-todos-parse";
-import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
+import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequest, type WorktreeTarget } from "../worktrees-shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -109,13 +108,6 @@ function parsePinChange(value: unknown): Parsed<PinChange> {
 	const { op, sessionIds } = value;
 	if (op !== "pin" && op !== "unpin") return null;
 	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { ok: { op, sessionIds } } : null;
-}
-
-function parsePresetChange(value: unknown): Parsed<PresetChange> {
-	if (!isObject(value)) return null;
-	if (value.op === "remove") return isNonEmpty(value.id) ? { ok: { op: "remove", id: value.id } } : null;
-	const preset = value.op === "save" ? parsePreset(value.preset) : null;
-	return preset && { ok: { op: "save", preset: preset.ok } };
 }
 
 /** A rename or an archive of a project; the server makes every other change. */
@@ -283,10 +275,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	pin(value) {
 		const change = parsePinChange(value.change);
 		return change && { ok: { t: "pin", change: change.ok } };
-	},
-	preset(value) {
-		const change = parsePresetChange(value.change);
-		return change && { ok: { t: "preset", change: change.ok } };
 	},
 	project(value) {
 		const change = parseProjectEdit(value.change);
@@ -664,20 +652,20 @@ export const SHA256 = /^[0-9a-f]{64}$/;
 const parseWorktreeTarget = (value: unknown): Parsed<WorktreeTarget> =>
 	isObject(value) && isNonEmpty(value.repository) && isNonEmpty(value.path) ? { ok: { repository: value.repository, path: value.path } } : null;
 
-/** The body of `PUT /api/worktrees/removal`: a preview of up to 100 registered checkouts, or the confirmations from such a preview. */
+/** The body of `PUT /api/worktrees/removal`: a preview of up to `MAX_WORKTREE_BATCH` registered checkouts, `merged` for **Remove merged**, or the confirmations from such a preview. */
 export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalRequest> {
 	if (!isObject(body)) return null;
 	if (body.action === "preview") {
-		if (!Array.isArray(body.targets) || body.targets.length === 0 || body.targets.length > 100) return null;
+		if (!Array.isArray(body.targets) || body.targets.length === 0 || body.targets.length > MAX_WORKTREE_BATCH) return null;
 		const targets: WorktreeTarget[] = [];
 		for (const item of body.targets) {
 			const target = parseWorktreeTarget(item);
 			if (!target) return null;
 			targets.push(target.ok);
 		}
-		return { ok: { action: "preview", targets } };
+		return { ok: { action: "preview", targets, merged: body.merged === true } };
 	}
-	if (body.action !== "remove" || !Array.isArray(body.plans) || body.plans.length === 0 || body.plans.length > 100) return null;
+	if (body.action !== "remove" || !Array.isArray(body.plans) || body.plans.length === 0 || body.plans.length > MAX_WORKTREE_BATCH) return null;
 	const plans: WorktreeConfirmation[] = [];
 	for (const item of body.plans) {
 		const target = parseWorktreeTarget(item);

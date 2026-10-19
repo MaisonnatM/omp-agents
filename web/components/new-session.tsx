@@ -1,7 +1,6 @@
 import { Sparkles } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
-import type { BranchChoice, GitCheckout } from "../../src/shared/git";
-import { presetBranch, type SessionPreset } from "../../src/shared/presets";
+import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
 import { folderName } from "../labels";
-import { getJson } from "../api";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
@@ -25,7 +23,6 @@ import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
-import { PresetPicker } from "./preset-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
 import { DirectoryPicker } from "./workspace-picker";
@@ -45,15 +42,13 @@ interface NewSessionProps {
 	onPickCwd: (cwd: string) => void;
 	/**
 	 * Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at
-	 * `thinking` when it names a level; through `skill` when it names one; with `tools` alone when it names some.
+	 * `thinking` when it names a level; through `skill` when it names one.
 	 */
 	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId">) => void;
 	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
 	onSchedule: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
 	todo: { text: string; prompt: string } | null;
-	/** The saved presets, which the draft's preset picker offers. */
-	presets: SessionPreset[];
 	/** A scheduled start opened to edit: the draft starts as it, sending saves it, **Start now** calls `onStart`, and `onSchedule` moves its time. */
 	scheduled?: ScheduledDraft;
 }
@@ -80,9 +75,8 @@ export interface ScheduledDraft {
  * is sent, so leaving the draft leaves nothing running. The message and its images stay in the composer until the session opens.
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
- * A preset fills the model, the thinking level, the skill, and the branch, which stay yours to change, and limits the tools.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, presets, scheduled }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useState(initial?.prompt ?? todo?.prompt ?? "");
@@ -90,11 +84,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
 	const [pinnedSkill] = usePinnedSkill();
-	const [selection, setSelection] = useState<{ preset: SessionPreset; at: Date } | null>(null);
-	const preset = selection?.preset ?? null;
-	// A scheduled start keeps the skill and tools it was saved with until a preset replaces them; with its skill turned off, the toggle offers the pinned one.
-	const draftSkill = preset ? preset.skill : initial?.skill ?? pinnedSkill;
-	const tools = preset ? preset.tools : initial?.tools ?? null;
+	// A scheduled start keeps the skill it was saved with; with its skill turned off, the toggle offers the pinned one.
+	const draftSkill = initial?.skill ?? pinnedSkill;
 	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
@@ -110,8 +101,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
-	const presetChoice = (current: GitCheckout | null): BranchChoice | null => selection && current ? presetBranch(selection.preset, current.branch, selection.at) : null;
-	const pickedChoice = picked?.cwd === cwd ? picked.choice : presetChoice(checkout);
+	const pickedChoice = picked?.cwd === cwd ? picked.choice : null;
 	// A new branch that a failed start created is an existing one now, so the next start uses it as such.
 	const choice: BranchChoice | null =
 		pickedChoice?.kind === "new" && checkout?.branches.some(branch => branch.name === pickedChoice.name)
@@ -147,25 +137,13 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		}
 	};
 	const directCommand = blockedShortcut(draft, "new");
-	const branchForStart = async (): Promise<BranchChoice | null> => {
-		if (picked?.cwd === cwd || !selection || selection.preset.worktree === "here") return choice;
-		const current = checkout ?? await getJson<GitCheckout | null>(`/api/git?cwd=${encodeURIComponent(cwd)}`);
-		if (!current?.branch) throw new Error(`${selection.preset.name} needs a checked-out Git branch.`);
-		return checkout ? choice : presetChoice(current);
-	};
-	const opOf = async (prompt: string): Promise<ScheduledOp> => ({ prompt, branch: await branchForStart(), model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill, tools });
+	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill });
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
-		await onSchedule(await opOf(prompt), when);
+		await onSchedule(opOf(prompt), when);
 		if (!scheduled) setDraft(current => (current.trim() === prompt ? "" : current));
 	}, "Could not schedule the session");
-	const save = useAction(async (prompt: string) => scheduled?.onSave(await opOf(prompt)), "Could not save the scheduled session");
-	const pickPreset = (next: SessionPreset | null): void => {
-		setSelection(next ? { preset: next, at: new Date() } : null);
-		setSkipSkill(false);
-		models.choose(next?.model ?? null, next?.thinking ?? null);
-		setPicked(null);
-	};
+	const save = useAction(async (prompt: string) => scheduled?.onSave(opOf(prompt)), "Could not save the scheduled session");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
@@ -173,7 +151,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
 				<Header title="Scheduled session" meta={scheduled.when}>
-					<Button variant="ghost" size="compact" disabled={starting || !connected || !draft.trim() || directCommand !== null} onClick={async () => onStart({ ...(await opOf(draft.trim())), images: [] })}>
+					<Button variant="ghost" size="compact" disabled={starting || !connected || !draft.trim() || directCommand !== null} onClick={() => onStart({ ...opOf(draft.trim()), images: [] })}>
 						{scheduled.error ? "Try again now" : "Start now"}
 					</Button>
 					<Button variant="ghost" size="compact" disabled={starting || !connected} onClick={scheduled.onCancel}>
@@ -212,7 +190,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							if (directCommand) return;
 							completion.close();
 							if (scheduled) save.run(text.trim());
-							else void attachments.read(text, async (prompt, images) => onStart({ ...(await opOf(prompt)), images }));
+							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
 						placeholder="Message this session…"
 						files={attachments.files}
@@ -220,7 +198,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						accept={ATTACH_ACCEPT}
 						leftSlot={
 							<>
-								{(presets.length > 0 || preset !== null) && <PresetPicker presets={presets} value={preset} onPick={pickPreset} disabled={starting} side="top" />}
 								<ModelPicker {...models.picker} disabled={starting || !connected} />
 								{draftSkill !== null && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 							</>

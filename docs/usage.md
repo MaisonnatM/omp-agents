@@ -522,17 +522,6 @@ An action that fails shows its error, and its control becomes available again.
   Choosing a level starts the session at that level, for the model it was chosen on: choosing another model, or a directory whose `default` role names another model, resets the effort to **Default**.
   Models without selectable thinking levels offer only **Default**.
   Cmd+. opens the model search here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
-- The **Preset** picker fills the draft's model, thinking level, skill, and worktree policy together.
-  You can change the model, thinking level, and branch or turn off the skill before starting; the selected preset's tool allowlist still applies.
-  The draft keeps the preset as picked, even if another window edits or removes the saved preset.
-  **No preset** returns to an unrestricted session with the default choices.
-  **Minimal** allows only `bash` and `edit` and uses the connected `smol` role when first seeded, otherwise the default model.
-  **Review** allows read-only built-in tools and selects the thermonuclear review skill; it has no shell tool to run `git diff`.
-  **Ship** keeps every tool and selects `mma-mode` on a new branch in its own worktree.
-  Ship needs a checked-out Git branch unless you choose a different branch policy in the draft.
-  Restricted sessions load no MCP servers or extension tools, and dashboard resumes and forks keep that restriction.
-  A tool allowlist is not a sandbox; sandbox presets wait for the separate sandbox feature.
-  Resuming through the normal `omp` CLI does not enforce the dashboard's stored tool policy.
 - A skill pinned in **Settings** shows as a toggle after the model picker, with the skill's name.
   While it is on, the first message goes through the skill, as if you had typed `/skill:<name>` before it, and the transcript shows the skill's pill.
   Click it to start this one session without the skill.
@@ -581,7 +570,7 @@ An action that fails shows its error, and its control becomes available again.
 ## Replay from here
 
 - In a main session's **Trajectory**, each prompt row has **Replay from here**, separate from the button that expands its steps. Past sessions and a running source both support it. Subagents and the row before the first prompt do not.
-  Claude Code and Codex sessions do not replay, and neither does a session started with a tool allowlist, since a replay needs its own guard extension.
+  Claude Code and Codex sessions do not replay.
 - Opening the dialog pins that prompt and its history. Later source replies do not invalidate it. If someone changes the prompt, its ancestors, or its session header, open the dialog again.
   The source session stays untouched and keeps running if it was already running.
 - **Use original settings** restores the first identifiable main request's model and thinking level. You can instead select a model and a concrete thinking level.
@@ -662,9 +651,10 @@ An action that fails shows its error, and its control becomes available again.
   A directory removed since its sessions ran, such as a deleted worktree, is no longer a workspace, so quick actions start in a workspace that still exists.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort by whose move it is: **Your move**, **Agent on it**, **Approved**, **Waiting on others**, **Drafts**, and **Recently merged**.
-  A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, which counts up each minute without a reload, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
+  A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, which counts up each minute without a reload, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, its conversations, and its checks.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
-  The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
+  The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, conversations, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
+  Conversations count the pull request's comments and review threads, resolved ones too, as GitHub's own list does, beside a speech bubble; a pull request with none shows no count.
   A narrow page drops the sessions, stack, and line columns.
   While you hover or focus a row, in the sidebar and in the table, a branch icon after its number copies the pull request's branch, which its tooltip names, without opening the pull request.
   Copying it also removes the linked worktree of the workspace's repository that has that branch checked out, with the same checks and toasts as copying a past session's branch.
@@ -1179,9 +1169,6 @@ An action that fails shows its error, and its control becomes available again.
   A prompt task can also **Pin the session when it finishes**.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
   The skill starts as the one pinned in **Settings › Preferences**, and **None** starts the sessions without one.
-- A prompt routine's **Preset** field selects a saved preset by id.
-  Each run reads its current model, thinking level, tools, and worktree policy; the routine's own **Skill** remains authoritative.
-  Removing a preset used by a routine makes its next run fail with an error instead of silently starting unrestricted.
 - A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.
   The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
   It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
@@ -1223,8 +1210,8 @@ An action that fails shows its error, and its control becomes available again.
   The project exists once its coordinator runs, so a start that fails leaves none behind.
 - The coordinator has six tools that the dashboard serves it, and only it has them.
   `start_worker` starts a worker: a new dashboard session on a prompt that stands alone, with a short title, in the project's workspace or a directory the coordinator names, absolute, `~/`, or relative to the workspace.
-  It may also name a model as `provider/id`, an effort, a skill, a session preset, and a branch; a preset fills what it leaves out.
-  In a git checkout a worker gets a branch of its own from the checked-out one, `<project>/<title>-<id>`, unless the coordinator names one, says `none`, or picks a preset that works in the checkout itself.
+  It may also name a model as `provider/id`, an effort, a skill, and a branch.
+  In a git checkout a worker gets a branch of its own from the checked-out one, `<project>/<title>-<id>`, unless the coordinator names one or says `none`.
   Workers are numbered `w1`, `w2`, and so on in the order their sessions start.
   A project runs at most 3 workers at once, working or asking, unless you change **At most** on its page, up to 20; the coordinator's other workers wait in a queue, listed on the page, and start in order as slots free up.
   `list_workers` lists the workers, their phases, and the queue, `read_worker` reads one worker's whole last reply and the questions it waits on, and `message_worker` sends one a message as you would: a running worker gets it after its current turn, and a stopped one is resumed first.
@@ -1330,13 +1317,11 @@ An action that fails shows its error, and its control becomes available again.
   A main session's transcript records neither its system prompt nor its tool definitions, so their tokens show together as **System prompt and tool definitions**, under **Not in transcript**; a subagent's transcript records its system prompt, so its files, skills, rules, and MCP servers show by name, and only **Tool definitions** stay unrecorded.
   Tokens come from omp's tokenizer for each model, or about four characters a token for a model omp has none for.
   The report reads every session file once, then only the files that changed, and shows how far it has read while it catches up.
-- **Session presets** lists the saved bundles and lets you create, edit, or remove one.
-  Choose a model and thinking level, every tool or selected built-in tools, a skill, and this directory or a new-branch worktree.
-  The first startup seeds **Minimal**, **Review**, and **Ship**; removing all presets leaves the list empty.
-  Presets live in `presets.json` beside the dashboard's access token and are shared by its browser tabs and desktop app.
 - **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
-  Each row shows the branch and path, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
+  A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.
+  Each row shows the branch, the path below the repository's parent folder with the full path on hover, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
   No omp session reads as no omp session, not as unused.
+  The status column stays empty for a checkout you can delete and names what blocks one you cannot; each repository's header checkbox selects every deletable row.
   **Delete** asks before it removes a linked worktree or forgets a registration whose directory is already gone.
   It keeps the branch and session transcripts.
   It refuses the main checkout, a locked checkout, unsaved changes, a nested repository, a checkout this dashboard or a live session is using, and a checkout whose subagent locations are unknown.
@@ -1344,6 +1329,13 @@ An action that fails shows its error, and its control becomes available again.
   A detached commit that no branch contains is named before its registration can be removed.
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
   Disk use is approximate, and removing a checkout may free less than the number shown.
+  A row whose work has merged says **Merged** after its branch, with the pull request's number when GitHub's newest pull request from that branch merged.
+  A worktree counts as merged when `origin`'s default branch contains its commit, which also covers a detached checkout, or when its branch's newest pull request merged and the branch has no commit made after the merge, which covers squash merges such as Graphite's.
+  The main checkout is never flagged, and a repository GitHub cannot answer for says so above the list, while the default branch still flags what it contains.
+  **Remove merged** previews every merged row the search shows and lists the ones it will remove and the ones it keeps, each with the reason.
+  It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses.
+  Confirming removes only the worktrees it listed for removal, keeps their branches, and reports how many it removed, kept, and failed to remove.
+  Nothing is removed until you confirm.
 - **Models** shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
   A role without its own chain says that it uses the `default` role's chain.
   Chains keyed by a model or a `provider/*` wildcard appear in their own table, and the `modelProviderOrder` follows.

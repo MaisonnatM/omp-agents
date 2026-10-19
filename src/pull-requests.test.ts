@@ -2,7 +2,7 @@ import { describe, expect, setSystemTime, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadPullRequests, parseDetailAnswer, parseListAnswer, parseRemote, repoOf } from "./pull-requests";
+import { loadPullRequests, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, repoOf } from "./pull-requests";
 import { runChecked } from "./proc";
 
 const repo = { owner: "acme", repo: "webapp" };
@@ -33,6 +33,22 @@ describe("parseRemote", () => {
 		expect(parseRemote("ssh://git@github.com/acme/webapp.git")).toEqual({ owner: "acme", repo: "webapp" });
 		expect(parseRemote("github.com:acme/webapp.git")).toEqual({ owner: "acme", repo: "webapp" });
 		expect(parseRemote("https://gitlab.com/acme/webapp.git")).toBeNull();
+	});
+});
+
+describe("parseMergedAnswer", () => {
+	test("keeps each branch whose newest pull request merged, by its alias", () => {
+		const answer = {
+			data: {
+				repository: {
+					b0: { nodes: [{ number: 7, state: "MERGED", mergedAt: "2026-10-01T10:00:00Z" }] },
+					b1: { nodes: [{ number: 8, state: "OPEN", mergedAt: null }] },
+					b2: { nodes: [] },
+					b3: { nodes: [{ number: 9, state: "CLOSED", mergedAt: null }] },
+				},
+			},
+		};
+		expect(parseMergedAnswer(answer, ["landed", "open", "none", "closed"])).toEqual(new Map([["landed", { number: 7, mergedAt: Date.parse("2026-10-01T10:00:00Z") }]]));
 	});
 });
 
@@ -102,6 +118,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-1",
 				stackedOn: "me/branch-0",
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -120,6 +137,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-2",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -138,6 +156,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-3",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -156,6 +175,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-4",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
 			},
 		]);

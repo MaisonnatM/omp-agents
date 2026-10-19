@@ -28,7 +28,6 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
 	skill: null,
-	preset: null,
 	enabled: true,
 	createdAt: at("2026-09-01T08:00:00+02:00"),
 	runs: [],

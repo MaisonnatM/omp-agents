@@ -20,8 +20,6 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
-- Session preset picker: `web/components/preset-picker.tsx`, used by the new-session page and routine editor.
-  Settings › Session presets is `web/components/settings/presets-tab.tsx`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx`.
@@ -52,6 +50,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
     Settings › Integrations' Google account lines, with **Add account**, **Remove**, and the workspace picker: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
+    Settings › Worktrees, with its **Merged** marks and **Remove merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry; change them only as `web/components/ui/PATCHES.md` describes.
 
@@ -84,8 +83,6 @@ The server lives in `src/`:
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
 - `src/server/socket.ts`: handles each socket message, answering through a `Peer` from `src/server/request-ledger.ts`; see [Socket requests](architecture.md#socket-requests).
   `src/server/start.ts` starts, forks, resumes, and replays dashboard sessions for the page's `start` and `resume-all` requests, and refuses to fork or resume a Claude Code or Codex session before it starts omp.
-  `src/omp/tool-policy.ts` resolves saved tool restrictions on the resumed or forked branch.
-  `src/omp/restricted-rpc.ts` creates a native SDK-restricted session and runs omp's RPC mode; `src/omp/rpc.ts` selects that entrypoint for an allowlist.
   `src/server/session-end.ts` ends a session for the page's `end` message and for the end inbox: `endSession` stops it, then calls `Worktrees.removeCheckout` on its worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
   Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's facts, and the subject a quick action started it on, to make the roster rows.
@@ -112,20 +109,17 @@ The server lives in `src/`:
   `SessionFacts` in `sessions.ts` declares a session's pull requests, Linear issues, /ship stage, worktree, and branch once, and `RosterHost` and `PastSession` extend it.
   `parseNewSessionRequest` there checks one, with `parseImages`, `parseModel`, `parseThinking`, and `parseSkill`, for the socket's `start` and a start kept in `scheduled.json`; `parsePullRequest` in `github.ts` checks a pull request's owner, repository, and number.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
-  `src/shared/presets.ts` defines `SessionPreset`, its validation, starter presets, reducer, and generated branch policy.
-  `src/server/presets-file.ts` seeds and persists the list in `presets.json`.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
-  `slug.ts` holds `slug`, the lower-case, dashed name segment that a worker's branch, a preset's branch, and a project's inbox file take.
-- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `tool-policy.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
-  `restricted-rpc.ts` is the SDK-backed RPC entrypoint for sessions with an allowlist, bundled separately as `restricted-rpc.js` in the desktop app.
+  `slug.ts` holds `slug`, the lower-case, dashed name segment that a worker's branch and a project's inbox file take.
+- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
   `context-index.ts` keeps the context-source index beside omp-stats' database: each request of each session file split by source, re-read only for files that changed.
 - `src/analytics.ts`: merges Claude Code's and Codex's requests into omp-stats' `StatsRead` with `withForeignUsage`, then folds per-file rows into sessions and workspaces.
   It joins each saved session's `SessionSummary`, its title and working directory, without reading transcripts.
 - `src/context-sources.ts`: splits a request's input by source, from its context messages and a subagent's recorded system prompt, and folds the index's rows into the Analytics tab's context-source report.
-- `src/proc.ts` runs subprocesses with the environment as this process holds it then, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `isNonEmpty`, `isSafeInteger`, `isDay`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `google-accounts.json`, `events.json`, `projects.json`, and `notices.json`.
+- `src/proc.ts` runs subprocesses with the environment as this process holds it then, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `isNonEmpty`, `isSafeInteger`, `isDay`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `calendars.json`, `google-accounts.json`, `events.json`, `projects.json`, and `notices.json`.
   A `JsonFile`'s `save` writes once per event-loop turn however many changes arrive in it, and `flushJsonFiles` writes them at once as the server stops or exits.
-  `ReducerFile` wraps `JsonFile` for the lists the server changes through a reducer, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `presets.json`, `calendars.json`, `google-accounts.json`, `events.json`, and `projects.json`: it loads the value or an empty one, applies a change through its `reduce`, saves only when the change gives a new value, and, for a `shared` file another server also writes, reads the file again before each change.
+  `ReducerFile` wraps `JsonFile` for the lists the server changes through a reducer, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `calendars.json`, `google-accounts.json`, `events.json`, and `projects.json`: it loads the value or an empty one, applies a change through its `reduce`, saves only when the change gives a new value, and, for a `shared` file another server also writes, reads the file again before each change.
   `src/json.ts` also holds `Parsed<T>`, the `{ ok }` or refusal every parser returns, and `BASE64`, which the socket's parsers and the domain parsers share.
   `src/paths.ts` names these files beside the access token, the old `google.json` the server deletes, and, under the data directory, each project's notes (`projectNotesDir`) and the user's (`userNotesDir`).
   `src/json.ts` also composes guards of whole shapes (`fields`, `tagged`, `arrayOf`, `nullable`), which `decoder` turns into decoders.
@@ -175,6 +169,7 @@ The server lives in `src/`:
   `factsOf` answers one shared empty `SessionFacts` for a session it does not know, and a known session's own arrays, so the facts of an unchanged session stay the same objects.
   A `gt submit` call's branch is the one its `--branch` names, else `branchAt` over `git.ts`'s `headHistory` of the directory it ran in: the branch that the first checkout after the call moved from, else the one checked out now.
 - `src/pull-requests.ts`: maps each workspace to its GitHub repository, reads the pull request list with one `gh api graphql` call per repository, and reads one pull request's details with one more.
+  `mergedPullRequests` asks one `gh api graphql` call for the newest pull request from each of a repository's branches, with one alias per branch, and keeps the merged ones with their merge time, for `src/worktrees.ts`.
   `loadPullRequestTitle` reads only a linked PR's title through a separate 30-second cache, without loading its details.
   `src/github.ts`'s `repoOf` keeps each workspace's repository, or its lack of one, for ten minutes in a `createCache` from `src/cache.ts`, and runs at most eight `git remote` lookups at once through a `limit` gate from `src/map-limit.ts`.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
@@ -188,6 +183,9 @@ The server lives in `src/`:
   The inventory and the snapshot of what uses the checkouts resolve each distinct directory once, and run those realpaths and the per-directory and per-repository git probes `PROBE_PARALLEL` (16) at a time.
   The inventory then reads every repository's checkouts from one queue, four at a time, with one `git rev-parse` for their identity, and `previewAll` previews several targets from one snapshot of what uses them, four at a time; `src/map-limit.ts` holds `mapLimit`, the ordered, bounded `Promise.all` they share, and `limit`, a gate that bounds tasks arriving one by one.
   A preview reports a path that git no longer lists as a worktree with the `unregistered` blocker, which `Worktrees` tells apart from other failures by its `UnregisteredWorktree` error class.
+  The inventory marks each linked checkout's `merged`: `git merge-base --is-ancestor` against `refs/remotes/origin/HEAD` for each distinct commit, then one `mergedPullRequests` call per repository, through the `WorktreesEnv` seam that tests fake, for the branches the default branch lacks.
+  A merged pull request counts only when the branch's last commit is no newer than the merge, read with one `git log --no-walk` call.
+  `previewAll(targets, true)`, for **Remove merged**, runs the same check and adds the `unmerged` blocker to each target it cannot show merged; removal needs no second check, since the confirmation pins the branch and commit.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows, and outside the sign-in and config directories in `DENIED_DIRS`.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/changes.ts`: the session changes dialog's reads for `GET /api/changes` and `GET /api/changes/file`, a session's checkout diff merged with its own changed files, the last scan of each place kept for three seconds so that reading a file does not list every change again, and each session transcript folded into its changed files once, by the lines it gained since; `src/shared/changes.ts` holds the shapes the page shares, `parseFullDiff`, which numbers the rows of a whole-file diff, and `patchRows`, which fills GitHub's patch out to the whole file.
@@ -262,7 +260,6 @@ The server lives in `src/`:
   `attachToTicket` (`PUT /api/ticket/attachment`) attaches a file in base64 to an existing issue: Linear's `prepare_attachment_upload` signs a storage URL, the server sends the bytes there with the signed headers, then `create_attachment_from_upload` links the file to the issue.
   `src/server/todo-ticket.ts` holds `createTicketForTodo` (`PUT /api/todo/ticket`), which opens an issue from a top-level todo and links it, answering only once the server's todo list holds the link, or with the identifier and why it does not; it refuses a todo that already links an issue before opening one.
 - `src/routines.ts`: the routine types and the rules of routines: `nextRunAt`, `nextDueAt`, `isDue`, `applyRoutine`, which applies an edit, `parseRoutineSpec`, which checks a `RoutineSpec` for `routines.json` and the socket alike, and a command's length, time, and output limits; see [Routines](architecture.md#routines).
-  A prompt routine holds a preset id; its runner resolves that preset when the run starts.
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
 - `src/shared/scheduled.ts`: the scheduled send shapes, `applyScheduled`, and `parseScheduledSpec`, which checks a `ScheduledSpec` for `scheduled.json` and the socket alike; see [Scheduled sends](architecture.md#scheduled-sends).
   `src/server/scheduled-file.ts` keeps them in `scheduled.json`, and `src/server/scheduled-runner.ts` claims and delivers them.
@@ -337,7 +334,7 @@ The page lives in `web/`.
   `preferences-tab.tsx` holds the dashboard's browser-local choices, and `routing-tab.tsx` the Models section: roles, model chains, provider order, and retries.
   `workspaces-tab.tsx` lists the workspaces with **Hide**, the hidden ones with **Show**, and adds a directory by path through `PUT /api/workspaces`; the list it shows comes back as the `workspaces` socket message.
   `source-control-tab.tsx` shows the `gh` and `gt` rows, the automatic pull switch, each repository's override with its last pull, and the default merge method, which `web/merge-method.ts` keeps in localStorage with the method last picked on a merge button.
-  `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each, and removes them.
+  `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each and which merged, and removes them one by one or, through **Remove merged**, every merged one nothing blocks, previewing and removing in batches of `MAX_WORKTREE_BATCH`.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section; `context-sources.tsx` renders the context-source table with its workspace and session filters.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
@@ -389,9 +386,6 @@ The page lives in `web/`.
   `web/use-copy.ts` copies text to the clipboard, resolving once the copy lands, and holds the copied state behind a button's check mark.
   `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft and the **New project** form: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
-  Preset selection uses `useDraftModelSelection.choose` to apply a saved model and thinking level together.
-  `web/components/preset-picker.tsx` shares the searchable preset list and summaries with `web/components/settings/presets-tab.tsx`.
-  `web/components/new-session.tsx` applies a preset to its draft, and `web/routines-model.ts` keeps the routine's preset id.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   `web/components/command-picker.tsx` holds `CommandPicker`, the searchable grouped list behind the branch, workspace, and skill pickers, with `CommandResults`, which the model menu's search shares.
   The checkout, the default model's role, and the skills are each one `useRead`.

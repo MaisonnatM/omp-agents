@@ -45,6 +45,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	head: `me/branch-${number}`,
 	stackedOn: null,
 	unresolved: { count: 0, exact: true },
+	conversations: 0,
 	updatedAt: number,
 	...fields,
 });

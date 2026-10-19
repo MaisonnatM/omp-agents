@@ -3,7 +3,6 @@ import type { PlanUsage } from "../src/shared/models";
 import type { Notice } from "../src/shared/notices";
 import type { ServerMsg } from "../src/shared/protocol";
 import { applyPins, type PinChange } from "../src/shared/pins";
-import type { SessionPreset } from "../src/shared/presets";
 import type { Project } from "../src/shared/projects";
 import type { ScheduledSend } from "../src/shared/scheduled";
 import { type LiveView, newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
@@ -53,8 +52,6 @@ export interface DashboardState {
 	workspaceList: WorkspaceList<Workspace>;
 	/** The pinned sessions' ids, empty until the server first sends them; a change shows here before the server answers. */
 	pins: string[];
-	/** The saved session presets, empty until the server first sends them. */
-	presets: SessionPreset[];
 	/** Every project, archived ones too, empty until the server first sends them. */
 	projects: Project[];
 	/** What the bell lists, empty until the server first sends it. */
@@ -64,7 +61,7 @@ export interface DashboardState {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "presets" | "projects" | "notices" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -185,8 +182,6 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, workspaceList: action.list };
 		case "pins":
 			return { ...state, pins: action.sessionIds };
-		case "presets":
-			return { ...state, presets: action.presets };
 		case "projects":
 			return { ...state, projects: action.projects };
 		case "notices":
@@ -226,7 +221,6 @@ export function initialState(route: Route): DashboardState {
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		pins: [],
-		presets: [],
 		projects: [],
 		notices: [],
 		ending: new Set(),

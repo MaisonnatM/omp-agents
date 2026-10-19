@@ -237,7 +237,6 @@ export function App() {
 														projects={state.projects}
 														workspaceList={state.workspaceList}
 														pins={state.pins}
-														presets={state.presets}
 														newSessionCompletions={state.newSessionCompletions}
 														connected={state.connected}
 														listed={state.listed}

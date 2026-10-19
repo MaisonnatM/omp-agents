@@ -101,6 +101,8 @@ export interface PullRequestSummary extends PullRequest {
 	stackedOn: string | null;
 	/** Review threads not yet resolved. `exact` is false when GitHub listed only some threads, so `count` is a floor. */
 	unresolved: { count: number; exact: boolean };
+	/** Comments and review threads, resolved ones too, as GitHub's own list counts its conversation. */
+	conversations: number;
 	/** Last update, or the merge for a merged PR, in ms since the epoch. */
 	updatedAt: number;
 }
@@ -133,6 +135,7 @@ const isSummary = fields<PullRequestSummary>({
 	head: isString,
 	stackedOn: nullable(isString),
 	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean }),
+	conversations: isNumber,
 	updatedAt: isNumber,
 });
 

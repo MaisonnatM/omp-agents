@@ -262,8 +262,6 @@ export type StartRequest =
 			model: ModelOption | null;
 			thinking: string | null;
 			skill: string | null;
-			/** The only tools the model may call, `null` for every tool omp loads. */
-			tools: string[] | null;
 			subject: WorkItem | null;
 			/** The todo the session works on, which links to it once omp starts; `null` for none. */
 			todoId: string | null;
@@ -273,7 +271,7 @@ export type StartRequest =
 	| { kind: "resume"; sessionId: string };
 /** A `start` of a new session. */
 export type NewSessionRequest = Extract<StartRequest, { kind: "new" }>;
-/** A new session in `cwd` on `prompt`, with no images, branch, model, thinking level, skill, tool allowlist, subject, or todo but those `options` name. */
+/** A new session in `cwd` on `prompt`, with no images, branch, model, thinking level, skill, subject, or todo but those `options` name. */
 export const newSessionRequest = (cwd: string, prompt: string, options: Partial<Omit<NewSessionRequest, "kind" | "cwd" | "prompt">> = {}): NewSessionRequest => ({
 	kind: "new",
 	cwd,
@@ -283,7 +281,6 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	model: null,
 	thinking: null,
 	skill: null,
-	tools: null,
 	subject: null,
 	todoId: null,
 	...options,
@@ -323,14 +320,6 @@ export function parseSkill(value: unknown): Parsed<string | null> {
 	return typeof value === "string" && /^\S+$/.test(value) ? { ok: value } : null;
 }
 
-/** `{ ok: null }` for every tool; a nonempty allowlist names each tool once. */
-export function parseTools(value: unknown): Parsed<string[] | null> {
-	if (value === null || value === undefined) return { ok: null };
-	if (!Array.isArray(value) || value.length === 0) return null;
-	const names = value.filter((name): name is string => typeof name === "string" && /^[\w.-]+$/.test(name));
-	return names.length === value.length && new Set(names).size === names.length ? { ok: names } : null;
-}
-
 /** `{ ok: null }` for no branch. */
 export function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
 	if (value === null || value === undefined) return { ok: null };
@@ -362,12 +351,11 @@ export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest
 	const model = value.model === null || value.model === undefined ? { ok: null } : parseModel(value.model);
 	const thinking = parseThinking(value.thinking);
 	const skill = parseSkill(value.skill);
-	const tools = parseTools(value.tools);
 	const subject = parseWorkItem(value.subject);
-	if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !tools || !subject) return null;
+	if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
 	if (todoId !== null && !isTodoId(todoId)) return null;
 	return prompt.trim() || images.ok.length > 0
-		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, tools: tools.ok, subject: subject.ok, todoId }) }
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId }) }
 		: null;
 }
 

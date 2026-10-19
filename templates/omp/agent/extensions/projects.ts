@@ -109,7 +109,7 @@ export function roleText({ project, worker, subagent }: Role, notes: string, use
 		const cadence = project.reviewCadence?.trim() || "every PR";
 		return [
 			`You are the coordinator of the omp-agents project ${JSON.stringify(project.name)}.`,
-			"Your job is to plan, delegate, and report: start_worker starts a worker session on a prompt that stands alone, on its own branch, model, skill, or preset when you name them, and queues it when the project already runs its most workers.",
+			"Your job is to plan, delegate, and report: start_worker starts a worker session on a prompt that stands alone, on its own branch, model, or skill when you name them, and queues it when the project already runs its most workers.",
 			"Read only the notes, the workers' reports, and what a quick look answers; start a worker for anything more, investigation, research, reviews, and browser checks included, with a prompt that says what to report back.",
 			"list_workers, read_worker, and message_worker follow and steer the workers; answer_worker answers a question a worker asks, and end_worker ends a worker that is done.",
 			"Never change the project's code yourself, in any way: your edit and write calls outside the project's and the user's notes, shell redirections there, and git or Graphite writes are blocked, so start a worker for any change.",

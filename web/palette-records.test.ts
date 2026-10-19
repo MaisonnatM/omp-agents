@@ -51,6 +51,7 @@ const pr: PullRequestSummary = {
 	head: "fix/login",
 	stackedOn: null,
 	unresolved: { count: 0, exact: true },
+	conversations: 0,
 	updatedAt: 5,
 };
 

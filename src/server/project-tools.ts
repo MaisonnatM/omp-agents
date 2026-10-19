@@ -19,8 +19,6 @@ export interface WorkerSpec {
 	model: string | null;
 	thinking: string | null;
 	skill: string | null;
-	/** A saved preset's id, whose model, thinking level, tools, and skill apply where the spec names none. */
-	preset: string | null;
 }
 
 /** A started worker, or its place in the queue. */
@@ -123,7 +121,7 @@ export function projectTools(projectId: string, control: ProjectControl): RpcHos
 				"Write the prompt so it stands alone: the goal, the context it needs, where to look, and what to report back.",
 				"`cwd` is the directory it starts in: absolute, ~/, relative to the project's workspace, or null for the workspace itself.",
 				"In a git checkout each worker works on a new branch in a worktree of its own; `branch` names it, `none` shares the directory as it is, null lets the dashboard name it.",
-				"`model` (provider/id), `thinking`, `skill`, and `preset` (a saved preset's id) choose how it runs; null keeps the default.",
+				"`model` (provider/id), `thinking`, and `skill` choose how it runs; null keeps the default.",
 				"When the project already runs its most workers at once, the worker waits in a queue and starts when one finishes.",
 				"You are told when it finishes its turn or asks a question; do not poll.",
 			].join(" "),
@@ -135,7 +133,6 @@ export function projectTools(projectId: string, control: ProjectControl): RpcHos
 				model: { ...NULLABLE, description: "provider/id, such as anthropic/claude-haiku-5-5, or null for omp's default." },
 				thinking: { ...NULLABLE, description: "A thinking level such as low or high, or null for the model's default." },
 				skill: { ...NULLABLE, description: "A skill its first message goes through, or null for none." },
-				preset: { ...NULLABLE, description: "A saved preset's id, such as minimal or review, or null for none." },
 			}),
 			loadMode: "essential",
 			async execute(params) {
@@ -148,7 +145,6 @@ export function projectTools(projectId: string, control: ProjectControl): RpcHos
 					model: optional(params, "model"),
 					thinking: optional(params, "thinking"),
 					skill: optional(params, "skill"),
-					preset: optional(params, "preset"),
 				});
 				return started.kind === "started"
 					? `Started ${started.workerId} ${JSON.stringify(title)} in ${started.cwd}. You are told when it finishes or asks; do not poll.`

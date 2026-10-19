@@ -19,7 +19,6 @@ import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNam
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
-import { builtinTools } from "../omp/modules";
 import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
 import { readStats, windowOf } from "../omp/stats";
@@ -46,6 +45,7 @@ import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
+import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
 import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
@@ -201,9 +201,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	/** `GET /api/models`: the models omp lists, for the settings page's pickers. */
 	const models = get(() => answer(async () => ({ models: await listModels() })));
 
-	/** `GET /api/tools`: omp's built-in tool names, which a preset's tool list offers. */
-	const tools = get(() => answer(async () => ({ tools: [...builtinTools.BUILTIN_TOOL_NAMES] })));
-
 	/** `GET /api/models/connected?cwd=<dir>`: the models of the providers you are connected to, for the new-session draft's model picker. */
 	const connected = get(async params => {
 		const cwd = await dirParam(params);
@@ -334,7 +331,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
 		"/api/models/roles": { GET: roles },
-		"/api/tools": { GET: tools },
 		"/api/replay/detail": { GET: replayRead(false) },
 		"/api/replay/compare": { GET: replayRead(true) },
 		"/api/analytics": { GET: analytics },
@@ -681,10 +677,10 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		return answer(() => env.worktrees.metrics({ repository, path }, req.signal));
 	});
 
-	/** `PUT /api/worktrees/removal`: preview a removal, or remove checkouts whose confirmation still matches. */
+	/** `PUT /api/worktrees/removal`: preview a removal, only of merged work when `merged` is set, or remove checkouts whose confirmation still matches. */
 	const worktreeRemoval = write(
-		body => checked(parseWorktreeRemoval(body), "Expected a preview with targets or removal with confirmed plans, up to 100 worktrees."),
-		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets) } : { results: await env.worktrees.remove(removal.plans) }),
+		body => checked(parseWorktreeRemoval(body), `Expected a preview with targets or removal with confirmed plans, up to ${MAX_WORKTREE_BATCH} worktrees.`),
+		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets, removal.merged) } : { results: await env.worktrees.remove(removal.plans) }),
 	);
 
 	/** `PUT /api/worktree/release` `{ cwd, branch }`: remove the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */

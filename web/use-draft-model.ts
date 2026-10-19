@@ -19,8 +19,6 @@ export interface DraftModelSelection {
 	/** The levels the picker offers: `null` until the model's capabilities are known, none when the model list failed. */
 	levels: string[] | null;
 	pickThinking: (level: string | null) => void;
-	/** Switches to `next`, `null` for omp's default model, at `level`, `null` for that model's default, as picking a preset does. */
-	choose: (next: ModelOption | null, level: string | null) => void;
 	/** Opens or closes the model menu; opening reads the model list again. */
 	openModels: (open: ModelMenuOpen | null) => void;
 	picker: DraftPicker;
@@ -53,10 +51,10 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 		setPendingDefaultEffort(null);
 		setPicked(level !== null && selector !== null ? { model: selector, level } : null);
 	};
-	const choose = (next: ModelOption | null, level: string | null): void => {
+	const pickModel = (next: ModelOption | null): void => {
 		setModel(next);
-		setPicked(next !== null && level !== null ? { model: selectorOf(next), level } : null);
-		setPendingDefaultEffort(next === null && level !== null ? { cwd, level } : null);
+		setPicked(null);
+		setPendingDefaultEffort(null);
 	};
 	const openModels = (next: ModelMenuOpen | null): void => {
 		if (next !== null && open === null) setOpens(count => count + 1);
@@ -67,7 +65,6 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 		thinking,
 		levels,
 		pickThinking,
-		choose,
 		openModels,
 		picker: {
 			current: selector,
@@ -75,7 +72,7 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 			list,
 			open,
 			onOpenChange: openModels,
-			onPick: next => choose(next, null),
+			onPick: pickModel,
 			effort: { current: thinking, levels, onPick: pickThinking, allowDefault: true },
 		},
 	};

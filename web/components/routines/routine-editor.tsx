@@ -1,6 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type RoutineSpec, type Weekday } from "../../../src/routines";
-import type { SessionPreset } from "../../../src/shared/presets";
 import type { Project } from "../../../src/shared/projects";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
 import { useSkills } from "../../use-skills";
 import { PageFrame } from "../list-page";
-import { PresetPicker } from "../preset-picker";
 import { DirectoryPicker } from "../workspace-picker";
 import { SkillPicker } from "../skill-picker";
 
@@ -141,16 +139,14 @@ interface RoutineEditorProps {
 	/** The workspaces, which the workspace picker offers. */
 	workspaces: Workspace[];
 	connected: boolean;
-	/** The saved presets, which the preset picker offers. */
-	presets: SessionPreset[];
 	/** The projects a project task may send its prompt to. */
 	projects: Project[];
 	onSave: (routine: RoutineSpec) => void;
 	onCancel: () => void;
 }
 
-/** A routine's name, workspace, task, schedules, preset, and skill, saved together. */
-export function RoutineEditor({ initial, isNew, workspaces, connected, presets, projects, onSave, onCancel }: RoutineEditorProps) {
+/** A routine's name, workspace, task, schedules, and skill, saved together. */
+export function RoutineEditor({ initial, isNew, workspaces, connected, projects, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
 	const skills = useSkills(draft.cwd || "~");
@@ -161,7 +157,6 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, presets, 
 	const removeSchedule = (index: number): void =>
 		setDraft(current => ({ ...current, schedules: current.schedules.filter((_, i) => i !== index) }));
 	const result = specOf(draft);
-	const preset = presets.find(candidate => candidate.id === draft.preset) ?? null;
 
 	return (
 		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta="Runs on a schedule while the dashboard runs">
@@ -269,26 +264,9 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, presets, 
 				</Field>
 
 				{draft.task === "prompt" && (
-					<>
-						<Field
-							label="Preset"
-							hint={
-								draft.preset !== null && !preset
-									? "This routine's preset was removed, so its runs fail until you pick another."
-									: "Each run starts on the preset's model, with its tools, and on its branch policy, as the preset reads at that run."
-							}
-						>
-							<PresetPicker
-								presets={presets}
-								value={preset}
-								side="bottom"
-								onPick={next => setDraft(current => ({ ...current, preset: next?.id ?? null, skill: next ? next.skill : current.skill }))}
-							/>
-						</Field>
-						<Field label="Skill" hint="Each session's first message goes through this skill.">
-							<SkillPicker label="Skill" skills={skills} value={draft.skill} onPick={skill => set("skill", skill)} />
-						</Field>
-					</>
+					<Field label="Skill" hint="Each session's first message goes through this skill.">
+						<SkillPicker label="Skill" skills={skills} value={draft.skill} onPick={skill => set("skill", skill)} />
+					</Field>
 				)}
 
 				<div className="flex items-center gap-3 border-t border-border pt-4">

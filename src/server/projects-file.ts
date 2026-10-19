@@ -5,7 +5,7 @@
  */
 import { ReducerFile } from "../fs";
 import { isObject, parseAll } from "../json";
-import { parseBranchChoice, parseModel, parseSkill, parseThinking, parseTools } from "../shared/sessions";
+import { parseBranchChoice, parseModel, parseSkill, parseThinking } from "../shared/sessions";
 import {
 	DEFAULT_MAX_WORKERS,
 	DEFAULT_PROJECT_NAME,
@@ -197,9 +197,8 @@ function parseWorkerStart(value: unknown): WorkerStart | null {
 	const model = value.model === null ? { ok: null } : parseModel(value.model);
 	const thinking = parseThinking(value.thinking);
 	const skill = parseSkill(value.skill);
-	const tools = parseTools(value.tools);
-	if (!branch || !model || !thinking || !skill || !tools) return null;
-	return { cwd: value.cwd, prompt: value.prompt, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, tools: tools.ok };
+	if (!branch || !model || !thinking || !skill) return null;
+	return { cwd: value.cwd, prompt: value.prompt, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok };
 }
 
 function parseQueued(value: unknown): QueuedWorker | null {

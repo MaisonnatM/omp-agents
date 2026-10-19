@@ -69,12 +69,6 @@ The main ones:
   Host tools: `RpcClient`'s `customTools` option (`RpcClientCustomTool`), which `start()` sends as `set_host_tools`, so a new process for the same session gets them again; `pi-coding-agent/src/modes/rpc/host-tools.ts` runs them as strict tools, and `defaultLoadModeForToolName` in `pi-coding-agent/src/tools/essential-tools.ts` makes one without `loadMode: "essential"` only discoverable.
   A host tool stays registered through `newSession`, `switchSession`, and `/move` in one process, since omp builds `SessionTools` once per `AgentSession` (`pi-coding-agent/src/session/session-tools.ts`).
   Extensions: `omp -e <file>` (`pi-coding-agent/src/main.ts`, `additionalExtensionPaths`) loads in `rpc-ui` mode too; `pi-coding-agent/src/discovery/omp-extension-roots.ts` dedupes by path only, so the same extension at two paths loads twice.
-- Restricted RPC sessions use `createAgentSession` in `pi-coding-agent/src/sdk.ts` and `runRpcMode` in `pi-coding-agent/src/modes/rpc/rpc-mode.ts`.
-  The SDK's `restrictToolNames: true` admits only `toolNames` and disables MCP and ambient extension tools before discovery.
-  The CLI's `--tools` does not set that policy, and `refreshMCPTools` in `pi-coding-agent/src/session/session-tools.ts` otherwise reactivates connected MCP tools.
-  `appendCustomEntry` in `pi-coding-agent/src/session/session-manager.ts` persists the dashboard policy.
-  The runner enables read-only LSP when selected and mirrors `main.ts`'s RPC setup, including `PI_NO_PTY`, `PI_NO_TITLE`, and `allowSessionModelFallback: false`.
-  It pins declared RPC defaults through `all` and `Setting.pinDefault` in `pi-coding-agent/src/config/registry.ts`, on settings from `Settings.loadIsolated`.
 - Service tiers: `serviceTierFamily` and `shouldSendServiceTier` in `pi-ai/src/types.ts`, which `fastAvailable` in `src/omp/models.ts` calls to decide, as `setFastMode` in `pi-coding-agent/src/session/model-controls.ts` does, whether `/fast` can turn on for the live model.
 - Settings and discovery: `pi-coding-agent/src/config/settings.ts`, `pi-coding-agent/src/discovery/index.ts`, and `pi-coding-agent/src/task/discovery.ts`.
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
@@ -232,17 +226,11 @@ Stop the dashboard to leave every room.
 ## Dashboard sessions
 
 Sessions started from the dashboard are omp child processes in RPC mode with tool dialogs, spawned through omp's own `RpcClient`.
-Unrestricted sessions use the installed CLI with `--mode rpc-ui`; restricted ones use `src/omp/restricted-rpc.ts` with the same SDK and RPC runner.
-The desktop build ships the runner as `restricted-rpc.js` beside `server.js`; `OMP_AGENTS_RESOURCES` selects that packaged path.
-Restricted launches reject extra extension arguments and host tools instead of dropping them or widening the allowlist.
+They use the installed CLI with `--mode rpc-ui`.
 The page starts one with a single `start` request whose `kind` is `new`, `fork`, `resume`, or `replay`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
 The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it.
 A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved.
 **Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command.
-A new-session `start` carries `tools`, either `null` for the normal CLI launch or a nonempty built-in tool allowlist.
-The restricted runner saves it as the custom entry `omp-agents-tool-allowlist` before the first prompt.
-`src/omp/tool-policy.ts` reads that entry on the saved branch's ancestor chain before a resume or fork is spawned.
-This keeps the restriction through dashboard resumes, forks, and model fallbacks; a normal terminal CLI resume does not read this policy.
 Prompts, Stop, live events, subagent progress, and questions stay on the pipe.
 A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
 A prompt omp refuses shows as a note in the session, and `LiveSession.prompt` rejects with `PromptRefused`, so a caller that has no one else to tell, such as the socket handler or a session's first message, skips it.
@@ -390,7 +378,7 @@ A prompt that fails comes back to the composer with its files and a note, and a 
 A handler's error goes to the server's log once, with its message type, on the run that threw.
 A page loaded before page ids tags its requests with no `floor`, so the server drops them until the page reloads.
 
-`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, presets, projects, and notices.
+`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, projects, and notices.
 `Dashboard` registers each typed message builder once, beside its store's edit function when it has synchronous edits.
 `Broadcasts.open` iterates these registrations, so a new list needs no separate opening-snapshot or push method.
 `Broadcasts.pushList(kind)` uses that same builder and suppresses an identical whole-list message; roster and past messages still send their row-level deltas.
@@ -520,24 +508,11 @@ The index stores one row per request and one per request and source, by integer 
 Each request with a report starts a background sync unless one ran in the last 15 seconds; the answer carries its progress, and `ContextSources` in `web/components/settings/context-sources.tsx` reads every two seconds while it runs and every 30 seconds otherwise.
 A report's totals match omp-stats' input tokens for the same files, cache reads and writes included, apart from requests either side has not synced yet.
 
-## Session presets
-
-`src/shared/presets.ts` defines each preset and its reducer and parser, and `src/server/presets-file.ts` stores them in `presets.json`.
-The first load seeds Minimal, Review, and Ship from the connected model roles; subsequent loads preserve edits and an intentionally empty list.
-The roster topic carries the whole list in `presets`; a `preset` message applies one save or removal through `ListRegistry`.
-The new-session picker copies a preset into the draft, while routines retain its id and resolve it at run time.
-The shared preset store reloads before edits and routine lookups, and each minute refreshes the list from other servers.
-`GET /api/tools` lists the installed omp built-in names from `pi-coding-agent/src/tools/builtin-names.ts` for the settings editor.
-An allowlist permits tools but does not enable tools disabled in omp's config.
-Sandbox state is not stored until the sandbox feature exists.
-
 ## Routines
 
 A routine starts dashboard sessions, or runs a shell command, on one or more schedules. A schedule is every so many minutes, counted from the last run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST. The routine is due at the earliest of them. Two intervals share that last run, so the shorter one decides.
 Its task is one prompt, one command, or one `project` task, `{ projectId, prompt }`, which takes no session slot: the run hands the prompt to the project runner's `notify` as an `event` from **Routine** and ends with outcome `project`, or with the error when the project is gone or archived.
 The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
-A prompt routine stores a nullable preset id and reads the preset at run time for model, thinking, tools, and branch policy.
-The routine's own skill overrides the preset's skill, and a removed preset fails the run.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
 A file from before `schedules` reads its `schedule` as a one-element list, and drops a routine whose task was pull requests.
@@ -662,13 +637,13 @@ Every spawn of a coordinator gets its tools, a resume included, since the proces
 It then flushes the file, because `JsonFile.save` writes at the end of the event-loop turn and the extension reads the file at the first prompt, and tracks the session by the role the file now gives it.
 So a coordinator that fails to start saves no project, a worker that fails to start takes no id, and workers take their ids in the order their sessions start; `startWorker` reads the id back from the tracked session.
 A worker starts in the directory `start_worker` names, read through `expandHome` in `src/paths.ts` and resolved against the project's workspace, else in the workspace.
-Its model (`modelOfSelector` in `src/shared/models.ts`), effort, and skill are the tool's, else its preset's; its branch is the one named, none for `none` or a preset whose worktree is `here`, else, in a git checkout, `<project slug>/<title slug>-<6-character id>` from the checked-out branch.
+Its model (`modelOfSelector` in `src/shared/models.ts`), effort, and skill are the tool's; its branch is the one named, none for `none`, else, in a git checkout, `<project slug>/<title slug>-<6-character id>` from the checked-out branch.
 Every worker joins the project's `queue` with `enqueue` first, so a crash before its session attaches leaves it queued for the next start.
 The runner's `#drain` starts queued workers in order while fewer than `maxWorkers` are busy, working, asking, or still starting; `startWorker` awaits its own worker's start when `#drain` began it, and reports its queue position otherwise.
 A queued worker that fails to start leaves the queue with `dequeue`; its error goes to the coordinator as the tool's error when `startWorker` began it, else as an `event` update.
 `settle` delivers the waiting updates and drains the queue; the runner calls it on each turn end, exit, roster change, outside event, and boot, and the server calls it after every project edit from the page that changed something.
 
-The coordinator's tools are strict host tools, every property required, loaded as `essential`: `start_worker` (`title`, `prompt`, `cwd`, `branch`, `model`, `thinking`, `skill`, `preset`, nullable), `list_workers`, `read_worker` (`worker`), `message_worker` (`worker`, `text`), `answer_worker` (`worker`, `requestId`, `answer`), which maps the answer to the request's kind, and `end_worker` (`worker`).
+The coordinator's tools are strict host tools, every property required, loaded as `essential`: `start_worker` (`title`, `prompt`, `cwd`, `branch`, `model`, `thinking`, `skill`, nullable), `list_workers`, `read_worker` (`worker`), `message_worker` (`worker`, `text`), `answer_worker` (`worker`, `requestId`, `answer`), which maps the answer to the request's kind, and `end_worker` (`worker`).
 An error a tool throws reaches the coordinator as the tool's error, and every tool throws once the project is archived.
 `message_worker` prompts the worker as a follow-up, reaching it through the same `reach` as a scheduled message, so a worker that does not run resumes first.
 
@@ -875,9 +850,11 @@ A pull, from that change or from the pull loop every five minutes, waits for the
 It reads the default branch from `origin/HEAD`, fetches it, and moves the local branch only when it is behind `origin`'s with no commits of its own: through `merge --ff-only` in the worktree that has it checked out, skipped when that worktree has changes to tracked files, else through `update-ref`.
 
 `GET /api/worktrees` lists the worktrees of every repository a session ran in, or of `?cwd=` when that directory is in a repository.
-Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, and why removal is refused.
+Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, why removal is refused, and `merged`: `{ by: "pull-request", number }`, `{ by: "default-branch", branch }`, or `null`.
+A linked checkout is merged when `origin`'s default branch contains its commit, or when its branch's newest pull request merged no earlier than the branch's last commit; the pull requests come from one `gh api graphql` call per repository, and a failed call becomes an entry in `errors`.
 `GET /api/worktrees/metrics?repository=&path=` reads approximate allocated disk use, the last commit time, and the modified and untracked counts for one registered checkout.
-`PUT /api/worktrees/removal` previews a removal or performs one whose confirmation still matches that preview.
+`PUT /api/worktrees/removal` previews a removal or performs one whose confirmation still matches that preview, up to `MAX_WORKTREE_BATCH` (100) worktrees per request.
+A preview with `merged: true`, which **Remove merged** sends, adds the `unmerged` blocker to every target the same check cannot show merged, so the page removes only the merged ones nothing else blocks.
 Removal uses `git worktree remove` without `--force`, so Git keeps the branch and still refuses a dirty or locked checkout.
 A missing directory is removed the same way, which drops only that registration.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.

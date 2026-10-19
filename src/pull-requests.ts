@@ -28,6 +28,7 @@ const PR_FIELDS = `... on PullRequest {
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+	comments { totalCount }
 	reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved } }
 }`;
 
@@ -77,6 +78,9 @@ function parseUnresolved(threads: unknown): PullRequestSummary["unresolved"] {
 	const total = isObject(threads) && typeof threads.totalCount === "number" ? threads.totalCount : nodes.length;
 	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
 }
+
+/** A connection's `totalCount`, 0 when GitHub left it out. */
+const totalOf = (connection: unknown): number => (isObject(connection) ? (num(connection.totalCount) ?? 0) : 0);
 
 /** GitHub's state of a pull request, its draft flag folded in. */
 function stateOf(node: Record<string, unknown>): PullRequestDetail["state"] {
@@ -133,6 +137,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 		role,
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
 		updatedAt,
+		conversations: totalOf(node.comments) + totalOf(node.reviewThreads),
 	};
 }
 
@@ -305,6 +310,44 @@ export function loadPullRequestTitle(pr: PullRequest): Promise<Pick<PullRequestD
 		if (!title) throw new Error(`Cannot read the title of ${prKey(pr)}`);
 		return { title };
 	});
+}
+
+/** A branch's newest pull request, once it merged. */
+export interface MergedPullRequest {
+	number: number;
+	mergedAt: number;
+}
+
+/** The newest pull request from each of `branches`, by its alias `b<index>` in the answer to {@link mergedQuery}, kept when it merged. */
+export function parseMergedAnswer(answer: unknown, branches: string[]): Map<string, MergedPullRequest> {
+	const data = dataOf(answer);
+	const repository = isObject(data.repository) ? data.repository : {};
+	const merged = new Map<string, MergedPullRequest>();
+	branches.forEach((branch, index) => {
+		const node = nodesOf(repository[`b${index}`])[0];
+		const mergedAt = isObject(node) ? Date.parse(str(node.mergedAt) ?? "") : Number.NaN;
+		if (isObject(node) && node.state === "MERGED" && typeof node.number === "number" && !Number.isNaN(mergedAt)) merged.set(branch, { number: node.number, mergedAt });
+	});
+	return merged;
+}
+
+/** One query for the newest pull request from each of `count` head branches, named `$b<index>`; an older merged one does not count once a branch opens another. */
+const mergedQuery = (count: number): string => {
+	const indexes = Array.from({ length: count }, (_, index) => index);
+	return `query($owner: String!, $repo: String!, ${indexes.map(index => `$b${index}: String!`).join(", ")}) { repository(owner: $owner, name: $repo) {
+	${indexes.map(index => `b${index}: pullRequests(headRefName: $b${index}, first: 1, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { number state mergedAt } }`).join("\n\t")}
+} }`;
+};
+
+/** The branches of `branches` whose newest pull request in `cwd`'s GitHub repository merged, from one `gh` call; empty when `origin` is not on GitHub. */
+export async function mergedPullRequests(cwd: string, branches: string[]): Promise<Map<string, MergedPullRequest>> {
+	const repo = await repoOf(cwd);
+	if (!repo || branches.length === 0) return new Map();
+	const vars: Record<string, string> = { owner: repo.owner, repo: repo.repo };
+	branches.forEach((branch, index) => {
+		vars[`b${index}`] = branch;
+	});
+	return parseMergedAnswer(await ghGraphql(mergedQuery(branches.length), vars), branches);
 }
 
 /**

@@ -8,7 +8,6 @@ import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, t
 import { SerialLane } from "../serial-lane";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEvent } from "../shared/projects";
-import { presetBranch, type SessionPreset } from "../shared/presets";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutinesFile } from "./routines-file";
 
@@ -32,10 +31,6 @@ export interface RoutineRunnerDeps {
 	onChange(): void;
 	/** Pins or unpins sidebar sessions, for every window, page open or not. */
 	changePins(change: PinChange): void;
-	/** Preset `id` as saved now, `null` once it is removed. */
-	preset(id: string): SessionPreset | null;
-	/** The branch checked out in `cwd`, `null` when HEAD is detached or `cwd` is no git checkout. */
-	checkedOut(cwd: string): Promise<string | null>;
 	/** Saves `event` for project `projectId`'s coordinator; why it cannot, or `null` once saved. */
 	notifyProject(projectId: string, event: ProjectEvent): string | null;
 }
@@ -140,14 +135,7 @@ export class RoutineRunner {
 			this.#deps.onChange();
 		};
 		if ([...this.#tracked.values()].some(tracked => tracked.routineId === routine.id)) return refuse("The last run's session is still running.");
-		const preset = routine.preset === null ? null : this.#deps.preset(routine.preset);
-		if (routine.preset !== null && !preset) return refuse(`${routine.name}: its preset was removed.`);
-		const checkedOut = preset?.worktree === "new-branch" ? await this.#deps.checkedOut(routine.cwd) : null;
-		if (preset?.worktree === "new-branch" && checkedOut === null) return refuse(`${routine.name}: its preset needs a checked-out Git branch.`);
-		const branch = preset ? presetBranch(preset, checkedOut, new Date(this.#deps.now())) : null;
-		const result = await this.#deps.start(
-			newSessionRequest(routine.cwd, `${prompt} ${UNATTENDED}`, { skill: routine.skill, model: preset?.model ?? null, thinking: preset?.thinking ?? null, tools: preset?.tools ?? null, branch }),
-		);
+		const result = await this.#deps.start(newSessionRequest(routine.cwd, `${prompt} ${UNATTENDED}`, { skill: routine.skill }));
 		const session = result.ok ? this.#deps.session(result.instanceId) : null;
 		if (!result.ok || !session) {
 			file.failed(routine.id, at, `${routine.name}: ${result.ok ? "the session exited as it started." : result.error}`);

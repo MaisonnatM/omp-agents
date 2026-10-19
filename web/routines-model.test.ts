@@ -14,7 +14,6 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
 	skill: null,
-	preset: null,
 	enabled: true,
 	createdAt: at(5, 10),
 	runs: [],
@@ -136,7 +135,6 @@ describe("editor form", () => {
 				cwd: "~/code/webapp",
 				enabled: false,
 				skill: "poteto-mode",
-				preset: null,
 				task: { kind: "prompt", prompt: "Reply ok.", pin: true },
 				schedules: [{ kind: "every", minutes: 360 }],
 			},
@@ -153,7 +151,6 @@ describe("editor form", () => {
 				cwd: "/tmp",
 				enabled: true,
 				skill: null,
-				preset: null,
 				task: { kind: "prompt", prompt: "Hi", pin: false },
 				schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }],
 			},
@@ -175,7 +172,6 @@ describe("editor form", () => {
 				cwd: "~/code",
 				enabled: true,
 				skill: null,
-				preset: null,
 				task: { kind: "command", command: "git worktree prune" },
 				schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }],
 			},
@@ -186,12 +182,12 @@ describe("editor form", () => {
 		expect(specOf(draftOf(saved))).toMatchObject({ ok: { task: { kind: "command", command: "git worktree prune" } } });
 	});
 
-	test("a project form needs a project and a prompt, saves no skill or preset, and reads back the same", () => {
+	test("a project form needs a project and a prompt, saves no skill, and reads back the same", () => {
 		const draft = { ...newDraft("r4", "~/code", "poteto-mode"), name: "Bugs", task: "project" as const, prompt: " Check #bugs. " };
 		expect(specOf(draft)).toEqual({ fix: "Pick the project its prompt goes to." });
 		expect(specOf({ ...draft, projectId: "p1", prompt: "" })).toEqual({ fix: "Write the prompt the coordinator gets." });
 		const spec = specOf({ ...draft, projectId: "p1" });
-		expect(spec).toMatchObject({ ok: { skill: null, preset: null, task: { kind: "project", projectId: "p1", prompt: "Check #bugs." } } });
+		expect(spec).toMatchObject({ ok: { skill: null, task: { kind: "project", projectId: "p1", prompt: "Check #bugs." } } });
 		expect(taskWords({ kind: "project", projectId: "p1", prompt: "Check #bugs." })).toBe("To project: Check #bugs.");
 		expect(specOf(draftOf(routine({ task: { kind: "project", projectId: "p1", prompt: "Check #bugs." } })))).toMatchObject({ ok: { task: { kind: "project", projectId: "p1" } } });
 	});

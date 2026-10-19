@@ -1,7 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Copy, GitMerge, RefreshCw, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import type { WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult } from "../../../src/worktrees-shared";
+import { MAX_WORKTREE_BATCH, type WorktreeEntry, type WorktreeInventory, type WorktreeMerge, type WorktreeMetrics, type WorktreeRemovalPlan, type WorktreeRemovalResult } from "../../../src/worktrees-shared";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { changeWorktrees, errorText, readWorktreeMetrics, readWorktrees } from "../../api";
@@ -12,22 +12,47 @@ type SortKey = "name" | "activity" | "size";
 const SORTS: Record<SortKey, string> = { size: "Size", activity: "Last omp activity", name: "Name" };
 
 type DialogState =
-	| { phase: "checking" }
-	| { phase: "ready"; plans: WorktreeRemovalPlan[] }
-	| { phase: "removing"; plans: WorktreeRemovalPlan[] }
-	| { phase: "done"; results: WorktreeRemovalResult[] }
+	| { phase: "checking"; count: number }
+	| { phase: "ready"; plans: WorktreeRemovalPlan[]; merged: boolean }
+	| { phase: "removing"; count: number }
+	| { phase: "done"; results: WorktreeRemovalResult[]; kept: WorktreeRemovalPlan[] }
 	| { phase: "error"; message: string };
 
+type ReadablePlan = Exclude<WorktreeRemovalPlan, { kind: "unreadable" }>;
+
 const keyOf = (target: { repository: string; path: string }): string => `${target.repository}\0${target.path}`;
+
+/** A plan the server could read and nothing blocks, which a confirmation removes. */
+const canRemove = (plan: WorktreeRemovalPlan): plan is ReadablePlan => plan.kind !== "unreadable" && plan.blockers.length === 0;
+
+const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+/** `items` in runs of at most `MAX_WORKTREE_BATCH`, the most one removal request takes. */
+const batches = <T,>(items: T[]): T[][] => Array.from({ length: Math.ceil(items.length / MAX_WORKTREE_BATCH) }, (_, index) => items.slice(index * MAX_WORKTREE_BATCH, (index + 1) * MAX_WORKTREE_BATCH));
+
+const mergedLabel = (merge: WorktreeMerge): string => (merge.by === "pull-request" ? `Merged #${merge.number}` : "Merged");
+
+const mergedTitle = (merge: WorktreeMerge): string => (merge.by === "pull-request" ? `Pull request #${merge.number} merged` : `${merge.branch} contains this commit`);
+
+const blockerText = (blockers: { message: string }[]): string => blockers.map(blocker => blocker.message).join(" ");
 
 function activityText(entry: WorktreeEntry): string {
 	if (entry.blockers.some(blocker => blocker.code === "occupied")) return "Session open";
 	return entry.lastActivity === null ? "No omp session" : `${age(entry.lastActivity)} ago`;
 }
 
+/** What blocks removal, beyond the main checkout the name already marks; empty when nothing does. */
 function statusText(entry: WorktreeEntry): string {
 	if (entry.missing) return "Directory gone";
-	return entry.blockers[0]?.message ?? "No blockers";
+	return entry.blockers.find(blocker => blocker.code !== "main")?.message ?? "";
+}
+
+/** `path` split into its folder, shortened beside the repository's main checkout, and its last segment, which always shows. */
+function pathParts(path: string, repositoryPath: string): { folder: string; name: string } {
+	const beside = repositoryPath.slice(0, repositoryPath.lastIndexOf("/") + 1);
+	const shown = beside && path.startsWith(beside) ? path.slice(beside.length) : path;
+	const cut = shown.lastIndexOf("/") + 1;
+	return { folder: shown.slice(0, cut), name: shown.slice(cut) };
 }
 
 /** The settings tab for Git worktrees of repositories omp sessions ran in, plus a repository path entered here. */
@@ -121,24 +146,46 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 	const visible = rows.flatMap(repo => repo.worktrees);
 	const removable = visible.filter(entry => entry.blockers.length === 0);
 	const chosen = removable.filter(entry => selected.has(keyOf(entry)));
+	const merged = visible.filter(entry => entry.merged !== null);
 
-	const ask = (targets: WorktreeEntry[]): void => {
+	/** Previews `targets`; `onlyMerged` also keeps each one whose work the server does not find merged. */
+	const ask = (targets: WorktreeEntry[], onlyMerged: boolean): void => {
 		setAcceptLoss(false);
-		setDialog({ phase: "checking" });
-		void changeWorktrees({ action: "preview", targets }).then(
-			answer => setDialog({ phase: "ready", plans: answer.plans }),
+		setDialog({ phase: "checking", count: targets.length });
+		const preview = async (): Promise<WorktreeRemovalPlan[]> => {
+			const plans: WorktreeRemovalPlan[] = [];
+			for (const batch of batches(targets)) plans.push(...(await changeWorktrees({ action: "preview", targets: batch, merged: onlyMerged })).plans);
+			return plans;
+		};
+		void preview().then(
+			plans => setDialog({ phase: "ready", plans, merged: onlyMerged }),
 			(err: unknown) => setDialog({ phase: "error", message: errorText(err) }),
 		);
 	};
 
+	/** Removes the plans nothing blocks; the rest are reported as kept. */
 	const confirm = (plans: WorktreeRemovalPlan[]): void => {
-		setDialog({ phase: "removing", plans });
-		void changeWorktrees({ action: "remove", plans: plans.flatMap(plan => (plan.kind === "unreadable" ? [] : [{ repository: plan.repository, path: plan.path, confirmation: plan.confirmation }])) }).then(
-			answer => {
-				setDialog({ phase: "done", results: answer.results });
-				if (answer.results.some(result => result.removed)) setRefresh(count => count + 1);
+		const going = plans.filter(canRemove);
+		const kept = plans.filter((plan): boolean => !canRemove(plan));
+		setDialog({ phase: "removing", count: going.length });
+		const remove = async (): Promise<WorktreeRemovalResult[]> => {
+			const results: WorktreeRemovalResult[] = [];
+			for (const batch of batches(going)) {
+				const answer = await changeWorktrees({ action: "remove", plans: batch.map(({ repository, path, confirmation }) => ({ repository, path, confirmation })) });
+				results.push(...answer.results);
+			}
+			return results;
+		};
+		void remove().then(
+			results => {
+				setDialog({ phase: "done", results, kept });
+				if (results.some(result => result.removed)) setRefresh(count => count + 1);
 			},
-			(err: unknown) => setDialog({ phase: "error", message: errorText(err) }),
+			(err: unknown) => {
+				setDialog({ phase: "error", message: errorText(err) });
+				// An earlier batch may have removed worktrees before this one failed.
+				setRefresh(count => count + 1);
+			},
 		);
 	};
 
@@ -183,6 +230,9 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 				<Button type="button" variant="ghost" size="compact" leadingIcon={RefreshCw} loading={reading} onClick={() => setRefresh(count => count + 1)}>
 					Refresh
 				</Button>
+				<Button type="button" variant="secondary" size="compact" leadingIcon={GitMerge} disabled={merged.length === 0} onClick={() => ask(merged, true)}>
+					Remove merged ({merged.length})
+				</Button>
 			</div>
 			<form className="flex flex-wrap items-end gap-2" onSubmit={addRepository}>
 				<label className="space-y-1 text-sm">
@@ -205,8 +255,20 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 					{item.path}: {item.error}
 				</p>
 			))}
-			{rows.map(repo =>
-				repo.worktrees.length === 0 ? null : (
+			{rows.map(repo => {
+				if (repo.worktrees.length === 0) return null;
+				const open = repo.worktrees.filter(entry => entry.blockers.length === 0);
+				const picked = open.filter(entry => selected.has(keyOf(entry))).length;
+				const pickAll = (): void =>
+					setSelected(current => {
+						const next = new Set(current);
+						for (const entry of open) {
+							if (picked === open.length) next.delete(keyOf(entry));
+							else next.add(keyOf(entry));
+						}
+						return next;
+					});
+				return (
 					<section key={repo.repository} className="space-y-2">
 						<h3 className="text-sm font-medium">
 							{repo.name} <span className="font-normal text-muted-foreground">{repo.path}</span>
@@ -216,7 +278,18 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 								<caption className="sr-only">Worktrees in {repo.name}</caption>
 								<thead className="text-xs text-muted-foreground">
 									<tr>
-										<th className="w-8" />
+										<th className="w-8">
+											<input
+												type="checkbox"
+												checked={open.length > 0 && picked === open.length}
+												ref={box => {
+													if (box) box.indeterminate = picked > 0 && picked < open.length;
+												}}
+												disabled={open.length === 0}
+												aria-label={`Select every removable worktree in ${repo.name}`}
+												onChange={pickAll}
+											/>
+										</th>
 										<th>Worktree</th>
 										<th>Last omp activity</th>
 										<th>Last commit</th>
@@ -230,6 +303,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 									{repo.worktrees.map(entry => {
 										const measured = metrics[keyOf(entry)];
 										const blocked = entry.blockers.length > 0;
+										const { folder, name } = pathParts(entry.path, repo.path);
 										return (
 											<tr key={keyOf(entry)}>
 												<td>
@@ -248,9 +322,15 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 													/>
 												</td>
 												<td className="max-w-64 pr-3">
-													<div className="truncate font-medium">{entry.branch ?? "Detached"}{entry.main ? " · Main" : ""}{entry.locked !== null ? " · Locked" : ""}</div>
-													<div className="truncate text-muted-foreground" title={entry.path}>
-														{entry.path}
+													<div className="truncate font-medium">
+														{entry.branch ?? "Detached"}
+														{entry.main ? " · Main" : ""}
+														{entry.locked !== null ? " · Locked" : ""}
+														{entry.merged ? <span title={mergedTitle(entry.merged)}> · {mergedLabel(entry.merged)}</span> : null}
+													</div>
+													<div className="flex min-w-0 text-muted-foreground" title={entry.path}>
+														<span className="truncate">{folder}</span>
+														<span className="shrink-0">{name}</span>
 													</div>
 												</td>
 												<td className="pr-3 whitespace-nowrap">{activityText(entry)}</td>
@@ -264,7 +344,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 													<Button type="button" variant="ghost" size="icon-compact" aria-label={`Copy ${entry.path}`} onClick={() => void navigator.clipboard.writeText(entry.path)}>
 														<Copy aria-hidden />
 													</Button>
-													<Button type="button" variant="ghost" size="compact" leadingIcon={Trash2} disabled={blocked} aria-label={`${entry.missing ? "Forget registration for" : "Delete"} ${entry.path}`} onClick={() => ask([entry])}>
+													<Button type="button" variant="ghost" size="compact" leadingIcon={Trash2} disabled={blocked} aria-label={`${entry.missing ? "Forget registration for" : "Delete"} ${entry.path}`} onClick={() => ask([entry], false)}>
 														{entry.missing ? "Forget" : "Delete"}
 													</Button>
 												</td>
@@ -275,10 +355,10 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 							</table>
 						</div>
 					</section>
-				),
-			)}
+				);
+			})}
 			{chosen.length > 0 ? (
-				<Button type="button" variant="primary" size="compact" onClick={() => ask(chosen)}>
+				<Button type="button" variant="primary" size="compact" onClick={() => ask(chosen, false)}>
 					Delete selected ({chosen.length})
 				</Button>
 			) : null}
@@ -313,7 +393,7 @@ function RemovalBody({
 		return (
 			<>
 				<DialogPrimitive.Title className="text-base font-medium">Checking worktrees</DialogPrimitive.Title>
-				<p className="mt-2 text-sm">Checking whether these worktrees can be removed…</p>
+				<p className="mt-2 text-sm">Checking whether {dialog.count === 1 ? "this worktree" : `these ${dialog.count} worktrees`} can be removed…</p>
 			</>
 		);
 	}
@@ -334,18 +414,31 @@ function RemovalBody({
 		return (
 			<>
 				<DialogPrimitive.Title className="text-base font-medium">Removing worktrees</DialogPrimitive.Title>
-				<p className="mt-2 text-sm">Removing…</p>
+				<p className="mt-2 text-sm">Removing {plural(dialog.count, "worktree")}…</p>
 			</>
 		);
 	}
 	if (dialog.phase === "done") {
+		const removed = dialog.results.filter(result => result.removed).length;
+		const failed = dialog.results.filter(result => !result.removed && result.error !== null).length;
+		const kept = dialog.kept.length + dialog.results.length - removed - failed;
 		return (
 			<>
 				<DialogPrimitive.Title className="text-base font-medium">Removal finished</DialogPrimitive.Title>
-				<ul className="mt-3 space-y-2 text-sm">
+				{dialog.results.length + dialog.kept.length > 1 ? (
+					<p className="mt-2 text-sm">
+						Removed {removed}. Kept {kept}. Failed {failed}.
+					</p>
+				) : null}
+				<ul className="mt-3 max-h-80 space-y-2 overflow-y-auto text-sm">
 					{dialog.results.map(result => (
-						<li key={keyOf(result)}>
-							{result.path}: {result.removed ? "Removed. The branch and transcripts were kept." : result.error ?? result.blockers.map(blocker => blocker.message).join(" ")}
+						<li key={keyOf(result)} className="break-all">
+							{result.path}: {result.removed ? "Removed. The branch and transcripts were kept." : result.error !== null ? `Failed. ${result.error}` : `Kept. ${blockerText(result.blockers)}`}
+						</li>
+					))}
+					{dialog.kept.map(plan => (
+						<li key={keyOf(plan)} className="break-all">
+							{plan.path}: Kept. {blockerText(plan.blockers)}
 						</li>
 					))}
 				</ul>
@@ -355,36 +448,47 @@ function RemovalBody({
 			</>
 		);
 	}
-	const validPlans = dialog.plans.flatMap(plan => (plan.kind === "unreadable" ? [] : [plan]));
-	const blocked = dialog.plans.some(plan => plan.blockers.length > 0);
-	const loss = validPlans.some(plan => plan.ignored.length > 0 || plan.detachedCommitLoss);
-	const pinnedHere = validPlans.flatMap(plan => plan.savedSessionIds.filter(id => pins.includes(id)));
+	const going = dialog.plans.filter(canRemove);
+	const kept = dialog.plans.filter((plan): boolean => !canRemove(plan));
+	const loss = going.some(plan => plan.ignored.length > 0 || plan.detachedCommitLoss);
+	const pinnedHere = going.flatMap(plan => plan.savedSessionIds.filter(id => pins.includes(id)));
+	const title = dialog.merged ? (going.length > 0 ? `Remove ${plural(going.length, "merged worktree")}?` : "No merged worktree can be removed") : dialog.plans.length === 1 ? "Remove this worktree?" : `Remove ${dialog.plans.length} worktrees?`;
+	// Only Remove merged removes part of what it previewed; a hand-picked removal stays all or nothing.
+	const stopped = dialog.merged ? going.length === 0 : kept.length > 0;
 	return (
 		<>
-			<DialogPrimitive.Title className="text-base font-medium">
-				{dialog.plans.length === 1 ? "Remove this worktree?" : `Remove ${dialog.plans.length} worktrees?`}
-			</DialogPrimitive.Title>
-			<ul className="mt-3 max-h-64 space-y-3 overflow-y-auto text-sm">
-				{dialog.plans.map(plan => (
-					<li key={keyOf(plan)}>
-						<p className="break-all text-muted-foreground">{plan.path}</p>
-						{plan.kind !== "unreadable" ? <p className="font-medium">{plan.branch ?? "Detached"}</p> : null}
-						{plan.blockers.length > 0 ? (
-							<p className="text-red-600 dark:text-red-400">{plan.blockers.map(blocker => blocker.message).join(" ")}</p>
-						) : plan.kind !== "unreadable" ? (
+			<DialogPrimitive.Title className="text-base font-medium">{title}</DialogPrimitive.Title>
+			{dialog.merged ? (
+				<p className="mt-2 text-sm">
+					{plural(going.length, "worktree")} will be removed. {plural(kept.length, "worktree")} will be kept.
+				</p>
+			) : null}
+			<div className="mt-3 max-h-80 space-y-3 overflow-y-auto text-sm">
+				{dialog.merged && going.length > 0 ? <h3 className="font-medium">Will be removed</h3> : null}
+				<ul className="space-y-3">
+					{going.map(plan => (
+						<li key={keyOf(plan)}>
+							<p className="break-all text-muted-foreground">{plan.path}</p>
+							<p className="font-medium">{plan.branch ?? "Detached"}</p>
 							<p>The branch {plan.branch ?? "is detached"} and session transcripts stay.</p>
-						) : null}
-						{plan.kind !== "unreadable" ? (
-							<>
-								{plan.ignored.length > 0 ? <p>Ignored files that will be deleted: {plan.ignored.join(", ")}. This includes dependencies and files such as .env.</p> : null}
-								{plan.detachedCommitLoss ? <p>This detached commit is not on a branch, tag, or remote. Removing the registration can make it unreachable.</p> : null}
-								{plan.savedSessionIds.length > 0 ? <p>{plan.savedSessionIds.length} saved omp session{plan.savedSessionIds.length === 1 ? "" : "s"} ran here. Resume may fail after the directory is gone.</p> : null}
-							</>
-						) : null}
-					</li>
-				))}
-			</ul>
-			{pinnedHere.length > 0 ? <p className="mt-3 text-sm">{pinnedHere.length} pinned session{pinnedHere.length === 1 ? "" : "s"} ran here.</p> : null}
+							{plan.ignored.length > 0 ? <p>Ignored files that will be deleted: {plan.ignored.join(", ")}. This includes dependencies and files such as .env.</p> : null}
+							{plan.detachedCommitLoss ? <p>This detached commit is not on a branch, tag, or remote. Removing the registration can make it unreachable.</p> : null}
+							{plan.savedSessionIds.length > 0 ? <p>{plural(plan.savedSessionIds.length, "saved omp session")} ran here. Resume may fail after the directory is gone.</p> : null}
+						</li>
+					))}
+				</ul>
+				{dialog.merged && kept.length > 0 ? <h3 className="font-medium">Kept</h3> : null}
+				<ul className="space-y-3">
+					{kept.map(plan => (
+						<li key={keyOf(plan)}>
+							<p className="break-all text-muted-foreground">{plan.path}</p>
+							{plan.kind !== "unreadable" ? <p className="font-medium">{plan.branch ?? "Detached"}</p> : null}
+							<p className="text-red-600 dark:text-red-400">{blockerText(plan.blockers)}</p>
+						</li>
+					))}
+				</ul>
+			</div>
+			{pinnedHere.length > 0 ? <p className="mt-3 text-sm">{plural(pinnedHere.length, "pinned session")} ran here.</p> : null}
 			<p className="mt-3 text-sm text-muted-foreground">Shells and editors outside omp may still be using a checkout. Close them first. This page cannot see all of them.</p>
 			{loss ? (
 				<label className="mt-3 flex items-start gap-2 text-sm">
@@ -396,8 +500,8 @@ function RemovalBody({
 				<Button type="button" variant="secondary" size="compact" onClick={onClose}>
 					Cancel
 				</Button>
-				<Button type="button" variant="primary" size="compact" disabled={blocked || (loss && !acceptLoss)} onClick={() => onConfirm(dialog.plans)}>
-					Delete worktree files
+				<Button type="button" variant="primary" size="compact" disabled={stopped || (loss && !acceptLoss)} onClick={() => onConfirm(dialog.plans)}>
+					{dialog.merged ? `Delete ${plural(going.length, "worktree")}` : "Delete worktree files"}
 				</Button>
 			</div>
 		</>

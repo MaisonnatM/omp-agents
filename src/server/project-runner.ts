@@ -15,7 +15,6 @@ import { agentDir } from "../omp/config";
 import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
 import { expandHome } from "../paths";
 import { type ModelOption, modelOfSelector } from "../shared/models";
-import type { SessionPreset } from "../shared/presets";
 import { slug } from "../shared/slug";
 import { isBusy, type Project, type ProjectEvent, type QueuedWorker, type Worker, type WorkerId, type WorkerPhase, type WorkerStart, workerPhase } from "../shared/projects";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult, type UserAnswer, type UserRequest } from "../shared/sessions";
@@ -76,8 +75,6 @@ export interface ProjectRunnerDeps {
 	interrupted(sessionId: string): boolean;
 	/** Whether session `sessionId` ran when the last server stopped. */
 	stoppedWithServer(sessionId: string): boolean;
-	/** The saved preset `id`, or `null` when there is none. */
-	preset(id: string): SessionPreset | null;
 	/** The branch checked out in `cwd`, or `null` outside git or on a detached head. */
 	checkedOut(cwd: string): Promise<string | null>;
 	/** The `omp` arguments that load the `projects` extension when omp does not already. */
@@ -374,15 +371,13 @@ export class ProjectRunner implements ProjectControl {
 		return project.workers.filter(worker => isBusy(this.phaseOf(worker))).length + launching;
 	}
 
-	/** How `spec` starts: its directory resolved, its preset applied, and its branch named. */
+	/** How `spec` starts: its directory resolved and its branch named. */
 	async #workerStart(project: Project, spec: WorkerSpec): Promise<WorkerStart> {
 		// `~` is the home directory; any other relative directory is the workspace's.
 		const cwd = spec.cwd === null ? project.cwd : resolve(project.cwd, expandHome(spec.cwd));
-		const preset = spec.preset === null ? null : this.#deps.preset(spec.preset);
-		if (spec.preset !== null && !preset) throw new Error(`No preset ${JSON.stringify(spec.preset)}. Pass null, or the id of a saved preset.`);
-		const model = spec.model === null ? (preset?.model ?? null) : modelOfSelector(spec.model);
+		const model = spec.model === null ? null : modelOfSelector(spec.model);
 		if (spec.model !== null && !model) throw new Error(`model must read provider/id, such as anthropic/claude-haiku-5-5; got ${JSON.stringify(spec.model)}.`);
-		const wantsBranch = spec.branch === null ? preset?.worktree !== "here" : spec.branch.toLowerCase() !== "none";
+		const wantsBranch = spec.branch === null || spec.branch.toLowerCase() !== "none";
 		const base = wantsBranch ? await this.#deps.checkedOut(cwd) : null;
 		const name = spec.branch === null ? `${branchSlug(project.name)}/${branchSlug(spec.title)}-${this.#deps.newId().replace(/-/g, "").slice(0, 6)}` : spec.branch;
 		return {
@@ -390,9 +385,8 @@ export class ProjectRunner implements ProjectControl {
 			prompt: spec.prompt,
 			branch: base === null ? null : { kind: "new", name, base },
 			model,
-			thinking: spec.thinking ?? preset?.thinking ?? null,
-			skill: spec.skill ?? preset?.skill ?? null,
-			tools: preset?.tools ?? null,
+			thinking: spec.thinking ?? null,
+			skill: spec.skill ?? null,
 		};
 	}
 
