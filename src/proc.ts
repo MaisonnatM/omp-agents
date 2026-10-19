@@ -27,7 +27,8 @@ export async function run(argv: string[], opts: RunOptions = {}): Promise<RunRes
 		stdout: "pipe",
 		stderr: "pipe",
 		timeout: opts.timeoutMs,
-		env: opts.env ? { ...process.env, ...opts.env } : undefined,
+		// Bun's default is the environment this process started with, which misses a variable set since, such as the test environment's scratch omp directory.
+		env: { ...process.env, ...opts.env },
 	});
 	const stop = (): void => { child.kill(); };
 	opts.signal?.addEventListener("abort", stop, { once: true });

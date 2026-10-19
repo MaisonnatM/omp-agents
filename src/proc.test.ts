@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runShell } from "./proc";
+import { run, runShell } from "./proc";
 
 const limits = { timeoutMs: 10_000, maxOutput: 1024 };
 
@@ -37,4 +37,9 @@ describe("runShell", () => {
 	test("rejects when it cannot start in its directory", async () => {
 		await expect(runShell("true", "/no/such/directory", limits)).rejects.toThrow("ENOENT");
 	});
+});
+
+test("run hands the child this process's environment as it is now, such as the test environment's scratch omp directory", async () => {
+	expect((await run(["/bin/sh", "-c", 'echo "$PI_CODING_AGENT_DIR"'])).stdout).toBe(`${process.env.PI_CODING_AGENT_DIR}\n`);
+	expect((await run(["/bin/sh", "-c", 'echo "$PI_CODING_AGENT_DIR"'], { env: { PI_CODING_AGENT_DIR: "/elsewhere" } })).stdout).toBe("/elsewhere\n");
 });
