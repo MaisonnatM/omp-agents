@@ -1,5 +1,6 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
 import type { PlanUsage } from "../src/shared/models";
+import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
 import type { ServerMsg } from "../src/shared/protocol";
 import { applyPins, type PinChange } from "../src/shared/pins";
@@ -56,12 +57,14 @@ export interface DashboardState {
 	projects: Project[];
 	/** What the bell lists, empty until the server first sends it. */
 	notices: Notice[];
+	/** The merges the server waits to make until GitHub allows them, empty until the server first sends them. */
+	merges: QueuedMerge[];
 	/** The live sessions this page asked the server to end, by instance id, until it answers. */
 	ending: ReadonlySet<string>;
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" | "merges" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -186,6 +189,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, projects: action.projects };
 		case "notices":
 			return { ...state, notices: action.list };
+		case "merges":
+			return { ...state, merges: action.list };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		case "pin": {
@@ -223,6 +228,7 @@ export function initialState(route: Route): DashboardState {
 		pins: [],
 		projects: [],
 		notices: [],
+		merges: [],
 		ending: new Set(),
 	};
 }

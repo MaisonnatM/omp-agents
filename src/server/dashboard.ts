@@ -24,7 +24,8 @@ import { findMcpServers } from "../omp/mcp";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
@@ -49,7 +50,9 @@ import { ListRegistry } from "./list-registry";
 import { GoogleAccountsFile } from "./google-accounts-file";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
-import { Loops } from "./loops";
+import { Loops, repeat } from "./loops";
+import { MergeCleanup } from "./merge-cleanup";
+import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
@@ -78,6 +81,8 @@ type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 
 /** The hidden calendars of an account that hid none. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
+/** How often the merge queue looks at the pull requests it waits on: checks take minutes, and a click shows its first step at once. */
+const MERGE_QUEUE_TICK_MS = 15_000;
 
 /** Everything the server serves, built once at startup; {@link Dashboard.start} sets it going and {@link Dashboard.stop} stops it. */
 export class Dashboard {
@@ -117,6 +122,10 @@ export class Dashboard {
 	readonly #scheduledRunner: ScheduledRunner;
 	readonly #projectRunner: ProjectRunner;
 	readonly #projectWatch: ProjectWatch;
+	readonly #mergeQueue: MergeQueue;
+	readonly #mergeCleanup: MergeCleanup;
+	/** Stops the merge queue's loop, which {@link start} starts. */
+	#stopMergeQueue = (): void => {};
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
@@ -208,6 +217,7 @@ export class Dashboard {
 				},
 			},
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
+			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -329,7 +339,34 @@ export class Dashboard {
 			detail: pr => loadPullRequestDetail(pr, true),
 			tickets: async () => (await loadTickets(true)).tickets,
 			notify: (projectId, event) => projectRunner.notify(projectId, event),
+			idle: sessionId => sessions.bySessionId(sessionId)?.row().status === "idle",
 			endIdle: (projectId, workerId) => projectRunner.endIdle(projectId, workerId),
+		});
+		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
+			enabled: () => this.#sourceControl.cleanUp,
+			// A project ends its own workers; a terminal session is ended only by the server that owns the unattended work, as the end inbox does.
+			sessions: () =>
+				sessions.rows(files.factsOf).flatMap(host =>
+					projects.roleOf(host.sessionId) || (!sessions.started(host.instanceId) && !ownerLock.held)
+						? []
+						: [{ sessionId: host.sessionId, idle: host.status === "idle", pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }],
+				),
+			states: readPullRequestStates,
+			gitDir: dir => worktreeAt(dir).then(at => at?.common ?? null, () => null),
+			end: async sessionId => {
+				const session = sessions.bySessionId(sessionId);
+				if (session) await this.#endLive(session);
+			},
+			deleteBranch: (gitDir, branch, head) => worktrees.deleteMergedBranch(gitDir, branch, head),
+		}));
+		this.#mergeQueue = new MergeQueue({
+			path: mergesFile,
+			github: GITHUB_MERGES,
+			now: Date.now,
+			newId: randomUUID,
+			active: () => ownerLock.held,
+			onChange: () => broadcasts.pushList("merges"),
+			onMerged: pr => void mergeCleanup.merged(pr),
 		});
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
@@ -358,6 +395,7 @@ export class Dashboard {
 				await scheduledRunner.tick();
 				await runner.tick();
 				await this.#projectWatch.tick();
+				await this.#mergeCleanup.tick();
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
@@ -429,8 +467,8 @@ export class Dashboard {
 				},
 				searchConversations: query => files.searchConversations(query),
 				sourceControl: () => this.#sourceControl.answer(this.#workspaceCwds()),
-				changeAutoPull: change => {
-					if (this.#sourceControl.apply(change) && this.#ownerLock.held) void this.#sourceControl.pull(this.#workspaceCwds());
+				changeSourceControl: change => {
+					if (this.#sourceControl.apply(change) && change.op !== "clean-up" && this.#ownerLock.held) void this.#sourceControl.pull(this.#workspaceCwds());
 				},
 			},
 			integrations: this.#integrations,
@@ -442,6 +480,13 @@ export class Dashboard {
 			gmail: this.#gmail,
 			files: { worktrees: this.#worktrees, terminals: this.terminals },
 			todos: { list: () => this.#todos.value, change: change => void this.#lists.apply("user-todos", change) },
+			pullRequests: {
+				changeMergeQueue: async change => {
+					await this.#mergeQueue.apply(change);
+					return this.#mergeQueue.list;
+				},
+				merged: pr => void this.#mergeCleanup.merged(pr),
+			},
 		});
 	}
 
@@ -480,6 +525,7 @@ export class Dashboard {
 		await this.#listRegistry();
 		if (this.#ownerLock.held) this.#clearOldDone();
 		this.#loops.start();
+		this.#stopMergeQueue = repeat("merge queue", () => this.#mergeQueue.tick(), MERGE_QUEUE_TICK_MS, 0);
 	}
 
 	/**
@@ -489,6 +535,7 @@ export class Dashboard {
 	 */
 	async stop(): Promise<void> {
 		this.#loops.stop();
+		this.#stopMergeQueue();
 		this.#projectRunner.stop();
 		this.#todoInbox.stop();
 		this.#endInbox.stop();

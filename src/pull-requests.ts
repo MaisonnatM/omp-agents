@@ -3,7 +3,7 @@
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
-import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
+import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
 import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, pullRequestName, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
@@ -174,7 +174,7 @@ const LOCKED_COMMENTERS: Record<string, true> = { ADMIN: true, MAINTAIN: true, W
 
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed isArchived viewerPermission pullRequest(number: $number) {
-		number title body isDraft state reviewDecision mergeable headRefName headRefOid baseRefName createdAt updatedAt additions deletions changedFiles locked
+		number title body isDraft state reviewDecision mergeable mergeStateStatus headRefName headRefOid baseRefName createdAt updatedAt additions deletions changedFiles locked
 		labels(first: 20) { nodes { name color } }
 		history: commits(last: 100) { nodes { commit {
 			abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
@@ -285,6 +285,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		commits: commitList,
 		headOid: str(node.headRefOid) ?? "",
 		mergeMethods: MERGE_METHODS.filter(method => repository[MERGE_ALLOWED[method]] === true),
+		mergeState: mergeStateOf(node.mergeStateStatus),
 		canComment: repository.isArchived !== true && (node.locked !== true || LOCKED_COMMENTERS[str(repository.viewerPermission) ?? ""] === true),
 	};
 }

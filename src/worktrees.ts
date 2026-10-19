@@ -494,4 +494,25 @@ export class Worktrees {
 		if (result.removed) return { kind: "removed", path: result.path };
 		return { kind: "kept", path: result.path, why: result.error ?? result.blockers.map(blocker => blocker.message).join(" ") };
 	}
+
+	/**
+	 * Deletes local branch `branch` of the repository whose git directory is `gitDir` when its last commit is `head`, the one
+	 * its pull request merged, or one `head` contains, as after the merge queue updated the branch on GitHub, and no worktree
+	 * has it checked out; whether it deleted it. A branch with a commit the merge did not take, or one a kept worktree still
+	 * holds, stays.
+	 */
+	async deleteMergedBranch(gitDir: string, branch: string, head: string): Promise<boolean> {
+		if ((await worktreesOf(gitDir)).some(registration => registration.branch === branch)) return false;
+		const ref = `refs/heads/${branch}`;
+		const tip = await run(["git", "-C", gitDir, "rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+		if (tip.code !== 0) return false;
+		const local = tip.stdout.trim();
+		if (local !== head) {
+			// GitHub may hold `head` alone, such as the merge of the base the queue made into the branch.
+			await run(["git", "-C", gitDir, "fetch", "--quiet", "--no-tags", "origin", head], { timeoutMs: 60_000 });
+			if ((await run(["git", "-C", gitDir, "merge-base", "--is-ancestor", local, head])).code !== 0) return false;
+		}
+		// `update-ref` deletes only while the branch still points at the commit checked, so a commit made meanwhile keeps it.
+		return (await run(["git", "-C", gitDir, "update-ref", "-d", ref, local])).code === 0;
+	}
 }

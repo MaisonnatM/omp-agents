@@ -1,6 +1,7 @@
 /**
- * Settings › Source control providers on the server: whether `gh` and `gt` are signed in, and the automatic pulls that
- * keep each workspace repository's default branch current while it has no local changes or commits.
+ * Settings › Source control providers on the server: whether `gh` and `gt` are signed in, the automatic pulls that
+ * keep each workspace repository's default branch current while it has no local changes or commits, and whether a
+ * merge cleans up after itself.
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,7 +10,7 @@ import { JsonFile } from "./fs";
 import { errorText, isObject } from "./json";
 import { HOME } from "./paths";
 import { run, runChecked } from "./proc";
-import { type AutoPull, type AutoPullChange, applyAutoPull, DEFAULT_AUTO_PULL, type ProviderStatus, type PullOutcome, type PullRepo, type SourceControlAnswer } from "./shared/source-control";
+import { applySourceControl, DEFAULT_SOURCE_CONTROL, type ProviderStatus, type PullOutcome, type PullRepo, type SourceControlAnswer, type SourceControlChange, type SourceControlSettings } from "./shared/source-control";
 import { SerialLane } from "./serial-lane";
 
 const FETCH_TIMEOUT_MS = 60_000;
@@ -75,29 +76,37 @@ async function graphiteStatus(): Promise<ProviderStatus> {
 	return { provider: "graphite", state: signedIn ? "signed-in" : "signed-out", account: null };
 }
 
-function parseAutoPull(value: unknown): AutoPull | null {
+/** A file from before the cleanup setting reads with it on. */
+function parseSettings(value: unknown): SourceControlSettings | null {
 	if (!isObject(value) || typeof value.on !== "boolean" || !isObject(value.repos)) return null;
+	if (value.cleanUp !== undefined && typeof value.cleanUp !== "boolean") return null;
 	const repos = Object.entries(value.repos);
-	return repos.every(([, on]) => typeof on === "boolean") ? { on: value.on, repos: Object.fromEntries(repos) as Record<string, boolean> } : null;
+	if (!repos.every(([, on]) => typeof on === "boolean")) return null;
+	return { on: value.on, repos: Object.fromEntries(repos) as Record<string, boolean>, cleanUp: value.cleanUp ?? DEFAULT_SOURCE_CONTROL.cleanUp };
 }
 
-/** The automatic pull setting, kept in `source-control.json`, and the last pull of each repository since the server started. */
+/** The settings kept in `source-control.json`, and the last pull of each repository since the server started. */
 export class SourceControl {
-	readonly #file: JsonFile<AutoPull>;
-	#autoPull: AutoPull;
+	readonly #file: JsonFile<SourceControlSettings>;
+	#settings: SourceControlSettings;
 	readonly #last = new Map<string, NonNullable<PullRepo["last"]>>();
 	readonly #pulls = new SerialLane();
 
 	constructor(path: string) {
-		this.#file = new JsonFile(path, { parse: parseAutoPull, holds: "the automatic pull setting", onInvalid: "aside", indent: "\t" });
-		this.#autoPull = this.#file.load() ?? DEFAULT_AUTO_PULL;
+		this.#file = new JsonFile(path, { parse: parseSettings, holds: "the source control settings", onInvalid: "aside", indent: "\t" });
+		this.#settings = this.#file.load() ?? DEFAULT_SOURCE_CONTROL;
+	}
+
+	/** Whether a merge ends the sessions it leaves with nothing to do. */
+	get cleanUp(): boolean {
+		return this.#settings.cleanUp;
 	}
 
 	/** Applies `change` and saves; whether it changed anything. */
-	apply(change: AutoPullChange): boolean {
-		const next = applyAutoPull(this.#autoPull, change);
-		if (next === this.#autoPull) return false;
-		this.#autoPull = next;
+	apply(change: SourceControlChange): boolean {
+		const next = applySourceControl(this.#settings, change);
+		if (next === this.#settings) return false;
+		this.#settings = next;
 		this.#file.save(next);
 		return true;
 	}
@@ -106,7 +115,7 @@ export class SourceControl {
 	pull(cwds: readonly string[]): Promise<void> {
 		return this.#pulls.run(async () => {
 			for (const repo of await repositoriesOf(cwds)) {
-				if (!(this.#autoPull.repos[repo] ?? this.#autoPull.on)) continue;
+				if (!(this.#settings.repos[repo] ?? this.#settings.on)) continue;
 				const outcome = await pullDefaultBranch(repo).catch((err: unknown) => skipped("failed", errorText(err)));
 				this.#last.set(repo, { at: Date.now(), outcome });
 			}
@@ -117,8 +126,9 @@ export class SourceControl {
 		const [providers, repos] = await Promise.all([Promise.all([githubStatus(), graphiteStatus()]), repositoriesOf(cwds)]);
 		return {
 			providers,
-			autoPull: this.#autoPull,
-			repos: repos.map(path => ({ path, on: this.#autoPull.repos[path] ?? null, last: this.#last.get(path) ?? null })),
+			autoPull: { on: this.#settings.on, repos: this.#settings.repos },
+			cleanUp: this.#settings.cleanUp,
+			repos: repos.map(path => ({ path, on: this.#settings.repos[path] ?? null, last: this.#last.get(path) ?? null })),
 		};
 	}
 }

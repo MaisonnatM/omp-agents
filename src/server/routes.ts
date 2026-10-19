@@ -52,8 +52,9 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
-import { parseAutoPullChange, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
-import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
+import { MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
+import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
+import type { MergeQueueChange, QueuedMerge } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
@@ -84,8 +85,8 @@ export interface SessionRoutesEnv {
 	/** The saved conversations whose prompts or replies hold every word of `query`, the file changed last first. */
 	searchConversations(query: string): Promise<ConversationHit[]>;
 	sourceControl(): Promise<SourceControlAnswer>;
-	/** Apply `change` to the automatic pulls, and pull again when it changed them. */
-	changeAutoPull(change: AutoPullChange): void;
+	/** Apply `change` to the source control settings, and pull again when it changed the automatic pulls. */
+	changeSourceControl(change: SourceControlChange): void;
 	replayDetail(view: View, turnId: string): Promise<ReplayDetail>;
 	replayComparison(view: View): Promise<ReplayComparison>;
 }
@@ -117,6 +118,15 @@ export interface RouteEnv {
 	gmail: GmailAccounts;
 	files: FileRoutesEnv;
 	todos: TodoRoutesEnv;
+	pullRequests: PullRequestRoutesEnv;
+}
+
+/** What the pull request routes hand on: the merge queue, and a merge for the cleanup after it. */
+export interface PullRequestRoutesEnv {
+	/** Apply `change` to the merge queue; answers the queued merges after it, or rejects with why it refused. */
+	changeMergeQueue(change: MergeQueueChange): Promise<readonly QueuedMerge[]>;
+	/** The details merged `pr`, whose head was `branch` at `head`. */
+	merged(pr: PullRequest & { branch: string; head: string }): void;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -277,11 +287,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	/** `GET /api/source-control`: GitHub's and Graphite's CLIs, the automatic pull setting, and the workspaces' repositories. */
 	const sourceControl = get(() => answer(() => env.sourceControl()));
 
-	/** `PUT /api/source-control` `{ op, on, repo? }`: turn automatic pulls on or off by default, or for one repository. */
-	const autoPullChange = write(
-		body => checked(parseAutoPullChange(body), "Expected { op: default, on } or { op: repo, repo, on } with on true, false, or null for a repository"),
+	/** `PUT /api/source-control` `{ op, on, repo? }`: turn automatic pulls on or off by default, or for one repository, or the cleanup after a merge. */
+	const sourceControlChange = write(
+		body => checked(parseSourceControlChange(body), "Expected { op: default, on }, { op: clean-up, on }, or { op: repo, repo, on } with on true, false, or null for a repository"),
 		async change => {
-			env.changeAutoPull(change);
+			env.changeSourceControl(change);
 			return env.sourceControl();
 		},
 	);
@@ -339,7 +349,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/skills": { GET: skills },
 		"/api/pull-requests": { GET: pullRequests },
 		"/api/workspaces": { PUT: workspaceChange },
-		"/api/source-control": { GET: sourceControl, PUT: autoPullChange },
+		"/api/source-control": { GET: sourceControl, PUT: sourceControlChange },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
 		"/api/project-notes": { GET: projectNotes },
@@ -601,8 +611,8 @@ function gmailRoutes({ get, write }: RouteKit, gmail: GmailAccounts): Routes {
 	};
 }
 
-/** GitHub pull requests in full: details, stack, options, edits, and their changed files. */
-function pullRequestRoutes({ get, write }: RouteKit): Routes {
+/** GitHub pull requests in full: details, stack, options, edits, merges that wait until they are ready, and their changed files. */
+function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv): Routes {
 	/** A read of the pull request `?owner=&repo=&number=` names, refused with `badRequest`. */
 	const pullRequestGet = (badRequest: string, read: (pr: PullRequest, params: URLSearchParams) => Promise<Response>): Handler =>
 		get(params => {
@@ -619,14 +629,18 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 	/** `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>`: the open pull requests stacked with that one, top first, for its details' Stack. */
 	const pullRequestStack = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestStack(pr)));
 
-	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
+	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. A merge cleans up after itself. */
 	const pullRequestWrite = write(
 		body =>
 			checked(
 				parsePullRequestEdit(body),
 				"Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, a merge method and head commit, a review thread to resolve or unresolve, or a reply or comment of at most 65536 characters",
 			),
-		savePullRequest,
+		async edit => {
+			const detail = await savePullRequest(edit);
+			if (edit.change.field === "merge" && detail.state === "merged") env.merged({ ...detail, branch: detail.head, head: detail.headOid });
+			return detail;
+		},
 	);
 
 	/** `GET /api/pull-request/options?owner=<o>&repo=<r>`: the labels and reviewers that repository's pull requests can take. */
@@ -646,8 +660,16 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 		return file ? Response.json(file) : fail(404, `${prKey(pr)} changes no file ${path}`);
 	});
 
+	/** `PUT /api/merge-queue`: `MergeQueueChange`, a merge that waits until GitHub allows it, of one pull request or a stack, or its cancel; answers the queued merges after it. */
+	const mergeQueue = write(
+		body => checked(parseMergeQueueChange(body), `Expected { op: add, method, prs } with 1 to ${MAX_QUEUED_STACK} pull requests, each with a head commit or null, or { op: cancel, id }`),
+		env.changeMergeQueue,
+		err => fail(409, errorText(err)),
+	);
+
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
+		"/api/merge-queue": { PUT: mergeQueue },
 		"/api/pull-request/title": { GET: pullRequestTitle },
 		"/api/pull-request/options": { GET: pullRequestOptions },
 		"/api/pull-request/stack": { GET: pullRequestStack },
@@ -788,7 +810,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...providerRoutes(kit),
 		...calendarRoutes(kit, env.calendar),
 		...gmailRoutes(kit, env.gmail),
-		...pullRequestRoutes(kit),
+		...pullRequestRoutes(kit, env.pullRequests),
 		...fileRoutes(kit, env.files),
 		...todoRoutes(kit, env.todos),
 	};

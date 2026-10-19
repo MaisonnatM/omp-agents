@@ -49,6 +49,11 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const [workspace, pickWorkspace] = useSelectedWorkspace(workspaces);
 	// Until the sessions are listed, the saved workspace reads as all workspaces.
 	pullRequestsStore.usePolling(workspace, state.listed);
+	// A queued merge that lands, or one queued or cancelled, changes what GitHub lists before the next poll would show it.
+	const landed = state.merges.map(merge => `${merge.id}:${merge.merged}`).join();
+	useEffect(() => {
+		if (state.listed) void pullRequestsStore.refresh(workspace, { fresh: true });
+	}, [landed]);
 	const { started } = state;
 	useEffect(() => {
 		if (!started) return;

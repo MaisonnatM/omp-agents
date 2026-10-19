@@ -23,6 +23,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Pins](#pins)
 - [Notifications](#notifications)
   - [Session notifications](#session-notifications)
+- [Merges that wait, and the cleanup after one](#merges-that-wait-and-the-cleanup-after-one)
 - [HTTP API](#http-api)
   - [Integrations](#integrations)
   - [MCP servers](#mcp-servers)
@@ -701,7 +702,8 @@ A worker's session reports three kinds of news, which the runner saves as update
 Two kinds come from elsewhere: `restarted`, which `recover` saves at boot when the owner lock is held, naming the workers `interrupted.json` says stopped with the server, after it resumes a coordinator that did, and `event`, which `notify` saves for the routine runner's `project` task and for `ProjectWatch`.
 `notify` also writes the event into the project's `inbox/` through the runner's `writeInbox`, which `Dashboard` wires to `writeInboxEvent` in `src/server/project-notes.ts`, and logs a write that fails rather than losing the update.
 `ProjectWatch` in `src/server/project-watch.ts` hears the minute tick and looks every `PROJECT_WATCH_MINUTES` (2): for each project not archived, it loads the pull request of each worker's branch and the viewer's Linear issues that match the project's `watch.linear`, keeps a snapshot of each in memory, and reports what changed since; the first look only records.
-When a look sees a pull request merged, it calls the runner's `endIdle` for each worker that worked on it and whose every pull request is now merged or closed, before it reports the merge; `endIdle` ends a worker whose live session is `idle`, as `end_worker` does, and the merge's update names the workers it ended.
+When a look sees a pull request merged, it ends each worker that the merge leaves with nothing to do, by `finishedSessions` in `src/server/merge-cleanup.ts`, the rule the cleanup after a merge applies to every other session: idle, linked to the merged pull request, with every pull request it worked on merged or closed.
+It ends each through the runner's `endIdle`, as `end_worker` does, before it reports the merge, and the merge's update names the workers it ended.
 A worker that works or asks, or has a pull request still open or unread, stays, and a merge seen at the first look ends none.
 Ending goes through `endSession`, so a worktree with changes stays and the branch stays.
 
@@ -814,6 +816,24 @@ An alert carries the hash that opens its session, `#session/<session id>`, from 
 In the desktop app the alert goes through the bridge to `desktop/attention.ts`, which shows an Electron `Notification` unless its window has focus, as `BrowserWindow.isFocused` tells, and, on its click, shows the window and sets the page's hash to the alert's; it holds each session's latest notification, closing the one before, since Electron drops a click of one nothing references.
 In a browser it is a Web `Notification` tagged with the alert's hash, so a session's newer one replaces the one before, raised while the page does not have focus, once the browser granted the permission that turning the switch on asks for.
 
+## Merges that wait, and the cleanup after one
+
+`MergeQueue` in `src/server/merge-queue.ts` carries out the merges GitHub would not take yet, and stacks, bottom first; it keeps them in `merges.json` beside the access token, and every socket hears them as a `merges` message on the roster topic, also sent when a socket opens.
+A queued merge is a `QueuedMerge`: the method, the base every pull request lands in, which is the bottom one's base when it was queued, the pull requests still to merge, each pinned to a head commit, how many merged, and its state, `waiting` or `failed`, with the reason.
+Adding one reads each pull request, refuses one not open, one whose head moved past the commit the confirmation showed, and one already queued, and orders them bottom first with `stackOrder`, which refuses pull requests that are not one chain of base branches.
+The server that queued a merge takes its first step at once, and the server that holds the owner lock ticks the queue every 15 seconds, reading `merges.json` again first, so it adopts a merge a server beside it queued.
+Each tick reads the first pull request of each waiting merge through one `gh api graphql` call (`readMergeStatus` in `src/pull-request-merge.ts`) and takes the step `nextStep` decides, then the steps after it that need no wait, at most six a tick.
+The steps, in the order `nextStep` checks: a merged pull request moves on; a closed one stops the merge, and so does one whose head moved past its pin, unless the queue updated its branch and the new head is GitHub's merge commit whose first parent is the pin, which the queue then pins, since `updatePullRequestBranch` answers before GitHub writes that commit.
+Then one based on another branch than the merge's base is retargeted onto it; a draft is marked ready; one that conflicts, or whose checks failed, stops it; one behind its base has its branch updated, and is not updated again for a minute while GitHub catches up; one GitHub merges now (`mergesNow`) merges with `expectedHeadOid` its pin; else the repository's auto-merge is armed when it allows it, or the merge waits on checks, a review, or a rule.
+A read that fails waits for the next tick, and a mutation GitHub refuses stops the merge with GitHub's reason.
+Each merge of a pull request hands it to `MergeCleanup`; the next one of a stack is then under way, and a merge with none left leaves the list.
+A cancel drops the merge and turns off an auto-merge it armed; a stopped merge stays listed with its reason until it is cancelled.
+
+`MergeCleanup` in `src/server/merge-cleanup.ts` ends what a merge leaves with nothing to do, when Settings › Source control's `cleanUp` is on.
+It hears each merge the dashboard made, from `PUT /api/pull-request` and the queue, at once, and looks every two minutes, on the minute tick of the server that holds the owner lock, at the live sessions' pull requests not yet merged or closed, through one `gh api graphql` call per repository (`readPullRequestStates`); the first look at a pull request only records it.
+For each merge, `finishedSessions` picks the idle live sessions linked to it whose every pull request is merged or closed; a project's sessions are left to their project, and a terminal session to the server that holds the owner lock, as the end inbox does.
+It ends each through `endSession`, which removes its linked worktree unless something keeps it, then deletes the local branch it worked on when that is the merged pull request's head branch, through `Worktrees.deleteMergedBranch`: only when the branch's commit is the merged head or one it contains, fetched from `origin` when missing, as after the queue updated the branch on GitHub, through `git update-ref -d` with that commit as the old value, so a commit made meanwhile keeps it, and never a branch a worktree has checked out.
+
 ## HTTP API
 
 **Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace.
@@ -903,14 +923,19 @@ Its `unresolved` counts the open threads among those it lists, with `exact` fals
 GitHub's GraphQL has no `viewerCanComment` on a pull request, so its `canComment` is true unless the repository is archived, or the conversation is locked and the viewer's `viewerPermission` is below `WRITE`, as GitHub lets only people who can write comment on a locked conversation.
 Every mutation goes through `ghMutation` in `src/github.ts`, which throws GitHub's errors even when its answer carries `data`, since a refused mutation answers its field as `null` beside them.
 `PUT /api/pull-request` answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
+A merge it answers as merged goes to `MergeCleanup` (see [Merges that wait, and the cleanup after one](#merges-that-wait-and-the-cleanup-after-one)) with the branch and head commit it merged.
 One change goes per call, so two changes made at once each keep the other.
 The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
 Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.
 
-`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
+`PUT /api/merge-queue` takes a `MergeQueueChange` from `src/shared/merge-queue.ts`, checked by `parseMergeQueueChange` in `src/server/wire.ts`: `{ op: "add", method, prs }`, one to `MAX_QUEUED_STACK` (20) pull requests in any order, each with the head commit the confirmation showed or `null`, or `{ op: "cancel", id }`.
+It answers the queued merges after it, which every socket also hears as a `merges` message, and a refusal, such as a branch that moved or a pull request already queued, as a 409 with the reason.
+The details' answer carries GitHub's `mergeStateStatus` as `mergeState`, which `mergesNow` in `src/shared/github.ts` reads to tell the confirmation whether to merge now or queue.
+
+`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
 `gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.
-`PUT /api/source-control` takes an `AutoPullChange`, `{ op: "default", on }` or `{ op: "repo", repo, on }` with `on: null` dropping a repository's own choice, checked by `parseAutoPullChange` in `src/server/wire.ts`, and answers the same as the `GET`.
-A change that changes the setting saves `source-control.json` beside the access token and, on the server that holds the owner lock, pulls at once.
+`PUT /api/source-control` takes a `SourceControlChange`, `{ op: "default", on }`, `{ op: "repo", repo, on }` with `on: null` dropping a repository's own choice, or `{ op: "clean-up", on }`, checked by `parseSourceControlChange` in `src/server/wire.ts`, and answers the same as the `GET`.
+A change that changes the settings saves `source-control.json` beside the access token and, for a change of the pulls on the server that holds the owner lock, pulls at once; a file from before `cleanUp` reads with it on.
 A pull, from that change or from the pull loop every five minutes, waits for the one under way, then runs `pullDefaultBranch` on each repository whose pulls are on.
 It reads the default branch from `origin/HEAD`, fetches it, and moves the local branch only when it is behind `origin`'s with no commits of its own: through `merge --ff-only` in the worktree that has it checked out, skipped when that worktree has changes to tracked files, else through `update-ref`.
 

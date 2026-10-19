@@ -343,6 +343,7 @@ describe("pull request status", () => {
 		commits: [],
 		headOid: "",
 		mergeMethods: [],
+		mergeState: "clean",
 		canComment: false,
 		...fields,
 	});

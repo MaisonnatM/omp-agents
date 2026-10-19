@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "./git";
-import { applyAutoPull, DEFAULT_AUTO_PULL, startingMethod } from "./shared/source-control";
+import { applySourceControl, DEFAULT_SOURCE_CONTROL, startingMethod } from "./shared/source-control";
 import { pullDefaultBranch } from "./source-control";
 
 const dirs: string[] = [];
@@ -63,12 +63,18 @@ describe("pullDefaultBranch", () => {
 	});
 });
 
-describe("applyAutoPull", () => {
+describe("applySourceControl", () => {
 	test("a repository's own choice wins until it is dropped", () => {
-		const own = applyAutoPull(DEFAULT_AUTO_PULL, { op: "repo", repo: "/r", on: true });
-		expect(own).toEqual({ on: false, repos: { "/r": true } });
-		expect(applyAutoPull(own, { op: "repo", repo: "/r", on: null })).toEqual(DEFAULT_AUTO_PULL);
-		expect(applyAutoPull(own, { op: "repo", repo: "/r", on: true })).toBe(own);
+		const own = applySourceControl(DEFAULT_SOURCE_CONTROL, { op: "repo", repo: "/r", on: true });
+		expect(own).toEqual({ on: false, repos: { "/r": true }, cleanUp: true });
+		expect(applySourceControl(own, { op: "repo", repo: "/r", on: null })).toEqual(DEFAULT_SOURCE_CONTROL);
+		expect(applySourceControl(own, { op: "repo", repo: "/r", on: true })).toBe(own);
+	});
+
+	test("the cleanup after a merge turns off and on without touching the pulls", () => {
+		const off = applySourceControl(DEFAULT_SOURCE_CONTROL, { op: "clean-up", on: false });
+		expect(off).toEqual({ on: false, repos: {}, cleanUp: false });
+		expect(applySourceControl(off, { op: "clean-up", on: false })).toBe(off);
 	});
 });
 

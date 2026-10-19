@@ -2,13 +2,14 @@
  * Watches what each project subscribes to and tells its coordinator what changed: its workers' pull requests (checks
  * that start failing, new comments and reviews, a merge or a close) and the viewer's Linear issues that match its filter
  * (new ones, and ones that changed). The first look at each only records it, so a dashboard start reports nothing old;
- * what changed while the dashboard was down is therefore not reported. A merge it sees ends the idle workers it leaves
- * with nothing open, and the merge's update says so.
+ * what changed while the dashboard was down is therefore not reported. A merge it sees ends the workers it leaves with
+ * nothing to do, by the rule the cleanup after a merge applies to every other session, and the merge's update says so.
  */
 import { errorText } from "../json";
 import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, pullRequestName, samePullRequest } from "../shared/github";
 import type { LinearFilter, Project, ProjectEvent, Worker, WorkerId } from "../shared/projects";
 import type { Ticket } from "../shared/tickets";
+import { finishedSessions } from "./merge-cleanup";
 
 /** How many minutes pass between two looks. */
 const PROJECT_WATCH_MINUTES = 2;
@@ -25,6 +26,8 @@ export interface ProjectWatchDeps {
 	tickets(): Promise<Ticket[]>;
 	/** Saves `event` for project `projectId`'s coordinator; why it cannot, or `null` once saved. */
 	notify(projectId: string, event: ProjectEvent): string | null;
+	/** Whether session `sessionId` runs and is idle. */
+	idle(sessionId: string): boolean;
 	/** Ends worker `workerId` of project `projectId` when it runs and is idle; whether it began to. */
 	endIdle(projectId: string, workerId: WorkerId): boolean;
 }
@@ -126,19 +129,16 @@ export class ProjectWatch {
 	}
 
 	/**
-	 * Ends each idle worker that worked on a pull request in `merged`, merged since the last look, once every pull request
-	 * it worked on is merged or closed; the ones it began to end, with their pull requests. A worker that works or asks,
-	 * or one with a pull request still open or unread, stays.
+	 * Ends each worker that a merge of `merged`, since the last look, leaves with nothing to do, by the rule every session
+	 * follows ({@link finishedSessions}); the ones it began to end, with their pull requests.
 	 */
 	#endFinished(projectId: string, linked: Map<Worker, LinkedPullRequest[]>, merged: LinkedPullRequest[]): [Worker, LinkedPullRequest[]][] {
-		if (merged.length === 0) return [];
-		const settled = (pr: LinkedPullRequest): boolean => {
+		const settled = (pr: PullRequest): boolean => {
 			const state = this.#pullRequests.get(pullRequestName(pr))?.state;
 			return state === "merged" || state === "closed";
 		};
-		return [...linked].filter(
-			([worker, prs]) => prs.some(pr => merged.some(other => samePullRequest(pr, other))) && prs.every(settled) && this.#deps.endIdle(projectId, worker.id),
-		);
+		const workers = [...linked].map(([worker, pullRequests]) => ({ worker, sessionId: worker.sessionId, idle: this.#deps.idle(worker.sessionId), pullRequests }));
+		return finishedSessions(workers, merged, settled).flatMap(({ worker, pullRequests }) => (this.#deps.endIdle(projectId, worker.id) ? [[worker, pullRequests] as [Worker, LinkedPullRequest[]]] : []));
 	}
 
 	async #watchTickets(projects: Project[]): Promise<void> {

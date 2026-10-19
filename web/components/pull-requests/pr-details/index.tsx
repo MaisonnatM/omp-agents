@@ -66,6 +66,8 @@ export interface DetailContentProps {
 	onPick?: (pr: PullRequest) => void;
 	/** The workspace whose pull request list a change here shows in at once. */
 	workspace: string | null;
+	/** A checkout of its repository, where copying its branch removes the linked worktree that has it checked out; `null` when none is known. */
+	cwd: string | null;
 }
 
 export type Placement = "page" | "sidebar";
@@ -83,7 +85,7 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
  * of the other actions; then Summary, Comments, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace, cwd }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
 	// The list's state of it joins `version`, so a change made from its row, or one the list reads from GitHub, reads the details again.
 	const { data: detail, error, saveError, edit, write } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, `${String(version)}:${listed?.state ?? "unlisted"}`);
@@ -127,7 +129,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
-				<DetailHeader pr={pr} detail={detail} readError={error} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
+				<DetailHeader pr={pr} detail={detail} readError={error} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} cwd={cwd} />
 				<div className={cn("flex flex-wrap items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
 						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>

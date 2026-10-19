@@ -2,6 +2,7 @@
 import type { Routine, RoutineChange } from "../routines";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
+import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
 import type { Project, ProjectEdit } from "./projects";
@@ -50,6 +51,8 @@ export type ServerMsg =
 	| { t: "projects"; projects: Project[] }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
 	| { t: "notices"; list: Notice[] }
+	/** Every merge the server waits to make until GitHub allows it, whole, sent when a socket opens and after every change. */
+	| { t: "merges"; list: QueuedMerge[] }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
 

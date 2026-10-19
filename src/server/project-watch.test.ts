@@ -44,7 +44,7 @@ function harness(projects: Project[]) {
 		tickets: [] as Ticket[],
 		notified: [] as string[],
 		reads: 0,
-		/** Whether `endIdle` finds the worker idle. */
+		/** Whether the worker is idle. */
 		idle: true,
 		ended: [] as string[],
 	};
@@ -60,9 +60,10 @@ function harness(projects: Project[]) {
 			state.notified.push(`${projectId} ${event.source}: ${event.title}${event.text ? ` | ${event.text}` : ""}`);
 			return null;
 		},
+		idle: () => state.idle,
 		endIdle(projectId, workerId) {
-			if (state.idle) state.ended.push(`${projectId} ${workerId}`);
-			return state.idle;
+			state.ended.push(`${projectId} ${workerId}`);
+			return true;
 		},
 	});
 	/** Two minutes pass, which takes one look. */

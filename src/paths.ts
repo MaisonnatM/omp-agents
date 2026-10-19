@@ -55,8 +55,10 @@ export const googleAccountsFile = join(configDir, "google-accounts.json");
 export const localEventsFile = join(configDir, "events.json");
 /** The notices the bell's user saw or cleared, beside {@link tokenFile}. */
 export const noticesFile = join(configDir, "notices.json");
-/** Automatic pulls of the workspaces' default branches, beside {@link tokenFile}. */
+/** The source control settings: automatic pulls of the workspaces' default branches, and the cleanup after a merge, beside {@link tokenFile}. */
 export const sourceControlFile = join(configDir, "source-control.json");
+/** The merges that wait until GitHub allows them, beside {@link tokenFile}. */
+export const mergesFile = join(configDir, "merges.json");
 /** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */
 export const oldGoogleFile = join(configDir, "google.json");
 /** Names the server that runs routines and applies the todo inbox, which servers side by side share, beside {@link tokenFile}. */

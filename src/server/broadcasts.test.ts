@@ -58,6 +58,7 @@ function setup(initial: PastSession[]) {
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 		projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
+		merges: { msg: () => ({ t: "merges", list: [] }) },
 	}, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
@@ -179,7 +180,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);
 		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
 		expect(lists.apply("projects", { op: "rename", id: "missing", name: "new" }, peer)).toBe(false);
-		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices"));
+		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
 		expect(published).toEqual([]);
 	});
 
