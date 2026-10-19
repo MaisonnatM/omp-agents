@@ -7,6 +7,7 @@ import { hashForProjects, sameView } from "../routing";
 import { projectHosts, type SidebarSessions } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
+import { ShortcutChip } from "./kbd";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ProjectSessions } from "./project-group";
 import { ScheduledGroup } from "./scheduled";
@@ -62,13 +63,14 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				<SidebarMenu aria-label="Start a session">
 					<SidebarMenuItem>
 						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-							<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} onClick={openNewSession}>
-								<span className="truncate">{newSessionLabel}</span>
+							<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} aria-label={newSessionLabel} onClick={openNewSession}>
+								{newSessionLabel}
+								<ShortcutChip id="newSession" className="ml-auto" />
 							</SidebarMenuButton>
 						</Tooltip>
 					</SidebarMenuItem>
 				</SidebarMenu>
-				<SidebarSearch label="Filter the sidebar's sessions" placeholder="Search sessions" query={query} onQuery={onQuery} />
+				<SidebarSearch label="Filter the sidebar's sessions" placeholder="Search sessions" query={query} onQuery={onQuery} shortcut="sessionSearch" />
 			</SidebarGroup>
 			<SidebarContent>
 				{filtering && projects.length + pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (

@@ -56,9 +56,10 @@ import { tabShortcutLabels } from "../../sidebar-tabs";
 import { useStoredState } from "../../stored-state";
 import { quickAddTodo } from "../../todo-quick-add";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { Kbd } from "../kbd";
 import { StatusDot } from "../status-dot";
 import { ActionPanel } from "./action-panel";
-import { Kbd, PaletteFooter } from "./palette-footer";
+import { PaletteFooter } from "./palette-footer";
 
 const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	newSession: Plus,
