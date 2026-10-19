@@ -151,7 +151,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 					<Code pr={pr} detail={detail} placement={placement} path={files?.path ?? null} version={version} />
 				</div>
 			) : (
-				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
+				<div className={cn(page && "min-h-0 flex-1 overflow-y-auto px-6")}>
 					<div className="space-y-6 py-4">
 						{saveError && (
 							<p role="alert" className={ERROR_TEXT}>
