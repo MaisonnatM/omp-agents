@@ -78,8 +78,12 @@ function parseUnresolved(threads: unknown): PullRequestSummary["unresolved"] {
 	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
 }
 
-/** GitHub reports an open or draft pull request as `CONFLICTING` with its base branch; `UNKNOWN` means not computed yet. */
-const conflictsOf = (node: Record<string, unknown>): boolean => node.state !== "MERGED" && node.state !== "CLOSED" && node.mergeable === "CONFLICTING";
+/** GitHub's state of a pull request, its draft flag folded in. */
+function stateOf(node: Record<string, unknown>): PullRequestDetail["state"] {
+	if (node.state === "MERGED") return "merged";
+	if (node.state === "CLOSED") return "closed";
+	return node.isDraft === true ? "draft" : "open";
+}
 
 /** What a pull request's row in the list and its details share, or `null` when GitHub left out its title or branches. */
 function parsePullRequestHead(node: Record<string, unknown>) {
@@ -92,16 +96,18 @@ function parsePullRequestHead(node: Record<string, unknown>) {
 	const commits = nodesOf(node.commits);
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
 	const rollup = isObject(commit.statusCheckRollup) ? str(commit.statusCheckRollup.state) : undefined;
+	const state = stateOf(node);
 	return {
 		title,
 		head,
 		base,
 		author,
 		reviewers,
-		state: node.state === "MERGED" ? ("merged" as const) : node.isDraft === true ? ("draft" as const) : ("open" as const),
+		state,
 		review: reviewOf(str(node.reviewDecision), reviewers),
 		checks: STATUS[rollup ?? ""] ?? "none",
-		conflicts: conflictsOf(node),
+		// `UNKNOWN` means GitHub has not computed it yet; a merged or closed pull request has nothing to conflict with.
+		conflicts: (state === "open" || state === "draft") && node.mergeable === "CONFLICTING",
 		additions: num(node.additions) ?? 0,
 		deletions: num(node.deletions) ?? 0,
 		unresolved: parseUnresolved(node.reviewThreads),
@@ -113,7 +119,9 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 	const parsed = parsePullRequestHead(node);
 	const updatedAt = Date.parse(str(node.mergedAt) ?? str(node.updatedAt) ?? "");
 	if (!parsed || Number.isNaN(updatedAt)) return null;
-	const { base, ...head } = parsed;
+	const { base, state, ...head } = parsed;
+	// GitHub's search index lags a close by up to a minute, so `is:open` can still return a pull request whose own state says closed.
+	if (state === "closed") return null;
 	const repository = isObject(node.repository) ? node.repository : {};
 	const defaultBranch = isObject(repository.defaultBranchRef) ? str(repository.defaultBranchRef.name) : undefined;
 	return {
@@ -121,6 +129,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 		repo,
 		number: node.number,
 		...head,
+		state,
 		role,
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
 		updatedAt,
@@ -259,7 +268,6 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		number: pr.number,
 		...head,
 		body: str(node.body) ?? "",
-		state: node.state === "CLOSED" ? "closed" : head.state,
 		changedFiles: num(node.changedFiles) ?? 0,
 		files,
 		checkRuns,

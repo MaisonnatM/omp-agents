@@ -1,5 +1,5 @@
 /** How the bell words, pictures, links, acts on, and toasts each notice: {@link presentNotice}, the one place that tells notice kinds apart. */
-import { type PullRequestSummary, pullRequestUrl } from "../src/shared/github";
+import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
 import { type Notice, usesClause } from "../src/shared/notices";
 import { providerLabel } from "./labels";
@@ -23,13 +23,13 @@ export type NoticeFace =
 	| { kind: "slack"; person: { name: string; avatarUrl: string | null } };
 
 /**
- * A notice's button: **Update** (`ready` when it may run: before the update, and again after it failed), **Merge on
- * GitHub**, or the quick action that makes a pull request's move.
+ * A notice's button: **Update** (`ready` when it may run: before the update, and again after it failed), **Merge**,
+ * which merges after a confirmation, or the quick action that makes a pull request's move.
  */
 export type NoticeAction =
 	| { kind: "none" }
 	| { kind: "update"; label: "Update" | "Updating"; ready: boolean }
-	| { kind: "merge"; url: string }
+	| { kind: "merge"; pr: PullRequestSummary }
 	| { kind: "quick"; pr: PullRequestSummary; action: PullRequestActionId; cwd: string };
 
 /**
@@ -97,7 +97,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				preview: pr.title,
 				link: { href: hashForPullRequests(pr), external: false },
 				face: { kind: "move", move, person: actor && { name: actor.login, avatarUrl: actor.avatarUrl } },
-				action: move === "merge" ? { kind: "merge", url: pullRequestUrl(pr) } : action ? { kind: "quick", pr, action, cwd } : { kind: "none" },
+				action: move === "merge" ? { kind: "merge", pr } : action ? { kind: "quick", pr, action, cwd } : { kind: "none" },
 			};
 		}
 		case "slack":
