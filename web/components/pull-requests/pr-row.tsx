@@ -160,6 +160,20 @@ export function ReviewState({ pr, max, className }: { pr: PullRequestSummary; ma
 	return icon && <IconTip icon={icon} className={className} />;
 }
 
+/** How many comments and review threads the pull request holds, as GitHub's list shows it; nothing when it has none. */
+function ConversationCount({ pr }: { pr: PullRequestSummary }) {
+	if (pr.conversations === 0) return null;
+	const label = `${pr.conversations} ${pr.conversations === 1 ? "conversation" : "conversations"}`;
+	return (
+		<Tooltip content={label}>
+			<span role="img" aria-label={label} className="flex shrink-0 items-center gap-0.5 text-xs tabular-nums text-muted-foreground">
+				<MessageSquare aria-hidden className="size-3.5" />
+				{pr.conversations}
+			</span>
+		</Tooltip>
+	);
+}
+
 /** The lines the pull request adds and removes. */
 export function DiffSize({ pr }: { pr: PullRequestSummary }) {
 	const label = `${pr.additions} line${pr.additions === 1 ? "" : "s"} added, ${pr.deletions} removed`;
@@ -418,6 +432,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
 						<StackInfo stack={stack} base={pr.stackedOn} />
 						<SessionChips sessions={sessions} onOpen={onOpen} compact />
+						<ConversationCount pr={pr} />
 						<ChecksIcon checks={pr.checks} className="[&_svg]:size-3.5" />
 					</span>
 				</p>
@@ -467,6 +482,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
+					<ConversationCount pr={pr} />
 					{why && (
 						<>
 							<span aria-hidden>·</span>

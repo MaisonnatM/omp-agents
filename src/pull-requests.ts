@@ -28,6 +28,7 @@ const PR_FIELDS = `... on PullRequest {
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+	comments { totalCount }
 	reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved } }
 }`;
 
@@ -77,6 +78,9 @@ function parseUnresolved(threads: unknown): PullRequestSummary["unresolved"] {
 	const total = isObject(threads) && typeof threads.totalCount === "number" ? threads.totalCount : nodes.length;
 	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
 }
+
+/** A connection's `totalCount`, 0 when GitHub left it out. */
+const totalOf = (connection: unknown): number => (isObject(connection) ? (num(connection.totalCount) ?? 0) : 0);
 
 /** GitHub's state of a pull request, its draft flag folded in. */
 function stateOf(node: Record<string, unknown>): PullRequestDetail["state"] {
@@ -133,6 +137,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 		role,
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
 		updatedAt,
+		conversations: totalOf(node.comments) + totalOf(node.reviewThreads),
 	};
 }
 

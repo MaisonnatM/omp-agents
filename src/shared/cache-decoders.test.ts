@@ -91,6 +91,7 @@ const pr: PullRequestSummary = {
 	head: "fix",
 	stackedOn: null,
 	unresolved: { count: 0, exact: true },
+	conversations: 0,
 	updatedAt: 1,
 };
 const listed = { owner: "acme", repo: "app", cwds: ["/code/app"], pullRequests: [pr] };

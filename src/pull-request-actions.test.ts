@@ -20,6 +20,7 @@ describe("pullRequestActions", () => {
 		head: "me/widgets",
 		stackedOn: null,
 		unresolved: { count: 0, exact: true },
+		conversations: 0,
 		updatedAt: 1,
 		...fields,
 	});

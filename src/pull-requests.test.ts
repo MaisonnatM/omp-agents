@@ -102,6 +102,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-1",
 				stackedOn: "me/branch-0",
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -120,6 +121,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-2",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -138,6 +140,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-3",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -156,6 +159,7 @@ describe("parseListAnswer", () => {
 				head: "me/branch-4",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
+				conversations: 0,
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
 			},
 		]);
