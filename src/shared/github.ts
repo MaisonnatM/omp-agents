@@ -284,7 +284,7 @@ export interface PullRequestDetail extends PullRequest {
 	canComment: boolean;
 }
 
-/** The states the details can set; merging is a change of its own. */
+/** The states the details can set; a merge goes through the merge queue. */
 export const SETTABLE_STATES = ["open", "draft", "closed"] as const;
 export type SettableState = (typeof SETTABLE_STATES)[number];
 
@@ -293,7 +293,6 @@ export type PullRequestChange =
 	| { field: "label"; name: string; on: boolean }
 	| { field: "reviewer"; login: string; on: boolean }
 	| { field: "state"; state: SettableState }
-	| { field: "merge"; method: MergeMethod; head: string }
 	| { field: "thread"; id: string; resolved: boolean }
 	| { field: "reply"; thread: string; body: string }
 	| { field: "comment"; body: string };

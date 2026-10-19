@@ -88,19 +88,19 @@ const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): A
  * A **Merge** badge, or a **Checks running** one on a pull request that is ready but for them: a button that merges after the
  * same confirmation as the details, reading what the merge needs while it is open; once queued, **Queued** or **Stopped**.
  */
-function MergeBadge({ pr, move, change }: { pr: PullRequestSummary; move: "merge" | "checks-running"; change: Action<[ListChange]> }) {
+function MergeBadge({ pr, move }: { pr: PullRequestSummary; move: "merge" | "checks-running" }) {
 	const [open, setOpen] = useState(false);
 	const target = useMergeTarget(pr, open);
 	const label = move === "merge" ? `Merge ${pullRequestName(pr)} on GitHub` : `Checks running: merge ${pullRequestName(pr)} once they pass`;
 	return (
-		<MergePopover pr={pr} target={target.data} error={target.error} onMerge={(method, head) => change.run({ field: "merge", method, head })} open={open} onOpenChange={setOpen} tooltip={label} align="start">
-			{(_, queued) => (
+		<MergePopover pr={pr} target={target.data} error={target.error} open={open} onOpenChange={setOpen} tooltip={label} align="start">
+			{({ queued, pending }) => (
 				<button
 					type="button"
 					aria-label={queued ? `${label}: ${queued.state.kind === "failed" ? "stopped" : "queued"}` : label}
-					aria-busy={change.pending || queued?.state.kind === "waiting"}
-					disabled={change.pending}
-					className={cn(BADGE, MOVE_LOOK[move][0], BADGE_BUTTON, (change.pending || queued?.state.kind === "waiting") && "motion-safe:animate-pulse")}
+					aria-busy={pending || queued?.state.kind === "waiting"}
+					disabled={pending}
+					className={cn(BADGE, MOVE_LOOK[move][0], BADGE_BUTTON, (pending || queued?.state.kind === "waiting") && "motion-safe:animate-pulse")}
 					style={{ fontVariationSettings: fontWeights.semibold }}
 				>
 					{queued ? (
@@ -121,8 +121,8 @@ function MergeBadge({ pr, move, change }: { pr: PullRequestSummary; move: "merge
  * A row's move badge: for **Merge**, and **Checks running** on a pull request ready but for them, a button that merges;
  * else a button that starts the quick action handing the move to an agent, when one applies; else the plain badge.
  */
-function RowMoveBadge({ pr, move, change, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId; change: Action<[ListChange]> } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
-	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} change={change} />;
+function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -433,7 +433,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<Age at={pr.updatedAt} compact exact className="w-7 shrink-0 text-right text-xs leading-5 tabular-nums text-muted-foreground" />
 				</div>
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-					<RowMoveBadge pr={pr} move={move} change={change} {...actions} />
+					<RowMoveBadge pr={pr} move={move} {...actions} />
 					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
@@ -482,7 +482,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			onClick={event => openFromRow(event, pr)}
 			className={cn("group/row relative cursor-pointer px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<RowMoveBadge pr={pr} move={move} change={change} {...actions} />
+			<RowMoveBadge pr={pr} move={move} {...actions} />
 			<div className="min-w-0">
 				<TitleLink pr={pr} targeted={targeted} className="block truncate" />
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">

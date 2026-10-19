@@ -14,7 +14,7 @@ import { gitCheckout } from "../git";
 import { GmailAccounts, GmailClient } from "../gmail";
 import { accountClients, createGoogleAccounts } from "../google-accounts";
 import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
-import { loadPullRequestDetail, loadPullRequests, mergedPullRequests } from "../pull-requests";
+import { loadPullRequestDetail, loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
 import { loadTickets } from "../tickets";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
@@ -51,7 +51,7 @@ import { GoogleAccountsFile } from "./google-accounts-file";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops, repeat } from "./loops";
-import { MergeCleanup } from "./merge-cleanup";
+import { cleanupEnds, MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
@@ -339,21 +339,25 @@ export class Dashboard {
 			detail: pr => loadPullRequestDetail(pr, true),
 			tickets: async () => (await loadTickets(true)).tickets,
 			notify: (projectId, event) => projectRunner.notify(projectId, event),
-			idle: sessionId => sessions.bySessionId(sessionId)?.row().status === "idle",
-			endIdle: (projectId, workerId) => projectRunner.endIdle(projectId, workerId),
 		});
+		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
 		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
-			enabled: () => this.#sourceControl.cleanUp,
-			// A project ends its own workers; a terminal session is ended only by the server that owns the unattended work, as the end inbox does.
 			sessions: () =>
-				sessions.rows(files.factsOf).flatMap(host =>
-					projects.roleOf(host.sessionId) || (!sessions.started(host.instanceId) && !ownerLock.held)
-						? []
-						: [{ sessionId: host.sessionId, idle: host.status === "idle", pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }],
-				),
+				sessions.rows(files.factsOf).flatMap(host => {
+					const role = projects.roleOf(host.sessionId);
+					const project = role ? projects.get(role.projectId) : undefined;
+					const watches = project !== undefined && !project.archived && project.watch.pullRequests;
+					const ends = cleanupEnds({ startedHere: sessions.started(host.instanceId) !== undefined, project: role && { role: role.role, watches } }, this.#sourceControl.cleanUp);
+					return ends ? [{ sessionId: host.sessionId, idle: host.status === "idle", pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }] : [];
+				}),
 			states: readPullRequestStates,
-			gitDir: dir => worktreeAt(dir).then(at => at?.common ?? null, () => null),
+			checkout: async dir => {
+				const at = await worktreeAt(dir).catch(() => null);
+				return at && { gitDir: at.common, repo: await repoOf(dir) };
+			},
 			end: async sessionId => {
+				const role = projects.roleOf(sessionId);
+				if (role?.role === "worker") return projectRunner.endFinished(role.projectId, role.workerId);
 				const session = sessions.bySessionId(sessionId);
 				if (session) await this.#endLive(session);
 			},
@@ -482,10 +486,9 @@ export class Dashboard {
 			todos: { list: () => this.#todos.value, change: change => void this.#lists.apply("user-todos", change) },
 			pullRequests: {
 				changeMergeQueue: async change => {
-					await this.#mergeQueue.apply(change);
-					return this.#mergeQueue.list;
+					const merged = await this.#mergeQueue.apply(change);
+					return { merges: [...this.#mergeQueue.list], merged };
 				},
-				merged: pr => void this.#mergeCleanup.merged(pr),
 			},
 		});
 	}

@@ -22,6 +22,7 @@ import {
 import { decodeInboxAnswer, type InboxAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
 import { decodePullRequestList, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestEdit, type PullRequestList, type RepoPullRequests } from "../src/shared/github";
+import type { MergeQueueAnswer, MergeQueueChange } from "../src/shared/merge-queue";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
 import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/shared/tickets";
@@ -29,7 +30,7 @@ import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import { errorText, getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
-import { withPullRequestChanged } from "./pull-requests-model";
+import { withPullRequestState } from "./pull-requests-model";
 import { pickedInbox } from "./inbox-model";
 import { useStoredState } from "./stored-state";
 
@@ -84,14 +85,27 @@ export const pullRequestsStore = createPolledStore<PullRequestList>({
 });
 
 /**
- * Makes `change` on GitHub and answers the pull request as GitHub has it after. A state change or a merge shows in
- * `workspace`'s list at once, so the rows and the details that read it agree, and the list is read again either way.
+ * Makes `change` on GitHub and answers the pull request as GitHub has it after. A state change shows in `workspace`'s
+ * list at once, so the rows and the details that read it agree, and the list is read again either way.
  */
 export async function writePullRequest(workspace: string | null, pr: PullRequest, change: PullRequestChange): Promise<PullRequestDetail> {
 	const detail = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change } satisfies PullRequestEdit);
-	if (change.field === "state" || change.field === "merge") pullRequestsStore.update(list => withPullRequestChanged(list, pr, change, Date.now()), workspace);
+	if (change.field === "state") pullRequestsStore.update(list => withPullRequestState(list, pr, change.state, Date.now()), workspace);
 	void pullRequestsStore.refresh(workspace, { fresh: true });
 	return detail;
+}
+
+/**
+ * Queues a merge, which the server makes at once when GitHub allows it, or cancels one. A pull request it merged on the
+ * way shows as merged in `workspace`'s list at once, as {@link writePullRequest} shows a state change, and the list is read again.
+ */
+export async function writeMergeQueue(workspace: string | null, change: MergeQueueChange): Promise<MergeQueueAnswer> {
+	const answer = await putJson<MergeQueueAnswer>("/api/merge-queue", change);
+	if (answer.merged.length === 0) return answer;
+	const at = Date.now();
+	pullRequestsStore.update(list => answer.merged.reduce((changed, pr) => withPullRequestState(changed, pr, "merged", at), list), workspace);
+	void pullRequestsStore.refresh(workspace, { fresh: true });
+	return answer;
 }
 
 /** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per workspace, so there is one entry. */

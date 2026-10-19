@@ -23,7 +23,7 @@ import {
 	shownPullRequests,
 	sessionStack,
 	stepTarget,
-	withPullRequestChanged,
+	withPullRequestState,
 	withThreadResolved,
 	yourMoveCount,
 } from "./pull-requests-model";
@@ -465,21 +465,21 @@ describe("pull request list after a change", () => {
 	const list = { repos: [repo("webapp", [one, two]), repo("api", [other]), failed], unmatched: ["/x"] };
 
 	test("a new state shows on the pull request's row, and leaves every other repository and row as it was", () => {
-		const ready = withPullRequestChanged(list, one, { field: "state", state: "open" }, 99);
+		const ready = withPullRequestState(list, one, "open", 99);
 		expect(ready.repos[0]).toEqual(repo("webapp", [pr(1, { state: "open" }), two]));
 		expect(listedPullRequests(ready.repos)[1]).toBe(two);
 		expect(ready.repos[1]).toBe(list.repos[1]);
 		expect(ready.repos[2]).toBe(failed);
 		expect(ready.unmatched).toEqual(["/x"]);
-		expect(withPullRequestChanged(list, two, { field: "state", state: "draft" }, 99).repos[0]).toEqual(repo("webapp", [one, pr(2, { state: "draft" })]));
+		expect(withPullRequestState(list, two, "draft", 99).repos[0]).toEqual(repo("webapp", [one, pr(2, { state: "draft" })]));
 	});
 
 	test("a merge marks the row merged and updated at the merge's time", () => {
-		expect(withPullRequestChanged(list, two, { field: "merge", method: "squash", head: "abc123" }, 1234).repos[0]).toEqual(repo("webapp", [one, pr(2, { state: "merged", updatedAt: 1234 })]));
+		expect(withPullRequestState(list, two, "merged", 1234).repos[0]).toEqual(repo("webapp", [one, pr(2, { state: "merged", updatedAt: 1234 })]));
 	});
 
 	test("a closed pull request leaves the list", () => {
-		const closed = withPullRequestChanged(list, other, { field: "state", state: "closed" }, 99);
+		const closed = withPullRequestState(list, other, "closed", 99);
 		expect(closed.repos).toEqual([list.repos[0], repo("api", []), failed]);
 		expect(closed.repos[0]).toBe(list.repos[0]);
 	});

@@ -1,8 +1,22 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { MergeStatus } from "../pull-request-merge";
 import { type PullRequest, prKey } from "../shared/github";
 import type { QueuedMerge, QueuedPullRequest } from "../shared/merge-queue";
 import { type MergeGitHub, MergeQueue, nextStep, stackOrder } from "./merge-queue";
+
+const dirs: string[] = [];
+afterEach(() => {
+	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+function mergesPath(): string {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-merges-"));
+	dirs.push(dir);
+	return join(dir, "merges.json");
+}
 
 const T0 = 1_000_000;
 
@@ -43,7 +57,9 @@ describe("nextStep", () => {
 		expect(nextStep(queued(), status({ state: "merged" }), T0)).toEqual({ kind: "merged" });
 		expect(nextStep(queued(), status({ state: "closed" }), T0)).toEqual({ kind: "fail", why: "#12 was closed." });
 		expect(nextStep(queued({ updatedAt: T0 }), status({ head: "h2", parents: ["h1", "b1"] }), T0)).toEqual({ kind: "adopt" });
-		expect(nextStep(queued({ updatedAt: T0 }), status({ head: "h2", parents: ["x9"] }), T0)).toMatchObject({ kind: "fail" });
+		expect(nextStep(queued({ updatedAt: T0 }), status({ head: "h2", parents: ["h1"] }), T0)).toMatchObject({ kind: "fail" });
+		expect(nextStep(queued({ updatedAt: T0 }), status({ head: "h2", parents: ["x9", "h1"] }), T0)).toMatchObject({ kind: "fail" });
+		expect(nextStep(queued(), status({ head: "h2", parents: ["h1", "b1"] }), T0)).toMatchObject({ kind: "fail" });
 		expect(nextStep(queued(), status({ head: "h9" }), T0)).toEqual({ kind: "fail", why: "#12's branch moved after the merge was queued; review it and merge again." });
 		expect(nextStep(queued(), status({ mergeState: "dirty" }), T0)).toEqual({ kind: "fail", why: "#12 conflicts with main." });
 		expect(nextStep(queued(), status({ checks: "failing", mergeState: "unstable" }), T0)).toEqual({ kind: "fail", why: "#12's checks failed." });
@@ -51,14 +67,15 @@ describe("nextStep", () => {
 });
 
 describe("stackOrder", () => {
-	test("orders a stack bottom first, whatever order it came in, and refuses pull requests that are no one chain", () => {
-		const top = { name: "top", branch: "c", base: "b" };
-		const middle = { name: "middle", branch: "b", base: "a" };
-		const bottom = { name: "bottom", branch: "a", base: "main" };
+	test("orders a stack bottom first, whatever order it came in, and refuses pull requests that are no one chain, such as one of another repository", () => {
+		const top = { owner: "o", repo: "r", number: 3, name: "top", branch: "c", base: "b" };
+		const middle = { owner: "o", repo: "r", number: 2, name: "middle", branch: "b", base: "a" };
+		const bottom = { owner: "o", repo: "r", number: 1, name: "bottom", branch: "a", base: "main" };
 		expect(stackOrder([top, bottom, middle])?.map(pr => pr.name)).toEqual(["bottom", "middle", "top"]);
 		expect(stackOrder([bottom])?.map(pr => pr.name)).toEqual(["bottom"]);
 		expect(stackOrder([top, bottom])).toBeNull();
-		expect(stackOrder([bottom, { name: "sibling", branch: "d", base: "main" }])).toBeNull();
+		expect(stackOrder([bottom, { ...bottom, number: 4, name: "sibling", branch: "d" }])).toBeNull();
+		expect(stackOrder([bottom, { ...middle, repo: "elsewhere" }])).toBeNull();
 	});
 });
 
@@ -77,7 +94,7 @@ function fakeGitHub(statuses: Map<number, MergeStatus>) {
 		update: async (id, head) => {
 			log.push(`update ${id} ${head}`);
 			const pr = byId(id);
-			Object.assign(pr, { head: `${head}+`, parents: [head], mergeState: "clean" });
+			Object.assign(pr, { head: `${head}+`, parents: [head, "base1"], mergeState: "clean" });
 		},
 		arm: async id => void log.push(`arm ${id}`),
 		disarm: async id => void log.push(`disarm ${id}`),
@@ -93,12 +110,12 @@ function fakeGitHub(statuses: Map<number, MergeStatus>) {
 	return { github, log };
 }
 
-function queue(statuses: Map<number, MergeStatus>, now = () => T0) {
+function queue(statuses: Map<number, MergeStatus>, { now = () => T0, active = (): boolean => true, path = mergesPath() } = {}) {
 	const { github, log } = fakeGitHub(statuses);
 	const merged: QueuedPullRequest[] = [];
 	let ids = 0;
-	const merges = new MergeQueue({ path: null, github, now, newId: () => `m${++ids}`, active: () => true, onChange: () => {}, onMerged: pr => void merged.push(pr) });
-	return { merges, log, merged };
+	const merges = new MergeQueue({ path, github, now, newId: () => `m${++ids}`, active, onChange: () => {}, onMerged: pr => void merged.push(pr) });
+	return { merges, log, merged, path };
 }
 
 describe("MergeQueue", () => {
@@ -108,7 +125,8 @@ describe("MergeQueue", () => {
 			[2, status({ id: "N2", branch: "upper", head: "u1", base: "lower", draft: true, mergeState: "draft" })],
 		]);
 		const { merges, log, merged } = queue(statuses);
-		await merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 2, head: null }, { owner: "o", repo: "r", number: 1, head: "l1" }] });
+		const answered = await merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 2, head: null }, { owner: "o", repo: "r", number: 1, head: "l1" }] });
+		expect(answered.map(prKey)).toEqual(["o/r#1"]);
 		expect(log).toEqual(["merge N1 squash l1", "retarget N2 main", "ready N2", "update N2 u1"]);
 		expect(merges.list).toMatchObject([{ base: "main", merged: 1, prs: [{ number: 2, head: "u1" }], updatedAt: T0, state: { kind: "waiting", why: "Updating the branch" } }]);
 		await merges.tick();
@@ -140,5 +158,32 @@ describe("MergeQueue", () => {
 		await merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 12, head: "h1" }] });
 		expect(merges.list).toMatchObject([{ state: { kind: "waiting", why: "Waiting for checks" } }]);
 		await expect(merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 12, head: "h1" }] })).rejects.toThrow("o/r#12 is already queued to merge.");
+	});
+
+	test("only the server that holds the owner lock changes GitHub: it steps a merge another server queued at its next tick, and stops one that server cancelled", async () => {
+		const statuses = new Map([
+			[12, status({ id: "N12", head: "h1" })],
+			[13, status({ id: "N13", branch: "other", head: "o1", mergeState: "blocked", checks: "pending" })],
+		]);
+		const owner = queue(statuses);
+		const other = queue(statuses, { active: () => false, path: owner.path });
+		expect(await other.merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 12, head: "h1" }] })).toEqual([]);
+		expect(other.log).toEqual([]);
+		expect(other.merges.list).toMatchObject([{ prs: [{ number: 12 }], state: { kind: "waiting", why: "Queued" } }]);
+		await owner.merges.tick();
+		expect(owner.log).toEqual(["merge N12 squash h1"]);
+		expect(owner.merged.map(prKey)).toEqual(["o/r#12"]);
+		await other.merges.tick();
+		expect(other.merges.list).toEqual([]);
+
+		await owner.merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 13, head: "o1" }] });
+		const [waiting] = owner.merges.list;
+		await other.merges.tick();
+		await other.merges.apply({ op: "cancel", id: waiting!.id });
+		statuses.get(13)!.checks = "passing";
+		statuses.get(13)!.mergeState = "clean";
+		await owner.merges.tick();
+		expect(owner.log).toEqual(["merge N12 squash h1"]);
+		expect(owner.merges.list).toEqual([]);
 	});
 });

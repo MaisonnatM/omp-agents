@@ -41,6 +41,12 @@ export type MergeQueueChange =
 	  }
 	| { op: "cancel"; id: string };
 
+/** The answer to `PUT /api/merge-queue`: the queued merges after the change, and the pull requests it merged on the way, which leave the list. */
+export interface MergeQueueAnswer {
+	merges: QueuedMerge[];
+	merged: QueuedPullRequest[];
+}
+
 const isQueuedPullRequest = fields<QueuedPullRequest>({ owner: isString, repo: isString, number: isNumber, title: isString, branch: isString, head: isString });
 
 /** A queued merge as `merges.json` keeps it. */

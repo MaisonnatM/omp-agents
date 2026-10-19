@@ -131,8 +131,8 @@ function MergeStack({ stack }: { stack: StackedPullRequest[] }) {
 				<QueuedMergeNote merge={queued} />
 			) : (
 				<MergePopover pr={bottom} stack={stack} target={target.data} error={target.error} open={open} onOpenChange={setOpen} align="end">
-					{() => (
-						<Button variant="secondary" size="compact" leadingIcon={GitMerge} active={open}>
+					{({ pending }) => (
+						<Button variant="secondary" size="compact" leadingIcon={GitMerge} active={open} loading={pending}>
 							Merge stack
 						</Button>
 					)}

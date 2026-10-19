@@ -1,6 +1,7 @@
 /**
  * The confirmation before a pull request merges on GitHub, which the details' merge button, a row's **Merge** badge, the
- * bell's **Merge**, and a session's stack open: it merges now, or queues a merge that waits until GitHub allows it.
+ * bell's **Merge**, and a session's stack open. Every merge goes to the server's merge queue, which merges at once when
+ * GitHub allows it and otherwise once it is ready.
  */
 import { GitMerge, Layers } from "lucide-react";
 import { type ReactElement, useState } from "react";
@@ -12,9 +13,8 @@ import { MERGE_METHOD_LABELS, type MergeMethod, startingMethod } from "../../../
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
-import { changeMergeQueue } from "../../api";
 import { useLastMergeMethod, useMergeMethodChoice } from "../../merge-method";
-import { useRead } from "../../reads";
+import { useRead, writeMergeQueue } from "../../reads";
 import { useAction } from "../../use-action";
 import { useDashboardStatus } from "../dashboard-context";
 
@@ -52,7 +52,8 @@ export function queuedMergeText(merge: QueuedMerge): string {
 
 /** A queued merge's line and its **Cancel**, or **Dismiss** once it stopped. */
 export function QueuedMergeNote({ merge }: { merge: QueuedMerge }) {
-	const cancel = useAction(async () => void (await changeMergeQueue({ op: "cancel", id: merge.id })), "Could not cancel the merge");
+	const { pullRequestsScope } = useDashboardStatus();
+	const cancel = useAction(async () => void (await writeMergeQueue(pullRequestsScope, { op: "cancel", id: merge.id })), "Could not cancel the merge");
 	return (
 		<div className="flex items-start gap-2 text-[13px]">
 			<p role={merge.state.kind === "failed" ? "alert" : "status"} className={merge.state.kind === "failed" ? "flex-1 text-red-600 dark:text-red-400" : "flex-1 text-muted-foreground"}>
@@ -65,63 +66,61 @@ export function QueuedMergeNote({ merge }: { merge: QueuedMerge }) {
 	);
 }
 
-/** What the confirmation merges: `pr` alone, now through `onMerge` when GitHub allows it, or a stack, which always queues. */
-type MergeOf =
-	| {
-			/** Merges now with `method`, only while the branch's head is still `head`; a merge that must wait is queued on the server instead. */
-			onMerge: (method: MergeMethod, head: string) => void;
-			stack?: undefined;
-	  }
-	| {
-			onMerge?: undefined;
-			/** The stack to merge, top first as its rail lists it, bottom first on GitHub. */
-			stack: StackedPullRequest[];
-	  };
+/** What the trigger shows: the method the merge starts with, the queued merge that takes it, and whether the server is taking one now. */
+export interface MergeTrigger {
+	method: MergeMethod | null;
+	queued: QueuedMerge | undefined;
+	pending: boolean;
+}
 
-export type MergePopoverProps = MergeOf & {
+export interface MergePopoverProps {
 	/** The pull request to merge: the bottom one of `stack`, when it merges a stack. */
 	pr: PullRequest;
+	/** The stack to merge, top first as its rail lists it; absent to merge `pr` alone. */
+	stack?: StackedPullRequest[];
 	/** What the merge needs from GitHub; `null` while it is read. */
 	target: MergeTarget | null;
 	/** Why `target` could not be read, if it could not. */
 	error?: string | null;
+	/** The server took the merge, whether it merged at once or waits. */
+	onQueued?: () => void;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	/** The trigger's tooltip, if any. */
 	tooltip?: string;
 	/** Which edge of the trigger the confirmation lines up with: the header's button sits at the right, a row's badge at the left. */
 	align?: "start" | "end";
-	/** The trigger, given the method the merge starts with and the queued merge that takes it, if any. */
-	children: (method: MergeMethod | null, queued: QueuedMerge | undefined) => ReactElement;
-};
+	children: (trigger: MergeTrigger) => ReactElement;
+}
 
 /**
- * Merges on GitHub with the method Settings starts it on, after a confirmation that can switch the method. A pull request
- * GitHub would not merge yet, and a stack, queue on the server, which merges once GitHub allows it; while queued, the
+ * Merges on GitHub with the method Settings starts it on, after a confirmation that can switch the method, through the
+ * server's merge queue, which merges once GitHub allows it, pinned to the head the confirmation showed; while queued, the
  * confirmation says where it stands and cancels it.
  */
-export function MergePopover({ pr, stack, target, error = null, onMerge, open, onOpenChange, tooltip, align = "end", children }: MergePopoverProps) {
-	const { merges } = useDashboardStatus();
+export function MergePopover({ pr, stack, target, error = null, onQueued, open, onOpenChange, tooltip, align = "end", children }: MergePopoverProps) {
+	const { merges, pullRequestsScope } = useDashboardStatus();
 	const [choice] = useMergeMethodChoice();
 	const [last, setLast] = useLastMergeMethod();
 	const [picked, setPicked] = useState<MergeMethod | null>(null);
 	const queue = useAction(async (method: MergeMethod, head: string) => {
 		const bottomFirst = stack ? stack.toReversed() : [pr];
-		await changeMergeQueue({ op: "add", method, prs: bottomFirst.map(({ owner, repo, number }, index) => ({ owner, repo, number, head: index === 0 ? head : null })) });
-	}, "Could not queue the merge");
+		await writeMergeQueue(pullRequestsScope, { op: "add", method, prs: bottomFirst.map(({ owner, repo, number }, index) => ({ owner, repo, number, head: index === 0 ? head : null })) });
+		onQueued?.();
+	}, "Could not merge");
 	const queued = queuedMergeOf(merges, pr) ?? stack?.map(stacked => queuedMergeOf(merges, stacked)).find(Boolean);
 	const allowed = target?.mergeMethods ?? [];
 	const method = picked && allowed.includes(picked) ? picked : startingMethod(choice, last, allowed);
-	const waits = stack !== undefined || (target !== null && !mergesNow(target));
+	// Only the wording follows whether GitHub merges it now; the queue decides what the merge does.
+	const later = stack !== undefined || (target !== null && !mergesNow(target));
 	const merge = (): void => {
 		if (!target || !method) return;
 		setLast(method);
 		onOpenChange(false);
-		if (waits) queue.run(method, target.headOid);
-		else onMerge?.(method, target.headOid);
+		queue.run(method, target.headOid);
 	};
-	const trigger = <PopoverTrigger asChild>{children(method, queued)}</PopoverTrigger>;
-	const question = (): ReactElement | null => {
+	const trigger = <PopoverTrigger asChild>{children({ method, queued, pending: queue.pending })}</PopoverTrigger>;
+	const question = (): ReactElement => {
 		if (target === null)
 			return (
 				<p role={error ? "alert" : undefined} className="text-[13px] text-muted-foreground">
@@ -134,7 +133,7 @@ export function MergePopover({ pr, stack, target, error = null, onMerge, open, o
 					Merge the {stack.length} pull requests of this stack into <span className="font-mono">{target.base}</span>, bottom first? Each waits for the one below it, then is retargeted and updated as GitHub requires; the first failure stops the rest.
 				</p>
 			);
-		if (waits)
+		if (later)
 			return (
 				<p className="text-[13px] text-pretty">
 					{pullRequestName(pr)} {waitReason(target)}. Merge it into <span className="font-mono">{target.base}</span> once it is ready? The dashboard waits for it, even with this page closed.
@@ -180,7 +179,7 @@ export function MergePopover({ pr, stack, target, error = null, onMerge, open, o
 							</Button>
 							<Button variant="primary" size="compact" leadingIcon={stack ? Layers : GitMerge} disabled={method === null} loading={queue.pending} onClick={merge}>
 								{method ? MERGE_METHOD_LABELS[method] : "Merge"}
-								{waits && " when ready"}
+								{later && " when ready"}
 							</Button>
 						</div>
 					</>

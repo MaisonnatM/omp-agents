@@ -88,7 +88,7 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
 export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace, cwd }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
 	// The list's state of it joins `version`, so a change made from its row, or one the list reads from GitHub, reads the details again.
-	const { data: detail, error, saveError, edit, write } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, `${String(version)}:${listed?.state ?? "unlisted"}`);
+	const { data: detail, error, saveError, edit, write, reload } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, `${String(version)}:${listed?.state ?? "unlisted"}`);
 	const stackRead = useRead<StackedPullRequest[]>(`/api/pull-request/stack?${query}`, version);
 	const stack = stackRead.data ?? [];
 	// Until the stack is read, its members would flash in the list of the others.
@@ -129,7 +129,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
-				<DetailHeader pr={pr} detail={detail} readError={error} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} cwd={cwd} />
+				<DetailHeader pr={pr} detail={detail} readError={error} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} />
 				<div className={cn("flex flex-wrap items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
 						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>

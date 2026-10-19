@@ -366,7 +366,6 @@ function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { ok: { field: "label", name: change.name, on: change.on } };
 	if (change.field === "reviewer" && typeof change.login === "string" && GITHUB_NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
 	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };
-	if (change.field === "merge" && isMergeMethod(change.method) && typeof change.head === "string" && COMMIT.test(change.head)) return { ok: { field: "merge", method: change.method, head: change.head } };
 	if (change.field === "thread" && isNodeId(change.id) && typeof change.resolved === "boolean") return { ok: { field: "thread", id: change.id, resolved: change.resolved } };
 	if (change.field === "reply" && isNodeId(change.thread) && isCommentBody(change.body)) return { ok: { field: "reply", thread: change.thread, body: change.body } };
 	if (change.field === "comment" && isCommentBody(change.body)) return { ok: { field: "comment", body: change.body } };

@@ -424,20 +424,16 @@ describe("ProjectRunner", () => {
 		expect(h.file.get(projectId)!.updates).toEqual([]);
 	});
 
-	test("endIdle ends an idle worker as end_worker does, without news, and leaves one that works or asks", async () => {
+	test("endFinished ends a worker the cleanup after a merge finished, as end_worker does, then tells the coordinator", async () => {
 		const h = harness();
-		const { projectId, worker } = await project(h, 2);
-		const [w1, w2] = [worker(1), worker(2)];
-		w1.status = "idle";
-		w2.status = "needs-input";
-		expect(h.runner.endIdle(projectId, "w2")).toBe(false);
-		expect(h.runner.endIdle(projectId, "w9")).toBe(false);
-		expect(h.runner.endIdle(projectId, "w1")).toBe(true);
-		await Promise.resolve();
+		const { projectId, worker } = await project(h, 1);
+		const w1 = worker(1);
+		await h.runner.endFinished(projectId, "w9");
+		expect(h.ended).toEqual([]);
+		await h.runner.endFinished(projectId, "w1");
 		expect(h.ended).toEqual([w1.sessionId]);
 		h.runner.exited(w1.instanceId);
-		expect(h.file.get(projectId)!.updates).toEqual([]);
-		expect(h.runner.endIdle(projectId, "w1")).toBe(false);
+		expect(h.file.get(projectId)!.updates).toMatchObject([{ kind: "event", source: "GitHub", title: 'Ended w1 "Task 1"', text: "Idle, with every pull request merged or closed.", url: null }]);
 	});
 
 	test("after a restart, a coordinator that stopped with the server resumes and hears which workers stopped", async () => {

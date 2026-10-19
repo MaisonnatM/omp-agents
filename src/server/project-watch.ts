@@ -2,14 +2,13 @@
  * Watches what each project subscribes to and tells its coordinator what changed: its workers' pull requests (checks
  * that start failing, new comments and reviews, a merge or a close) and the viewer's Linear issues that match its filter
  * (new ones, and ones that changed). The first look at each only records it, so a dashboard start reports nothing old;
- * what changed while the dashboard was down is therefore not reported. A merge it sees ends the workers it leaves with
- * nothing to do, by the rule the cleanup after a merge applies to every other session, and the merge's update says so.
+ * what changed while the dashboard was down is therefore not reported. The cleanup after a merge, not the watch, ends
+ * the workers a merge leaves with nothing to do.
  */
 import { errorText } from "../json";
 import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, pullRequestName, samePullRequest } from "../shared/github";
-import type { LinearFilter, Project, ProjectEvent, Worker, WorkerId } from "../shared/projects";
+import type { LinearFilter, Project, ProjectEvent } from "../shared/projects";
 import type { Ticket } from "../shared/tickets";
-import { finishedSessions } from "./merge-cleanup";
 
 /** How many minutes pass between two looks. */
 const PROJECT_WATCH_MINUTES = 2;
@@ -26,14 +25,10 @@ export interface ProjectWatchDeps {
 	tickets(): Promise<Ticket[]>;
 	/** Saves `event` for project `projectId`'s coordinator; why it cannot, or `null` once saved. */
 	notify(projectId: string, event: ProjectEvent): string | null;
-	/** Whether session `sessionId` runs and is idle. */
-	idle(sessionId: string): boolean;
-	/** Ends worker `workerId` of project `projectId` when it runs and is idle; whether it began to. */
-	endIdle(projectId: string, workerId: WorkerId): boolean;
 }
 
-/** One change to report on a pull request; `merged` marks its merge. */
-type News = { title: string; text: string; merged?: true };
+/** One change to report on a pull request. */
+type News = { title: string; text: string };
 
 /** What a pull request looked like at the last look. */
 interface PullRequestSeen {
@@ -54,9 +49,7 @@ export function pullRequestNews(seen: PullRequestSeen | undefined, now: PullRequ
 	if (!seen) return [];
 	const name = pullRequestName(now);
 	const news: News[] = [];
-	if (now.state !== seen.state && (now.state === "merged" || now.state === "closed")) {
-		news.push({ title: `${name} was ${now.state}`, text: now.title, ...(now.state === "merged" ? { merged: true as const } : {}) });
-	}
+	if (now.state !== seen.state && (now.state === "merged" || now.state === "closed")) news.push({ title: `${name} was ${now.state}`, text: now.title });
 	if (now.checks === "failing" && seen.checks !== "failing") {
 		const failing = now.checkRuns.filter(check => check.state === "failing").map(check => check.name);
 		news.push({ title: `Checks failed on ${name}`, text: failing.length > 0 ? `Failing: ${failing.join(", ")}` : now.title });
@@ -100,10 +93,8 @@ export class ProjectWatch {
 
 	async #watchPullRequests(projects: Project[]): Promise<void> {
 		for (const project of projects) {
-			const linked = new Map(project.workers.map(worker => [worker, this.#deps.pullRequestsOf(worker.sessionId)]));
 			const pullRequests: LinkedPullRequest[] = [];
-			for (const prs of linked.values()) for (const pr of prs) if (!pullRequests.some(seen => samePullRequest(seen, pr))) pullRequests.push(pr);
-			const found: { pr: LinkedPullRequest; news: News[] }[] = [];
+			for (const worker of project.workers) for (const pr of this.#deps.pullRequestsOf(worker.sessionId)) if (!pullRequests.some(seen => samePullRequest(seen, pr))) pullRequests.push(pr);
 			for (const pr of pullRequests) {
 				const name = pullRequestName(pr);
 				const seen = this.#pullRequests.get(name);
@@ -114,31 +105,10 @@ export class ProjectWatch {
 					return null;
 				});
 				if (!detail) continue;
-				found.push({ pr, news: pullRequestNews(seen, detail) });
+				for (const { title, text } of pullRequestNews(seen, detail)) this.#deps.notify(project.id, { source: "GitHub", title, text, url: `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}` });
 				this.#pullRequests.set(name, { state: detail.state, checks: detail.checks, lastEvent: Math.max(0, ...detail.conversation.map(event => event.at)) });
 			}
-			const ended = this.#endFinished(project.id, linked, found.filter(({ news }) => news.some(item => item.merged)).map(({ pr }) => pr));
-			for (const { pr, news } of found) {
-				for (const { title, text, merged } of news) {
-					const gone = merged ? ended.filter(([, prs]) => prs.some(other => samePullRequest(other, pr))).map(([worker]) => `${worker.id} ${JSON.stringify(worker.title)}`) : [];
-					const said = gone.length > 0 ? `${text}\nEnded ${gone.join(", ")}: idle, with every pull request merged or closed.` : text;
-					this.#deps.notify(project.id, { source: "GitHub", title, text: said, url: `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}` });
-				}
-			}
 		}
-	}
-
-	/**
-	 * Ends each worker that a merge of `merged`, since the last look, leaves with nothing to do, by the rule every session
-	 * follows ({@link finishedSessions}); the ones it began to end, with their pull requests.
-	 */
-	#endFinished(projectId: string, linked: Map<Worker, LinkedPullRequest[]>, merged: LinkedPullRequest[]): [Worker, LinkedPullRequest[]][] {
-		const settled = (pr: PullRequest): boolean => {
-			const state = this.#pullRequests.get(pullRequestName(pr))?.state;
-			return state === "merged" || state === "closed";
-		};
-		const workers = [...linked].map(([worker, pullRequests]) => ({ worker, sessionId: worker.sessionId, idle: this.#deps.idle(worker.sessionId), pullRequests }));
-		return finishedSessions(workers, merged, settled).flatMap(({ worker, pullRequests }) => (this.#deps.endIdle(projectId, worker.id) ? [[worker, pullRequests] as [Worker, LinkedPullRequest[]]] : []));
 	}
 
 	async #watchTickets(projects: Project[]): Promise<void> {

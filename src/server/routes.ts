@@ -54,7 +54,7 @@ import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import { MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
-import type { MergeQueueChange, QueuedMerge } from "../shared/merge-queue";
+import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
@@ -121,12 +121,10 @@ export interface RouteEnv {
 	pullRequests: PullRequestRoutesEnv;
 }
 
-/** What the pull request routes hand on: the merge queue, and a merge for the cleanup after it. */
+/** What the pull request routes hand on: the merge queue, through which every merge goes. */
 export interface PullRequestRoutesEnv {
-	/** Apply `change` to the merge queue; answers the queued merges after it, or rejects with why it refused. */
-	changeMergeQueue(change: MergeQueueChange): Promise<readonly QueuedMerge[]>;
-	/** The details merged `pr`, whose head was `branch` at `head`. */
-	merged(pr: PullRequest & { branch: string; head: string }): void;
+	/** Apply `change` to the merge queue; answers the queued merges after it and what it merged, or rejects with why it refused. */
+	changeMergeQueue(change: MergeQueueChange): Promise<MergeQueueAnswer>;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -629,18 +627,14 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 	/** `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>`: the open pull requests stacked with that one, top first, for its details' Stack. */
 	const pullRequestStack = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestStack(pr)));
 
-	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. A merge cleans up after itself. */
+	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
 		body =>
 			checked(
 				parsePullRequestEdit(body),
-				"Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, a merge method and head commit, a review thread to resolve or unresolve, or a reply or comment of at most 65536 characters",
+				"Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, a review thread to resolve or unresolve, or a reply or comment of at most 65536 characters",
 			),
-		async edit => {
-			const detail = await savePullRequest(edit);
-			if (edit.change.field === "merge" && detail.state === "merged") env.merged({ ...detail, branch: detail.head, head: detail.headOid });
-			return detail;
-		},
+		savePullRequest,
 	);
 
 	/** `GET /api/pull-request/options?owner=<o>&repo=<r>`: the labels and reviewers that repository's pull requests can take. */
@@ -660,7 +654,7 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 		return file ? Response.json(file) : fail(404, `${prKey(pr)} changes no file ${path}`);
 	});
 
-	/** `PUT /api/merge-queue`: `MergeQueueChange`, a merge that waits until GitHub allows it, of one pull request or a stack, or its cancel; answers the queued merges after it. */
+	/** `PUT /api/merge-queue`: `MergeQueueChange`, a merge of one pull request or a stack, made at once when GitHub allows it and later otherwise, or its cancel; answers a `MergeQueueAnswer`. */
 	const mergeQueue = write(
 		body => checked(parseMergeQueueChange(body), `Expected { op: add, method, prs } with 1 to ${MAX_QUEUED_STACK} pull requests, each with a head commit or null, or { op: cancel, id }`),
 		env.changeMergeQueue,

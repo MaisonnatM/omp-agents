@@ -5,8 +5,8 @@
  * project keeps them until it is unarchived.
  * A session's role is keyed by session id on disk, so a resumed coordinator gets its tools again.
  * Every worker joins the project's queue, also saved, and starts once the project has a free slot; it leaves the queue
- * in the same change that adds it to the project. A worker the coordinator ends, or the runner ends once its pull
- * requests merged, stops without news.
+ * in the same change that adds it to the project. A worker the coordinator ends, or the cleanup after a merge ends
+ * through the runner, stops without news; the cleanup's end tells the coordinator why instead.
  */
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -301,15 +301,15 @@ export class ProjectRunner implements ProjectControl {
 	}
 
 	/**
-	 * Ends worker `workerId` of project `projectId` as end_worker does, when it runs and is idle; whether it began to.
-	 * The watch calls it once the worker's pull requests are all merged or closed, which leaves it nothing to do.
+	 * Ends worker `workerId` of project `projectId`, which the cleanup after a merge found idle with every pull request
+	 * merged or closed, as end_worker does, then tells its coordinator; settles once it ended, and rejects when it did not.
 	 */
-	endIdle(projectId: string, workerId: WorkerId): boolean {
+	async endFinished(projectId: string, workerId: WorkerId): Promise<void> {
 		const project = this.#deps.file.get(projectId);
 		const worker = project && !project.archived ? project.workers.find(candidate => candidate.id === workerId) : undefined;
-		if (!project || !worker || this.#deps.bySessionId(worker.sessionId)?.status !== "idle") return false;
-		void this.#end(worker).catch((error: unknown) => console.error(`omp-agents: cannot end ${worker.id} of project ${project.name}: ${errorText(error)}`));
-		return true;
+		if (!worker) return;
+		await this.#end(worker);
+		this.notify(projectId, { source: "GitHub", title: `Ended ${worker.id} ${JSON.stringify(worker.title)}`, text: "Idle, with every pull request merged or closed.", url: null });
 	}
 
 	/** Ends the worker's session; the exit it causes is no news for the coordinator. */

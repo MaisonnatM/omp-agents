@@ -73,12 +73,12 @@ function ReviewerInline({ reviewers }: { reviewers: Reviewer[] }) {
 }
 
 /** The merge button, whose confirmation waits for the details while GitHub has not answered yet, or says why it did not; once queued, it says so. */
-function MergeButton({ pr, detail, readError, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; onSave: SavePullRequest }) {
+function MergeButton({ pr, detail, readError, onQueued }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; onQueued: () => void }) {
 	const [open, setOpen] = useState(false);
 	return (
-		<MergePopover pr={pr} target={detail} error={readError} onMerge={(method, head) => onSave({ field: "merge", method, head }, {})} open={open} onOpenChange={setOpen}>
-			{(method, queued) => (
-				<Button variant={queued?.state.kind === "failed" ? "secondary" : "primary"} size="compact" leadingIcon={GitMerge} active={open}>
+		<MergePopover pr={pr} target={detail} error={readError} onQueued={onQueued} open={open} onOpenChange={setOpen}>
+			{({ method, queued, pending }) => (
+				<Button variant={queued?.state.kind === "failed" ? "secondary" : "primary"} size="compact" leadingIcon={GitMerge} active={open} loading={pending}>
 					{queued ? (queued.state.kind === "failed" ? "Merge stopped" : "Merging when ready") : method ? MERGE_METHOD_LABELS[method] : "Merge"}
 				</Button>
 			)}
@@ -87,11 +87,11 @@ function MergeButton({ pr, detail, readError, onSave }: { pr: PullRequest; detai
 }
 
 /** The Next move's one button, as the header's primary action. */
-function NextMoveButton({ pr, detail, readError, next, quick, onOpen, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onSave: SavePullRequest }) {
+function NextMoveButton({ pr, detail, readError, next, quick, onOpen, onMergeQueued }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onMergeQueued: () => void }) {
 	const { move, reason, action, session } = next;
 	let button: ReactNode = null;
 	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
-	else if (move === "merge" || (move === "checks-running" && detail && readyOnceChecksPass(detail))) button = <MergeButton pr={pr} detail={detail} readError={readError} onSave={onSave} />;
+	else if (move === "merge" || (move === "checks-running" && detail && readyOnceChecksPass(detail))) button = <MergeButton pr={pr} detail={detail} readError={readError} onQueued={onMergeQueued} />;
 	else if (session)
 		button = (
 			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
@@ -139,6 +139,8 @@ interface DetailHeaderProps {
 	options: PullRequestOptionsRead;
 	onOpen: DetailContentProps["onOpen"];
 	onSave: SavePullRequest;
+	/** The server took a merge of it, at once or to wait: the details read it again. */
+	onMergeQueued: () => void;
 	placement: Placement;
 	/** The heading, which takes focus on the page. */
 	headingRef: RefObject<HTMLHeadingElement | null>;
@@ -147,7 +149,7 @@ interface DetailHeaderProps {
 }
 
 /** The header: the pull request's name, author, branches, size, status, and reviewers, with the Next move's button and the `⋯` menu. */
-export function DetailHeader({ pr, detail, readError, stack, next, actions, quick, placed, options, onOpen, onSave, placement, headingRef, cwd }: DetailHeaderProps) {
+export function DetailHeader({ pr, detail, readError, stack, next, actions, quick, placed, options, onOpen, onSave, onMergeQueued, placement, headingRef, cwd }: DetailHeaderProps) {
 	const page = placement === "page";
 	const Heading = page ? "h1" : "h3";
 	const stackedBase = detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
@@ -164,7 +166,7 @@ export function DetailHeader({ pr, detail, readError, stack, next, actions, quic
 					</a>
 				</p>
 				<span className="ml-auto flex shrink-0 items-center gap-1.5">
-					{next && <NextMoveButton pr={pr} detail={detail} readError={readError} next={next} quick={quick} onOpen={onOpen} onSave={onSave} />}
+					{next && <NextMoveButton pr={pr} detail={detail} readError={readError} next={next} quick={quick} onOpen={onOpen} onMergeQueued={onMergeQueued} />}
 					<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={{ ...quick, actions }} onState={to => onSave({ field: "state", state: to }, { state: to })} label="More actions" />
 				</span>
 			</div>

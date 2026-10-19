@@ -163,8 +163,8 @@ export function SourceControlTab({ active }: { active: boolean }) {
 					</IntegrationList>
 				)}
 			</Section>
-			<Section title="After a merge" meta="Once a pull request merges, from the dashboard or anywhere else, each idle session it leaves with every pull request merged or closed ends.">
-				<p className="text-xs text-muted-foreground">Its linked worktree and the merged branch go too, unless the worktree has changes or the branch has commits the merge did not take. A project's workers follow the project's own setting.</p>
+			<Section title="After a merge" meta="Once a pull request merges, from the dashboard or anywhere else, each session the dashboard started that it leaves idle with every pull request merged or closed ends.">
+				<p className="text-xs text-muted-foreground">Its linked worktree and the merged branch go too, unless another session still works there, the worktree has changes, or the branch has commits the merge did not take. Sessions you run in a terminal never end. A project's workers follow the project's own setting.</p>
 				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
 					<SettingSwitch label="Clean up after a merge" checked={answer?.cleanUp ?? true} disabled={!answer || pending} onCheckedChange={next => void change({ op: "clean-up", on: next })} />
 					End finished sessions and remove their worktrees and branches

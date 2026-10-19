@@ -1,6 +1,5 @@
 /** The page's HTTP client. Whatever the server answers, a failure is an `ApiError` with a readable message. */
 import type { BranchRelease } from "../src/shared/git";
-import type { MergeQueueChange, QueuedMerge } from "../src/shared/merge-queue";
 import type { SettingsError } from "../src/shared/models";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
 
@@ -68,6 +67,3 @@ export async function changeWorktrees(request: WorktreeRemovalRequest, signal?: 
 
 /** Removes the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */
 export const releaseWorktree = (cwd: string, branch: string): Promise<BranchRelease> => putJson("/api/worktree/release", { cwd, branch });
-
-/** Queues a merge that waits until GitHub allows it, or cancels one; answers the queued merges after it, as the socket also sends them. */
-export const changeMergeQueue = (change: MergeQueueChange): Promise<QueuedMerge[]> => putJson("/api/merge-queue", change);
