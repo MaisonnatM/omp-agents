@@ -174,6 +174,7 @@ The server lives in `src/`:
   `loadPullRequestTitle` reads only a linked PR's title through a separate 30-second cache, without loading its details.
   `src/github.ts`'s `repoOf` keeps each workspace's repository, or its lack of one, for ten minutes in a `createCache` from `src/cache.ts`, and runs at most eight `git remote` lookups at once through a `limit` gate from `src/map-limit.ts`.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
+  The list leaves out a pull request whose own state says closed, which the open searches still return for up to a minute after a close, since GitHub's search index lags it.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either; the details count `unresolved` from the threads they keep, so their counts and threads agree.
   The details also read the last 100 commits with the pull requests GitHub links each to, and keep a commit linked to none or to this one, since a branch that merged its trunk lists the trunk's commits too.
 - `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), the branch a worktree had checked out at a given time (`headHistory`, `branchAt`), and the worktree a new session's branch runs in.
