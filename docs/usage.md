@@ -885,7 +885,8 @@ An action that fails shows its error, and its control becomes available again.
   The section checks again every minute while it is open, and **Refresh** checks at once.
 - Google Calendar and Gmail each hold several accounts.
   Once the OAuth client is saved, **Connect** signs in the first account and **Add account** opens Google's account chooser for another; each account then has its own line with its address, its status, **Reconnect** and **Remove** in its menu, and its tools.
-  **Add account** and **Reconnect** refuse an address another account of the service already holds, and sign that account out again; an add that fails or is abandoned leaves no server behind.
+  **Add account** and **Reconnect** refuse an address another account of the service already holds; a refused or abandoned **Reconnect** keeps the account's old sign-in, and an add that fails or is abandoned leaves no server behind.
+  An account whose address Google will not say shows why on its line, after its status.
   Addresses match whatever their case, so `Ana@example.com` in Gmail and `ana@example.com` in Google Calendar are one address.
   **Remove** takes the account's server and sign-in out of omp; the last account on a service stays as a signed-out server, since it keeps the OAuth client.
   A new OAuth client ID or secret removes every added account and signs out the remaining one, since Google ties sign-ins to the client.

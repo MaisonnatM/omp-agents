@@ -68,6 +68,12 @@ export const arrayOf =
 	(value): value is T[] =>
 		Array.isArray(value) && value.every(item => guard(item));
 
+/** An object, not an array, whose every value passes `guard`, such as entries by name. */
+export const recordOf =
+	<T>(guard: Guard<T>): Guard<Record<string, T>> =>
+	(value): value is Record<string, T> =>
+		isObject(value) && !Array.isArray(value) && Object.values(value).every(item => guard(item));
+
 /** An object whose every field `shape` names passes that field's guard; fields it does not name are not checked. */
 export const fields =
 	<T>(shape: Shape<T>): Guard<T> =>

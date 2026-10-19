@@ -256,7 +256,8 @@ export interface GmailInbox {
 	accounts: GoogleAccount[];
 	/** The account the picker narrows to, as {@link pickedInbox} reads the stored choice; `null` for every shown account. */
 	picked: AccountId | null;
-	pick: (account: AccountId | null) => void;
+	/** Stores the picker's choice, or what `next` makes of the stored one, `null` for every account. */
+	pick: (next: AccountId | null | ((stored: AccountId | null) => AccountId | null)) => void;
 	/** The conversations of every shown account, newest first, whatever the picker narrows to. */
 	threads: MailThread[];
 }

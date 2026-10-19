@@ -14,7 +14,7 @@ import { gitCheckout } from "../git";
 import type { GoogleCalendars } from "../google-calendar";
 import type { GmailAccounts } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from "../pull-requests";
-import { type GoogleAccountsStore, linkGoogleAccount, loadIntegrations, removeIntegration, saveGoogleClient, saveSlackClient, startIntegrationSignIn } from "../integrations";
+import type { Integrations } from "../integrations";
 import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
 import { blobsDir } from "../omp/config";
@@ -110,8 +110,8 @@ export type TodoRoutesEnv = Omit<TodoTicketEnv, "createTicket">;
 export interface RouteEnv {
 	guards: Guards;
 	sessions: SessionRoutesEnv;
-	/** The addresses and workspace links of the Google accounts. */
-	googleAccounts: GoogleAccountsStore;
+	/** The MCP integrations, Gmail's and Google Calendar's accounts included. */
+	integrations: Integrations;
 	calendar: CalendarRoutesEnv;
 	gmail: GmailAccounts;
 	files: FileRoutesEnv;
@@ -351,35 +351,33 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 }
 
 /** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
-function integrationRoutes({ get, write }: RouteKit, accounts: GoogleAccountsStore): Routes {
+function integrationRoutes({ get, write }: RouteKit, integrations: Integrations): Routes {
 	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server or accounts, and the sign-in the page last started. */
-	const integrations = get(params => answer(() => loadIntegrations(accounts, params.has("fresh"))));
+	const loaded = get(params => answer(() => integrations.load(params.has("fresh"))));
 
 	/** A write of `{ id, account }` naming an MCP integration and one of its accounts, answered with that integration as `act` leaves it. */
-	const integrationWrite = (act: (accounts: GoogleAccountsStore, target: IntegrationTarget) => Promise<McpIntegration>): Handler =>
-		write(body => checked(parseIntegrationTarget(body), "Expected { id, account } naming an integration and, for Gmail or Google Calendar, an account or null"), target =>
-			act(accounts, target),
-		);
+	const integrationWrite = (act: (target: IntegrationTarget) => Promise<McpIntegration>): Handler =>
+		write(body => checked(parseIntegrationTarget(body), "Expected { id, account } naming an integration and, for Gmail or Google Calendar, an account or null"), act);
 
 	/** `PUT /api/integrations/sign-in`: starts a sign-in to an account, or adds one, and answers with its authorization address to open. */
-	const integrationSignIn = integrationWrite(startIntegrationSignIn);
+	const integrationSignIn = integrationWrite(integrations.startSignIn);
 
 	/** `PUT /api/integrations/remove`: signs out of the integration's server, as `/mcp unauth` does, and removes an account's server unless it is the last. */
-	const integrationRemove = integrationWrite(removeIntegration);
+	const integrationRemove = integrationWrite(integrations.remove);
 
 	/** `PUT /api/integrations/google-links`: `{ address, workspaces }`, the workspaces a Google address's accounts are linked to; answers every integration. */
 	const googleLinks = write(
 		body => checked(parseGoogleLinks(body), "Expected { address, workspaces } naming a Google address and absolute workspace directories"),
-		links => linkGoogleAccount(accounts, links),
+		integrations.linkGoogleAccount,
 	);
 
 	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
 	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
-	const slackClient = write(body => checked(parseSlackClient(body)), input => saveSlackClient(accounts, input), refuseClient);
+	const slackClient = write(body => checked(parseSlackClient(body)), integrations.saveSlackClient, refuseClient);
 
 	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
-	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => saveGoogleClient(accounts, id, input), refuseClient);
+	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => integrations.saveGoogleClient(id, input), refuseClient);
 
 	/** `GET /api/mcp-servers[?fresh]`: every user-level MCP server omp loads, where omp stands with each, and its sign-in under way. */
 	const mcpServers = get(params => answer(() => loadMcpServers(params.has("fresh"))));
@@ -452,7 +450,7 @@ function integrationRoutes({ get, write }: RouteKit, accounts: GoogleAccountsSto
 	});
 
 	return {
-		"/api/integrations": { GET: integrations },
+		"/api/integrations": { GET: loaded },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/remove": { PUT: integrationRemove },
 		"/api/integrations/google-links": { PUT: googleLinks },
@@ -769,7 +767,7 @@ export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
 	return {
 		...sessionRoutes(kit, env.sessions),
-		...integrationRoutes(kit, env.googleAccounts),
+		...integrationRoutes(kit, env.integrations),
 		...providerRoutes(kit),
 		...calendarRoutes(kit, env.calendar),
 		...gmailRoutes(kit, env.gmail),

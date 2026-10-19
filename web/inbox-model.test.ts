@@ -6,6 +6,7 @@ import { colorIndex, type FoldEvent, type Folds, foldMessages, foldsAfter, initi
 const account = (name: string): GoogleAccount => ({
 	name,
 	address: `${name}@example.com`,
+	addressError: null,
 	connection: { kind: "ready", tools: [], server: { name, url: "https://gmailmcp.googleapis.com/mcp/v1", host: "gmailmcp.googleapis.com" } },
 	workspaces: [],
 });

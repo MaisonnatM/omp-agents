@@ -22,6 +22,9 @@ export interface GoogleCalendar {
 	error: string | null;
 }
 
+/** A calendar's key among every account's, since two accounts may list the same calendar. */
+export const calendarKey = (account: AccountId, calendarId: string): string => JSON.stringify([account, calendarId]);
+
 /** `GET /api/google` and what `PUT /api/google/calendars` answers: the calendars checked in each account's Google Calendar list, and each account whose list could not be read. */
 export interface GoogleStatus {
 	calendars: GoogleCalendar[];

@@ -1,5 +1,5 @@
 import { Mail, SquarePen } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { type AccountId, anyCallable, callable, type GoogleAccount } from "../../../src/shared/accounts";
 import type { MailThread } from "../../../src/shared/gmail";
 import { threadUrl, type MailSend } from "../../../src/shared/gmail";
@@ -7,7 +7,7 @@ import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
 import { type MailDocument, useMailDraft } from "../../mail-draft";
 import { gmailStore, mailThreadScope, mailThreadStore, useGmailInbox } from "../../reads";
-import { hashForInbox, type InboxRoute } from "../../routing";
+import { hashForInbox, type InboxRoute, routeFromHash } from "../../routing";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useOpenLatest } from "../../use-open-latest";
 import { DisconnectedPage } from "../integrations/disconnected-page";
@@ -136,8 +136,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 	const read = inbox.read;
 	const open = target === null || target === "new" ? null : target;
 	const at = open === null ? -1 : threads.findIndex(thread => thread.account === open.account && thread.id === open.thread);
-	const addressOf = (account: AccountId): string | null =>
-		accounts.find(candidate => candidate.name === account)?.address ?? read?.data.accounts.find(candidate => candidate.account === account)?.address ?? null;
+	const addressOf = (account: AccountId): string | null => gmail?.accounts.find(candidate => candidate.name === account)?.address ?? null;
 	const openAddress = open && addressOf(open.account);
 	const openUrl = open && openAddress !== null ? threadUrl(openAddress, open.thread) : null;
 	const tagged = picked === null && accounts.length > 1;
@@ -145,14 +144,19 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 	useReturnFocus(openKey, id => id, id => document.getElementById(id)?.querySelector<HTMLElement>("a"), read);
 	useOpenLatest(hashForInbox, target, threads[0] ? { account: threads[0].account, thread: threads[0].id } : null, read !== null);
 
-	// Only a conversation that opens picks its account, so a pick made while one is open leaves it open.
-	const openAccount = open?.account ?? null;
-	const arrived = useRef<string | null>(null);
+	// A conversation opened from the address picks its own account, unless every inbox shows; a pick made while one is
+	// open changes no hash, so it leaves the conversation open.
 	useEffect(() => {
-		if (gmail === null || openKey === arrived.current) return;
-		arrived.current = openKey;
-		if (openAccount !== null && picked !== null && openAccount !== picked && accounts.some(account => account.name === openAccount)) pick(openAccount);
-	}, [gmail, openKey, openAccount, picked, accounts, pick]);
+		const follow = (): void => {
+			const route = routeFromHash(location.hash);
+			const page = route.kind === "page" ? route.page : null;
+			const opened = page?.kind === "inbox" && page.target !== null && page.target !== "new" ? page.target.account : null;
+			if (opened !== null) pick(stored => (stored === null ? null : opened));
+		};
+		follow();
+		window.addEventListener("hashchange", follow);
+		return () => window.removeEventListener("hashchange", follow);
+	}, [pick]);
 
 	// Read the next and previous conversations while one is open, so ↓/↑ open them at once.
 	const previous = at > 0 ? threads[at - 1] : undefined;

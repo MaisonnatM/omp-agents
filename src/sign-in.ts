@@ -16,8 +16,11 @@ export interface SignInAttempt<Target> {
 	target: Target;
 }
 
-/** The sign-ins to one server, or to one service's accounts, `Target` naming which a sign-in is to. */
-export interface SignIn<Target = null> {
+/** What a sign-in runs: it calls `waiting` with the provider's authorization address, and stops once `signal` aborts. */
+type Run = (signal: AbortSignal, waiting: (url: string) => void) => Promise<void>;
+
+/** The sign-ins to a service, `Target` naming which of its accounts a sign-in is to. */
+export interface SignIn<Target> {
 	/** The sign-in under way or that last failed, `null` once one succeeds. */
 	state(): SignInAttempt<Target> | null;
 	/** Abandons the sign-in under way, whose `signal` aborts, and forgets one that failed. */
@@ -26,7 +29,7 @@ export interface SignIn<Target = null> {
 	 * Runs `run` to sign in to `target`, abandoning any sign-in under way, and resolves once `run` calls `waiting` with
 	 * the provider's authorization address, or ends. `signal` aborts when another sign-in replaces this one or the time runs out.
 	 */
-	start(target: Target, run: (signal: AbortSignal, waiting: (url: string) => void) => Promise<void>): Promise<void>;
+	start(target: Target, run: Run): Promise<void>;
 	/**
 	 * `target`'s status as `read` answers it, or while a sign-in to `target` waits on the browser, as `read` last answered
 	 * it during that sign-in: the sign-in is about to change it, and the page asks every few seconds meanwhile.
@@ -35,7 +38,7 @@ export interface SignIn<Target = null> {
 }
 
 /** A {@link SignIn}; `timeoutError` is the failure a sign-in shows when the browser does not come back in time. */
-export function createSignIn<Target = null>(timeoutError: string): SignIn<Target> {
+export function createSignIn<Target>(timeoutError: string): SignIn<Target> {
 	let current: (SignInAttempt<Target> & { controller: AbortController; held: McpRemoteStatus | null }) | null = null;
 	return {
 		state: () => current && { signIn: current.signIn, target: current.target },
@@ -72,5 +75,23 @@ export function createSignIn<Target = null>(timeoutError: string): SignIn<Target
 			attempt.held = await read();
 			return attempt.held;
 		},
+	};
+}
+
+/** The sign-ins to one server: a {@link SignIn} whose calls name no target, and whose state is the sign-in's own. */
+export interface ServerSignIn {
+	state(): SignInState;
+	cancel(): void;
+	start(run: Run): Promise<void>;
+	hold(read: () => Promise<McpRemoteStatus>): Promise<McpRemoteStatus>;
+}
+
+export function createServerSignIn(timeoutError: string): ServerSignIn {
+	const signIn = createSignIn<null>(timeoutError);
+	return {
+		state: () => signIn.state()?.signIn ?? null,
+		cancel: () => signIn.cancel(),
+		start: run => signIn.start(null, run),
+		hold: read => signIn.hold(null, read),
 	};
 }

@@ -22,17 +22,17 @@ import {
 import { integrationOn, MCP_SERVICES } from "./shared/accounts";
 import { catalogEntry, catalogEntryOn } from "./shared/mcp-catalog";
 import type { McpServerAdd, McpServerRow, McpServerStatus, McpServersAnswer } from "./shared/mcp-servers";
-import { createSignIn, type SignIn } from "./sign-in";
+import { createServerSignIn, type ServerSignIn } from "./sign-in";
 
 /** A change the page asked for that omp's config does not allow, answered as a 400 with its message. */
 export class McpServerRejected extends Error {}
 
-const signIns = new Map<string, SignIn>();
+const signIns = new Map<string, ServerSignIn>();
 
-function signInOf(name: string): SignIn {
+function signInOf(name: string): ServerSignIn {
 	let signIn = signIns.get(name);
 	if (!signIn) {
-		signIn = createSignIn(`${name}'s sign-in page was not completed within 5 minutes. Try again.`);
+		signIn = createServerSignIn(`${name}'s sign-in page was not completed within 5 minutes. Try again.`);
 		signIns.set(name, signIn);
 	}
 	return signIn;
@@ -52,13 +52,13 @@ async function rowOf(server: ConfiguredMcpServer, remote: McpServer | null, sign
 	const host = remote && new URL(remote.url).host;
 	const transport = config.type === "sse" ? "sse" : config.type === "stdio" || (!config.type && !config.url) ? "stdio" : "http";
 	const integration = integrationOn(host);
-	const signIn = signIns.get(name)?.state()?.signIn ?? null;
+	const signIn = signIns.get(name)?.state() ?? null;
 	let status: McpServerStatus;
 	if (!enabled) status = { kind: "disabled" };
 	else if (integration) status = { kind: "integration", id: integration };
 	else if (transport === "stdio") status = { kind: "local" };
 	else if (!remote) status = { kind: "failing", error: `Its address, ${config.url ?? "missing"}, is not a URL.`, status: null };
-	else status = await signInOf(name).hold(null, () => remoteStatusOf(remote, { signedIn, signInRequired: false }, fresh));
+	else status = await signInOf(name).hold(() => remoteStatusOf(remote, { signedIn, signInRequired: false }, fresh));
 	return {
 		name,
 		transport,
@@ -113,7 +113,7 @@ function signable(server: ConfiguredMcpServer): McpServer {
 /** Starts a sign-in to server `name`, abandoning any under way, and answers once it has the authorization address or has failed. */
 export async function startMcpServerSignIn(name: string): Promise<McpServerRow> {
 	const remote = signable(await configured(name));
-	await signInOf(name).start(null, async (signal, waiting) => {
+	await signInOf(name).start(async (signal, waiting) => {
 		await signInMcp({ ...remote, oauth: remote.config.oauth }, { onAuth: waiting, signal });
 	});
 	return rowNamed(name);

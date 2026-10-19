@@ -8,7 +8,7 @@ const server = { name: "google-calendar", url: "https://calendarmcp.googleapis.c
 const failing = (status: number | null, error = `The "google-calendar" MCP server answered HTTP ${status}`) => ({ kind: "failing" as const, server, error, status });
 const calendar = (...connections: McpServerConnection[]): McpIntegration => ({
 	id: "google-calendar",
-	accounts: connections.map((connection, at) => ({ name: at === 0 ? "google-calendar" : `google-calendar-${at + 1}`, address: `me${at}@example.com`, connection, workspaces: [] })),
+	accounts: connections.map((connection, at) => ({ name: at === 0 ? "google-calendar" : `google-calendar-${at + 1}`, address: `me${at}@example.com`, addressError: null, connection, workspaces: [] })),
 	signIn: null,
 	setup: { clientId: "30887206948-fot6diel47j76ceoft65e8sjojbstop1.apps.googleusercontent.com", hasClientSecret: true, callbackPort: 3119, configured: true },
 });

@@ -119,7 +119,7 @@ interface AccountRowProps {
 function AccountRow({ integration, account, last, workspaces, children }: AccountRowProps) {
 	const { id } = integration;
 	const { label } = MCP_SERVICES[id];
-	const { name, address, connection } = account;
+	const { name, address, addressError, connection } = account;
 	const shown = address ?? name;
 	const signIn = useSignIn(integration.signIn?.account === name ? integration.signIn : null, integrationsStore.refresh, () => startSignIn(id, name));
 	const { refreshing } = integrationsStore.use();
@@ -145,6 +145,12 @@ function AccountRow({ integration, account, last, workspaces, children }: Accoun
 							<>
 								<MetaDot />
 								<WorkspaceLinks account={account} address={address} workspaces={workspaces} />
+							</>
+						)}
+						{addressError && (
+							<>
+								<MetaDot />
+								<span className="text-destructive">Cannot read its address: {addressError}</span>
 							</>
 						)}
 						{tools.toggle && (

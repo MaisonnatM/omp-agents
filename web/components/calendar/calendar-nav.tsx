@@ -2,7 +2,7 @@
 import { Check } from "lucide-react";
 import { useState } from "react";
 import type { Routine } from "../../../src/routines";
-import type { CalendarShownInput, GoogleCalendar, GoogleStatus } from "../../../src/shared/calendar";
+import { type CalendarShownInput, calendarKey, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/calendar";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { errorText, putJson } from "../../api";
@@ -17,9 +17,6 @@ const CALENDAR_GROUPS = [
 	{ group: "mine", label: "My calendars" },
 	{ group: "other", label: "Other calendars" },
 ] as const satisfies readonly { group: GoogleCalendar["group"]; label: string }[];
-
-/** A calendar's key among every account's: two accounts may list the same calendar. */
-const keyOf = ({ account, id }: Pick<GoogleCalendar, "account" | "id">): string => `${account}/${id}`;
 
 /**
  * The calendars checked in the Google Calendar lists of the accounts `workspace` shows, each account under its address
@@ -42,15 +39,15 @@ function GoogleCalendarGroups({ workspace }: { workspace: string | null }) {
 		});
 	const toggle = async (calendar: GoogleCalendar): Promise<void> => {
 		const { account, id, name, shown } = calendar;
-		const key = keyOf(calendar);
+		const key = calendarKey(account, id);
 		setFailure(null);
 		setPending(current => new Map(current).set(key, !shown));
 		try {
 			const answer = await putJson<GoogleStatus>("/api/google/calendars", { account, id, shown: !shown } satisfies CalendarShownInput);
-			const saved = answer.calendars.find(listed => keyOf(listed) === key);
+			const saved = answer.calendars.find(listed => calendarKey(listed.account, listed.id) === key);
 			googleStore.update(status => ({
 				...status,
-				calendars: status.calendars.flatMap(listed => (keyOf(listed) !== key ? [listed] : saved ? [{ ...listed, shown: saved.shown }] : [])),
+				calendars: status.calendars.flatMap(listed => (calendarKey(listed.account, listed.id) !== key ? [listed] : saved ? [{ ...listed, shown: saved.shown }] : [])),
 			}));
 		} catch (err) {
 			setFailure(`Cannot ${shown ? "hide" : "show"} ${name}: ${errorText(err)}`);
@@ -76,7 +73,7 @@ function GoogleCalendarGroups({ workspace }: { workspace: string | null }) {
 							</SidebarGroupLabel>
 							<SidebarMenu aria-label={heading}>
 								{listed.map(calendar => {
-									const key = keyOf(calendar);
+									const key = calendarKey(calendar.account, calendar.id);
 									const busy = pending.has(key);
 									const shown = pending.get(key) ?? calendar.shown;
 									return (

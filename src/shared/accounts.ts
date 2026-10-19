@@ -212,6 +212,12 @@ export type McpConnection = { kind: "absent" } | McpServerConnection;
 /** Where omp stands with a server in its config: what listing its tools found. */
 export type McpServerConnection = McpRemoteStatus & { server: McpServerRef };
 
+/** Server `name` at `url` as listing its tools found it, `status`. */
+export const serverConnection = ({ name, url }: { name: string; url: string }, status: McpRemoteStatus): McpServerConnection => ({
+	...status,
+	server: { name, url, host: new URL(url).host },
+});
+
 /** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Inbox, shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";
 
@@ -221,10 +227,14 @@ export const callable = (connection: McpConnection): boolean => connection.kind 
 /** Whether the dashboard calls any of `accounts`, as {@link callable} says of each. */
 export const anyCallable = (accounts: readonly { connection: McpConnection }[]): boolean => accounts.some(account => callable(account.connection));
 
-/** One account of a Google service: its server, the address Google says it signs in as once a read learned it, and the workspaces it is linked to. */
+/**
+ * One account of a Google service: its server, the address Google says it signs in as once a read learned it, why the
+ * latest read of that address failed, and the workspaces it is linked to.
+ */
 export interface GoogleAccount {
 	name: AccountId;
 	address: string | null;
+	addressError: string | null;
 	connection: McpServerConnection;
 	/** Absolute workspace directories; empty for an account shown in every workspace. */
 	workspaces: string[];
@@ -303,7 +313,7 @@ const isServerConnection = tagged<McpServerConnection, "kind">("kind", {
 
 const isConnection = (value: unknown): value is McpConnection => fields<{ kind: "absent" }>({ kind: oneOf(["absent"]) })(value) || isServerConnection(value);
 
-const isAccount = fields<GoogleAccount>({ name: isString, address: nullable(isString), connection: isServerConnection, workspaces: arrayOf(isString) });
+const isAccount = fields<GoogleAccount>({ name: isString, address: nullable(isString), addressError: nullable(isString), connection: isServerConnection, workspaces: arrayOf(isString) });
 
 const isSignIn = nullable(
 	(value: unknown): value is NonNullable<IntegrationSignIn> =>

@@ -6,7 +6,7 @@
  * {@link GoogleCalendarClient} reads one account; {@link GoogleCalendars} merges every signed-in account's.
  */
 import { type Cache, createCache } from "./cache";
-import type { AccountClients } from "./integrations";
+import type { AccountClients } from "./google-accounts";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
 import type { AccountId } from "./shared/accounts";
 import type { CalendarEvent, CalendarEventsAnswer, EventWhen, GoogleCalendar, GoogleStatus } from "./shared/calendar";

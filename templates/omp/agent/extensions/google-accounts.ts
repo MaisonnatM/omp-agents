@@ -18,8 +18,7 @@ const SERVICES = [
 
 /**
  * The part of server `name`'s tool names that omp mints from it, `mcp__<this>_<tool>`.
- * omp's `sanitizeMCPToolNamePart` (src/mcp/tool-bridge.ts), which an extension cannot import, as `toolPrefixOf` in
- * `src/integrations.ts` also copies it; change all three together.
+ * A copy of omp's `sanitizeMCPToolNamePart` (src/mcp/tool-bridge.ts), which an extension cannot import; keep it in step with omp's.
  */
 const sanitized = (name: string): string =>
 	name

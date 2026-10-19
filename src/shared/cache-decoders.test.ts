@@ -18,7 +18,7 @@ const integrations: IntegrationsAnswer = {
 			setup: { clientId: "1.2", hasClientSecret: true, redirectUri: "https://example.com/callback", callbackPort: 3120, scope: "chat:write", configured: true },
 		},
 		"google-calendar": { id: "google-calendar", accounts: [], signIn: { phase: "failed", error: "denied", account: null }, setup: googleSetup },
-		gmail: { id: "gmail", accounts: [{ name: "gmail-2", address: "me@example.com", connection: { kind: "signed-out", server }, workspaces: ["/repo"] }], signIn: null, setup: googleSetup },
+		gmail: { id: "gmail", accounts: [{ name: "gmail-2", address: "me@example.com", addressError: null, connection: { kind: "signed-out", server }, workspaces: ["/repo"] }], signIn: null, setup: googleSetup },
 	},
 };
 
@@ -48,7 +48,7 @@ const events: CalendarEventsAnswer = {
 const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 } }] };
 
 const inbox: InboxAnswer = {
-	accounts: [{ account: "gmail", address: "me@example.com", error: null }],
+	accounts: [{ account: "gmail", error: null }],
 	threads: [{ account: "gmail", id: "t1", from: "Ada", subject: "Hi", snippet: "Hello", at: 1, unread: true, count: 2, url: "https://mail.google.com/t1" }],
 };
 

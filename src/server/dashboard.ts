@@ -13,13 +13,15 @@ import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
 import { gitCheckout } from "../git";
 import { GmailAccounts, GmailClient } from "../gmail";
+import { accountClients, createGoogleAccounts } from "../google-accounts";
 import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
 import { loadPullRequestDetail, loadPullRequests } from "../pull-requests";
 import { loadTickets } from "../tickets";
-import { accountClients, integrationFetch, integrationSignedIn } from "../integrations";
+import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
+import { findMcpServers } from "../omp/mcp";
 import { connectedRoles } from "../omp/models";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
@@ -32,6 +34,7 @@ import { SourceControl } from "../source-control";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
+import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import { type SessionPreset, starterPresets } from "../shared/presets";
 import type { ServerMsg } from "../shared/protocol";
@@ -94,7 +97,7 @@ export class Dashboard {
 	readonly #presets = new PresetsFile(presetsFile);
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
-	readonly #googleAccounts = new GoogleAccountsFile(googleAccountsFile);
+	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
 	readonly #localEvents = new LocalEventsFile(localEventsFile);
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
 	readonly terminals = new Terminals();
@@ -442,7 +445,7 @@ export class Dashboard {
 					if (this.#sourceControl.apply(change) && this.#ownerLock.held) void this.#sourceControl.pull(this.#workspaceCwds());
 				},
 			},
-			googleAccounts: this.#googleAccounts,
+			integrations: this.#integrations,
 			calendar: {
 				google: this.#google,
 				setCalendarShown: (account, id, shown) => this.#calendars.apply(account, id, shown),
@@ -475,6 +478,8 @@ export class Dashboard {
 		this.#todoInbox.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
+		const [calendarServer] = await findMcpServers(MCP_SERVICES["google-calendar"].host);
+		if (calendarServer) this.#calendars.adopt(calendarServer.name);
 		await this.#listRegistry();
 		void this.#seedPresets();
 		if (this.#ownerLock.held) this.#clearOldDone();

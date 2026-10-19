@@ -64,33 +64,30 @@ const twoThreads = (): Record<string, unknown> => ({
 
 test("the inbox lists each thread in Gmail's order with its last sender, first subject, unread state, size, arrival, and link", async () => {
 	const { client, reads } = clientOf(twoThreads());
-	expect(await client.inbox()).toEqual({
-		address: "max+work@example.com",
-		threads: [
-			{
-				account: "gmail",
-				id: "18f2a",
-				from: "Bob Stone",
-				subject: "Draft review",
-				snippet: "Looks good to me",
-				at: 1791003600000,
-				unread: true,
-				count: 2,
-				url: "https://mail.google.com/mail/?authuser=max%2Bwork%40example.com#inbox/18f2a",
-			},
-			{
-				account: "gmail",
-				id: "18e07",
-				from: "receipts@shop.example",
-				subject: "",
-				snippet: "Your order shipped",
-				at: 1790900000000,
-				unread: false,
-				count: 1,
-				url: "https://mail.google.com/mail/?authuser=max%2Bwork%40example.com#inbox/18e07",
-			},
-		],
-	});
+	expect(await client.inbox()).toEqual([
+		{
+			account: "gmail",
+			id: "18f2a",
+			from: "Bob Stone",
+			subject: "Draft review",
+			snippet: "Looks good to me",
+			at: 1791003600000,
+			unread: true,
+			count: 2,
+			url: "https://mail.google.com/mail/?authuser=max%2Bwork%40example.com#inbox/18f2a",
+		},
+		{
+			account: "gmail",
+			id: "18e07",
+			from: "receipts@shop.example",
+			subject: "",
+			snippet: "Your order shipped",
+			at: 1790900000000,
+			unread: false,
+			count: 1,
+			url: "https://mail.google.com/mail/?authuser=max%2Bwork%40example.com#inbox/18e07",
+		},
+	]);
 	const list = new URL(reads.find(url => new URL(url).pathname === INBOX)!);
 	expect(Object.fromEntries(list.searchParams)).toEqual({ labelIds: "INBOX", maxResults: "50" });
 	const thread = new URL(reads.find(url => url.includes("18f2a"))!);
@@ -100,27 +97,27 @@ test("the inbox lists each thread in Gmail's order with its last sender, first s
 test("a snippet's HTML entities read as the characters they stand for", async () => {
 	const answers = twoThreads();
 	answers[INBOX] = { threads: [{ id: "18f2a", snippet: "Tom &amp; Jerry&#39;s &lt;draft&gt; is &quot;ready&quot; &#x1F44B; &nbsp;" }] };
-	expect((await clientOf(answers).client.inbox()).threads.map(thread => thread.snippet)).toEqual(["Tom & Jerry's <draft> is \"ready\" 👋 &nbsp;"]);
+	expect((await clientOf(answers).client.inbox()).map(thread => thread.snippet)).toEqual(["Tom & Jerry's <draft> is \"ready\" 👋 &nbsp;"]);
 });
 
 test("a thread without an id or without messages is left out", async () => {
 	const answers = twoThreads();
 	answers[INBOX] = { threads: [{ snippet: "no id" }, { id: "18f2a", snippet: "" }, { id: "18e07", snippet: "" }] };
 	answers[`${INBOX}/18f2a`] = { id: "18f2a", historyId: "9910" };
-	expect((await clientOf(answers).client.inbox()).threads.map(thread => thread.id)).toEqual(["18e07"]);
+	expect((await clientOf(answers).client.inbox()).map(thread => thread.id)).toEqual(["18e07"]);
 });
 
 test("a draft of your reply does not count as the thread's last message", async () => {
 	const answers = twoThreads();
 	answers[`${INBOX}/18f2a`] = { ...REVIEW, messages: [...REVIEW.messages, message("m4", "Max <max+work@example.com>", "Re: Draft review", ["DRAFT"], "1791007200000")] };
-	const [review] = (await clientOf(answers).client.inbox()).threads;
+	const [review] = await clientOf(answers).client.inbox();
 	expect([review?.from, review?.at, review?.count]).toEqual(["Bob Stone", 1791003600000, 2]);
 });
 
 test("an empty inbox lists no threads", async () => {
 	const answers = twoThreads();
 	answers[INBOX] = { resultSizeEstimate: 0 };
-	expect(await clientOf(answers).client.inbox()).toEqual({ address: "max+work@example.com", threads: [] });
+	expect(await clientOf(answers).client.inbox()).toEqual([]);
 });
 
 test("a thread that cannot be read fails the read with Google's reason", async () => {
@@ -405,8 +402,8 @@ test("the merged inbox lists every account's threads newest first, and one accou
 	});
 	const answer = await accounts.inbox();
 	expect(answer.accounts).toEqual([
-		{ account: "gmail", address: "max+work@example.com", error: null },
-		{ account: "gmail-2", address: null, error: "Gmail refused omp's sign-in" },
+		{ account: "gmail", error: null },
+		{ account: "gmail-2", error: "Gmail refused omp's sign-in" },
 	]);
 	expect(answer.threads.map(thread => [thread.account, thread.id])).toEqual([
 		["gmail", "18f2a"],

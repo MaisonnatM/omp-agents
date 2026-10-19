@@ -23,10 +23,9 @@ export interface MailThread {
 	url: string;
 }
 
-/** One Gmail account the inbox read: its address once Gmail named it, and why its read failed, `null` when it worked. */
+/** One Gmail account the inbox read, and why its read failed, `null` when it worked; its address is its integration account's. */
 export interface InboxAccount {
 	account: AccountId;
-	address: string | null;
 	error: string | null;
 }
 
@@ -39,7 +38,7 @@ export interface InboxAnswer {
 /** A kept {@link InboxAnswer} with every account and conversation whole, or `null`. */
 export const decodeInboxAnswer = decoder(
 	fields<InboxAnswer>({
-		accounts: arrayOf(fields<InboxAccount>({ account: isString, address: nullable(isString), error: nullable(isString) })),
+		accounts: arrayOf(fields<InboxAccount>({ account: isString, error: nullable(isString) })),
 		threads: arrayOf(
 			fields<MailThread>({
 				account: isString,

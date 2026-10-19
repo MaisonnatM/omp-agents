@@ -30,12 +30,16 @@ describe("CalendarsFile", () => {
 		expect(hiddenOf(new CalendarsFile(path))).toEqual({ "google-calendar-2": ["team@group.calendar.google.com"] });
 	});
 
-	test("a file from before accounts reads as the original Google Calendar server's hidden calendars", () => {
+	test("a file from before accounts goes to the first Google Calendar server whatever its name, once, beside what that server hides since", () => {
 		const path = calendarsPath();
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(path, JSON.stringify({ hidden: ["team@group.calendar.google.com"] }));
-		expect(hiddenOf(new CalendarsFile(path))).toEqual({ "google-calendar": ["team@group.calendar.google.com"] });
+		const file = new CalendarsFile(path);
 		expect(existsSync(`${path}.invalid`)).toBe(false);
+		expect(file.apply("gcal", "holidays@group.v.calendar.google.com", false)).toBe(true);
+		expect(file.adopt("gcal")).toBe(true);
+		expect(file.adopt("google-calendar")).toBe(false);
+		expect(hiddenOf(new CalendarsFile(path))).toEqual({ gcal: ["holidays@group.v.calendar.google.com", "team@group.calendar.google.com"] });
 	});
 
 	test("a file holding something else moves aside rather than being written over", () => {

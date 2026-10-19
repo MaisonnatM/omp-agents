@@ -1,6 +1,10 @@
-/** What the Calendar page shows on each day of a month: Google events and events kept on this computer, routine runs, past and planned, and todos and tickets on the day they are due. */
+/**
+ * What the Calendar page shows on each day of a month: Google events and events kept on this computer, routine runs,
+ * past and planned, and todos and tickets on the day they are due. Also the calendars a new event may go in.
+ */
 import { nextDueAt, type Routine, type RoutineRun } from "../src/routines";
-import type { CalendarEvent, EventWhen, GoogleEventRef, LocalEvent, LocalEventRef } from "../src/shared/calendar";
+import type { GoogleAccount } from "../src/shared/accounts";
+import { type CalendarEvent, calendarKey, type EventWhen, type GoogleCalendar, type GoogleEventRef, type LocalEvent, type LocalEventRef, type NewEventCalendar } from "../src/shared/calendar";
 import type { Ticket, TicketStatusType } from "../src/shared/tickets";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { daysBetween, localDay } from "./days";
@@ -98,7 +102,7 @@ export function calendarEntries({ routines, todos, tickets, events, localEvents 
 	const inMonth = (day: string | null): day is string => day !== null && day >= first && day < end;
 	const shown: ShownEvent[] = [
 		...(events ?? []).map(({ account, calendarId, eventId, writable, title, when, color, calendar, url }): ShownEvent => ({
-			id: `${account}/${calendarId}/${eventId}`,
+			id: `${calendarKey(account, calendarId)}/${eventId}`,
 			title,
 			when,
 			color,
@@ -120,4 +124,41 @@ export function calendarEntries({ routines, todos, tickets, events, localEvents 
 		if (inMonth(ticket.dueDate)) entries.push({ kind: "ticket", day: ticket.dueDate, at: null, identifier: ticket.id, title: ticket.title, status: ticket.status, statusType: ticket.statusType });
 	}
 	return entries.sort((a, b) => (a.day === b.day ? (a.at ?? 0) - (b.at ?? 0) : a.day < b.day ? -1 : 1));
+}
+
+/** A calendar the new event dialog's picker offers, by the value that names it. */
+export interface CalendarChoice {
+	value: string;
+	label: string;
+	calendar: NewEventCalendar;
+}
+
+const LOCAL_CHOICE: CalendarChoice = { value: "local", label: "This computer", calendar: { kind: "local" } };
+
+/**
+ * The picker's choices: the shown Google calendars you may write to, account by account and yours first in each, then
+ * this computer. With several accounts, each calendar's label names its account's address.
+ */
+export function calendarChoices(calendars: GoogleCalendar[], accounts: GoogleAccount[]): CalendarChoice[] {
+	const writable = calendars.filter(calendar => calendar.shown && calendar.writable);
+	const google = accounts.flatMap(account => {
+		const own = writable.filter(calendar => calendar.account === account.name);
+		const suffix = accounts.length > 1 ? ` · ${account.address ?? account.name}` : "";
+		return [...own.filter(calendar => calendar.group === "mine"), ...own.filter(calendar => calendar.group === "other")].map(
+			({ id, name }): CalendarChoice => ({ value: calendarKey(account.name, id), label: `${name}${suffix}`, calendar: { kind: "google", account: account.name, calendarId: id } }),
+		);
+	});
+	return [...google, LOCAL_CHOICE];
+}
+
+/** How a value kept from before accounts starts: `google:<calendar id>`. */
+const BEFORE_ACCOUNTS = "google:";
+
+/**
+ * The choice the kept value `kept` names, else the first. A value from before accounts names the calendar of its id in
+ * the first account that offers it.
+ */
+export function keptChoice(choices: readonly CalendarChoice[], kept: string | null): CalendarChoice {
+	const before = kept?.startsWith(BEFORE_ACCOUNTS) ? kept.slice(BEFORE_ACCOUNTS.length) : null;
+	return choices.find(choice => choice.value === kept) ?? choices.find(({ calendar }) => calendar.kind === "google" && calendar.calendarId === before) ?? choices[0]!;
 }
