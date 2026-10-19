@@ -7,7 +7,7 @@ import { hashForProjects, sameView } from "../routing";
 import { projectHosts, type SidebarSessions } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
-import { Kbd } from "./command-palette/palette-footer";
+import { ShortcutChip } from "./kbd";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ProjectSessions } from "./project-group";
 import { ScheduledGroup } from "./scheduled";
@@ -65,7 +65,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
 							<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} aria-label={newSessionLabel} onClick={openNewSession}>
 								{newSessionLabel}
-								<Kbd className="ml-auto h-5 min-w-5 px-1 text-[11px]">{shortcutLabels("newSession")[0]}</Kbd>
+								<ShortcutChip id="newSession" className="ml-auto" />
 							</SidebarMenuButton>
 						</Tooltip>
 					</SidebarMenuItem>

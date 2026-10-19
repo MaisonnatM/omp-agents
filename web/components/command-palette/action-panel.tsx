@@ -3,7 +3,8 @@ import { type KeyboardEvent as ReactKeyboardEvent, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { actionChord, chordAction, PANEL_CHORD, type PaletteAction, type PaletteItem } from "../../command-palette";
 import { chordLabel, pressesChord } from "../../shortcuts";
-import { FooterButton, Kbd } from "./palette-footer";
+import { Kbd } from "../kbd";
+import { FooterButton } from "./palette-footer";
 
 /** Matches an action by its title; its value is its id, which may hold a URL. */
 const byTitle = (_value: string, search: string, keywords?: string[]): number => defaultFilter(keywords?.[0] ?? "", search);

@@ -1,8 +1,8 @@
 import { Search } from "lucide-react";
 import { useRef } from "react";
 import { SidebarInput } from "@/components/ui/sidebar";
-import { type ShortcutId, shortcutLabels, useShortcuts } from "../shortcuts";
-import { Kbd } from "./command-palette/palette-footer";
+import { type ShortcutId, useShortcuts } from "../shortcuts";
+import { ShortcutChip } from "./kbd";
 
 interface SidebarSearchProps {
 	label: string;
@@ -18,9 +18,9 @@ export function SidebarSearch({ label, placeholder, query, onQuery, shortcut }: 
 	const ref = useRef<HTMLInputElement>(null);
 	const focusField = (): boolean => {
 		const input = ref.current;
-		// A hidden tab or sidebar leaves the key its usual meaning, such as the browser's Find.
-		if (!input?.checkVisibility()) return false;
-		input.focus();
+		input?.focus();
+		// A hidden tab, a sliding or hidden sidebar, or an open dialog keeps focus away, and the key keeps its usual meaning, such as the browser's Find.
+		if (!input || document.activeElement !== input) return false;
 		input.select();
 		return true;
 	};
@@ -43,11 +43,7 @@ export function SidebarSearch({ label, placeholder, query, onQuery, shortcut }: 
 				}}
 				className={chip ? "pr-14 pl-8" : "pl-8"}
 			/>
-			{chip && (
-				<Kbd aria-hidden className="pointer-events-none absolute top-1/2 right-2 h-5 min-w-5 -translate-y-1/2 px-1 text-[11px]">
-					{shortcutLabels(shortcut)[0]}
-				</Kbd>
-			)}
+			{chip && <ShortcutChip id={shortcut} className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2" />}
 		</label>
 	);
 }

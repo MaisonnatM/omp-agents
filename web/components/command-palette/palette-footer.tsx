@@ -1,22 +1,10 @@
-/** The command palette's bottom bar, with its key chips (`Kbd`) and footer buttons. */
+/** The command palette's bottom bar, with its footer buttons. */
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { ENTER } from "../../command-palette";
 import { chordLabel } from "../../shortcuts";
-
-/** A key chip, as the shortcuts dialog draws them. */
-export function Kbd({ className, ...props }: ComponentProps<"kbd">) {
-	return (
-		<kbd
-			className={cn(
-				"inline-flex h-[22px] min-w-[22px] shrink-0 items-center justify-center rounded-[5px] border border-border bg-background px-1.5 font-sans text-xs text-muted-foreground",
-				className,
-			)}
-			{...props}
-		/>
-	);
-}
+import { Kbd } from "../kbd";
 
 /** A footer button: an action's title, then its key chip. */
 export function FooterButton({ className, ...props }: ComponentProps<"button">) {
