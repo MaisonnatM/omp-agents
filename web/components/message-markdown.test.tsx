@@ -56,9 +56,22 @@ test("external favicons disclose only the hostname, never the link path or crede
 
 test("unfinished streaming fences remain code blocks", () => {
 	const html = renderToStaticMarkup(<MessageMarkdown text={"Before\n\n```ts\nconst answer = 42"} />);
-	expect(html).toContain("<pre>");
+	expect(html).toContain('data-slot="code-block-content"');
 	expect(html).toContain("hljs-keyword");
 	expect(html).toContain("answer");
+});
+
+test("a fence titles its code block with its language, colors it line by line, and offers a copy button", () => {
+	const html = renderToStaticMarkup(<MessageMarkdown text={"```tsx\nconst a = 1\n\nconst b = 2\n```"} />);
+	expect(html).toMatch(/data-slot="code-block-title"[^>]*>tsx</);
+	expect(html.match(/data-slot="code-block-line"/g)).toHaveLength(3);
+	expect(html).toContain('<span class="hljs-keyword">const</span>');
+	expect(html).toContain('aria-label="Copy"');
+
+	const plain = renderToStaticMarkup(<MessageMarkdown text={"```\nconst a = 1\n```"} />);
+	expect(plain).not.toContain('data-slot="code-block-header"');
+	expect(plain).not.toContain("hljs");
+	expect(plain).toContain('aria-label="Copy"');
 });
 
 test("GitHub text renders the HTML GitHub allows, hides comments, and still refuses executable markup", () => {

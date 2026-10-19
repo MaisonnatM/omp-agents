@@ -34,7 +34,6 @@
     "@lexical/plain-text": "0.52.0",
     "@lexical/react": "0.52.0",
     "@lexical/rich-text": "0.52.0",
-    "@radix-ui/react-collapsible": "^1.1.20",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-hover-card": "^1.1.24",
     "@radix-ui/react-popover": "^1.1.23",
@@ -58,7 +57,6 @@
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0",
     "recharts": "^3.10.1",
-    "rehype-highlight": "^7.0.2",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1"

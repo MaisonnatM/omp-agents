@@ -22,7 +22,8 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
-- Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx`.
+- Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx` and tool calls and thinking as `ActivityGroup`, on shadcn's `Trace` from `web/components/ui/trace.tsx`.
+  A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from `outline` in `web/transcript-view.ts`.
 - Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the **Transcript**/**Trajectory** tabs in `web/components/pane.tsx` swap for the transcript.
 - Replay from here: the sibling prompt-row action in `web/components/trajectory.tsx` opens `ReplayDialog` in `web/components/replay-dialog.tsx`; `FormDialog` provides its focus, escape, and pending-submit behavior.
@@ -52,7 +53,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › Integrations' Google account lines, with **Add account**, **Remove**, and the workspace picker: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
     Settings › Worktrees, with its **Merged** marks and **Remove merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
-- Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry; change them only as `web/components/ui/PATCHES.md` describes.
+- Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry and some from shadcn's, with the shadcn utilities they need in `web/shadcn.css`; change them only as `web/components/ui/PATCHES.md` describes.
 
 ## Server
 
@@ -308,7 +309,7 @@ The page lives in `web/`.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/pull-requests-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, `web/inbox-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
   `web/inbox-model.ts` folds a conversation's messages into open, closed, and stacked rows with `foldMessages` and `foldsAfter`, words its recipients and lists who wrote in it with `participants`, picks an avatar's letter past a leading English article with `initialOf` and the avatar's colour from the address with `colorIndex`, cuts plain text into links, and builds a message's sandboxed document.
   `src/shared/every-word.ts` holds `everyWord` and `searchWords`, the one search rule the sidebar's sessions, the Files tab, the Todo page, the model search, the `@` menu, the command palette's todos, tickets, and pull requests, and the server's conversation search share: every word typed, in any order and any case.
-- `web/changes-model.ts`: `folderTree`, the tree of folders that the changes explorer and the notes list share, and `fileTree`, the explorer's, where a folder holding one folder and no file joins it, then the diff's folded runs, the file view's gutter marks, the diff list's sizes and `lastAtOrAbove`, which finds the file at the top of its scroll, and `changesPathOf`, which finds a Files tab path in the session changes list; `web/components/changes/file-tree.tsx` draws that tree; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines.
+- `web/changes-model.ts`: `folderTree`, the tree of folders that the changes explorer and the notes list share, and `fileTree`, the explorer's, where a folder holding one folder and no file joins it, then the diff's folded runs, the file view's gutter marks, the diff list's sizes and `lastAtOrAbove`, which finds the file at the top of its scroll, and `changesPathOf`, which finds a Files tab path in the session changes list; `web/components/changes/file-tree.tsx` draws that tree; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines, for the changes view and a message's code blocks.
 - `web/notes-model.ts`: `noteRows`, a notes directory's files as `folderTree` lays them out, flattened into folder and file rows with their depth, folders first then files at each level, by name; `ProjectNotesList` in `web/components/projects/project-parts.tsx` draws the project's tree and the user's, on the project page and in the coordinator's sidebar.
 - `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
   `web/delimited.ts` parses a TSV or CSV file into rows.

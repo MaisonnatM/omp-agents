@@ -45,8 +45,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   Long labels wrap at 16rem.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
   `badge` on `TabItem` draws a count after the label, which the Sessions tab uses for the sessions waiting on you and the Pull requests tab for the pull requests that wait on your move.
-- `ui/thinking-steps.tsx`: `icon` takes a component as well as a name, and `iconClassName` styles it.
-  Its layout effect is React's `useLayoutEffect`, since the dashboard never renders on a server; the same goes for `hooks/use-merge-split.tsx`, `ui/sidebar-group.tsx`, and the sidebar menu files.
+- `hooks/use-merge-split.tsx`, `ui/sidebar-group.tsx`, and the sidebar menu files use React's `useLayoutEffect`, since the dashboard never renders on a server.
 - `hooks/use-fluid-hover.ts`: `remeasure` called again before its frame runs does nothing, so a list of rows registering drops readiness and queues one measurement instead of one per row.
 - `hooks/use-fluid-hover.ts`: a click in the gap beside a row reaches the row with the click's modifier keys, instead of as a plain `element.click()`.
   A Cmd+click there marks a suggested prompt instead of sending it.
@@ -76,6 +75,11 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   `SelectGroup`, `SelectLabel`, `SelectSeparator`, and the exported scroll buttons and trigger `size` are removed, since nothing uses them; the popup keeps its scroll arrows.
 - `ui/empty.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/empty.json`).
   It imports `cn` from `@/lib/utils`, `EmptyContent` is removed, since nothing uses it, and `EmptyTitle` drops the registry's `cn-font-heading` hook, which this app's CSS does not define.
+- `ui/collapsible.tsx`, `ui/trace.tsx`, and `ui/code-block.tsx` come from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/<name>.json`).
+  They import `cn` from `@/lib/utils` and each other from `@/components/ui/`, and their icons are lucide's.
+  `CodeBlockCopyButton` is Fluid's `Button` at `icon-compact`, since Fluid's has no `icon-xs`, and `ui/code-block.tsx` drops `"use client"`.
+  `CodeBlockLine` drops the `supports-[content:counter(line)_/_'']` alt text for line numbers, since Bun's CSS parser rejects `content: counter(line) / ''` and fails the page build; the dashboard shows no line numbers.
+  The shadcn utilities they use are `web/shadcn.css`, with `scrollbar-thin`, which the registry's code block uses and no stylesheet defines.
 
 ## `kibo-ui/calendar/index.tsx`
 

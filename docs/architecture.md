@@ -1208,8 +1208,9 @@ The frame sits on white in both themes, since mail is written for white.
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
 The roster uses `sidebar`, and its **Pull requests**, **Tickets**, **Sessions**, **Todo**, **Calendar**, **Inbox**, and **Settings** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
-User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
-The model's thinking text uses that same group.
+User and assistant turns use `chat-message`, and the composer uses `input-message`.
+Tool calls and the model's thinking use shadcn's Base UI `trace`, vendored as `web/components/ui/trace.tsx` on `web/components/ui/collapsible.tsx`, and code blocks in messages its `code-block`, vendored as `web/components/ui/code-block.tsx`.
+The utilities both use from shadcn's `tailwind.css`, such as `shimmer` and `scroll-fade-x`, are copied into `web/shadcn.css`, since that file's `scroll-fade` would clash with the page's own.
 `thinking-indicator` shows while the agent works.
 `Button`'s `loading` prop preserves its label's width, shows a spinner, disables the control, and sets `aria-busy`.
 `InputMessage` takes `sending` and `stopping` for its send and Stop controls.
@@ -1240,7 +1241,8 @@ It also gets two slots, `beforeEditor` and `afterActions`: `composer-queue.tsx` 
 Its own queue, history recall, and suggested prompts are removed, since those slots replace them.
 `ChatMessage` gets `files`, the names of the files a sent prompt carried as text, and `images`, the addresses of the images it carried.
 
-Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`).
+Markdown uses `react-markdown` and `remark-gfm` (`web/components/message-markdown.tsx`).
+A fenced code block renders as a `CodeBlock`, colored line by line by `highlightLines` in `web/code-highlight.ts`, the `lowlight` grammars the changes view uses, rather than shadcn's `shiki` hook, so the page bundles one highlighter.
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL.
 In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
 A `file://` address whose escapes do not decode renders as a link with no address, and text from GitHub keeps no `file://` path, since it renders through the default filter.
