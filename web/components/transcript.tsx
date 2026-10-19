@@ -5,6 +5,7 @@ import {
 	Braces,
 	Brain,
 	Bug,
+	CircleCheck,
 	CircleStop,
 	Code,
 	CornerDownLeft,
@@ -41,7 +42,7 @@ import {
 	TextSearch,
 	Wrench,
 } from "lucide-react";
-import { createContext, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentRow, LiveView, View } from "../../src/shared/sessions";
 import type { Item } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ import {
 	useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
-import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
+import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
@@ -182,7 +183,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 	const links = useContext(SubagentLinks);
 	const chip = "inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs ring-1 ring-border";
 	return (
-		<span className="mt-1 flex flex-wrap gap-1.5" data-subagents>
+		<span className="-mt-1 ml-6 flex flex-wrap gap-1.5" data-subagents>
 			{ids.map(id => {
 				if (!links) {
 					return (
@@ -219,9 +220,10 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 	);
 }
 
-const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
+export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
+	const LoaderIcon = useIcon("loader");
 	const tools = entries.filter((entry): entry is ToolItem => entry.kind === "tool");
 	const running =
 		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
@@ -238,32 +240,54 @@ const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: Activi
 			: "Thought";
 	const visible = entries.filter(entry => (entry.kind === "thinking" ? !hideThinking : !hideTools));
 	return (
-		<ThinkingSteps open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="w-full max-w-2xl self-start">
-			<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
-			<ThinkingStepsContent>
-				{visible.map((entry, index) =>
-					entry.kind === "thinking" ? (
-						<ThinkingStep key={entry.id} icon={Brain} label="Thinking" status={entry.streaming ? "active" : "complete"} isLast={index === visible.length - 1}>
-							<div data-thinking={entry.streaming ? "live" : "done"}>
-								<MessageMarkdown text={entry.text} />
-							</div>
-						</ThinkingStep>
-					) : (
-						<ThinkingStep
-							key={entry.id}
-							icon={Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name] : entry.name.startsWith("mcp__") ? Plug : Wrench}
-							iconClassName={entry.status === "error" ? "text-red-600 dark:text-red-400" : undefined}
-							label={entry.name}
-							description={entry.summary || undefined}
-							status={entry.status === "running" ? "active" : "complete"}
-							isLast={index === visible.length - 1}
-						>
-							{entry.agents.length > 0 && <SpawnedAgents ids={entry.agents} />}
-						</ThinkingStep>
-					),
-				)}
-			</ThinkingStepsContent>
-		</ThinkingSteps>
+		<TraceCollapsible open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="max-w-2xl self-start">
+			<TraceCollapsibleTrigger>
+				<TraceLine status={running ? "running" : undefined}>
+					<TraceIcon>{running ? <LoaderIcon className="animate-spin" /> : tools.length ? <CircleCheck /> : <Brain />}</TraceIcon>
+					<TraceTitle>{header}</TraceTitle>
+				</TraceLine>
+			</TraceCollapsibleTrigger>
+			<TraceCollapsibleContent>
+				<Trace>
+					{visible.map(entry => {
+						if (entry.kind === "thinking") {
+							return (
+								<TraceCollapsible key={entry.id} defaultOpen>
+									<TraceCollapsibleTrigger>
+										<TraceLine status={entry.streaming ? "running" : undefined}>
+											<TraceIcon>
+												<Brain />
+											</TraceIcon>
+											<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
+										</TraceLine>
+									</TraceCollapsibleTrigger>
+									<TraceCollapsibleContent>
+										<div data-thinking={entry.streaming ? "live" : "done"}>
+											<MessageMarkdown text={entry.text} />
+										</div>
+									</TraceCollapsibleContent>
+								</TraceCollapsible>
+							);
+						}
+						const Icon = Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name]! : entry.name.startsWith("mcp__") ? Plug : Wrench;
+						return (
+							<Fragment key={entry.id}>
+								<TraceLine status={entry.status === "ok" ? undefined : entry.status}>
+									<TraceIcon>
+										<Icon />
+									</TraceIcon>
+									<TraceTitle>
+										{entry.name}
+										{entry.summary && <span className="text-muted-foreground/70"> {entry.summary}</span>}
+									</TraceTitle>
+								</TraceLine>
+								{entry.agents.length > 0 && <SpawnedAgents ids={entry.agents} />}
+							</Fragment>
+						);
+					})}
+				</Trace>
+			</TraceCollapsibleContent>
+		</TraceCollapsible>
 	);
 });
 

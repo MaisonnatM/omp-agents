@@ -1,10 +1,12 @@
+import type { Element, ElementContent } from "hast";
 import { type ComponentProps, memo } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform } from "react-markdown";
-import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
+import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
+import { highlightLines } from "../code-highlight";
 import type { PullRequestDetail } from "../../src/shared/github";
 import { remarkFilePaths, textFilePath } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
@@ -129,7 +131,7 @@ const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) =
 	);
 };
 
-/** A reference in a sent prompt, which `remarkPromptChips` marks; a ticket or pull request still opens. Any other `span`, such as highlighted code's, stays one. */
+/** A reference in a sent prompt, which `remarkPromptChips` marks; a ticket or pull request still opens. Any other `span` stays one. */
 const promptChip: Components["span"] = ({ node, ...props }) => {
 	const { dataChip: kind, dataLabel: label, dataTarget: target } = node?.properties ?? {};
 	if (!isChipKind(kind) || typeof label !== "string" || typeof target !== "string") return <span {...props} />;
@@ -143,9 +145,40 @@ const promptChip: Components["span"] = ({ node, ...props }) => {
 	);
 };
 
-const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage) };
+const textOf = (node: Element | ElementContent): string =>
+	node.type === "text" ? node.value : node.type === "element" ? node.children.map(textOf).join("") : "";
+
+/** A code block, colored by its fence's language, which titles it, with a copy button. A `<pre>` in GitHub's raw HTML has no `<code>` and no language. */
+const codeBlock: Components["pre"] = ({ node }) => {
+	const code = node?.children.find((child): child is Element => child.type === "element" && child.tagName === "code");
+	const className = code?.properties.className;
+	const language = (Array.isArray(className) ? className : []).map(String).find(name => name.startsWith("language-"))?.slice("language-".length) ?? null;
+	const text = node ? textOf(code ?? node).replace(/\n$/, "") : "";
+	const copy = <CodeBlockCopyButton value={text} />;
+	return (
+		<CodeBlock>
+			{language ? (
+				<CodeBlockHeader>
+					<CodeBlockTitle>{language}</CodeBlockTitle>
+					<CodeBlockActions>{copy}</CodeBlockActions>
+				</CodeBlockHeader>
+			) : (
+				<CodeBlockActions>{copy}</CodeBlockActions>
+			)}
+			<CodeBlockContent>
+				{highlightLines(text, language ?? "").map((tokens, index) => (
+					<CodeBlockLine key={index}>
+						{tokens.map((token, at) => (token.className ? <span key={at} className={token.className}>{token.text}</span> : token.text))}
+					</CodeBlockLine>
+				))}
+			</CodeBlockContent>
+		</CodeBlock>
+	);
+};
+
+const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage), pre: codeBlock };
 const PROMPT_COMPONENTS: Components = { ...AGENT_COMPONENTS, span: promptChip };
-const GITHUB_COMPONENTS: Components = { a: link, img: imageFrom(githubImage), video };
+const GITHUB_COMPONENTS: Components = { a: link, img: imageFrom(githubImage), video, pre: codeBlock };
 
 /** GitHub's schema, plus the `<video>` a Linear issue's recording becomes. */
 const SANITIZE_SCHEMA = {
@@ -154,8 +187,7 @@ const SANITIZE_SCHEMA = {
 	attributes: { ...defaultSchema.attributes, video: ["src"] },
 };
 
-const AGENT_PLUGINS = [rehypeHighlight];
-const GITHUB_PLUGINS = [rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeHighlight] satisfies ComponentProps<typeof ReactMarkdown>["rehypePlugins"];
+const GITHUB_PLUGINS = [rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA]] satisfies ComponentProps<typeof ReactMarkdown>["rehypePlugins"];
 const REMARK_PLUGINS = [remarkGfm];
 const AGENT_REMARK_PLUGINS = [remarkGfm, remarkFilePaths];
 const PROMPT_REMARK_PLUGINS = [remarkGfm, remarkPromptChips, remarkFilePaths];
@@ -191,7 +223,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({ text, github = fa
 		<div className="message-markdown max-w-full whitespace-normal break-words">
 			<ReactMarkdown
 				remarkPlugins={github ? REMARK_PLUGINS : prompt ? PROMPT_REMARK_PLUGINS : AGENT_REMARK_PLUGINS}
-				rehypePlugins={github ? GITHUB_PLUGINS : AGENT_PLUGINS}
+				rehypePlugins={github ? GITHUB_PLUGINS : undefined}
 				components={github ? GITHUB_COMPONENTS : prompt ? PROMPT_COMPONENTS : AGENT_COMPONENTS}
 				urlTransform={github ? urlTransform : agentUrlTransform}
 			>

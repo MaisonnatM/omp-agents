@@ -263,10 +263,9 @@ An action that fails shows its error, and its control becomes available again.
   A subagent's turns show in the subagent's own pane, not its parent's.
   The pane goes back to the transcript when it opens another conversation.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
-- Each tool call in a tool group shows an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
-  The icon of a call that failed is red, and the group's heading counts the failures.
-- The model's thinking is a row in that same group.
-  It shows while the model is still writing it, then stays.
+- Each tool call in a tool group is a line with an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
+  A call that is running shimmers, a call that failed is red, and the group's heading counts the failures.
+- The model's thinking is a line in that same group, **Thinking** while the model still writes it and **Thought** after, with its text under it; click the line to fold the text.
   A thinking block the provider redacts, which has no text, stays out.
   **Settings → Preferences** has a switch for each, **Show tool calls** and **Show thinking**, which hides the tool rows or the thinking text in every pane; the heading stays.
   The choice is saved in this browser.
@@ -278,6 +277,7 @@ An action that fails shows its error, and its control becomes available again.
   Click it to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in a new tab.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
+- A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
   Click the session's title to open the session's main agent in the pane, or focus the pane that already shows it.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.
