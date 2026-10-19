@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { SessionAlert } from "../src/shared/desktop-bridge";
 import type { Project } from "../src/shared/projects";
 import type { HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
 import { alertsOf, freshAlerts, needsYou, unreadShown, yourSessions } from "./attention";
@@ -28,41 +29,50 @@ describe("yourSessions", () => {
 });
 
 describe("alertsOf", () => {
-	test("raises one alert per open question and per unread turn, titled by the session", () => {
+	test("raises one alert per session: its oldest question over an unread turn, titled by the session, opening it", () => {
 		const confirm: UserRequest = { id: "r2", title: "Delete the branch?", deadline: null, kind: "confirm", message: "feat/x has unpushed work." };
-		expect(alertsOf([host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged." } })])).toEqual([
-			{ key: "a/ask/r1", sessionId: "s-a", title: "Session a", body: "Which branch?" },
-			{ key: "a/ask/r2", sessionId: "s-a", title: "Session a", body: "Delete the branch?\nfeat/x has unpushed work." },
-			{ key: "a/turn/7", sessionId: "s-a", title: "Session a", body: "Merged." },
+		expect(alertsOf([host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged." } }), host("b", "needs-input", { requests: [confirm] })])).toEqual([
+			{ key: "a/ask/r1", hash: "#session/s-a", title: "Session a", body: "Which branch?" },
+			{ key: "b/ask/r2", hash: "#session/s-b", title: "Session b", body: "Delete the branch?\nfeat/x has unpushed work." },
 		]);
+		expect(alertsOf([host("a", "idle", { unread: { at: 7, reply: "Merged." } }), host("c", "idle")])).toEqual([{ key: "a/turn/7", hash: "#session/s-a", title: "Session a", body: "Merged." }]);
 	});
 
 	test("names a session without a title by its folder, a turn without a reply, and a wait Collab does not relay", () => {
-		expect(alertsOf([host("b", "idle", { sessionName: null, unread: { at: 3, reply: null } }), host("c", "needs-input", { sessionName: null })])).toEqual([
-			{ key: "b/turn/3", sessionId: "s-b", title: "webapp", body: "Finished its turn." },
-			{ key: "c/input", sessionId: "s-c", title: "webapp", body: "Waits for your input." },
+		expect(alertsOf([host("b", "idle", { sessionName: null, unread: { at: 3, reply: null } }), host("c", "needs-input", { sessionName: null, unread: { at: 4, reply: "x" } })])).toEqual([
+			{ key: "b/turn/3", hash: "#session/s-b", title: "webapp", body: "Finished its turn." },
+			{ key: "c/input", hash: "#session/s-c", title: "webapp", body: "Waits for your input." },
 		]);
 	});
 });
 
 describe("freshAlerts", () => {
 	const turn = (at: number) => alertsOf([host("a", "idle", { unread: { at, reply: "Done." } })]);
+	const asks = alertsOf([host("q", "needs-input", { requests: [ask("r1", "Which branch?")] })]);
+	const raisedOver = (pushes: SessionAlert[][]): string[] => {
+		let heard = freshAlerts(null, []).heard;
+		const raised: string[] = [];
+		for (const now of pushes) {
+			const next = freshAlerts(heard, now);
+			raised.push(...next.fresh.map(alert => alert.key));
+			heard = next.heard;
+		}
+		return raised;
+	};
 
 	test("raises nothing for what already waited when the page loads", () => {
 		const first = freshAlerts(null, turn(1));
 		expect(first.fresh).toEqual([]);
 		expect([...first.heard]).toEqual(["a/turn/1"]);
+		expect(freshAlerts(first.heard, turn(1)).fresh).toEqual([]);
 	});
 
 	test("raises each moment once across roster pushes, and the next turn of the same session again", () => {
-		let heard = freshAlerts(null, []).heard;
-		const raised: string[] = [];
-		for (const now of [turn(1), turn(1), [], turn(2), turn(2)]) {
-			const next = freshAlerts(heard, now);
-			raised.push(...next.fresh.map(alert => alert.key));
-			heard = next.heard;
-		}
-		expect(raised).toEqual(["a/turn/1", "a/turn/2"]);
+		expect(raisedOver([turn(1), turn(1), [], turn(2), turn(2)])).toEqual(["a/turn/1", "a/turn/2"]);
+	});
+
+	test("raises a question once though a reconnect drops it for a push and replays it", () => {
+		expect(raisedOver([asks, [], asks])).toEqual(["q/ask/r1"]);
 	});
 });
 

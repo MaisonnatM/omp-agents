@@ -1,6 +1,8 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
+import { isObject } from "./json";
 import type { HostSnapshot } from "./omp/collab";
 import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer, WithdrawnMessage } from "./shared/sessions";
+import { splitSuggestions } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -14,7 +16,34 @@ export type LiveUpdate =
 	/** A live agent event of the session; it streams what the session file does not hold yet. */
 	| { kind: "event"; event: unknown }
 	/** An out-of-band line for the session (`agentId` null) or one of its subagents. */
-	| { kind: "note"; agentId: string | null; level: "info" | "warning" | "error"; text: string };
+	| { kind: "note"; agentId: string | null; level: "info" | "warning" | "error"; text: string }
+	| TurnUpdate;
+
+/** The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none. */
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null };
+
+/** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
+function lastReply(messages: unknown): string | null {
+	if (!Array.isArray(messages)) return null;
+	for (const message of messages.toReversed()) {
+		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
+		const text = message.content
+			.flatMap(block => (isObject(block) && block.type === "text" && typeof block.text === "string" && block.text.trim() ? [block.text] : []))
+			.join("\n\n");
+		if (text) return splitSuggestions(text).body;
+	}
+	return null;
+}
+
+/**
+ * What a main-agent live event does to its turn, which both transports report: `agent_start` starts one, and an
+ * `agent_end` ends it, unless it hands over to a queued follow-up (`isTerminal: false`); `null` for any other event.
+ */
+export function turnUpdate(event: unknown): TurnUpdate | null {
+	if (!isObject(event)) return null;
+	if (event.type === "agent_start") return { kind: "turn-started" };
+	return event.type === "agent_end" && event.isTerminal !== false ? { kind: "turn-ended", reply: lastReply(event.messages) } : null;
+}
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */
 export class PromptRefused extends Error {}

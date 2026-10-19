@@ -244,6 +244,15 @@ describe("SessionGuest follow-ups", () => {
 		expect(socket.messages).toEqual([{ t: "prompt", text: "after" }]);
 	});
 
+	test("reports the host's turn starting and ending for good, with its last reply, as a dashboard session does", async () => {
+		const { socket, updates } = await joinRoom();
+		const turns = () => updates.filter(update => update.kind === "turn-started" || update.kind === "turn-ended");
+		socket.frame({ t: "event", event: { type: "agent_start" } });
+		socket.frame({ t: "event", event: { type: "agent_end", isTerminal: false, messages: [] } });
+		socket.frame({ t: "event", event: { type: "agent_end", messages: [{ role: "assistant", content: [{ type: "text", text: "Merged." }] }] } });
+		expect(turns()).toEqual([{ kind: "turn-started" }, { kind: "turn-ended", reply: "Merged." }]);
+	});
+
 	test("a held follow-up can be taken back until its turn ends", async () => {
 		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
 		guest.send(null, { text: "first", payload: "first" }, "followUp");

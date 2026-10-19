@@ -431,7 +431,7 @@ Routine and scheduled runner actions and asynchronous notice actions remain sepa
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process on Bun and never imports it: `bun src/server.ts` from a checkout, and in the packaged app the Bun binary it ships in `Contents/Resources/server/bin/bun` on the bundled `server.js`, with `OMP_AGENTS_RESOURCES` naming that directory (`src/server/resources.ts`) so the server reads its prebuilt page and the starter kit from it.
 omp's sessions run on that same Bun, through `process.execPath`.
-It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/shared/desktop-bridge.ts`, and `src/shared/sessions.ts` with what it imports, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`, and `desktop/preload.ts` into `desktop/dist/preload.cjs`.
+It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, and `src/shared/desktop-bridge.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`, and `desktop/preload.ts` into `desktop/dist/preload.cjs`.
 Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the command palette on its **Create todo** view.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
@@ -798,14 +798,17 @@ A role or chain entry keeps whatever follows the model in its selector, such as 
 
 The Dock badge and the session notifications count on the roster: the server keeps whether each live session waits on you, and each page decides what to show of it.
 A row's `status` of `needs-input` says that the session asks something, and its `unread` names the turn it ended since you last looked: when, and the first line of its last reply.
-`UnreadTurns` in `src/server/unread-turns.ts` keeps them, by instance id, in memory, from each live session's main-agent events, which both transports report: an `agent_end` that ends the run, by the same rule as `turn-ended`, sets it, with the reply `lastReply` in `src/dashboard-session.ts` reads, and the next `agent_start` clears it.
-`LiveSessions` holds it, adds it to each row in `rows()`, and drops it when the session leaves, and `Dashboard` pushes the roster when it changes.
-A page sends `{ t: "read", instanceId }` while a pane shows the session's main agent in a focused window, which clears it for every page.
+Both transports report the main agent's turn as a `TurnUpdate` from `turnUpdate` in `src/live-session.ts`: `turn-started` at `agent_start`, and `turn-ended` with its last reply at an `agent_end` that ends the run, not one that hands over to a queued follow-up.
+`LiveSessions` applies each on its emit path, keeping the unread turns privately by instance id in memory, adds them to each row in `rows()`, and drops one when its session leaves; `Dashboard` then pushes the roster.
+A page sends `{ t: "read", instanceId }` while a pane shows the session's main agent in a focused window, which `LiveSessions.markRead` clears for every page.
+A socket that opens while the registry is stale, since no socket listened at the last poll, hears its first roster only after the registry is listed again, so that roster is settled and the page's baseline holds what already waited.
 
 `useAttention` in `web/use-attention.ts`, over the pure rules in `web/attention.ts`, leaves out a project's workers, which answer to their coordinator, and counts the rest that need you for the desktop's badge.
-Each open question and each unread turn is an alert keyed by what it is, `<instance id>/ask/<request id>` or `<instance id>/turn/<at>`, and a key the page has not heard since its first roster raises one while **Settings › Preferences › Notifications** is on.
-In the desktop app the alert goes through the bridge to `desktop/attention.ts`, which shows an Electron `Notification` unless its window has focus, as `BrowserWindow.isFocused` tells, and, on its click, shows the window and sets the page's hash to `#session/<session id>`; it holds each session's latest notification, since Electron drops a click of one nothing references.
-In a browser it is a Web `Notification` tagged with the session id, raised while the page does not have focus, once the browser granted the permission that turning the switch on asks for.
+Each session raises at most one alert at a time, keyed by what it waits on: its oldest open question, `<instance id>/ask/<request id>`, else a wait Collab does not relay, `<instance id>/input`, else its unread turn, `<instance id>/turn/<at>`.
+The keys of the page's first roster count as heard, a key once heard stays heard, and a key never heard raises its alert while **Settings › Preferences › Notifications** is on, so a question a reconnect replays raises none again.
+An alert carries the hash that opens its session, `#session/<session id>`, from `hashForSession`, so the shell needs nothing of the roster's shapes.
+In the desktop app the alert goes through the bridge to `desktop/attention.ts`, which shows an Electron `Notification` unless its window has focus, as `BrowserWindow.isFocused` tells, and, on its click, shows the window and sets the page's hash to the alert's; it holds each session's latest notification, closing the one before, since Electron drops a click of one nothing references.
+In a browser it is a Web `Notification` tagged with the alert's hash, so a session's newer one replaces the one before, raised while the page does not have focus, once the browser granted the permission that turning the switch on asks for.
 
 ## HTTP API
 

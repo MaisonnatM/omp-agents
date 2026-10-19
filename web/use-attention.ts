@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalStore } from "react";
 import type { DesktopBridge, SessionAlert } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
-import { hashForSession, type View } from "../src/shared/sessions";
+import type { View } from "../src/shared/sessions";
 import { alertsOf, freshAlerts, needsYou, unreadShown, yourSessions } from "./attention";
 import type { DashboardState } from "./dashboard-state";
 import type { Page } from "./routing";
@@ -81,10 +81,10 @@ function raise(alert: SessionAlert): void {
 	}
 	if (browserPermission() !== "granted") return;
 	// One notification per session: a newer one replaces the one before.
-	const notification = new Notification(alert.title, { body: alert.body, tag: alert.sessionId });
+	const notification = new Notification(alert.title, { body: alert.body, tag: alert.hash });
 	notification.onclick = () => {
 		window.focus();
-		location.hash = hashForSession(alert.sessionId);
+		location.hash = alert.hash;
 		notification.close();
 	};
 }

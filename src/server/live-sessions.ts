@@ -5,8 +5,8 @@ import { SessionGuest } from "../guest";
 import type { LiveSession, LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
-import { type RosterHost, type SessionFacts, type WorkItem, worksOn } from "../shared/sessions";
-import { UnreadTurns } from "./unread-turns";
+import { oneLine } from "../session-entries";
+import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
@@ -16,12 +16,18 @@ export function withSubject(facts: SessionFacts, subject: WorkItem | undefined):
 	return subject.kind === "ticket" ? { ...facts, tickets: [subject.id, ...facts.tickets] } : { ...facts, pullRequests: [{ ...subject.pr, link: "worked" }, ...facts.pullRequests] };
 }
 
+/** The first line of `reply` that holds text, as one summary line. */
+function firstLine(reply: string | null): string | null {
+	const line = reply?.split("\n").find(text => text.trim());
+	return line ? oneLine(line) : null;
+}
+
 export class LiveSessions {
 	readonly #sessions = new Map<string, LiveSession>();
 	/** What the sessions started from a quick action work on, by instance id, for as long as they run. */
 	readonly #subjects = new Map<string, WorkItem>();
-	/** The turns each session ended since you last looked at it. */
-	readonly unread = new UnreadTurns();
+	/** The turn each session ended since a page showed it in a focused window, by instance id. */
+	readonly #unread = new Map<string, UnreadTurn>();
 	/**
 	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
 	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
@@ -57,9 +63,21 @@ export class LiveSessions {
 			instanceId,
 			emit: update => {
 				if (update.kind === "switched") this.#reindex();
-				this.#onUpdate(instanceId, update);
+				this.#report(instanceId, update);
 			},
 		};
+	}
+
+	/** Keeps session `instanceId`'s unread turn from what it reports, then hands the report on. */
+	#report(instanceId: string, update: SessionUpdate): void {
+		if (update.kind === "turn-started") this.#unread.delete(instanceId);
+		else if (update.kind === "turn-ended") this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(update.reply) });
+		this.#onUpdate(instanceId, update);
+	}
+
+	/** A page showed session `instanceId` in a focused window; whether it had a turn unread. */
+	markRead(instanceId: string): boolean {
+		return this.#unread.delete(instanceId);
 	}
 
 	/** Lists `session`; `false` when it already finished, as a process that exited between its spawn and now, which would stay listed with no one to remove it. */
@@ -74,7 +92,7 @@ export class LiveSessions {
 	remove(instanceId: string): void {
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
-		this.unread.clear(instanceId);
+		this.#unread.delete(instanceId);
 		this.#reindex();
 		forgetSession(instanceId);
 	}
@@ -90,7 +108,7 @@ export class LiveSessions {
 		return [...this.#sessions.values()].map(session => ({
 			...session.row(),
 			cwdDisplay: displayPath(session.cwd),
-			unread: this.unread.of(session.instanceId),
+			unread: this.#unread.get(session.instanceId) ?? null,
 			...withSubject(factsOf(session.sessionId), this.#subjects.get(session.instanceId)),
 		}));
 	}
@@ -122,7 +140,7 @@ export class LiveSessions {
 		const kept = this.#sessions.size;
 		for (const host of hosts) {
 			if (!this.#sessions.has(host.instanceId)) {
-				this.#sessions.set(host.instanceId, new SessionGuest(host, update => this.#onUpdate(host.instanceId, update)));
+				this.#sessions.set(host.instanceId, new SessionGuest(host, update => this.#report(host.instanceId, update)));
 			}
 		}
 		this.#reindex();

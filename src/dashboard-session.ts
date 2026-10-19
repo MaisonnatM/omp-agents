@@ -6,7 +6,7 @@
 import { randomBytes } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { errorText, isObject, isTexts } from "./json";
-import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused } from "./live-session";
+import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused, turnUpdate } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
 import { attachRpc, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
@@ -19,7 +19,7 @@ import { isDashboardPrompt } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";
 import { textOf } from "./session-entries";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
-import { isUserPrompt, type StartingPrompt, splitSuggestions } from "./transcript";
+import { isUserPrompt, type StartingPrompt } from "./transcript";
 import { SerialLane } from "./serial-lane";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
@@ -40,9 +40,7 @@ export type DashboardUpdate =
 	/** The session moved to a new file and session id, so its views read that file from now on. */
 	| { kind: "switched" }
 	/** The main agent's {@link DashboardSession.starting} prompt changed. */
-	| { kind: "starting" }
-	/** A turn ran to its end, which the queue did not hand to a follow-up; `reply` is its last text without suggested prompts, `null` when it ended on none. */
-	| { kind: "turn-ended"; reply: string | null };
+	| { kind: "starting" };
 
 /** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
 export const newInstanceId = (): string => randomBytes(8).toString("hex");
@@ -74,19 +72,6 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 
 /** Session events after which the model, thinking level, or context size can have changed. */
 const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
-
-/** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
-export function lastReply(messages: unknown): string | null {
-	if (!Array.isArray(messages)) return null;
-	for (const message of messages.toReversed()) {
-		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
-		const text = message.content
-			.flatMap(block => (isObject(block) && block.type === "text" && typeof block.text === "string" && block.text.trim() ? [block.text] : []))
-			.join("\n\n");
-		if (text) return splitSuggestions(text).body;
-	}
-	return null;
-}
 
 /** A message taken back from omp's queue, holding only the image fields the composer restores. */
 function withdrawn({ text, images = [] }: { text: string; images?: readonly PromptImage[] }): WithdrawnMessage {
@@ -647,14 +632,15 @@ export class DashboardSession implements LiveSession {
 		if ((event.type === "message_start" || event.type === "message_end") && isObject(event.message) && isUserPrompt(event.message)) {
 			this.#change(() => this.#prompt.shown());
 		}
-		if (event.type === "agent_start") {
+		const turn = turnUpdate(event);
+		if (turn?.kind === "turn-started") {
 			this.#change(() => this.#prompt.turnStarted());
-		} else if (event.type === "agent_end" && event.isTerminal !== false) {
+			this.#emit(turn);
+		} else if (turn?.kind === "turn-ended") {
 			this.#replayInitial = null;
-			// A non-terminal end hands over to a queued follow-up.
 			this.#change(() => this.#prompt.turnEnded());
 			this.#refresh();
-			this.#emit({ kind: "turn-ended", reply: lastReply(event.messages) });
+			this.#emit(turn);
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });

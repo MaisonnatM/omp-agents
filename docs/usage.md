@@ -1453,7 +1453,7 @@ An action that fails shows its error, and its control becomes available again.
 - A live session that asks you something, or finishes a turn, raises a system notification while the dashboard's window does not have focus.
   Its title is the session's, and its text is the question, or the first line of the turn's last reply.
   Clicking it brings the window up on that session.
-- Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before.
+- Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before; a session that asks while its turn is unread notifies the question.
   The sessions that already waited when the page loads raise none, and neither do a project's workers, whose coordinator hears when they finish or ask.
 - A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window and tab agrees.
 - The desktop app shows them unless **Settings › Preferences › Notifications** turns them off.

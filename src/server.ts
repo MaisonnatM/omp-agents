@@ -67,7 +67,7 @@ try {
 			maxPayloadLength: 64 * 1024 * 1024,
 			open(ws) {
 				if (isTerminalSocket(ws)) return terminalSocket.open(ws);
-				dashboard.open(ws as Socket);
+				void dashboard.open(ws as Socket);
 			},
 			message(ws, raw) {
 				if (isTerminalSocket(ws)) return terminalSocket.message(ws, raw);
