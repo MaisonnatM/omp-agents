@@ -127,7 +127,7 @@ export interface RpcFrameModule {
 	RpcFrameDecoder: new () => { push(value: unknown): object | undefined };
 }
 export interface UtilsModule {
-	ptree: { spawn(cmd: string[], options: { cwd: string; stdin: "pipe" }): RpcProcess };
+	ptree: { spawn(cmd: string[], options: { cwd: string; stdin: "pipe"; env: Record<string, string | undefined> }): RpcProcess };
 	readJsonl(stream: ReadableStream<Uint8Array>): AsyncGenerator<unknown>;
 }
 

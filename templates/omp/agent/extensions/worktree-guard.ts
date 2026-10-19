@@ -47,7 +47,7 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 				block: true,
 				reason: [
 					`${main.top} is the repository's main checkout.`,
-					"Create a worktree on a new branch (`git worktree add -b <branch> ../<repo>-<topic> <parent>`) and make the change there.",
+					"Create a worktree on a new branch (`git worktree add -b <branch> ~/code/<repo>-wt/<topic> <parent>`) and make the change there.",
 					...(main.graphite ? ["This repository uses Graphite: run `gt track <branch> -p <parent>` in the new worktree before you commit."] : []),
 					"When the user asked you to work in place, retry the same call; it goes through.",
 				].join(" "),

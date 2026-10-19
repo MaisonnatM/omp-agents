@@ -11,6 +11,7 @@ Then read the section for the work: [omp imports](#omp-imports), [omp internals]
   After you change `desktop/`, run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
 - Update `docs/usage.md` when the interface changes, `docs/architecture.md` when the server or a protocol changes, and `docs/code-layout.md` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
   The README holds only features, installation, and configuration.
+- Look a feature up in `docs/usage.md` by the words the page shows, such as a button's or a tab's label, rather than by a code identifier, which the interface docs rarely name.
 - Bump the Bun and omp versions in `.github/workflows/checks.yml` together with the README's tested versions.
 
 ## omp imports

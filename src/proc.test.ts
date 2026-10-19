@@ -37,6 +37,19 @@ describe("runShell", () => {
 	test("rejects when it cannot start in its directory", async () => {
 		await expect(runShell("true", "/no/such/directory", limits)).rejects.toThrow("ENOENT");
 	});
+
+	test("hides the server's own PORT and OMP_AGENTS_PARENT, so a server the command starts neither takes the dashboard's port nor exits when its stdin ends", async () => {
+		const saved = { PORT: process.env.PORT, OMP_AGENTS_PARENT: process.env.OMP_AGENTS_PARENT };
+		Object.assign(process.env, { PORT: "4317", OMP_AGENTS_PARENT: "stdin" });
+		try {
+			expect(await runShell('echo "[$PORT][$OMP_AGENTS_PARENT][$HOME]"', tmpdir(), limits)).toEqual({ exitCode: 0, output: `[][][${process.env.HOME}]\n` });
+		} finally {
+			for (const [name, value] of Object.entries(saved)) {
+				if (value === undefined) delete process.env[name];
+				else process.env[name] = value;
+			}
+		}
+	});
 });
 
 test("run hands the child this process's environment as it is now, such as the test environment's scratch omp directory", async () => {

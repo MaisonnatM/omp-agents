@@ -22,6 +22,17 @@ Restart it after editing `src/` or `web/`.
 A session started from the smoke dashboard is a real omp session.
 Open `#new/%2Ftmp` to start one in `/tmp`, use a prompt such as `Reply with just the word ok. Use no tools.`, and end it with **End session**.
 
+## Isolated state
+
+A smoke server reads and writes the user's own state: `calendars.json`, `projects.json`, `token`, and the rest under `~/.config/omp-agents`, and project notes under the data directory.
+When a check changes that state, such as starting a project or hiding a calendar, start the server with temporary `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `XDG_STATE_HOME`, each a fresh `mktemp -d`.
+Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`, and its project notes are under `$XDG_DATA_HOME`.
+The omp sessions it starts still use the user's omp directory, so they still run with the user's models and sign-ins.
+
+A project's sessions load the installed `~/.omp/agent/extensions/projects.ts` whenever it exists, not `templates/omp/agent/extensions/projects.ts` (`projectsExtensionArgs` in `src/server/project-runner.ts`), so to test an edit of the template, install it first or check `bun run omp-template --dry-run`.
+
+The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shells, and commands it starts (`childEnv` in `src/proc.ts`), so a smoke server an agent starts takes the port it is given and does not exit when its stdin ends.
+
 ## Browser smoke
 
 Open the page in managed headless Chromium.

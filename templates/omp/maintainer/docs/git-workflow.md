@@ -16,11 +16,13 @@ If Graphite is configured, prefer `gt create` and `gt submit`; `git worktree add
 
 ## Create a worktree in a Graphite repository
 
-Create the branch on its parent, then track it before the first commit:
+Create the branch on its parent under `~/code/<repo>-wt/<topic>`, then track it before the first commit.
+Use the worktree's absolute path in every later command; a relative `../` path breaks as soon as the cwd changes.
 
 ```sh
-git worktree add -b <branch> ../<repo>-<topic> <parent>
-gt track <branch> -p <parent> --cwd ../<repo>-<topic> --no-interactive -q
+wt=~/code/<repo>-wt/<topic>
+git worktree add -b <branch> "$wt" <parent>
+gt track <branch> -p <parent> --cwd "$wt" --no-interactive -q
 ```
 
 A branch Graphite does not track fails `gt modify`, `gt restack`, and `gt submit` with "Cannot perform this operation on untracked branch"; run the `gt track` above, never fall back to `git commit --amend`.

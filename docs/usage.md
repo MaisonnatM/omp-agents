@@ -341,13 +341,13 @@ An action that fails shows its error, and its control becomes available again.
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
   Hover it to see the full model selector.
   The settings page labels models the same way.
-- Click the branch of a pull request's details, of a session's header, or of a Linear issue's detail view to copy its name; its icon turns into a check mark for a moment.
+- Click the branch of a pull request's row or details, of a session's header, or of a Linear issue's detail view to copy it; its icon turns into a check mark for a moment.
   A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a session's header, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
-  Copying the branch of a past session's linked worktree also removes that worktree, so you can check the branch out elsewhere, and keeps the branch.
+  A session's header copies `cd <worktree>` when the session works in a linked worktree, so you can test its work in a terminal, and the branch's name otherwise; it removes nothing.
+  Copying the branch of a pull request's row also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
   It applies the checks of **Settings → Worktrees**: it never removes a repository's main checkout, a locked checkout, one with uncommitted or untracked changes, one a live session or this dashboard uses, or one with a nested repository.
   A toast names the worktree it removed, or the one it kept and why; a branch that no linked worktree has checked out shows no toast.
-  Copying the branch of a running session's linked worktree, when its header can end the session, removes nothing, since the session uses that worktree; a toast offers **End session**, which ends the session as the header's **End session** does and so removes the worktree.
-  Copying a main checkout's branch from a session's header, the branch of a running session that the header cannot end, the branch of a pull request's details, or the branch of a Linear issue only copies.
+  Copying the branch of a pull request's details or of a Linear issue only copies.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 

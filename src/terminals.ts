@@ -1,16 +1,11 @@
 /** The shells of the dashboard's terminal panel: each runs in a pseudo-terminal and outlives the page that opened it. */
 import type { Subprocess } from "bun";
 import { displayPath } from "./paths";
+import { childEnv } from "./proc";
 import type { TerminalInfo } from "./shared/terminals";
 
 /** How much of a shell's output a page that attaches later, such as after a reload, gets replayed. */
 export const SCROLLBACK_BYTES = 1024 * 1024;
-
-/**
- * What the server sets for itself: a dev server in the terminal would take the dashboard's `PORT`, and the desktop
- * shell's `OMP_AGENTS_PARENT` means nothing to anything else.
- */
-const SERVER_ENV = ["PORT", "OMP_AGENTS_PARENT"];
 
 /** The output kept for a page that attaches later, oldest dropped first once it holds over `limit` bytes. */
 export class Scrollback {
@@ -47,8 +42,7 @@ export class Terminal {
 		size: { cols: number; rows: number },
 		onExit: (terminal: Terminal) => void,
 	) {
-		const env: Record<string, string | undefined> = { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor", TERM_PROGRAM: "omp-agents" };
-		for (const name of SERVER_ENV) delete env[name];
+		const env = childEnv({ TERM: "xterm-256color", COLORTERM: "truecolor", TERM_PROGRAM: "omp-agents" });
 		this.#proc = Bun.spawn([process.env.SHELL || "/bin/sh", "-l"], {
 			cwd,
 			env,

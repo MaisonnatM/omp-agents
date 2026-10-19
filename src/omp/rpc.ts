@@ -1,6 +1,7 @@
 /** omp's RPC mode: a session this dashboard starts as a child process and drives through omp's own `RpcClient`. */
 import { errorText, isObject } from "../json";
 import type { Frame } from "./collab";
+import { childEnv } from "../proc";
 import { ompCommand } from "./install";
 import { type RpcHostTool, type RpcProcess, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
 
@@ -143,7 +144,7 @@ export async function startRpc(cwd: string, onFrame: (frame: Record<string, unkn
 		args: ["--mode", "rpc-ui", ...launch.args],
 		customTools: launch.tools,
 		spawn: agentArgs => {
-			const proc = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe" });
+			const proc = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe", env: childEnv() });
 			const [forClient, forFrames] = proc.stdout.tee();
 			void readUnroutedFrames(forFrames, onFrame);
 			child = proc;

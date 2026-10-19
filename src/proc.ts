@@ -1,5 +1,18 @@
 /** One place that runs a subprocess to completion and reads its output. */
 
+/**
+ * What the server sets for itself: a dev server an agent or a terminal starts would take the dashboard's `PORT`, and
+ * the desktop shell's `OMP_AGENTS_PARENT` would make a smoke server an agent starts exit as soon as its stdin ends.
+ */
+const SERVER_ENV = ["PORT", "OMP_AGENTS_PARENT"];
+
+/** This process's environment without what the server sets for itself, for the omp sessions, shells, and routine commands it starts. */
+export function childEnv(extra: Record<string, string> = {}): Record<string, string | undefined> {
+	const env: Record<string, string | undefined> = { ...process.env, ...extra };
+	for (const name of SERVER_ENV) delete env[name];
+	return env;
+}
+
 export interface RunOptions {
 	cwd?: string;
 	/** Written to the child's stdin; without it stdin is closed. */
@@ -62,7 +75,7 @@ export interface ShellResult {
  * Its stderr goes into its output in order with stdout; output past `maxOutput` keeps its end, after `…`.
  */
 export async function runShell(command: string, cwd: string, opts: ShellOptions): Promise<ShellResult> {
-	const child = Bun.spawn(["/bin/sh", "-c", `exec 2>&1\n${command}`], { cwd, stdin: "ignore", stdout: "pipe", stderr: "ignore", detached: true });
+	const child = Bun.spawn(["/bin/sh", "-c", `exec 2>&1\n${command}`], { cwd, env: childEnv(), stdin: "ignore", stdout: "pipe", stderr: "ignore", detached: true });
 	// The command's own children keep the pipe open after `sh` dies, so stopping it signals its whole process group.
 	const stop = (): void => {
 		try {
