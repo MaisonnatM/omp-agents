@@ -5,7 +5,6 @@ import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
 import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
-import { savedTools } from "../omp/tool-policy";
 import { prepareReplay } from "../replay";
 import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
@@ -59,14 +58,13 @@ export function createStarter(env: StartEnv): Starter {
 
 	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its project's extensions and host tools. */
 	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<{ started: Started } | { error: string }> {
-		const launchWith = (base: RpcLaunch, tools: string[] | null): RpcLaunch => tools === null ? base : { ...base, allowedTools: tools };
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
 				if (!dir) return { error: `${request.cwd.trim()} is not a directory.` };
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };
-				const { branch, model, thinking, skill, tools, images } = request;
+				const { branch, model, thinking, skill, images } = request;
 				let cwd = dir;
 				if (branch) {
 					try {
@@ -82,7 +80,7 @@ export function createStarter(env: StartEnv): Starter {
 					return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
 				}
 				return launch("Cannot start omp", async (id, emit) => ({
-					session: await DashboardSession.start(id, cwd, model, thinking, launchWith(rpcLaunch, tools), emit),
+					session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
 					prompt: null,
 					first: { text, images },
 				}));
@@ -91,16 +89,12 @@ export function createStarter(env: StartEnv): Starter {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
-				return launch("Cannot fork", async (id, emit) => {
-					const tools = await savedTools(source, request.entryId);
-					return DashboardSession.fork(id, source, request.entryId, launchWith(PLAIN_LAUNCH, tools), emit);
-				});
+				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, PLAIN_LAUNCH, emit));
 			}
 			case "replay": {
 				const source = env.pathFor(request.view);
 				if (!source || request.view.kind === "live" && request.view.agentId !== null) return { error: "Cannot replay: the main session's file is unavailable." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot replay: this session is read-only. Only omp sessions replay here." };
-				if (await savedTools(source) !== null) return { error: "Cannot replay: this session runs with a tool allowlist, which replays do not support." };
 				return launch("Cannot replay", async (id, emit) => {
 					const prepared = await prepareReplay(request, source, env.mayDiscardReplay);
 					try {
@@ -119,10 +113,7 @@ export function createStarter(env: StartEnv): Starter {
 				if (formatOf(path).source !== "omp") return { error: "Cannot resume: this session is read-only. Only omp sessions resume here." };
 				resuming.add(sessionId);
 				try {
-					return await launch("Cannot resume", async (id, emit) => {
-						const tools = await savedTools(path);
-						return { session: await DashboardSession.resume(id, path, launchWith(rpcLaunch, tools), emit), prompt: null };
-					});
+					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }));
 				} finally {
 					resuming.delete(sessionId);
 				}

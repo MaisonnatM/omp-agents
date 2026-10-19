@@ -57,7 +57,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "draft" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "presets" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "draft" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -100,7 +100,6 @@ export const PageSwitch = memo(function PageSwitch({
 	projects,
 	workspaceList,
 	pins,
-	presets,
 	newSessionCompletions,
 	connected,
 	listed,
@@ -145,12 +144,11 @@ export const PageSwitch = memo(function PageSwitch({
 					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
-					presets={presets}
 				/>
 			);
 		}
 		case "scheduled":
-			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} presets={presets} todoOf={todoId => todoSeed(userTodos, todoId)} />;
+			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
 		case "settings":
 			return (
 				<SettingsPage
@@ -160,9 +158,6 @@ export const PageSwitch = memo(function PageSwitch({
 					workspaces={workspaces}
 					workspaceList={workspaceList}
 					pins={pins}
-					presets={presets}
-					defaultCwd={defaultWorkspace}
-					connected={connected}
 				/>
 			);
 		case "pull-requests":
@@ -197,7 +192,6 @@ export const PageSwitch = memo(function PageSwitch({
 				<RoutinesPage
 					key={routinesTarget ?? ""}
 					routines={routines}
-					presets={presets}
 					projects={projects}
 					target={routinesTarget}
 					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.

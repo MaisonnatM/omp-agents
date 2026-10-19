@@ -55,7 +55,7 @@ describe("applyProject", () => {
 	});
 
 	test("a queued worker leaves the queue in the change that adds it", () => {
-		const start = { cwd: "/work/app", prompt: "Go.", branch: null, model: null, thinking: null, skill: null, tools: null };
+		const start = { cwd: "/work/app", prompt: "Go.", branch: null, model: null, thinking: null, skill: null };
 		const queued = apply(create, { op: "enqueue", id: "p1", worker: { id: "q-s-a", title: "Copy", at: AT, start } });
 		expect(queued[0]?.queue.map(entry => entry.id)).toEqual(["q-s-a"]);
 		const added = applyProject(queued, addWorker("s-a", "Copy"))[0];

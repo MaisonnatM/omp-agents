@@ -2,7 +2,7 @@
 import { errorText, isObject } from "../json";
 import type { Frame } from "./collab";
 import { ompCommand } from "./install";
-import { builtinTools, type RpcHostTool, type RpcProcess, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
+import { type RpcHostTool, type RpcProcess, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
 
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {
@@ -103,8 +103,6 @@ export interface RpcChild {
 export interface RpcLaunch {
 	args: string[];
 	tools: RpcHostTool[];
-	/** Native SDK restriction; omitted for a normal CLI session. */
-	allowedTools?: string[];
 }
 
 export const PLAIN_LAUNCH: RpcLaunch = { args: [], tools: [] };
@@ -134,24 +132,18 @@ async function readUnroutedFrames(stdout: ReadableStream<Uint8Array>, onFrame: (
 }
 
 /**
- * Starts omp's CLI or the restricted SDK runner in `cwd`, through omp's own `RpcClient`.
+ * Starts omp's CLI in `cwd`, through omp's own `RpcClient`.
  * Resolves once omp reports ready. `onFrame` gets every
  * frame of {@link UNROUTED_FRAMES} from spawn on, so a dialog raised while the session opens is not lost.
  */
 export async function startRpc(cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
-	const tools = launch.allowedTools;
-	if (tools && (launch.args.length || launch.tools.length)) throw new Error("Restricted sessions cannot load launch extensions or host tools.");
-	if (tools?.some(name => !builtinTools.BUILTIN_TOOL_NAMES.includes(name))) throw new Error("Restricted sessions accept only built-in omp tools.");
 	let child: RpcProcess | undefined;
 	const client = new rpc.RpcClient({
 		// On the CLI path, the last mode wins over RpcClient's `rpc`; `rpc-ui` enables tool dialogs.
 		args: ["--mode", "rpc-ui", ...launch.args],
 		customTools: launch.tools,
 		spawn: agentArgs => {
-			const resources = process.env.OMP_AGENTS_RESOURCES;
-			const runner = resources ? `${resources}/restricted-rpc.js` : `${import.meta.dir}/restricted-rpc.ts`;
-			const command = tools ? [process.execPath, runner, JSON.stringify(tools)] : [...ompCommand, ...agentArgs];
-			const proc = utils.ptree.spawn(command, { cwd, stdin: "pipe" });
+			const proc = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe" });
 			const [forClient, forFrames] = proc.stdout.tee();
 			void readUnroutedFrames(forFrames, onFrame);
 			child = proc;

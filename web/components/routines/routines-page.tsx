@@ -2,7 +2,6 @@ import { ArrowLeft, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
 import type { Project } from "../../../src/shared/projects";
-import type { SessionPreset } from "../../../src/shared/presets";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -152,7 +151,6 @@ function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; h
 
 interface DetailProps {
 	routine: Routine;
-	presets: SessionPreset[];
 	projects: Project[];
 	hosts: RosterHost[];
 	now: number;
@@ -190,7 +188,7 @@ function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
 }
 
 /** One routine's settings, then its runs, newest first. */
-function RoutineDetail({ routine, presets, projects, hosts, now, connected, onChange, onEdit }: DetailProps) {
+function RoutineDetail({ routine, projects, hosts, now, connected, onChange, onEdit }: DetailProps) {
 	const { task } = routine;
 	const { request } = useDashboardActions();
 	const run = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
@@ -201,8 +199,7 @@ function RoutineDetail({ routine, presets, projects, hosts, now, connected, onCh
 		["Next run", nextRunWords(routine, now)],
 	];
 	if (task.kind === "prompt") {
-		const preset = routine.preset === null ? "None" : (presets.find(candidate => candidate.id === routine.preset)?.name ?? "Removed, so runs fail");
-		settings.push(["Preset", preset], ["Skill", routine.skill ?? "None"], ["Pin", task.pin ? "When it finishes, in place of the previous session" : "No"]);
+		settings.push(["Skill", routine.skill ?? "None"], ["Pin", task.pin ? "When it finishes, in place of the previous session" : "No"]);
 	}
 	if (task.kind === "project") settings.push(["Project", projects.find(project => project.id === task.projectId)?.name ?? "Removed, so runs fail"]);
 	return (
@@ -299,8 +296,6 @@ function RoutineRow({ routine, now, connected, onChange, onEdit }: RowProps) {
 
 interface RoutinesPageProps {
 	routines: Routine[];
-	/** The saved presets, which the editor offers and the settings name. */
-	presets: SessionPreset[];
 	/** Every project; the editor offers the ones not archived as a project task's target. */
 	projects: Project[];
 	/** The routine whose settings and runs show, `null` for the list. */
@@ -314,7 +309,7 @@ interface RoutinesPageProps {
 }
 
 /** Your routines, one routine's settings and runs, or the editor for a new one or an edit. */
-export function RoutinesPage({ routines, presets, projects, target, hosts, workspaces, defaultCwd, connected }: RoutinesPageProps) {
+export function RoutinesPage({ routines, projects, target, hosts, workspaces, defaultCwd, connected }: RoutinesPageProps) {
 	const { send } = useDashboardActions();
 	const now = useMinute();
 	const [editing, setEditing] = useState<{ draft: RoutineDraft; isNew: boolean } | null>(null);
@@ -330,7 +325,6 @@ export function RoutinesPage({ routines, presets, projects, target, hosts, works
 				isNew={editing.isNew}
 				workspaces={workspaces}
 				connected={connected}
-				presets={presets}
 				projects={projects.filter(project => !project.archived)}
 				onCancel={() => setEditing(null)}
 				onSave={routine => {
@@ -343,7 +337,7 @@ export function RoutinesPage({ routines, presets, projects, target, hosts, works
 	}
 
 	const shown = target === null ? undefined : routines.find(routine => routine.id === target);
-	if (shown) return <RoutineDetail routine={shown} presets={presets} projects={projects} hosts={hosts} now={now} connected={connected} onChange={onChange} onEdit={edit(shown)} />;
+	if (shown) return <RoutineDetail routine={shown} projects={projects} hosts={hosts} now={now} connected={connected} onChange={onChange} onEdit={edit(shown)} />;
 
 	const paused = routines.filter(routine => !routine.enabled).length;
 	const meta =

@@ -8,7 +8,6 @@ import type { PastSession, RosterHost } from "../shared/sessions";
 import { Broadcasts } from "./broadcasts";
 import { ListRegistry } from "./list-registry";
 import { PinsFile } from "./pins-file";
-import { PresetsFile } from "./presets-file";
 import { ProjectsFile } from "./projects-file";
 import { RequestLedger } from "./request-ledger";
 import { RoutinesFile } from "./routines-file";
@@ -42,7 +41,6 @@ function setup(initial: PastSession[]) {
 	const workspaces = new WorkspacesFile(join(dir, "workspaces.json"));
 	const pins = new PinsFile(join(dir, "pins.json"));
 	const projects = new ProjectsFile(join(dir, "projects.json"));
-	const presets = new PresetsFile(join(dir, "presets.json"));
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
@@ -58,7 +56,6 @@ function setup(initial: PastSession[]) {
 			apply: change => workspaces.apply(change),
 		},
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
-		presets: { msg: () => ({ t: "presets", presets: presets.value }), apply: change => presets.apply(change) },
 		projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 	}, kind => broadcasts.pushList(kind));
@@ -181,7 +178,6 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);
 		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
-		expect(lists.apply("presets", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("projects", { op: "rename", id: "missing", name: "new" }, peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices"));
 		expect(published).toEqual([]);

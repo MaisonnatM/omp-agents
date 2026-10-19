@@ -25,9 +25,18 @@ function activityText(entry: WorktreeEntry): string {
 	return entry.lastActivity === null ? "No omp session" : `${age(entry.lastActivity)} ago`;
 }
 
+/** What blocks removal, beyond the main checkout the name already marks; empty when nothing does. */
 function statusText(entry: WorktreeEntry): string {
 	if (entry.missing) return "Directory gone";
-	return entry.blockers[0]?.message ?? "No blockers";
+	return entry.blockers.find(blocker => blocker.code !== "main")?.message ?? "";
+}
+
+/** `path` split into its folder, shortened beside the repository's main checkout, and its last segment, which always shows. */
+function pathParts(path: string, repositoryPath: string): { folder: string; name: string } {
+	const beside = repositoryPath.slice(0, repositoryPath.lastIndexOf("/") + 1);
+	const shown = beside && path.startsWith(beside) ? path.slice(beside.length) : path;
+	const cut = shown.lastIndexOf("/") + 1;
+	return { folder: shown.slice(0, cut), name: shown.slice(cut) };
 }
 
 /** The settings tab for Git worktrees of repositories omp sessions ran in, plus a repository path entered here. */
@@ -205,8 +214,20 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 					{item.path}: {item.error}
 				</p>
 			))}
-			{rows.map(repo =>
-				repo.worktrees.length === 0 ? null : (
+			{rows.map(repo => {
+				if (repo.worktrees.length === 0) return null;
+				const open = repo.worktrees.filter(entry => entry.blockers.length === 0);
+				const picked = open.filter(entry => selected.has(keyOf(entry))).length;
+				const pickAll = (): void =>
+					setSelected(current => {
+						const next = new Set(current);
+						for (const entry of open) {
+							if (picked === open.length) next.delete(keyOf(entry));
+							else next.add(keyOf(entry));
+						}
+						return next;
+					});
+				return (
 					<section key={repo.repository} className="space-y-2">
 						<h3 className="text-sm font-medium">
 							{repo.name} <span className="font-normal text-muted-foreground">{repo.path}</span>
@@ -216,7 +237,18 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 								<caption className="sr-only">Worktrees in {repo.name}</caption>
 								<thead className="text-xs text-muted-foreground">
 									<tr>
-										<th className="w-8" />
+										<th className="w-8">
+											<input
+												type="checkbox"
+												checked={open.length > 0 && picked === open.length}
+												ref={box => {
+													if (box) box.indeterminate = picked > 0 && picked < open.length;
+												}}
+												disabled={open.length === 0}
+												aria-label={`Select every removable worktree in ${repo.name}`}
+												onChange={pickAll}
+											/>
+										</th>
 										<th>Worktree</th>
 										<th>Last omp activity</th>
 										<th>Last commit</th>
@@ -230,6 +262,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 									{repo.worktrees.map(entry => {
 										const measured = metrics[keyOf(entry)];
 										const blocked = entry.blockers.length > 0;
+										const { folder, name } = pathParts(entry.path, repo.path);
 										return (
 											<tr key={keyOf(entry)}>
 												<td>
@@ -249,8 +282,9 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 												</td>
 												<td className="max-w-64 pr-3">
 													<div className="truncate font-medium">{entry.branch ?? "Detached"}{entry.main ? " · Main" : ""}{entry.locked !== null ? " · Locked" : ""}</div>
-													<div className="truncate text-muted-foreground" title={entry.path}>
-														{entry.path}
+													<div className="flex min-w-0 text-muted-foreground" title={entry.path}>
+														<span className="truncate">{folder}</span>
+														<span className="shrink-0">{name}</span>
 													</div>
 												</td>
 												<td className="pr-3 whitespace-nowrap">{activityText(entry)}</td>
@@ -275,8 +309,8 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 							</table>
 						</div>
 					</section>
-				),
-			)}
+				);
+			})}
 			{chosen.length > 0 ? (
 				<Button type="button" variant="primary" size="compact" onClick={() => ask(chosen)}>
 					Delete selected ({chosen.length})

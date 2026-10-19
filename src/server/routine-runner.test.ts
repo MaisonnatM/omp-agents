@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyPins } from "../shared/pins";
-import type { SessionPreset } from "../shared/presets";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
 import { RoutineRunner, SESSION_START_DEADLINE_MS } from "./routine-runner";
@@ -25,9 +24,9 @@ function routinesPath(): string {
 
 const everyHour = { kind: "every" as const, minutes: 60 };
 
-function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false }, preset: string | null = null): RoutinesFile {
+function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false }): RoutinesFile {
 	const file = new RoutinesFile(path);
-	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "prompt" ? "ship" : null, preset, enabled: true } }, T0);
+	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "prompt" ? "ship" : null, enabled: true } }, T0);
 	return file;
 }
 
@@ -37,7 +36,7 @@ function addPrompts(file: RoutinesFile, count: number): void {
 		file.apply(
 			{
 				op: "save",
-				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}`, pin: false }, skill: null, preset: null, enabled: true },
+				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}`, pin: false }, skill: null, enabled: true },
 			},
 			T0,
 		);
@@ -53,7 +52,7 @@ interface FakeExec {
 }
 
 /** A runner over `file` with a fake clock, starter, sessions, commands, and pins. */
-function harness(file: RoutinesFile, checkedOut: string | null = "main") {
+function harness(file: RoutinesFile) {
 	const sessions = new Map<string, { status: HostStatus; ended: boolean }>();
 	const fake = {
 		now: T0 + HOUR,
@@ -65,7 +64,6 @@ function harness(file: RoutinesFile, checkedOut: string | null = "main") {
 		pins: [] as string[],
 		/** Each pin change and session end, in order. */
 		log: [] as string[],
-		presets: [] as SessionPreset[],
 		/** What reached projects, and the error a project answers with, by id. */
 		notified: [] as string[],
 		projectErrors: new Map<string, string>(),
@@ -102,8 +100,6 @@ function harness(file: RoutinesFile, checkedOut: string | null = "main") {
 			fake.pins = applyPins(fake.pins, change);
 			fake.log.push(`${change.op} ${change.sessionIds.join(",")}`);
 		},
-		preset: id => fake.presets.find(preset => preset.id === id) ?? null,
-		checkedOut: async () => checkedOut,
 		notifyProject(projectId, { source, title, text }) {
 			const error = fake.projectErrors.get(projectId) ?? null;
 			if (error === null) fake.notified.push(`${projectId}: ${source}: ${title}: ${text}`);
@@ -171,23 +167,6 @@ describe("RoutineRunner", () => {
 		fake.now += HOUR;
 		await runner.tick();
 		expect(file.value[0]?.runs[0]?.errors).toEqual(["Notes: project Billing is archived."]);
-	});
-
-	test("a new-branch preset refuses a run outside a checked-out Git branch", async () => {
-		const file = fileWith(routinesPath(), undefined, "ship");
-		const { runner, fake } = harness(file, null);
-		fake.presets = [{ id: "ship", name: "Ship", model: null, thinking: null, tools: null, skill: "mma-mode", worktree: "new-branch" }];
-		await runner.tick();
-		expect(fake.requests).toEqual([]);
-		expect(file.value[0]?.runs[0]?.errors).toEqual(["Notes: its preset needs a checked-out Git branch."]);
-	});
-
-	test("a routine whose preset was removed starts nothing and fails the run, rather than run with every tool", async () => {
-		const file = fileWith(routinesPath(), undefined, "gone");
-		const { runner, fake } = harness(file);
-		await runner.tick();
-		expect(fake.requests).toEqual([]);
-		expect(file.value[0]?.runs[0]?.errors).toEqual(["Notes: its preset was removed."]);
 	});
 
 	test("a start that fails records the error, and the next run tries again", async () => {
@@ -293,7 +272,7 @@ describe("RoutineRunner", () => {
 
 	test("a routine that does not pin, and a session ended at the start deadline, pin nothing", async () => {
 		const file = fileWith(routinesPath());
-		file.apply({ op: "save", routine: { id: "r2", name: "Retro", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, skill: null, preset: null, enabled: true } }, T0);
+		file.apply({ op: "save", routine: { id: "r2", name: "Retro", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, skill: null, enabled: true } }, T0);
 		const { runner, fake } = harness(file);
 		await runner.tick();
 		fake.sessions.get("i1")!.status = "working";
@@ -364,7 +343,7 @@ describe("RoutineRunner", () => {
 		test("runs while every session slot is busy", async () => {
 			const file = fileWith(routinesPath());
 			addPrompts(file, 3);
-			file.apply({ op: "save", routine: { id: "r4", name: "Prune", cwd: "/work/other", schedules: [everyHour], task: command, skill: null, preset: null, enabled: true } }, T0);
+			file.apply({ op: "save", routine: { id: "r4", name: "Prune", cwd: "/work/other", schedules: [everyHour], task: command, skill: null, enabled: true } }, T0);
 			const { runner, fake } = harness(file);
 			await runner.tick();
 			expect(fake.requests).toHaveLength(3);

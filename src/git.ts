@@ -35,6 +35,12 @@ export async function commonDir(cwd: string): Promise<string> {
 	return canonical((await git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")).trim());
 }
 
+/** The git directory every worktree of `dir`'s repository shares, `null` when `dir` is gone or outside git. */
+export async function repositoryAt(dir: string): Promise<string | null> {
+	const { code, stdout } = await run(["git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"]);
+	return code === 0 ? canonical(stdout.trim()) : null;
+}
+
 /** Git's NUL-separated porcelain format preserves paths and lock reasons containing newlines. Main checkout first. */
 export function parseWorktrees(porcelain: string): Registration[] {
 	return porcelain.split("\0\0").filter(Boolean).map((block, index) => {

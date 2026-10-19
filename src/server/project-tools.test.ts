@@ -22,7 +22,7 @@ const PROJECT: Project = {
 	maxWorkers: 3,
 	watch: { pullRequests: true, linear: null },
 	reviewCadence: "every PR",
-	queue: [{ id: "q1", title: "Later", at: AT, start: { cwd: "/work/app", prompt: "Later.", branch: null, model: null, thinking: null, skill: null, tools: null } }],
+	queue: [{ id: "q1", title: "Later", at: AT, start: { cwd: "/work/app", prompt: "Later.", branch: null, model: null, thinking: null, skill: null } }],
 };
 
 const control = (project: Project): ProjectControl => ({

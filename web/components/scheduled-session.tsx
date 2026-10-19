@@ -1,6 +1,5 @@
 /** A scheduled new session's start, opened from the sidebar to view and edit as the new-session draft it was scheduled from. */
 import { useContext, useState } from "react";
-import type { SessionPreset } from "../../src/shared/presets";
 import type { ScheduledChange, ScheduledSend } from "../../src/shared/scheduled";
 import { hashForSession, newSessionRequest, type NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -18,13 +17,11 @@ interface ScheduledSessionProps {
 	workspaces: Workspace[];
 	connected: boolean;
 	completions: Completions | null;
-	/** The saved presets, which the draft's preset picker offers. */
-	presets: SessionPreset[];
 	/** The todo `todoId` names, as the new-session draft words it. */
 	todoOf: (todoId: string | null) => { text: string; prompt: string } | null;
 }
 
-export function ScheduledSession({ id, workspaces, connected, completions, presets, todoOf }: ScheduledSessionProps) {
+export function ScheduledSession({ id, workspaces, connected, completions, todoOf }: ScheduledSessionProps) {
 	const send = useContext(ScheduledSends).find(candidate => candidate.id === id);
 	if (!send) return <p className="m-auto text-sm text-muted-foreground">It is no longer scheduled: it started, or was canceled.</p>;
 	if (send.target.kind === "message") {
@@ -35,7 +32,7 @@ export function ScheduledSession({ id, workspaces, connected, completions, prese
 		);
 	}
 	// Keyed by the send, so another one opens as its own draft.
-	return <ScheduledDraftPage key={send.id} send={send} request={send.target.request} workspaces={workspaces} connected={connected} completions={completions} presets={presets} todoOf={todoOf} />;
+	return <ScheduledDraftPage key={send.id} send={send} request={send.target.request} workspaces={workspaces} connected={connected} completions={completions} todoOf={todoOf} />;
 }
 
 interface DraftPageProps extends Omit<ScheduledSessionProps, "id"> {
@@ -43,7 +40,7 @@ interface DraftPageProps extends Omit<ScheduledSessionProps, "id"> {
 	request: NewSessionRequest;
 }
 
-function ScheduledDraftPage({ send, request, workspaces, connected, completions, presets, todoOf }: DraftPageProps) {
+function ScheduledDraftPage({ send, request, workspaces, connected, completions, todoOf }: DraftPageProps) {
 	const { request: ask, send: post } = useDashboardActions();
 	const [cwd, setCwd] = useState(request.cwd);
 	const now = useMinute();
@@ -60,7 +57,6 @@ function ScheduledDraftPage({ send, request, workspaces, connected, completions,
 			launch={null}
 			connected={connected}
 			completions={completions}
-			presets={presets}
 			onComplete={(reqId, text, cursor) => post({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
 			onPickCwd={setCwd}
 			onStart={op => change.run(updated(op, null), { op: "send-now", id: send.id })}

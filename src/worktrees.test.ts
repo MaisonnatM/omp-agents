@@ -198,7 +198,7 @@ describe("worktree removal", () => {
 		expect((await quiet.inventory(null)).repositories).toEqual([]);
 	});
 
-	test("lists each repository once, in the order of the first directory in it, and a directory outside git as an error", async () => {
+	test("lists each repository once, in the order of the first directory in it, and skips a directory gone or outside git unless it is requested", async () => {
 		const first = await repo();
 		const second = await repo();
 		const wip = await linked(first.parent, first.main);
@@ -206,7 +206,7 @@ describe("worktree removal", () => {
 		dirs.push(outside);
 		const sessions = [wip, wip, first.main, wip].map((cwd, index) => ({ id: `s${index}`, cwd, modifiedAt: index }));
 		const listed = await new Worktrees({
-			knownCwds: () => [second.main, wip, outside, first.main],
+			knownCwds: () => [second.main, wip, outside, join(outside, "gone"), first.main],
 			activity: () => [...sessions, { id: "gone", cwd: join(outside, "missing", "deeper"), modifiedAt: 9 }],
 			live: () => [],
 			serverCwd: "/no/such/dashboard",
@@ -214,7 +214,8 @@ describe("worktree removal", () => {
 		expect(listed.repositories.map(item => item.path)).toEqual([second.main, first.main]);
 		expect(listed.repositories[1]?.worktrees.map(entry => entry.path)).toEqual([first.main, wip]);
 		expect(listed.repositories[1]?.worktrees[1]?.savedSessionIds).toEqual(["s0", "s1", "s3"]);
-		expect(listed.errors.map(error => error.path)).toEqual([outside]);
+		expect(listed.errors).toEqual([]);
+		expect((await quiet.inventory(outside)).errors).toEqual([{ path: outside, error: "Not in a Git repository." }]);
 	});
 
 	test("releaseBranch removes the clean linked worktree that has the branch checked out", async () => {

@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { lstat, readdir } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
-import { canonical, commonDir, git, worktreeAt, worktreesOf, type Registration } from "./git";
+import { canonical, commonDir, git, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { run } from "./proc";
@@ -224,10 +224,10 @@ export class Worktrees {
 		const snapshot = await this.#snapshot();
 		const serverPath = await this.#serverPath();
 		const cwds = scope === null ? this.env.knownCwds() : [scope];
-		const repositoryOf = await probeEach(cwds, commonDir);
+		const repositoryOf = await probeEach(cwds, repositoryAt);
 		const repositories = new Set(cwds.flatMap(cwd => {
 			const probed = repositoryOf.get(cwd);
-			return probed?.ok ? [probed.value] : [];
+			return probed?.ok && probed.value !== null ? [probed.value] : [];
 		}));
 		const listingOf = await probeEach(repositories, async repository => {
 			const listed = await worktreesOf(repository);
@@ -241,6 +241,11 @@ export class Worktrees {
 		for (const cwd of cwds) {
 			try {
 				const repository = unwrap(repositoryOf.get(cwd));
+				// A directory sessions ran in that is gone or outside git has no worktrees; only a path asked for says so.
+				if (repository === null) {
+					if (scope !== null) result.errors.push({ path: cwd, error: "Not in a Git repository." });
+					continue;
+				}
 				if (known.has(repository)) continue;
 				known.add(repository);
 				const { listed } = unwrap(listingOf.get(repository));

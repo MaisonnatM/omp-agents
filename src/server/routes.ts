@@ -19,7 +19,6 @@ import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNam
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
-import { builtinTools } from "../omp/modules";
 import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
 import { readStats, windowOf } from "../omp/stats";
@@ -199,9 +198,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	/** `GET /api/models`: the models omp lists, for the settings page's pickers. */
 	const models = get(() => answer(async () => ({ models: await listModels() })));
 
-	/** `GET /api/tools`: omp's built-in tool names, which a preset's tool list offers. */
-	const tools = get(() => answer(async () => ({ tools: [...builtinTools.BUILTIN_TOOL_NAMES] })));
-
 	/** `GET /api/models/connected?cwd=<dir>`: the models of the providers you are connected to, for the new-session draft's model picker. */
 	const connected = get(async params => {
 		const cwd = await dirParam(params);
@@ -332,7 +328,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
 		"/api/models/roles": { GET: roles },
-		"/api/tools": { GET: tools },
 		"/api/replay/detail": { GET: replayRead(false) },
 		"/api/replay/compare": { GET: replayRead(true) },
 		"/api/analytics": { GET: analytics },

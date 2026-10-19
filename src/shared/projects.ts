@@ -49,7 +49,6 @@ export interface WorkerStart {
 	model: ModelOption | null;
 	thinking: string | null;
 	skill: string | null;
-	tools: string[] | null;
 }
 
 /** A worker the coordinator asked for while the project ran {@link Project.maxWorkers} busy workers. */

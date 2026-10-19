@@ -5,7 +5,6 @@ import { join } from "node:path";
 import type { RpcLaunch } from "../omp/rpc";
 import { HOME } from "../paths";
 import type { Project, ProjectEvent } from "../shared/projects";
-import type { SessionPreset } from "../shared/presets";
 import type { HostStatus, StartRequest, StartResult, UserAnswer, UserRequest } from "../shared/sessions";
 import { projectNotices } from "./notices";
 import { type ProjectLaunch, ProjectRunner } from "./project-runner";
@@ -60,7 +59,6 @@ interface Harness {
 interface HarnessOptions {
 	/** The branch checked out in every directory; `null` outside git. */
 	checkedOut?: string | null;
-	presets?: SessionPreset[];
 	/** The session ids that ran when the last server stopped. */
 	stoppedWithServer?: string[];
 }
@@ -142,7 +140,6 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		},
 		interrupted: () => true,
 		stoppedWithServer: sessionId => options.stoppedWithServer?.includes(sessionId) ?? false,
-		preset: id => options.presets?.find(preset => preset.id === id) ?? null,
 		checkedOut: async () => options.checkedOut ?? null,
 		extensionArgs: () => ["-e", "/repo/projects.ts"],
 		seedNotes: id => seeded.push(id),
@@ -369,13 +366,11 @@ describe("ProjectRunner", () => {
 		expect(branches.slice(1)).toEqual([{ kind: "new", name: "docs/billing", base: "main" }, null]);
 	});
 
-	test("a worker starts on the model, thinking level, and skill it names, its preset filling the rest", async () => {
-		const review: SessionPreset = { id: "review", name: "Review", model: { provider: "openai", id: "gpt" }, thinking: "low", tools: ["read"], skill: "review", worktree: "here" };
-		const h = harness(projectsPath(), new Map(), { checkedOut: "main", presets: [review] });
+	test("a worker starts on the model, thinking level, and skill it names", async () => {
+		const h = harness(projectsPath(), new Map(), { checkedOut: "main" });
 		const { projectId } = await project(h, 0);
-		await startWorker(h, projectId, { title: "Review", prompt: "Review.", cwd: null, branch: null, model: "anthropic/claude-haiku-5-5", preset: "review" });
-		expect(h.launches.at(-1)?.request).toMatchObject({ model: { provider: "anthropic", id: "claude-haiku-5-5" }, thinking: "low", tools: ["read"], skill: "review", branch: null });
-		await expect(startWorker(h, projectId, { title: "X", prompt: "X.", cwd: null, preset: "gone" })).rejects.toThrow('No preset "gone"');
+		await startWorker(h, projectId, { title: "Review", prompt: "Review.", cwd: null, branch: "none", model: "anthropic/claude-haiku-5-5", thinking: "low", skill: "review" });
+		expect(h.launches.at(-1)?.request).toMatchObject({ model: { provider: "anthropic", id: "claude-haiku-5-5" }, thinking: "low", skill: "review", branch: null });
 		await expect(startWorker(h, projectId, { title: "X", prompt: "X.", cwd: null, model: "haiku" })).rejects.toThrow("model must read provider/id");
 	});
 
