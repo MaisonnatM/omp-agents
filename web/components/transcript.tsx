@@ -261,7 +261,7 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 											<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
 										</TraceLine>
 									</TraceCollapsibleTrigger>
-									<TraceCollapsibleContent>
+									<TraceCollapsibleContent className="text-[13px]">
 										<div data-thinking={entry.streaming ? "live" : "done"}>
 											<MessageMarkdown text={entry.text} />
 										</div>
