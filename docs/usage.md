@@ -343,8 +343,7 @@ An action that fails shows its error, and its control becomes available again.
   The settings page labels models the same way.
 - Click the branch of a pull request's row or details, of a session's header, or of a Linear issue's detail view to copy it; its icon turns into a check mark for a moment.
   A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a session's header, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
-  A session's header copies `cd <worktree>` when the session works in a linked worktree, so you can test its work in a terminal, and the branch's name otherwise; it removes nothing.
-  Copying the branch of a pull request's row also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
+  Copying the branch of a pull request's row or of a session's header also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
   It applies the checks of **Settings → Worktrees**: it never removes a repository's main checkout, a locked checkout, one with uncommitted or untracked changes, one a live session or this dashboard uses, or one with a nested repository.
   A toast names the worktree it removed, or the one it kept and why; a branch that no linked worktree has checked out shows no toast.
   Copying the branch of a pull request's details or of a Linear issue only copies.
@@ -657,7 +656,7 @@ An action that fails shows its error, and its control becomes available again.
   Conversations count the pull request's comments and review threads, resolved ones too, as GitHub's own list does, beside a speech bubble; a pull request with none shows no count.
   A narrow page drops the sessions, stack, and line columns.
   While you hover or focus a row, in the sidebar and in the table, a branch icon after its number copies the pull request's branch, which its tooltip names, without opening the pull request.
-  Copying it also removes the linked worktree of the workspace's repository that has that branch checked out, with the same checks and toasts as copying a past session's branch.
+  Copying it also removes the linked worktree of the workspace's repository that has that branch checked out, with the same checks and toasts as copying a session's branch.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
   A pull request that a running session asks you about is **Answer**, and one that a running session works on is **Working**.
