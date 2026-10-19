@@ -25,7 +25,7 @@ Open `#new/%2Ftmp` to start one in `/tmp`, use a prompt such as `Reply with just
 ## Isolated state
 
 A smoke server reads and writes the user's own state: `calendars.json`, `projects.json`, `token`, and the rest under `~/.config/omp-agents`, and project notes under the data directory.
-When a check changes that state, such as starting a project or hiding a calendar, start the server with temporary `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `XDG_STATE_HOME`, each a fresh `mktemp -d`.
+When a check changes that state, such as starting a project or hiding a calendar, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
 Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`, and its project notes are under `$XDG_DATA_HOME`.
 The omp sessions it starts still use the user's omp directory, so they still run with the user's models and sign-ins.
 
