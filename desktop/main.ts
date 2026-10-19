@@ -205,8 +205,9 @@ function savedBounds(): Partial<Rectangle> {
 	return visible ? { x, y, width, height } : { width, height };
 }
 
-/** Copy for selected text; cut, copy, paste, and spelling suggestions in a text field; nothing elsewhere. */
+/** Copy Image on an image; copy for selected text; cut, copy, paste, and spelling suggestions in a text field; nothing elsewhere. */
 function contextMenuItems(params: ContextMenuParams, contents: WebContents): MenuItemConstructorOptions[] {
+	if (params.mediaType === "image" && params.hasImageContents) return [{ label: "Copy Image", click: () => contents.copyImageAt(params.x, params.y) }];
 	if (!params.isEditable) return params.selectionText ? [{ role: "copy" }] : [];
 	const spelling = params.dictionarySuggestions.map(word => ({ label: word, click: () => contents.replaceMisspelling(word) }));
 	return [...spelling, ...(spelling.length ? [SEPARATOR] : []), { role: "cut" }, { role: "copy" }, { role: "paste" }, SEPARATOR, { role: "selectAll" }];
