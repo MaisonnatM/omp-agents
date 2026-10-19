@@ -1,0 +1,29 @@
+/**
+ * What the desktop shell's preload (`desktop/preload.ts`) gives the page as `window.ompDesktop`: the Dock badge and the
+ * system notifications of the sessions that need you, which the shell's main process (`desktop/attention.ts`) shows.
+ */
+import { fields, type Guard, isString } from "../json";
+
+/** The name the bridge takes on `window`; absent in a browser. */
+export const DESKTOP_BRIDGE = "ompDesktop";
+export const BADGE_CHANNEL = "omp-agents:badge";
+export const ALERT_CHANNEL = "omp-agents:alert";
+
+/** One moment a live session came to need you: it asked, or it ended a turn. */
+export interface SessionAlert {
+	/** The same moment keeps its key across roster pushes; another moment of the same session takes another. */
+	key: string;
+	/** The session it opens, through `hashForSession`. */
+	sessionId: string;
+	title: string;
+	body: string;
+}
+
+export const isSessionAlert: Guard<SessionAlert> = fields<SessionAlert>({ key: isString, sessionId: isString, title: isString, body: isString });
+
+export interface DesktopBridge {
+	/** Shows `count` on the Dock icon, nothing for 0. */
+	badge(count: number): void;
+	/** Shows `alert` as a system notification, whose click brings the window up on the session. */
+	alert(alert: SessionAlert): void;
+}

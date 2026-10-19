@@ -34,6 +34,7 @@ import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
 import { startOf } from "./starts";
+import { useAttention } from "./use-attention";
 import { useDashboard } from "./use-dashboard";
 import { useFocusedSession } from "./use-focused-session";
 import { useOverlays } from "./use-overlays";
@@ -64,6 +65,7 @@ export function App() {
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send);
+	useAttention(state, page, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;

@@ -381,6 +381,9 @@ export class Dashboard {
 			dismissInterrupted(sessionId) {
 				if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
 			},
+			markRead(instanceId) {
+				if (sessions.unread.clear(instanceId)) broadcasts.rosterChanged();
+			},
 			stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
@@ -544,6 +547,7 @@ export class Dashboard {
 				return;
 			case "event":
 				this.#views.applyEvent(instanceId, update.event);
+				if (this.#sessions.unread.observe(instanceId, update.event)) this.#broadcasts.rosterChanged();
 				return;
 			case "starting":
 				this.#views.starting(instanceId);

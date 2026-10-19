@@ -110,6 +110,14 @@ interface RosterHostBase extends SessionFacts {
 	requests: UserRequest[];
 	/** What waits on the main agent's turn. */
 	queue: MessageQueue;
+	/** The main agent's turn that ended since you last looked at the session; `null` once you did, or while a turn runs. */
+	unread: UnreadTurn | null;
+}
+
+/** A turn that ended unseen: when, in ms since the epoch, and the first line of its reply, `null` when it ended on none. */
+export interface UnreadTurn {
+	at: number;
+	reply: string | null;
 }
 
 export type RosterHost = RosterHostBase &

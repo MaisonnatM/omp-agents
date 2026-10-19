@@ -24,6 +24,8 @@ export interface SocketEnv {
 	end(instanceId: string): Promise<void>;
 	/** Move interrupted session `sessionId` to the past sessions. */
 	dismissInterrupted(sessionId: string): void;
+	/** You looked at live session `instanceId`, so the turn it ended is no longer unread. */
+	markRead(instanceId: string): void;
 	/** Whether interrupted session `sessionId` stopped while its turn ran. */
 	stoppedMidTurn(sessionId: string): boolean;
 	/** Run routine `id` now, whatever its schedule. */
@@ -114,6 +116,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	},
 	"dismiss-interrupted": ({ dismissInterrupted }, _peer, { sessionId }) => dismissInterrupted(sessionId),
 	end: ({ end }, _peer, { instanceId }) => end(instanceId),
+	read: ({ markRead }, _peer, { instanceId }) => markRead(instanceId),
 	async "list-models"({ sessions }, peer, { instanceId }) {
 		const session = sessions.started(instanceId);
 		if (!session) {

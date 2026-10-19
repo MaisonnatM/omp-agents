@@ -43,6 +43,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
 - Keyboard shortcuts: the table in `web/shortcuts.ts`, the page-wide handlers in `web/use-page-shortcuts.ts`, and the reference dialog in `web/components/shortcuts-dialog.tsx`.
 - Notification bell: `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
+- System notifications of sessions that ask or finish, and the desktop app's Dock badge: `useAttention` in `web/use-attention.ts`, shown by `desktop/attention.ts` in the desktop app; their switch is `SessionNotifications` in `web/components/settings/preferences-tab.tsx`.
 - Pages, each routed by `web/routing.ts`:
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
@@ -89,7 +90,8 @@ The server lives in `src/`:
   `src/server/start.ts` starts, forks, resumes, and replays dashboard sessions for the page's `start` and `resume-all` requests, and refuses to fork or resume a Claude Code or Codex session before it starts omp.
   `src/server/session-end.ts` ends a session for the page's `end` message and for the end inbox: `endSession` stops it, then calls `Worktrees.removeCheckout` on its worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
-  Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's facts, and the subject a quick action started it on, to make the roster rows.
+  Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's `unread` turn, the session's facts, and the subject a quick action started it on, to make the roster rows.
+  `src/server/unread-turns.ts` holds `UnreadTurns`, which the registry keeps as `unread`: the turn each session ended since a page showed it in a focused window, set and cleared by its main agent's `agent_end` and `agent_start` events, which `Dashboard` hands it, and cleared by the page's `read` message; see [Session notifications](architecture.md#session-notifications).
   The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
@@ -245,6 +247,7 @@ The server lives in `src/`:
   `src/server/pins-file.ts` keeps them in `pins.json` beside the access token and moves a file it cannot read to `pins.json.invalid`.
 - `src/shared/notices.ts`: the bell's `Notice`, an update (a newer omp or a `ModelUpdate`) with its `NoticeStatus`, a pull request with your move, a Slack message, a used-up plan window, a provider out of credits, a calendar event, or a project that needs you, with its seen and read flags, and the socket's `NOTICE_OPS`.
   `src/server/notices.ts` checks for them and runs the updates through `src/omp/release.ts` and `src/settings.ts`; `src/omp/model-updates.ts` finds the newer models and the routing edits that switch to them, `src/slack-messages.ts` the Slack messages that wait on you, and `src/omp/stats.ts` the providers out of credits; see [Notifications](architecture.md#notifications).
+- `src/shared/desktop-bridge.ts`: `DesktopBridge`, what the desktop shell's preload gives the page as `window.ompDesktop`, its IPC channels, and `SessionAlert`, one moment a session came to need you, which the page raises and the shell's main process shows.
 - `src/shared/moves.ts`: a pull request's moves, `moveOf`, which picks one from its facts and from where the running sessions on it stand (`agentOn`), `actionFacts`, which lays a pull request's details over its list entry so its details page decides its move and quick actions from what the Status shows, and `YOUR_MOVES`, the ones that wait on you, which the Pull requests page and the bell share.
 - `src/server/json-inbox.ts`: `JsonInboxDir<T>`, the directory of one-JSON-file requests that `todo-inbox.ts` and `end-inbox.ts` both read.
   Each inbox gives it a `parse` that turns a file into a request, or says why it is not one, and an `apply` that returns whether the file is done.
@@ -429,6 +432,8 @@ The page lives in `web/`.
   `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell, its source filters, and its list, and `NoticeOrigin`, the logo and name of where a notice came from.
   `web/components/use-notice-toasts.tsx` holds `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once under its `NoticeOrigin`, even with the sidebar hidden.
   Both draw each notice from `presentNotice` in `web/notice-model.ts`, the one place that tells notice kinds apart: its source, headline, preview, link, face, action, and toast policy.
+  `web/use-attention.ts` holds `useAttention`, which `web/app.tsx` calls too: it sends the desktop app's Dock badge, raises a session notification through the desktop bridge or the browser's Notifications API, and sends `read` for the unread sessions the panes show in a focused window; `useSessionNotifications` there is the **Settings › Preferences** switch.
+  `web/attention.ts` holds its rules: `yourSessions`, which leaves out a project's workers, `needsYou`, `alertsOf`, `freshAlerts`, which raises each alert once and none for what waited when the page loaded, and `unreadShown`.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
   Every other list groups its top-level todos by status, in `STATUS_GROUPS` order, under fold headers whose folds `useFolds` keeps; the page puts the list on the left and the open todo's `detail.tsx` on the right in a `ListSplit`.
@@ -539,6 +544,7 @@ It is not loaded or applied by the dashboard; [omp modules](architecture.md#omp-
 
 `desktop/` holds the desktop shell; see [Desktop shell](architecture.md#desktop-shell).
 `desktop/main.ts` is its main process, with `desktop/shell-env.ts` and `desktop/updates.ts` for the packaged app, and `bun run desktop` at the root installs the package and starts it from the checkout through `desktop/launch.ts`; `scripts/build-desktop-artifact.ts` packages it (see [Packaging and releases](architecture.md#packaging-and-releases)).
+`desktop/preload.ts` is the window's preload, which gives the page the `DesktopBridge`, and `desktop/attention.ts` takes what the page sends through it: the Dock badge's count and the session notifications, whose click shows the window on the session.
 On macOS the launcher clones `node_modules/electron/dist/Electron.app` to `desktop/dist/omp agents.app`, sets its `CFBundleName`, `CFBundleDisplayName`, and `CFBundleIdentifier`, gives it an `.icns` that it renders from `icon.png` with `sips` and `iconutil`, signs it ad hoc, and runs that copy, because the Dock, the menu bar, and Cmd+Tab read an app's name and icon from its bundle.
 It rebuilds the copy when Electron's version or `icon.png` changes.
 `desktop/icon.svg` is the app icon, the logo mark on a macOS-style tile, and `desktop/icon.png` is that SVG rendered at 1024 px, because Electron reads no SVG; render it again after you change the SVG.

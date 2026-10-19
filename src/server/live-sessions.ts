@@ -6,6 +6,7 @@ import type { LiveSession, LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
 import { type RosterHost, type SessionFacts, type WorkItem, worksOn } from "../shared/sessions";
+import { UnreadTurns } from "./unread-turns";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
@@ -19,6 +20,8 @@ export class LiveSessions {
 	readonly #sessions = new Map<string, LiveSession>();
 	/** What the sessions started from a quick action work on, by instance id, for as long as they run. */
 	readonly #subjects = new Map<string, WorkItem>();
+	/** The turns each session ended since you last looked at it. */
+	readonly unread = new UnreadTurns();
 	/**
 	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
 	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
@@ -71,6 +74,7 @@ export class LiveSessions {
 	remove(instanceId: string): void {
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
+		this.unread.clear(instanceId);
 		this.#reindex();
 		forgetSession(instanceId);
 	}
@@ -81,11 +85,12 @@ export class LiveSessions {
 		this.#bySessionId = index;
 	}
 
-	/** Each session's roster row, with its `cwdDisplay` and what the session files' index knows of it. */
+	/** Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it. */
 	rows(factsOf: (sessionId: string) => SessionFacts): RosterHost[] {
 		return [...this.#sessions.values()].map(session => ({
 			...session.row(),
 			cwdDisplay: displayPath(session.cwd),
+			unread: this.unread.of(session.instanceId),
 			...withSubject(factsOf(session.sessionId), this.#subjects.get(session.instanceId)),
 		}));
 	}

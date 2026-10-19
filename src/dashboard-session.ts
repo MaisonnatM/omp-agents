@@ -76,7 +76,7 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
 
 /** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
-function lastReply(messages: unknown): string | null {
+export function lastReply(messages: unknown): string | null {
 	if (!Array.isArray(messages)) return null;
 	for (const message of messages.toReversed()) {
 		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;

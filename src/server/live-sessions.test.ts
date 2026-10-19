@@ -51,4 +51,15 @@ describe("LiveSessions", () => {
 		expect(sessions.get("i1")).toBeUndefined();
 		expect(sessions.bySessionId("s1")).toBeUndefined();
 	});
+
+	test("a row carries the turn its session ended unseen until the session leaves, and a session that returns starts read", () => {
+		const sessions = new LiveSessions(() => {});
+		const live = { instanceId: "i1", sessionId: "s1", cwd: "/work", row: () => ({ instanceId: "i1" }), follow() {}, finished: () => false } as unknown as LiveSession;
+		sessions.add(live, null);
+		sessions.unread.observe("i1", { type: "agent_end", messages: [{ role: "assistant", content: [{ type: "text", text: "Done." }] }] });
+		expect(sessions.rows(() => facts)[0]?.unread).toEqual({ at: expect.any(Number), reply: "Done." });
+		sessions.remove("i1");
+		sessions.add(live, null);
+		expect(sessions.rows(() => facts)[0]?.unread).toBeNull();
+	});
 });

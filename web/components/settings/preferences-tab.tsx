@@ -8,6 +8,7 @@ import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
 import { hideTab, moveTab, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
+import { useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
@@ -102,6 +103,23 @@ function PinnedSkill({ cwd, workspace }: { cwd: string | null; workspace: string
 	);
 }
 
+/** The system notifications of sessions that ask you something or end a turn, while the window is not focused. */
+function SessionNotifications() {
+	const { on, blocked, set } = useSessionNotifications();
+	return (
+		<Section
+			title="Notifications"
+			meta="A system notification when a session asks you something or finishes a turn while this window is not focused; clicking it opens the session. Saved in this browser."
+		>
+			<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
+				<PreferenceSwitch checked={on} onCheckedChange={set} disabled={blocked !== null && !on} />
+				Notify me when a session needs me
+			</label>
+			{blocked && <p className="text-xs text-muted-foreground">{blocked}</p>}
+		</Section>
+	);
+}
+
 /** The dashboard's own choices, kept in this browser rather than in omp's files. `workspace` names `cwd` for the skill list. */
 export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspace: string | null }) {
 	const [theme, setTheme] = useTheme();
@@ -137,6 +155,7 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 				</div>
 			</Section>
 			<SidebarTabs />
+			<SessionNotifications />
 			<PinnedSkill cwd={cwd} workspace={workspace} />
 		</>
 	);

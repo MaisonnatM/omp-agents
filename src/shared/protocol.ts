@@ -78,6 +78,8 @@ export type ClientMsg =
 	| { t: "complete"; reqId: number; scope: CompletionScope; text: string; cursor: number }
 	/** End a live session: stop the omp process this dashboard started, or send SIGTERM to a terminal session's omp. */
 	| { t: "end"; instanceId: string }
+	/** The page shows live session `instanceId` in a focused window, so its roster row's `unread` turn is read. */
+	| { t: "read"; instanceId: string }
 	/** Start a dashboard session. `reqId` counts per page and comes back with the answer. */
 	| ({ t: "start"; reqId: number } & StartRequest)
 	/** Create a project and start its coordinator in `cwd` on `prompt`, at `model` and `thinking` as `start` takes them, answered with `started` for `reqId` as a `start` is. An empty `name` reads as New project. */

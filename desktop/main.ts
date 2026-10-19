@@ -6,9 +6,9 @@
 // First: a packaged app takes the login shell's environment before `src/paths.ts` reads it.
 import "./shell-env";
 import { type ChildProcess, execFile, spawn } from "node:child_process";
-import { readdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { createInterface, type Interface } from "node:readline";
 import type { Readable } from "node:stream";
 import {
@@ -26,10 +26,10 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { tokenFile, userTodosFile } from "../src/paths";
+import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
-import { parseUserTodoList } from "../src/user-todos-parse";
+import { showAttention } from "./attention";
 import { startUpdates, type Updates } from "./updates";
 
 const PORT = portFromEnv();
@@ -64,6 +64,8 @@ const ERR_ABORTED = -3;
 const IS_MAC = process.platform === "darwin";
 /** `icon.svg` rendered at 1024 px; Electron reads no SVG. */
 const ICON = join(app.getAppPath(), "icon.png");
+/** `preload.ts` as `bun run build` bundles it. */
+const PRELOAD = join(app.getAppPath(), "dist", "preload.cjs");
 const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
 /** Brings the window up with the command palette open on Create todo, from any app. */
 const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
@@ -232,7 +234,7 @@ function createWindow(): BrowserWindow {
 		title: "omp agents",
 		// macOS takes the app's icon from the Dock instead.
 		icon: ICON,
-		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD },
 	});
 	win.once("ready-to-show", () => win.show());
 
@@ -353,28 +355,6 @@ function removeOldLoginAgents(): void {
 	} catch {}
 }
 
-/** The Dock and taskbar badge counts the top-level todos left, as the Todo tab's **All** does; none clears it. */
-function showTodosLeft(): void {
-	let left = 0;
-	try {
-		const list = parseUserTodoList(JSON.parse(readFileSync(userTodosFile, "utf8")));
-		left = list?.todos.filter(todo => todo.doneAt === null).length ?? 0;
-	} catch {}
-	app.setBadgeCount(left);
-}
-
-/** The server replaces `todos.json` through a temporary file, so the watch is on its directory. */
-function watchTodosLeft(): void {
-	showTodosLeft();
-	try {
-		watch(dirname(userTodosFile), (_event, name) => {
-			if (name === basename(userTodosFile)) showTodosLeft();
-		});
-	} catch (err) {
-		console.error(`omp-agents: cannot watch ${userTodosFile}: ${errorText(err)}`);
-	}
-}
-
 if (!app.requestSingleInstanceLock()) {
 	app.quit();
 } else {
@@ -406,7 +386,7 @@ if (!app.requestSingleInstanceLock()) {
 		app.dock?.setIcon(ICON);
 		win = createWindow();
 		void connect(win);
-		watchTodosLeft();
+		showAttention(win, isDashboard, reveal);
 		const quickTodo = (): void => {
 			reveal();
 			void win?.webContents.executeJavaScript(`window.dispatchEvent(new Event(${JSON.stringify(QUICK_TODO_EVENT)}))`).catch(() => {});
