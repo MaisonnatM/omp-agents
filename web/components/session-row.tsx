@@ -53,23 +53,21 @@ interface RowLineProps {
 /** The look of what ends a session row: muted, small, and pushed right. */
 export const ROW_END = "ml-auto shrink-0 text-xs tabular-nums text-muted-foreground";
 
-/** A sidebar session row's one line: its dot, label, muted facts, then its badge and what ends it at the right. Scheduled sends share it. */
+/** A sidebar session row's one line: its label, muted facts, then its badge, what ends it, and its dot at the right. Scheduled sends share it. */
 export function RowLine({ dot, badge, label, after, facts, end }: RowLineProps) {
 	return (
-		<>
-			{dot}
-			<span className="flex min-w-0 flex-1 items-baseline gap-2">
-				<span className="truncate font-medium text-foreground">{label}</span>
-				{after}
-				{facts && (
-					<span className={cn("shrink-0 text-xs", facts.alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} title={facts.title}>
-						{facts.text}
-					</span>
-				)}
-				{badge && <span className="ml-auto flex shrink-0 self-center">{badge}</span>}
-				{end}
-			</span>
-		</>
+		<span className="flex min-w-0 flex-1 items-baseline gap-2">
+			<span className="truncate font-medium text-foreground">{label}</span>
+			{after}
+			{facts && (
+				<span className={cn("shrink-0 text-xs", facts.alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} title={facts.title}>
+					{facts.text}
+				</span>
+			)}
+			{badge && <span className="ml-auto flex shrink-0 self-center">{badge}</span>}
+			{end}
+			{dot && <span className="flex shrink-0 self-center">{dot}</span>}
+		</span>
 	);
 }
 
