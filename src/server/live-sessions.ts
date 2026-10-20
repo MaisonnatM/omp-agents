@@ -63,19 +63,17 @@ export class LiveSessions {
 			instanceId,
 			emit: update => {
 				if (update.kind === "switched") this.#reindex();
-				this.#report(instanceId, update);
+				this.#onUpdate(instanceId, update);
 			},
 		};
 	}
 
-	/** Keeps session `instanceId`'s unread turn from what it reports, then hands the report on. */
-	#report(instanceId: string, update: SessionUpdate): void {
-		if (update.kind === "turn-started") this.#unread.delete(instanceId);
-		else if (update.kind === "turn-ended") this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(update.reply) });
-		this.#onUpdate(instanceId, update);
+	/** Session `instanceId` ended a turn with `reply`, which stays unread until a look or its next turn reads it. */
+	markUnread(instanceId: string, reply: string | null): void {
+		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(reply) });
 	}
 
-	/** A page showed session `instanceId` in a focused window; whether it had a turn unread. */
+	/** A page showed session `instanceId` in a focused window, or its next turn started; whether it had a turn unread. */
 	markRead(instanceId: string): boolean {
 		return this.#unread.delete(instanceId);
 	}
@@ -140,7 +138,7 @@ export class LiveSessions {
 		const kept = this.#sessions.size;
 		for (const host of hosts) {
 			if (!this.#sessions.has(host.instanceId)) {
-				this.#sessions.set(host.instanceId, new SessionGuest(host, update => this.#report(host.instanceId, update)));
+				this.#sessions.set(host.instanceId, new SessionGuest(host, update => this.#onUpdate(host.instanceId, update)));
 			}
 		}
 		this.#reindex();

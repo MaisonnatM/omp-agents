@@ -13,32 +13,72 @@ export function yourSessions(hosts: readonly RosterHost[], projects: readonly Pr
 /** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since. */
 export const needsYou = (host: RosterHost): boolean => host.status === "needs-input" || host.unread !== null;
 
-/** What each of `hosts` waits on you for now, one alert per session: its oldest open question, else its unread turn. */
-export function alertsOf(hosts: readonly RosterHost[]): SessionAlert[] {
-	return hosts.flatMap(host => {
-		const at = { hash: hashForSession(host.sessionId), title: hostLabel(host) };
-		const [request] = host.requests;
-		if (request) {
-			const body = request.kind === "confirm" ? `${request.title}\n${request.message}` : request.title;
-			return [{ ...at, key: `${host.instanceId}/ask/${request.id}`, body }];
-		}
-		// A terminal session can wait on a dialog of its own that Collab does not relay as a question.
-		if (host.status === "needs-input") return [{ ...at, key: `${host.instanceId}/input`, body: "Waits for your input." }];
-		if (host.unread) return [{ ...at, key: `${host.instanceId}/turn/${host.unread.at}`, body: host.unread.reply ?? "Finished its turn." }];
-		return [];
-	});
+/**
+ * What a session waits on you for now: its oldest open question, else a wait with no question relayed (a terminal
+ * session's own dialog, or the placeholder a terminal session shows until its host replays the question), else its
+ * unread turn. A question and a turn carry a key that names them across roster pushes; the bare wait has none.
+ */
+type Moment = { kind: "ask" | "turn"; key: string; body: string } | { kind: "input"; body: string };
+
+function momentOf(host: RosterHost): Moment | null {
+	const [request] = host.requests;
+	if (request) return { kind: "ask", key: `ask/${request.id}`, body: request.kind === "confirm" ? `${request.title}\n${request.message}` : request.title };
+	if (host.status === "needs-input") return { kind: "input", body: "Waits for your input." };
+	if (host.unread) return { kind: "turn", key: `turn/${host.unread.at}`, body: host.unread.reply ?? "Finished its turn." };
+	return null;
 }
 
 /**
- * The alerts of `now` never heard, and the keys heard from now on. `heard` is `null` until the first roster, whose
- * alerts all count as heard, so a page that loads raises none for what already waited. A key stays heard once it is,
- * so a question that a reconnect replays, or a wait that flaps, raises no second alert.
+ * What the page knows of one live session. `wait` is the episode it is in: `null` while it does not need you, `"input"`
+ * while the episode showed only a wait with no question, and `"told"` once it showed a question or a turn. `heard` holds
+ * the keys of the questions and turns found or raised, which stay heard while the session lives.
  */
-export function freshAlerts(heard: ReadonlySet<string> | null, now: readonly SessionAlert[]): { fresh: SessionAlert[]; heard: Set<string> } {
-	const keys = new Set(heard);
-	const fresh = now.filter(alert => !keys.has(alert.key));
-	for (const alert of now) keys.add(alert.key);
-	return { fresh: heard === null ? [] : fresh, heard: keys };
+interface Watch {
+	wait: "input" | "told" | null;
+	heard: ReadonlySet<string>;
+}
+
+/** The live sessions this page has seen, by instance id. */
+export type Attention = ReadonlyMap<string, Watch>;
+
+/** Whether `moment` of a session the page has seen as `seen` raises an alert. */
+function raises(seen: Watch, moment: Moment): boolean {
+	switch (moment.kind) {
+		case "input":
+			return seen.wait === null;
+		case "ask":
+			// A question that details the bare wait already raised or found is the same episode.
+			return seen.wait !== "input" && !seen.heard.has(moment.key);
+		case "turn":
+			return !seen.heard.has(moment.key);
+		default: {
+			const unhandled: never = moment;
+			return unhandled;
+		}
+	}
+}
+
+/**
+ * The alerts that `hosts`, the sessions on the roster now, raise after `before`, and what the page knows from now on.
+ * A session the page sees for the first time raises nothing, so what already waited when the page loaded, or before a
+ * terminal session joined, stays quiet; a session that came to need you since the page saw it not needing you raises.
+ */
+export function attend(before: Attention, hosts: readonly RosterHost[]): { raise: SessionAlert[]; attention: Attention } {
+	const raise: SessionAlert[] = [];
+	const attention = new Map<string, Watch>();
+	for (const host of hosts) {
+		const seen = before.get(host.instanceId);
+		const moment = momentOf(host);
+		const heard = seen?.heard ?? new Set<string>();
+		if (!moment) {
+			attention.set(host.instanceId, { wait: null, heard });
+			continue;
+		}
+		if (seen && raises(seen, moment)) raise.push({ hash: hashForSession(host.sessionId), title: hostLabel(host), body: moment.body });
+		if (moment.kind === "input") attention.set(host.instanceId, { wait: seen?.wait ?? "input", heard });
+		else attention.set(host.instanceId, { wait: "told", heard: heard.has(moment.key) ? heard : new Set([...heard, moment.key]) });
+	}
+	return { raise, attention };
 }
 
 /** The live sessions among `shown`, the views on screen, that ended a turn you had not seen: showing them in a focused window reads it. */

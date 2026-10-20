@@ -506,12 +506,13 @@ export class Dashboard {
 		this.#ownerLock.release();
 	}
 
-	/** A dashboard socket opened; the registry, when no one listened since it was last listed, is listed first, so the first roster the socket hears is settled. */
-	async open(ws: Socket): Promise<void> {
+	/** A dashboard socket opened. */
+	open(ws: Socket): void {
 		this.#requests.open(ws);
+		this.#broadcasts.open(ws);
+		// The registry was not polled while nobody listened; list it now rather than at the next tick.
+		if (!this.#registryFresh) void this.#listRegistry();
 		if (!this.#activityFresh) void this.#checkActivity();
-		if (!this.#registryFresh) await this.#listRegistry();
-		if (ws.readyState === WebSocket.OPEN) this.#broadcasts.open(ws);
 	}
 
 	/** A message on a dashboard socket; one that is not a client message is dropped. */
@@ -573,9 +574,10 @@ export class Dashboard {
 				this.#projectRunner.switched(instanceId);
 				return;
 			case "turn-started":
-				this.#broadcasts.rosterChanged();
+				if (this.#sessions.markRead(instanceId)) this.#broadcasts.rosterChanged();
 				return;
 			case "turn-ended":
+				this.#sessions.markUnread(instanceId, update.reply);
 				this.#projectRunner.turnEnded(instanceId, update.reply);
 				this.#broadcasts.rosterChanged();
 				return;

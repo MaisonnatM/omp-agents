@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { SessionAlert } from "../src/shared/desktop-bridge";
 import type { Project } from "../src/shared/projects";
 import type { HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
-import { alertsOf, freshAlerts, needsYou, unreadShown, yourSessions } from "./attention";
+import { type Attention, attend, needsYou, unreadShown, yourSessions } from "./attention";
 
 const host = (instanceId: string, status: HostStatus, { unread = null, requests = [], sessionName = `Session ${instanceId}` }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null } = {}) =>
 	({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests }) as RosterHost;
@@ -28,51 +27,63 @@ describe("yourSessions", () => {
 	});
 });
 
-describe("alertsOf", () => {
-	test("raises one alert per session: its oldest question over an unread turn, titled by the session, opening it", () => {
-		const confirm: UserRequest = { id: "r2", title: "Delete the branch?", deadline: null, kind: "confirm", message: "feat/x has unpushed work." };
-		expect(alertsOf([host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged." } }), host("b", "needs-input", { requests: [confirm] })])).toEqual([
-			{ key: "a/ask/r1", hash: "#session/s-a", title: "Session a", body: "Which branch?" },
-			{ key: "b/ask/r2", hash: "#session/s-b", title: "Session b", body: "Delete the branch?\nfeat/x has unpushed work." },
-		]);
-		expect(alertsOf([host("a", "idle", { unread: { at: 7, reply: "Merged." } }), host("c", "idle")])).toEqual([{ key: "a/turn/7", hash: "#session/s-a", title: "Session a", body: "Merged." }]);
-	});
-
-	test("names a session without a title by its folder, a turn without a reply, and a wait Collab does not relay", () => {
-		expect(alertsOf([host("b", "idle", { sessionName: null, unread: { at: 3, reply: null } }), host("c", "needs-input", { sessionName: null, unread: { at: 4, reply: "x" } })])).toEqual([
-			{ key: "b/turn/3", hash: "#session/s-b", title: "webapp", body: "Finished its turn." },
-			{ key: "c/input", hash: "#session/s-c", title: "webapp", body: "Waits for your input." },
-		]);
-	});
-});
-
-describe("freshAlerts", () => {
-	const turn = (at: number) => alertsOf([host("a", "idle", { unread: { at, reply: "Done." } })]);
-	const asks = alertsOf([host("q", "needs-input", { requests: [ask("r1", "Which branch?")] })]);
-	const raisedOver = (pushes: SessionAlert[][]): string[] => {
-		let heard = freshAlerts(null, []).heard;
+describe("attend", () => {
+	const raisedOver = (pushes: RosterHost[][]): string[] => {
+		let attention: Attention = new Map();
 		const raised: string[] = [];
-		for (const now of pushes) {
-			const next = freshAlerts(heard, now);
-			raised.push(...next.fresh.map(alert => alert.key));
-			heard = next.heard;
+		for (const hosts of pushes) {
+			const next = attend(attention, hosts);
+			raised.push(...next.raise.map(alert => alert.body));
+			attention = next.attention;
 		}
 		return raised;
 	};
+	const idle = [host("q", "idle")];
+	const working = [host("q", "working")];
+	const placeholder = [host("q", "needs-input")];
+	const asks = (id = "r1", title = "Which branch?") => [host("q", "needs-input", { requests: [ask(id, title)] })];
+	const turn = (at: number) => [host("q", "idle", { unread: { at, reply: `Turn ${at}.` } })];
 
-	test("raises nothing for what already waited when the page loads", () => {
-		const first = freshAlerts(null, turn(1));
-		expect(first.fresh).toEqual([]);
-		expect([...first.heard]).toEqual(["a/turn/1"]);
-		expect(freshAlerts(first.heard, turn(1)).fresh).toEqual([]);
+	test("raises one alert per session, titled by the session and opening it: its oldest question over an unread turn", () => {
+		const confirm: UserRequest = { id: "r2", title: "Delete the branch?", deadline: null, kind: "confirm", message: "feat/x has unpushed work." };
+		const seen = attend(new Map(), [host("a", "idle"), host("b", "idle"), host("c", "idle")]).attention;
+		const { raise } = attend(seen, [
+			host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged." } }),
+			host("b", "needs-input", { requests: [confirm] }),
+			host("c", "idle", { sessionName: null, unread: { at: 3, reply: null } }),
+		]);
+		expect(raise).toEqual([
+			{ hash: "#session/s-a", title: "Session a", body: "Which branch?" },
+			{ hash: "#session/s-b", title: "Session b", body: "Delete the branch?\nfeat/x has unpushed work." },
+			{ hash: "#session/s-c", title: "webapp", body: "Finished its turn." },
+		]);
 	});
 
-	test("raises each moment once across roster pushes, and the next turn of the same session again", () => {
-		expect(raisedOver([turn(1), turn(1), [], turn(2), turn(2)])).toEqual(["a/turn/1", "a/turn/2"]);
+	test("raises nothing for a session that already waited the first time the page sees it", () => {
+		expect(raisedOver([asks(), asks()])).toEqual([]);
+		expect(raisedOver([[], turn(1), turn(1)])).toEqual([]);
+	});
+
+	test("hears the question a terminal session replays after its welcome as the wait it showed when it joined", () => {
+		expect(raisedOver([[], placeholder, asks()])).toEqual([]);
+		expect(raisedOver([idle, placeholder, asks()])).toEqual(["Waits for your input."]);
 	});
 
 	test("raises a question once though a reconnect drops it for a push and replays it", () => {
-		expect(raisedOver([asks, [], asks])).toEqual(["q/ask/r1"]);
+		expect(raisedOver([idle, asks(), placeholder, asks(), idle, asks()])).toEqual(["Which branch?"]);
+	});
+
+	test("raises each new question and turn after the page saw the session not need you", () => {
+		expect(raisedOver([idle, asks(), working, asks("r2", "Merge it?"), working, turn(1), turn(1), working, turn(2)])).toEqual(["Which branch?", "Merge it?", "Turn 1.", "Turn 2."]);
+		expect(raisedOver([idle, asks(), asks("r2", "Merge it?")])).toEqual(["Which branch?", "Merge it?"]);
+	});
+
+	test("raises each wait with no question that starts after the session stopped needing you", () => {
+		expect(raisedOver([idle, placeholder, placeholder, working, placeholder])).toEqual(["Waits for your input.", "Waits for your input."]);
+	});
+
+	test("forgets a session that leaves the roster, so it returns as one the page sees for the first time", () => {
+		expect(raisedOver([idle, [], asks()])).toEqual([]);
 	});
 });
 

@@ -53,27 +53,21 @@ describe("LiveSessions", () => {
 	});
 
 	test("a row carries the turn its session ended unseen, with its reply's first line, until a look, the next turn, or the session leaving reads it", () => {
-		const updates: string[] = [];
-		const sessions = new LiveSessions((_instanceId, update) => updates.push(update.kind));
-		const { instanceId, emit } = sessions.allocate();
-		const live = { instanceId, sessionId: "s1", cwd: "/work", row: () => ({ instanceId }), follow() {}, finished: () => false } as unknown as LiveSession;
+		const sessions = new LiveSessions(() => {});
+		const live = { instanceId: "i1", sessionId: "s1", cwd: "/work", row: () => ({ instanceId: "i1" }), follow() {}, finished: () => false } as unknown as LiveSession;
 		sessions.add(live, null);
 		const unread = () => sessions.rows(() => facts)[0]?.unread;
-		emit({ kind: "turn-ended", reply: "\n  Fixed the **flaky** test.  \nDetails follow." });
+		expect(sessions.markRead("i1")).toBe(false);
+		sessions.markUnread("i1", "\n  Fixed the **flaky** test.  \nDetails follow.");
 		expect(unread()).toEqual({ at: expect.any(Number), reply: "Fixed the **flaky** test." });
-		expect(sessions.markRead(instanceId)).toBe(true);
-		expect(sessions.markRead(instanceId)).toBe(false);
+		expect(sessions.markRead("i1")).toBe(true);
+		expect(sessions.markRead("i1")).toBe(false);
 		expect(unread()).toBeNull();
 
-		emit({ kind: "turn-ended", reply: null });
+		sessions.markUnread("i1", null);
 		expect(unread()).toEqual({ at: expect.any(Number), reply: null });
-		emit({ kind: "turn-started" });
-		expect(unread()).toBeNull();
-
-		emit({ kind: "turn-ended", reply: "Done." });
-		sessions.remove(instanceId);
+		sessions.remove("i1");
 		sessions.add(live, null);
 		expect(unread()).toBeNull();
-		expect(updates).toEqual(["turn-ended", "turn-ended", "turn-started", "turn-ended"]);
 	});
 });

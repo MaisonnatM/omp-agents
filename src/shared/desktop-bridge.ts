@@ -9,17 +9,15 @@ export const DESKTOP_BRIDGE = "ompDesktop";
 export const BADGE_CHANNEL = "omp-agents:badge";
 export const ALERT_CHANNEL = "omp-agents:alert";
 
-/** The moment a live session last came to need you: it asks you something, or it ended a turn. */
+/** The moment a live session came to need you: it asks you something, or it ended a turn. */
 export interface SessionAlert {
-	/** The same moment keeps its key across roster pushes; another moment of the same session takes another. */
-	key: string;
 	/** The page's hash that opens the session, `#session/<session id>`; it also names the session, whose newer alert replaces its older one. */
 	hash: string;
 	title: string;
 	body: string;
 }
 
-export const isSessionAlert: Guard<SessionAlert> = fields<SessionAlert>({ key: isString, hash: isString, title: isString, body: isString });
+export const isSessionAlert: Guard<SessionAlert> = fields<SessionAlert>({ hash: isString, title: isString, body: isString });
 
 export interface DesktopBridge {
 	/** Shows `count` on the Dock icon, nothing for 0. */
