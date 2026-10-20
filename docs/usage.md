@@ -89,7 +89,9 @@ An action that fails shows its error, and its control becomes available again.
   An unknown or malformed line shows in the transcript as one warning with the line's start, alongside any text or tools the reader understood.
   Their subagents' sessions are left out of the list.
   The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
-- The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
+- The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because omp exited on its own, or stopped while no dashboard ran, as when the computer restarted.
+  A session the dashboard started keeps running when the dashboard server stops, restarts, or crashes, turn, background jobs, and subagents included, and the next server shows it live again, so it never shows here for that.
+  It shows as working again when its turn ran, compacted, or waited on a background job's result as the server stopped.
   The group shows only while it has a row.
   Its **Resume all** button resumes every session it lists, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
@@ -97,7 +99,7 @@ An action that fails shows its error, and its control becomes available again.
   **Move to past** in a row's menu moves it to the past sessions.
   A session that you end, resume, or move leaves the group.
   The server keeps the list in `interrupted.json` beside its access token, so it survives a restart.
-  Sessions started in a terminal keep running when the dashboard stops, so they never show here.
+  Sessions started in a terminal keep running when the dashboard stops too, and never show here.
 - The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under the header, and the bottom fades while more rows sit below.
 - Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, or the left edge of the session details sidebar.
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
@@ -552,7 +554,8 @@ An action that fails shows its error, and its control becomes available again.
   A conversation of greetings or acknowledgements only, such as `hi`, stays untitled until a later message.
   omp counts that title as one that you set, as it counts a `/rename` in a terminal.
 - A running session shows **End session** in its header, unless its room is read-only.
-  **End session** stops its omp process: one that the dashboard started stops over its pipe, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
+  **End session** stops its omp process: one that the dashboard started stops with every process it started, its background jobs, kernels, and subagents included, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
+  A session the dashboard started that exits on its own takes those processes with it too.
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
   The dashboard then removes the linked git worktree the session works in, the one whose branch its header names, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
   A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.
@@ -565,7 +568,7 @@ An action that fails shows its error, and its control becomes available again.
   The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.
   The pane then shows the live session, which carries on in the same file and moves to the running sessions.
-  A session whose omp process exited mid-turn, for example because the dashboard that started it was stopped, resumes too: omp records the interrupted turn first, as it does in a terminal.
+  A session whose omp process exited mid-turn, for example because the computer restarted, resumes too: omp records the interrupted turn first, as it does in a terminal.
   If another omp process still writes the file, omp writes the resumed session's entries to a new file instead of mixing the two.
 - Click **Fork from here** under a prompt or a turn's last reply to start a dashboard session that holds the conversation up to that point, as omp's `/branch` does.
   A fork from a prompt leaves that prompt out of the history and puts it in the composer, so you can edit and resend it.
@@ -1262,7 +1265,7 @@ An action that fails shows its error, and its control becomes available again.
   A worker you prompt yourself reports the same way when its turn finishes.
   A worker is told to end each turn on a report that stands alone, since the coordinator reads only its last reply, and to end its turn with a question it needs answered rather than ask it through the `ask` tool.
   A question a worker still asks through `ask` reaches the coordinator with its request id: it answers it with `answer_worker` when the notes or your preferences settle it, and tells you otherwise.
-  The update also says when the dashboard restarted and stopped workers; a coordinator that stopped with the dashboard resumes on its own.
+  The update also says when workers stopped while no dashboard ran; a coordinator that stopped then resumes on its own.
 - The notices bell's **Projects** tab tells you when a worker asks and the coordinator is idle or stopped, when a worker stopped without **End session**, and when a project is done: all its workers idle or ended, nothing queued, and nothing waiting for the coordinator.
 - A routine can **Send to a project**: each run sends its prompt to the project's coordinator as an update from **Routine**, taking no session of its own.
 - A project's notes live in `$XDG_DATA_HOME/omp-agents/projects/<id>/`, `~/.local/share/omp-agents/projects/<id>/` by default, outside every repository, so every worktree the project works in shares them.
@@ -1285,7 +1288,7 @@ An action that fails shows its error, and its control becomes available again.
   Resuming it with `omp --resume` in a terminal gives it the role text, when the extension is installed, but no coordinator tools, since only the dashboard serves them.
   A `/move` or an edited prompt, which gives a session a new id, keeps it in its project, and a fork of a project's session belongs to no project.
 - The server keeps the projects and their waiting updates in `projects.json` beside its access token, so no update is lost while the coordinator is stopped or the dashboard restarts.
-  Quitting the dashboard stops its sessions without telling any coordinator.
+  The project's sessions keep running when the dashboard quits or restarts, and the next dashboard follows them again.
 
 ## Settings
 
@@ -1575,7 +1578,8 @@ The packaged app, or `bun run desktop` from a checkout, shows the dashboard in i
   When the dashboard does not load, for example on a reload after the server it used stopped, the window says so, with **Retry**.
 - On macOS, closing the window hides it: the server, the sessions it started, and its Collab guests keep running.
   Click the app in the Dock, or run `bun run desktop` again, to show it.
-  Cmd+Q quits the app; when the app started the server, it waits for the server to end its sessions first, which then show under **interrupted** at the next start.
+  Cmd+Q quits the app; when the app started the server, it waits for the server to write what it keeps and let go of its sessions.
+  The sessions it started keep running, a running turn included, and show live again when the app opens; **End session** is how a session stops.
   Off macOS, closing the window quits.
 - In the packaged app on macOS, **omp agents › Open at Login** starts the app, and with it the server, when you log in.
   The app reads `PATH` and the rest of its environment from your login shell at each start, so a change to your shell profile applies at the next launch.

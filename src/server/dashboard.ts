@@ -66,7 +66,7 @@ import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { createClientHandler } from "./socket";
-import { createStarter, type Starter } from "./start";
+import { createStarter, reattachAll, type Starter } from "./start";
 import { TodoInbox } from "./todo-inbox";
 import { UserTodosFile } from "./user-todos-file";
 import { type Socket, Views } from "./views";
@@ -111,6 +111,7 @@ export class Dashboard {
 	readonly #todoInbox: TodoInbox;
 	readonly #worktrees: Worktrees;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
+	readonly #reattached = Promise.withResolvers<void>();
 	readonly #endInbox: EndInbox;
 	readonly #runner: RoutineRunner;
 	readonly #scheduledRunner: ScheduledRunner;
@@ -441,13 +442,22 @@ export class Dashboard {
 		});
 	}
 
+	/** Settles once {@link start} attached to the sessions the last server left running and learned which survived. */
+	get reattached(): Promise<void> {
+		return this.#reattached.promise;
+	}
+
 	/**
-	 * Starts following omp: seeds the user's notes and moves each project's older notes to their places now, watches the
-	 * session files and the inboxes, takes the owner lock when it is free, lists the files and the registry, and starts
-	 * the loops; `publisher` is the server now listening.
+	 * Starts following omp: attaches to the sessions the last server left running, seeds the user's notes and moves each
+	 * project's older notes to their places now, watches the session files and the inboxes, takes the owner lock when it
+	 * is free, lists the files and the registry, and starts the loops; `publisher` is the server now listening.
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
+		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
+		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) }, survived => this.#interrupted.recover(survived));
+		this.#reattached.resolve();
+		this.#broadcasts.syncRoster();
 		seedUserNotes(userNotesDir);
 		for (const project of this.#projects.value) moveOldNotes(projectNotesDir(project.id));
 		this.#loops.watch();
@@ -470,8 +480,9 @@ export class Dashboard {
 	}
 
 	/**
-	 * Stops everything that runs on its own first, so no tick publishes while the rest shuts down; then ends the sessions
-	 * started here, hangs up on the shells, writes what the stores have not, and stops the routine commands still running.
+	 * Stops everything that runs on its own first, so no tick publishes while the rest shuts down; then lets go of the
+	 * sessions started here, which run on for the next server, hangs up on the shells, writes what the stores have not,
+	 * and stops the routine commands still running.
 	 */
 	async stop(): Promise<void> {
 		this.#loops.stop();

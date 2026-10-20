@@ -42,6 +42,7 @@ async function buildResources(): Promise<void> {
 	for (const [path, blob] of await buildPage()) await Bun.write(join(pageDir, path), blob);
 	// The packaged server reads the prebuilt page, so `buildPage`'s Tailwind import never runs there.
 	await bundle(join(ROOT, "src", "server.ts"), RESOURCES, "server.js", { target: "bun", external: ["bun-plugin-tailwind"] });
+	await bundle(join(ROOT, "src", "keeper.ts"), RESOURCES, "keeper.js", { target: "bun" });
 	// The installer reads its layers beside itself, as `templates/omp/install.ts` does in a checkout.
 	const kitOut = join(RESOURCES, "templates", "omp");
 	cpSync(join(KIT, "agent"), join(kitOut, "agent"), { recursive: true });

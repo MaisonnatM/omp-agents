@@ -95,7 +95,7 @@ export interface ExitDiagnosticsModule {
 	createInterruptedToolResults(entries: readonly FileEntry[], context: "fork"): object[];
 }
 
-/** omp's `RpcAgentProcess` (src/modes/rpc/rpc-client.ts): the transport `RpcClient` drives, which `ptree.ChildProcess` implements. */
+/** omp's `RpcAgentProcess` (src/modes/rpc/rpc-client.ts): the transport `RpcClient` drives, which a session keeper's connection implements. */
 export interface RpcProcess {
 	readonly pid: number;
 	readonly exited: Promise<number>;
@@ -120,14 +120,13 @@ export interface RpcHostTool {
 }
 export interface RpcClientModule {
 	/** `customTools` are sent with every `start()`, so a new process for the same session gets them again. */
-	RpcClient: new (options: { spawn: (agentArgs: string[]) => RpcProcess; args: string[]; customTools: RpcHostTool[] }) => RpcClient;
+	RpcClient: new (options: { spawn: (agentArgs: string[]) => Promise<RpcProcess>; args: string[]; customTools: RpcHostTool[] }) => RpcClient;
 }
 export interface RpcFrameModule {
 	/** Reassembles protocol v2 chunk frames from parsed JSONL lines. */
 	RpcFrameDecoder: new () => { push(value: unknown): object | undefined };
 }
 export interface UtilsModule {
-	ptree: { spawn(cmd: string[], options: { cwd: string; stdin: "pipe"; env: Record<string, string | undefined> }): RpcProcess };
 	readJsonl(stream: ReadableStream<Uint8Array>): AsyncGenerator<unknown>;
 }
 
@@ -643,11 +642,13 @@ export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc
 	"RpcClient.prototype.bash": "function",
 	"RpcClient.prototype.setFastMode": "function",
 	"RpcClient.prototype.onPromptResult": "function",
-	// Sends the constructor's `customTools`; the option itself cannot be checked.
+	// Sends the constructor's `customTools`, and a reattached session's; the option itself cannot be checked.
 	"RpcClient.prototype.setCustomTools": "function",
 });
-export const rpcFrames = await load<RpcFrameModule>(join(srcDir, "modes", "rpc", "rpc-frame.ts"), { RpcFrameDecoder: "function" });
-export const utils = await load<UtilsModule>(join(utilsSrc, "index.ts"), { "ptree.spawn": "function", readJsonl: "function" });
+/** omp's frame codec, which a session keeper (`src/keeper.ts`) also loads to read omp's output frame by frame. */
+export const rpcFrameFile = join(srcDir, "modes", "rpc", "rpc-frame.ts");
+export const rpcFrames = await load<RpcFrameModule>(rpcFrameFile, { RpcFrameDecoder: "function" });
+export const utils = await load<UtilsModule>(join(utilsSrc, "index.ts"), { readJsonl: "function" });
 
 export const autocomplete = await load<AutocompleteModule>(join(dirname(packageDir), "pi-tui", "src", "autocomplete.ts"), {
 	CombinedAutocompleteProvider: "function",

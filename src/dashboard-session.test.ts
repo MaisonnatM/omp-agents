@@ -17,7 +17,7 @@ import type { ServerMsg } from "./shared/protocol";
 import * as replayLaunch from "./omp/replay-launch";
 import type { PreparedReplay } from "./replay";
 
-const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, queuedMessages: { steering: [], followUp: [] } };
+const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
 
 /** An omp RPC client whose methods answer at once, records what the session sends omp, and lets a test play omp's events. */
 class FakeClient implements RpcClient {
@@ -50,7 +50,7 @@ class FakeClient implements RpcClient {
 		return { enabled, active: enabled };
 	};
 	setSubagentSubscription = async () => "progress";
-	getSubagents = async () => [];
+	getSubagents: RpcClient["getSubagents"] = async () => [];
 	switchSession = async () => ({ cancelled: false });
 	branch: RpcClient["branch"] = async () => ({ text: "", cancelled: false });
 	newSession = async () => ({ cancelled: false });
@@ -62,6 +62,10 @@ class FakeClient implements RpcClient {
 	onSubagentProgress = () => () => {};
 	steerSubagent = async (): Promise<void> => {};
 	cancelSubagent = async () => true;
+	setCustomTools: RpcClient["setCustomTools"] = async tools => {
+		this.calls.push(`tools ${tools.map(tool => tool.name).join(",")}`);
+		return tools.map(tool => tool.name);
+	};
 	bash: RpcClient["bash"] = async command => {
 		this.calls.push(`bash ${command}`);
 	};
@@ -83,9 +87,9 @@ async function settle(): Promise<void> {
 
 /** An omp process that never exits, driven through `client`; `startRpc` hands `onFrame` to the session. */
 function fakeOmp(client: FakeClient) {
-	const child: RpcChild = { client, pid: 4242, exited: Promise.withResolvers<void>().promise, write: () => {} };
+	const child: RpcChild = { client, pid: 4242, exited: Promise.withResolvers<"detach" | "exit">().promise, write: () => {}, meta: { startedAt: 1, cwd: "/tmp/project" }, detach: () => {} };
 	const omp = { onFrame: (_frame: Record<string, unknown>) => {} };
-	spyOn(rpc, "startRpc").mockImplementation(async (_cwd, onFrame) => {
+	spyOn(rpc, "startRpc").mockImplementation(async (_instanceId, _cwd, onFrame) => {
 		omp.onFrame = onFrame;
 		return child;
 	});
@@ -623,6 +627,116 @@ describe("DashboardSession start", () => {
 
 		// The question arrived (a roster change), the process stopped, and only then was the question dropped (another).
 		expect(order).toEqual(["roster", "stop", "roster"]);
+	});
+});
+
+describe("DashboardSession reattach", () => {
+	/** A session a previous server started, whose omp a test plays through `client` and ends through `exit`. */
+	function keptOmp(client: FakeClient) {
+		const exit = Promise.withResolvers<"detach" | "exit">();
+		const hungUp: string[] = [];
+		const child: RpcChild = { client, pid: 4343, exited: exit.promise, write: () => {}, meta: { startedAt: 1_700_000_000_000, cwd: "/tmp/kept" }, detach: () => { hungUp.push("detach"); exit.resolve("detach"); } };
+		spyOn(rpc, "attachRpc").mockImplementation(async (_instanceId, onFrame) => {
+			// The keeper hands the new server the question omp still waits on.
+			onFrame({ type: "extension_ui_request", id: "q1", method: "confirm", title: "Deploy?", message: "" });
+			return child;
+		});
+		return { exit, hungUp };
+	}
+
+	test("a session attached mid-turn works on with its question, subagents, start time, and its project's tools", async () => {
+		const client = new FakeClient();
+		keptOmp(client);
+		client.getState = async () => ({ ...STATE, sessionId: "kept-1", isStreaming: true });
+		client.getSubagents = async () => [{ id: "a1", agent: "explore", status: "running", description: "Read the docs" }];
+		const tool = { name: "project_status", label: "Status", description: "", parameters: {}, loadMode: "essential" as const, execute: async () => "" };
+		const asked: string[] = [];
+		const session = await DashboardSession.reattach("inst-kept", sessionId => (asked.push(sessionId), [tool]), () => {});
+
+		expect(asked).toEqual(["kept-1"]);
+		expect(client.calls).toContain("tools project_status");
+		const row = session.row();
+		expect([row.instanceId, row.pid, row.startedAt, row.cwd, row.status]).toEqual(["inst-kept", 4343, 1_700_000_000_000, "/tmp/kept", "needs-input"]);
+		expect(row.requests.map(request => request.title)).toEqual(["Deploy?"]);
+		expect(row.agents).toMatchObject([{ id: "a1", kind: "explore", status: "running", activity: "Read the docs" }]);
+
+		session.answer("q1", { kind: "confirm", confirmed: true });
+		expect(session.status).toBe("working");
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect(session.status).toBe("idle");
+	});
+
+	test("the server shutting down hangs up on omp without ending it, reporting an exit, or counting it finished", async () => {
+		const client = new FakeClient();
+		const { hungUp } = keptOmp(client);
+		const updates: DashboardUpdate[] = [];
+		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update));
+		const stops: string[] = [];
+		client.stop = async () => {
+			stops.push("stop");
+		};
+		await session.dispose();
+		await settle();
+		expect([hungUp, stops, updates.filter(update => update.kind === "exited"), session.finished()]).toEqual([["detach"], [], [], false]);
+	});
+
+	test("End session on an attached session stops omp and reports the exit as ended", async () => {
+		const client = new FakeClient();
+		const { exit } = keptOmp(client);
+		const updates: DashboardUpdate[] = [];
+		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update));
+		client.stop = async () => exit.resolve("exit");
+		await session.end();
+		await settle();
+		expect(updates.filter(update => update.kind === "exited")).toEqual([{ kind: "exited", ended: true }]);
+	});
+
+	test("a session attached while it waits on a background job works until the job's result ends its turn", async () => {
+		const client = new FakeClient();
+		keptOmp(client);
+		client.getState = async () => ({ ...STATE, hasPendingAsyncWork: true });
+		const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
+		session.answer("q1", { kind: "confirm", confirmed: true });
+		expect(session.status).toBe("working");
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "agent_end", messages: [], isTerminal: false });
+		await settle();
+		expect(session.status).toBe("working");
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect(session.status).toBe("idle");
+	});
+
+	test("a session file with no directory in its header and a broken replay marker attaches where omp started, as a replay", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-reattach-"));
+		try {
+			const file = join(dir, "session.jsonl");
+			const at = new Date(0).toISOString();
+			writeFileSync(file, `${JSON.stringify({ type: "session", version: 3, id: "kept-1", timestamp: at })}\n${JSON.stringify({ type: "custom", id: "e1", parentId: null, timestamp: at, customType: "omp-agents-replay", data: {} })}\n`);
+			const client = new FakeClient();
+			keptOmp(client);
+			client.getState = async () => ({ ...STATE, sessionFile: file });
+			const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
+			expect(session.row().cwd).toBe("/tmp/kept");
+			await expect(session.prompt("a1", "hi", [], "steer")).rejects.toThrow("Subagent prompts are blocked in a replay.");
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	test("an attach that fails hangs up and leaves omp running for the next server", async () => {
+		const client = new FakeClient();
+		const { hungUp } = keptOmp(client);
+		const stops: string[] = [];
+		client.stop = async () => {
+			stops.push("stop");
+		};
+		client.getSubagents = async () => {
+			throw new Error("omp did not answer");
+		};
+		await expect(DashboardSession.reattach("inst-kept", () => [], () => {})).rejects.toThrow("omp did not answer");
+		expect([hungUp, stops]).toEqual([["detach"], []]);
 	});
 });
 

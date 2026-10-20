@@ -16,6 +16,18 @@ export async function answer(run: () => Promise<unknown>, refuse?: (err: unknown
 	}
 }
 
+/**
+ * Refuses with a 503 until `settled` settles, then lets everything through. The dashboard socket waits so on the
+ * sessions the last server left running: a page that connects sooner retries, as it does after any failed connect.
+ */
+export function refuseUntil(settled: Promise<unknown>, why: string): () => Response | null {
+	let open = false;
+	void settled.then(() => {
+		open = true;
+	});
+	return () => (open ? null : fail(503, why));
+}
+
 /** How a request shows it holds the access token: a login cookie, or the `?token=` of the printed URL. */
 export type Credential = "cookie" | "login";
 

@@ -35,11 +35,16 @@ export function replayLaunch(config: string, launch: RpcLaunch): ReplayLaunch {
 	for (const name of ["request-log", "replay-guard"]) if (!existsSync(join(agentDir, "extensions", `${name}.ts`))) args.push("-e", join(ompTemplateDir, "agent", "extensions", `${name}.ts`));
 	return { ...launch, args, readyToken };
 }
-export async function launchForReplayResume(file: string, launch: RpcLaunch): Promise<ReplayResume> {
+/** The replay marker session file `file` records, or `null` when it is no replay; rejects when the marker is unreadable. */
+export async function readReplayMarker(file: string): Promise<ReplayMarker | null> {
 	const entries = await loader.loadEntriesFromFile(file);
 	const entry = entries.findLast(entry => entry.type === "custom" && entry.customType === REPLAY_MARKER);
 	const marker = replayMarkerOf(entry?.data);
 	if (entry && !marker) throw new Error("Replay protection metadata is invalid. This file cannot be safely resumed.");
+	return marker;
+}
+export async function launchForReplayResume(file: string, launch: RpcLaunch): Promise<ReplayResume> {
+	const marker = await readReplayMarker(file);
 	if (!marker) return { launch, marker: null };
 	return { launch: replayLaunch(await writeReplayConfig(file), launch), marker };
 }

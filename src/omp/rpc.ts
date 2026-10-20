@@ -1,9 +1,15 @@
-/** omp's RPC mode: a session this dashboard starts as a child process and drives through omp's own `RpcClient`. */
+/**
+ * omp's RPC mode: a session this dashboard starts as an omp process and drives through omp's own `RpcClient`. Each
+ * process runs under a keeper (`src/keeper.ts`), so it outlives the server, and the next server attaches to it.
+ */
 import { errorText, isObject } from "../json";
+import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "../keeper-link";
+import type { KeeperMeta } from "../keeper-wire";
+import { keepersDir } from "../paths";
 import type { Frame } from "./collab";
 import { childEnv } from "../proc";
 import { ompCommand } from "./install";
-import { type RpcHostTool, type RpcProcess, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
+import { type RpcHostTool, rpc, rpcFrameFile, rpcFrames, type ServiceTierModel, utils } from "./modules";
 
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {
@@ -27,6 +33,12 @@ export interface RpcState {
 	fastModeEnabled: boolean;
 	/** Whether requests actually go out on the priority tier. */
 	fastModeActive: boolean;
+	/** Whether a turn runs. */
+	isStreaming: boolean;
+	/** Whether omp compacts the context, which a turn's own maintenance does before it goes on. */
+	isCompacting: boolean;
+	/** Whether a background job's result will start the agent again once it arrives. */
+	hasPendingAsyncWork: boolean;
 	/** omp's displayable steering and follow-up queues, as its `queue_update` event reports them. */
 	queuedMessages: { steering: string[]; followUp: string[] };
 }
@@ -87,6 +99,8 @@ export interface RpcClient {
 	steerSubagent(subagentId: string, message: string): Promise<void>;
 	/** Hard-stops a running subagent; `false` when it was not running. */
 	cancelSubagent(subagentId: string): Promise<boolean>;
+	/** Replaces the tools this process serves the session; `start()` sends the ones the client was made with. */
+	setCustomTools(tools: RpcHostTool[]): Promise<string[]>;
 	/** Runs a user `!` command in the session's directory and records it in the session. */
 	bash(command: string): Promise<unknown>;
 }
@@ -94,10 +108,14 @@ export interface RpcClient {
 export interface RpcChild {
 	client: RpcClient;
 	pid: number;
-	/** Settles when the process is gone, however it ended. */
-	exited: Promise<unknown>;
+	/** Settles with `exit` when omp is gone, however it ended, or with `detach` once {@link detach} hung up on it. */
+	exited: Promise<"detach" | "exit">;
 	/** Write an `extension_ui_response` (or any frame `RpcClient` has no method for) to omp's stdin. */
 	write(frame: object): void;
+	/** When the session started and where omp started, which its keeper hands every server that attaches. */
+	meta: KeeperMeta;
+	/** Hangs up on omp without stopping it, as the server shuts down; the next server attaches to it again. */
+	detach(): void;
 }
 
 /** What a session gets on top of a plain one: extra `omp` arguments, and the tools this process serves it. */
@@ -132,46 +150,54 @@ async function readUnroutedFrames(stdout: ReadableStream<Uint8Array>, onFrame: (
 	}
 }
 
-/**
- * Starts omp's CLI in `cwd`, through omp's own `RpcClient`.
- * Resolves once omp reports ready. `onFrame` gets every
- * frame of {@link UNROUTED_FRAMES} from spawn on, so a dialog raised while the session opens is not lost.
- */
-export async function startRpc(cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
-	let child: RpcProcess | undefined;
+/** Drives the omp that `link` connects to through omp's own `RpcClient`, which `start()`s on it as on a fresh process. */
+async function drive(link: (agentArgs: string[]) => Promise<KeeperLink>, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
+	let linked: KeeperLink | undefined;
 	const client = new rpc.RpcClient({
 		// On the CLI path, the last mode wins over RpcClient's `rpc`; `rpc-ui` enables tool dialogs.
 		args: ["--mode", "rpc-ui", ...launch.args],
 		customTools: launch.tools,
-		spawn: agentArgs => {
-			const proc = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe", env: childEnv() });
-			const [forClient, forFrames] = proc.stdout.tee();
+		spawn: async agentArgs => {
+			linked = await link(agentArgs);
+			const [forClient, forFrames] = linked.process.stdout.tee();
 			void readUnroutedFrames(forFrames, onFrame);
-			child = proc;
-			// ptree's ChildProcess keeps its state in private fields, so the copy forwards to it rather than inheriting.
-			return {
-				pid: proc.pid,
-				exited: proc.exited,
-				stdin: proc.stdin,
-				stdout: forClient,
-				peekStderr: () => proc.peekStderr(),
-				kill: (signal, graceMs) => proc.kill(signal, graceMs),
-			};
+			return { ...linked.process, stdout: forClient };
 		},
 	});
 	await client.start();
-	if (!child) throw new Error("omp RPC client started without spawning a process");
-	const { stdin } = child;
+	if (!linked) throw new Error("omp RPC client started without a process");
+	const { process: omp, ended, meta, detach } = linked;
 	return {
 		client,
-		pid: child.pid,
-		// ptree rejects `exited` for a killed child.
-		exited: child.exited.catch(() => undefined),
-		write: frame => {
-			// One synchronous line, as `RpcClient` writes its own, so frames never interleave.
-			stdin.write(`${JSON.stringify(frame)}\n`);
-			// A failed flush means the process is gone, which `exited` reports.
-			Promise.resolve(stdin.flush?.()).catch(() => {});
-		},
+		pid: omp.pid,
+		exited: ended,
+		// One line in one write, as `RpcClient` writes its own, so frames never interleave.
+		write: frame => void omp.stdin.write(`${JSON.stringify(frame)}\n`),
+		meta,
+		detach,
 	};
 }
+
+/**
+ * Starts omp's CLI in `cwd` under a keeper for session `instanceId`, through omp's own `RpcClient`. Resolves once omp
+ * reports ready. `onFrame` gets every frame of {@link UNROUTED_FRAMES} from spawn on, so a dialog raised while the
+ * session opens is not lost.
+ */
+export function startRpc(instanceId: string, cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
+	return drive(
+		agentArgs => startKeeper(keepersDir, instanceId, { cwd, argv: [...ompCommand, ...agentArgs], env: childEnv(), frameModule: rpcFrameFile, meta: { startedAt: Date.now(), cwd } }),
+		onFrame,
+		launch,
+	);
+}
+
+/**
+ * Attaches to session `instanceId`, which a previous server started and whose omp still runs. `onFrame` first gets the
+ * questions omp still waits on. omp keeps the tools the last server served it until the caller replaces them.
+ */
+export function attachRpc(instanceId: string, onFrame: (frame: Record<string, unknown>) => void): Promise<RpcChild> {
+	return drive(() => attachKeeper(keepersDir, instanceId), onFrame, PLAIN_LAUNCH);
+}
+
+/** The instance ids of the sessions a previous server started whose keeper may still run. */
+export const keptSessions = (): string[] => listKeepers(keepersDir);

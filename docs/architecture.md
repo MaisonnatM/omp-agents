@@ -8,6 +8,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Terminal sessions](#terminal-sessions)
   - [Why the server joins every terminal session](#why-the-server-joins-every-terminal-session)
 - [Dashboard sessions](#dashboard-sessions)
+  - [Session keepers](#session-keepers)
 - [Socket requests](#socket-requests)
 - [Desktop shell](#desktop-shell)
   - [Packaging and releases](#packaging-and-releases)
@@ -63,10 +64,15 @@ The main ones:
   `pi-coding-agent/src/cli/gc-cli.ts` keeps a blob while any session file holds its `blob:sha256:` reference, and `putSync` in `blob-store.ts` refreshes a reused blob's time so a reference not yet written to disk survives `omp gc`.
 - Documents: `convertBufferWithMarkit` in `pi-coding-agent/src/utils/markit.ts`, the converter behind omp's `read` of a PDF, Word, PowerPoint, Excel, or EPUB file, which `src/omp/documents.ts` calls for `PUT /api/attachment/document`.
 - RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`.
-  `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of the child's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
+  `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of omp's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
+  `RpcClient`'s `spawn` option may return any process with `pid`, `exited`, `stdin`, `stdout`, `peekStderr`, and `kill` (`RpcAgentProcess`); `start()` waits for omp's `ready` line, sends `negotiate_protocol` when it offers protocol 2, then `set_host_tools`, and a stdout that ends makes it call `kill`; see [Session keepers](#session-keepers).
+  omp answers `negotiate_protocol` again whenever it is sent (`rpc-mode.ts`), and `RpcFrameDecoder` throws on a chunk sequence that does not start at index 0 or that another frame interrupts; omp writes a frame over 1 MB as such a sequence.
+  `get_state` reports `isStreaming`, `isCompacting`, and `hasPendingAsyncWork` (`AgentSession.hasPendingAsyncWork`, a running background job whose result will start the agent again), and `get_subagents` returns `RpcSubagentSnapshot`s with the fields of a subagent lifecycle frame.
+  `agent_end` carries `isTerminal: false` while an async delivery remains, such as a background job, so a turn that started one stays running until the job delivers.
+  omp's eval kernels and subagents spawn with Bun's `detached`, as session leaders of their own (`pi-coding-agent/src/eval/kernel-base.ts`, `task/executor.ts`), and its background jobs lead process groups of their own, so only a walk of the process tree finds them, and only while omp runs.
   `get_available_models` returns omp's whole `Model` objects, with `name`, `contextWindow`, `api`, `identity`, and `serviceTiers`; `get_state` adds `fastModeEnabled` and `fastModeActive`, and `setFastMode` sends `set_fast_mode`.
   `RpcClient.prompt` resolves with the request id once omp admitted the prompt, and `onPromptResult` delivers that prompt's `prompt_result` (`rpc-prompt-results.ts`); see [Dashboard sessions](#dashboard-sessions).
-  Host tools: `RpcClient`'s `customTools` option (`RpcClientCustomTool`), which `start()` sends as `set_host_tools`, so a new process for the same session gets them again; `pi-coding-agent/src/modes/rpc/host-tools.ts` runs them as strict tools, and `defaultLoadModeForToolName` in `pi-coding-agent/src/tools/essential-tools.ts` makes one without `loadMode: "essential"` only discoverable.
+  Host tools: `RpcClient`'s `customTools` option (`RpcClientCustomTool`), which `start()` sends as `set_host_tools`, so a new process for the same session gets them again, and `setCustomTools`, which replaces them for a session the server attached to; `pi-coding-agent/src/modes/rpc/host-tools.ts` runs them as strict tools, sending `host_tool_call` and waiting on `host_tool_result` or its own `host_tool_cancel`, and `defaultLoadModeForToolName` in `pi-coding-agent/src/tools/essential-tools.ts` makes one without `loadMode: "essential"` only discoverable.
   A host tool stays registered through `newSession`, `switchSession`, and `/move` in one process, since omp builds `SessionTools` once per `AgentSession` (`pi-coding-agent/src/session/session-tools.ts`).
   Extensions: `omp -e <file>` (`pi-coding-agent/src/main.ts`, `additionalExtensionPaths`) loads in `rpc-ui` mode too; `pi-coding-agent/src/discovery/omp-extension-roots.ts` dedupes by path only, so the same extension at two paths loads twice.
 - Service tiers: `serviceTierFamily` and `shouldSendServiceTier` in `pi-ai/src/types.ts`, which `fastAvailable` in `src/omp/models.ts` calls to decide, as `setFastMode` in `pi-coding-agent/src/session/model-controls.ts` does, whether `/fast` can turn on for the live model.
@@ -226,13 +232,14 @@ Stop the dashboard to leave every room.
 
 ## Dashboard sessions
 
-Sessions started from the dashboard are omp child processes in RPC mode with tool dialogs, spawned through omp's own `RpcClient`.
+Sessions started from the dashboard are omp processes in RPC mode with tool dialogs, driven through omp's own `RpcClient`.
+Each runs under a session keeper, so it outlives the server that started it; see [Session keepers](#session-keepers).
 They use the installed CLI with `--mode rpc-ui`.
 The page starts one with a single `start` request whose `kind` is `new`, `fork`, `resume`, or `replay`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
 The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it.
 A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved.
-**Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command.
-Prompts, Stop, live events, subagent progress, and questions stay on the pipe.
+**Resume** starts the same process in the directory that the session file's header records and opens the file with omp's `switch_session` command.
+Prompts, Stop, live events, subagent progress, and questions stay on omp's stdio, which the keeper lends the server.
 A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
 A prompt omp refuses shows as a note in the session, and `LiveSession.prompt` rejects with `PromptRefused`, so a caller that has no one else to tell, such as the socket handler or a session's first message, skips it.
 The composer's queue is omp's `queue_update` event.
@@ -257,8 +264,8 @@ omp's RPC mode does not title a session from its first prompt, as its terminal d
 While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
 `RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`.
 An `agent_end` that ends the run, not one that hands over to a queued follow-up (`isTerminal: false`), makes the session report `turn-ended` with its last reply: the text of the last assistant message that has any, without the suggested prompts `splitSuggestions` takes off, or `null` when none has text; the project runner reads it ([Projects](#projects)).
-Stopping the dashboard stops every session that it started.
-The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one.
+A session keeps running when the server stops, restarts, or crashes; only **End session**, or omp exiting on its own, ends it.
+The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one that ended.
 
 omp acks a `prompt` once it admitted it, but on every turn its auto-thinking classifier (`applyAutoThinkingLevel` in `pi-coding-agent/src/session/model-controls.ts`) holds `agent_start` back by about a second, and a new session's first turn can also wait on MCP discovery (`MCP_DISCOVERY_TURN_WAIT_MS` in `pi-coding-agent/src/session/agent-session.ts`).
 So a prompt the main agent takes while idle becomes the session's starting prompt at its ack: the session reports `working` and tells its view, which shows the prompt as pending ([Transcripts](#transcripts)).
@@ -274,7 +281,8 @@ A session's first message, a suggestion, and an edited prompt all take this path
 `src/server/interrupted.ts` keeps which of those sessions were interrupted, in `interrupted.json` beside the access token, and which of them were mid-turn (working or waiting on a question).
 Each time a dashboard session starts, exits, or starts or ends a turn, the server writes the session ids of the ones that run and of those whose turn runs.
 A session that exits without the page's `end` request joins the interrupted list, mid-turn if its turn ran.
-A server that crashes writes nothing more, so at its next start it reads the ones that ran as interrupted, with the turn state they last had.
+At its next start, the server first attaches to the sessions whose keeper still runs, then reads the others that ran when the last server stopped as interrupted, with the turn state they last had (`InterruptedSessions.recover`): their omp exited while no server watched, as when the computer restarted.
+The server listens before then, so a taken port fails before any keeper is joined, but refuses the dashboard socket with a 503 until `recover` has run (`refuseUntil` in `src/server/http.ts`), so no page starts or resumes a session meanwhile; the page retries as after any failed connect, then sends `watch` and its waiting requests.
 A session that runs again leaves the list, and `dismiss-interrupted` takes one out.
 Each past row carries `interrupted`.
 `resume-all` resumes several past sessions at once, each the way a `start` with `resume` does, then sends `continue` as a prompt to each one that stopped mid-turn.
@@ -310,6 +318,36 @@ The route hands the bytes and the name's extension to omp's `convertBufferWithMa
 `withFiles` in `src/shared/prompt-files.ts` puts each file after the typed text in the block omp's `@file` arguments write, `<file name="…">`, its text, and `</file>`, so a leading `/skill:` or file command still expands with the files as its arguments.
 `preparePrompt` in `web/prompt-attachments-model.ts` keeps the files' text under `MAX_PROMPT_FILE_CHARS`, a million characters, in attach order, both as files attach and on the files a prompt sends, after awaiting each file's read.
 omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits the trailing blocks off again with `splitFiles`, and a user item's `files` holds their names, which the transcript shows as chips.
+
+### Session keepers
+
+A keeper (`src/keeper.ts`) holds one session's omp: it runs omp with piped stdio, and lends that stdio to one server at a time through a Unix socket, `sessions/<port>/<instance id>.sock` beside the access token, with omp's stderr in the `.log` beside it and its own pid in the `.pid`, written before it listens.
+The directory is per port, so a server on another port, such as a smoke run, never takes over this one's sessions.
+`startKeeper` in `src/keeper-link.ts` starts it through `/bin/sh`, which backgrounds it and exits, and Bun's `detached` makes it a session leader: no signal to the server's process group, and no kill of the server's process tree, reaches it.
+It retries while nobody listens on the socket yet; any other end of the connection before the greeting, a close or the reset Linux sends to a connection still waiting in the backlog of a keeper that exited, means the keeper hung up, and the start fails with the tail of omp's stderr from the log.
+Of omp's modules the keeper loads only `rpc-frame.ts`, whose path the server passes it (`rpcFrameFile` in `src/omp/modules.ts`); the packaged app ships the keeper as `keeper.js` beside `server.js` (`keeperScript` in `src/server/resources.ts`).
+
+Each connection starts with the keeper's greeting, `omp_agents_keeper` with omp's pid and the `meta` the server passed at the start (`startedAt` and the directory omp started in), then omp's own `ready` line again.
+So `startRpc` and `attachRpc` in `src/omp/rpc.ts` both hand omp's `RpcClient` the connection as the process its `spawn` option returns, and the client starts on it as on a fresh omp.
+A connection's `negotiate_protocol` makes it the one omp talks to, and the keeper passes the line on to omp, which answers it again; a second negotiation changes nothing in omp, and its `RpcClient` reads chunked frames from the moment it sends one.
+When omp's `ready` offers no protocol 2, the client sends none, so a connection joins on the greeting instead; a connection that has not joined can neither write to omp nor stop it.
+The joining connection first hears the questions omp still waits on (`extension_ui_request` dialogs not yet answered or cancelled, with what remains of a timeout).
+The keeper reads omp's output one logical frame at a time through omp's `RpcFrameDecoder`, so an `rpc_chunk` sequence counts as the frame it carries, and forwards each whole frame, with all its lines, to the connection that joined.
+omp's output while no server listens is dropped; the attaching server reads omp's state instead: `DashboardSession.reattach` counts a turn as running when `get_state` reports `isStreaming`, `isCompacting`, or `hasPendingAsyncWork`, lists the subagents `get_subagents` reports, and serves the session's project tools again with `set_host_tools`.
+A host tool call that no server hears, because none has joined, fails at once with a note that the dashboard restarted, so omp's turn goes on; so do the calls a server heard and did not answer before it hung up or another joined.
+
+The server's shutdown calls `DashboardSession.dispose`, which hangs up without stopping omp; the link's `ended` then settles with `detach` rather than `exit`, so the session reports no exit and does not count as finished.
+At startup `reattachAll` in `src/server/start.ts` connects to every socket in the directory under the instance id it had, holding back what each session reports; a socket nobody listens on loses its files.
+A keeper that takes the connection and does not greet within 3 seconds is stuck: the server hangs up, logs its instance id, and stops it by the pid in its `.pid` file with `stopTree` in `src/process-census.ts`, which lists the keeper and every process under it with one `ps`, each with its start time, sends them SIGTERM, and after 3 seconds SIGKILL only to those still running under the same start time, so a pid another process reused is never hit.
+Startup and the socket gate then wait at most about 6 seconds, no Resume starts a second omp on its file, and `recover` counts its session as interrupted.
+Once all attached, `InterruptedSessions.recover` learns which sessions survived, and only then is each listed again, in its project, and what it reported passed on, before the runners recover.
+Attaching to a keeper that greeted never stops omp: a session file without a readable header leaves the session in the directory omp started in, a replay marker that cannot be read counts as a replay, and a session that fails to attach is left running, unlisted, for the next server.
+**End session** sends the keeper `omp_agents_keeper_stop`: the keeper notes the processes under omp while omp is still their parent, sends SIGTERM to omp and to them, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
+omp exiting on its own ends the same way, except that its processes are no longer under it, so the keeper stops the ones it noted before.
+omp's background jobs, kernels and subagents lead process groups or sessions of their own and are reparented once omp exits, so the keeper's `ProcessCensus` (`src/process-census.ts`) notes the processes under omp with `ps` a second after a tool call ends, since an async call starts its job just after it returns, and every 10 seconds, each with its start time so that a reused pid is never signalled.
+A process omp started since the last note escapes an omp that exits on its own.
+A `ps` that fails is logged with the pids that may still run, rather than read as nothing left.
+A keeper exits whenever omp does, and omp exits when its keeper dies, since its stdin closes, and stops its own background jobs as it exits.
 
 ## Replay from here
 
@@ -403,7 +441,8 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 - The shell takes the server as started once it prints `listeningLine` (`omp-agents (omp v…) on http://127.0.0.1:<port>`), not once the port answers: another server that took the port while this one built its page would answer too, and the shell would then own a server that is about to fail.
 - It spawns the server with `OMP_AGENTS_PARENT=stdin` and an open stdin pipe that it never writes to.
   The server calls its `shutdown()` when that pipe ends, which it does however the shell exits, `SIGKILL` included, so no server outlives the app and holds the port.
-  On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to end its sessions.
+  On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to write its stores and let go of its sessions.
+  Quitting leaves the sessions the server started running, as a restart or a crash does: the server cannot tell a quit from a restart, **Restart to Install** quits too, and the next launch shows them live again, while **End session** stays the one way to stop a session.
 - The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`.
   A custom scheme for the page would fail that check.
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.

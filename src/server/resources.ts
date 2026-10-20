@@ -1,6 +1,7 @@
 /**
- * Where the server finds the files it ships beside its code: the page and the omp templates. A packaged app names its
- * resources directory in `OMP_AGENTS_RESOURCES`, which `scripts/build-desktop-artifact.ts` fills; a checkout leaves it unset.
+ * Where the server finds the files it ships beside its code: the page, the session keeper, and the omp templates. A
+ * packaged app names its resources directory in `OMP_AGENTS_RESOURCES`, which `scripts/build-desktop-artifact.ts` fills;
+ * a checkout leaves it unset.
  */
 import { join } from "node:path";
 
@@ -13,3 +14,5 @@ export const prebuiltPageDir: string | null = packagedResources && join(packaged
 /** The omp starter kit: `templates/omp` in a checkout, its copy in a packaged app. */
 export const ompTemplateDir: string = join(packagedResources ?? join(import.meta.dir, "..", ".."), "templates", "omp");
 
+/** The script each session's keeper runs (`src/keeper.ts`): its bundle in a packaged app. */
+export const keeperScript: string = packagedResources ? join(packagedResources, "keeper.js") : join(import.meta.dir, "..", "keeper.ts");

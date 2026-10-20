@@ -1,6 +1,7 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { portFromEnv } from "./server/address";
 
 export const HOME = homedir();
 
@@ -13,6 +14,11 @@ export const tokenFile = join(configDir, "token");
 
 /** The sessions this dashboard started that stopped without End session, beside {@link tokenFile}. */
 export const interruptedFile = join(configDir, "interrupted.json");
+/**
+ * Where the keepers of the sessions the server on `PORT` started listen, a Unix socket and a log each, beside {@link tokenFile}.
+ * One directory per port, so a server on another port, such as a smoke run, never takes over this one's sessions.
+ */
+export const keepersDir = join(configDir, "sessions", String(portFromEnv()));
 
 /** The Todo page's list, beside {@link tokenFile}. */
 export const userTodosFile = join(configDir, "todos.json");

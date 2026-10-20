@@ -1,4 +1,7 @@
-/** Sessions this dashboard started that stopped without **End session**: with the server, or on their own. A file keeps them across restarts. */
+/**
+ * Sessions this dashboard started that stopped without **End session**: on their own, or with the computer while no server
+ * watched them. A file keeps them across restarts. A session survives a server's exit, and the next server attaches to it.
+ */
 import { JsonFile } from "../fs";
 import { isObject, isTexts } from "../json";
 
@@ -34,12 +37,12 @@ function fromLists(value: unknown): Saved | null {
 export class InterruptedSessions {
 	readonly #file: JsonFile<Saved>;
 	/**
-	 * The dashboard sessions that run now, and those that stopped without **End session**. The file keeps
-	 * them, so the next start finds the ones the server went down with.
+	 * The dashboard sessions that run now, and those that stopped without **End session**. The file keeps them, so the
+	 * next start finds the ones that ran when the last server stopped, and learns which of them survived it.
 	 */
 	readonly #sessions: Map<string, SessionState>;
-	/** The sessions that ran when the last server stopped, whatever happened to them since. */
-	readonly #stoppedWithServer: ReadonlySet<string>;
+	/** The sessions that ran when the last server stopped and did not survive it. */
+	#stoppedWithServer: ReadonlySet<string> = new Set();
 
 	constructor(path: string) {
 		this.#file = new JsonFile(path, {
@@ -48,13 +51,25 @@ export class InterruptedSessions {
 			onInvalid: "ignore",
 		});
 		const saved = this.#file.load()?.sessions ?? [];
-		// The sessions that ran when the last server stopped stopped with it.
-		this.#sessions = new Map(saved.map(({ id, working }) => [id, { interrupted: true, working }]));
-		this.#stoppedWithServer = new Set(saved.filter(session => !session.interrupted).map(session => session.id));
-		if (this.#stoppedWithServer.size > 0) this.#save();
+		this.#sessions = new Map(saved.map(({ id, interrupted, working }) => [id, { interrupted, working }]));
 	}
 
-	/** Whether session `sessionId` ran when the last server stopped. */
+	/**
+	 * The server started and attached to the sessions `survived` names, which run on. The others that ran when the last
+	 * server stopped are interrupted, with the turn state they last had: their omp exited while no server watched.
+	 */
+	recover(survived: ReadonlySet<string>): void {
+		const stopped = new Set<string>();
+		for (const [id, state] of this.#sessions) {
+			if (state.interrupted || survived.has(id)) continue;
+			this.#sessions.set(id, { interrupted: true, working: state.working });
+			stopped.add(id);
+		}
+		this.#stoppedWithServer = stopped;
+		if (stopped.size > 0) this.#save();
+	}
+
+	/** Whether session `sessionId` ran when the last server stopped, and did not survive it. */
 	stoppedWithServer(sessionId: string): boolean {
 		return this.#stoppedWithServer.has(sessionId);
 	}
