@@ -1,4 +1,4 @@
-/** The dashboard server: builds the {@link Dashboard}, serves its HTTP API, page, and sockets, then sets it following omp's files and registry. */
+/** The dashboard server: builds the {@link Dashboard}, serves its HTTP API, page, and sockets, then sets it following omp's files and registry; **Update dashboard** runs it again in place. */
 import "./preflight";
 import type { Server, ServerWebSocket } from "bun";
 import { errorText } from "./json";
@@ -8,16 +8,19 @@ import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address
 import { loadToken } from "./server/auth";
 import { Dashboard } from "./server/dashboard";
 import { fail, guardsFor, refuseUntil } from "./server/http";
-import { loadPage, servePage } from "./server/page";
+import { loadPage, pageBuild, servePage } from "./server/page";
+import { SelfUpdate } from "./server/self-update";
 import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSocket } from "./server/terminal-socket";
 import type { Socket, SocketData } from "./server/views";
+import type { ServerMsg } from "./shared/protocol";
 import { parsePageId } from "./server/wire";
 
 const PORT = portFromEnv();
 const token = loadToken(tokenFile);
 const guards = guardsFor(PORT, token);
 const page = await loadPage();
-const dashboard = new Dashboard(PORT);
+const buildMsg = JSON.stringify({ t: "build", id: await pageBuild(page) } satisfies ServerMsg);
+const dashboard = new Dashboard(PORT, await SelfUpdate.forServer(restart));
 // The port is bound before the sessions are attached, so a taken port fails before any keeper is joined, but no page
 // may start or resume a session until the server knows which ones survived.
 const notReattached = refuseUntil(dashboard.reattached, "The dashboard is still attaching to the sessions that kept running.");
@@ -67,6 +70,7 @@ try {
 			maxPayloadLength: 64 * 1024 * 1024,
 			open(ws) {
 				if (isTerminalSocket(ws)) return terminalSocket.open(ws);
+				ws.send(buildMsg);
 				dashboard.open(ws as Socket);
 			},
 			message(ws, raw) {
@@ -92,20 +96,46 @@ console.log(listeningLine(PORT, ompVersion));
 console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
 
-/** SIGINT and SIGTERM may both arrive; the second finds the shutdown already under way. */
+/**
+ * Lets go of the sessions started here, which run on, and stops the server, then exits, or with `rerun` runs this server's own command again
+ * in this process: the same pid, port, environment, and standard streams, so a terminal keeps its job and the desktop
+ * shell its child, and the new server loads the checkout as it is now. SIGINT and SIGTERM may both arrive, or one during
+ * a restart; the later finds the shutdown already under way, and a signal or the shell's pipe ending cancels the rerun.
+ */
 let shuttingDown: Promise<void> | undefined;
+let rerun = false;
 function shutdown(): Promise<void> {
 	shuttingDown ??= (async () => {
 		await dashboard.stop();
 		server.stop(true);
-		process.exit(0);
+		// SelfUpdate offers no restart where execve is missing, as on Windows.
+		if (!rerun || !process.execve) process.exit(0);
+		// The owner lock stays: it names this pid and port, which the new server keeps, so no other server takes over the routines meanwhile.
+		try {
+			process.execve(process.execPath, [process.execPath, ...process.argv.slice(1)], process.env);
+		} catch (err) {
+			console.error(`omp-agents: cannot restart: ${errorText(err)}`);
+			process.exit(1);
+		}
 	})();
 	return shuttingDown;
 }
-process.on("SIGINT", () => void shutdown());
-process.on("SIGTERM", () => void shutdown());
+
+/** **Update dashboard**'s restart; a shutdown already under way stays one. */
+function restart(): void {
+	rerun = shuttingDown === undefined;
+	void shutdown();
+}
+
+function stop(): void {
+	rerun = false;
+	void shutdown();
+}
+
+process.on("SIGINT", stop);
+process.on("SIGTERM", stop);
 // The desktop shell holds the server's stdin open and never writes to it; when the shell dies, even by SIGKILL, the pipe ends.
 if (process.env.OMP_AGENTS_PARENT === "stdin") {
-	process.stdin.on("end", () => void shutdown());
+	process.stdin.on("end", stop);
 	process.stdin.resume();
 }

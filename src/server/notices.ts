@@ -6,8 +6,9 @@ import { JsonFile } from "../fs";
 import { errorText, isObject } from "../json";
 import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, moveOf, YOUR_MOVES, type YourMove } from "../shared/moves";
+import type { DashboardUpdateOutcome } from "../shared/dashboard-update";
 import type { PlanUsage } from "../shared/models";
-import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject } from "../shared/notices";
+import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, UpdateSubject } from "../shared/notices";
 import { EVENT_LEAD_MS, usesClause } from "../shared/notices";
 import type { Project, Worker, WorkerPhase } from "../shared/projects";
 import type { HostStatus } from "../shared/sessions";
@@ -38,6 +39,10 @@ export interface NoticeSources {
 	updateOmp(latest: string): Promise<string>;
 	modelUpdates(): Promise<ModelUpdate[]>;
 	upgradeModel(update: ModelUpdate): Promise<void>;
+	/** How many commits origin's branch holds past the commit the omp-agents server runs, after fetching it; `null` for none, or when it cannot update itself. */
+	dashboardCommits(): Promise<{ branch: string; running: string; commits: number } | null>;
+	/** Pulls omp-agents' checkout and restarts the server; rejects with why it cannot. */
+	updateDashboard(): Promise<DashboardUpdateOutcome>;
 	/** Every workspace's pull request list, and where the running sessions on each pull request stand. */
 	pullRequests(): Promise<{ list: PullRequestList; agent: AgentOn }>;
 	/** The Slack messages that wait on you; none while Slack is not connected. */
@@ -57,6 +62,8 @@ export interface NoticeSources {
 
 /** The kinds the update check looks for. */
 export const UPDATE_KINDS = ["omp", "model"] as const satisfies readonly NoticeKind[];
+/** The kinds the dashboard check looks for, which fetches omp-agents' own branch. */
+export const DASHBOARD_KINDS = ["dashboard"] as const satisfies readonly NoticeKind[];
 /** The kinds the activity check looks for. */
 export const ACTIVITY_KINDS = ["pull-request", "slack"] as const satisfies readonly NoticeKind[];
 /** The kinds the provider check looks for. */
@@ -98,6 +105,7 @@ const AVAILABLE: NoticeStatus = { state: "available" };
 const LOOKED_FOR: Record<NoticeKind, string> = {
 	omp: "a newer omp",
 	model: "newer models",
+	dashboard: "omp-agents updates",
 	"pull-request": "your pull requests' moves",
 	slack: "Slack messages",
 	plan: "used-up plans",
@@ -106,9 +114,18 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	project: "projects that need you",
 };
 
+/**
+ * The check that follows each kind's successful update. A dashboard update restarts the server, whose startup check
+ * counts again: a fetch now would still hold `.git`'s lock when the restarted server's check fetches.
+ */
+const RECHECK_AFTER: Record<UpdateSubject["kind"], readonly NoticeKind[] | null> = { omp: UPDATE_KINDS, model: UPDATE_KINDS, dashboard: null };
+
 const isIds = (value: unknown): value is string[] => Array.isArray(value) && value.every(id => typeof id === "string");
 
 const isScopes = (value: unknown): value is Record<string, string> => isObject(value) && Object.values(value).every(scope => typeof scope === "string");
+
+/** Whether `found` offers an update the user starts, and so carries its status. */
+const isUpdate = <T extends { kind: NoticeKind }>(found: T): found is T & UpdateSubject => found.kind === "omp" || found.kind === "model" || found.kind === "dashboard";
 
 /**
  * The marks `notices.json` holds; a file from before notices could be read holds no `read`, and one from before marks kept
@@ -233,7 +250,7 @@ export class Notices {
 			.filter(({ id }) => !this.#marks.cleared.has(id))
 			.map(({ scope: _, ...found }): Notice => {
 				const marks = { seen: this.#marks.seen.has(found.id), read: this.#marks.read.has(found.id) };
-				return found.kind === "omp" || found.kind === "model" ? { ...found, ...marks, status: this.#status.get(found.id) ?? AVAILABLE } : { ...found, ...marks };
+				return isUpdate(found) ? { ...found, ...marks, status: this.#status.get(found.id) ?? AVAILABLE } : { ...found, ...marks };
 			})
 			.toSorted((a, b) => b.at - a.at);
 	}
@@ -310,6 +327,8 @@ export class Notices {
 				return all(await this.#ompNotices(), false);
 			case "model":
 				return all(await this.#modelNotices(), false);
+			case "dashboard":
+				return all(await this.#dashboardNotices(), false);
 			case "pull-request": {
 				const { list, agent } = await this.#sources.pullRequests();
 				return pullRequestNotices(list, agent);
@@ -339,12 +358,12 @@ export class Notices {
 		return state === "updating" || state === "updated";
 	}
 
-	/** `update` runs each update and, once one succeeds, checks again; the others mark notices `ids`. An unlisted id does nothing. */
+	/** `update` runs each update and, once one succeeds, checks again as {@link RECHECK_AFTER} says; the others mark notices `ids`. An unlisted id does nothing. */
 	async apply(ids: string[], op: NoticeOp): Promise<void> {
 		const listed = ids.flatMap(id => this.#found.get(id) ?? []);
 		if (listed.length === 0) return;
 		if (op === "update") {
-			await Promise.all(listed.map(found => (found.kind === "omp" || found.kind === "model" ? this.#update(found) : undefined)));
+			await Promise.all(listed.map(found => (isUpdate(found) ? this.#update(found) : undefined)));
 			return;
 		}
 		for (const { id, scope } of listed) {
@@ -355,7 +374,7 @@ export class Notices {
 		this.#changed();
 	}
 
-	async #update(found: Found & { kind: "omp" | "model" }): Promise<void> {
+	async #update(found: Found & UpdateSubject): Promise<void> {
 		if (this.#updateStarted(found.id)) return;
 		this.#marks.seen.add(found.id);
 		this.#marks.read.add(found.id);
@@ -363,13 +382,31 @@ export class Notices {
 		this.#save();
 		this.#setStatus(found.id, { state: "updating" });
 		try {
-			const note = found.kind === "omp" ? `omp ${await this.#sources.updateOmp(found.latest)} is installed. Restart omp-agents to load it.` : await this.#upgrade(found);
-			this.#setStatus(found.id, { state: "updated", note });
+			this.#setStatus(found.id, { state: "updated", note: await this.#run(found) });
 		} catch (err) {
 			this.#setStatus(found.id, { state: "failed", error: errorText(err) });
 			return;
 		}
-		await this.check(UPDATE_KINDS);
+		const recheck = RECHECK_AFTER[found.kind];
+		if (recheck) await this.check(recheck);
+	}
+
+	/** Runs the update `subject` offers; answers what it did. */
+	async #run(subject: UpdateSubject): Promise<string> {
+		switch (subject.kind) {
+			case "omp":
+				return `omp ${await this.#sources.updateOmp(subject.latest)} is installed. Restart omp-agents to load it.`;
+			case "model":
+				return this.#upgrade(subject);
+			case "dashboard": {
+				const outcome = await this.#sources.updateDashboard();
+				return outcome.kind === "current" ? "omp-agents already runs the newest commit." : `Restarting omp-agents at ${outcome.to.slice(0, 7)}…`;
+			}
+			default: {
+				const unhandled: never = subject;
+				return unhandled;
+			}
+		}
 	}
 
 	async #upgrade(update: ModelUpdate): Promise<string> {
@@ -386,6 +423,12 @@ export class Notices {
 	async #modelNotices(): Promise<Unscoped[]> {
 		const at = this.#sources.now();
 		return (await this.#sources.modelUpdates()).map(update => ({ id: `model:${update.provider}/${update.from.id}>${update.to.id}`, at, kind: "model", ...update }));
+	}
+
+	/** One notice per running build, so the count of new commits grows on it rather than toasting again for each. */
+	async #dashboardNotices(): Promise<Unscoped[]> {
+		const found = await this.#sources.dashboardCommits();
+		return found ? [{ id: `dashboard:${found.running}`, at: this.#sources.now(), kind: "dashboard", branch: found.branch, commits: found.commits }] : [];
 	}
 
 	#setStatus(id: string, status: NoticeStatus): void {

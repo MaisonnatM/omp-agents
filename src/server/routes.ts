@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, and the text files agent text names through.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, and the dashboard's own update.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
@@ -58,6 +58,8 @@ import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
+import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
+import { UpdateRefused } from "./self-update";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
@@ -108,6 +110,12 @@ export interface FileRoutesEnv {
 /** What the todo routes read and write: the Todo page's list. */
 export type TodoRoutesEnv = Omit<TodoTicketEnv, "createTicket">;
 
+/** What the dashboard update routes read: where the server stands, and **Update dashboard** itself. */
+export interface DashboardRoutesEnv {
+	status(): Promise<DashboardUpdateStatus>;
+	update(): Promise<DashboardUpdateOutcome>;
+}
+
 /** Everything the HTTP API reads, by concern. */
 export interface RouteEnv {
 	guards: Guards;
@@ -119,6 +127,7 @@ export interface RouteEnv {
 	files: FileRoutesEnv;
 	todos: TodoRoutesEnv;
 	pullRequests: PullRequestRoutesEnv;
+	dashboard: DashboardRoutesEnv;
 }
 
 /** What the pull request routes hand on: the merge queue, through which every merge goes. */
@@ -795,6 +804,20 @@ function providerRoutes({ get, write }: RouteKit): Routes {
 	};
 }
 
+/**
+ * **Update dashboard**: `GET /api/dashboard/update` answers `DashboardUpdateStatus` without asking origin; `PUT` with any
+ * JSON body fast-forwards the server's checkout, installs when `bun.lock` changed, and answers `DashboardUpdateOutcome`
+ * before the server restarts, or 409 with why the checkout stays as it was.
+ */
+function dashboardRoutes({ get, write }: RouteKit, env: DashboardRoutesEnv): Routes {
+	return {
+		"/api/dashboard/update": {
+			GET: get(() => answer(() => env.status())),
+			PUT: write(() => null, () => env.update(), err => (err instanceof UpdateRefused ? fail(409, err.message) : null)),
+		},
+	};
+}
+
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
@@ -807,5 +830,6 @@ export function createRoutes(env: RouteEnv): Routes {
 		...pullRequestRoutes(kit, env.pullRequests),
 		...fileRoutes(kit, env.files),
 		...todoRoutes(kit, env.todos),
+		...dashboardRoutes(kit, env.dashboard),
 	};
 }

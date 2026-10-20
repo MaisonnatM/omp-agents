@@ -1,7 +1,7 @@
 /** How the bell words, pictures, links, acts on, and toasts each notice: {@link presentNotice}, the one place that tells notice kinds apart. */
 import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
-import { type Notice, usesClause } from "../src/shared/notices";
+import { type Notice, type UpdateSubject, usesClause } from "../src/shared/notices";
 import { providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
@@ -159,15 +159,17 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 			};
 		}
 		case "omp":
-		case "model": {
+		case "model":
+		case "dashboard": {
 			const { status } = notice;
+			const words = updateWords(notice);
 			let preview: string;
 			switch (status.state) {
 				case "available":
-					preview = notice.kind === "omp" ? `You run omp ${notice.current}.` : `${usesClause(notice.uses)} ${notice.from.name}.`;
+					preview = words.available;
 					break;
 				case "updating":
-					preview = notice.kind === "omp" ? "Updating omp…" : `Switching to ${notice.to.name}…`;
+					preview = words.updating;
 					break;
 				case "updated":
 					preview = status.note;
@@ -178,15 +180,38 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 			}
 			return {
 				source: "updates",
-				headline: `${notice.kind === "omp" ? `omp ${notice.latest}` : notice.to.name} is out`,
+				headline: words.headline,
 				preview,
 				failed: status.state === "failed",
 				busy: status.state === "updating",
 				link: null,
 				face: { kind: "update" },
-				action: status.state === "updated" ? { kind: "none" } : { kind: "update", label: status.state === "updating" ? "Updating" : "Update", ready: status.state === "available" || status.state === "failed" },
+				action:
+					status.state === "updated"
+						? { kind: "none" }
+						: { kind: "update", label: status.state === "updating" ? "Updating" : "Update", ready: status.state === "available" || status.state === "failed" },
 				toast: { kind: "update", dismissedElsewhere: notice.seen && status.state === "available" },
 			};
+		}
+	}
+}
+
+/** How an update notice words itself, before and while its update runs. */
+function updateWords(notice: UpdateSubject): { headline: string; available: string; updating: string } {
+	switch (notice.kind) {
+		case "omp":
+			return { headline: `omp ${notice.latest} is out`, available: `You run omp ${notice.current}.`, updating: "Updating omp…" };
+		case "model":
+			return { headline: `${notice.to.name} is out`, available: `${usesClause(notice.uses)} ${notice.from.name}.`, updating: `Switching to ${notice.to.name}…` };
+		case "dashboard":
+			return {
+				headline: `omp-agents update: ${notice.commits === 1 ? "1 new commit" : `${notice.commits} new commits`} on ${notice.branch}`,
+				available: "Update pulls them and restarts omp-agents.",
+				updating: "Pulling and restarting omp-agents…",
+			};
+		default: {
+			const unhandled: never = notice;
+			return unhandled;
 		}
 	}
 }
