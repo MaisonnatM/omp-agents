@@ -1,9 +1,8 @@
 import { memo, useCallback, useRef } from "react";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
-import type { DashboardState } from "../dashboard-state";
 import { type ModelList, UNREAD } from "../reads";
-import { closePane, hashForView, type Layout, sameView } from "../routing";
+import { closePane, hashForView, type Layout } from "../routing";
 import { Pane } from "./pane";
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./split-resize-handle";
 
@@ -12,7 +11,6 @@ interface PaneGridProps {
 	hosts: RosterHost[];
 	past: PastSession[];
 	lastHosts: ReadonlyMap<string, RosterHost>;
-	draft: DashboardState["draft"];
 	models: ReadonlyMap<string, ModelList>;
 	/** The workspaces, which each composer's directory picker offers. */
 	workspaces: Workspace[];
@@ -29,7 +27,7 @@ interface PaneGridProps {
  * The panes in their grid, up to four, with the handles that resize it. It takes only what the panes read, and every
  * pane's props stay equal while a token streams, so the grid renders for roster and layout changes alone.
  */
-export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts, draft, models, workspaces, maximized, hasDetails, rightOpen, show, toggleSidebar }: PaneGridProps) {
+export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts, models, workspaces, maximized, hasDetails, rightOpen, show, toggleSidebar }: PaneGridProps) {
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
 	const latest = useRef(layout);
@@ -66,7 +64,6 @@ export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts,
 					host={pane.kind === "live" ? hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
 					lastHost={pane.kind === "live" ? lastHosts.get(pane.instanceId) ?? null : null}
 					session={pane.kind === "past" ? past.find(s => s.sessionId === pane.sessionId) ?? null : null}
-					initialDraft={draft && sameView(draft.view, pane) ? draft.text : ""}
 					models={(pane.kind === "live" && models.get(pane.instanceId)) || UNREAD}
 					workspaces={workspaces}
 					onLayout={onLayout}
