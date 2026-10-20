@@ -1,8 +1,9 @@
 /**
  * The cleanup after a merge: each live session this dashboard started that is linked to a pull request that merged while
  * this server watched ends, with its linked worktree and the local branch of the pull request it merged, once it is idle
- * with every pull request it links merged or closed. The worktree goes through `Worktrees.removeCheckout`, which keeps it
- * while any live session, a terminal one included, still works in it or it has changes, and the
+ * and not held for a usage limit's continue, with every pull request it links merged or closed. The worktree goes through
+ * `Worktrees.removeCheckout`, which keeps it while any live session, a terminal one included, still works in it or it
+ * has changes, and the
  * branch only while it still points at the merged commit. It hears of a merge the queue made at once, and looks every two
  * minutes for one made anywhere else; the first look at a pull request only records it, so a dashboard start ends nothing
  * for a merge made before it. Merges and looks run one at a time, and a pull request once merged or closed is not read
@@ -21,6 +22,8 @@ const CLEANUP_WATCH_MINUTES = 2;
 export interface CleanupSession {
 	sessionId: string;
 	idle: boolean;
+	/** Still on its task, by `occupiedBy`: a turn runs or waits on a question, or a usage limit's continue holds it. */
+	occupied: boolean;
 	pullRequests: readonly PullRequest[];
 	/** The directory it works in: its linked worktree, else its own. */
 	workDir: string;
@@ -41,7 +44,7 @@ export interface MergeCleanupDeps {
 	states(prs: readonly PullRequest[]): Promise<Map<string, PullRequestState>>;
 	/** The checkout `dir` is in, read before the session's worktree goes; `null` outside git. */
 	checkout(dir: string): Promise<CleanupCheckout | null>;
-	/** Ends session `sessionId` as **End session** does, which removes its linked worktree unless something keeps it; rejects when it did not end, such as one gone or no longer idle. */
+	/** Ends session `sessionId` as **End session** does, which removes its linked worktree unless something keeps it; rejects when it did not end, such as one gone. */
 	end(sessionId: string): Promise<void>;
 	/** Deletes `branch` of `gitDir` while it still points at `head` and no worktree holds it. */
 	deleteBranch(gitDir: string, branch: string, head: string): Promise<boolean>;
@@ -68,7 +71,7 @@ export class MergeCleanup {
 	readonly #deps: MergeCleanupDeps;
 	/** Each pull request of a live session as the last look saw it, or as the queue merged it, by {@link prKey}; one merged or closed stays so. */
 	readonly #seen = new Map<string, PullRequestState>();
-	/** The sessions linked to a pull request that merged while this server watched: each ends once it is idle with every pull request settled. */
+	/** The sessions linked to a pull request that merged while this server watched: each ends once it is {@link finished} with every pull request settled. */
 	readonly #finishing = new Set<string>();
 	/** Merges and looks, one at a time, so a look never reads `#seen` across a merge. */
 	readonly #lane = new SerialLane();
@@ -127,12 +130,12 @@ export class MergeCleanup {
 		for (const session of this.#deps.sessions()) if (session.pullRequests.some(pr => merged.some(other => samePullRequest(pr, other)))) this.#finishing.add(session.sessionId);
 	}
 
-	/** Ends each waiting session that is idle with every pull request merged or closed; one whose end fails waits for the next look. */
+	/** Ends each waiting session that is finished with every pull request merged or closed; one whose end fails waits for the next look. */
 	async #settle(): Promise<void> {
 		if (this.#finishing.size === 0) return;
 		const live = this.#deps.sessions();
 		for (const sessionId of this.#finishing) if (!live.some(session => session.sessionId === sessionId)) this.#finishing.delete(sessionId);
-		const done = live.filter(session => this.#finishing.has(session.sessionId) && session.idle && session.pullRequests.every(pr => this.#settled(pr)));
+		const done = live.filter(session => this.#finishing.has(session.sessionId) && finished(session) && session.pullRequests.every(pr => this.#settled(pr)));
 		await Promise.all(
 			done.map(async session => {
 				try {
@@ -145,10 +148,15 @@ export class MergeCleanup {
 		);
 	}
 
-	/** Ends `session`, then deletes its branch when that is the head branch of a pull request of its own repository that merged. */
+	/**
+	 * Ends `session`, then deletes its branch when that is the head branch of a pull request of its own repository that
+	 * merged. One that started a turn or was held while its checkout was read is refused, so the next look tries it again.
+	 */
 	async #finish(session: CleanupSession): Promise<void> {
 		const { branch } = session;
 		const checkout = branch === null ? null : await this.#deps.checkout(session.workDir);
+		const now = this.#deps.sessions().find(one => one.sessionId === session.sessionId);
+		if (now && !finished(now)) throw new Error("It is on its task again.");
 		const repo = checkout?.repo;
 		const merged = repo
 			? session.pullRequests.flatMap(pr => {
@@ -161,3 +169,6 @@ export class MergeCleanup {
 		await this.#deps.deleteBranch(checkout.gitDir, branch, merged.head).catch((error: unknown) => console.error(`omp-agents: cannot delete the merged branch ${branch}: ${errorText(error)}`));
 	}
 }
+
+/** Whether `session` is done with its task: idle, and not held for a usage limit's continue. */
+const finished = (session: CleanupSession): boolean => session.idle && !session.occupied;

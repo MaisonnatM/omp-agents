@@ -509,7 +509,7 @@ An action that fails shows its error, and its control becomes available again.
 - The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit.
 - A session waits on one continue at most: a later limit moves it to the new reset.
   Any new turn of that session cancels it, whoever sends the prompt: you, a project's coordinator or its updates, or a scheduled message; so do an edited prompt and **End session**.
-- Until the continue goes, fails, or you cancel it, the session stays on its task: a routine does not end the session, a project worker keeps its slot, its coordinator hears the worker finished only if the continue fails or is canceled, and the bell does not call the project done.
+- Until the continue goes, fails, or you cancel it, the session stays on its task: a routine does not end the session, **After a merge** does not end it, a project worker keeps its slot, its coordinator hears the worker finished only if the continue fails or is canceled, and the bell does not call the project done.
   The sidebar and the **Projects** page still show it idle, and it stays on its task when the dashboard restarts.
 - omp's own `retry.waitForUsageReset` setting instead keeps the turn waiting inside omp, so a turn it holds never ends on the limit.
 
@@ -752,6 +752,7 @@ An action that fails shows its error, and its control becomes available again.
   Clicking the branch it brings copies its name and removes the linked worktree that has it checked out, as a row's copy-branch button does.
   The header ends with **Status** and **Reviewers**, each label beside its value at every width.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
+  A pull request otherwise ready to merge whose branch is behind its base, under a rule that wants it up to date, says **Behind** its base in place of **Ready to merge**, and still offers its merge, which updates the branch first.
   Click the state to make the pull request **Open**, **Draft**, or **Closed**; a merged one keeps its state.
   **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
   Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
@@ -1424,7 +1425,7 @@ An action that fails shows its error, and its control becomes available again.
   **After a merge**, on by default and kept in the same file, ends each session the dashboard started that is linked to a pull request that merges, once the session is idle and every pull request it submitted or worked on is merged or closed, whether the merge came from the dashboard or anywhere else.
   It never ends an omp session you run in a terminal, nor one another dashboard started, and it leaves a worktree that any live session, a terminal one included, still works in.
   The dashboard sees a merge it made at once, and one made elsewhere within two minutes; a merge made before the dashboard started, or before the session linked the pull request, ends nothing.
-  A session still working when its pull request merges ends once it is idle, one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
+  A session still working when its pull request merges, or waiting to continue after a usage limit, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
   A project's workers follow their project's **Workers' pull requests** instead, and a coordinator never ends.
   **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses whatever you chose most recently in this browser, and a method the repository does not allow falls back to the first one it does.

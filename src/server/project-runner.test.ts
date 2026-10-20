@@ -427,15 +427,11 @@ describe("ProjectRunner", () => {
 		expect(h.file.get(projectId)!.updates).toEqual([]);
 	});
 
-	test("endFinished ends an idle worker the cleanup after a merge finished, as end_worker does, then tells the coordinator, and rejects one that is gone or works", async () => {
+	test("endFinished ends a worker the cleanup after a merge finished, as end_worker does, then tells the coordinator, and rejects one that is gone", async () => {
 		const h = harness();
 		const { projectId, worker } = await project(h, 1);
 		const w1 = worker(1);
 		await expect(h.runner.endFinished(projectId, "w9")).rejects.toThrow(`Project ${projectId} has no worker w9.`);
-		w1.status = "working";
-		await expect(h.runner.endFinished(projectId, "w1")).rejects.toThrow("w1 is working, not idle.");
-		expect(h.ended).toEqual([]);
-		w1.status = "idle";
 		await h.runner.endFinished(projectId, "w1");
 		expect(h.ended).toEqual([w1.sessionId]);
 		h.runner.exited(w1.instanceId);
@@ -443,7 +439,7 @@ describe("ProjectRunner", () => {
 		await expect(h.runner.endFinished(projectId, "w1")).rejects.toThrow("w1 does not run.");
 	});
 
-	test("a held worker reads idle but keeps its slot, and the cleanup after a merge does not end it until its hold ends", async () => {
+	test("a held worker reads idle but keeps its slot until its hold ends", async () => {
 		const h = harness();
 		const { projectId, worker } = await project(h, 0);
 		h.file.apply({ op: "max-workers", id: projectId, max: 1 });
@@ -453,8 +449,6 @@ describe("ProjectRunner", () => {
 		w1.held = true;
 		expect(await startWorker(h, projectId, { title: "Two", prompt: "2.", cwd: null })).toStartWith('Queued "Two" at position 1');
 		expect(h.runner.phaseOf(h.file.get(projectId)!.workers[0]!)).toBe("idle");
-		await expect(h.runner.endFinished(projectId, "w1")).rejects.toThrow("w1 waits on its continue after a usage limit.");
-		expect(h.ended).toEqual([]);
 		const started = h.until(() => h.file.get(projectId)!.workers.length === 2);
 		w1.held = false;
 		h.runner.turnEnded(w1.instanceId, "done");
