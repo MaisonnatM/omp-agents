@@ -384,7 +384,7 @@ interface SessionScan {
 	workDirs: string[];
 	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
 	worktree: string | null;
-	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it: a refresh writes its git fields, `#resolve` its default branch and pull request. */
+	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it; only `#resolve` writes it, whole, from git's answer, the default branch, and the pull request it heads. */
 	branch: SessionBranch | null;
 }
 
