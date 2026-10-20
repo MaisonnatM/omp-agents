@@ -1,7 +1,8 @@
 /** The subagent header's crumb styles, and a session header's controls: its branch, its Linear issues, and its pull requests. */
-import { Check, ChevronDown, Fingerprint, GitPullRequest, Layers } from "lucide-react";
+import { Check, ChevronDown, Fingerprint, GitMerge, GitPullRequest, Layers } from "lucide-react";
 import { Fragment, type MouseEvent, useEffect, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest } from "../../src/shared/github";
+import { queuedMergeOf } from "../../src/shared/merge-queue";
 import type { SessionFacts } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
@@ -16,6 +17,8 @@ import { linearUrlOf } from "../tickets-model";
 import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
 import { BranchName, releaseBranch } from "./git";
 import { StackRail } from "./pull-requests/pr-details/stack";
+import { MergePopover, QueuedMergeNote, useMergeTarget } from "./pull-requests/merge-popover";
+import { useDashboardStatus } from "./dashboard-context";
 import { OrgIcon } from "./org-icon";
 import { useCopy } from "../use-copy";
 
@@ -86,6 +89,7 @@ function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[]
 			</PopoverTrigger>
 			<PopoverContent align="end" className="w-[28rem] p-0" onClick={closeOnLink}>
 				{stacked && <StackRail stack={stacked.stack} trailing={pr => <ExternalLinks pr={pr} />} />}
+				{stacked && <MergeStack stack={stacked.stack} />}
 				{others.length > 0 && (
 					<div className={stacked ? "border-t border-border py-1" : "py-1"}>
 						{stacked && <p className="px-3 pt-1 pb-0.5 text-xs text-muted-foreground">Also on this session</p>}
@@ -111,6 +115,30 @@ function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[]
 				)}
 			</PopoverContent>
 		</Popover>
+	);
+}
+
+/** **Merge stack**: queues the stack's merge, bottom first, after the merge confirmation; once queued, where it stands, with **Cancel**. */
+function MergeStack({ stack }: { stack: StackedPullRequest[] }) {
+	const { merges } = useDashboardStatus();
+	const [open, setOpen] = useState(false);
+	const bottom = stack[stack.length - 1]!;
+	const target = useMergeTarget(bottom, open);
+	const queued = stack.map(pr => queuedMergeOf(merges, pr)).find(merge => merge !== undefined);
+	return (
+		<div className="border-t border-border px-3 py-2">
+			{queued ? (
+				<QueuedMergeNote merge={queued} />
+			) : (
+				<MergePopover pr={bottom} stack={stack} target={target.data} error={target.error} open={open} onOpenChange={setOpen} align="end">
+					{({ pending }) => (
+						<Button variant="secondary" size="compact" leadingIcon={GitMerge} active={open} loading={pending}>
+							Merge stack
+						</Button>
+					)}
+				</MergePopover>
+			)}
+		</div>
 	);
 }
 

@@ -335,17 +335,17 @@ export function stateActions(state: PullRequestDetail["state"]): StateActionId[]
 	}
 }
 
-/** A change that moves a pull request in the list: a state change or a merge. */
-export type ListChange = Extract<PullRequestChange, { field: "state" | "merge" }>;
+/** A change a row makes that moves its pull request in the list: a state change; a merge goes through the merge queue. */
+export type ListChange = Extract<PullRequestChange, { field: "state" }>;
 
 /**
- * The list after GitHub took `change` on `pr` at `at`, until the list is read again: a closed pull request leaves it,
+ * The list after `pr` took `state` on GitHub at `at`, until the list is read again: a closed pull request leaves it,
  * since it lists none; a merged one moves to **Recently merged**. Every repository and row it leaves alone stays the same object.
  */
-export function withPullRequestChanged(list: PullRequestList, pr: PullRequest, change: ListChange, at: number): PullRequestList {
+export function withPullRequestState(list: PullRequestList, pr: PullRequest, state: ListChange["state"] | "merged", at: number): PullRequestList {
 	const changed = (row: PullRequestSummary): PullRequestSummary[] => {
-		if (change.field === "merge") return [{ ...row, state: "merged", updatedAt: at }];
-		return change.state === "closed" ? [] : [{ ...row, state: change.state }];
+		if (state === "merged") return [{ ...row, state, updatedAt: at }];
+		return state === "closed" ? [] : [{ ...row, state }];
 	};
 	return {
 		...list,

@@ -88,6 +88,7 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 				files={files}
 				onPick={onPick}
 				workspace={workspace}
+				cwd={listed?.cwd ?? hosts.find(host => host.instanceId === current)?.cwd ?? null}
 			/>
 		</>
 	);

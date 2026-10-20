@@ -203,6 +203,7 @@ export function useDashboard(): Dashboard {
 					case "workspaces":
 					case "projects":
 					case "notices":
+					case "merges":
 						dispatch(msg);
 						return;
 					case "done": {

@@ -4,7 +4,6 @@ import { dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from 
 import { loadPullRequestDetail } from "./pull-requests";
 import { isObject, str } from "./json";
 import { type Person, type PullRequest, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
-import type { MergeMethod } from "./shared/source-control";
 
 const OPTIONS_TTL_MS = 5 * 60_000;
 
@@ -60,16 +59,6 @@ async function setState(pr: PullRequest, target: SettableState): Promise<void> {
 	for (const step of stateSteps({ open: node.state === "OPEN", draft: node.isDraft === true }, target)) await ghMutation(mutation(step), { id: node.id });
 }
 
-const MERGE_MUTATION = `mutation($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
-	mergePullRequest(input: { pullRequestId: $id, mergeMethod: $method, expectedHeadOid: $head }) { clientMutationId }
-}`;
-
-async function merge(pr: PullRequest, method: MergeMethod, head: string): Promise<void> {
-	const { id, state } = await nodeOf(pr);
-	if (state !== "OPEN") throw new Error(`${pullRequestName(pr)} is ${String(state).toLowerCase()}, not open`);
-	await ghMutation(MERGE_MUTATION, { id, method: method.toUpperCase(), head });
-}
-
 /** A mutation that takes only a review thread's node id. */
 const threadMutation = (name: string): string => `mutation($id: ID!) { ${name}(input: { threadId: $id }) { clientMutationId } }`;
 
@@ -90,9 +79,6 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 			break;
 		case "state":
 			await setState(pr, change.state);
-			break;
-		case "merge":
-			await merge(pr, change.method, change.head);
 			break;
 		case "thread":
 			await ghMutation(threadMutation(change.resolved ? "resolveReviewThread" : "unresolveReviewThread"), { id: change.id });

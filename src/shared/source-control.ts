@@ -1,4 +1,4 @@
-/** Settings › Source control providers: the CLIs the dashboard reads GitHub and Graphite through, automatic pulls, and merge methods. */
+/** Settings › Source control providers: the CLIs the dashboard reads GitHub and Graphite through, automatic pulls, the cleanup after a merge, and merge methods. */
 
 /** GitHub's merge methods, in the order its merge button lists them. */
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
@@ -18,23 +18,39 @@ export function startingMethod(choice: MergeMethodChoice, last: MergeMethod | nu
 	return wanted !== null && allowed.includes(wanted) ? wanted : (allowed[0] ?? null);
 }
 
-/** Automatic pulls, kept by the server in `source-control.json`. */
+/** Automatic pulls. */
 export interface AutoPull {
 	on: boolean;
 	/** A repository's own choice, keyed by its main checkout, over {@link on}. */
 	repos: Record<string, boolean>;
 }
 
-export const DEFAULT_AUTO_PULL: AutoPull = { on: false, repos: {} };
+/** What the server keeps in `source-control.json`: automatic pulls, and whether a merge ends the sessions it leaves with nothing to do. */
+export interface SourceControlSettings extends AutoPull {
+	cleanUp: boolean;
+}
 
-/** `on: null` drops the repository's own choice, so it follows the default again. */
-export type AutoPullChange = { op: "default"; on: boolean } | { op: "repo"; repo: string; on: boolean | null };
+export const DEFAULT_SOURCE_CONTROL: SourceControlSettings = { on: false, repos: {}, cleanUp: true };
 
-export function applyAutoPull(now: AutoPull, change: AutoPullChange): AutoPull {
-	if (change.op === "default") return now.on === change.on ? now : { ...now, on: change.on };
-	if ((now.repos[change.repo] ?? null) === change.on) return now;
-	const { [change.repo]: _, ...rest } = now.repos;
-	return { ...now, repos: change.on === null ? rest : { ...rest, [change.repo]: change.on } };
+/** `on: null` drops the repository's own choice, so it follows the default again; `clean-up` turns the cleanup after a merge on or off. */
+export type SourceControlChange = { op: "default"; on: boolean } | { op: "repo"; repo: string; on: boolean | null } | { op: "clean-up"; on: boolean };
+
+export function applySourceControl(now: SourceControlSettings, change: SourceControlChange): SourceControlSettings {
+	switch (change.op) {
+		case "default":
+			return now.on === change.on ? now : { ...now, on: change.on };
+		case "clean-up":
+			return now.cleanUp === change.on ? now : { ...now, cleanUp: change.on };
+		case "repo": {
+			if ((now.repos[change.repo] ?? null) === change.on) return now;
+			const { [change.repo]: _, ...rest } = now.repos;
+			return { ...now, repos: change.on === null ? rest : { ...rest, [change.repo]: change.on } };
+		}
+		default: {
+			const unhandled: never = change;
+			return unhandled;
+		}
+	}
 }
 
 /** What one pull of a repository's default branch did. */
@@ -65,5 +81,7 @@ export interface ProviderStatus {
 export interface SourceControlAnswer {
 	providers: ProviderStatus[];
 	autoPull: AutoPull;
+	/** Whether a merge ends the idle sessions it leaves with every pull request merged or closed, with their worktrees and branches. */
+	cleanUp: boolean;
 	repos: PullRepo[];
 }

@@ -233,6 +233,14 @@ export interface PullRequestLabel {
 	color: string;
 }
 
+/** GitHub's `mergeStateStatus`, lowercased: whether its merge button would merge now and, if not, what holds it. */
+export const MERGE_STATES = ["clean", "unstable", "has-hooks", "behind", "blocked", "dirty", "draft", "unknown"] as const;
+export type MergeState = (typeof MERGE_STATES)[number];
+
+/** Whether GitHub would merge a pull request now, with none of its checks still running: else a merge waits until it is ready. */
+export const mergesNow = ({ mergeState, checks }: { mergeState: MergeState; checks: CheckState }): boolean =>
+	(mergeState === "clean" || mergeState === "unstable" || mergeState === "has-hooks") && checks !== "pending";
+
 /** One pull request in full, as a pull request's details show it in place of opening GitHub. */
 export interface PullRequestDetail extends PullRequest {
 	title: string;
@@ -270,11 +278,13 @@ export interface PullRequestDetail extends PullRequest {
 	headOid: string;
 	/** The merge methods the repository allows, in GitHub's order. */
 	mergeMethods: MergeMethod[];
+	/** Whether GitHub would merge it now, and if not, what holds it: a branch behind its base, a pending check or review, conflicts. */
+	mergeState: MergeState;
 	/** Whether you may comment on it: its repository is not archived, and its conversation is not locked or you can write to the repository. */
 	canComment: boolean;
 }
 
-/** The states the details can set; merging is a change of its own. */
+/** The states the details can set; a merge goes through the merge queue. */
 export const SETTABLE_STATES = ["open", "draft", "closed"] as const;
 export type SettableState = (typeof SETTABLE_STATES)[number];
 
@@ -283,7 +293,6 @@ export type PullRequestChange =
 	| { field: "label"; name: string; on: boolean }
 	| { field: "reviewer"; login: string; on: boolean }
 	| { field: "state"; state: SettableState }
-	| { field: "merge"; method: MergeMethod; head: string }
 	| { field: "thread"; id: string; resolved: boolean }
 	| { field: "reply"; thread: string; body: string }
 	| { field: "comment"; body: string };

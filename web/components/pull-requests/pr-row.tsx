@@ -2,7 +2,7 @@
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
 import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
-import type { MoveId } from "../../../src/shared/moves";
+import { type MoveId, readyOnceChecksPass } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -84,23 +84,33 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): Action<[ListChange]> =>
 	useAction((change: ListChange) => onChange(pr, change), "GitHub refused the change");
 
-/** A **Merge** badge: a button that merges after the same confirmation as the details, reading what the merge needs while it is open. */
-function MergeBadge({ pr, change }: { pr: PullRequestSummary; change: Action<[ListChange]> }) {
+/**
+ * A **Merge** badge, or a **Checks running** one on a pull request that is ready but for them: a button that merges after the
+ * same confirmation as the details, reading what the merge needs while it is open; once queued, **Queued** or **Stopped**.
+ */
+function MergeBadge({ pr, move }: { pr: PullRequestSummary; move: "merge" | "checks-running" }) {
 	const [open, setOpen] = useState(false);
 	const target = useMergeTarget(pr, open);
-	const label = `Merge ${pullRequestName(pr)} on GitHub`;
+	const label = move === "merge" ? `Merge ${pullRequestName(pr)} on GitHub` : `Checks running: merge ${pullRequestName(pr)} once they pass`;
 	return (
-		<MergePopover pr={pr} target={target.data} error={target.error} onMerge={(method, head) => change.run({ field: "merge", method, head })} open={open} onOpenChange={setOpen} tooltip={label} align="start">
-			{() => (
+		<MergePopover pr={pr} target={target.data} error={target.error} open={open} onOpenChange={setOpen} tooltip={label} align="start">
+			{({ queued, pending }) => (
 				<button
 					type="button"
-					aria-label={label}
-					aria-busy={change.pending}
-					disabled={change.pending}
-					className={cn(BADGE, MOVE_LOOK.merge[0], BADGE_BUTTON, change.pending && "motion-safe:animate-pulse")}
+					aria-label={queued ? `${label}: ${queued.state.kind === "failed" ? "stopped" : "queued"}` : label}
+					aria-busy={pending || queued?.state.kind === "waiting"}
+					disabled={pending}
+					className={cn(BADGE, MOVE_LOOK[move][0], BADGE_BUTTON, (pending || queued?.state.kind === "waiting") && "motion-safe:animate-pulse")}
 					style={{ fontVariationSettings: fontWeights.semibold }}
 				>
-					<BadgeFace move="merge" />
+					{queued ? (
+						<>
+							<GitMerge aria-hidden className="size-3 shrink-0" />
+							{queued.state.kind === "failed" ? "Stopped" : "Queued"}
+						</>
+					) : (
+						<BadgeFace move={move} />
+					)}
 				</button>
 			)}
 		</MergePopover>
@@ -108,11 +118,11 @@ function MergeBadge({ pr, change }: { pr: PullRequestSummary; change: Action<[Li
 }
 
 /**
- * A row's move badge: for **Merge**, a button that merges; else a button that starts the quick action handing the move
- * to an agent, when one applies; else the plain badge.
+ * A row's move badge: for **Merge**, and **Checks running** on a pull request ready but for them, a button that merges;
+ * else a button that starts the quick action handing the move to an agent, when one applies; else the plain badge.
  */
-function RowMoveBadge({ pr, move, change, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId; change: Action<[ListChange]> } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
-	if (move === "merge") return <MergeBadge pr={pr} change={change} />;
+function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -423,7 +433,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<Age at={pr.updatedAt} compact exact className="w-7 shrink-0 text-right text-xs leading-5 tabular-nums text-muted-foreground" />
 				</div>
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-					<RowMoveBadge pr={pr} move={move} change={change} {...actions} />
+					<RowMoveBadge pr={pr} move={move} {...actions} />
 					<StateTag pr={pr} move={move} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
@@ -472,7 +482,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			onClick={event => openFromRow(event, pr)}
 			className={cn("group/row relative cursor-pointer px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<RowMoveBadge pr={pr} move={move} change={change} {...actions} />
+			<RowMoveBadge pr={pr} move={move} {...actions} />
 			<div className="min-w-0">
 				<TitleLink pr={pr} targeted={targeted} className="block truncate" />
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">

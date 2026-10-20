@@ -642,6 +642,9 @@ An action that fails shows its error, and its control becomes available again.
 - In a session's header, the pull request button opens a popover with one row per pull request: the row opens its details on the Pull requests page, and the GitHub and Graphite icons at its end open it there.
   When two or more of the session's open pull requests stack on each other, as a ticket's `gt submit` stack does, the button reads **Stack · 3** and the popover draws the stack on a rail, top first, down to the branch it merges into, as a pull request's **Stack** does.
   The session's other pull requests follow under **Also on this session**, and **Open stack on Graphite** ends the popover.
+  **Merge stack**, under the rail, merges the whole stack into the bottom one's base, bottom first, after a confirmation with the merge methods the repository allows.
+  The dashboard's server merges each one once the one below it merged, retargeting it onto that base, marking a draft ready, and updating its branch as GitHub requires, as a merge that waits until it is ready does; the line under the rail says which one it is on and what it waits on, with **Cancel**.
+  It stops at the first one that fails, with the reason, and leaves the ones above it as they are.
 - A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier, and so does the ticket button in its header.
   It opens the issue's details in the tickets page's main content (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
   An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
@@ -709,7 +712,7 @@ An action that fails shows its error, and its control becomes available again.
   It holds the quick actions that apply, then **Convert to draft** on an open pull request or **Mark ready for review** on a draft, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change.
   A state change or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
-  Click a **Merge** badge to merge the pull request after the same confirmation as the details' merge button, which reads the pull request from GitHub while it is open.
+  Click a **Merge** badge to merge the pull request after the same confirmation as the details' merge button, which reads the pull request from GitHub while it is open; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
@@ -731,6 +734,7 @@ An action that fails shows its error, and its control becomes available again.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
 - The details of a pull request open with a header: the repository and number, a link to it on GitHub, then the title, its author, when it last changed, and `gh pr checkout <number>`, which a click copies.
   Its next line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
+  Clicking the branch it brings copies its name and removes the linked worktree that has it checked out, as a row's copy-branch button does.
   The header ends with **Status** and **Reviewers**, each label beside its value at every width.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
   Click the state to make the pull request **Open**, **Draft**, or **Closed**; a merged one keeps its state.
@@ -742,6 +746,11 @@ An action that fails shows its error, and its control becomes available again.
   **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
   In a session's details sidebar, that session is the one you are in, so its **Open the session** button and its chip under **Sessions** do not show.
   The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; while the details are still being read, its confirmation says so and waits.
+  A pull request GitHub would not merge yet, because its branch is behind its base, its checks still run, or a review or rule holds it, still merges in one click: the confirmation says why it waits and its button reads **Squash and merge when ready**, or the method you picked.
+  The dashboard's server then carries the merge out, even with the page closed: it updates a branch that is behind, waits for the checks, and merges once GitHub allows it, or arms GitHub's auto-merge where the repository allows it.
+  While it waits, the button reads **Merging when ready**, a row's badge **Queued**, and the confirmation says what it waits on, with **Cancel**; a merge that stops, when the checks fail, the branch conflicts or moves, or GitHub refuses, reads **Merge stopped** and **Stopped**, with the reason and **Dismiss**.
+  **CI running** on your own pull request that is ready but for its checks offers the same button.
+  The server keeps the queued merges in `merges.json` beside its access token, so a restart picks them up where they were; with dashboards on two ports, the one that runs routines carries out every merge, so a merge clicked on the other starts within 15 seconds.
   The `⋯` menu beside it holds the other quick actions, then the state changes: **Convert to draft** and **Close pull request** on an open pull request, **Mark ready for review** and **Close pull request** on a draft, and **Reopen pull request** on a closed one.
   It ends with **Open on GitHub** and **Open on Graphite**, each with its logo.
 - Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, and **Code**.
@@ -1243,9 +1252,9 @@ An action that fails shows its error, and its control becomes available again.
   Once its plan is clear, it starts the workers at once, without asking you to approve the plan or to say go, and never hands you a prompt to paste or start yourself.
   It asks you only for a decision that is yours, such as the scope, a product choice, or a merge when your review cadence calls for it.
   When a worker's work is done, its pull request merged or closed or its report leaving it nothing to do, the coordinator ends it in the same turn, then tells you.
-  With **Workers' pull requests** on, the dashboard also ends a worker once it sees one of its pull requests merged, if the worker is idle and every pull request it worked on is merged or closed; the merge's update tells the coordinator.
-  A worker that works or asks stays, and a worker the coordinator or the dashboard ends sends no update that it stopped.
-  Ending a worker removes its worktree only when nothing in it would be lost, as **End session** does, and keeps its branch.
+  With **Workers' pull requests** on, the dashboard also ends a worker once one of its pull requests merges, as soon as the worker is idle and every pull request it worked on is merged or closed, as **After a merge** in Settings › Source control does for other sessions; an update then tells the coordinator which worker it ended.
+  A worker that works or asks stays until it is idle, and a worker the coordinator or the dashboard ends sends no update that it stopped.
+  Ending a worker removes its worktree only when nothing in it would be lost, as **End session** does, and deletes its local branch only when the merge took every commit of it.
 - The **Sessions** tab lists each project as a collapsible group at the top, under the project's name: the coordinator first, with a **Coordinator** badge, then the workers in order, `w1` first.
   A worker's row reads as the title the coordinator gave it, beside its `w1`, `w2` badge, rather than the title omp generated for the session.
   A project's sessions leave the other groups, **Pinned** included, and the group lists them even in `/tmp`, which the sidebar otherwise hides.
@@ -1397,6 +1406,12 @@ An action that fails shows its error, and its control becomes available again.
 - **Source control providers** shows whether the `gh` and `gt` command-line tools are installed and signed in; **Check again** reads them again.
   **Automatically pull** keeps the default branch current when the checkout has no local changes or commits; it is off by default, and the server checks every five minutes and right after a change.
   Each repository your workspaces use lists its last pull and an override, **Default**, **On**, or **Off**; the server keeps both in `source-control.json` beside its access token.
+  **After a merge**, on by default and kept in the same file, ends each session the dashboard started that is linked to a pull request that merges, once the session is idle and every pull request it submitted or worked on is merged or closed, whether the merge came from the dashboard or anywhere else.
+  It never ends an omp session you run in a terminal, nor one another dashboard started, and it leaves a worktree that any live session, a terminal one included, still works in.
+  The dashboard sees a merge it made at once, and one made elsewhere within two minutes; a merge made before the dashboard started, or before the session linked the pull request, ends nothing.
+  A session still working when its pull request merges ends once it is idle, one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
+  Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
+  A project's workers follow their project's **Workers' pull requests** instead, and a coordinator never ends.
   **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses whatever you chose most recently in this browser, and a method the repository does not allow falls back to the first one it does.
 - **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
@@ -1441,7 +1456,7 @@ An action that fails shows its error, and its control becomes available again.
   Selecting an update's notice marks it read.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
-  **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once GitHub merged it; when GitHub refuses, a toast says why.
+  **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
   Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or **Calendar** for an event kept on this computer, or omp for an update.
   A pull request's, Slack message's, provider's, or event's toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts.

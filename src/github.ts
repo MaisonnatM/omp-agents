@@ -7,7 +7,7 @@ import { isObject, str } from "./json";
 import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
-import type { CheckRunState, Person, PullRequestEvent, PullRequestFile, Repo, ReviewDecision, ReviewerState } from "./shared/github";
+import { type CheckRunState, MERGE_STATES, type MergeState, type Person, type PullRequestEvent, type PullRequestFile, type Repo, type ReviewDecision, type ReviewerState } from "./shared/github";
 
 const GH_TIMEOUT_MS = 20_000;
 
@@ -102,6 +102,9 @@ export const REVIEW: Record<string, ReviewDecision> = {
 	CHANGES_REQUESTED: "changes-requested",
 	REVIEW_REQUIRED: "review-required",
 };
+
+/** A pull request's `mergeStateStatus`, such as `HAS_HOOKS`; `unknown` for a value this version does not know. */
+export const mergeStateOf = (value: unknown): MergeState => MERGE_STATES.find(state => state === str(value)?.toLowerCase().replaceAll("_", "-")) ?? "unknown";
 
 /** A commit status's state, and the rollup of all the head commit's checks. */
 export const STATUS: Record<string, Exclude<CheckRunState, "skipped">> = {

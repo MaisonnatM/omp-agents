@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-	type AutoPullChange,
 	MERGE_METHOD_LABELS,
 	MERGE_METHODS,
 	type MergeMethodChoice,
@@ -13,6 +12,7 @@ import {
 	type PullOutcome,
 	type PullRepo,
 	type SourceControlAnswer,
+	type SourceControlChange,
 	type SourceControlProvider,
 } from "../../../src/shared/source-control";
 import { errorText, putJson } from "../../api";
@@ -69,7 +69,7 @@ type RepoPull = "default" | "on" | "off";
 
 const MERGE_METHOD_CHOICES: Record<MergeMethodChoice, string> = { last: "Last selected", ...MERGE_METHOD_LABELS };
 
-function AutoPullSwitch(props: { checked: boolean; disabled: boolean; label: string; onCheckedChange: (on: boolean) => void }) {
+function SettingSwitch(props: { checked: boolean; disabled: boolean; label: string; onCheckedChange: (on: boolean) => void }) {
 	return (
 		<Switch.Root
 			aria-label={props.label}
@@ -83,13 +83,13 @@ function AutoPullSwitch(props: { checked: boolean; disabled: boolean; label: str
 	);
 }
 
-/** GitHub's and Graphite's CLIs, automatic pulls by default and per repository, and the merge button's starting method. */
+/** GitHub's and Graphite's CLIs, automatic pulls by default and per repository, the cleanup after a merge, and the merge button's starting method. */
 export function SourceControlTab({ active }: { active: boolean }) {
 	const read = useEditableRead<SourceControlAnswer>(active ? "/api/source-control" : null);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [choice, setChoice] = useMergeMethodChoice();
-	const change = async (next: AutoPullChange): Promise<void> => {
+	const change = async (next: SourceControlChange): Promise<void> => {
 		setPending(true);
 		setError(null);
 		try {
@@ -125,7 +125,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 			<Section title="Automatically pull" meta="Keeps the default branch current when the checkout has no local changes or commits. Projects can override it.">
 				<p className="text-xs text-muted-foreground">Each repository your workspaces use is a project; its own choice wins over the default.</p>
 				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-					<AutoPullSwitch label="Automatically pull" checked={on} disabled={!answer || pending} onCheckedChange={next => void change({ op: "default", on: next })} />
+					<SettingSwitch label="Automatically pull" checked={on} disabled={!answer || pending} onCheckedChange={next => void change({ op: "default", on: next })} />
 					Pull every five minutes
 				</label>
 				{error && (
@@ -162,6 +162,13 @@ export function SourceControlTab({ active }: { active: boolean }) {
 						))}
 					</IntegrationList>
 				)}
+			</Section>
+			<Section title="After a merge" meta="Once a pull request merges, from the dashboard or anywhere else, each session the dashboard started that it leaves idle with every pull request merged or closed ends.">
+				<p className="text-xs text-muted-foreground">Its linked worktree and the merged branch go too, unless another session still works there, the worktree has changes, or the branch has commits the merge did not take. Sessions you run in a terminal never end. A project's workers follow the project's own setting.</p>
+				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
+					<SettingSwitch label="Clean up after a merge" checked={answer?.cleanUp ?? true} disabled={!answer || pending} onCheckedChange={next => void change({ op: "clean-up", on: next })} />
+					End finished sessions and remove their worktrees and branches
+				</label>
 			</Section>
 			<Section title="Default merge method" meta="Pull requests start with this method. Last selected reuses whatever you chose most recently on this device.">
 				<Select<MergeMethodChoice> items={MERGE_METHOD_CHOICES} value={choice} onValueChange={next => next && setChoice(next)}>

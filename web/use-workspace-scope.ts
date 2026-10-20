@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { prKey } from "../src/shared/github";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
 import type { DashboardState } from "./dashboard-state";
@@ -49,6 +50,14 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const [workspace, pickWorkspace] = useSelectedWorkspace(workspaces);
 	// Until the sessions are listed, the saved workspace reads as all workspaces.
 	pullRequestsStore.usePolling(workspace, state.listed);
+	// A pull request that leaves the queue, merged by the server while the page waited, or cancelled, changes what GitHub lists before the next poll would show it; before the sessions are listed, the first poll reads it.
+	const queued = useMemo(() => state.merges.flatMap(merge => merge.prs.map(prKey)), [state.merges]);
+	const lastQueued = useRef(queued);
+	useEffect(() => {
+		const left = lastQueued.current.some(key => !queued.includes(key));
+		lastQueued.current = queued;
+		if (left && state.listed) void pullRequestsStore.refresh(workspace, { fresh: true });
+	}, [queued]);
 	const { started } = state;
 	useEffect(() => {
 		if (!started) return;

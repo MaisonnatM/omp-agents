@@ -1,5 +1,6 @@
 /** The React contexts that hand the dashboard's stable actions and changing status to the sidebar, panes, and pages. */
 import { createContext, useContext } from "react";
+import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { MentionLists } from "../mentions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
@@ -53,6 +54,8 @@ export interface DashboardStatus {
 	 * reads that entry, never another scope's: the all-workspaces entry asks GitHub about every repository.
 	 */
 	pullRequestsScope: string | null;
+	/** The merges the server waits to make until GitHub allows them, which a pull request's row, its details, and a session's stack show. */
+	merges: readonly QueuedMerge[];
 }
 
 export const DashboardStatusContext = createContext<DashboardStatus | null>(null);

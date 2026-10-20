@@ -17,12 +17,14 @@ interface ListChanges {
 	projects: ProjectEdit;
 }
 
-export type ListKind = keyof ListChanges | "notices";
+/** The lists only the server changes, through actions of their own: the bell's notices, and the queued merges. */
+type ReadOnlyKind = "notices" | "merges";
+export type ListKind = keyof ListChanges | ReadOnlyKind;
 export type ListMessage<T extends ListKind = ListKind> = Extract<ServerMsg, { t: T }>;
 type EditableEntries = {
 	[T in keyof ListChanges]: { msg(): ListMessage<T>; apply(change: ListChanges[T]): boolean };
 };
-type ListEntries = EditableEntries & { notices: { msg(): ListMessage<"notices"> } };
+type ListEntries = EditableEntries & { [T in ReadOnlyKind]: { msg(): ListMessage<T> } };
 export class ListRegistry {
 	readonly #entries: ListEntries;
 	readonly #snapshots: { msg(): ListMessage }[];

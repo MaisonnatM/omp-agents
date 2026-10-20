@@ -30,6 +30,9 @@ export const hasOpenThreads = ({ unresolved }: Pick<MergeFacts, "unresolved">): 
 export const readyToMerge = (facts: MergeFacts): boolean =>
 	facts.state === "open" && (facts.review === "approved" || facts.review === "none") && !facts.conflicts && (facts.checks === "passing" || facts.checks === "none") && !hasOpenThreads(facts);
 
+/** Ready to merge but for checks still running, so a merge queued now lands once they pass. */
+export const readyOnceChecksPass = (facts: MergeFacts): boolean => facts.checks === "pending" && readyToMerge({ ...facts, checks: "passing" });
+
 /**
  * The facts a pull request's moves and quick actions follow on its details page: who you are to it from the list entry `listed`,
  * and its state, review, checks, conflicts, and threads from `detail` once read, so the header and the Summary agree.

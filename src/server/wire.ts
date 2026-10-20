@@ -5,7 +5,7 @@
  * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
  * A shape the server also keeps in a file, such as a routine, a scheduled send, or an event's time, is parsed by its domain module.
  */
-import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, type Parsed, str } from "../json";
+import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
 import {
 	GOOGLE_CLIENT_ID,
@@ -30,7 +30,8 @@ import type { PinChange } from "../shared/pins";
 import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "../shared/projects";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
-import { type AutoPullChange, MERGE_METHODS } from "../shared/source-control";
+import type { MergeQueueChange } from "../shared/merge-queue";
+import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
@@ -365,7 +366,6 @@ function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { ok: { field: "label", name: change.name, on: change.on } };
 	if (change.field === "reviewer" && typeof change.login === "string" && GITHUB_NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
 	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };
-	if (change.field === "merge" && isMergeMethod(change.method) && typeof change.head === "string" && COMMIT.test(change.head)) return { ok: { field: "merge", method: change.method, head: change.head } };
 	if (change.field === "thread" && isNodeId(change.id) && typeof change.resolved === "boolean") return { ok: { field: "thread", id: change.id, resolved: change.resolved } };
 	if (change.field === "reply" && isNodeId(change.thread) && isCommentBody(change.body)) return { ok: { field: "reply", thread: change.thread, body: change.body } };
 	if (change.field === "comment" && isCommentBody(change.body)) return { ok: { field: "comment", body: change.body } };
@@ -381,11 +381,27 @@ export function parsePullRequestEdit(body: unknown): Parsed<PullRequestEdit> {
 }
 
 /** The body of `PUT /api/source-control`. */
-export function parseAutoPullChange(body: unknown): Parsed<AutoPullChange> {
+export function parseSourceControlChange(body: unknown): Parsed<SourceControlChange> {
 	if (!isObject(body)) return null;
-	if (body.op === "default" && typeof body.on === "boolean") return { ok: { op: "default", on: body.on } };
+	if ((body.op === "default" || body.op === "clean-up") && typeof body.on === "boolean") return { ok: { op: body.op, on: body.on } };
 	if (body.op === "repo" && typeof body.repo === "string" && body.repo.startsWith("/") && (typeof body.on === "boolean" || body.on === null)) return { ok: { op: "repo", repo: body.repo, on: body.on } };
 	return null;
+}
+
+/** The most pull requests one queued merge takes: a stack taller than this is merged in parts. */
+export const MAX_QUEUED_STACK = 20;
+
+/** The body of `PUT /api/merge-queue`. */
+export function parseMergeQueueChange(body: unknown): Parsed<MergeQueueChange> {
+	if (!isObject(body)) return null;
+	if (body.op === "cancel") return typeof body.id === "string" && body.id !== "" ? { ok: { op: "cancel", id: body.id } } : null;
+	if (body.op !== "add" || !isMergeMethod(body.method) || !Array.isArray(body.prs) || body.prs.length === 0 || body.prs.length > MAX_QUEUED_STACK) return null;
+	const prs = parseAll(body.prs, value => {
+		if (!isObject(value) || !(value.head === null || (typeof value.head === "string" && COMMIT.test(value.head)))) return null;
+		const pr = parsePullRequest(value.owner, value.repo, value.number);
+		return pr && { ...pr.ok, head: value.head };
+	});
+	return prs && { ok: { op: "add", method: body.method, prs } };
 }
 
 /** `?owner=<o>&repo=<r>` of `GET /api/pull-request/options`. */

@@ -45,7 +45,8 @@ test("the server learns which sessions survived before it lists or hears any, an
 		if (instanceId === "i-broken") throw new Error("omp did not answer");
 		// A question omp still waits on reaches the session while it attaches.
 		emit({ kind: "roster" });
-		return { instanceId, sessionId: `s-${instanceId}`, finished: () => instanceId === "i-gone" } as unknown as DashboardSession;
+		const fields = { instanceId: { value: instanceId }, sessionId: { value: `s-${instanceId}` }, finished: { value: () => instanceId === "i-gone" } };
+		return Object.create(DashboardSession.prototype, fields) as DashboardSession;
 	});
 	const heard: string[] = [];
 	const sessions: LiveSessions = new LiveSessions((instanceId, update) => heard.push(`${update.kind} ${instanceId}, listed: ${sessions.get(instanceId) !== undefined}`));
@@ -53,6 +54,8 @@ test("the server learns which sessions survived before it lists or hears any, an
 	await reattachAll(sessions, projects, survived => heard.push(`recover ${[...survived].join(" ")}`));
 	expect(heard).toEqual(["recover s-i-kept", "project i-kept", "roster i-kept, listed: true"]);
 	expect([sessions.get("i-gone"), sessions.get("i-broken")]).toEqual([undefined, undefined]);
+	// The cleanup after a merge ends only sessions this dashboard started, which a reattached one still is.
+	expect(sessions.started("i-kept")?.sessionId).toBe("s-i-kept");
 });
 
 /**

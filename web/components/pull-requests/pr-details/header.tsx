@@ -2,6 +2,7 @@ import { ArrowLeft, Check, CircleDashed, CircleDot, CircleX, Copy, ExternalLink,
 import { type ReactNode, type RefObject, useState } from "react";
 import { type PullRequestOptionsRead, ReviewersField, type SavePullRequest, StateField } from "../pr-fields";
 import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, type Reviewer, type ReviewerState, type StackedPullRequest } from "../../../../src/shared/github";
+import { readyOnceChecksPass } from "../../../../src/shared/moves";
 import { MERGE_METHOD_LABELS } from "../../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { age, modeOf } from "../../../labels";
 import type { QuickActionId } from "../../../quick-actions";
 import { useCopy } from "../../../use-copy";
-import { BranchLabel, BranchName } from "../../git";
+import { BranchLabel, BranchName, releaseBranch } from "../../git";
 import { QuickActionButton, type QuickActionsProps } from "../../quick-actions";
 import { Avatar, IconTip, STATE_ICON } from "../avatars";
 import { MergePopover } from "../merge-popover";
@@ -71,14 +72,14 @@ function ReviewerInline({ reviewers }: { reviewers: Reviewer[] }) {
 	);
 }
 
-/** The merge button, whose confirmation waits for the details while GitHub has not answered yet, or says why it did not. */
-function MergeButton({ pr, detail, readError, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; onSave: SavePullRequest }) {
+/** The merge button, whose confirmation waits for the details while GitHub has not answered yet, or says why it did not; once queued, it says so. */
+function MergeButton({ pr, detail, readError, onQueued }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; onQueued: () => void }) {
 	const [open, setOpen] = useState(false);
 	return (
-		<MergePopover pr={pr} target={detail} error={readError} onMerge={(method, head) => onSave({ field: "merge", method, head }, {})} open={open} onOpenChange={setOpen}>
-			{method => (
-				<Button variant="primary" size="compact" leadingIcon={GitMerge} active={open}>
-					{method ? MERGE_METHOD_LABELS[method] : "Merge"}
+		<MergePopover pr={pr} target={detail} error={readError} onQueued={onQueued} open={open} onOpenChange={setOpen}>
+			{({ method, queued, pending }) => (
+				<Button variant={queued?.state.kind === "failed" ? "secondary" : "primary"} size="compact" leadingIcon={GitMerge} active={open} loading={pending}>
+					{queued ? (queued.state.kind === "failed" ? "Merge stopped" : "Merging when ready") : method ? MERGE_METHOD_LABELS[method] : "Merge"}
 				</Button>
 			)}
 		</MergePopover>
@@ -86,11 +87,11 @@ function MergeButton({ pr, detail, readError, onSave }: { pr: PullRequest; detai
 }
 
 /** The Next move's one button, as the header's primary action. */
-function NextMoveButton({ pr, detail, readError, next, quick, onOpen, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onSave: SavePullRequest }) {
+function NextMoveButton({ pr, detail, readError, next, quick, onOpen, onMergeQueued }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onMergeQueued: () => void }) {
 	const { move, reason, action, session } = next;
 	let button: ReactNode = null;
 	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
-	else if (move === "merge") button = <MergeButton pr={pr} detail={detail} readError={readError} onSave={onSave} />;
+	else if (move === "merge" || (move === "checks-running" && detail && readyOnceChecksPass(detail))) button = <MergeButton pr={pr} detail={detail} readError={readError} onQueued={onMergeQueued} />;
 	else if (session)
 		button = (
 			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
@@ -138,13 +139,17 @@ interface DetailHeaderProps {
 	options: PullRequestOptionsRead;
 	onOpen: DetailContentProps["onOpen"];
 	onSave: SavePullRequest;
+	/** The server took a merge of it, at once or to wait: the details read it again. */
+	onMergeQueued: () => void;
 	placement: Placement;
 	/** The heading, which takes focus on the page. */
 	headingRef: RefObject<HTMLHeadingElement | null>;
+	/** A checkout of its repository, where copying the branch removes the linked worktree that has it checked out, as a row's copy does. */
+	cwd: string | null;
 }
 
 /** The header: the pull request's name, author, branches, size, status, and reviewers, with the Next move's button and the `⋯` menu. */
-export function DetailHeader({ pr, detail, readError, stack, next, actions, quick, placed, options, onOpen, onSave, placement, headingRef }: DetailHeaderProps) {
+export function DetailHeader({ pr, detail, readError, stack, next, actions, quick, placed, options, onOpen, onSave, onMergeQueued, placement, headingRef, cwd }: DetailHeaderProps) {
 	const page = placement === "page";
 	const Heading = page ? "h1" : "h3";
 	const stackedBase = detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
@@ -161,7 +166,7 @@ export function DetailHeader({ pr, detail, readError, stack, next, actions, quic
 					</a>
 				</p>
 				<span className="ml-auto flex shrink-0 items-center gap-1.5">
-					{next && <NextMoveButton pr={pr} detail={detail} readError={readError} next={next} quick={quick} onOpen={onOpen} onSave={onSave} />}
+					{next && <NextMoveButton pr={pr} detail={detail} readError={readError} next={next} quick={quick} onOpen={onOpen} onMergeQueued={onMergeQueued} />}
 					<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={{ ...quick, actions }} onState={to => onSave({ field: "state", state: to }, { state: to })} label="More actions" />
 				</span>
 			</div>
@@ -194,7 +199,7 @@ export function DetailHeader({ pr, detail, readError, stack, next, actions, quic
 								<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
 							)}
 							<ArrowLeft aria-label="from" className="size-3 shrink-0" />
-							<BranchName name={detail.head} className="font-mono" />
+							<BranchName name={detail.head} onCopy={cwd === null ? undefined : () => releaseBranch(cwd, detail.head)} className="font-mono" />
 						</span>
 						<span className="ml-auto flex items-center gap-2 tabular-nums">
 							<FileDiff aria-hidden className="size-3.5" />

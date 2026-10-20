@@ -5,7 +5,7 @@ import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -389,18 +389,15 @@ describe("parsePullRequestQuery", () => {
 describe("parsePullRequestEdit", () => {
 	const pr = { owner: "anthropics", repo: "omp-agents", number: 12 };
 
-	test("takes one label, reviewer, state, or merge change to a pull request", () => {
+	test("takes one label, reviewer, or state change to a pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "good first issue", on: true } })?.ok).toEqual({ ...pr, change: { field: "label", name: "good first issue", on: true } });
 		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } })?.ok).toEqual({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } });
 		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "draft" } })?.ok).toEqual({ ...pr, change: { field: "state", state: "draft" } });
-		const merge = { field: "merge", method: "squash", head: "a".repeat(40) } as const;
-		expect(parsePullRequestEdit({ ...pr, change: merge })?.ok).toEqual({ ...pr, change: merge });
 	});
 
-	test("rejects the merged state, an unknown merge method, a head that is not a commit, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
+	test("rejects the merged state, a merge, which goes through the merge queue, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "merged" } })).toBeNull();
-		expect(parsePullRequestEdit({ ...pr, change: { field: "merge", method: "fast-forward", head: "a".repeat(40) } })).toBeNull();
-		expect(parsePullRequestEdit({ ...pr, change: { field: "merge", method: "merge", head: "main" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "merge", method: "squash", head: "a".repeat(40) } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: " ", on: true } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "org/team", on: true } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "bug" } })).toBeNull();
@@ -428,6 +425,24 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "" } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "x".repeat(65_537) } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: 42 } })).toBeNull();
+	});
+});
+
+describe("parseMergeQueueChange", () => {
+	const pr = { owner: "anthropics", repo: "omp-agents", number: 12 };
+
+	test("takes a merge of pull requests, each with the head the confirmation showed or none, and a cancel", () => {
+		const add = { op: "add" as const, method: "squash" as const, prs: [{ ...pr, head: "a".repeat(40) }, { ...pr, number: 13, head: null }] };
+		expect(parseMergeQueueChange(add)?.ok).toEqual(add);
+		expect(parseMergeQueueChange({ op: "cancel", id: "m1" })?.ok).toEqual({ op: "cancel", id: "m1" });
+	});
+
+	test("rejects an unknown merge method, a head that is not a commit, no pull request, too tall a stack, and a cancel without an id", () => {
+		expect(parseMergeQueueChange({ op: "add", method: "fast-forward", prs: [{ ...pr, head: null }] })).toBeNull();
+		expect(parseMergeQueueChange({ op: "add", method: "merge", prs: [{ ...pr, head: "main" }] })).toBeNull();
+		expect(parseMergeQueueChange({ op: "add", method: "merge", prs: [] })).toBeNull();
+		expect(parseMergeQueueChange({ op: "add", method: "merge", prs: Array.from({ length: MAX_QUEUED_STACK + 1 }, (_, index) => ({ ...pr, number: index + 1, head: null })) })).toBeNull();
+		expect(parseMergeQueueChange({ op: "cancel", id: "" })).toBeNull();
 	});
 });
 

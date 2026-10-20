@@ -256,6 +256,22 @@ describe("worktree removal", () => {
 		expect(existsSync(occupied)).toBe(true);
 	});
 
+	test("deleteMergedBranch deletes a branch at the merged commit or behind it, and keeps one with a commit the merge lacks or one a worktree has checked out", async () => {
+		const { parent, main } = await repo();
+		const gitDir = await common(main);
+		const merged = (await git(main, "rev-parse", "HEAD")).trim();
+		await linked(parent, main, "held");
+		await git(main, "branch", "done");
+		await git(main, "branch", "behind");
+		const later = (await git(main, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "later")).trim();
+		await git(main, "branch", "moved", later);
+		expect(await quiet.deleteMergedBranch(gitDir, "done", merged)).toBe(true);
+		expect(await quiet.deleteMergedBranch(gitDir, "behind", later)).toBe(true);
+		expect(await quiet.deleteMergedBranch(gitDir, "moved", merged)).toBe(false);
+		expect(await quiet.deleteMergedBranch(gitDir, "held", merged)).toBe(false);
+		expect((await git(main, "branch", "--format=%(refname:short)")).trim().split("\n").sort()).toEqual(["held", "main", "moved"]);
+	});
+
 	test("flags a linked worktree merged when origin's default branch has its commit or its newest pull request merged after its last commit, and Remove merged keeps the rest", async () => {
 		const { parent, main } = await repo();
 		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
