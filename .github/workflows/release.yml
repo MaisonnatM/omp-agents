@@ -1,10 +1,17 @@
 name: Release
 
-# Push a `vX.Y.Z` tag whose version matches desktop/package.json to publish the macOS app to GitHub Releases, which the
-# installed apps' updater reads through `latest-mac.yml`.
+# Every push to main publishes the macOS app to GitHub Releases, which the installed apps' updater reads through
+# `latest-mac.yml`. The version is desktop/package.json's major.minor with the run number as its patch, so it always
+# grows without a commit back to main; bump major.minor there by hand.
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [main]
+  workflow_dispatch:
+
+# A burst of merges releases only the last one.
+concurrency:
+  group: release
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -22,13 +29,17 @@ jobs:
       - run: bun install -g @oh-my-pi/pi-coding-agent@18.10.1
       - run: bun install --frozen-lockfile
       - run: bun install --cwd desktop --frozen-lockfile
-      - name: Check the tag names desktop/package.json's version
+      - name: Set the version from the run number
         run: |
-          version=$(bun -e 'console.log(require("./desktop/package.json").version)')
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match desktop/package.json's version $version." >&2
-            exit 1
-          fi
+          version=$(bun -e '
+            const path = "./desktop/package.json";
+            const pkg = require(path);
+            const [major, minor] = pkg.version.split(".");
+            pkg.version = `${major}.${minor}.${process.env.GITHUB_RUN_NUMBER}`;
+            require("fs").writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
+            console.log(pkg.version);
+          ')
+          echo "TAG=v$version" >> "$GITHUB_ENV"
       - run: bun test
       - run: bun run typecheck
       - run: bun run --cwd desktop typecheck
@@ -53,5 +64,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd desktop/release
-          gh release create "$GITHUB_REF_NAME" --title "omp agents ${GITHUB_REF_NAME#v}" --generate-notes \
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "omp agents ${TAG#v}" --generate-notes \
             *.dmg *.zip *.blockmap latest-mac.yml

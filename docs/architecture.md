@@ -420,7 +420,7 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 `scripts/build-desktop-artifact.ts`, modeled on T3 Code's script of the same name, builds `desktop/dist/resources` (the server bundled into `server.js` with Tailwind left out, the page prebuilt by `buildPage`, and the starter kit with its installer bundled into `install.js`), downloads the Bun of the build's own version for each architecture into `desktop/dist/bun-<arch>`, and runs electron-builder with a config it generates, which writes a DMG, a zip, their blockmaps, and `latest-mac.yml` to `desktop/release`.
 It signs and notarizes when `CSC_LINK` and the `APPLE_API_KEY*` variables are set, with the hardened runtime and `desktop/entitlements.mac.plist`, which lets Bun JIT; otherwise it signs ad hoc.
 `--mock-update-port <port>` points the update feed at `scripts/mock-update-server.ts`, which serves `desktop/release`, to try an update without publishing.
-`.github/workflows/release.yml` runs on a `vX.Y.Z` tag matching `desktop/package.json`'s version: the checks, one build for arm64 and x64 on an Apple silicon runner, and a GitHub Release with every artifact.
+`.github/workflows/release.yml` runs on every push to `main`, one run at a time with a newer push cancelling an older run: it sets `desktop/package.json`'s patch version to the run number, keeping its major and minor, then runs the checks, one build for arm64 and x64 on an Apple silicon runner, and a GitHub Release tagged `vX.Y.Z` with every artifact.
 
 ## Terminal panel
 
