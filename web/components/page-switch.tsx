@@ -2,6 +2,7 @@ import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
+import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
 import type { Layout, Page, TodoListView } from "../routing";
@@ -57,7 +58,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "draft" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -93,7 +94,6 @@ export const PageSwitch = memo(function PageSwitch({
 	past,
 	lastHosts,
 	layout,
-	draft,
 	models,
 	userTodos,
 	routines,
@@ -144,6 +144,7 @@ export const PageSwitch = memo(function PageSwitch({
 					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
+					draftKey={newDraftKey(seed ? page.todoId : null)}
 				/>
 			);
 		}
@@ -229,7 +230,6 @@ export const PageSwitch = memo(function PageSwitch({
 						hosts={hosts}
 						past={past}
 						lastHosts={lastHosts}
-						draft={draft}
 						models={models}
 						workspaces={workspaces}
 						maximized={maximized}

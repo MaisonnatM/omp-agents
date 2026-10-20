@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
+import { liveDraftKey, useComposerDraft } from "../composer-drafts";
 import { folderName } from "../labels";
 import { useChangedFiles, useComposerData, useNextSuggestions } from "../pane-store";
 import type { ModelList } from "../reads";
@@ -45,8 +46,6 @@ interface ConversationProps {
 	host: RosterHost | null;
 	/** Last known row, for the header after the session ended. */
 	lastHost: RosterHost | null;
-	/** Composer text on mount, from a fork. */
-	initialDraft: string;
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	/** The last model list the server sent for this session; nothing while none has arrived. */
@@ -66,7 +65,7 @@ interface ConversationProps {
 	workspaces: Workspace[];
 }
 
-/** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts, queues, and scroll reset per view. */
+/** One live session or subagent: header, live transcript, composer. Keyed by view: its draft is kept per view, in this browser, while queues and scroll reset per view. */
 export function Conversation(props: ConversationProps) {
 	return (
 		<MessageScrollerProvider autoScroll>
@@ -89,7 +88,6 @@ function LiveConversation({
 	view,
 	host,
 	lastHost,
-	initialDraft,
 	fork,
 	onFork,
 	models,
@@ -105,7 +103,7 @@ function LiveConversation({
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const { completions, withdrawn } = useComposerData(view);
 	const changed = useChangedFiles(view) ?? NO_FILES;
-	const [draft, setDraft] = useState(initialDraft);
+	const [draft, setDraft] = useComposerDraft(liveDraftKey(view), "");
 	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	const subject = subjectOf(view, host, lastHost);

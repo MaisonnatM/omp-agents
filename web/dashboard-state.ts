@@ -6,7 +6,7 @@ import type { ServerMsg } from "../src/shared/protocol";
 import { applyPins, type PinChange } from "../src/shared/pins";
 import type { Project } from "../src/shared/projects";
 import type { ScheduledSend } from "../src/shared/scheduled";
-import { type LiveView, newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
+import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
 import type { Routine } from "../src/routines";
 import { applyUserTodo } from "../src/user-todos";
@@ -35,8 +35,6 @@ export interface DashboardState {
 	starts: Starts;
 	/** The server's last answer to the new-session draft's `complete`. */
 	newSessionCompletions: Completions | null;
-	/** Composer text for a forked session's first mount. */
-	draft: { view: LiveView; text: string } | null;
 	/** The session this page last started, forked, or resumed, once it is ready. */
 	started: { instanceId: string; cwd: string } | null;
 	/** `null` until the server's first `omp usage` run finishes. */
@@ -115,7 +113,6 @@ function withLayout(state: DashboardState, next: Layout): DashboardState {
 		lastHosts: rememberHosts(state.lastHosts, state.hosts, layout),
 		models: pick(state.models, liveIds(layout)),
 		starts: dropHidden(state.starts, shown),
-		draft: state.draft && shown(state.draft.view) ? state.draft : null,
 	};
 }
 
@@ -154,17 +151,11 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		case "past":
 			return { ...state, past: applyDelta(state.past, action.reset, action.sessions, session => session.sessionId, action.removed).sort(newestPastFirst), listed: true };
 		case "started": {
-			const start = pendingStart(state.starts, action.reqId);
-			if (!start) return state;
+			if (!pendingStart(state.starts, action.reqId)) return state;
 			const starts = settleStart(state.starts, action.reqId, action.result);
 			if (!action.result.ok) return { ...state, starts };
-			const { instanceId, cwd, prompt } = action.result;
-			// A fork's composer starts with the prompt it branched at, to edit; forking a reply starts it empty.
-			const draft: DashboardState["draft"] =
-				start.op.kind === "fork"
-					? { view: { kind: "live", instanceId, agentId: null }, text: start.op.point.prefill ? (prompt ?? "") : "" }
-					: state.draft;
-			return { ...state, starts, draft, started: { instanceId, cwd } };
+			const { instanceId, cwd } = action.result;
+			return { ...state, starts, started: { instanceId, cwd } };
 		}
 		case "resumed-all": {
 			const starts = settleResumeAll(state.starts, action.reqId, action.errors);
@@ -217,7 +208,6 @@ export function initialState(route: Route): DashboardState {
 		lastHosts: new Map(),
 		starts: new Map(),
 		newSessionCompletions: null,
-		draft: null,
 		started: null,
 		usage: null,
 		models: new Map(),

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useComposerDraft } from "../composer-drafts";
 import { folderName } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
@@ -51,6 +52,8 @@ interface NewSessionProps {
 	todo: { text: string; prompt: string } | null;
 	/** A scheduled start opened to edit: the draft starts as it, sending saves it, **Start now** calls `onStart`, and `onSchedule` moves its time. */
 	scheduled?: ScheduledDraft;
+	/** Where this browser keeps the unsent text; `null` keeps none. */
+	draftKey: string | null;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -76,10 +79,10 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
-	const [draft, setDraft] = useState(initial?.prompt ?? todo?.prompt ?? "");
+	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
