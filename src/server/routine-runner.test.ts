@@ -52,10 +52,15 @@ interface FakeExec {
 	fail: (err: Error) => void;
 }
 
-/** A runner over `file` with a fake clock, starter, sessions, commands, and pins. */
-function harness(file: RoutinesFile) {
-	/** `held`: a usage limit stopped its turn, and its continue waits. */
-	const sessions = new Map<string, { status: HostStatus; held: boolean; ended: boolean }>();
+/** A session the fake starter started; `held`: a usage limit stopped its turn, and its continue waits. */
+interface FakeSession {
+	status: HostStatus;
+	held: boolean;
+	ended: boolean;
+}
+
+/** A runner over `file` with a fake clock, starter, sessions, commands, and pins; `sessions` are the ones a previous server left running. */
+function harness(file: RoutinesFile, sessions = new Map<string, FakeSession>()) {
 	const fake = {
 		now: T0 + HOUR,
 		requests: [] as StartRequest[],
@@ -75,7 +80,7 @@ function harness(file: RoutinesFile) {
 		async start(request: StartRequest): Promise<StartResult> {
 			fake.requests.push(request);
 			if (fake.failWith !== null) return { ok: false, error: fake.failWith };
-			const instanceId = `i${fake.requests.length}`;
+			const instanceId = `i${sessions.size + 1}`;
 			sessions.set(instanceId, { status: "unknown", held: false, ended: false });
 			return { ok: true, instanceId, cwd: "/work/webapp", prompt: null };
 		},
@@ -184,7 +189,7 @@ describe("RoutineRunner", () => {
 		fake.now += HOUR;
 		await runner.tick();
 		expect(fake.requests).toHaveLength(2);
-		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "session", instanceId: "i2", sessionId: "s-i2" });
+		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "session", instanceId: "i1", sessionId: "s-i1" });
 	});
 
 	test("a session that worked and went idle ends, and one idle before it ever worked keeps running", async () => {
@@ -305,6 +310,52 @@ describe("RoutineRunner", () => {
 		await runner.tick();
 		expect(fake.log).toEqual(["end s-i1", "end s-i2"]);
 		expect(fake.pins).toEqual([]);
+	});
+
+	test("a session that survived a restart stays its routine's: it holds its slot, and ends pinned once its turn is over, while one that died frees its slot", async () => {
+		const path = routinesPath();
+		const before = fileWith(path, { kind: "prompt", prompt: "Write the daily retro.", pin: true });
+		addPrompts(before, 5);
+		const first = harness(before);
+		await first.runner.tick();
+		for (const session of first.fake.sessions.values()) session.status = "working";
+		await first.runner.tick();
+		// i3's omp exited while no server watched.
+		first.fake.sessions.get("i3")!.ended = true;
+
+		const file = new RoutinesFile(path);
+		const after = harness(file, first.fake.sessions);
+		after.runner.recover();
+		await after.runner.tick();
+		expect(file.value.map(routine => routine.runs[0]?.outcome)).toEqual([
+			{ kind: "session", instanceId: "i1", sessionId: "s-i1" },
+			{ kind: "session", instanceId: "i2", sessionId: "s-i2" },
+			{ kind: "session", instanceId: "i3", sessionId: "s-i3" },
+			{ kind: "session", instanceId: "i4", sessionId: "s-i4" },
+			{ kind: "pending", queued: true },
+		]);
+		expect(file.value.map(routine => routine.runs[0]?.errors)).toEqual([[], [], [], [], []]);
+
+		first.fake.sessions.get("i1")!.status = "idle";
+		after.runner.observe("i1");
+		await Promise.resolve();
+		expect([after.fake.log, after.fake.pins]).toEqual([["pin s-i1", "end s-i1"], ["s-i1"]]);
+		await after.runner.tick();
+		expect(file.value[4]?.runs[0]?.outcome).toEqual({ kind: "session", instanceId: "i5", sessionId: "s-i5" });
+	});
+
+	test("a session whose turn ended while no server watched ends at the first tick after the restart", async () => {
+		const path = routinesPath();
+		const first = harness(fileWith(path));
+		await first.runner.tick();
+		first.fake.sessions.get("i1")!.status = "working";
+		await first.runner.tick();
+		first.fake.sessions.get("i1")!.status = "idle";
+
+		const after = harness(new RoutinesFile(path), first.fake.sessions);
+		after.runner.recover();
+		await after.runner.tick();
+		expect(after.fake.log).toEqual(["end s-i1"]);
 	});
 
 	describe("a command routine", () => {
