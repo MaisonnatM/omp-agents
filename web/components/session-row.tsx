@@ -1,22 +1,11 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { Ellipsis, Loader } from "lucide-react";
-import { Fragment, memo, type ReactElement, type ReactNode, useState } from "react";
+import { Loader } from "lucide-react";
+import { Fragment, memo, type ReactElement, type ReactNode } from "react";
 import type { PullRequest } from "../../src/shared/github";
 import type { PastSession, RosterHost, ShipProgress, View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
-import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuTrigger,
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuTrigger,
-	MenuItem,
-	MenuLinkItem,
-	MenuSeparator,
-	MenuShortcut,
-} from "@/components/ui/menu";
-import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
+import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
@@ -64,13 +53,12 @@ interface RowLineProps {
 /** The look of what ends a session row: muted, small, and pushed right. */
 export const ROW_END = "ml-auto shrink-0 text-xs tabular-nums text-muted-foreground";
 
-/** A sidebar session row's one line: its dot, badge, label, muted facts, and what ends it. Scheduled sends share it. */
+/** A sidebar session row's one line: its dot, label, muted facts, then its badge and what ends it at the right. Scheduled sends share it. */
 export function RowLine({ dot, badge, label, after, facts, end }: RowLineProps) {
 	return (
 		<>
 			{dot}
 			<span className="flex min-w-0 flex-1 items-baseline gap-2">
-				{badge}
 				<span className="truncate font-medium text-foreground">{label}</span>
 				{after}
 				{facts && (
@@ -78,6 +66,7 @@ export function RowLine({ dot, badge, label, after, facts, end }: RowLineProps) 
 						{facts.text}
 					</span>
 				)}
+				{badge && <span className="ml-auto flex shrink-0 self-center">{badge}</span>}
 				{end}
 			</span>
 		</>
@@ -101,8 +90,6 @@ export function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
 }
 
 interface RowMenuProps {
-	/** The row's name, which the "More actions" button is labelled after. */
-	label: string;
 	entry: SessionEntry;
 	/** The session shows in a pane. */
 	onScreen: boolean;
@@ -116,7 +103,7 @@ interface RowMenuProps {
  * The actions of a row's menu. It reads the dashboard's actions and start state, which the menu's content mounts only
  * while it is open, so a row that keeps its menu closed renders for neither.
  */
-function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProps, "label" | "children">) {
+function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProps, "children">) {
 	const { open, send, start, end, workspaceSettings } = useDashboardActions();
 	const { starts: { resume }, ending } = useDashboardStatus();
 	const actions = sessionActions(entry, {
@@ -145,24 +132,14 @@ function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProp
 	);
 }
 
-/** A sidebar row whose {@link sessionActions} open on right-click and from its hover-revealed "More actions" button. */
-function RowMenu({ label, entry, onScreen, pinned, onTogglePin, children }: RowMenuProps) {
-	const [menuOpen, setMenuOpen] = useState(false);
-	const items = <RowMenuItems entry={entry} onScreen={onScreen} pinned={pinned} onTogglePin={onTogglePin} />;
+/** A sidebar row whose {@link sessionActions} open on right-click. */
+function RowMenu({ entry, onScreen, pinned, onTogglePin, children }: RowMenuProps) {
 	return (
 		<ContextMenu>
-			<ContextMenuTrigger render={<SidebarMenuItem />}>
-				{children}
-				<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-					<Tooltip content="More actions" forceOpen={menuOpen ? false : undefined}>
-						<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${label}`} />}>
-							<Ellipsis />
-						</DropdownMenuTrigger>
-					</Tooltip>
-					<DropdownMenuContent align="end">{items}</DropdownMenuContent>
-				</DropdownMenu>
-			</ContextMenuTrigger>
-			<ContextMenuContent>{items}</ContextMenuContent>
+			<ContextMenuTrigger render={<SidebarMenuItem />}>{children}</ContextMenuTrigger>
+			<ContextMenuContent>
+				<RowMenuItems entry={entry} onScreen={onScreen} pinned={pinned} onTogglePin={onTogglePin} />
+			</ContextMenuContent>
 		</ContextMenu>
 	);
 }
@@ -212,7 +189,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 	const view: View = { kind: "past", sessionId: session.sessionId };
 	const label = roleTitle ?? pastLabel(session);
 	return (
-		<RowMenu label={label} entry={{ kind: "past", session }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
+		<RowMenu entry={{ kind: "past", session }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
@@ -244,7 +221,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = roleTitle ?? hostLabel(host);
 	return (
-		<RowMenu label={label} entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
+		<RowMenu entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}

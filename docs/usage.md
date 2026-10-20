@@ -234,8 +234,7 @@ An action that fails shows its error, and its control becomes available again.
   A row that is already open focuses its pane instead of opening a second copy.
   The **×** in a pane's header closes it.
   Closing the second-to-last pane returns to a single conversation.
-- Right-click a row in the sessions sidebar, focus it and press the context-menu key or Shift+F10, or hover or tab to its **⋯** button, for its quick actions.
-  Both menus hold the same items.
+- Right-click a row in the sessions sidebar, or focus it and press the context-menu key or Shift+F10, for its quick actions.
   Every row offers **Open** and, when the row is not on screen yet, **Open in split**.
   A running session adds **Pin** (**Unpin** once pinned), its pull requests on GitHub, **Workspace settings**, **Copy path**, **Copy session ID**, and **End session** when the dashboard can end it.
   A past session adds **Resume**, which opens its transcript and continues it as the header's **Resume** does, then the same pin, links, and copies.
