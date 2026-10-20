@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared/transcript";
-import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnReplies, withEditedPrompt } from "./transcript-view";
+import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, toolImages, turnReplies, withEditedPrompt } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -227,5 +227,21 @@ describe("a prompt the dashboard sent", () => {
 		expect(editablePrompt(items)).toBeNull();
 		expect(nextSuggestions(items, false)).toEqual(["Merge it"]);
 		expect(nextSuggestions([prompt, reply("r1", ["Ship it"]), update], false)).toEqual([]);
+	});
+});
+
+describe("toolImages", () => {
+	test("lists every tool call's images in reading order across calls, each captioned by its tool and summary, and no prompt's", () => {
+		const items: Item[] = [
+			{ id: "u", kind: "user", text: "look", skill: null, from: null, entryId: "u", images: ["/p.png"] },
+			{ id: "tool:a", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: ["/a1.png", "/a2.png"] },
+			{ id: "tool:b", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] },
+			{ id: "tool:c", kind: "tool", name: "read", summary: "", status: "ok", agents: [], images: ["/c.png"] },
+		];
+		expect(toolImages(items)).toEqual([
+			{ id: "tool:a", at: 0, src: "/a1.png", caption: "browser · screenshot" },
+			{ id: "tool:a", at: 1, src: "/a2.png", caption: "browser · screenshot" },
+			{ id: "tool:c", at: 0, src: "/c.png", caption: "read" },
+		]);
 	});
 });

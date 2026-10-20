@@ -1,5 +1,4 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ChevronLeft, ChevronRight, ExternalLink, Images, MessageSquare, X } from "lucide-react";
+import { Images, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import type { AgentMedia } from "../../src/shared/transcript";
@@ -9,6 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { age } from "../labels";
 import { useDashboardActions } from "./dashboard-context";
 import { DetailsEmpty } from "./details-sidebar-frame";
+import { ImageViewer } from "./media-viewer";
 
 const agentName = (media: AgentMedia): string => media.agentId ?? "Main agent";
 
@@ -22,77 +22,34 @@ const mediaKey = (media: AgentMedia): string => `${media.agentId}:${media.at}:${
 function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; index: number; view: View; onShow: (key: string | null) => void }) {
 	const { open } = useDashboardActions();
 	const shown = media[index]!;
-	const step = (by: 1 | -1): void => onShow(mediaKey(media[Math.min(media.length - 1, Math.max(0, index + by))]!));
 	const agentView: View | null = view.kind === "live" && shown.agentId !== view.agentId ? { ...view, agentId: shown.agentId } : null;
-	const caption = captionOf(shown);
 	return (
-		<DialogPrimitive.Root open onOpenChange={next => !next && onShow(null)}>
-			<DialogPrimitive.Portal>
-				<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
-				<DialogPrimitive.Content
-					className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[min(72rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
-					onKeyDown={event => {
-						if (event.key === "ArrowLeft") step(-1);
-						else if (event.key === "ArrowRight") step(1);
-					}}
-				>
-					<div className="flex items-start justify-between gap-4">
-						<div className="min-w-0 space-y-0.5">
-							<Tooltip content={caption} side="bottom">
-								<DialogPrimitive.Title className="truncate text-sm font-semibold">
-									{caption}
-								</DialogPrimitive.Title>
-							</Tooltip>
-							<DialogPrimitive.Description className="text-xs text-muted-foreground">
-								{index + 1} of {media.length} · {new Date(shown.at).toLocaleString()}
-							</DialogPrimitive.Description>
-						</div>
-						<div className="flex shrink-0 items-center gap-1">
-							{agentView && (
-								<Button
-									variant="ghost"
-									size="compact"
-									leadingIcon={MessageSquare}
-									onClick={() => {
-										onShow(null);
-										open(agentView, "replace");
-									}}
-								>
-									Open agent
-								</Button>
-							)}
-							<Tooltip content="Open the image in a new tab">
-								<Button variant="ghost" size="icon-compact" aria-label="Open the image in a new tab" asChild>
-									<a href={shown.src} target="_blank" rel="noopener noreferrer">
-										<ExternalLink />
-									</a>
-								</Button>
-							</Tooltip>
-							<Tooltip content="Close" shortcut={["Esc"]}>
-								<DialogPrimitive.Close asChild>
-									<Button variant="ghost" size="icon-compact" aria-label="Close">
-										<X />
-									</Button>
-								</DialogPrimitive.Close>
-							</Tooltip>
-						</div>
-					</div>
-					<div className="flex min-h-0 flex-1 items-center gap-2">
-						<Tooltip content="Newer image" shortcut={["←"]} disabled={index === 0}>
-							<Button variant="ghost" size="icon-compact" aria-label="Newer image" disabled={index === 0} onClick={() => step(-1)}>
-								<ChevronLeft />
-							</Button>
-						</Tooltip>
-						<img src={shown.src} alt={caption} className="min-h-0 min-w-0 flex-1 max-h-[calc(100vh-9rem)] object-contain" />
-						<Tooltip content="Older image" shortcut={["→"]} disabled={index === media.length - 1}>
-							<Button variant="ghost" size="icon-compact" aria-label="Older image" disabled={index === media.length - 1} onClick={() => step(1)}>
-								<ChevronRight />
-							</Button>
-						</Tooltip>
-					</div>
-				</DialogPrimitive.Content>
-			</DialogPrimitive.Portal>
-		</DialogPrimitive.Root>
+		<ImageViewer
+			src={shown.src}
+			caption={captionOf(shown)}
+			index={index}
+			count={media.length}
+			detail={new Date(shown.at).toLocaleString()}
+			previousLabel="Newer image"
+			nextLabel="Older image"
+			onIndex={next => onShow(mediaKey(media[next]!))}
+			onClose={() => onShow(null)}
+			actions={
+				agentView && (
+					<Button
+						variant="ghost"
+						size="compact"
+						leadingIcon={MessageSquare}
+						onClick={() => {
+							onShow(null);
+							open(agentView, "replace");
+						}}
+					>
+						Open agent
+					</Button>
+				)
+			}
+		/>
 	);
 }
 
