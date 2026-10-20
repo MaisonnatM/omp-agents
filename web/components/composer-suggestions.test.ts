@@ -7,8 +7,8 @@ const press = (key: string, shiftKey = false) => ({ key, shiftKey, altKey: false
 const list = { open: true, count: prompts.length, active: null, marked: false };
 
 test("marks plus the clicked row come back in list order, whatever the click order", () => {
-	expect(chosenText(prompts, new Set(["Update the docs"]), 0)).toBe("Run the tests\nUpdate the docs");
-	expect(chosenText(prompts, new Set(["Update the docs", "Run the tests"]), 1)).toBe("Run the tests\nOpen a PR\nUpdate the docs");
+	expect(chosenText(prompts, new Set(["Update the docs"]), 0)).toBe("- Run the tests\n- Update the docs");
+	expect(chosenText(prompts, new Set(["Update the docs", "Run the tests"]), 1)).toBe("- Run the tests\n- Open a PR\n- Update the docs");
 });
 
 test("a row both marked and clicked appears once", () => {
@@ -24,7 +24,8 @@ test("with marks but no highlight, Enter sends and Tab fills just the marks, and
 	expect(suggestionKey(press("Enter"), marks)).toEqual({ kind: "send", index: null });
 	expect(suggestionKey(press("Tab"), marks)).toEqual({ kind: "fill", index: null });
 	expect(suggestionKey(press("Escape"), marks)).toEqual({ kind: "clear" });
-	expect(chosenText(prompts, new Set(["Run the tests", "Update the docs"]), null)).toBe("Run the tests\nUpdate the docs");
+	expect(chosenText(prompts, new Set(["Run the tests", "Update the docs"]), null)).toBe("- Run the tests\n- Update the docs");
+	expect(chosenText(prompts, new Set(), 1)).toBe("Open a PR");
 });
 
 test("with nothing marked or highlighted, Enter and Esc stay the composer's", () => {

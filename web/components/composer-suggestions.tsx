@@ -14,9 +14,10 @@ import { modHeld } from "../shortcuts";
 
 const NONE: ReadonlySet<string> = new Set();
 
-/** The prompts a gesture on row `index` sends or fills: the marked ones plus that row, in list order, one per line. */
+/** The prompts a gesture on row `index` sends or fills: the marked ones plus that row, in list order. Several become a Markdown list, so they render as separate rows. */
 export function chosenText(prompts: readonly string[], marked: ReadonlySet<string>, index: number | null): string {
-	return prompts.filter((text, i) => i === index || marked.has(text)).join("\n");
+	const chosen = prompts.filter((text, i) => i === index || marked.has(text));
+	return chosen.length === 1 ? chosen[0] : chosen.map(text => `- ${text}`).join("\n");
 }
 
 /** What a key does to the list: send or fill the marks plus row `index`, send every row, move the highlight to `to`, or clear both. */
@@ -203,7 +204,7 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 	};
 	const sendAll = (): void => {
 		clear();
-		onSend(prompts.join("\n"));
+		onSend(chosenText(prompts, new Set(prompts), null));
 	};
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		const action = suggestionKey(event, { open, count: prompts.length, active: activeIndex, marked: prompts.some(text => marked.has(text)) });
