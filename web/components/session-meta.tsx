@@ -1,5 +1,5 @@
 /** The subagent header's crumb styles, and a session header's controls: its branch, its Linear issues, and its pull requests. */
-import { ChevronDown, GitPullRequest, Layers } from "lucide-react";
+import { Check, ChevronDown, Fingerprint, GitPullRequest, Layers } from "lucide-react";
 import { Fragment, type MouseEvent, useEffect, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest } from "../../src/shared/github";
 import type { SessionFacts } from "../../src/shared/sessions";
@@ -17,6 +17,7 @@ import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
 import { BranchName, releaseBranch } from "./git";
 import { StackRail } from "./pull-requests/pr-details/stack";
 import { OrgIcon } from "./org-icon";
+import { useCopy } from "../use-copy";
 
 export const PARENT_CRUMB = "font-normal text-muted-foreground";
 export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
@@ -32,6 +33,20 @@ export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "
 			<TicketMenu tickets={facts.tickets} />
 			<PullRequestButton pullRequests={facts.pullRequests} />
 		</>
+	);
+}
+
+/** A session header's ID, as an icon button right after its title that copies the ID. */
+export function SessionIdCopy({ id }: { id: string }) {
+	const { copied, copy } = useCopy();
+	const Icon = copied ? Check : Fingerprint;
+	const label = copied ? "Copied" : `Copy session ID ${id}`;
+	return (
+		<Tooltip content={label}>
+			<Button variant="ghost" size="icon-sm" aria-label={label} onClick={() => copy(id)} className="text-muted-foreground">
+				<Icon aria-hidden />
+			</Button>
+		</Tooltip>
 	);
 }
 
