@@ -7,7 +7,7 @@
  */
 import { expandPrompt } from "./commands";
 import { errorText, isObject, nonEmptyStr } from "./json";
-import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused } from "./live-session";
+import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused, turnUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, listHosts, openRoom, type Room } from "./omp/collab";
 import { selectorOf } from "./shared/models";
 import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, UserAnswer, UserRequest, WithdrawnMessage } from "./shared/sessions";
@@ -421,6 +421,8 @@ export class SessionGuest implements LiveSession {
 					this.#interrupted = true;
 				}
 				this.#emit({ kind: "event", event });
+				const turn = turnUpdate(event);
+				if (turn) this.#emit(turn);
 				return;
 			}
 			case "state": {

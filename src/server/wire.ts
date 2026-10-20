@@ -244,6 +244,7 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	"dismiss-interrupted": ({ sessionId }) => (isNonEmpty(sessionId) ? { ok: { t: "dismiss-interrupted", sessionId } } : null),
 	end: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "end", instanceId } } : null),
+	read: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "read", instanceId } } : null),
 	"list-models": ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "list-models", instanceId } } : null),
 	"set-model"(value) {
 		const { instanceId } = value;

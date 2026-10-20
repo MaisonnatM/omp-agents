@@ -8,7 +8,7 @@
   "private": true,
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "bun build main.ts --target=node --format=cjs --external electron --outfile dist/main.cjs",
+    "build": "bun build main.ts preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming [name].cjs",
     "start": "bun run build && bun launch.ts",
     "typecheck": "tsc --noEmit"
   },

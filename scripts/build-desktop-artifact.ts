@@ -78,7 +78,7 @@ function builderConfig(): Record<string, unknown> {
 		// Without spaces, so GitHub's asset names match the URLs in `latest-mac.yml`.
 		artifactName: "omp-agents-${version}-${arch}.${ext}",
 		directories: { output: join(DESKTOP, "release") },
-		files: ["dist/main.cjs", "icon.png", "package.json"],
+		files: ["dist/main.cjs", "dist/preload.cjs", "icon.png", "package.json"],
 		extraResources: [
 			{ from: RESOURCES, to: "server" },
 			{ from: join(DIST, "bun-${arch}"), to: "server/bin" },

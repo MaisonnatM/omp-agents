@@ -381,6 +381,9 @@ export class Dashboard {
 			dismissInterrupted(sessionId) {
 				if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
 			},
+			markRead(instanceId) {
+				if (sessions.markRead(instanceId)) broadcasts.rosterChanged();
+			},
 			stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
@@ -570,8 +573,13 @@ export class Dashboard {
 				this.#broadcasts.syncRoster();
 				this.#projectRunner.switched(instanceId);
 				return;
+			case "turn-started":
+				if (this.#sessions.markRead(instanceId)) this.#broadcasts.rosterChanged();
+				return;
 			case "turn-ended":
+				this.#sessions.markUnread(instanceId, update.reply);
 				this.#projectRunner.turnEnded(instanceId, update.reply);
+				this.#broadcasts.rosterChanged();
 				return;
 			default: {
 				const unhandled: never = update;

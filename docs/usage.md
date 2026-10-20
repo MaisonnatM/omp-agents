@@ -28,6 +28,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Projects](#projects)
 - [Settings](#settings)
 - [Notifications](#notifications)
+  - [Session notifications](#session-notifications)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Desktop app](#desktop-app)
 - [Limitations](#limitations)
@@ -1377,6 +1378,7 @@ An action that fails shows its error, and its control becomes available again.
   **Settings** cannot be hidden, so you can always come back to show the others, but it can move.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Inbox** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
+  **Notifications** turns the [session notifications](#session-notifications) on or off.
   **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the sidebar's workspace, and says which, or your own skills with **All workspaces**.
@@ -1404,7 +1406,7 @@ An action that fails shows its error, and its control becomes available again.
 ## Notifications
 
 - The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
-- Five sources feed it.
+- Six sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
@@ -1422,7 +1424,8 @@ An action that fails shows its error, and its control becomes available again.
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
   - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
     All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
-- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
+  - **Projects**: a project that needs you, checked every minute: a worker's question its coordinator left unanswered once the coordinator is idle or stopped, a worker that stopped without **End session**, and a project whose workers are all done with nothing left for its coordinator.
+- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, **Projects**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
@@ -1444,6 +1447,18 @@ An action that fails shows its error, and its control becomes available again.
 - **×** clears a notice from the bell.
   A cleared update comes back with a newer version, a cleared pull request notice when the pull request comes back to the move after a while, a cleared Slack notice with a newer message, a cleared plan notice when the window runs out again a while after it reset, and a cleared credits notice when the credits run out again a while after a request worked.
 - The server keeps which notices were seen, read, and cleared in `notices.json` beside its access token.
+
+### Session notifications
+
+- A live session that asks you something, or finishes a turn, raises a system notification while the dashboard's window does not have focus.
+  Its title is the session's, and its text is the question, or the first line of the turn's last reply.
+  Clicking it brings the window up on that session.
+- Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before; a session that asks while its turn is unread notifies the question.
+  A session that already waited when the page loads, or when the page reconnects, raises none, and neither do a project's workers, whose coordinator hears when they finish or ask.
+- A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window and tab agrees.
+- The desktop app shows them unless **Settings › Preferences › Notifications** turns them off.
+  A browser shows them only once you turn that switch on and allow the dashboard's notifications when the browser asks; when it blocks them, the switch says so.
+  Each window keeps the switch in its own localStorage.
 
 ## Keyboard shortcuts
 
@@ -1596,7 +1611,8 @@ The packaged app, or `bun run desktop` from a checkout, shows the dashboard in i
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
 - Alt+Shift+Cmd+T, from any app, brings the window up with the command menu's **Create todo** open, so you can type a title and press Enter to create a todo.
   When another app holds the keys, the app logs so and the shortcut does nothing.
-- The Dock icon's badge counts the top-level todos left to do, as **All** does, and goes away at none.
+- The Dock icon's badge counts the sessions waiting on you: each that asks you something, or finished a turn you have not looked at since, a project's workers left out, and goes away at none.
+  The **Todo** page's header still counts the open todos.
 
 ## Limitations
 

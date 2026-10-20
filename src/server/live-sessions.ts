@@ -5,7 +5,8 @@ import { SessionGuest } from "../guest";
 import type { LiveSession, LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
-import { type RosterHost, type SessionFacts, type WorkItem, worksOn } from "../shared/sessions";
+import { oneLine } from "../session-entries";
+import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
@@ -15,10 +16,18 @@ export function withSubject(facts: SessionFacts, subject: WorkItem | undefined):
 	return subject.kind === "ticket" ? { ...facts, tickets: [subject.id, ...facts.tickets] } : { ...facts, pullRequests: [{ ...subject.pr, link: "worked" }, ...facts.pullRequests] };
 }
 
+/** The first line of `reply` that holds text, as one summary line. */
+function firstLine(reply: string | null): string | null {
+	const line = reply?.split("\n").find(text => text.trim());
+	return line ? oneLine(line) : null;
+}
+
 export class LiveSessions {
 	readonly #sessions = new Map<string, LiveSession>();
 	/** What the sessions started from a quick action work on, by instance id, for as long as they run. */
 	readonly #subjects = new Map<string, WorkItem>();
+	/** The turn each session ended since a page showed it in a focused window, by instance id. */
+	readonly #unread = new Map<string, UnreadTurn>();
 	/**
 	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
 	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
@@ -59,6 +68,16 @@ export class LiveSessions {
 		};
 	}
 
+	/** Session `instanceId` ended a turn with `reply`, which stays unread until a look or its next turn reads it. */
+	markUnread(instanceId: string, reply: string | null): void {
+		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(reply) });
+	}
+
+	/** A page showed session `instanceId` in a focused window, or its next turn started; whether it had a turn unread. */
+	markRead(instanceId: string): boolean {
+		return this.#unread.delete(instanceId);
+	}
+
 	/** Lists `session`; `false` when it already finished, as a process that exited between its spawn and now, which would stay listed with no one to remove it. */
 	add(session: LiveSession, subject: WorkItem | null): boolean {
 		if (session.finished(Date.now())) return false;
@@ -71,6 +90,7 @@ export class LiveSessions {
 	remove(instanceId: string): void {
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
+		this.#unread.delete(instanceId);
 		this.#reindex();
 		forgetSession(instanceId);
 	}
@@ -81,11 +101,12 @@ export class LiveSessions {
 		this.#bySessionId = index;
 	}
 
-	/** Each session's roster row, with its `cwdDisplay` and what the session files' index knows of it. */
+	/** Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it. */
 	rows(factsOf: (sessionId: string) => SessionFacts): RosterHost[] {
 		return [...this.#sessions.values()].map(session => ({
 			...session.row(),
 			cwdDisplay: displayPath(session.cwd),
+			unread: this.#unread.get(session.instanceId) ?? null,
 			...withSubject(factsOf(session.sessionId), this.#subjects.get(session.instanceId)),
 		}));
 	}

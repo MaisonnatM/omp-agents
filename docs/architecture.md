@@ -22,6 +22,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Projects](#projects)
 - [Pins](#pins)
 - [Notifications](#notifications)
+  - [Session notifications](#session-notifications)
 - [HTTP API](#http-api)
   - [Integrations](#integrations)
   - [MCP servers](#mcp-servers)
@@ -430,8 +431,8 @@ Routine and scheduled runner actions and asynchronous notice actions remain sepa
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process on Bun and never imports it: `bun src/server.ts` from a checkout, and in the packaged app the Bun binary it ships in `Contents/Resources/server/bin/bun` on the bundled `server.js`, with `OMP_AGENTS_RESOURCES` naming that directory (`src/server/resources.ts`) so the server reads its prebuilt page and the starter kit from it.
 omp's sessions run on that same Bun, through `process.execPath`.
-It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, `src/user-todos-shared.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
-It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the command palette on its **Create todo** view.
+It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, and `src/shared/desktop-bridge.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`, and `desktop/preload.ts` into `desktop/dist/preload.cjs`.
+Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the command palette on its **Create todo** view.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
 - At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /?token=<token>` on the port.
@@ -447,7 +448,8 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
   A custom scheme for the page would fail that check.
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
   An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the MCP sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
-- The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
+- The page runs with context isolation and the sandbox on, and gets no Node or Electron API.
+  Its preload, `desktop/preload.ts`, hands it only `window.ompDesktop`, the `DesktopBridge` of `src/shared/desktop-bridge.ts`, whose `badge` and `alert` send one IPC message each; see [Session notifications](#session-notifications).
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
 - The packaged app, launched by Finder or at login, gets no shell environment, so `desktop/shell-env.ts` runs the login shell (`$SHELL -ilc`) once at startup and merges its environment into `process.env` before the server starts; omp, `gh`, and `git` are then found as in a terminal.
@@ -791,6 +793,24 @@ Every socket hears the list as a `notices` message on the roster topic after eac
 The server keeps the omp modules it loaded until it restarts, and `src/omp/modules.ts` names any export the new release dropped at the next start.
 `update` on a model calls `upgradeModel` in `src/settings.ts`, which turns `upgradeEdits` into routing edits and writes each with `writeRouting`, under the same lock as a Settings › Models save.
 A role or chain entry keeps whatever follows the model in its selector, such as `:high` or `:auto`, and each chain that names the model is written whole.
+
+### Session notifications
+
+The Dock badge and the session notifications count on the roster: the server keeps whether each live session waits on you, and each page decides what to show of it.
+A row's `status` of `needs-input` says that the session asks something, and its `unread` names the turn it ended since you last looked: when, and the first line of its last reply.
+Both transports report the main agent's turn as a `TurnUpdate` from `turnUpdate` in `src/live-session.ts`: `turn-started` at `agent_start`, and `turn-ended` with its last reply at an `agent_end` that ends the run, not one that hands over to a queued follow-up.
+`Dashboard` applies each in `#onLiveUpdate` through `LiveSessions`, which keeps the unread turns privately by instance id in memory, adds them to each row in `rows()`, and drops one when its session leaves.
+`turn-ended` sets the turn with `markUnread` and always pushes the roster; `turn-started` clears it with `markRead` and pushes the roster only when a turn was unread.
+A page sends `{ t: "read", instanceId }` while a pane shows the session's main agent in a focused window, which `LiveSessions.markRead` clears for every page.
+
+`useAttention` in `web/use-attention.ts`, over the pure rules in `web/attention.ts`, leaves out a project's workers, which answer to their coordinator, and counts the rest that need you for the desktop's badge.
+Each session raises at most one alert at a time, for what it waits on: its oldest open question, else a wait with no question relayed, else its unread turn.
+`attend` keeps an episode per live session: the first roster that shows a session hears its wait and raises nothing, so neither a page that loads nor a terminal session that joins after the socket's first roster raises what already waited.
+A wait with no question raises only when it starts after the page saw the session not need you, and a question that follows it in the same wait is the question the host replays after a guest's welcome, so it raises nothing.
+A question, by its request id, or an unread turn, by its time, that the page has not heard raises its alert while **Settings › Preferences › Notifications** is on, and stays heard while the session lives, so a question a reconnect replays raises none again.
+An alert carries the hash that opens its session, `#session/<session id>`, from `hashForSession`, so the shell needs nothing of the roster's shapes.
+In the desktop app the alert goes through the bridge to `desktop/attention.ts`, which shows an Electron `Notification` unless its window has focus, as `BrowserWindow.isFocused` tells, and, on its click, shows the window and sets the page's hash to the alert's; it holds each session's latest notification, closing the one before, since Electron drops a click of one nothing references.
+In a browser it is a Web `Notification` tagged with the alert's hash, so a session's newer one replaces the one before, raised while the page does not have focus, once the browser granted the permission that turning the switch on asks for.
 
 ## HTTP API
 
