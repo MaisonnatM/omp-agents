@@ -320,6 +320,11 @@ An action that fails shows its error, and its control becomes available again.
   A path in an open Markdown file opens in the dialog's place, relative to that file.
   The dialog shows the first 1 MB of a larger file and says so; it refuses a file whose real path, past any link, has another extension, and a file that is not UTF-8.
   A todo's notes do not open paths: a path there is plain text.
+- An image or video on this computer that a prompt or the agent's text names shows in the message: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`, `.mp4`, `.m4v`, `.webm`, or `.mov`.
+  Its path is found as a text file's is, and opens the file dialog with the image large or the video playing.
+  Written as an image, `![alt](path)`, it shows in place, and a video there plays in place; otherwise each one the text names shows once as a thumbnail under the text, a video by its first frame, and opens the dialog on click.
+  A remote image, `![](https://…)`, stays a link, so a prompt-injected address never loads.
+  A path to a missing file, or to one in a directory that does not open, shows no thumbnail.
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.

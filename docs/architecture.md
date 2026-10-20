@@ -799,8 +799,11 @@ Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md
 `GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
 The path is absolute or starts with `~`, which `expandHome` in `src/paths.ts` reads as the home directory; the page resolves a relative one against the session's directory first.
 The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
-It must also lie outside the directories that hold sign-ins and config, `DENIED_DIRS` in `src/text-file.ts`, compared by their real paths, or the route answers 403: omp-agents' own directory, which holds the access token, and omp's agent directory, but for its Markdown, such as `AGENTS.md` and skills.
+It must also lie outside the directories that hold sign-ins and config, `DENIED_DIRS` in `src/local-file.ts`, compared by their real paths, or the route answers 403: omp-agents' own directory, which holds the access token, and omp's agent directory, but for its Markdown, such as `AGENTS.md` and skills, and its images and videos.
 It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes are not UTF-8.
+`GET /api/media?path=<absolute path>` serves an image or video that agent text names, as the type `MEDIA_FILE_TYPES` in `src/shared/transcript.ts` gives its extension, with the same path, real-path extension, and `DENIED_DIRS` checks as `GET /api/file`.
+Bun answers a `Range` request with a 206 and that part, so a video seeks.
+It sends `Cache-Control: private, no-cache`, since a file can change under the same path, and `Content-Security-Policy: sandbox; default-src 'none'`, so an SVG opened at that address runs no script on the page's origin.
 It runs `git worktree list --porcelain -z`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the pull request list's cached lookup.
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
@@ -1243,8 +1246,9 @@ Its own queue, history recall, and suggested prompts are removed, since those sl
 
 Markdown uses `react-markdown` and `remark-gfm` (`web/components/message-markdown.tsx`).
 A fenced code block renders as a `CodeBlock`, colored line by line by `highlightLines` in `web/code-highlight.ts`, the `lowlight` grammars the changes view uses, rather than shadcn's `shiki` hook, so the page bundles one highlighter.
-In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL.
-In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
+In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL or a path to an image or video on this computer, which `LocalMedia` in `web/components/local-media.tsx` shows through `GET /api/media`.
+In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text, image, or video file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
+It then ends the text with a `figure` naming the images and videos those links name, each once, but for those an image already shows; `MediaStrip` draws it as thumbnails, each dropping out when its file does not load.
 A `file://` address whose escapes do not decode renders as a link with no address, and text from GitHub keeps no `file://` path, since it renders through the default filter.
 A relative path resolves against `FileBaseContext`: the pane's session directory, or the directory of the file the dialog shows.
 Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` with only a `src`.

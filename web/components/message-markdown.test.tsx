@@ -119,14 +119,29 @@ const fileLinks = (text: string, base: string | null): { html: string; count: nu
 	return { html, count: html.match(/class="file-link"/g)?.length ?? 0 };
 };
 
-test("agent text opens text file paths in the file dialog, not web addresses or other files", () => {
+test("agent text opens file paths in the file dialog, not web addresses or other files", () => {
 	const { html, count } = fileLinks(
-		"Wrote /tmp/omp-token-decision.tsv and `docs/usage.md:12`, see [plan](file:///tmp/plan.md), https://example.com/readme.md, `src/app.ts`, and /tmp/shot.png.",
+		"Wrote /tmp/omp-token-decision.tsv and `docs/usage.md:12`, see [plan](file:///tmp/plan.md), https://example.com/readme.md, `src/app.ts`, /tmp/report.pdf, and /tmp/shot.png.",
 		"/repo",
 	);
-	expect(count).toBe(3);
+	expect(count).toBe(4);
 	expect(html).toContain('<a href="https://example.com/readme.md"');
 	expect(html).toContain("<code>src/app.ts</code>");
+});
+
+test("agent text shows the images and videos it names under it, each once, but for one it already shows in place", () => {
+	const { html } = fileLinks("Before `tmp/a.png`, after /tmp/demo.mp4, again `tmp/a.png`.\n\n![b](shots/b.webp) and `shots/b.webp`\n\n```\n/tmp/c.png\n```", "/repo");
+	const src = (path: string) => `/api/media?${new URLSearchParams({ path })}`.replaceAll("&", "&amp;");
+	expect(html.match(/<figure[^>]*>.*<\/figure>/)?.[0].match(/src="[^"]+"/g)).toEqual([`src="${src("/repo/tmp/a.png")}"`, `src="${src("/tmp/demo.mp4")}"`]);
+	expect(html).toContain(`<img src="${src("/repo/shots/b.webp")}" alt="b"`);
+	expect(html).not.toContain("c.png&quot;");
+	expect(html).not.toContain(src("/tmp/c.png"));
+});
+
+test("a remote image in agent text stays a link even with a media extension", () => {
+	const { html } = fileLinks("![x](https://attacker.example/x.png)", "/repo");
+	expect(html).not.toContain("<img");
+	expect(html).not.toContain("<figure");
 });
 
 test("a relative file path opens only where a session directory resolves it, and code blocks stay code", () => {

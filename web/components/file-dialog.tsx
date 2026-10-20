@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { linkedFile, mediaUrl } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";
@@ -19,8 +20,47 @@ type Look = "markdown" | "tsv" | "csv" | "text";
 
 const LOOKS: Record<string, Look> = { md: "markdown", markdown: "markdown", tsv: "tsv", csv: "csv" };
 
-/** A text file that a path in agent text opened, rendered by its type; a path in the file opens in its place. */
+/** A file that a path in agent text opened: an image or video large, else a text file rendered by its type. */
 export function FileDialog({ path, onClose }: { path: string; onClose: () => void }) {
+	const kind = linkedFile(path)?.kind;
+	return kind === "image" || kind === "video" ? <MediaDialog path={path} video={kind === "video"} onClose={onClose} /> : <TextFileDialog path={path} onClose={onClose} />;
+}
+
+/** An image or video on this computer, as large as the dialog allows; a video plays at once. */
+function MediaDialog({ path, video, onClose }: { path: string; video: boolean; onClose: () => void }) {
+	const { copied, copy } = useCopy();
+	const [failed, setFailed] = useState(false);
+	const name = path.slice(path.lastIndexOf("/") + 1);
+	const src = mediaUrl(path);
+	return (
+		<ViewerDialog
+			title={name}
+			description={path}
+			bodyLabel={name}
+			onClose={onClose}
+			actions={
+				<Tooltip content={copied ? "Copied" : "Copy the path"}>
+					<Button variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(path)}>
+						{copied ? <Check /> : <Copy />}
+					</Button>
+				</Tooltip>
+			}
+		>
+			<div className="flex min-h-full items-center justify-center p-4">
+				{failed ? (
+					<p className="text-sm text-muted-foreground">This file could not be loaded: it is missing, or lies in a directory that does not open here.</p>
+				) : video ? (
+					<video controls autoPlay src={src} onError={() => setFailed(true)} className="max-h-[75vh] max-w-full bg-black" />
+				) : (
+					<img src={src} alt={name} onError={() => setFailed(true)} className="max-h-[75vh] max-w-full object-contain" />
+				)}
+			</div>
+		</ViewerDialog>
+	);
+}
+
+/** A text file rendered by its type; a path in the file opens in its place. */
+function TextFileDialog({ path, onClose }: { path: string; onClose: () => void }) {
 	const read = useRead<TextFile>(`/api/file?${new URLSearchParams({ path })}`);
 	const look = LOOKS[path.slice(path.lastIndexOf(".") + 1).toLowerCase()] ?? "text";
 	const [source, setSource] = useState(false);

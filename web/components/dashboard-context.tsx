@@ -19,7 +19,7 @@ export interface DashboardActions {
 	changeTodo: Dashboard["changeTodo"];
 	/** End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast. */
 	end: (instanceId: string) => void;
-	/** Open the text file at an absolute or `~/` path in the file dialog. */
+	/** Open the text, image, or video file at an absolute or `~/` path in the file dialog. */
 	openFile: (path: string) => void;
 	/** Open the new-ticket dialog with `title` as the issue's title. */
 	openNewTicket: (title: string) => void;

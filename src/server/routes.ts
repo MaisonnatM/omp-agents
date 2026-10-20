@@ -39,10 +39,11 @@ import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import type { ReplayComparison, ReplayDetail } from "../shared/replay";
+import { MEDIA_FILE_TYPES } from "../shared/transcript";
 import type { View } from "../shared/sessions";
 import { parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
-import { readTextFile } from "../text-file";
+import { findMediaFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
@@ -727,6 +728,25 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		return read.ok ? Response.json(read.file) : fail(read.status, read.error);
 	});
 
+	/**
+	 * `GET /api/media?path=<path>`: an image or video that agent text names, by an absolute or `~/` path, served as its
+	 * extension's type; Bun answers a `Range` request with its part, so a video seeks. Its own sandbox policy keeps an
+	 * SVG opened at this address from running script on the page's origin.
+	 */
+	const media = get(async params => {
+		const found = await findMediaFile(params.get("path") ?? "");
+		if (!found.ok) return fail(found.status, found.error);
+		return new Response(Bun.file(found.real), {
+			headers: {
+				"Content-Type": MEDIA_FILE_TYPES[found.extension]!,
+				"Content-Security-Policy": "sandbox; default-src 'none'",
+				"X-Content-Type-Options": "nosniff",
+				// The file may change under the same path, so the browser asks again each time.
+				"Cache-Control": "private, no-cache",
+			},
+		});
+	});
+
 	return {
 		"/api/git": { GET: git },
 		"/api/worktrees": { GET: worktreeInventory },
@@ -738,6 +758,7 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		"/api/image": { GET: image },
 		"/api/attachment/document": { PUT: promptDocument },
 		"/api/file": { GET: textFile },
+		"/api/media": { GET: media },
 	};
 }
 

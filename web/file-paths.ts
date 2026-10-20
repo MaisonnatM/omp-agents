@@ -1,26 +1,34 @@
 /**
- * The paths of text files in agent text, which open in the page's file dialog: `GET /api/file` reads the files whose
- * extension `TEXT_FILE_EXTENSIONS` lists.
+ * The paths of files in agent text, which open in the page's file dialog: `GET /api/file` reads the text files whose
+ * extension `TEXT_FILE_EXTENSIONS` lists, and `GET /api/media` serves the images and videos `MEDIA_FILE_TYPES` lists.
  */
-import { TEXT_FILE_EXTENSIONS } from "../src/shared/transcript";
+import { isVideoExtension, MEDIA_FILE_EXTENSIONS, TEXT_FILE_EXTENSIONS } from "../src/shared/transcript";
 
-const EXTENSIONS = TEXT_FILE_EXTENSIONS.join("|");
+const EXTENSIONS = [...TEXT_FILE_EXTENSIONS, ...MEDIA_FILE_EXTENSIONS].join("|");
 const SEGMENTS = String.raw`[\w.@+~-]+(?:\/[\w.@+~-]+)*\.(?:${EXTENSIONS})`;
 const LINE = String.raw`(?::\d+(?:-\d+)?)?`;
 /** A path in prose: absolute or `~/` only, since a relative one would match words such as `and/or.txt`. */
 const PROSE_PATH = new RegExp(String.raw`(?<![\w~./:-])(?:~\/|\/)${SEGMENTS}${LINE}(?![\w/])`, "gi");
 /** An inline code span that is a path, relative ones included: `` `docs/usage.md:12` ``. */
 const CODE_PATH = new RegExp(String.raw`^(?:~\/|\.{0,2}\/)?${SEGMENTS}${LINE}$`, "i");
-const TEXT_FILE = new RegExp(String.raw`\.(?:${EXTENSIONS})$`, "i");
+const LINKED_FILE = new RegExp(String.raw`\.(${EXTENSIONS})$`, "i");
 const LINE_SUFFIX = /:\d+(?:-\d+)?$/;
 const SCHEME = /^[a-z][a-z\d+.-]*:/i;
 
-/** The text file a link's `href` names, without a `:line` suffix, or `null` for a web address or any other file. */
-export function textFilePath(href: string): string | null {
+/** What a file in agent text is: a text file the dialog reads, or an image or video it shows. */
+export type FileKind = "text" | "image" | "video";
+
+/** The file a link's `href` names, without a `:line` suffix, or `null` for a web address or any other file. */
+export function linkedFile(href: string): { path: string; kind: FileKind } | null {
 	if (href === "" || SCHEME.test(href) || href.startsWith("#") || href.startsWith("?")) return null;
 	const path = href.replace(LINE_SUFFIX, "");
-	return TEXT_FILE.test(path) ? path : null;
+	const extension = LINKED_FILE.exec(path)?.[1]?.toLowerCase();
+	if (extension === undefined) return null;
+	return { path, kind: TEXT_FILE_EXTENSIONS.includes(extension) ? "text" : isVideoExtension(extension) ? "video" : "image" };
 }
+
+/** The address of the image or video at absolute or `~/` path `path`. */
+export const mediaUrl = (path: string): string => `/api/media?${new URLSearchParams({ path })}`;
 
 /** Whether `path` is absolute or `~/`, as the transcript writes a path outside the session's directory. */
 export function isAbsolutePath(path: string): boolean {
@@ -47,6 +55,7 @@ interface MdNode {
 	value?: string;
 	url?: string;
 	children?: MdNode[];
+	data?: { hName: string; hProperties: Record<string, string> };
 }
 
 /** `text` with each prose path in it made a link. */
@@ -72,5 +81,24 @@ function linkPaths(parent: MdNode): void {
 	});
 }
 
-/** A remark plugin that makes each text file path in agent text a link, which `MessageMarkdown` opens in the file dialog. */
-export const remarkFilePaths = () => linkPaths;
+/**
+ * A remark plugin that makes each file path in agent text a link, which `MessageMarkdown` opens in the file dialog, and
+ * ends the text with a `figure` of the images and videos it names, in order and each once, but for those an image
+ * already shows, so the message shows them as well as naming them.
+ */
+export const remarkFilePaths = () => (root: MdNode) => {
+	linkPaths(root);
+	const shown = new Set<string>();
+	const named: string[] = [];
+	const visit = (node: MdNode): void => {
+		if (node.type === "image" && node.url) shown.add(node.url);
+		if (node.type === "link" && node.url) {
+			const file = linkedFile(node.url);
+			if (file && file.kind !== "text") named.push(file.path);
+		}
+		node.children?.forEach(visit);
+	};
+	visit(root);
+	const media = [...new Set(named)].filter(path => !shown.has(path));
+	if (media.length > 0) root.children?.push({ type: "mediaStrip", children: [], data: { hName: "figure", hProperties: { dataMedia: JSON.stringify(media) } } });
+};

@@ -1,4 +1,4 @@
-/** What a transcript shows: its items, the files its agent changed, its images, and the text files it opens. */
+/** What a transcript shows: its items, the files its agent changed, its images, and the files it opens. */
 
 /** The extensions of the files that agent text may open in the page's file dialog, `GET /api/file`. */
 export const TEXT_FILE_EXTENSIONS: readonly string[] = ["md", "markdown", "txt", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "xml", "diff", "patch"];
@@ -13,6 +13,25 @@ export interface TextFile {
 	size: number;
 	truncated: boolean;
 }
+
+/** The images and videos a path in agent text shows, by extension, with the type `GET /api/media` serves each as. */
+export const MEDIA_FILE_TYPES: Readonly<Record<string, string>> = {
+	png: "image/png",
+	jpg: "image/jpeg",
+	jpeg: "image/jpeg",
+	gif: "image/gif",
+	webp: "image/webp",
+	avif: "image/avif",
+	svg: "image/svg+xml",
+	mp4: "video/mp4",
+	m4v: "video/mp4",
+	webm: "video/webm",
+	mov: "video/quicktime",
+};
+export const MEDIA_FILE_EXTENSIONS: readonly string[] = Object.keys(MEDIA_FILE_TYPES);
+
+/** Whether a media file, by its extension, plays as a video rather than showing as an image. */
+export const isVideoExtension = (extension: string): boolean => MEDIA_FILE_TYPES[extension.toLowerCase()]?.startsWith("video/") ?? false;
 
 /** How a prompt the dashboard sends in the user's place starts; the agent reads it, the user never sees it as theirs. */
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";

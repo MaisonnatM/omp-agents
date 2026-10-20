@@ -1,13 +1,13 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { agentDir } from "./omp/config";
 import { projectNotesDir, tokenFile, userNotesDir } from "./paths";
-import { MAX_TEXT_FILE_BYTES } from "./shared/transcript";
-import { DENIED_DIRS, readTextFile } from "./text-file";
+import { DENIED_DIRS, findMediaFile, readTextFile } from "./local-file";
+import { MAX_TEXT_FILE_BYTES, MEDIA_FILE_EXTENSIONS } from "./shared/transcript";
 
-const dir = await mkdtemp(join(tmpdir(), "omp-agents-text-file-"));
+const dir = await mkdtemp(join(tmpdir(), "omp-agents-local-file-"));
 afterAll(() => rm(dir, { recursive: true, force: true }));
 
 test("a text file reads whole, under the path it was named by", async () => {
@@ -41,10 +41,10 @@ test("a large file stops at the limit without splitting a character", async () =
 	expect(read.file.text).toBe("a".repeat(MAX_TEXT_FILE_BYTES - 1));
 });
 
-test("omp-agents' directory and omp's agent directory are denied, Markdown in omp's still opens", () => {
+test("omp-agents' directory and omp's agent directory are denied, Markdown and media in omp's still open", () => {
 	expect(DENIED_DIRS).toEqual([
 		{ dir: dirname(tokenFile), opens: [] },
-		{ dir: agentDir, opens: ["md", "markdown"] },
+		{ dir: agentDir, opens: ["md", "markdown", ...MEDIA_FILE_EXTENSIONS] },
 	]);
 });
 
@@ -76,4 +76,23 @@ test("a text file in a denied directory is refused, by its real path, but for th
 	expect(await readTextFile(join(dir, "harmless.json"), denied)).toMatchObject({ ok: false, status: 403 });
 	expect(await readTextFile(join(agent, "skills", "SKILL.md"), denied)).toMatchObject({ ok: true, file: { text: "# skill" } });
 	expect(await readTextFile(join(dir, "secrets-but-not.json"), denied)).toMatchObject({ ok: true, file: { text: "{}" } });
+});
+
+test("a media file is found by its real path and extension; a link named like one cannot reach another file", async () => {
+	await writeFile(join(dir, "Shot.PNG"), new Uint8Array([0x89, 0x50]));
+	await writeFile(join(dir, "secret"), "token");
+	await symlink(join(dir, "secret"), join(dir, "fake.png"));
+	expect(await findMediaFile(join(dir, "Shot.PNG"))).toEqual({ ok: true, real: await realpath(join(dir, "Shot.PNG")), extension: "png" });
+	expect(await findMediaFile(join(dir, "fake.png"))).toMatchObject({ ok: false, status: 415 });
+	expect(await findMediaFile(join(dir, "report.tsv"))).toMatchObject({ ok: false, status: 415 });
+	expect(await findMediaFile(join(dir, "missing.mp4"))).toMatchObject({ ok: false, status: 404 });
+	expect(await findMediaFile("shot.png")).toMatchObject({ ok: false, status: 400 });
+});
+
+test("a media file in a denied directory is refused unless that directory opens its extension", async () => {
+	const secrets = join(dir, "media-secrets");
+	await mkdir(secrets, { recursive: true });
+	await writeFile(join(secrets, "a.webm"), "");
+	expect(await findMediaFile(join(secrets, "a.webm"), [{ dir: secrets, opens: [] }])).toMatchObject({ ok: false, status: 403 });
+	expect(await findMediaFile(join(secrets, "a.webm"), [{ dir: secrets, opens: ["webm"] }])).toMatchObject({ ok: true, extension: "webm" });
 });
