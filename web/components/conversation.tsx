@@ -28,7 +28,7 @@ import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-atta
 import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
 import { ScheduleButton, ScheduledMessages, useScheduleSend } from "./scheduled";
-import { type Subject, subjectOf } from "./subject";
+import { deliveryOf, type Subject, subjectOf } from "./subject";
 import { Trajectory } from "./trajectory";
 import { Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
@@ -162,7 +162,7 @@ function LiveConversation({
 		void attachments.take(text, (prompt, images) => request({ t: "prompt", view, text: prompt, images, delivery }), () => setDraft(current => current || text));
 	};
 	const sendText = (text: string): void => {
-		if (blockedShortcut(text, shell) === null) submit(text, working && subject.followUps ? "followUp" : "steer");
+		if (blockedShortcut(text, shell) === null) submit(text, deliveryOf(subject));
 	};
 
 	const directCommand = blockedShortcut(draft, shell);

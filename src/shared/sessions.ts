@@ -66,6 +66,10 @@ export interface SessionBranch {
 	name: string;
 	/** Whether it is checked out in a linked worktree, which copying it can free; otherwise in the repository's main checkout. */
 	linked: boolean;
+	/** The repository's default branch, as `origin/HEAD` names it, which a pull request from this branch merges into; `null` when git has not recorded one. */
+	defaultBranch: string | null;
+	/** The pull request the pull request list says this branch heads, open or merged; `null` while the list names none. */
+	pullRequest: PullRequest | null;
 }
 
 /** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, its worktree, and its branch. */

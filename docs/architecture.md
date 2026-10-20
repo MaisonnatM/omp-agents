@@ -168,7 +168,7 @@ Every transcript comes from the session files on this machine, not from a networ
   Like an open transcript, each file reads only the bytes appended since its last scan.
   The first scan reads every session file, 16 sessions at a time.
   On 641 MB across 464 sessions it takes under a second, and the sidebar shows before it finishes.
-  A session that names a PR by number alone costs one `git remote get-url origin` in its working directory.
+  A session that names a PR by number alone, or works on a branch, costs one `git remote get-url origin` in its working directory.
   A `gt submit` call costs, once per directory it ran in, one `git remote get-url origin` and a `git reflog show HEAD` with a `git symbolic-ref HEAD`, which place the branch checked out at the call's time; the server keeps each call's branch for as long as it lists the session.
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
 - The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
@@ -178,9 +178,11 @@ Every transcript comes from the session files on this machine, not from a networ
   Session rows carry them as `tickets`, the session's own first.
 - The same scan reads the branch each session that wrote works on, in its worktree else its directory, through `worktreeAt` in `src/git.ts`.
   In a linked worktree that is the branch checked out now; in a repository's main checkout it is the branch `headHistory` and `branchAt` in `src/git.ts` find checked out at the session file's last write, from the HEAD reflog.
-  Session rows carry it as `branch`, a `SessionBranch` `{ name, linked }` from `src/shared/sessions.ts`, `null` on a detached HEAD, outside git, or once the directory is gone, and a branch switch changes the row at the session's next write.
+  `defaultBranchOf` there reads the repository's default branch from `origin/HEAD` with one `git symbolic-ref` per directory of a session that wrote, so a moved `origin/HEAD` updates the `defaultBranch` of every session in that directory.
+  Session rows carry it as `branch`, a `SessionBranch` `{ name, linked, defaultBranch, pullRequest }` from `src/shared/sessions.ts`, `null` on a detached HEAD, outside git, or once the directory is gone, and a branch switch changes the row at the session's next write.
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
+  It also sets the `pullRequest` of each such session's `branch`, the PR it heads, and so links the PR of a main checkout's branch other than the default one too; the header's **Open PR** shows only while it is `null`.
 
 ## Terminal sessions
 
