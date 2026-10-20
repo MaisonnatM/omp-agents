@@ -10,10 +10,10 @@
  * hears the questions omp still waits on, and every whole frame omp writes from then on. omp's output while no client
  * listens is dropped: the server reads omp's state and the session file instead.
  */
-import { unlinkSync } from "node:fs";
+import { unlinkSync, writeFileSync } from "node:fs";
 import { createServer, type Socket } from "node:net";
 import { isObject } from "./json";
-import { HELLO, type KeeperHello, STOP } from "./keeper-wire";
+import { HELLO, type KeeperHello, pidFileOf, STOP } from "./keeper-wire";
 import type { RpcFrameModule } from "./omp/modules";
 import { ProcessCensus } from "./process-census";
 
@@ -239,6 +239,8 @@ async function main(): Promise<void> {
 		socket.on("close", () => drop(socket));
 		void opened.promise.then(() => greet(socket));
 	});
+	const pidFile = pidFileOf(socketPath);
+	writeFileSync(pidFile, String(process.pid), { mode: 0o600 });
 	server.listen(socketPath);
 
 	const output = (async () => {
@@ -255,10 +257,12 @@ async function main(): Promise<void> {
 		// The client hears the end only once nothing omp started runs on.
 		await census.reap();
 		server.close();
-		try {
-			unlinkSync(socketPath);
-		} catch {
-			// Already gone.
+		for (const path of [socketPath, pidFile]) {
+			try {
+				unlinkSync(path);
+			} catch {
+				// Already gone.
+			}
 		}
 		const last = gate.kind === "starting" ? null : gate.client;
 		if (!last) process.exit(code);

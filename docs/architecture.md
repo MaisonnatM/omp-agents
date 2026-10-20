@@ -321,7 +321,7 @@ omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits
 
 ### Session keepers
 
-A keeper (`src/keeper.ts`) holds one session's omp: it runs omp with piped stdio, and lends that stdio to one server at a time through a Unix socket, `sessions/<port>/<instance id>.sock` beside the access token, with omp's stderr in the `.log` beside it.
+A keeper (`src/keeper.ts`) holds one session's omp: it runs omp with piped stdio, and lends that stdio to one server at a time through a Unix socket, `sessions/<port>/<instance id>.sock` beside the access token, with omp's stderr in the `.log` beside it and its own pid in the `.pid`, written before it listens.
 The directory is per port, so a server on another port, such as a smoke run, never takes over this one's sessions.
 `startKeeper` in `src/keeper-link.ts` starts it through `/bin/sh`, which backgrounds it and exits, and Bun's `detached` makes it a session leader: no signal to the server's process group, and no kill of the server's process tree, reaches it.
 Of omp's modules the keeper loads only `rpc-frame.ts`, whose path the server passes it (`rpcFrameFile` in `src/omp/modules.ts`); the packaged app ships the keeper as `keeper.js` beside `server.js` (`keeperScript` in `src/server/resources.ts`).
@@ -337,8 +337,9 @@ A host tool call that no server hears, because none has joined, fails at once wi
 
 The server's shutdown calls `DashboardSession.dispose`, which hangs up without stopping omp; the link's `ended` then settles with `detach` rather than `exit`, so the session reports no exit and does not count as finished.
 At startup `reattachAll` in `src/server/start.ts` connects to every socket in the directory under the instance id it had, holding back what each session reports; a socket nobody listens on loses its files.
+A keeper that takes the connection and does not greet within 3 seconds is stuck: the server hangs up, logs its instance id, and stops it by the pid in its `.pid` file, with omp and every process under it, SIGTERM then SIGKILL after 3 seconds, so startup and the socket gate wait at most about 6 seconds and no Resume starts a second omp on its file; `recover` then counts its session as interrupted.
 Once all attached, `InterruptedSessions.recover` learns which sessions survived, and only then is each listed again, in its project, and what it reported passed on, before the runners recover.
-Attaching never stops omp: a session file without a readable header leaves the session in the directory omp started in, a replay marker that cannot be read counts as a replay, and a session that fails to attach is left running, unlisted, for the next server.
+Attaching to a keeper that greeted never stops omp: a session file without a readable header leaves the session in the directory omp started in, a replay marker that cannot be read counts as a replay, and a session that fails to attach is left running, unlisted, for the next server.
 **End session** sends the keeper `omp_agents_keeper_stop`: the keeper notes the processes under omp while omp is still their parent, sends SIGTERM to omp and to them, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
 omp exiting on its own ends the same way, except that its processes are no longer under it, so the keeper stops the ones it noted before.
 omp's background jobs, kernels and subagents lead process groups or sessions of their own and are reparented once omp exits, so the keeper's `ProcessCensus` (`src/process-census.ts`) notes the processes under omp with `ps` a second after a tool call ends, since an async call starts its job just after it returns, and every 10 seconds, each with its start time so that a reused pid is never signalled.

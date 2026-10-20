@@ -36,7 +36,7 @@ function descendants(table: ProcessTable, root: number): Processes {
 }
 
 /** Sends `name` to `pid`, which may be gone already. */
-function signal(pid: number, name: NodeJS.Signals): void {
+export function signal(pid: number, name: NodeJS.Signals): void {
 	try {
 		process.kill(pid, name);
 	} catch {

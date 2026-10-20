@@ -1,9 +1,15 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DashboardSession } from "../dashboard-session";
 import { claudeCodeRoot } from "../foreign/claude-code";
 import { codexHome } from "../foreign/codex";
+import { flushJsonFiles } from "../fs";
+import * as keeperLink from "../keeper-link";
+import { pidFileOf } from "../keeper-wire";
 import * as rpc from "../omp/rpc";
+import { refuseUntil } from "./http";
+import { InterruptedSessions } from "./interrupted";
 import { LiveSessions } from "./live-sessions";
 import type { ProjectJoin } from "./project-runner";
 import { createStarter, reattachAll } from "./start";
@@ -48,3 +54,60 @@ test("the server learns which sessions survived before it lists or hears any, an
 	expect(heard).toEqual(["recover s-i-kept", "project i-kept", "roster i-kept, listed: true"]);
 	expect([sessions.get("i-gone"), sessions.get("i-broken")]).toEqual([undefined, undefined]);
 });
+
+/**
+ * A keeper that took the connection and is stuck: it records its pid as a keeper does, runs a job in a session of its
+ * own as omp's background jobs do, prints that job's pid, listens, and never greets.
+ */
+const STUCK_KEEPER = `
+import { writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+const [socket, pidFile] = process.argv.slice(2);
+writeFileSync(pidFile, String(process.pid));
+const job = Bun.spawn(["sleep", "61"], { detached: true, stdout: "ignore" });
+createServer(() => {}).listen(socket, () => console.log(job.pid));
+`;
+
+const alive = (pid: number): boolean => {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+};
+
+test("a keeper that never greets is stopped with its job within the bound, then the socket opens and its session is interrupted", async () => {
+	const dir = mkdtempSync(join("/tmp", "ost-"));
+	try {
+		const socket = join(dir, "stuck.sock");
+		writeFileSync(join(dir, "keeper.ts"), STUCK_KEEPER);
+		const keeper = Bun.spawn([process.execPath, join(dir, "keeper.ts"), socket, pidFileOf(socket)], { stdout: "pipe" });
+		const job = Number((await keeper.stdout.getReader().read()).value?.toString().trim());
+		const attach = keeperLink.attachKeeper;
+		spyOn(keeperLink, "attachKeeper").mockImplementation((_dir, instanceId) => attach(dir, instanceId));
+		spyOn(rpc, "keptSessions").mockReturnValue(["stuck"]);
+		spyOn(console, "error").mockImplementation(() => {});
+		const saved = join(dir, "interrupted.json");
+		new InterruptedSessions(saved).setRunning(new Map([["s-stuck", true]]));
+		flushJsonFiles();
+		const interrupted = new InterruptedSessions(saved);
+
+		const began = Date.now();
+		const reattached = reattachAll(new LiveSessions(() => {}), { launchFor: () => ({ rpc: { tools: [] }, attach: () => {} }) as unknown as ProjectJoin }, survived => interrupted.recover(survived));
+		const notReattached = refuseUntil(reattached, "Still attaching.");
+		expect(notReattached()?.status).toBe(503);
+		await reattached;
+		await keeper.exited;
+		expect([Date.now() - began < 8_000, notReattached(), interrupted.has("s-stuck"), interrupted.stoppedMidTurn("s-stuck"), alive(job), readdirSync(dir).sort()]).toEqual([
+			true,
+			null,
+			true,
+			true,
+			false,
+			["interrupted.json", "keeper.ts"],
+		]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+}, 15_000);

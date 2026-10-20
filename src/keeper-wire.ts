@@ -21,5 +21,11 @@ export interface KeeperHello {
 	meta: unknown;
 }
 
+/**
+ * Where the keeper listening on `socket` records its pid, written before it listens: a keeper that accepts and never
+ * greets tells no pid, and the server stops it by this one.
+ */
+export const pidFileOf = (socket: string): string => socket.replace(/\.sock$/, ".pid");
+
 /** The line a client sends to end the session: the keeper stops omp, and exits once omp did. */
 export const STOP = { type: "omp_agents_keeper_stop" } as const;
