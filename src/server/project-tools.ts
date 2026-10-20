@@ -201,7 +201,8 @@ export function projectTools(projectId: string, control: ProjectControl): RpcHos
 			label: "Answer worker",
 			description: [
 				"Answer a question a worker asks through its ask dialog, as the user would in the dashboard.",
-				"For a choice, answer with one option's label; for a yes or no question, yes or no; for text, the text.",
+				"For a choice, answer with one option's label, or labels separated by commas when several may be picked; text that names no option is sent as the worker's own answer. For a yes or no question, yes or no; for text, the text.",
+				"An ask with several questions takes one answer per line, in question order.",
 				"Answer only what you know from the goal, the notes, or the user; otherwise tell the user.",
 			].join(" "),
 			parameters: schema({

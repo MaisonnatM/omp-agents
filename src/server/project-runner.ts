@@ -17,7 +17,7 @@ import { expandHome } from "../paths";
 import { type ModelOption, modelOfSelector } from "../shared/models";
 import { slug } from "../shared/slug";
 import { type Project, type ProjectEvent, type QueuedWorker, type Worker, type WorkerId, type WorkerPhase, type WorkerStart, workerPhase } from "../shared/projects";
-import { type HostStatus, newSessionRequest, type StartRequest, type StartResult, type UserAnswer, type UserRequest } from "../shared/sessions";
+import { type AskQuestion, type AskReply, type HostStatus, newSessionRequest, type StartRequest, type StartResult, type UserAnswer, type UserRequest } from "../shared/sessions";
 import { type ProjectControl, projectTools, updateText, type WorkerSpec, type WorkerStarted } from "./project-tools";
 import type { ProjectFacts } from "./notices";
 import type { ProjectRole, ProjectsFile, UpdateBody } from "./projects-file";
@@ -118,7 +118,15 @@ export interface ProjectSpec {
 /** `text` as a branch name's segment, at most 40 characters. */
 const branchSlug = (text: string): string => slug(text, "worker", 40);
 
-/** `answer` as the reply `request` takes: an option's label, yes or no, or text. */
+/** `line` as the reply to `question`: the rows it names, comma-separated when multi-select, else the line as typed text. */
+function askReplyFor(question: AskQuestion, line: string): AskReply {
+	const find = (label: string) => question.options.find(candidate => candidate.label.trim().toLowerCase() === label.trim().toLowerCase());
+	const named = (question.multi ? line.split(",") : [line]).map(find);
+	if (named.every(option => option !== undefined)) return { id: question.id, selected: [...new Set(named.map(option => option.label))], custom: null };
+	return { id: question.id, selected: [], custom: line };
+}
+
+/** `answer` as the reply `request` takes: an option's label, yes or no, text, or one line per question of an `ask`. */
 function answerFor(request: UserRequest, answer: string): UserAnswer {
 	const value = answer.trim();
 	switch (request.kind) {
@@ -135,6 +143,13 @@ function answerFor(request: UserRequest, answer: string): UserAnswer {
 		}
 		case "text":
 			return { kind: "value", value: answer };
+		case "ask": {
+			const lines = request.questions.length === 1 ? [value] : value.split("\n").map(line => line.trim());
+			if (lines.length !== request.questions.length || lines.some(line => !line)) {
+				throw new Error(`Request ${request.id} asks ${request.questions.length} questions: ${request.questions.map(question => JSON.stringify(question.question)).join(", ")}. Answer each on its own line, in order.`);
+			}
+			return { kind: "ask", answers: request.questions.map((question, index) => askReplyFor(question, lines[index]!)) };
+		}
 		default: {
 			const unhandled: never = request;
 			return unhandled;

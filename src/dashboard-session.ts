@@ -21,7 +21,7 @@ import { textOf } from "./session-entries";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { isUserPrompt, type StartingPrompt } from "./transcript";
 import { SerialLane } from "./serial-lane";
-import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
+import { ASK_DIALOG_OPT_IN, PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 interface RpcAgent {
 	id: string;
@@ -319,6 +319,8 @@ export class DashboardSession implements LiveSession {
 		const { child, abandon } = await reach(instanceId, opening, onFrame);
 		try {
 			await child.client.setSubagentSubscription("progress");
+			// An omp without the command answers it with an error and keeps asking in selects.
+			child.write(ASK_DIALOG_OPT_IN);
 			const cwd = await prepare(child);
 			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit);
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();

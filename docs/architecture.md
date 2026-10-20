@@ -261,7 +261,8 @@ A guest keeps the same order for its `prompt`, `abort`, and `flush` frames, beca
 Collab has no queue frames, so a guest answers `promote` by sending the follow-up it holds as a steer, and `interrupt` by taking back the follow-ups it holds before it sends `abort`.
 It flushes while the host's `state` frame counts a queued message (`queuedMessageCount`), or while this guest sent a steer that no `state` frame has counted yet.
 Plain `--mode rpc` gives the session no `ask` tool.
-`rpc-ui` gives it one, and omp sends the `ask` steps and extension dialogs as `extension_ui_request` frames.
+`rpc-ui` gives it one, and omp sends extension dialogs as `extension_ui_request` frames.
+The server sends `set_ask_dialog` when it opens a session, so omp sends each `ask` call whole as one `ask` frame and takes all its answers in one `extension_ui_response` (`requestRpcAskDialog` in `rpc-mode.ts`) instead of a chain of selects, whose frames do not report a multi-select's checked rows.
 omp's `RpcClient` reads those frames but only hands them to its own login flow, so the server reads a copy of the child's stdout through omp's JSONL reader and chunk decoder.
 It writes the `extension_ui_response` to the child's stdin as one line, the way `RpcClient` writes its own commands.
 omp sends a `cancel` frame when a question ends without an answer, for example after Stop.
@@ -1393,7 +1394,8 @@ Toasts use Base UI's `Toast` through one manager in `web/components/toaster.tsx`
 
 Questions use `web/components/question-card.tsx`, the dashboard's own card in the look of Fluid's `ask-user-questions`, which `web/components/user-request.tsx` fills from omp's request.
 A select is one row per omp option, and a confirm is **Yes** and **No** rows, both in `question-options.tsx`, which reuses Fluid's hover highlight and merged selection backgrounds; an input or an editor is a free-text field.
-A select's checked rows come from the request, since omp sends a multi-select pick back as a new request with the row checked.
+A terminal session's select takes its checked rows from the request, since omp sends a multi-select pick back as a new request with the row checked.
+A dashboard session's `ask` request holds every question; `AskCard` keeps the picks and typed text of each, shows multi-select rows as checkboxes, and sends one `ask` answer after the last question.
 
 Changes the dashboard makes to Fluid's components are listed in `web/components/ui/PATCHES.md`, each with its reason, so an upgrade is a merge that checks each entry.
 The dashboard keeps them mechanical where it can.

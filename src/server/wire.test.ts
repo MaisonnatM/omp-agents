@@ -331,6 +331,10 @@ describe("parseClientMsg", () => {
 		expect(answer({ kind: "cancel" })).toMatchObject({ answer: { kind: "cancel" } });
 		expect(answer({ kind: "confirm", confirmed: "yes" })).toBeNull();
 		expect(answer({ kind: "value" })).toBeNull();
+		const reply = { id: "langs", selected: ["TS"], custom: null };
+		expect(answer({ kind: "ask", answers: [reply] })).toMatchObject({ answer: { kind: "ask", answers: [reply] } });
+		expect(answer({ kind: "ask", answers: [{ ...reply, selected: [1] }] })).toBeNull();
+		expect(answer({ kind: "ask", answers: [{ id: "langs", selected: [] }] })).toBeNull();
 		expect(msg({ t: "answer", instanceId: "i1", requestId: 1, answer: { kind: "cancel" } })).toBeNull();
 	});
 

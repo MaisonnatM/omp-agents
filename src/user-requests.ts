@@ -3,7 +3,7 @@
  * frames for dashboard sessions and Collab `ui-request` frames for terminal sessions.
  */
 import { isObject, str } from "./json";
-import type { RequestOption, UserAnswer, UserRequest } from "./shared/sessions";
+import type { AskQuestion, RequestOption, UserAnswer, UserRequest } from "./shared/sessions";
 
 function parseOptions(options: unknown, details: unknown): RequestOption[] | null {
 	if (!Array.isArray(options)) return null;
@@ -19,6 +19,22 @@ function parseOptions(options: unknown, details: unknown): RequestOption[] | nul
 	return rows;
 }
 
+/** omp's `RpcAskDialogQuestion`s, or `null` when any is malformed. */
+function parseAskQuestions(value: unknown): AskQuestion[] | null {
+	if (!Array.isArray(value) || value.length === 0) return null;
+	const questions: AskQuestion[] = [];
+	for (const item of value) {
+		if (!isObject(item)) return null;
+		const id = str(item.id);
+		const question = str(item.question);
+		const options = parseOptions(item.options, null);
+		if (id === undefined || question === undefined || !options) return null;
+		const recommended = typeof item.recommended === "number" && Number.isInteger(item.recommended) && item.recommended >= 0 && item.recommended < options.length ? item.recommended : null;
+		questions.push({ id, question, header: str(item.header)?.trim() || null, options, multi: item.multi === true, recommended });
+	}
+	return questions;
+}
+
 /** What one RPC `extension_ui_request` does to the pending questions, or `null` for frames that ask nothing. */
 export type RpcRequestChange = { kind: "add"; request: UserRequest } | { kind: "cancel"; id: string } | null;
 
@@ -30,9 +46,13 @@ export function parseRpcRequest(frame: Record<string, unknown>, now: number): Rp
 		const target = str(frame.targetId);
 		return target === undefined ? null : { kind: "cancel", id: target };
 	}
+	const deadline = typeof frame.timeout === "number" && frame.timeout > 0 ? now + frame.timeout : null;
+	if (frame.method === "ask") {
+		const questions = parseAskQuestions(frame.questions);
+		return questions && { kind: "add", request: { id, title: questions[0]!.question, deadline, kind: "ask", questions } };
+	}
 	const title = str(frame.title);
 	if (title === undefined) return null;
-	const deadline = typeof frame.timeout === "number" && frame.timeout > 0 ? now + frame.timeout : null;
 	const base = { id, title, deadline };
 	switch (frame.method) {
 		case "select": {
@@ -56,6 +76,9 @@ export function parseRpcRequest(frame: Record<string, unknown>, now: number): Rp
 	}
 }
 
+/** The command that has omp send each `ask` call whole, as one `ask` request, instead of a chain of selects. */
+export const ASK_DIALOG_OPT_IN = { type: "set_ask_dialog", enabled: true };
+
 /** omp's `RpcExtensionUIResponse` for `answer` to request `id`. */
 export function rpcResponse(id: string, answer: UserAnswer): Record<string, unknown> {
 	switch (answer.kind) {
@@ -63,6 +86,12 @@ export function rpcResponse(id: string, answer: UserAnswer): Record<string, unkn
 			return { type: "extension_ui_response", id, value: answer.value };
 		case "confirm":
 			return { type: "extension_ui_response", id, confirmed: answer.confirmed };
+		case "ask":
+			return {
+				type: "extension_ui_response",
+				id,
+				answers: answer.answers.map(reply => ({ id: reply.id, selectedOptions: reply.selected, ...(reply.custom === null ? {} : { customInput: reply.custom }) })),
+			};
 		case "cancel":
 			return { type: "extension_ui_response", id, cancelled: true };
 	}
@@ -87,7 +116,10 @@ export function parseCollabRequest(value: unknown): UserRequest | null {
 	return { ...base, kind: "select", options, checked };
 }
 
-/** Whether `answer` is a reply `request` can take: one of its rows, text for a text field, yes or no for a confirm. */
+/**
+ * Whether `answer` is a reply `request` can take: one of its rows, text for a text field, yes or no for a confirm, and for
+ * an `ask` one answer per question in order, each of known distinct rows, with at most one pick or typed text when single-select.
+ */
 function fits(request: UserRequest, answer: UserAnswer): boolean {
 	if (answer.kind === "cancel") return true;
 	switch (request.kind) {
@@ -97,6 +129,17 @@ function fits(request: UserRequest, answer: UserAnswer): boolean {
 			return answer.kind === "value";
 		case "confirm":
 			return answer.kind === "confirm";
+		case "ask":
+			return (
+				answer.kind === "ask" &&
+				answer.answers.length === request.questions.length &&
+				request.questions.every((question, index) => {
+					const reply = answer.answers[index]!;
+					const known = reply.selected.every(label => question.options.some(option => option.label === label));
+					const picks = reply.selected.length + (reply.custom === null ? 0 : 1);
+					return reply.id === question.id && known && new Set(reply.selected).size === reply.selected.length && (question.multi || picks <= 1);
+				})
+			);
 	}
 }
 

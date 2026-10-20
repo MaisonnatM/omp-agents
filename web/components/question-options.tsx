@@ -25,6 +25,8 @@ interface OptionRowProps {
 	option: QuestionOption;
 	layout: OptionLayout;
 	selected: boolean;
+	/** A checkbox rather than a radio: picking toggles the row. */
+	multi: boolean;
 	/** Hovered or focused: the row's number gives way to the submit arrow. */
 	active: boolean;
 	tabIndex: number;
@@ -33,8 +35,8 @@ interface OptionRowProps {
 	onPick: () => void;
 }
 
-/** One radio row: its title and description, then the number that picks it, which turns into an arrow while the row is active. */
-function OptionRow({ index, option, layout, selected, active, tabIndex, arrow, registerItem, onPick }: OptionRowProps) {
+/** One radio or checkbox row: its title and description, then the number that picks it, which turns into an arrow while the row is active. */
+function OptionRow({ index, option, layout, selected, multi, active, tabIndex, arrow, registerItem, onPick }: OptionRowProps) {
 	const ref = useRef<HTMLDivElement>(null);
 	const shape = useShape();
 	const size = useSize();
@@ -63,7 +65,7 @@ function OptionRow({ index, option, layout, selected, active, tabIndex, arrow, r
 			ref={ref}
 			data-fluid-hover-index={index}
 			data-state={selected ? "checked" : "unchecked"}
-			role="radio"
+			role={multi ? "checkbox" : "radio"}
 			aria-checked={selected}
 			tabIndex={tabIndex}
 			onClick={onPick}
@@ -144,6 +146,8 @@ interface QuestionOptionsProps {
 	layout: OptionLayout;
 	/** Indices of the rows shown checked. */
 	selected: readonly number[];
+	/** Rows toggle as checkboxes, any number at once, instead of one radio pick. */
+	multi?: boolean;
 	/** The id of the question's title, which names the radio group. */
 	labelledBy: string;
 	onPick: (index: number) => void;
@@ -154,7 +158,7 @@ interface QuestionOptionsProps {
  * share merged backgrounds, and a ring follows keyboard focus only. ↑, ↓, Home, and End move between rows, Enter or
  * Space picks one, and Tab enters the group at its first checked row, else its first.
  */
-export function QuestionOptions({ options, layout, selected, labelledBy, onPick }: QuestionOptionsProps) {
+export function QuestionOptions({ options, layout, selected, multi = false, labelledBy, onPick }: QuestionOptionsProps) {
 	const shape = useShape();
 	const ArrowRight = useIcon("arrow-right");
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -194,7 +198,7 @@ export function QuestionOptions({ options, layout, selected, labelledBy, onPick 
 	return (
 		<div
 			ref={containerRef}
-			role="radiogroup"
+			role={multi ? "group" : "radiogroup"}
 			aria-labelledby={labelledBy}
 			onMouseEnter={handlers.onMouseEnter}
 			onMouseMove={handlers.onMouseMove}
@@ -252,6 +256,7 @@ export function QuestionOptions({ options, layout, selected, labelledBy, onPick 
 					option={option}
 					layout={layout}
 					selected={selected.includes(index)}
+					multi={multi}
 					active={activeIndex === index}
 					tabIndex={index === tabStop ? 0 : -1}
 					arrow={<ArrowRight size={14} strokeWidth={2} className="h-3.5 w-3.5" />}

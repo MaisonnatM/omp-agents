@@ -34,7 +34,7 @@ import type { MergeQueueChange } from "../shared/merge-queue";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
-import type { CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
+import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
@@ -75,11 +75,22 @@ function parseCompletionScope(value: unknown): Parsed<CompletionScope> {
 	return view && { ok: { kind: "live", view: view.ok } };
 }
 
+function parseAskReply(value: unknown): AskReply | null {
+	if (!isObject(value) || typeof value.id !== "string" || !Array.isArray(value.selected)) return null;
+	if (!value.selected.every((label): label is string => typeof label === "string")) return null;
+	if (value.custom !== null && typeof value.custom !== "string") return null;
+	return { id: value.id, selected: value.selected, custom: value.custom };
+}
+
 function parseAnswer(value: unknown): Parsed<UserAnswer> {
 	if (!isObject(value)) return null;
 	if (value.kind === "cancel") return { ok: { kind: "cancel" } };
 	if (value.kind === "value" && typeof value.value === "string") return { ok: { kind: "value", value: value.value } };
 	if (value.kind === "confirm" && typeof value.confirmed === "boolean") return { ok: { kind: "confirm", confirmed: value.confirmed } };
+	if (value.kind === "ask" && Array.isArray(value.answers)) {
+		const answers = value.answers.map(parseAskReply);
+		return answers.every((reply): reply is AskReply => reply !== null) ? { ok: { kind: "ask", answers } } : null;
+	}
 	return null;
 }
 

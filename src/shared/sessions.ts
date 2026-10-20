@@ -219,10 +219,28 @@ export interface RequestOption {
 	description: string | null;
 }
 
+/** One question of an `ask` request. */
+export interface AskQuestion {
+	id: string;
+	question: string;
+	header: string | null;
+	options: RequestOption[];
+	multi: boolean;
+	/** The row omp suggests, by index. */
+	recommended: number | null;
+}
+
+/** The answer to one {@link AskQuestion}: the picked rows' labels, and the typed text when the user wrote their own. */
+export interface AskReply {
+	id: string;
+	selected: string[];
+	custom: string | null;
+}
+
 /**
- * A question a live session waits on: one step of omp's `ask` tool or an extension dialog.
- * omp drives an `ask` as a chain of these. Picking `Other (type your own)` brings a text request,
- * and each pick in a multi-select question brings the same select back with that row checked.
+ * A question a live session waits on: omp's `ask` tool or an extension dialog. A dashboard session gets each `ask` call
+ * whole, as one `ask` request. A terminal session gets it as a chain of the others: picking `Other (type your own)` brings
+ * a text request, and each pick in a multi-select question brings the same select back with that row checked.
  */
 export type UserRequest = {
 	id: string;
@@ -230,14 +248,19 @@ export type UserRequest = {
 	/** When omp stops waiting and takes its default, in ms since the epoch; `null` when it waits for good. */
 	deadline: number | null;
 } & (
-	/** `checked`: rows a multi-select question has ticked so far; omp's RPC frames never report them. */
+	/** `checked`: rows a multi-select question has ticked so far. */
 	| { kind: "select"; options: RequestOption[]; checked: number[] }
 	| { kind: "confirm"; message: string }
 	| { kind: "text"; multiline: boolean; placeholder: string | null; prefill: string }
+	| { kind: "ask"; questions: AskQuestion[] }
 );
 
-/** A reply to a {@link UserRequest}: a row label or typed text, a yes or no, or a dismissal. */
-export type UserAnswer = { kind: "value"; value: string } | { kind: "confirm"; confirmed: boolean } | { kind: "cancel" };
+/** A reply to a {@link UserRequest}: a row label or typed text, a yes or no, every `ask` answer in question order, or a dismissal. */
+export type UserAnswer =
+	| { kind: "value"; value: string }
+	| { kind: "confirm"; confirmed: boolean }
+	| { kind: "ask"; answers: AskReply[] }
+	| { kind: "cancel" };
 
 /**
  * Whether the dashboard can prompt and stop the session right now. Transcripts are read from disk

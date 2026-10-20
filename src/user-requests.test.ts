@@ -46,12 +46,50 @@ describe("parseRpcRequest", () => {
 		expect(parseRpcRequest(frame("notify", { message: "hi" }), NOW)).toBeNull();
 		expect(parseRpcRequest(frame("select", { title: "Pick", options: [1, 2] }), NOW)).toBeNull();
 	});
+
+	test("reads a whole ask as one request titled by its first question, and drops a malformed one", () => {
+		const questions = [
+			{ id: "langs", question: "Which languages?", header: " Stack ", options: [{ label: "TS" }, { label: "Go", description: "fast" }], multi: true, recommended: 1 },
+			{ id: "db", question: "Database?", options: [{ label: "SQLite" }], recommended: 5 },
+		];
+		expect(parseRpcRequest({ type: "extension_ui_request", id: "r1", method: "ask", questions, timeout: 10_000 }, NOW)).toEqual({
+			kind: "add",
+			request: {
+				id: "r1",
+				title: "Which languages?",
+				deadline: NOW + 10_000,
+				kind: "ask",
+				questions: [
+					{ id: "langs", question: "Which languages?", header: "Stack", options: [{ label: "TS", description: null }, { label: "Go", description: "fast" }], multi: true, recommended: 1 },
+					{ id: "db", question: "Database?", header: null, options: [{ label: "SQLite", description: null }], multi: false, recommended: null },
+				],
+			},
+		});
+		expect(parseRpcRequest({ type: "extension_ui_request", id: "r1", method: "ask", questions: [] }, NOW)).toBeNull();
+		expect(parseRpcRequest({ type: "extension_ui_request", id: "r1", method: "ask", questions: [{ id: "x", options: [] }] }, NOW)).toBeNull();
+	});
 });
 
 test("rpcResponse writes omp's extension_ui_response for each answer", () => {
 	expect(rpcResponse("r1", { kind: "value", value: "Blue" })).toEqual({ type: "extension_ui_response", id: "r1", value: "Blue" });
 	expect(rpcResponse("r1", { kind: "confirm", confirmed: false })).toEqual({ type: "extension_ui_response", id: "r1", confirmed: false });
 	expect(rpcResponse("r1", { kind: "cancel" })).toEqual({ type: "extension_ui_response", id: "r1", cancelled: true });
+	expect(
+		rpcResponse("r1", {
+			kind: "ask",
+			answers: [
+				{ id: "langs", selected: ["TS", "Go"], custom: "Rust" },
+				{ id: "db", selected: ["SQLite"], custom: null },
+			],
+		}),
+	).toEqual({
+		type: "extension_ui_response",
+		id: "r1",
+		answers: [
+			{ id: "langs", selectedOptions: ["TS", "Go"], customInput: "Rust" },
+			{ id: "db", selectedOptions: ["SQLite"] },
+		],
+	});
 });
 
 describe("parseCollabRequest", () => {
@@ -122,6 +160,35 @@ describe("PendingRequests", () => {
 		expect(pending.take("a", { kind: "value", value: "Red" })).toBe(false);
 		expect(pending.take("b", { kind: "cancel" })).toBe(true);
 		expect(pending.list()).toEqual([]);
+	});
+
+	test("an ask takes one answer per question in order, of its own rows, and one pick when single-select", () => {
+		const pending = new PendingRequests(() => {});
+		const option = (label: string) => ({ label, description: null });
+		pending.add({
+			id: "a",
+			title: "Which languages?",
+			deadline: null,
+			kind: "ask",
+			questions: [
+				{ id: "langs", question: "Which languages?", header: null, options: [option("TS"), option("Go")], multi: true, recommended: null },
+				{ id: "db", question: "Database?", header: null, options: [option("SQLite"), option("Postgres")], multi: false, recommended: null },
+			],
+		});
+		const answer = (langs: string[], db: string[], custom: string | null = null) => ({
+			kind: "ask" as const,
+			answers: [
+				{ id: "langs", selected: langs, custom: null },
+				{ id: "db", selected: db, custom },
+			],
+		});
+		expect(pending.take("a", { kind: "value", value: "TS" })).toBe(false);
+		expect(pending.take("a", answer(["TS", "Rust"], ["SQLite"]))).toBe(false);
+		expect(pending.take("a", answer(["TS", "TS"], ["SQLite"]))).toBe(false);
+		expect(pending.take("a", answer(["TS"], ["SQLite", "Postgres"]))).toBe(false);
+		expect(pending.take("a", answer(["TS"], ["SQLite"], "MySQL"))).toBe(false);
+		expect(pending.take("a", { kind: "ask", answers: answer(["TS"], ["SQLite"]).answers.reverse() })).toBe(false);
+		expect(pending.take("a", answer(["TS", "Go"], [], "MySQL"))).toBe(true);
 	});
 
 	test("a resent request replaces its copy in place", () => {

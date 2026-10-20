@@ -527,14 +527,13 @@ An action that fails shows its error, and its control becomes available again.
   **Dismiss** or Esc cancels the question, which omp treats like Esc in its terminal.
   The session continues its turn with your answer.
   Questions that wait in a queue show their count next to the first one, and a question with a timeout shows the time at which omp takes its default answer.
-- omp asks one step at a time, as in its terminal.
+- In a session that the dashboard started, an `ask` shows one question at a time, with an **Other** row that opens a text field.
+  A single-select pick moves to the next question; a multi-select question checks and unchecks its rows, then moves on with **Next**.
+  **Back** returns to the previous question, and Esc in the **Other** field returns to the rows.
+  The last question sends every answer at once.
+- In a terminal session, omp asks one step at a time, as in its terminal.
   Picking `Other (type your own)` brings a text field next.
-  In a multi-select question, each pick comes back as a new step with the pick toggled, and a final row (`Done selecting` or `Next →`) submits the selection.
-  In a terminal session, the checked options show highlighted.
-  omp's RPC dialogs do not report which options are checked, so a session that the dashboard started shows only the count, for example `(2 selected) Which languages do you use?`.
-- In a session that the dashboard started, a multi-select question inside an `ask` with several questions has no row that submits it.
-  omp's `ask` moves past such a question only on the right arrow key of its terminal dialog, and RPC dialogs cannot send that key.
-  Answer it with `Other (type your own)`, or ask the agent to use one question per `ask`.
+  In a multi-select question, each pick comes back as a new step with the checked options highlighted, and a final row (`Done selecting` or `Next →`) submits the selection.
 
 ## Starting, ending, resuming, and forking
 

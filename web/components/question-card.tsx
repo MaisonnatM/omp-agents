@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
 import { IS_MAC, modHeld } from "../shortcuts";
 import { type OptionLayout, type QuestionOption, QuestionOptions } from "./question-options";
 
-/** What a card asks: rows to pick one of, or a free-text answer. */
+/** What a card asks: rows to pick one or several of, or a free-text answer. */
 export type Question = { title: string; description?: string } & (
-	| { kind: "options"; options: QuestionOption[]; layout: OptionLayout }
+	| { kind: "options"; options: QuestionOption[]; layout: OptionLayout; multi?: boolean }
 	| { kind: "text"; multiline: boolean; placeholder?: string; submitLabel: string }
 );
 
@@ -27,6 +27,8 @@ interface QuestionCardProps extends HTMLAttributes<HTMLDivElement> {
 	defaultText?: string;
 	/** The line above the title. */
 	header: ReactNode;
+	/** The row under an options question, such as the button that sends a multi-select's picks. */
+	footer?: ReactNode;
 	onAnswer: (answer: QuestionAnswer) => void;
 }
 
@@ -38,7 +40,7 @@ const SUBMIT_CHORD = `${IS_MAC ? "⌘" : "⌃"}↵`;
  * owner's to bind. A text question focuses its field on mount and sends with the submit button, with ⌘↵ or ⌃↵, or with
  * Enter when it is single-line.
  */
-export function QuestionCard({ question, checked, defaultText = "", header, onAnswer, className, onKeyDown, ...rest }: QuestionCardProps) {
+export function QuestionCard({ question, checked, defaultText = "", header, footer, onAnswer, className, onKeyDown, ...rest }: QuestionCardProps) {
 	const shape = useShape();
 	const size = useSize();
 	const compact = size.variant === "compact";
@@ -101,6 +103,7 @@ export function QuestionCard({ question, checked, defaultText = "", header, onAn
 								options={question.options}
 								layout={question.layout}
 								selected={checked}
+								multi={question.multi}
 								labelledBy={titleId}
 								onPick={index => onAnswer({ kind: "option", index })}
 							/>
@@ -117,6 +120,7 @@ export function QuestionCard({ question, checked, defaultText = "", header, onAn
 					</div>
 				</div>
 			</motion.div>
+			{question.kind === "options" && footer && <div className={cn("pt-1", padX, compact ? "pb-1.5" : "pb-2")}>{footer}</div>}
 			{question.kind === "text" && (
 				<div className={cn("pt-1", padX, compact ? "pb-1.5" : "pb-2")}>
 					<div className="flex items-center justify-end -mx-2 sm:-mx-3">

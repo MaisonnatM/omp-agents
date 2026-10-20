@@ -398,13 +398,35 @@ describe("ProjectRunner", () => {
 		w1.requests = [
 			{ id: "r1", title: "Proceed?", deadline: null, kind: "confirm", message: "Proceed?" },
 			{ id: "r2", title: "Policy", deadline: null, kind: "select", options: [{ label: "Retry" }, { label: "Fail" }], checked: [] },
+			{
+				id: "r3",
+				title: "Which languages?",
+				deadline: null,
+				kind: "ask",
+				questions: [
+					{ id: "langs", question: "Which languages?", header: null, options: [{ label: "TS" }, { label: "Go" }], multi: true, recommended: null },
+					{ id: "db", question: "Database?", header: null, options: [{ label: "SQLite" }], multi: false, recommended: null },
+				],
+			},
 		] as UserRequest[];
 		expect(await tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r1", answer: "Yes" })).toStartWith("Answered w1.");
 		await expect(tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r2", answer: "Maybe" })).rejects.toThrow('offers "Retry", "Fail"');
 		await tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r2", answer: "retry" });
+		await expect(tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r3", answer: "ts" })).rejects.toThrow("Answer each on its own line");
+		await tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r3", answer: "ts, go\nMySQL" });
 		expect(w1.answers).toEqual([
 			{ requestId: "r1", answer: { kind: "confirm", confirmed: true } },
 			{ requestId: "r2", answer: { kind: "value", value: "Retry" } },
+			{
+				requestId: "r3",
+				answer: {
+					kind: "ask",
+					answers: [
+						{ id: "langs", selected: ["TS", "Go"], custom: null },
+						{ id: "db", selected: [], custom: "MySQL" },
+					],
+				},
+			},
 		]);
 		await expect(tool(h, projectId, "answer_worker", { worker: "w1", requestId: "r9", answer: "x" })).rejects.toThrow("waits on no request r9");
 		expect(await tool(h, projectId, "end_worker", { worker: "w1" })).toBe("Ended w1.");
