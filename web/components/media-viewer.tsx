@@ -19,14 +19,17 @@ interface ImageViewerProps {
 	/** The labels of the buttons to the image before (← key) and after (→ key) it in the list. */
 	previousLabel: string;
 	nextLabel: string;
-	/** Show the image at `index`, kept within the list. */
+	/** Show the image at `index`, always within the list. */
 	onIndex: (index: number) => void;
 	onClose: () => void;
 }
 
 /** One image large, with its caption, its place in a list, and buttons and ←/→ to the images before and after it. */
 export function ImageViewer({ src, caption, index, count, detail, actions, previousLabel, nextLabel, onIndex, onClose }: ImageViewerProps) {
-	const step = (by: 1 | -1): void => onIndex(Math.min(count - 1, Math.max(0, index + by)));
+	const step = (by: 1 | -1): void => {
+		const next = index + by;
+		if (next >= 0 && next < count) onIndex(next);
+	};
 	return (
 		<DialogPrimitive.Root open onOpenChange={next => !next && onClose()}>
 			<DialogPrimitive.Portal>
@@ -39,8 +42,11 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 					}}
 					className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[min(72rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
 					onKeyDown={event => {
-						if (event.key === "ArrowLeft") step(-1);
-						else if (event.key === "ArrowRight") step(1);
+						if (event.altKey || event.metaKey || event.ctrlKey) return;
+						const by = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : null;
+						if (by === null) return;
+						event.preventDefault();
+						step(by);
 					}}
 				>
 					<div className="flex items-start justify-between gap-4">

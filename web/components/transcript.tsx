@@ -538,6 +538,10 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const openImage = useCallback((id: string, at: number) => setImage({ id, at }), []);
 	const imageIndex = image ? images.findIndex(entry => entry.id === image.id && entry.at === image.at) : -1;
 	const shownImage = images[imageIndex];
+	// An image that left the transcript, such as after a rewrite, closes the viewer for good rather than reopening when it returns.
+	useEffect(() => {
+		if (image && imageIndex < 0) setImage(null);
+	}, [image, imageIndex]);
 	const previousItems = useRef<Item[]>([]);
 	const replacing = useMemo(() => {
 		const id = replacingPrompt(previousItems.current, items);
