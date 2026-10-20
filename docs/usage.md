@@ -1242,6 +1242,7 @@ An action that fails shows its error, and its control becomes available again.
   That pin replaces the one on the routine's previous session, and your other pins stay.
   A session that has not begun its turn 10 minutes after it started is ended, and its run records that as an error.
   Such a session is not pinned.
+  A routine session keeps running when the dashboard restarts, still counts toward the 3, and ends, pinned when the routine asks, once its turn finishes.
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
