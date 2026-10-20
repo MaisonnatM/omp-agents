@@ -385,7 +385,7 @@ export class Dashboard {
 					const project = role ? projects.get(role.projectId) : undefined;
 					const watches = project !== undefined && !project.archived && project.watch.pullRequests;
 					const ends = cleanupEnds({ startedHere: sessions.started(host.instanceId) !== undefined, project: role && { role: role.role, watches } }, this.#sourceControl.cleanUp);
-					return ends ? [{ sessionId: host.sessionId, idle: host.status === "idle", pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }] : [];
+					return ends ? [{ sessionId: host.sessionId, idle: host.status === "idle", occupied: occupiedBy(host.status, autoContinue.held(host.sessionId)), pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }] : [];
 				}),
 			states: readPullRequestStates,
 			checkout: async dir => {
@@ -397,9 +397,6 @@ export class Dashboard {
 				if (role?.role === "worker") return projectRunner.endFinished(role.projectId, role.workerId);
 				const session = sessions.bySessionId(sessionId);
 				if (!session) throw new Error("It does not run.");
-				// The cleanup saw it idle before it read the checkout; one that started a turn since waits for the next look.
-				const { status } = session.row();
-				if (status !== "idle") throw new Error(`It is ${status}, not idle.`);
 				await this.#endLive(session);
 			},
 			deleteBranch: (gitDir, branch, head) => worktrees.deleteMergedBranch(gitDir, branch, head),
