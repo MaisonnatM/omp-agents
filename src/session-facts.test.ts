@@ -479,6 +479,40 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(earlier).branch).toBe(onMain);
 	});
 
+	test("keeps publishing the whole branch it knew while a refresh after a branch switch still asks git, then the new one whole", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(session, `${bashCall("b", "bun test")}\n`);
+		let gate: PromiseWithResolvers<null> | null = null;
+		const asked = Promise.withResolvers<void>();
+		const index = new SessionFactsIndex(
+			() => {
+				if (!gate) return Promise.resolve(null);
+				asked.resolve();
+				return gate.promise;
+			},
+			worktreeAt,
+			headHistory,
+		);
+		const listed = (modifiedAt: number) => [{ path: session, cwd: join(parent, "app-wip"), modifiedAt }];
+
+		await index.refresh(listed(1));
+		const before = index.factsOf(session).branch;
+		expect(before).toEqual({ name: "wip", linked: true, defaultBranch: "main", pullRequest: null });
+
+		await git(join(parent, "app-wip"), "switch", "-q", "-c", "next");
+		gate = Promise.withResolvers<null>();
+		const refreshed = index.refresh(listed(2));
+		await asked.promise;
+		expect(index.factsOf(session).branch).toBe(before);
+		gate.resolve(null);
+		expect(await refreshed).toBe(true);
+		expect(index.factsOf(session).branch).toEqual({ name: "next", linked: true, defaultBranch: "main", pullRequest: null });
+	});
+
 	test("links the PR of the branch each gt submit submitted, printed or not, as checked out where and when it ran, and no dry run", async () => {
 		const parent = realpathSync(sessionDir());
 		const main = await repoWithWorktrees(parent);

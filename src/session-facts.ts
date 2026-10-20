@@ -549,16 +549,17 @@ export class SessionFactsIndex {
 	}
 
 	/**
-	 * Recompute a session's pull requests, from its transcripts' refs and then its branch, and its `branch`'s default branch
-	 * and the PR that branch heads; returns whether either changed.
+	 * Recompute a session's pull requests, from its transcripts' refs and then its branch, and its `branch` whole from `git`,
+	 * what git last said of it, with its default branch and the PR it heads; returns whether either changed.
 	 */
-	#resolve(session: SessionScan): boolean {
-		const { repo, branch } = session;
+	#resolve(session: SessionScan, git: GitBranch | null = session.branch): boolean {
+		const { repo } = session;
 		const defaultBranch = this.#defaultBranches.get(workDirOf(session)) ?? null;
-		const linking = repo ? linkingBranch(branch, defaultBranch) : null;
+		const linking = repo ? linkingBranch(git, defaultBranch) : null;
 		const headed = repo && linking ? (this.#heads.get(headKey(repo, linking)) ?? null) : null;
-		const branchChanged = branch !== null && (branch.defaultBranch !== defaultBranch || (branch.pullRequest && prKey(branch.pullRequest)) !== (headed && prKey(headed)));
-		if (branchChanged) session.branch = { ...branch, defaultBranch, pullRequest: headed };
+		const branch: SessionBranch | null = git && { name: git.name, linked: git.linked, defaultBranch, pullRequest: headed };
+		const branchChanged = JSON.stringify(branch) !== JSON.stringify(session.branch);
+		if (branchChanged) session.branch = branch;
 		const refs = session.refs.flatMap((ref): PullRequestRef[] => {
 			if (ref.kind !== "submit") return [ref];
 			const submitted = session.submitted.get(refKey(ref));
@@ -609,15 +610,12 @@ export class SessionFactsIndex {
 			changed = true;
 		});
 		// A session that wrote to its transcript may have switched branch since: two `git` calls per writing session's directory per refresh, and two more for a main checkout's HEAD reflog.
-		const branches = await mapLimit(scans, SCAN_PARALLEL, ({ session, writtenAt }) => gitBranch(workDirOf(session), writtenAt, worktreeAt, historyOf));
-		scans.forEach(({ session }, i) => {
-			const branch = branches[i]!;
-			if (branch?.name === session.branch?.name && branch?.linked === session.branch?.linked) return;
-			session.branch = branch && { ...branch, defaultBranch: null, pullRequest: null };
-			changed = true;
-		});
+		// The answers stay here until `#resolve` publishes each branch whole, since a roster push can read `branch` during the awaits below.
+		const reads = await mapLimit(scans, SCAN_PARALLEL, ({ session, writtenAt }) => gitBranch(workDirOf(session), writtenAt, worktreeAt, historyOf));
+		const branches = new Map(scans.map(({ session }, i) => [session, reads[i]!]));
+		const gitOf = (session: SessionScan): GitBranch | null => (branches.has(session) ? branches.get(session)! : session.branch);
 		// `origin/HEAD` may have moved too: one more `git` call per writing session's directory with a branch.
-		const dirs = [...new Set(touched.flatMap(session => (session.branch ? [workDirOf(session)] : [])))];
+		const dirs = [...new Set(touched.flatMap(session => (gitOf(session) ? [workDirOf(session)] : [])))];
 		const defaults = await mapLimit(dirs, SCAN_PARALLEL, defaultBranchOf);
 		const redirected = new Set<string>();
 		dirs.forEach((dir, i) => {
@@ -632,7 +630,7 @@ export class SessionFactsIndex {
 		const unknownRepo = [...resolving].filter(
 			session =>
 				session.repo === null &&
-				(linkingBranch(session.branch, this.#defaultBranches.get(workDirOf(session)) ?? null) !== null || session.refs.some(ref => ref.kind === "number")),
+				(linkingBranch(gitOf(session), this.#defaultBranches.get(workDirOf(session)) ?? null) !== null || session.refs.some(ref => ref.kind === "number")),
 		);
 		await mapLimit(unknownRepo, SCAN_PARALLEL, async session => {
 			session.repo = await repoOf(session.cwd);
@@ -643,7 +641,7 @@ export class SessionFactsIndex {
 			const submitted = await submittedBranch(ref, session.cwd, repoOf, historyOf);
 			if (submitted) session.submitted.set(refKey(ref), submitted);
 		});
-		for (const session of resolving) if (this.#resolve(session)) changed = true;
+		for (const session of resolving) if (this.#resolve(session, gitOf(session))) changed = true;
 		return changed;
 	}
 

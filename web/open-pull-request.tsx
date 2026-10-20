@@ -46,13 +46,15 @@ export interface Flight {
 
 /**
  * Where `prompt` stands in `host`, whose transcript's last turn the prompt `last` opened: in `flight` from the press until
- * the session shows it took it, by queueing it or opening a turn with it, or until the server answered and no turn runs;
- * then `seen` while the queue holds it or the turn it opened runs; else `null`.
+ * the session shows it took it, by queueing it or opening a turn with it, or until the server answered and the session is
+ * idle; then `seen` while the queue holds it or, until the session is idle, while it opened the last turn; else `null`.
+ * A session that waits on a question, or whose status is not known yet, has not ended the turn.
  */
 export function phaseOf(prompt: string, host: OpenPullRequestHost, last: string | null, flight: Flight | null): "flight" | "seen" | null {
 	const queued = host.queue.steering.includes(prompt) || host.queue.followUp.includes(prompt);
-	if (flight?.prompt === prompt && !queued && last !== prompt && !(flight.answered && host.status !== "working")) return "flight";
-	return queued || (host.status === "working" && last === prompt) ? "seen" : null;
+	const idle = host.status === "idle";
+	if (flight?.prompt === prompt && !queued && last !== prompt && !(flight.answered && idle)) return "flight";
+	return queued || (!idle && last === prompt) ? "seen" : null;
 }
 
 /** Where a session stands on **Open PR**: not offered, ready with the prompt to send, or opening while its prompt is in flight or seen. */

@@ -65,6 +65,16 @@ describe("phaseOf", () => {
 		]).toEqual(["seen", "seen", "seen", null, null]);
 	});
 
+	test("a session that waits on a question or reports no status yet has not ended the turn: an answered press stays in flight and the turn it opened stays seen", () => {
+		expect([
+			phaseOf(PROMPT, host({ status: "needs-input" }), earlier, answered),
+			phaseOf(PROMPT, host({ status: "unknown" }), earlier, answered),
+			phaseOf(PROMPT, host({ status: "needs-input" }), PROMPT, null),
+			phaseOf(PROMPT, host({ status: "unknown" }), PROMPT, null),
+			phaseOf(PROMPT, host({ status: "needs-input" }), "a later prompt", null),
+		]).toEqual(["flight", "flight", "seen", "seen", null]);
+	});
+
 	test("a press for a prompt the session no longer offers is not in flight", () => {
 		const other = offeredPrompt(host({ branch: onBranch({ name: "me/other" }) })) ?? "";
 		expect(phaseOf(other, host({ branch: onBranch({ name: "me/other" }) }), null, pressed)).toBeNull();
