@@ -188,3 +188,17 @@ export function replacingPrompt(previous: readonly Item[], items: readonly Item[
 	const prompt = items.findLast(item => item.kind === "user");
 	return prompt && !previous.some(item => item.id === prompt.id) ? prompt.id : null;
 }
+
+/** One image a tool's result returned: its tool item, its place among that item's images, and the line that captions it. */
+export interface ToolImage {
+	id: string;
+	at: number;
+	src: string;
+	caption: string;
+}
+
+/** Every image the tool calls of `items` returned, in reading order, each captioned with its tool and what the call said it did. */
+export const toolImages = (items: readonly Item[]): ToolImage[] =>
+	items.flatMap(item =>
+		item.kind === "tool" && item.images ? item.images.map((src, at) => ({ id: item.id, at, src, caption: [item.name, item.summary].filter(Boolean).join(" · ") })) : [],
+	);

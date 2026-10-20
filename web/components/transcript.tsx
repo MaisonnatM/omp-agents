@@ -66,13 +66,13 @@ import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
-import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, replacingPrompt, type ToolItem, toBlocks, turnReplies, withEditedPrompt } from "../transcript-view";
+import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, replacingPrompt, type ToolItem, toBlocks, toolImages, turnReplies, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
+import { ImageViewer } from "./media-viewer";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TranscriptMinimap } from "./transcript-minimap";
-import { ViewerDialog } from "./viewer-dialog";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
 const TOOL_ICON: Record<string, LucideIcon> = {
@@ -158,6 +158,9 @@ export const SubagentLinks = createContext<{
 	onCancel: ((view: LiveView & { agentId: string }) => Promise<void>) | null;
 } | null>(null);
 
+/** Opens the transcript's image viewer at image `at` of tool item `id`; outside a `Transcript` it does nothing. */
+const OpenToolImage = createContext<(id: string, at: number) => void>(() => {});
+
 function CancelAgentButton({ view, onCancel, running }: { view: LiveView & { agentId: string }; onCancel: (view: LiveView & { agentId: string }) => Promise<void>; running: boolean }) {
 	const LoaderIcon = useIcon("loader");
 	const cancel = useAction(() => onCancel(view), "Could not cancel the subagent");
@@ -221,9 +224,9 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 	);
 }
 
-/** The images a tool's result returned, as thumbnails under its line; one opens large in a dialog. */
-function ToolImages({ srcs, tool }: { srcs: string[]; tool: string }) {
-	const [shown, setShown] = useState<number | null>(null);
+/** The images a tool's result returned, as thumbnails under its line; one opens large in the transcript's viewer. */
+function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: string }) {
+	const openImage = useContext(OpenToolImage);
 	const label = (index: number): string => `Image ${index + 1} from ${tool}`;
 	return (
 		<span className="-mt-1 ml-6 flex flex-wrap gap-1.5" data-tool-images>
@@ -233,19 +236,12 @@ function ToolImages({ srcs, tool }: { srcs: string[]; tool: string }) {
 					key={index}
 					type="button"
 					aria-label={`Open ${label(index).toLowerCase()}`}
-					onClick={() => setShown(index)}
+					onClick={() => openImage(id, index)}
 					className="cursor-zoom-in overflow-hidden rounded-md outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
 				>
 					<img src={src} alt={label(index)} loading="lazy" className="h-32 max-w-60 object-contain" />
 				</button>
 			))}
-			{shown !== null && (
-				<ViewerDialog title={label(shown)} description={tool} bodyLabel={label(shown)} onClose={() => setShown(null)}>
-					<div className="flex min-h-full items-center justify-center p-4">
-						<img src={srcs[shown]} alt={label(shown)} className="max-h-[75vh] max-w-full object-contain" />
-					</div>
-				</ViewerDialog>
-			)}
 		</span>
 	);
 }
@@ -312,7 +308,7 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 									</TraceTitle>
 								</TraceLine>
 								{entry.agents.length > 0 && <SpawnedAgents ids={entry.agents} />}
-								{entry.images && <ToolImages srcs={entry.images} tool={entry.name} />}
+								{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
 							</Fragment>
 						);
 					})}
@@ -536,6 +532,16 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const replies = useMemo(() => turnReplies(items, working), [items, working]);
 	const shown = useRef<Block[]>([]);
 	const blocks = useMemo(() => (shown.current = toBlocks(items, shown.current)), [items]);
+	const images = useMemo(() => toolImages(items), [items]);
+	// The image the viewer shows, by its tool item and its place in that item's images, so new images do not move it.
+	const [image, setImage] = useState<{ id: string; at: number } | null>(null);
+	const openImage = useCallback((id: string, at: number) => setImage({ id, at }), []);
+	const imageIndex = image ? images.findIndex(entry => entry.id === image.id && entry.at === image.at) : -1;
+	const shownImage = images[imageIndex];
+	// An image that left the transcript, such as after a rewrite, closes the viewer for good rather than reopening when it returns.
+	useEffect(() => {
+		if (image && imageIndex < 0) setImage(null);
+	}, [image, imageIndex]);
 	const previousItems = useRef<Item[]>([]);
 	const replacing = useMemo(() => {
 		const id = replacingPrompt(previousItems.current, items);
@@ -594,68 +600,82 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	}, [revealId, loaded, items, view, scrollToMessage]);
 
 	return (
-		<MessageScroller className="@container flex-1">
-			<MessageScrollerViewport>
-				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 p-3" aria-relevant="additions text" data-transcript>
-					{visibleBlocks.map(block => {
-						if (block.kind === "activity") {
+		<OpenToolImage.Provider value={openImage}>
+			<MessageScroller className="@container flex-1">
+				<MessageScrollerViewport>
+					<MessageScrollerContent className="mx-auto max-w-3xl gap-3 p-3" aria-relevant="additions text" data-transcript>
+						{visibleBlocks.map(block => {
+							if (block.kind === "activity") {
+								return (
+									<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
+										<ActivityGroup entries={block.entries} />
+									</MessageScrollerItem>
+								);
+							}
+							const item = block.item;
+							if (item.kind === "notice") {
+								return (
+									<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
+										<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+											{item.text}
+										</p>
+									</MessageScrollerItem>
+								);
+							}
+							const point = forks.get(item.id);
+							const edit = editing?.item.id === item.id ? editing : null;
 							return (
-								<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
-									<ActivityGroup entries={block.entries} />
-								</MessageScrollerItem>
+								<MessageRow
+									key={item.id}
+									item={item}
+									copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
+									forkAt={point?.entryId ?? null}
+									prefill={point?.prefill ?? false}
+									forking={here?.phase === "starting" && here.op.itemId === item.id}
+									forkDisabled={fork?.phase === "starting"}
+									failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
+									editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
+									editor={edit ? (
+										<PromptEditor
+											initial={edit.item.text}
+											text={edit.text}
+											pending={resend.pending}
+											working={working}
+											error={edit.error}
+											onChange={text => setEditing(current => current ? { ...current, text, error: null } : current)}
+											onSave={() => resend.run(edit)}
+											onCancel={() => setEditing(null)}
+										/>
+									) : undefined}
+									replacing={item.id === replacing}
+									onFork={onFork}
+									onEditing={beginEditing}
+								/>
 							);
-						}
-						const item = block.item;
-						if (item.kind === "notice") {
-							return (
-								<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
-									<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-										{item.text}
-									</p>
-								</MessageScrollerItem>
-							);
-						}
-						const point = forks.get(item.id);
-						const edit = editing?.item.id === item.id ? editing : null;
-						return (
-							<MessageRow
-								key={item.id}
-								item={item}
-								copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
-								forkAt={point?.entryId ?? null}
-								prefill={point?.prefill ?? false}
-								forking={here?.phase === "starting" && here.op.itemId === item.id}
-								forkDisabled={fork?.phase === "starting"}
-								failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
-								editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
-								editor={edit ? (
-									<PromptEditor
-										initial={edit.item.text}
-										text={edit.text}
-										pending={resend.pending}
-										working={working}
-										error={edit.error}
-										onChange={text => setEditing(current => current ? { ...current, text, error: null } : current)}
-										onSave={() => resend.run(edit)}
-										onCancel={() => setEditing(null)}
-									/>
-								) : undefined}
-								replacing={item.id === replacing}
-								onFork={onFork}
-								onEditing={beginEditing}
-							/>
-						);
-					})}
-					{loaded && items.length === 0 && !working && !editing && empty}
-					{working && !streaming && (
-						<MessageScrollerItem messageId="thinking" className="flex flex-col">
-							<ThinkingIndicator className="self-start" />
-						</MessageScrollerItem>
-					)}
-				</MessageScrollerContent>
-			</MessageScrollerViewport>
-			<TranscriptMinimap items={items} working={working} />
-			<MessageScrollerButton />
-		</MessageScroller>
+						})}
+						{loaded && items.length === 0 && !working && !editing && empty}
+						{working && !streaming && (
+							<MessageScrollerItem messageId="thinking" className="flex flex-col">
+								<ThinkingIndicator className="self-start" />
+							</MessageScrollerItem>
+						)}
+					</MessageScrollerContent>
+				</MessageScrollerViewport>
+				<TranscriptMinimap items={items} working={working} />
+				<MessageScrollerButton />
+			</MessageScroller>
+			{shownImage && (
+				<ImageViewer
+					src={shownImage.src}
+					caption={shownImage.caption}
+					index={imageIndex}
+					count={images.length}
+					previousLabel="Previous image"
+					nextLabel="Next image"
+					onIndex={next => setImage({ id: images[next]!.id, at: images[next]!.at })}
+					onClose={() => setImage(null)}
+				/>
+			)}
+		</OpenToolImage.Provider>
 	);
 });
