@@ -126,10 +126,12 @@ export const PageSwitch = memo(function PageSwitch({
 		case "new": {
 			const cwd = page.cwd ?? defaultWorkspace;
 			const seed = todoSeed(userTodos, page.todoId);
+			// Until the todo list arrives, a todo's draft is neither the plain draft nor kept, so it cannot overwrite either.
+			const pending = page.todoId !== null && userTodos === null;
 			return (
 				<NewSession
 					// A todo's title and notes start the draft, so the draft mounts anew once the list names it.
-					key={seed ? `todo:${page.todoId}` : "new"}
+					key={pending ? `pending:${page.todoId}` : seed ? `todo:${page.todoId}` : "new"}
 					cwd={cwd}
 					workspaces={workspaces}
 					launch={newStart}
@@ -144,7 +146,7 @@ export const PageSwitch = memo(function PageSwitch({
 					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
-					draftKey={newDraftKey(seed ? page.todoId : null)}
+					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
 				/>
 			);
 		}

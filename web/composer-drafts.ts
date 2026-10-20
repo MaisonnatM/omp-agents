@@ -55,14 +55,15 @@ export const clearDraft = (key: string): void => writeDraft(key, null);
 /**
  * A composer's text, starting from the draft kept under `key`, else from `seed`, and kept there as it changes. Empty
  * text, or text equal to `seed`, keeps nothing, so a sent, scheduled, or emptied message forgets the draft. `null` keeps
- * nothing at all.
+ * nothing at all. The key is fixed for the composer's life: key the component by it to switch drafts.
  */
 export function useComposerDraft(key: string | null, seed: string): [string, Dispatch<SetStateAction<string>>] {
-	const [text, setText] = useState(() => (key === null ? seed : (storedDrafts()[key]?.text ?? seed)));
+	const [slot] = useState(key);
+	const [text, setText] = useState(() => (slot === null ? seed : (storedDrafts()[slot]?.text ?? seed)));
 	// The seed it opened with: a later one, such as a todo edited in another window, is not where this draft started.
 	const [start] = useState(seed);
 	useEffect(() => {
-		if (key !== null) writeDraft(key, text === "" || text === start ? null : text);
-	}, [key, start, text]);
+		if (slot !== null) writeDraft(slot, text === "" || text === start ? null : text);
+	}, [slot, start, text]);
 	return [text, setText];
 }
