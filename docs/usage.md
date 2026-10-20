@@ -752,6 +752,7 @@ An action that fails shows its error, and its control becomes available again.
   Clicking the branch it brings copies its name and removes the linked worktree that has it checked out, as a row's copy-branch button does.
   The header ends with **Status** and **Reviewers**, each label beside its value at every width.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
+  A pull request otherwise ready to merge whose branch is behind its base, under a rule that wants it up to date, says **Behind** its base in place of **Ready to merge**, and still offers its merge, which updates the branch first.
   Click the state to make the pull request **Open**, **Draft**, or **Closed**; a merged one keeps its state.
   **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
   Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
