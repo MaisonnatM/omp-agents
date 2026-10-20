@@ -1,5 +1,5 @@
 /** The subagent header's crumb styles, and a session header's controls: its branch, its Linear issues, and its pull requests. */
-import { Check, ChevronDown, Fingerprint, GitMerge, GitPullRequest, Layers } from "lucide-react";
+import { Check, ChevronDown, Copy, GitMerge, GitPullRequest, Layers } from "lucide-react";
 import { Fragment, type MouseEvent, useEffect, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest } from "../../src/shared/github";
 import { queuedMergeOf } from "../../src/shared/merge-queue";
@@ -42,7 +42,7 @@ export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "
 /** A session header's ID, as an icon button right after its title that copies the ID. */
 export function SessionIdCopy({ id }: { id: string }) {
 	const { copied, copy } = useCopy();
-	const Icon = copied ? Check : Fingerprint;
+	const Icon = copied ? Check : Copy;
 	const label = copied ? "Copied" : `Copy session ID ${id}`;
 	return (
 		<Tooltip content={label}>
