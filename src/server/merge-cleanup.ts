@@ -71,7 +71,7 @@ export class MergeCleanup {
 	readonly #deps: MergeCleanupDeps;
 	/** Each pull request of a live session as the last look saw it, or as the queue merged it, by {@link prKey}; one merged or closed stays so. */
 	readonly #seen = new Map<string, PullRequestState>();
-	/** The sessions linked to a pull request that merged while this server watched: each ends once it is idle with every pull request settled. */
+	/** The sessions linked to a pull request that merged while this server watched: each ends once it is {@link finished} with every pull request settled. */
 	readonly #finishing = new Set<string>();
 	/** Merges and looks, one at a time, so a look never reads `#seen` across a merge. */
 	readonly #lane = new SerialLane();
