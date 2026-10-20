@@ -21,6 +21,7 @@ import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { findMcpServers } from "../omp/mcp";
+import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
@@ -45,6 +46,7 @@ import { CalendarsFile } from "./calendars-file";
 import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
 import { InterruptedSessions } from "./interrupted";
+import { IsolationSweep } from "./isolation-sweep";
 import { ListRegistry } from "./list-registry";
 import { GoogleAccountsFile } from "./google-accounts-file";
 import { LocalEventsFile } from "./local-events-file";
@@ -117,6 +119,8 @@ export class Dashboard {
 	readonly #lists: ListRegistry;
 	readonly #todoInbox: TodoInbox;
 	readonly #worktrees: Worktrees;
+	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
+	readonly #isolationSweep: IsolationSweep;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
 	readonly #reattached = Promise.withResolvers<void>();
 	readonly #endInbox: EndInbox;
@@ -267,6 +271,7 @@ export class Dashboard {
 				}));
 			},
 		}));
+		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
 		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "replay" || request.kind === "new" && request.branch !== null);
 		const startSession = (this.#startSession = request => startWith(request, null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
@@ -431,6 +436,8 @@ export class Dashboard {
 				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
+				// It reads every sandbox's checkout, which takes minutes, so the routines and sends after it do not wait for it.
+				void this.#isolationSweep.tick();
 				await scheduledRunner.tick();
 				await runner.tick();
 				await this.#projectWatch.tick();

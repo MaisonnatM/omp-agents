@@ -18,6 +18,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Context sources](#context-sources)
 - [Routines](#routines)
   - [One server runs the unattended work](#one-server-runs-the-unattended-work)
+  - [Isolation sandboxes](#isolation-sandboxes)
 - [Scheduled sends](#scheduled-sends)
 - [Projects](#projects)
 - [Pins](#pins)
@@ -95,7 +96,8 @@ The main ones:
   The MCP sign-ins and sign-outs read and write omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
   `pi-coding-agent/src/commands/token.ts` uses `refreshStoredManagedMcpOAuthCredential` from `oauth-credentials.ts` to refresh a managed token and persist its rotated refresh token before printing the access token.
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
-- Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
+- Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory, and `getWorktreesDir`, its directory of isolation sandboxes.
+- Isolation sandboxes: `ISOLATION_OWNER_FILE` and `hasLiveIsolationOwner` in `pi-coding-agent/src/task/isolation-ownership.ts`, the marker `ensureIsolation` in `task/worktree.ts` writes and the check of its process id and start time, and `stopRetainedMount` in `pi-coding-agent/src/cli/worktree-cli.ts`, the teardown `omp worktree clear` runs on a retained mount, which `src/omp/isolation.ts` hands the sweep; see [Isolation sandboxes](#isolation-sandboxes).
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
   `src/omp/stats.ts` reads omp-stats' database and starts its live sync on its first read, which the provider check makes at startup.
   `pi-catalog/src/models.ts` provides `getBundledModel` and `calculateCost`, which `listPrice` in `src/omp/stats.ts` uses to price Claude Code and Codex requests.
@@ -623,17 +625,33 @@ Every socket hears the routines after each change and each step of a run as a `r
 ### One server runs the unattended work
 
 Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
-Routines, the todo inbox, and the daily clean-up of checked todos write that directory without anyone asking, so one server at a time runs them.
+Routines, the todo inbox, the daily clean-up of checked todos, and the daily sweep of omp's isolation sandboxes write that directory or omp's without anyone asking, so one server at a time runs them.
 `src/server/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it, and it takes over a lock whose process is gone or whose content is not a lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
 On a takeover the server logs it, reads `routines.json`, `todos.json`, and `projects.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo inbox.
 A server that exits normally deletes its lock.
-The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick's routines and scheduled sends, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick's routines, scheduled sends, and isolation sweep, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 `projects.json` is the exception: every server runs its own project runner, which writes on every worker turn, so `ProjectsFile` is a `shared` `ReducerFile`, which reads the file again before it applies a change, and a change made on one server keeps what another saved.
 `ScheduledFile` is shared the same way, so a send added on any server reaches the owner.
+
+### Isolation sandboxes
+
+omp runs a subagent's isolated task in a sandbox under `~/.omp/wt` (`getWorktreesDir`, which `OMP_WORKTREE_DIR` moves): a directory named after the repository and the task, which holds the owner marker `.omp-isolation-owner.json`, naming the omp process and its start time, and the checkout `m`, `merged` in older sandboxes, a full copy of the repository with its own `.git`.
+omp removes a sandbox when its task ends, but one whose omp exited first stays, often gigabytes, and `omp worktree clear` removes those without looking at their changes.
+`IsolationSweep` in `src/server/isolation-sweep.ts` removes them more carefully, once a day: the owner's minute tick starts a sweep when none ran for 24 hours, the first one a minute after the server starts or takes over, and does not wait for it, since it runs `git status` in every sandbox, four at a time.
+A directory without the marker, such as a pull request's checkout, is no sandbox, and the sweep leaves it alone.
+A sandbox stays while omp's `hasLiveIsolationOwner` says its process runs: a process id that is gone, or that another process now holds with a different start time, has exited.
+It stays while a live session, idle or waiting ones included, or the server runs in it, by `Worktrees.inUse`; while its checkout has a tracked change or an untracked file, by `git status --porcelain --untracked-files=all`; and while its checkout is a linked worktree that Git locked.
+It also stays when the sweep cannot read it: a marker that names no process, a checkout that is not a Git checkout of its own, or a git call that fails, such as a `git status` that takes over two minutes.
+Commits that no remote has do not keep a sandbox, since the copy carries every local branch of the repository it copies, so nearly every sandbox has some, and the repository the task ran from keeps those branches.
+A commit the task itself made, which its omp exited before bringing back, goes with the sandbox, as with `omp worktree clear`.
+A sandbox with the marker but no checkout, left by an omp that exited while it made one, holds nothing of a task and goes.
+Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it stops a retained native mount through omp's `stopRetainedMount`, renames the sandbox with the suffix `.omp-agents-removing`, and deletes it, so the next sweep finishes a removal cut short instead of reading half a sandbox.
+A mount that will not stop keeps its sandbox.
+Each sweep logs one line with how many sandboxes it removed and kept, by reason, and one more for each it could not read or remove.
 
 ## Scheduled sends
 

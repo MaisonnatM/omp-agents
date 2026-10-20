@@ -10,7 +10,7 @@ const LIST_THROTTLE_MS = 500;
 const RESCAN_MS = 60_000;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
-/** Routine schedules count in minutes, and a Mac that wakes from sleep catches up at the next tick; checked todos clear on it too, and the bell looks for events about to start. */
+/** Routine schedules count in minutes, and a Mac that wakes from sleep catches up at the next tick; checked todos clear on it too, the isolation sweep starts from it once a day, and the bell looks for events about to start. */
 const MINUTE_TICK_MS = 60_000;
 /** omp and the model catalog release a few times a week; each check runs `omp models` and asks npm for omp's newest release. */
 const NOTICE_CHECK_MS = 6 * 60 * 60_000;
