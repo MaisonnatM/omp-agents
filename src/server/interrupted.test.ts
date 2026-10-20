@@ -49,14 +49,17 @@ describe("InterruptedSessions", () => {
 		expect(started(path, ["kept"]).has("kept")).toBe(false);
 	});
 
-	test("what sessions report while they attach leaves alone what the last server left running", () => {
+	test("a session started before the server knows which survived counts, and leaves alone what the last server left running", () => {
 		const path = fileIn();
 		started(path).setRunning(new Map([["kept", false], ["lost", true]]));
 		const next = new InterruptedSessions(path);
-		// The first attached session reports before the others attached, and before the server knows which survived.
-		next.setRunning(new Map([["kept", true]]));
+		next.setRunning(new Map([["new", true]]));
 		next.recover(new Set(["kept"]));
 		expect([next.has("lost"), next.stoppedMidTurn("lost"), next.stoppedWithServer("lost")]).toEqual([true, true, true]);
+		expect([next.has("kept"), next.stoppedWithServer("kept"), next.has("new")]).toEqual([false, false, false]);
+		// The session it started is saved as running, so a crash now finds it.
+		flushJsonFiles();
+		expect(started(path).stoppedMidTurn("new")).toBe(true);
 	});
 
 	test("a session that stopped while the server ran stays interrupted across a restart, until it runs again", () => {

@@ -146,10 +146,8 @@ export class DashboardSession implements LiveSession {
 	#userCommand = false;
 	/** Whether **End session** stopped the process, rather than omp exiting on its own. */
 	#ended = false;
-	/** Whether the process exited, however it came to. */
+	/** Whether omp exited, however it came to; hanging up on it as the server shuts down is no exit. */
 	#exited = false;
-	/** Whether this server hung up on omp as it shut down, leaving omp to run for the next server. */
-	#detached = false;
 	/** Prompt, dequeue, promote, interrupt, flush, and edit, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new SerialLane();
 	/** Model setters and state reads share a lane, separate from ordered turn commands. */
@@ -190,9 +188,9 @@ export class DashboardSession implements LiveSession {
 		});
 		client.onSubagentLifecycle(payload => this.#onSubagent(SUBAGENT_LIFECYCLE, payload));
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
-		void child.exited.then(() => {
+		void child.exited.then(how => {
+			if (how === "detach") return;
 			this.#exited = true;
-			if (this.#detached) return;
 			this.#change(() => this.#prompt.release());
 			requests.clear();
 			emit({ kind: "exited", ended: this.#ended });
@@ -386,7 +384,6 @@ export class DashboardSession implements LiveSession {
 
 	/** omp keeps running, turn and all, and the next server attaches to it again ({@link reattach}). */
 	async dispose(): Promise<void> {
-		this.#detached = true;
 		this.#child.detach();
 	}
 

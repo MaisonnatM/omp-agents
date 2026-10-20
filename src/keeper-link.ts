@@ -6,32 +6,16 @@ import { closeSync, fstatSync, mkdirSync, openSync, readdirSync, readSync, rmSyn
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { isObject } from "./json";
+import { HELLO, type KeeperMeta, STOP } from "./keeper-wire";
 import type { RpcProcess } from "./omp/modules";
 import { keeperScript } from "./server/resources";
 
-export const HELLO = "omp_agents_keeper";
-/** The first line a keeper sends on each connection; `meta` is what the server passed it at the start. */
-export interface KeeperHello {
-	type: typeof HELLO;
-	/** omp's pid. */
-	pid: number;
-	meta: unknown;
-}
-/** The line a client sends to end the session: the keeper stops omp, and exits once omp did. */
-export const STOP = { type: "omp_agents_keeper_stop" } as const;
-
-/** What the server tells a keeper when it starts it, which every connection hands back. */
-export interface KeeperMeta {
-	/** When the session started. */
-	startedAt: number;
-	/** The directory omp started in, before its session file records one. */
-	cwd: string;
-}
-
 /** One connection to a keeper. */
 export interface KeeperLink {
-	/** omp as the process its `RpcClient` drives: a kill stops omp, and `exited` settles once the keeper hung up. */
+	/** omp as the process its `RpcClient` drives: a kill stops omp, and `exited` settles with {@link ended}, either way. */
 	process: RpcProcess;
+	/** Why the connection ended: this server hung up ({@link detach}), or the keeper did, once omp exited. */
+	ended: Promise<"detach" | "exit">;
 	meta: KeeperMeta;
 	/** Hangs up without stopping omp, which keeps running for the next server. */
 	detach(): void;
@@ -78,7 +62,7 @@ function connect(dir: string, instanceId: string): Promise<KeeperLink> {
 	const socket = createConnection(socketOf(dir, instanceId));
 	let output!: ReadableStreamDefaultController<Uint8Array>;
 	const stdout = new ReadableStream<Uint8Array>({ start: controller => void (output = controller) });
-	const closed = Promise.withResolvers<number>();
+	const ended = Promise.withResolvers<"detach" | "exit">();
 	let greeted = false;
 	let detached = false;
 	/** The stderr tail once the keeper is gone and its log with it. */
@@ -105,13 +89,15 @@ function connect(dir: string, instanceId: string): Promise<KeeperLink> {
 		if (end + 1 < head.length) output.enqueue(head.subarray(end + 1));
 		resolve({
 			meta,
+			ended: ended.promise,
 			detach: () => {
 				detached = true;
 				socket.destroy();
 			},
 			process: {
 				pid: hello.pid as number,
-				exited: closed.promise,
+				// omp's `RpcClient` quotes it as an exit code.
+				exited: ended.promise.then(() => 0),
 				stdin: { write: data => socket.write(data) },
 				stdout,
 				peekStderr: () => lastStderr ?? tail(log),
@@ -137,7 +123,7 @@ function connect(dir: string, instanceId: string): Promise<KeeperLink> {
 		} catch {
 			// Already closed.
 		}
-		closed.resolve(0);
+		ended.resolve(detached ? "detach" : "exit");
 	});
 	return promise;
 }

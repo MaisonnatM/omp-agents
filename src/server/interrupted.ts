@@ -42,10 +42,12 @@ export class InterruptedSessions {
 	 */
 	readonly #sessions: Map<string, SessionState>;
 	/**
-	 * The sessions that ran when the last server stopped and did not survive it; `null` until {@link recover} learned
-	 * which, while {@link #sessions} still lists what the last server left running.
+	 * The sessions that ran when the last server stopped, until {@link recover} learned which of them survived it. A
+	 * session this server starts before then reports without them, so {@link setRunning} leaves them alone until then.
 	 */
-	#stoppedWithServer: ReadonlySet<string> | null = null;
+	#lastServer: ReadonlySet<string>;
+	/** The sessions that ran when the last server stopped and did not survive it. */
+	#stoppedWithServer: ReadonlySet<string> = new Set();
 
 	constructor(path: string) {
 		this.#file = new JsonFile(path, {
@@ -55,6 +57,7 @@ export class InterruptedSessions {
 		});
 		const saved = this.#file.load()?.sessions ?? [];
 		this.#sessions = new Map(saved.map(({ id, interrupted, working }) => [id, { interrupted, working }]));
+		this.#lastServer = new Set(saved.flatMap(({ id, interrupted }) => (interrupted ? [] : [id])));
 	}
 
 	/**
@@ -63,18 +66,20 @@ export class InterruptedSessions {
 	 */
 	recover(survived: ReadonlySet<string>): void {
 		const stopped = new Set<string>();
-		for (const [id, state] of this.#sessions) {
-			if (state.interrupted || survived.has(id)) continue;
+		for (const id of this.#lastServer) {
+			const state = this.#sessions.get(id);
+			if (!state || state.interrupted || survived.has(id)) continue;
 			this.#sessions.set(id, { interrupted: true, working: state.working });
 			stopped.add(id);
 		}
+		this.#lastServer = new Set();
 		this.#stoppedWithServer = stopped;
 		if (stopped.size > 0) this.#save();
 	}
 
 	/** Whether session `sessionId` ran when the last server stopped, and did not survive it. */
 	stoppedWithServer(sessionId: string): boolean {
-		return this.#stoppedWithServer?.has(sessionId) === true;
+		return this.#stoppedWithServer.has(sessionId);
 	}
 
 	has(sessionId: string): boolean {
@@ -87,15 +92,11 @@ export class InterruptedSessions {
 		return state?.interrupted === true && state.working;
 	}
 
-	/**
-	 * The dashboard sessions that run now, each with whether its turn runs. A session that runs again, once resumed, is no
-	 * longer interrupted. Before {@link recover}, sessions still attaching report, so the call changes nothing.
-	 */
+	/** The dashboard sessions that run now, each with whether its turn runs. A session that runs again, once resumed, is no longer interrupted. */
 	setRunning(sessions: ReadonlyMap<string, boolean>): void {
-		if (this.#stoppedWithServer === null) return;
 		let changed = false;
 		for (const [id, state] of this.#sessions) {
-			if (state.interrupted || sessions.has(id)) continue;
+			if (state.interrupted || sessions.has(id) || this.#lastServer.has(id)) continue;
 			this.#sessions.delete(id);
 			changed = true;
 		}

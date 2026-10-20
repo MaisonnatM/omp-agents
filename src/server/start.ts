@@ -141,25 +141,47 @@ export function createStarter(env: StartEnv): Starter {
 	};
 }
 
+/** A session attached to but not listed yet, which holds back what it reports until it is. */
+interface Attached {
+	session: DashboardSession;
+	/** Passes on what the session reported while it attached, then lets each report through as it comes. */
+	publish(): void;
+}
+
+/** Attaches to session `instanceId`; `null` when it cannot, which leaves its omp running for the next server. */
+async function attach(sessions: LiveSessions, projects: StartEnv["projects"], instanceId: string): Promise<Attached | null> {
+	const { emit } = sessions.allocate(instanceId);
+	const held: DashboardUpdate[] = [];
+	let report = (update: DashboardUpdate): void => void held.push(update);
+	try {
+		const session = await DashboardSession.reattach(instanceId, sessionId => projects.launchFor({ kind: "resume", sessionId }, null).rpc.tools, update => report(update));
+		return {
+			session,
+			publish: () => {
+				report = emit;
+				for (const update of held.splice(0)) emit(update);
+			},
+		};
+	} catch (err) {
+		console.error(`omp-agents: cannot attach to session ${instanceId}: ${errorText(err)}`);
+		return null;
+	}
+}
+
 /**
- * Attaches to every session a previous server started whose omp still runs, and lists it again in its project, under
- * the instance id it had. One it reaches but cannot attach to runs on unlisted, and the next server tries again.
- * Resolves with the session ids of the sessions that survived.
+ * Attaches to every session a previous server started whose omp still runs, and hands `recover` the session ids of
+ * those that survived. Only then does it list each again in its project, under the instance id it had, and pass on what
+ * it reported, so no report reaches the server before it knows which sessions survived. One it reaches but cannot
+ * attach to runs on unlisted, and the next server tries again.
  */
-export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"]): Promise<Set<string>> {
-	const survived = new Set<string>();
-	await Promise.all(
-		keptSessions().map(async instanceId => {
-			const { emit } = sessions.allocate(instanceId);
-			try {
-				const session = await DashboardSession.reattach(instanceId, sessionId => projects.launchFor({ kind: "resume", sessionId }, null).rpc.tools, emit);
-				if (!sessions.add(session, null)) return;
-				projects.launchFor({ kind: "resume", sessionId: session.sessionId }, null).attach(session);
-				survived.add(session.sessionId);
-			} catch (err) {
-				console.error(`omp-agents: cannot attach to session ${instanceId}: ${errorText(err)}`);
-			}
-		}),
+export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"], recover: (survived: ReadonlySet<string>) => void): Promise<void> {
+	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, projects, instanceId)))).filter(
+		(kept): kept is Attached => kept !== null && !kept.session.finished(),
 	);
-	return survived;
+	recover(new Set(attached.map(({ session }) => session.sessionId)));
+	for (const { session, publish } of attached) {
+		sessions.add(session, null);
+		projects.launchFor({ kind: "resume", sessionId: session.sessionId }, null).attach(session);
+		publish();
+	}
 }

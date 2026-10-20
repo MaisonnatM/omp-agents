@@ -449,7 +449,7 @@ export class Dashboard {
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		this.#interrupted.recover(await reattachAll(this.#sessions, { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) }));
+		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) }, survived => this.#interrupted.recover(survived));
 		this.#broadcasts.syncRoster();
 		seedUserNotes(userNotesDir);
 		for (const project of this.#projects.value) moveOldNotes(projectNotesDir(project.id));

@@ -3,7 +3,8 @@ import { once } from "node:events";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
-import { attachKeeper, type KeeperLink, listKeepers, STOP, startKeeper } from "./keeper-link";
+import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "./keeper-link";
+import { STOP } from "./keeper-wire";
 import { rpc, rpcFrameFile, type RpcHostTool, utils } from "./omp/modules";
 import type { RpcClient } from "./omp/rpc";
 
@@ -11,7 +12,7 @@ import type { RpcClient } from "./omp/rpc";
  * A stand-in for `omp --mode rpc-ui`: omp's `ready` line, then a response to each command. `ask` raises a question,
  * `call` a host tool call of tool `frame.tool`, and `big` one over omp's 1 MB line limit, which it writes as `rpc_chunk`s
  * as omp does. `job` starts a background job and `exit` exits. `get_state` reports, as `sessionName`, what it heard: how
- * often it negotiated, the answers, the host tool results, and the job's pid.
+ * often it negotiated, the answers, the host tool results, and the job's pid. Started with `v1`, it offers protocol 1 only.
  */
 const FAKE_OMP = `
 const heard = { negotiations: 0, answers: [], tools: [], job: null };
@@ -20,7 +21,7 @@ if (process.argv[2] === "fail") {
 	console.error("no model is signed in");
 	process.exit(3);
 }
-out({ type: "ready", protocolVersion: 1, supportedProtocolVersions: [1, 2], maxFrameBytes: 1024 * 1024, maxReassembledFrameBytes: 64 * 1024 * 1024 });
+out({ type: "ready", protocolVersion: 1, supportedProtocolVersions: process.argv[2] === "v1" ? [1] : [1, 2], maxFrameBytes: 1024 * 1024, maxReassembledFrameBytes: 64 * 1024 * 1024 });
 let buffer = "";
 for await (const chunk of Bun.stdin.stream()) {
 	buffer += new TextDecoder().decode(chunk);
@@ -142,7 +143,7 @@ describe("session keeper", () => {
 		first.process.stdin.write(`${JSON.stringify({ type: "ask", id: "x" })}\n`);
 		await eventually(async () => (await heard(client)).negotiations === 1);
 		first.detach();
-		await first.process.exited;
+		expect(await first.ended).toBe("detach");
 		expect(listKeepers(dir)).toEqual(["s1"]);
 
 		const second = await attachKeeper(dir, "s1");
@@ -152,9 +153,9 @@ describe("session keeper", () => {
 		await eventually(() => frames.length === 1);
 		expect(frames[0]).toMatchObject({ id: "q1", method: "confirm", title: "Go on?" });
 		second.process.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: "q1", confirmed: true })}\n`);
-		// The keeper answered the second client's negotiation itself, and omp heard the answer.
+		// omp answered the second client's negotiation as it did the first's, and heard the second client's answer.
 		await eventually(async () => (await heard(next)).answers.length === 1);
-		expect(await heard(next)).toEqual({ negotiations: 1, answers: ["q1:true"], tools: [], job: null });
+		expect(await heard(next)).toEqual({ negotiations: 2, answers: ["q1:true"], tools: [], job: null });
 
 		second.detach();
 		await second.process.exited;
@@ -233,9 +234,24 @@ describe("session keeper", () => {
 		// The keeper notes omp's processes 1 s after a tool call ends, in its own process, which no fake clock reaches.
 		await Bun.sleep(1_500);
 		link.process.stdin.write(`${JSON.stringify({ type: "exit", id: "y" })}\n`);
-		await link.process.exited;
+		expect(await link.ended).toBe("exit");
 		expect(alive(job ?? 0)).toBe(false);
 		await eventually(() => Bun.spawnSync(["pgrep", "-f", join(dir, "s1.sock")]).stdout.toString() === "");
+	});
+
+	test("a client of an omp without protocol 2 joins on the greeting, and the next one takes over from it", async () => {
+		const dir = scratch();
+		const first = await start(dir, "v1");
+		await drive(first);
+		first.detach();
+
+		const second = await attachKeeper(dir, "s1");
+		links.push(second);
+		const { client } = await drive(second);
+		second.process.stdin.write(`${JSON.stringify({ type: "ask", id: "x" })}\n`);
+		second.process.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: "q1", confirmed: false })}\n`);
+		await eventually(async () => (await heard(client)).answers.length === 1);
+		expect(await heard(client)).toEqual({ negotiations: 0, answers: ["q1:false"], tools: [], job: null });
 	});
 
 	test("an omp that exits before it is ready fails the start with what it wrote to stderr", async () => {

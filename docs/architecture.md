@@ -282,7 +282,7 @@ A session's first message, a suggestion, and an edited prompt all take this path
 Each time a dashboard session starts, exits, or starts or ends a turn, the server writes the session ids of the ones that run and of those whose turn runs.
 A session that exits without the page's `end` request joins the interrupted list, mid-turn if its turn ran.
 At its next start, the server first attaches to the sessions whose keeper still runs, then reads the others that ran when the last server stopped as interrupted, with the turn state they last had (`InterruptedSessions.recover`): their omp exited while no server watched, as when the computer restarted.
-Until then it ignores what attaching sessions report, so their reports cannot erase the sessions that did not survive.
+A session this server starts before then is saved as running, but its report leaves alone the sessions the last server left running, so it cannot erase those that did not survive.
 A session that runs again leaves the list, and `dismiss-interrupted` takes one out.
 Each past row carries `interrupted`.
 `resume-all` resumes several past sessions at once, each the way a `start` with `resume` does, then sends `continue` as a prompt to each one that stopped mid-turn.
@@ -328,17 +328,21 @@ Of omp's modules the keeper loads only `rpc-frame.ts`, whose path the server pas
 
 Each connection starts with the keeper's greeting, `omp_agents_keeper` with omp's pid and the `meta` the server passed at the start (`startedAt` and the directory omp started in), then omp's own `ready` line again.
 So `startRpc` and `attachRpc` in `src/omp/rpc.ts` both hand omp's `RpcClient` the connection as the process its `spawn` option returns, and the client starts on it as on a fresh omp.
-The keeper negotiated protocol 2 with omp itself and answers a connection's `negotiate_protocol`, which makes that connection the one omp talks to; until then the connection can neither write to omp nor stop it.
+A connection's `negotiate_protocol` makes it the one omp talks to, and the keeper passes the line on to omp, which answers it again; a second negotiation changes nothing in omp, and its `RpcClient` reads chunked frames from the moment it sends one.
+When omp's `ready` offers no protocol 2, the client sends none, so a connection joins on the greeting instead; a connection that has not joined can neither write to omp nor stop it.
 The joining connection first hears the questions omp still waits on (`extension_ui_request` dialogs not yet answered or cancelled, with what remains of a timeout).
 The keeper reads omp's output one logical frame at a time through omp's `RpcFrameDecoder`, so an `rpc_chunk` sequence counts as the frame it carries, and forwards each whole frame, with all its lines, to the connection that joined.
 omp's output while no server listens is dropped; the attaching server reads omp's state instead: `DashboardSession.reattach` counts a turn as running when `get_state` reports `isStreaming`, `isCompacting`, or `hasPendingAsyncWork`, lists the subagents `get_subagents` reports, and serves the session's project tools again with `set_host_tools`.
 A host tool call that no server hears, because none has joined, fails at once with a note that the dashboard restarted, so omp's turn goes on; so do the calls a server heard and did not answer before it hung up or another joined.
 
-The server's shutdown calls `DashboardSession.dispose`, which hangs up without stopping omp and reports no exit.
-At startup `reattachAll` in `src/server/start.ts` connects to every socket in the directory under the instance id it had, and lists each session again, in its project, before the runners recover; a socket nobody listens on loses its files.
+The server's shutdown calls `DashboardSession.dispose`, which hangs up without stopping omp; the link's `ended` then settles with `detach` rather than `exit`, so the session reports no exit and does not count as finished.
+At startup `reattachAll` in `src/server/start.ts` connects to every socket in the directory under the instance id it had, holding back what each session reports; a socket nobody listens on loses its files.
+Once all attached, `InterruptedSessions.recover` learns which sessions survived, and only then is each listed again, in its project, and what it reported passed on, before the runners recover.
 Attaching never stops omp: a session file without a readable header leaves the session in the directory omp started in, a replay marker that cannot be read counts as a replay, and a session that fails to attach is left running, unlisted, for the next server.
-**End session** sends the keeper `omp_agents_keeper_stop`, and omp exiting on its own ends the same way: the keeper sends SIGTERM to omp and every process omp started, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
-omp's background jobs, kernels and subagents lead process groups or sessions of their own and are reparented once omp exits, so the keeper notes the processes under omp with `ps` a second after a tool call ends, since an async call starts its job just after it returns, and every 10 seconds, each with its start time so that a reused pid is never signalled; a process omp started since the last note escapes an omp that is killed.
+**End session** sends the keeper `omp_agents_keeper_stop`: the keeper notes the processes under omp while omp is still their parent, sends SIGTERM to omp and to them, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
+omp exiting on its own ends the same way, except that its processes are no longer under it, so the keeper stops the ones it noted before.
+omp's background jobs, kernels and subagents lead process groups or sessions of their own and are reparented once omp exits, so the keeper's `ProcessCensus` (`src/process-census.ts`) notes the processes under omp with `ps` a second after a tool call ends, since an async call starts its job just after it returns, and every 10 seconds, each with its start time so that a reused pid is never signalled.
+A process omp started since the last note escapes an omp that exits on its own.
 A `ps` that fails is logged with the pids that may still run, rather than read as nothing left.
 A keeper exits whenever omp does, and omp exits when its keeper dies, since its stdin closes, and stops its own background jobs as it exits.
 

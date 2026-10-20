@@ -87,7 +87,7 @@ async function settle(): Promise<void> {
 
 /** An omp process that never exits, driven through `client`; `startRpc` hands `onFrame` to the session. */
 function fakeOmp(client: FakeClient) {
-	const child: RpcChild = { client, pid: 4242, exited: Promise.withResolvers<void>().promise, write: () => {}, meta: { startedAt: 1, cwd: "/tmp/project" }, detach: () => {} };
+	const child: RpcChild = { client, pid: 4242, exited: Promise.withResolvers<"detach" | "exit">().promise, write: () => {}, meta: { startedAt: 1, cwd: "/tmp/project" }, detach: () => {} };
 	const omp = { onFrame: (_frame: Record<string, unknown>) => {} };
 	spyOn(rpc, "startRpc").mockImplementation(async (_instanceId, _cwd, onFrame) => {
 		omp.onFrame = onFrame;
@@ -633,9 +633,9 @@ describe("DashboardSession start", () => {
 describe("DashboardSession reattach", () => {
 	/** A session a previous server started, whose omp a test plays through `client` and ends through `exit`. */
 	function keptOmp(client: FakeClient) {
-		const exit = Promise.withResolvers<void>();
+		const exit = Promise.withResolvers<"detach" | "exit">();
 		const hungUp: string[] = [];
-		const child: RpcChild = { client, pid: 4343, exited: exit.promise, write: () => {}, meta: { startedAt: 1_700_000_000_000, cwd: "/tmp/kept" }, detach: () => { hungUp.push("detach"); exit.resolve(); } };
+		const child: RpcChild = { client, pid: 4343, exited: exit.promise, write: () => {}, meta: { startedAt: 1_700_000_000_000, cwd: "/tmp/kept" }, detach: () => { hungUp.push("detach"); exit.resolve("detach"); } };
 		spyOn(rpc, "attachRpc").mockImplementation(async (_instanceId, onFrame) => {
 			// The keeper hands the new server the question omp still waits on.
 			onFrame({ type: "extension_ui_request", id: "q1", method: "confirm", title: "Deploy?", message: "" });
@@ -667,7 +667,7 @@ describe("DashboardSession reattach", () => {
 		expect(session.status).toBe("idle");
 	});
 
-	test("the server shutting down hangs up on omp without ending it or reporting an exit", async () => {
+	test("the server shutting down hangs up on omp without ending it, reporting an exit, or counting it finished", async () => {
 		const client = new FakeClient();
 		const { hungUp } = keptOmp(client);
 		const updates: DashboardUpdate[] = [];
@@ -678,7 +678,7 @@ describe("DashboardSession reattach", () => {
 		};
 		await session.dispose();
 		await settle();
-		expect([hungUp, stops, updates.filter(update => update.kind === "exited")]).toEqual([["detach"], [], []]);
+		expect([hungUp, stops, updates.filter(update => update.kind === "exited"), session.finished()]).toEqual([["detach"], [], [], false]);
 	});
 
 	test("End session on an attached session stops omp and reports the exit as ended", async () => {
@@ -686,7 +686,7 @@ describe("DashboardSession reattach", () => {
 		const { exit } = keptOmp(client);
 		const updates: DashboardUpdate[] = [];
 		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update));
-		client.stop = async () => exit.resolve();
+		client.stop = async () => exit.resolve("exit");
 		await session.end();
 		await settle();
 		expect(updates.filter(update => update.kind === "exited")).toEqual([{ kind: "exited", ended: true }]);

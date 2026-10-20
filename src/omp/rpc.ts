@@ -3,7 +3,8 @@
  * process runs under a keeper (`src/keeper.ts`), so it outlives the server, and the next server attaches to it.
  */
 import { errorText, isObject } from "../json";
-import { attachKeeper, type KeeperLink, type KeeperMeta, listKeepers, startKeeper } from "../keeper-link";
+import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "../keeper-link";
+import type { KeeperMeta } from "../keeper-wire";
 import { keepersDir } from "../paths";
 import type { Frame } from "./collab";
 import { childEnv } from "../proc";
@@ -107,8 +108,8 @@ export interface RpcClient {
 export interface RpcChild {
 	client: RpcClient;
 	pid: number;
-	/** Settles when omp is gone, however it ended, or once {@link detach} hung up on it. */
-	exited: Promise<unknown>;
+	/** Settles with `exit` when omp is gone, however it ended, or with `detach` once {@link detach} hung up on it. */
+	exited: Promise<"detach" | "exit">;
 	/** Write an `extension_ui_response` (or any frame `RpcClient` has no method for) to omp's stdin. */
 	write(frame: object): void;
 	/** When the session started and where omp started, which its keeper hands every server that attaches. */
@@ -165,11 +166,11 @@ async function drive(link: (agentArgs: string[]) => Promise<KeeperLink>, onFrame
 	});
 	await client.start();
 	if (!linked) throw new Error("omp RPC client started without a process");
-	const { process: omp, meta, detach } = linked;
+	const { process: omp, ended, meta, detach } = linked;
 	return {
 		client,
 		pid: omp.pid,
-		exited: omp.exited,
+		exited: ended,
 		// One line in one write, as `RpcClient` writes its own, so frames never interleave.
 		write: frame => void omp.stdin.write(`${JSON.stringify(frame)}\n`),
 		meta,

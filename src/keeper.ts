@@ -5,19 +5,18 @@
  * Of omp's modules it loads only the frame decoder the server names, so it starts fast and holds little memory.
  *
  * Each connection gets a {@link KeeperHello} first, then omp's `ready` line again, so omp's own `RpcClient` starts on it as
- * on a fresh process. The keeper negotiated omp's protocol itself and answers the client's `negotiate_protocol`, which
- * makes that connection the one omp talks to. It then hears the questions omp still waits on, and every whole frame
- * omp writes from then on. omp's output while no client listens is dropped: the server reads omp's state and the
- * session file instead.
+ * on a fresh process. The client's `negotiate_protocol`, which omp answers again as it did the first, makes that
+ * connection the one omp talks to; a client of an omp without protocol 2 sends none, and joins on the greeting. It then
+ * hears the questions omp still waits on, and every whole frame omp writes from then on. omp's output while no client
+ * listens is dropped: the server reads omp's state and the session file instead.
  */
 import { unlinkSync } from "node:fs";
 import { createServer, type Socket } from "node:net";
 import { isObject } from "./json";
-import { HELLO, type KeeperHello, STOP } from "./keeper-link";
+import { HELLO, type KeeperHello, STOP } from "./keeper-wire";
 import type { RpcFrameModule } from "./omp/modules";
+import { ProcessCensus } from "./process-census";
 
-/** The id of the keeper's own `negotiate_protocol`. */
-const NEGOTIATE_ID = "omp-agents-keeper";
 /** How long omp and what it started get to exit on SIGTERM before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
 /** How often the keeper notes the processes under omp, which it stops once omp exited and they were reparented. */
@@ -28,6 +27,15 @@ const AFTER_TOOL_MS = 1_000;
 const DIALOGS: Record<string, true> = { select: true, confirm: true, input: true, editor: true };
 
 type Frame = Record<string, unknown>;
+
+/** Who may talk to omp. A connection that has not joined can neither write to omp nor stop it. */
+type Gate =
+	/** omp has not written `ready`, so connections wait for their greeting. */
+	| { kind: "starting" }
+	/** omp is ready, offering `protocol` at most; `client` is the connection it talks to, the last one that joined. */
+	| { kind: "live"; ready: string; protocol: 1 | 2; client: Socket | null }
+	/** omp is being stopped or exited: no connection joins any more, and `client` hears the end. */
+	| { kind: "stopping"; client: Socket | null };
 
 /** One logical frame of omp's output, with the physical lines that carry it: one, or a whole `rpc_chunk` sequence. */
 interface OmpFrame {
@@ -94,46 +102,6 @@ function parse(line: string): Frame | null {
 	}
 }
 
-/** Processes by pid, each with its start time, which tells it from a later process that reuses the pid. */
-type Processes = Map<number, string>;
-
-/** Every process by pid, with its parent and start time. */
-type ProcessTable = Map<number, { ppid: number; started: string }>;
-
-/** Every process now; `null` when `ps` failed. */
-function processTable(): ProcessTable | null {
-	const ps = Bun.spawnSync(["ps", "-A", "-o", "pid=,ppid=,lstart="]);
-	if (!ps.success) return null;
-	const table: ProcessTable = new Map();
-	for (const line of ps.stdout.toString().split("\n")) {
-		const [pid, ppid, ...started] = line.trim().split(/\s+/);
-		if (pid && ppid && started.length > 0) table.set(Number(pid), { ppid: Number(ppid), started: started.join(" ") });
-	}
-	return table;
-}
-
-/** The processes under `root` in `table`, without `root`. */
-function descendants(table: ProcessTable, root: number): Processes {
-	const children = new Map<number, number[]>();
-	for (const [pid, { ppid }] of table) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
-	const found: Processes = new Map();
-	const queue = [...(children.get(root) ?? [])];
-	for (let pid = queue.shift(); pid !== undefined; pid = queue.shift()) {
-		found.set(pid, table.get(pid)?.started ?? "");
-		queue.push(...(children.get(pid) ?? []));
-	}
-	return found;
-}
-
-/** Sends `signal` to `pid`, which may be gone already. */
-function signal(pid: number, name: NodeJS.Signals): void {
-	try {
-		process.kill(pid, name);
-	} catch {
-		// Gone already.
-	}
-}
-
 async function main(): Promise<void> {
 	const [socketPath, meta, frameModule, ...command] = process.argv.slice(2);
 	if (!socketPath || meta === undefined || !frameModule || command.length === 0) {
@@ -147,47 +115,35 @@ async function main(): Promise<void> {
 	process.on("SIGHUP", () => {});
 
 	const omp = Bun.spawn(command, { stdin: "pipe", stdout: "pipe", stderr: "inherit" });
-	/** Bun leaves `exitCode` null for a process a signal ended. */
-	let ompExited = false;
-	void omp.exited.then(() => {
-		ompExited = true;
-	});
+	const census = new ProcessCensus(omp.pid, { everyMs: WATCH_MS, soonMs: AFTER_TOOL_MS, graceMs: STOP_GRACE_MS });
 	const write = (line: string): void => {
 		omp.stdin.write(`${line}\n`);
 		void Promise.resolve(omp.stdin.flush()).catch(() => {});
 	};
 
-	/** omp's `ready` line, which every client starts on. */
-	let ready: string | null = null;
-	/** Whether the keeper negotiated omp's protocol 2, so each client's `negotiate_protocol` is answered here. */
-	let negotiated = false;
-	/** Settles once clients can start: omp is ready and negotiated, or it exited. */
+	let gate: Gate = { kind: "starting" };
+	/** Settles once the gate left `starting`, when the connections that wait get their greeting or their hang-up. */
 	const opened = Promise.withResolvers<void>();
 	/** Questions omp waits on, by request id, with when they came. */
 	const dialogs = new Map<string, { frame: Frame; at: number }>();
 	/** Host tool calls the current client heard and has not answered. */
 	const toolCalls = new Set<string>();
-	/** The connection omp talks to: the last one that negotiated. */
-	let client: Socket | null = null;
-	/** The processes omp started, as last seen: once omp exited they are no longer under it, so the reap goes by these. */
-	const started: Processes = new Map();
-	/** Settles once omp and everything it started stopped. */
-	let reaping: Promise<void> | null = null;
 
 	const failTool = (id: string): void =>
 		write(JSON.stringify({ type: "host_tool_result", id, result: { content: [{ type: "text", text: "The dashboard restarted while this tool ran. Check what it did before you call it again." }], details: {} }, isError: true }));
 
 	/** `gone` no longer hears omp; the tool calls it heard will never be answered, so they fail now rather than hang the turn. */
 	const drop = (gone: Socket): void => {
-		if (client !== gone) return;
-		client = null;
+		if (gate.kind === "starting" || gate.client !== gone) return;
+		gate.client = null;
+		if (gate.kind !== "live") return;
 		for (const id of toolCalls) failTool(id);
 		toolCalls.clear();
 	};
 
-	const join = (joining: Socket): void => {
-		if (client) {
-			const previous = client;
+	const join = (live: Extract<Gate, { kind: "live" }>, joining: Socket): void => {
+		if (live.client) {
+			const previous = live.client;
 			drop(previous);
 			previous.destroy();
 		}
@@ -200,64 +156,32 @@ async function main(): Promise<void> {
 			}
 			joining.write(`${JSON.stringify(timeout === null ? frame : { ...frame, timeout })}\n`);
 		}
-		client = joining;
+		live.client = joining;
 	};
 
-	/** Notes the processes under omp, and forgets those that are gone; whether `ps` answered. */
-	const watch = (): boolean => {
-		const table = processTable();
-		if (!table) return false;
-		for (const [pid, at] of started) if (table.get(pid)?.started !== at) started.delete(pid);
-		if (!ompExited) for (const [pid, at] of descendants(table, omp.pid)) started.set(pid, at);
-		return true;
+	/** The gate closes for good; the client that talks to omp keeps hearing it until it exits. */
+	const close = (): void => {
+		if (gate.kind === "stopping") return;
+		gate = { kind: "stopping", client: gate.kind === "live" ? gate.client : null };
+		opened.resolve();
 	};
-	const watcher = setInterval(watch, WATCH_MS);
-	/** Whether a watch is due after a tool call ended, so a burst of calls costs one `ps`. */
-	let watchDue = false;
 
-	/**
-	 * Stops omp and every process it started, for End session and for omp exiting on its own alike. omp's background jobs
-	 * and kernels lead process groups or sessions of their own, and are reparented once omp exits, so only the processes
-	 * the keeper saw under omp find them.
-	 */
-	const reap = (): Promise<void> =>
-		(reaping ??= (async () => {
-			let listed = watch();
-			omp.kill("SIGTERM");
-			for (const pid of started.keys()) signal(pid, "SIGTERM");
-			const deadline = Date.now() + STOP_GRACE_MS;
-			while (Date.now() < deadline && (!ompExited || started.size > 0 || !listed)) {
-				await Bun.sleep(50);
-				listed = watch();
-			}
-			omp.kill("SIGKILL");
-			for (const pid of started.keys()) signal(pid, "SIGKILL");
-			clearInterval(watcher);
-			if (!listed) console.error(`omp-agents keeper: ps failed, so these processes omp started may still run: ${[...started.keys()].join(" ")}`);
-		})());
+	/** End session: notes what omp started while omp is still its parent, then stops omp and all of it. */
+	const stop = (): void => {
+		if (gate.kind === "stopping") return;
+		close();
+		census.note();
+		omp.kill("SIGTERM");
+		setTimeout(() => omp.kill("SIGKILL"), STOP_GRACE_MS).unref();
+		void census.reap();
+	};
 
 	const fromOmp = ({ frame, lines }: OmpFrame): void => {
-		if (frame.type === "tool_execution_end" && !watchDue) {
-			watchDue = true;
-			setTimeout(() => {
-				watchDue = false;
-				watch();
-			}, AFTER_TOOL_MS);
-		}
-		if (ready === null) {
+		if (frame.type === "tool_execution_end") census.noteSoon();
+		if (gate.kind === "starting") {
 			if (frame.type !== "ready") return;
-			ready = lines.join("\n");
 			const versions = frame.supportedProtocolVersions;
-			if (Array.isArray(versions) && versions.includes(2)) write(JSON.stringify({ type: "negotiate_protocol", id: NEGOTIATE_ID, protocolVersion: 2 }));
-			else opened.resolve();
-			return;
-		}
-		if (frame.type === "response" && frame.id === NEGOTIATE_ID) {
-			negotiated = frame.success === true;
-			if (!negotiated) {
-				console.error(`omp-agents keeper: omp refused protocol 2: ${lines.join("\n")}`);
-				void reap();
-			}
+			gate = { kind: "live", ready: lines.join("\n"), protocol: Array.isArray(versions) && versions.includes(2) ? 2 : 1, client: null };
 			opened.resolve();
 			return;
 		}
@@ -268,25 +192,44 @@ async function main(): Promise<void> {
 			toolCalls.delete(frame.targetId);
 		} else if (frame.type === "host_tool_call" && typeof frame.id === "string") {
 			// Only the client that hears the call can run it.
-			if (!client) return failTool(frame.id);
+			if (!gate.client) return failTool(frame.id);
 			toolCalls.add(frame.id);
 		}
-		client?.write(`${lines.join("\n")}\n`);
+		gate.client?.write(`${lines.join("\n")}\n`);
 	};
 
 	const fromClient = (from: Socket, line: string): void => {
+		if (gate.kind !== "live") return;
 		const frame = parse(line);
-		if (from !== client) {
-			if (frame?.type === "negotiate_protocol" && negotiated) {
-				from.write(`${JSON.stringify({ id: frame.id, type: "response", command: "negotiate_protocol", success: true, data: { protocolVersion: 2 } })}\n`);
-				join(from);
-			}
-			return;
-		}
-		if (frame?.type === STOP.type) return void reap();
-		if (frame?.type === "extension_ui_response" && typeof frame.id === "string") dialogs.delete(frame.id);
+		if (from !== gate.client) {
+			// omp's client negotiates right after the greeting, so its negotiation is its join; omp answers it.
+			if (frame?.type !== "negotiate_protocol" || gate.protocol !== 2) return;
+			join(gate, from);
+		} else if (frame?.type === STOP.type) return stop();
+		else if (frame?.type === "extension_ui_response" && typeof frame.id === "string") dialogs.delete(frame.id);
 		else if (frame?.type === "host_tool_result" && typeof frame.id === "string") toolCalls.delete(frame.id);
 		write(line);
+	};
+
+	const greet = (socket: Socket): void => {
+		if (socket.destroyed) return;
+		switch (gate.kind) {
+			// `opened` settles only once the gate left `starting`. A stopping omp greets no one; one that exited before it was ready left why in the log.
+			case "starting":
+			case "stopping":
+				return void socket.end();
+			case "live": {
+				const hello: KeeperHello = { type: HELLO, pid: omp.pid, meta: JSON.parse(meta) };
+				socket.write(`${JSON.stringify(hello)}\n${gate.ready}\n`);
+				// A client of an omp without protocol 2 sends no `negotiate_protocol`.
+				if (gate.protocol === 1) join(gate, socket);
+				return;
+			}
+			default: {
+				const unhandled: never = gate;
+				return unhandled;
+			}
+		}
 	};
 
 	const server = createServer(socket => {
@@ -294,15 +237,7 @@ async function main(): Promise<void> {
 		socket.on("data", (chunk: Buffer) => lines.push(chunk, line => fromClient(socket, line)));
 		socket.on("error", () => {});
 		socket.on("close", () => drop(socket));
-		void opened.promise.then(() => {
-			if (socket.destroyed) return;
-			// omp exited before it was ready, and the client reads why from the log; or it is being stopped.
-			if (ready === null || reaping !== null) return void socket.end();
-			const hello: KeeperHello = { type: HELLO, pid: omp.pid, meta: JSON.parse(meta) };
-			socket.write(`${JSON.stringify(hello)}\n${ready}\n`);
-			// A client of an omp without protocol 2 sends no `negotiate_protocol`, so it joins on the greeting.
-			if (!negotiated) join(socket);
-		});
+		void opened.promise.then(() => greet(socket));
 	});
 	server.listen(socketPath);
 
@@ -316,21 +251,21 @@ async function main(): Promise<void> {
 			});
 	})();
 	void Promise.all([omp.exited, output.catch(() => {})]).then(async ([code]) => {
+		close();
 		// The client hears the end only once nothing omp started runs on.
-		await reap();
-		opened.resolve();
+		await census.reap();
 		server.close();
 		try {
 			unlinkSync(socketPath);
 		} catch {
 			// Already gone.
 		}
-		const last = client;
+		const last = gate.kind === "starting" ? null : gate.client;
 		if (!last) process.exit(code);
 		last.end(() => process.exit(code));
 		setTimeout(() => process.exit(code), 1_000).unref();
 	});
-	process.on("SIGTERM", () => void reap());
+	process.on("SIGTERM", stop);
 }
 
 await main();
