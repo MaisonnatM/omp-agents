@@ -6,6 +6,7 @@
   "scripts": {
     "start": "bun src/server.ts",
     "desktop": "bun install --cwd desktop --frozen-lockfile && bun run --cwd desktop start",
+    "omp-release": "bun scripts/omp-release.ts",
     "omp-template": "bun templates/omp/install.ts",
     "prepare": "git config core.hooksPath .githooks",
     "test": "bun test",

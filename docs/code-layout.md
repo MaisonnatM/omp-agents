@@ -558,6 +558,8 @@ It also links [decisions](decisions.md), why each design choice was made, [`LEAR
 [Getting started](getting-started.md) walks a new user through a first session and each integration's sign-in, and `docs/images/` holds the README's screenshot.
 `patches/omp-18.11.1-paid-cursor-fallback.patch` preserves the external OMP runtime's paid Cursor fallback implementation and regression tests against upstream `v18.11.1`.
 It is not loaded or applied by the dashboard; [omp modules](architecture.md#omp-modules) describes its base, application, and installation boundary.
+`scripts/omp-release.ts` (`bun run omp-release [version]`) checks an omp release against this codebase: it installs that release and the tested one, runs `src/omp/modules.ts` and `bun test` against the release, and writes a report of the test result, the omp files that changed between the two, and their changelogs to `node_modules/.cache/`.
+`.agents/skills/omp-release/SKILL.md` is the skill an agent follows to sort that report into what must change, what to adopt, and docs drift, and to open the version bump when only the pins must change.
 
 ## Desktop
 

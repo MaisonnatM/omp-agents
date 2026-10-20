@@ -12,7 +12,9 @@ Then read the section for the work: [omp imports](#omp-imports), [omp internals]
 - Update `docs/usage.md` when the interface changes, `docs/architecture.md` when the server or a protocol changes, and `docs/code-layout.md` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
   The README holds only features, installation, and configuration.
 - Look a feature up in `docs/usage.md` by the words the page shows, such as a button's or a tab's label, rather than by a code identifier, which the interface docs rarely name.
-- Bump the Bun and omp versions in `.github/workflows/checks.yml` together with the README's tested versions.
+- Bump the tested omp version at all five of its pins together: `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, and the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
+  Bump Bun's version in both workflows together with the README's.
+  Check a new omp release with `bun run omp-release` and the [omp release skill](.agents/skills/omp-release/SKILL.md) before you bump it.
 
 ## omp imports
 

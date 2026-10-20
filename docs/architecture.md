@@ -39,6 +39,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 The server imports omp's own modules from the installed package, so it does not reimplement a protocol, the encryption, or the session-file format, and it always speaks the same version as the sessions it shows.
 `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
+`bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../.agents/skills/omp-release/SKILL.md) says how to read its report.
 
 Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.11.1-paid-cursor-fallback.patch`](../patches/omp-18.11.1-paid-cursor-fallback.patch) with its regression tests.
 Its base is upstream tag `v18.11.1`, commit `7cc912940b107eb2d771b0d106c640a8eddc9edf`; do not apply it to another release without porting and verifying it.
