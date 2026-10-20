@@ -317,7 +317,7 @@ An action that fails shows its error, and its control becomes available again.
   Link labels are semibold (font weight 600) and underlined beside their icons, without underlining the icons.
   Favicons load lazily through Google's favicon service, sharing only the destination hostname, not its path, query, credentials, or the dashboard's address.
 - A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.
-  An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the session's directory.
+  An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the linked worktree the session works in, else the session's directory.
   A `:line` suffix, as in `docs/usage.md:12`, is dropped; hover the path to read the file it opens.
   Markdown renders as the agent's messages do, a TSV or CSV file as a table of its first 1,000 rows, and anything else as plain text; **Show source** shows a rendered file's text.
   A path in an open Markdown file opens in the dialog's place, relative to that file.

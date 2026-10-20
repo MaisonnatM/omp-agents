@@ -135,7 +135,7 @@ export const Pane = memo(function Pane({
 			className={cn("relative flex min-h-0 min-w-0 flex-col bg-background outline-none", maximized && (focused ? "z-10" : "invisible"))}
 		>
 			<SubagentLinks.Provider value={links}>
-				<FileBaseContext.Provider value={(view.kind === "past" ? session : (host ?? lastHost))?.cwd ?? null}>
+				<FileBaseContext.Provider value={fileBase(view.kind === "past" ? session : (host ?? lastHost))}>
 					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
 						{content}
 						{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
@@ -145,3 +145,6 @@ export const Pane = memo(function Pane({
 		</section>
 	);
 });
+
+/** Where the agent's relative paths start: the linked worktree it works in, else its directory. */
+const fileBase = (session: { cwd: string; worktree: string | null } | null | undefined): string | null => session?.worktree ?? session?.cwd ?? null;

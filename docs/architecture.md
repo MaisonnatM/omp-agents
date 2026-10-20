@@ -798,7 +798,7 @@ Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md
 `diskAvailable` and `diskTotal` come from `statfs` on the home directory: the blocks free to an unprivileged user and all the volume's blocks; on macOS the free figure leaves out purgeable space, which Finder counts.
 
 `GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
-The path is absolute or starts with `~`, which `expandHome` in `src/paths.ts` reads as the home directory; the page resolves a relative one against the session's directory first.
+The path is absolute or starts with `~`, which `expandHome` in `src/paths.ts` reads as the home directory; the page resolves a relative one against the session's worktree or directory first.
 The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
 It must also lie outside the directories that hold sign-ins and config, `DENIED_DIRS` in `src/local-file.ts`, compared by their real paths, or the route answers 403: omp-agents' own directory, which holds the access token, and omp's agent directory, but for its Markdown, such as `AGENTS.md` and skills, and its images and videos.
 It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes are not UTF-8.
@@ -1251,7 +1251,7 @@ In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an ima
 In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text, image, or video file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
 It then ends the text with a `figure` naming the images and videos those links name, each once, but for those an image already shows; `MediaStrip` draws it as thumbnails, each dropping out when its file does not load.
 A `file://` address whose escapes do not decode renders as a link with no address, and text from GitHub keeps no `file://` path, since it renders through the default filter.
-A relative path resolves against `FileBaseContext`: the pane's session directory, or the directory of the file the dialog shows.
+A relative path resolves against `FileBaseContext`: the pane's session worktree, from `SessionFacts.worktree`, else its directory, or the directory of the file the dialog shows.
 Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` with only a `src`.
 It keeps images only from GitHub's image hosts and the route for a Linear issue's files, and plays a video only from that route.
 `web/index.html` sets the page's `Content-Security-Policy`.
