@@ -72,6 +72,7 @@ import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TranscriptMinimap } from "./transcript-minimap";
+import { ViewerDialog } from "./viewer-dialog";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
 const TOOL_ICON: Record<string, LucideIcon> = {
@@ -220,6 +221,35 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 	);
 }
 
+/** The images a tool's result returned, as thumbnails under its line; one opens large in a dialog. */
+function ToolImages({ srcs, tool }: { srcs: string[]; tool: string }) {
+	const [shown, setShown] = useState<number | null>(null);
+	const label = (index: number): string => `Image ${index + 1} from ${tool}`;
+	return (
+		<span className="-mt-1 ml-6 flex flex-wrap gap-1.5" data-tool-images>
+			{srcs.map((src, index) => (
+				// A result's images never change, so their order names them.
+				<button
+					key={index}
+					type="button"
+					aria-label={`Open ${label(index).toLowerCase()}`}
+					onClick={() => setShown(index)}
+					className="cursor-zoom-in overflow-hidden rounded-md outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+				>
+					<img src={src} alt={label(index)} loading="lazy" className="h-32 max-w-60 object-contain" />
+				</button>
+			))}
+			{shown !== null && (
+				<ViewerDialog title={label(shown)} description={tool} bodyLabel={label(shown)} onClose={() => setShown(null)}>
+					<div className="flex min-h-full items-center justify-center p-4">
+						<img src={srcs[shown]} alt={label(shown)} className="max-h-[75vh] max-w-full object-contain" />
+					</div>
+				</ViewerDialog>
+			)}
+		</span>
+	);
+}
+
 export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
@@ -228,11 +258,11 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 	const running =
 		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
 	const failed = tools.filter(tool => tool.status === "error").length;
-	// A group that spawned subagents stays open, so their links stay one click away.
-	const spawned = tools.some(tool => tool.agents.length > 0);
+	// A group that spawned subagents or returned images stays open, so their links and images stay in sight.
+	const pinned = tools.some(tool => tool.agents.length > 0 || tool.images);
 	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
 	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
-	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || spawned;
+	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || pinned;
 	const header = running
 		? "Working"
 		: tools.length
@@ -282,6 +312,7 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 									</TraceTitle>
 								</TraceLine>
 								{entry.agents.length > 0 && <SpawnedAgents ids={entry.agents} />}
+								{entry.images && <ToolImages srcs={entry.images} tool={entry.name} />}
 							</Fragment>
 						);
 					})}

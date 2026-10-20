@@ -136,6 +136,7 @@ Every transcript comes from the session files on this machine, not from a networ
   A subagent's view folds its own file, so it shows its own changes.
 - A `task` result names the subagents it spawned in `details.progress` and `details.results`; the tool item lists their ids, which name each subagent's view.
   A running `task` reports them sooner through `tool_execution_update` events.
+- A tool result's images, through `imagesOf` in `src/session-entries.ts` as a prompt's, ride on its tool item as `images`, which the transcript shows under the call's row; only the view's own file adds them, while the media tree below also collects its subagents'.
 - Each watched view also gets a media tree (`src/media.ts`), which collects the images that tool results returned, from the view's file and from every subagent transcript, at any depth, in the directory named after it.
   About half the screenshots in a session sit in its subagents' files, so a session's view collects them all; a subagent's view collects its own and its subagents'.
   An image is a `content` block of a tool result, which omp moves to its blob store, so it reaches the page through `/api/image`; the caption is the summary of the tool call with the same id, and a user prompt's images are left out.

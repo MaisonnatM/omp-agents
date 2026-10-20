@@ -183,6 +183,25 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error", agents: [] }]);
 	});
 
+	test("a tool result's images show on its call, and a replayed call keeps them", () => {
+		const t = new Transcript();
+		const call = { type: "toolCall", id: "s1", name: "browser", arguments: { action: "screenshot" } };
+		const hash = "a".repeat(64);
+		const content = [
+			{ type: "text", text: "Screenshot captured" },
+			{ type: "image", data: `blob:sha256:${hash}`, mimeType: "image/webp" },
+			{ type: "image", data: "aGk=", mimeType: "image/png" },
+			{ type: "image", data: "PHN2Zz4=", mimeType: "image/svg+xml" },
+		];
+		t.applyEntry({ type: "message", id: "e1", message: assistant(600, [call], { stopReason: "toolUse" }) });
+		t.applyEntry({ type: "message", id: "e2", message: { role: "toolResult", timestamp: 601, toolCallId: "s1", toolName: "browser", isError: false, content } });
+		t.applyEntry({ type: "message", id: "e1", message: assistant(600, [call], { stopReason: "toolUse" }) });
+
+		expect(t.items()).toEqual([
+			{ id: "tool:s1", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: [`/api/image?hash=${hash}&type=image%2Fwebp`, "data:image/png;base64,aGk="] },
+		]);
+	});
+
 	test("a subagent's yield shows its answer, not the payload type", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "y1", name: "yield", arguments: { type: "result", data: "done banana" } };

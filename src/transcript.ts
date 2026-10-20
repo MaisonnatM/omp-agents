@@ -330,7 +330,7 @@ export class Transcript {
 			case "toolResult": {
 				const callId = str(message.toolCallId);
 				if (callId) this.#settled.add(`tool:${callId}`);
-				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message));
+				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), imagesOf(message.content));
 			}
 			case "bashExecution":
 				return this.#upsert({ id: key, kind: "user", text: shellRun(message), skill: null, from: null, entryId: null });
@@ -378,6 +378,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[],
+		result: { images?: string[] } = {},
 	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;
@@ -391,6 +392,7 @@ export class Transcript {
 			status: status ?? base.status,
 			// Each report names the subagents it knows of; a workpool update names only the one that moved.
 			agents: union(base.agents, agents),
+			...result,
 		});
 	}
 

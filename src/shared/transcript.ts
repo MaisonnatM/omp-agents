@@ -56,8 +56,11 @@ export type Item =
 	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }
-	/** `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool. */
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[] }
+	/**
+	 * `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool.
+	 * `images`: the addresses of the images its result returned, such as a screenshot, as a prompt's; absent when none.
+	 */
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[] }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
 /** One successful `edit` or `write` result on a file; `at` is when omp recorded it, in ms since the epoch, or `null` when its entry carries no time. */

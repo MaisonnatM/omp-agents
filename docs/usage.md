@@ -280,6 +280,9 @@ An action that fails shows its error, and its control becomes available again.
   Click it to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in a new tab.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
+- A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large.
+  A tool group that returned images stays open.
+  Hiding tool calls hides them too; the **Media** tab still lists every one.
 - A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
   Click the session's title to open the session's main agent in the pane, or focus the pane that already shows it.
