@@ -11,7 +11,6 @@ import type { PlanUsage } from "../shared/models";
 import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, UpdateSubject } from "../shared/notices";
 import { EVENT_LEAD_MS, usesClause } from "../shared/notices";
 import type { Project, Worker, WorkerPhase } from "../shared/projects";
-import type { HostStatus } from "../shared/sessions";
 import type { SlackFound } from "../slack-messages";
 
 /** A timed calendar event; `ref` names it among the events: `local/<id>`, or `google/<account>/<calendar id>/<event id>`. */
@@ -23,11 +22,14 @@ export interface AccountFoundEvents {
 	events: FoundEvent[] | null;
 }
 
-/** A project not archived as its notices see it: its coordinator's live status, `null` when it does not run, and each worker's phase and open questions. */
+/**
+ * A project not archived as its notices see it: whether its coordinator is still on its task, and each worker's phase, whether it is still on
+ * its task, and its open questions. A session a usage limit stopped is idle but stays on its task until its continue goes.
+ */
 export interface ProjectFacts {
 	project: Project;
-	coordinator: HostStatus | null;
-	workers: { worker: Worker; phase: WorkerPhase; questions: { id: string; title: string }[] }[];
+	coordinatorOccupied: boolean;
+	workers: { worker: Worker; phase: WorkerPhase; occupied: boolean; questions: { id: string; title: string }[] }[];
 }
 
 export interface NoticeSources {
@@ -198,17 +200,16 @@ function eventNotices(local: FoundEvent[], google: AccountFoundEvents[] | null, 
  * nothing queued or waiting for its coordinator.
  */
 export function projectNotices(facts: ProjectFacts[], at: number): Unscoped[] {
-	return facts.flatMap(({ project, coordinator, workers }) => {
+	return facts.flatMap(({ project, coordinatorOccupied, workers }) => {
 		const base = { at, kind: "project" as const, projectId: project.id, project: project.name };
-		const coordinatorBusy = coordinator === "working" || coordinator === "needs-input";
 		const found: Unscoped[] = workers.flatMap(({ worker, phase, questions }) => {
 			const who = { id: worker.id, title: worker.title };
 			const stopped = phase === "interrupted" ? [{ ...base, id: `project:${project.id}:${worker.id}:stopped:${worker.sessionId}`, about: "stopped" as const, worker: who, text: `${worker.id} stopped without End session.` }] : [];
-			const asks = coordinatorBusy ? [] : questions.map(request => ({ ...base, id: `project:${project.id}:${worker.id}:asks:${request.id}`, about: "asks" as const, worker: who, text: request.title }));
+			const asks = coordinatorOccupied ? [] : questions.map(request => ({ ...base, id: `project:${project.id}:${worker.id}:asks:${request.id}`, about: "asks" as const, worker: who, text: request.title }));
 			return [...stopped, ...asks];
 		});
-		const settled = workers.every(({ phase }) => phase === "idle" || phase === "ended");
-		if (workers.length > 0 && settled && !coordinatorBusy && project.queue.length === 0 && project.updates.length === 0) {
+		const settled = workers.every(({ phase, occupied }) => !occupied && (phase === "idle" || phase === "ended"));
+		if (workers.length > 0 && settled && !coordinatorOccupied && project.queue.length === 0 && project.updates.length === 0) {
 			const last = project.workers.map(worker => worker.lastReply?.at ?? "").toSorted().at(-1) ?? "";
 			const count = `${workers.length} ${workers.length === 1 ? "worker" : "workers"}`;
 			found.push({ ...base, id: `project:${project.id}:done:${workers.length}:${last}`, about: "done", worker: null, text: `${count} done; nothing waits for the coordinator.` });

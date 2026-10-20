@@ -7,7 +7,7 @@ import { HOME } from "../paths";
 import type { Project, ProjectEvent } from "../shared/projects";
 import type { HostStatus, StartRequest, StartResult, UserAnswer, UserRequest } from "../shared/sessions";
 import { projectNotices } from "./notices";
-import { type ProjectLaunch, ProjectRunner } from "./project-runner";
+import { occupiedBy, type ProjectLaunch, ProjectRunner } from "./project-runner";
 import { projectTools } from "./project-tools";
 import { ProjectsFile, parseProjects } from "./projects-file";
 
@@ -24,6 +24,8 @@ interface FakeSession {
 	sessionId: string;
 	cwd: string;
 	status: HostStatus;
+	/** A usage limit stopped its turn, and its continue waits. */
+	held: boolean;
 	requests: UserRequest[];
 	/** The answers the session got. */
 	answers: { requestId: string; answer: UserAnswer }[];
@@ -90,6 +92,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 			? {
 					sessionId: session.sessionId,
 					status: session.status,
+					occupied: occupiedBy(session.status, session.held),
 					requests: session.requests,
 					prompt: async (text: string) => {
 						session.attempts++;
@@ -113,7 +116,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		const instanceId = `i${sessions.size + 1}`;
 		const sessionId = request.kind === "resume" ? request.sessionId : `s-${instanceId}`;
 		const cwd = request.kind === "new" ? request.cwd : "/work/app";
-		const session: FakeSession = { instanceId, sessionId, cwd, status: "idle", requests: [], answers: [], prompts: [], attempts: 0, refuses: false, firstPromptSaw: null, alive: true };
+		const session: FakeSession = { instanceId, sessionId, cwd, status: "idle", held: false, requests: [], answers: [], prompts: [], attempts: 0, refuses: false, firstPromptSaw: null, alive: true };
 		sessions.set(instanceId, session);
 		join.attach(session);
 		if (request.kind === "new") {
@@ -438,6 +441,53 @@ describe("ProjectRunner", () => {
 		h.runner.exited(w1.instanceId);
 		expect(h.file.get(projectId)!.updates).toMatchObject([{ kind: "event", source: "GitHub", title: 'Ended w1 "Task 1"', text: "Idle, with every pull request merged or closed.", url: null }]);
 		await expect(h.runner.endFinished(projectId, "w1")).rejects.toThrow("w1 does not run.");
+	});
+
+	test("a held worker reads idle but keeps its slot, and the cleanup after a merge does not end it until its hold ends", async () => {
+		const h = harness();
+		const { projectId, worker } = await project(h, 0);
+		h.file.apply({ op: "max-workers", id: projectId, max: 1 });
+		await startWorker(h, projectId, { title: "One", prompt: "1.", cwd: null });
+		const w1 = worker(1);
+		w1.status = "idle";
+		w1.held = true;
+		expect(await startWorker(h, projectId, { title: "Two", prompt: "2.", cwd: null })).toStartWith('Queued "Two" at position 1');
+		expect(h.runner.phaseOf(h.file.get(projectId)!.workers[0]!)).toBe("idle");
+		await expect(h.runner.endFinished(projectId, "w1")).rejects.toThrow("w1 waits on its continue after a usage limit.");
+		expect(h.ended).toEqual([]);
+		const started = h.until(() => h.file.get(projectId)!.workers.length === 2);
+		w1.held = false;
+		h.runner.turnEnded(w1.instanceId, "done");
+		await started;
+		expect(h.file.get(projectId)!.workers.map(({ id, title }) => `${id} ${title}`)).toEqual(["w1 One", "w2 Two"]);
+	});
+
+	test("a held coordinator gets no updates and leaves worker questions to itself; a held worker keeps the project from done", async () => {
+		const h = harness();
+		const { projectId, coordinator, worker } = await project(h, 2);
+		const [w1, w2] = [worker(1), worker(2)];
+		coordinator.status = "idle";
+		coordinator.held = true;
+		w1.status = "needs-input";
+		w1.requests = [{ id: "r1", title: "Which retry policy?", deadline: null, kind: "text", multiline: false, placeholder: null, prefill: "" }];
+		h.runner.observe(w1.instanceId);
+		expect([coordinator.attempts, h.file.get(projectId)!.updates.map(update => update.kind), notices(h)]).toEqual([0, ["asked"], []]);
+		const asked = h.until(() => h.file.get(projectId)!.updates.length === 0);
+		coordinator.held = false;
+		h.runner.observe(coordinator.instanceId);
+		await asked;
+		expect(notices(h)).toMatchObject([{ id: `project:${projectId}:w1:asks:r1`, about: "asks" }]);
+
+		w1.status = "idle";
+		w1.requests = [];
+		w2.status = "idle";
+		w2.held = true;
+		const finished = h.until(() => h.file.get(projectId)!.updates.length === 0);
+		h.runner.turnEnded(w1.instanceId, "ok");
+		await finished;
+		expect(notices(h)).toEqual([]);
+		w2.held = false;
+		expect(notices(h)).toMatchObject([{ about: "done", worker: null }]);
 	});
 
 	test("after a restart, a coordinator that stopped with the server resumes and hears which workers stopped", async () => {

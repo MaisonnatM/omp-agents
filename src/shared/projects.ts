@@ -174,6 +174,3 @@ export function parseWatch(value: unknown): ProjectWatch | null {
 
 /** `cadence` trimmed to one line, or {@link DEFAULT_REVIEW_CADENCE} when nothing is left. */
 export const reviewCadence = (cadence: string): string => cadence.replace(/\s+/g, " ").trim().slice(0, MAX_REVIEW_CADENCE) || DEFAULT_REVIEW_CADENCE;
-
-/** Whether `phase` takes one of the project's {@link Project.maxWorkers} slots. */
-export const isBusy = (phase: WorkerPhase): boolean => phase === "working" || phase === "asking";

@@ -197,6 +197,11 @@ describe("parseClientMsg", () => {
 		expect(add({ at: "tomorrow" })).toBeNull();
 		expect(add({ reset: "" })).toBeNull();
 		expect(change({ op: "remove", id: "" })).toBeNull();
+		const continueTarget = { kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null };
+		expect(add({ target: continueTarget })).toBeNull();
+		expect(change({ op: "update", send: { ...spec, target: continueTarget } })).toBeNull();
+		expect(change({ op: "continue", send: { ...spec, target: continueTarget } })).toBeNull();
+		expect(change({ op: "drop-continue", sessionId: "s1" })).toBeNull();
 	});
 
 	test("pin takes one or more session ids to pin or unpin, and refuses an empty list, an unknown op, or a blank id", () => {

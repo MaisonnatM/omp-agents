@@ -22,8 +22,11 @@ export const SESSION_START_DEADLINE_MS = 600_000;
 export interface RoutineRunnerDeps {
 	file: RoutinesFile;
 	start(request: StartRequest): Promise<StartResult>;
-	/** Live session `instanceId`, or `null` once it is gone. */
-	session(instanceId: string): { status: HostStatus; sessionId: string; end(): Promise<void> } | null;
+	/**
+	 * Live session `instanceId`, or `null` once it is gone; `occupied` while it is still on its task: a turn runs or waits on a question, or a usage
+	 * limit stopped it and its continue waits. An occupied session holds its slot and is not ended.
+	 */
+	session(instanceId: string): { status: HostStatus; occupied: boolean; sessionId: string; end(): Promise<void> } | null;
 	now(): number;
 	/** Runs `command` through `sh` in `cwd`, whatever its exit code; rejects only when it cannot start. */
 	exec(command: string, cwd: string): Promise<{ exitCode: number | null; output: string }>;
@@ -43,9 +46,6 @@ interface Tracked {
 	startedAt: number;
 	phase: "starting" | "working";
 }
-
-/** A session's turn runs, or waits on a question; either way it holds its slot. */
-const turnRuns = (status: HostStatus | undefined): boolean => status === "working" || status === "needs-input";
 
 /** A command or a project update runs without an omp session, so it holds no session slot. */
 const takesSession = (task: RoutineTask): boolean => task.kind === "prompt";
@@ -140,7 +140,7 @@ export class RoutineRunner {
 		if (!result.ok || !session) {
 			file.failed(routine.id, at, `${routine.name}: ${result.ok ? "the session exited as it started." : result.error}`);
 		} else {
-			this.#tracked.set(result.instanceId, { routineId: routine.id, runAt: at, startedAt: this.#deps.now(), phase: turnRuns(session.status) ? "working" : "starting" });
+			this.#tracked.set(result.instanceId, { routineId: routine.id, runAt: at, startedAt: this.#deps.now(), phase: session.occupied ? "working" : "starting" });
 			file.started(routine.id, at, { instanceId: result.instanceId, sessionId: session.sessionId });
 		}
 		this.#deps.onChange();
@@ -198,7 +198,7 @@ export class RoutineRunner {
 		const session = this.#deps.session(instanceId);
 		if (!session) {
 			this.#tracked.delete(instanceId);
-		} else if (turnRuns(session.status)) {
+		} else if (session.occupied) {
 			tracked.phase = "working";
 		} else if (session.status === "idle" && tracked.phase === "working") {
 			this.#tracked.delete(instanceId);

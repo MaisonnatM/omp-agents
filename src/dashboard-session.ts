@@ -638,9 +638,10 @@ export class DashboardSession implements LiveSession {
 			this.#emit(turn);
 		} else if (turn?.kind === "turn-ended") {
 			this.#replayInitial = null;
+			// Before the change that shows the session idle, so a listener can hold a session a usage limit stopped first.
+			this.#emit(turn);
 			this.#change(() => this.#prompt.turnEnded());
 			this.#refresh();
-			this.#emit(turn);
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });

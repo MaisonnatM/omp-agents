@@ -1,6 +1,7 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
 import { isObject } from "./json";
 import type { HostSnapshot } from "./omp/collab";
+import { type UsageLimitHit, usageLimitOf } from "./omp/usage-limit";
 import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer, WithdrawnMessage } from "./shared/sessions";
 import { splitSuggestions } from "./transcript";
 
@@ -19,8 +20,11 @@ export type LiveUpdate =
 	| { kind: "note"; agentId: string | null; level: "info" | "warning" | "error"; text: string }
 	| TurnUpdate;
 
-/** The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none. */
-export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null };
+/**
+ * The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none,
+ * and `limit` the provider's usage limit it ended on, `null` when it ended any other way.
+ */
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; limit: UsageLimitHit | null };
 
 /** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
 function lastReply(messages: unknown): string | null {
@@ -42,7 +46,7 @@ function lastReply(messages: unknown): string | null {
 export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (!isObject(event)) return null;
 	if (event.type === "agent_start") return { kind: "turn-started" };
-	return event.type === "agent_end" && event.isTerminal !== false ? { kind: "turn-ended", reply: lastReply(event.messages) } : null;
+	return event.type === "agent_end" && event.isTerminal !== false ? { kind: "turn-ended", reply: lastReply(event.messages), limit: usageLimitOf(event.messages) } : null;
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */
