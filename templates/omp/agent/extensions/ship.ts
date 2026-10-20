@@ -152,13 +152,97 @@ function report(s: ShipState | undefined): string {
 	return lines.join("\n");
 }
 
-/** Bash segments, split on shell separators, so `cd x && gh pr ready 4` is seen as two commands. */
-function segments(command: string): string[] {
-	return command.split(/&&|\|\||;|\||\n/).map(s => s.trim()).filter(Boolean);
+/**
+ * The commands of a bash line, each as its words: split on `&&`, `||`, `;`, `|`, `&`, parentheses, and newlines outside quotes,
+ * with quotes removed and leading `NAME=value` assignments dropped, so `cd x && gh pr ready 4` is two commands and `rg "gh pr ready" f` one `rg`.
+ */
+export function commands(line: string): string[][] {
+	const out: string[][] = [];
+	let words: string[] = [];
+	let word: string | undefined;
+	const endWord = () => {
+		if (word !== undefined) words.push(word);
+		word = undefined;
+	};
+	const endCommand = () => {
+		endWord();
+		if (words.length > 0) out.push(words);
+		words = [];
+	};
+	for (let i = 0; i < line.length; i++) {
+		const c = line[i];
+		if (c === "'") {
+			const end = line.indexOf("'", i + 1);
+			const stop = end < 0 ? line.length : end;
+			word = (word ?? "") + line.slice(i + 1, stop);
+			i = stop;
+		} else if (c === '"') {
+			word ??= "";
+			for (i++; i < line.length && line[i] !== '"'; i++) {
+				if (line[i] === "\\" && '"\\$`'.includes(line[i + 1] ?? "")) i++;
+				word += line[i];
+			}
+		} else if (c === "\\") {
+			i++;
+			if (i < line.length && line[i] !== "\n") word = (word ?? "") + line[i];
+		} else if (c === " " || c === "\t") {
+			endWord();
+		} else if (c === "&" && (line[i - 1] === ">" || line[i - 1] === "<" || line[i + 1] === ">")) {
+			// The `&` of a redirection such as `2>&1` or `&>file`.
+			word = (word ?? "") + c;
+		} else if ("&|;()\n".includes(c)) {
+			endCommand();
+		} else {
+			word = (word ?? "") + c;
+		}
+	}
+	endCommand();
+	return out.flatMap(w => {
+		const start = w.findIndex(x => !/^[A-Za-z_]\w*=/.test(x));
+		return start < 0 ? [] : [w.slice(start)];
+	});
 }
 
-function args(rest: string): string[] {
-	return rest.trim().split(/\s+/).filter(Boolean);
+/** The arguments after `gh pr <sub>` when the command's words run it, else `undefined`. */
+export function ghPr(words: string[], sub: "create" | "ready"): string[] | undefined {
+	return words[0] === "gh" && words[1] === "pr" && words[2] === sub ? words.slice(3) : undefined;
+}
+
+/** The `gh pr view` selector for `gh pr ready <args>`: its first positional (number, URL, or branch) and `--repo`; redirections and other flags drop. */
+export function prSelector(args: string[]): string[] {
+	const repo: string[] = [];
+	let positional: string | undefined;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		const redirect = arg.match(/^(?:\d*|&)(?:>&|<&|>>|<<|>|<)(.*)$/);
+		if (redirect) {
+			// A bare operator such as `>` takes the next word as its target.
+			if (!redirect[1]) i++;
+		} else if (arg === "-R" || arg === "--repo") {
+			if (i + 1 < args.length) repo.splice(0, 2, "--repo", args[++i]);
+		} else if (/^(--repo=|-R)./.test(arg)) {
+			repo.splice(0, 2, "--repo", arg.replace(/^(--repo=|-R)/, ""));
+		} else if (!arg.startsWith("-")) {
+			positional ??= arg;
+		}
+	}
+	return positional === undefined ? repo : [positional, ...repo];
+}
+
+/** The owner a selector names through `--repo` (`owner/name`, `host/owner/name`, or a URL) or a pull request URL, else `undefined`. */
+export function selectorOwner(selector: string[]): string | undefined {
+	const flag = selector.indexOf("--repo");
+	if (flag >= 0) {
+		const parts = (selector[flag + 1] ?? "").replace(/^https?:\/\//, "").split("/").filter(Boolean);
+		return parts.length >= 3 ? parts[1] : parts[0];
+	}
+	return selector[0]?.match(/^https?:\/\/[^/]+\/([^/]+)\/[^/]+\/pull\/\d+/)?.[1];
+}
+
+/** Whether `owner` differs from the owner of the repository `repo` (`owner/name`), case-insensitively; `false` when either is unknown. */
+export function otherOwner(owner: string | undefined, repo: string | undefined): boolean {
+	const own = repo?.split("/")[0];
+	return owner !== undefined && own !== undefined && owner.toLowerCase() !== own.toLowerCase();
 }
 
 export default function ship(pi: ExtensionAPI) {
@@ -291,20 +375,24 @@ export default function ship(pi: ExtensionAPI) {
 		const input = event.input;
 		if (typeof input.command !== "string") return;
 		const cwd = typeof input.cwd === "string" ? input.cwd : ctx.cwd;
-		for (const seg of segments(input.command)) {
-			const create = seg.match(/\bgh\s+pr\s+create\b(.*)$/);
-			if (create && !args(create[1]).some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
+		for (const words of commands(input.command)) {
+			const create = ghPr(words, "create");
+			if (create && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
 				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the thermonuclear review." };
 			}
-			const ready = seg.match(/\bgh\s+pr\s+ready\b(.*)$/);
-			if (ready && !args(ready[1]).includes("--undo")) {
-				const reason = await bodyHasCheckbox(args(ready[1]), cwd);
+			const ready = ghPr(words, "ready");
+			if (ready && !ready.includes("--undo")) {
+				const selector = prSelector(ready);
+				// A PR to someone else's repository, such as an awesome list, follows that project's process, not /ship.
+				const owner = selectorOwner(selector);
+				if (owner && otherOwner(owner, await resolveRepo(cwd))) continue;
+				const reason = await bodyHasCheckbox(selector, cwd);
 				if (reason) return { block: true, reason };
 				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The thermonuclear review is complete. Mark this draft ready for human review?"))) {
 					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
 				}
 			}
-			if (/\bgt\s+(submit|ss)\b/.test(seg) && /(^|\s)(--publish|-p)(\s|$)/.test(seg)) {
+			if (words[0] === "gt" && (words[1] === "submit" || words[1] === "ss") && words.some(a => a === "--publish" || a === "-p")) {
 				const reason = await bodyHasCheckbox([], cwd);
 				if (reason) return { block: true, reason };
 				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "Publish this reviewed PR for human review?"))) {
@@ -319,10 +407,14 @@ export default function ship(pi: ExtensionAPI) {
 		const command = event.input.command;
 		const output = event.content.map(c => (c.type === "text" ? c.text : "")).join("\n");
 		const url = output.match(/https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
-		if (/\bgh\s+pr\s+create\b/.test(command) && url && !state.pr) {
+		const ran = commands(command);
+		if (ran.some(words => ghPr(words, "create")) && url && !state.pr) {
 			save(ctx, { ...state, repo: url[1], pr: Number(url[2]), stage: "thermonuclear" });
 			await refresh(ctx);
-		} else if (/\bgh\s+pr\s+ready\b/.test(command) && !/--undo/.test(command) && state.pr && state.stage !== "live") {
+		} else if (state.pr && state.stage !== "live" && ran.some(words => {
+			const ready = ghPr(words, "ready");
+			return ready !== undefined && !ready.includes("--undo") && !otherOwner(selectorOwner(prSelector(ready)), state?.repo);
+		})) {
 			save(ctx, { ...state, stage: "live", work: undefined });
 			await refresh(ctx);
 		}

@@ -37,7 +37,9 @@ if (input.command) {
 	console.log(JSON.stringify({ result: result ?? null, confirmations }));
 } else if (input.write || input.edit) {
 	const call = input.edit ? { toolName: "edit", input: input.edit } : { toolName: "write", input: { path: input.write } };
-	const result = await gate(call, { cwd: process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
+	// attempts repeats the call, as an agent retrying after a block does; the last answer counts.
+	let result;
+	for (let i = 0; i < (input.attempts ?? 1); i++) result = await gate(call, { cwd: process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
 	console.log(JSON.stringify({ result: result ?? null }));
 } else if (input.agentStart) {
 	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
@@ -104,6 +106,16 @@ describe("ship publication gate", () => {
 		expect(result?.block ?? false).toBe(!approve);
 		expect(confirmations).toBe(1);
 	});
+
+	// The harness's `gh` answers every call with `response`, so `gh repo view` names the cwd repository `me/app` and the PR body lacks the checkbox.
+	test.each([["dustinspecker/awesome-eslint", false], ["me/app", true], ["ME/other", true]])("gh pr ready -R %s is gated: %s", (repo, gated) => {
+		const { result, confirmations } = exercise("ship", {
+			command: `gh pr ready 5 -R ${repo} >/dev/null`, approve: true,
+			response: { code: 0, stdout: "me/app", stderr: "" },
+		});
+		expect(result?.block ?? false).toBe(gated);
+		expect(confirmations).toBe(0);
+	});
 });
 
 describe("ship_stage ready gate", () => {
@@ -125,7 +137,11 @@ describe("ship_stage ready gate", () => {
 describe("worktree guard", () => {
 	const root = mkdtempSync(join(tmpdir(), "worktree-guard-"));
 	const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: root, stdout: "ignore", stderr: "ignore" });
-	git("init", "-q", "main");
+	git("init", "-q", "-b", "main", "main");
+	git("init", "-q", "-b", "feature", "feature");
+	git("init", "-q", "-b", "trunk", "upstream");
+	git("-C", "upstream", "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "start");
+	git("clone", "-q", "upstream", "downstream");
 	mkdirSync(join(root, "isolated"));
 	writeFileSync(join(root, "isolated", ".omp-isolation-owner.json"), "{}");
 	git("clone", "-q", "main", "isolated/m");
@@ -134,6 +150,12 @@ describe("worktree guard", () => {
 
 	test.each([["main", true], ["plain", true], ["isolated/m", false]])("a first write in the %s clone", (checkout, blocked) => {
 		const { result } = exercise("worktree-guard", { write: join(root, checkout, "file.txt") });
+		expect(result?.block ?? false).toBe(blocked);
+	});
+
+	// `downstream` is on `trunk`, the default branch its `origin/HEAD` names; `feature` has no remote and is on neither `main` nor `master`.
+	test.each([["main", true], ["downstream", true], ["feature", false]])("a retried write in the %s checkout is blocked: %s", (checkout, blocked) => {
+		const { result } = exercise("worktree-guard", { write: join(root, checkout, "file.txt"), attempts: 2 });
 		expect(result?.block ?? false).toBe(blocked);
 	});
 });

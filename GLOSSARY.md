@@ -29,6 +29,10 @@ _Avoid_: Crashed session, orphan
 A session that another session's `task` call spawned.
 _Avoid_: Child agent, worker (see **Worker**)
 
+**Isolation sandbox**:
+The directory under `~/.omp/wt` where omp runs a subagent's isolated task, with a marker naming the omp process that owns it.
+_Avoid_: Workspace (see **Workspace**), worktree
+
 **Keeper**:
 The detached process that holds one dashboard session's omp and lends its stdio to one server at a time.
 _Avoid_: Daemon, supervisor

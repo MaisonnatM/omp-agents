@@ -62,6 +62,8 @@ export interface DirsModule {
 	getBlobsDir(): string;
 	/** omp-stats' database, `stats.db` in omp's data root. */
 	getStatsDbPath(): string;
+	/** Where omp puts its task-isolation sandboxes and PR checkouts, `~/.omp/wt` unless `OMP_WORKTREE_DIR` moves it. */
+	getWorktreesDir(): string;
 }
 /** Subset of omp's `SessionEntry` (src/session/session-entries.ts); the header has `type: "session"`. */
 export interface FileEntry extends Record<string, unknown> {
@@ -568,8 +570,17 @@ export interface ErrorFlagsModule {
 export interface FetchRetryModule {
 	extractRetryHint(source: null, body: string): number | undefined;
 }
+/** omp's task-isolation ownership (src/task/isolation-ownership.ts): the marker a sandbox holds, and whether its omp process still runs. */
+export interface IsolationOwnershipModule {
+	ISOLATION_OWNER_FILE: string;
+	hasLiveIsolationOwner(baseDir: string): Promise<boolean>;
+}
+/** `omp worktree` (src/cli/worktree-cli.ts): the native teardown a retained sandbox's mount needs before removal; throws when it cannot run it. */
+export interface WorktreeCliModule {
+	stopRetainedMount(dir: string): Promise<boolean>;
+}
 
-type Kind = "function" | "number" | "object";
+type Kind = "function" | "number" | "object" | "string";
 
 /** The value at a dotted export path such as `Settings.loadReadOnly`. */
 function exportAt(mod: unknown, path: string): unknown {
@@ -659,6 +670,7 @@ export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getMCPConfigPath: "function",
 	getBlobsDir: "function",
 	getStatsDbPath: "function",
+	getWorktreesDir: "function",
 });
 
 export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc-client.ts"), {
@@ -789,3 +801,8 @@ export const errorFlags = await load<ErrorFlagsModule>(join(dirname(packageDir),
 	is: "function",
 });
 export const fetchRetry = await load<FetchRetryModule>(join(utilsSrc, "fetch-retry.ts"), { extractRetryHint: "function" });
+export const isolationOwnership = await load<IsolationOwnershipModule>(join(srcDir, "task", "isolation-ownership.ts"), {
+	ISOLATION_OWNER_FILE: "string",
+	hasLiveIsolationOwner: "function",
+});
+export const worktreeCli = await load<WorktreeCliModule>(join(srcDir, "cli", "worktree-cli.ts"), { stopRetainedMount: "function" });

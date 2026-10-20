@@ -74,7 +74,8 @@ async function probeEach<T>(keys: Iterable<string>, probe: (key: string) => Prom
 	return new Map(distinct.map((key, index) => [key, probed[index]!]));
 }
 
-const beneath = (parent: string, child: string): boolean => {
+/** Whether `child` is `parent` or inside it, both canonical. */
+export const beneath = (parent: string, child: string): boolean => {
 	const suffix = relative(parent, child);
 	return suffix === "" || (!isAbsolute(suffix) && suffix !== ".." && !suffix.startsWith(`..${sep}`));
 };
@@ -159,6 +160,12 @@ export class Worktrees {
 			const probed = host.unknownAgents ? repositoryOf.get(path) : undefined;
 			return { path, unknownAgents: host.unknownAgents, repository: probed?.ok ? probed.value : null, unknownRepository: probed?.ok === false };
 		});
+	}
+
+	/** The canonical directories live sessions run in, idle and waiting ones included, and the server's own: a checkout that holds one is in use. */
+	async inUse(): Promise<string[]> {
+		const [hosts, server] = await Promise.all([this.#liveHosts(), this.#serverPath()]);
+		return [...hosts.map(host => host.path), server];
 	}
 
 	/** One canonical view of live sessions and saved activity, reused for every worktree in the request. */
