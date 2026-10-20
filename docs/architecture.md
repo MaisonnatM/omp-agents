@@ -606,7 +606,10 @@ Each tick does three things, in order:
 
 Running a tick twice starts nothing new, since the slot is claimed, and a tick that comes while one runs is skipped.
 A crash after a claim loses no queued run, since it is on disk. A start that had not finished waits for the routine's next slot.
-After a restart the runner tracks no session, which is right, because the dashboard's sessions die with the server.
+A routine's session survives a restart, and `RoutineRunner.recover` tracks it again from the run that started it, once the server attached to the surviving sessions, so it keeps its slot and ends, pinned when its routine asks, once idle.
+It counts as working, since its turn may have ended while no server watched; one that never began its turn therefore ends at once, without the start deadline's error.
+A run whose session did not survive keeps its `session` outcome, and the session no longer holds a slot.
+On a takeover the runner tracks only the sessions this server attached to, since a server attaches only to the sessions started on its own port.
 Stopping the server stops every running command, right before it exits, so the result of a command it stopped is never saved as a time-limit stop.
 A run saves its command as `running` before the command starts, then as `exited`, `stopped`, or `failed` when it ends.
 No command resumes after a restart: the server that owns routines turns each run still saved as `running` into `stopped` by the dashboard, with that error, when it starts or takes over (`RoutineRunner.recover`).
@@ -622,7 +625,7 @@ Routines, the todo inbox, and the daily clean-up of checked todos write that dir
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it, and it takes over a lock whose process is gone or whose content is not a lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json`, `todos.json`, and `projects.json` again, since the previous owner kept saving them, fails the runs that were running and the scheduled sends left sending, and drains the todo inbox.
+On a takeover the server logs it, reads `routines.json`, `todos.json`, and `projects.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo inbox.
 A server that exits normally deletes its lock.
 The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick's routines and scheduled sends, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
