@@ -86,7 +86,7 @@ An action that fails shows its error, and its control becomes available again.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
   Claude Code's sessions in `~/.claude/projects` and Codex's in `~/.codex/sessions` list here too, among omp's.
   `CLAUDE_CONFIG_DIR` and `CODEX_HOME` move those directories as they move them for their agents.
-  Every session row names its source first among its details, **omp**, **Claude Code**, or **Codex**, including running omp sessions.
+  Their rows name their source first among their details, **Claude Code** or **Codex**; omp's rows name no source.
   Their transcripts keep updating while the agent writes, and the conversation search finds their prompts and replies.
   They are read-only: the pane's header reads `Read-only · Claude Code` or `Read-only · Codex`, and neither the header nor the row's menu offers **Resume** or **Fork from here**.
   An unknown or malformed line shows in the transcript as one warning with the line's start, alongside any text or tools the reader understood.

@@ -220,7 +220,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
 				ship={session.ship}
 				facts={sessionFacts(
-					[SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)],
+					[session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)],
 					session.pullRequests,
 				)}
 				when={session.modifiedAt}
@@ -251,7 +251,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
 				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
 				ship={host.ship}
-				facts={sessionFacts([SOURCE_LABELS.omp, host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)], host.pullRequests)}
+				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)], host.pullRequests)}
 				when={host.startedAt}
 				dot={<HostStatus host={host} />}
 				open={open}
