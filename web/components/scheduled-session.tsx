@@ -62,6 +62,7 @@ function ScheduledDraftPage({ send, request, workspaces, connected, completions,
 			onStart={op => change.run(updated(op, null), { op: "send-now", id: send.id })}
 			onSchedule={(op, when) => ask({ t: "schedule", change: updated(op, when) })}
 			todo={todoOf(request.todoId)}
+			draftKey={null}
 			scheduled={{
 				request,
 				when: whenLabel(send, now),

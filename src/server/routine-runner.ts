@@ -52,7 +52,7 @@ const takesSession = (task: RoutineTask): boolean => task.kind === "prompt";
 
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
-	/** By instance id. Kept in memory only: the sessions die with the server, and the queued runs resume from the file. */
+	/** By instance id. A session outlives the server, so {@link recover} takes back the ones a stopped server tracked from the runs that started them. */
 	readonly #tracked = new Map<string, Tracked>();
 	/** Routines with a command running. A run holds one outcome and ten run-now claims push it out of the history, so the file cannot say whether a command still runs. */
 	readonly #commands = new Set<string>();
@@ -64,17 +64,35 @@ export class RoutineRunner {
 	}
 
 	/**
-	 * Fails the runs that a stopped server left running: no command runs yet, so a run saved as running lost its command with
-	 * the server that ran it. Called by the server that owns routines, when it starts or takes over, and never beside one that runs them.
+	 * Takes over what a stopped server left in the runs: a session that survived it is tracked again, holding its slot until it ends,
+	 * and a command saved as running failed, since it died with that server. Called by the server that owns routines, once it
+	 * attached to the surviving sessions, when it starts or takes over, and never beside one that runs them.
 	 */
 	recover(): void {
+		for (const routine of this.#deps.file.value) for (const run of routine.runs) this.#recoverRun(routine.id, run);
+	}
+
+	#recoverRun(routineId: string, { at, outcome }: RoutineRun): void {
 		const { file, now } = this.#deps;
-		for (const { id, runs } of file.value)
-			for (const { at, outcome } of runs)
-				if (outcome.kind === "command" && outcome.run.phase === "running") {
-					file.command(id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: outcome.run.startedAt, endedAt: now() });
-					file.failed(id, at, "The dashboard stopped while the command ran.");
-				}
+		switch (outcome.kind) {
+			case "pending":
+			case "project":
+				return;
+			case "session":
+				// Its turn may have ended while no server watched, so it counts as worked and ends once idle.
+				if (!this.#tracked.has(outcome.instanceId) && this.#deps.session(outcome.instanceId))
+					this.#tracked.set(outcome.instanceId, { routineId, runAt: at, startedAt: now(), phase: "working" });
+				return;
+			case "command":
+				if (outcome.run.phase !== "running") return;
+				file.command(routineId, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: outcome.run.startedAt, endedAt: now() });
+				file.failed(routineId, at, "The dashboard stopped while the command ran.");
+				return;
+			default: {
+				const unhandled: never = outcome;
+				return unhandled;
+			}
+		}
 	}
 
 	/** Claims due slots, starts the queued runs, then retires finished sessions. A tick while one runs is skipped. */

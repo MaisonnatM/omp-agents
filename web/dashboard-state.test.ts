@@ -44,33 +44,12 @@ describe("dashboard state", () => {
 		expect(focused.layout.panes[0]).toBe(open.layout.panes[0]);
 	});
 
-	test("a fork's draft starts with the prompt it branched at, and forking a reply starts empty", () => {
+	test("a start's answer settles it and names the session it started, and an answer to no start changes nothing", () => {
 		const fork = { kind: "fork", view: { kind: "past", sessionId: "s" }, itemId: "u", point: { entryId: "e", prefill: true } } as const;
 		const waiting = reduce(blank(), { t: "start", reqId: 1, op: fork });
 		const started = reduce(waiting, { t: "started", reqId: 1, result: { ok: true, instanceId: "i", cwd: "/work", prompt: "hello" } });
-		expect(started.draft).toEqual({ view: live("i"), text: "hello" });
 		expect(started.started).toEqual({ instanceId: "i", cwd: "/work" });
-		const reply = reduce(blank(), { t: "start", reqId: 2, op: { ...fork, point: { entryId: "e", prefill: false } } });
-		const empty = reduce(reply, { t: "started", reqId: 2, result: { ok: true, instanceId: "j", cwd: "/work", prompt: "hello" } });
-		expect(empty.draft).toEqual({ view: live("j"), text: "" });
-	});
-
-	test("a start that is not a fork leaves the draft, and closing its view drops the draft", () => {
-		const fork = { kind: "fork", view: { kind: "past", sessionId: "s" }, itemId: "u", point: { entryId: "e", prefill: true } } as const;
-		const drafted = reduce(reduce(blank(), { t: "start", reqId: 1, op: fork }), {
-			t: "started",
-			reqId: 1,
-			result: { ok: true, instanceId: "i", cwd: "/work", prompt: "hello" },
-		});
-		const shown = reduce(drafted, { t: "route", route: { kind: "panes", layout: layout([live("i")]) } });
-		const resumed = reduce(reduce(shown, { t: "start", reqId: 2, op: { kind: "resume", sessionId: "s" } }), {
-			t: "started",
-			reqId: 2,
-			result: { ok: true, instanceId: "k", cwd: "/work", prompt: null },
-		});
-		expect(resumed.draft).toBe(shown.draft);
-		const closed = reduce(resumed, { t: "route", route: { kind: "panes", layout: layout([]) } });
-		expect(closed.draft).toBeNull();
+		expect(started.starts.size).toBe(0);
 		expect(reduce(blank(), { t: "started", reqId: 9, result: { ok: true, instanceId: "z", cwd: "/", prompt: null } })).toEqual(blank());
 	});
 

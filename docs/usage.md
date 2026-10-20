@@ -348,7 +348,7 @@ An action that fails shows its error, and its control becomes available again.
   In a linked worktree it is the branch checked out there now.
   In a repository's main checkout it is the branch checked out there when the session last wrote, so a past session keeps its branch after the checkout moves to another one.
   A session on a detached HEAD, outside git, or in a directory that is gone shows no branch.
-- Right after a session's title, live or past, before the trajectory switch, a fingerprint button copies the session's ID, which its tooltip names; its icon turns into a check mark for a moment.
+- Right after a session's title, live or past, before the trajectory switch, a copy button copies the session's ID, which its tooltip names; its icon turns into a check mark for a moment.
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
 - Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
@@ -387,6 +387,10 @@ An action that fails shows its error, and its control becomes available again.
 - A prompt sent while the dashboard is disconnected from its server comes back to the composer with its files and a note saying why.
   A prompt, answer, or start sent just before the connection drops reaches the session once when the page reconnects, never twice.
   If the server restarted, or the page stayed disconnected for over an hour, before the server answered, the page says so, and the session's transcript shows whether the prompt took effect.
+- Each session and subagent keeps its own unsent text when you switch to another one or to a page, and when you reload, as chat apps keep a draft per conversation.
+  The text is kept in this browser and goes once you send it or empty the composer.
+  The new-session draft keeps its text the same way, one for the plain draft and one for each todo it starts from, until the session it starts opens.
+  Attached files and images are not kept.
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**, as Cursor lists its queue.
   Hovering a row, or focusing it, shows three buttons; a touch screen shows them always.
   **Send now** (↑ icon, or Cmd+Enter on the focused row) turns a follow-up into a steer, which the running turn takes at its next step; on a steer it stops the turn so omp runs its held steers at once.
@@ -510,7 +514,7 @@ An action that fails shows its error, and its control becomes available again.
 - The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit.
 - A session waits on one continue at most: a later limit moves it to the new reset.
   Any new turn of that session cancels it, whoever sends the prompt: you, a project's coordinator or its updates, or a scheduled message; so do an edited prompt and **End session**.
-- Until the continue goes, fails, or you cancel it, the session stays on its task: a routine does not end the session, a project worker keeps its slot, its coordinator hears the worker finished only if the continue fails or is canceled, and the bell does not call the project done.
+- Until the continue goes, fails, or you cancel it, the session stays on its task: a routine does not end the session, **After a merge** does not end it, a project worker keeps its slot, its coordinator hears the worker finished only if the continue fails or is canceled, and the bell does not call the project done.
   The sidebar and the **Projects** page still show it idle, and it stays on its task when the dashboard restarts.
 - omp's own `retry.waitForUsageReset` setting instead keeps the turn waiting inside omp, so a turn it holds never ends on the limit.
 
@@ -753,6 +757,7 @@ An action that fails shows its error, and its control becomes available again.
   Clicking the branch it brings copies its name and removes the linked worktree that has it checked out, as a row's copy-branch button does.
   The header ends with **Status** and **Reviewers**, each label beside its value at every width.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
+  A pull request otherwise ready to merge whose branch is behind its base, under a rule that wants it up to date, says **Behind** its base in place of **Ready to merge**, and still offers its merge, which updates the branch first.
   Click the state to make the pull request **Open**, **Draft**, or **Closed**; a merged one keeps its state.
   **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
   Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
@@ -1238,6 +1243,7 @@ An action that fails shows its error, and its control becomes available again.
   That pin replaces the one on the routine's previous session, and your other pins stay.
   A session that has not begun its turn 10 minutes after it started is ended, and its run records that as an error.
   Such a session is not pinned.
+  A routine session keeps running when the dashboard restarts, still counts toward the 3, and ends, pinned when the routine asks, once its turn finishes.
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
@@ -1425,7 +1431,7 @@ An action that fails shows its error, and its control becomes available again.
   **After a merge**, on by default and kept in the same file, ends each session the dashboard started that is linked to a pull request that merges, once the session is idle and every pull request it submitted or worked on is merged or closed, whether the merge came from the dashboard or anywhere else.
   It never ends an omp session you run in a terminal, nor one another dashboard started, and it leaves a worktree that any live session, a terminal one included, still works in.
   The dashboard sees a merge it made at once, and one made elsewhere within two minutes; a merge made before the dashboard started, or before the session linked the pull request, ends nothing.
-  A session still working when its pull request merges ends once it is idle, one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
+  A session still working when its pull request merges, or waiting to continue after a usage limit, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
   A project's workers follow their project's **Workers' pull requests** instead, and a coordinator never ends.
   **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses whatever you chose most recently in this browser, and a method the repository does not allow falls back to the first one it does.

@@ -236,7 +236,6 @@ export function App() {
 														past={state.past}
 														lastHosts={state.lastHosts}
 														layout={layout}
-														draft={state.draft}
 														models={state.models}
 														userTodos={state.userTodos}
 														routines={state.routines}

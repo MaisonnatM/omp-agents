@@ -28,7 +28,6 @@ interface PaneProps {
 	host: RosterHost | null;
 	lastHost: RosterHost | null;
 	session: PastSession | null;
-	initialDraft: string;
 	models: ModelList;
 	/** The workspaces, which the composer's directory picker offers. */
 	workspaces: Workspace[];
@@ -43,7 +42,7 @@ const paneArea = (index: number, count: number): string =>
 
 /** It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed token never asks this pane to render. */
 export const Pane = memo(function Pane({
-	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models, workspaces, onLayout, toggleRight, rightOpen,
+	view, index, count, focused, maximized, topRight, host, lastHost, session, models, workspaces, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
 	const { send, request, start, focus, open, end } = useDashboardActions();
 	const { fork, resume } = useDashboardStatus().starts;
@@ -109,7 +108,6 @@ export const Pane = memo(function Pane({
 			view={view}
 			host={host}
 			lastHost={lastHost}
-			initialDraft={initialDraft}
 			fork={fork}
 			onFork={onFork}
 			models={models}
