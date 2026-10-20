@@ -7,7 +7,7 @@ import { displayPath, tokenFile } from "./paths";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Dashboard } from "./server/dashboard";
-import { fail, guardsFor } from "./server/http";
+import { fail, guardsFor, refuseUntil } from "./server/http";
 import { loadPage, servePage } from "./server/page";
 import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSocket } from "./server/terminal-socket";
 import type { Socket, SocketData } from "./server/views";
@@ -18,6 +18,9 @@ const token = loadToken(tokenFile);
 const guards = guardsFor(PORT, token);
 const page = await loadPage();
 const dashboard = new Dashboard(PORT);
+// The port is bound before the sessions are attached, so a taken port fails before any keeper is joined, but no page
+// may start or resume a session until the server knows which ones survived.
+const notReattached = refuseUntil(dashboard.reattached, "The dashboard is still attaching to the sessions that kept running.");
 
 /** A socket is the dashboard's own, which watches views, or a terminal tab's, which carries one shell. */
 type AnySocketData = SocketData | TerminalSocketData;
@@ -26,7 +29,7 @@ const isTerminalSocket = (ws: ServerWebSocket<AnySocketData>): ws is TerminalSoc
 const NOT_A_WEBSOCKET = (): Response => new Response("expected a websocket", { status: 426 });
 
 function upgrade(req: Request, srv: Server<AnySocketData>): Response | undefined {
-	const refused = guards.admitSocket(req);
+	const refused = guards.admitSocket(req) ?? notReattached();
 	if (refused) return refused;
 	// A page loaded before page ids connects with none; its views still update, and its tagged requests, which carry no `floor`, are dropped until it reloads.
 	const pageId = parsePageId(new URL(req.url).searchParams.get("page")) ?? crypto.randomUUID();

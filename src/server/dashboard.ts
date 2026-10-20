@@ -111,6 +111,7 @@ export class Dashboard {
 	readonly #todoInbox: TodoInbox;
 	readonly #worktrees: Worktrees;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
+	readonly #reattached = Promise.withResolvers<void>();
 	readonly #endInbox: EndInbox;
 	readonly #runner: RoutineRunner;
 	readonly #scheduledRunner: ScheduledRunner;
@@ -441,6 +442,11 @@ export class Dashboard {
 		});
 	}
 
+	/** Settles once {@link start} attached to the sessions the last server left running and learned which survived. */
+	get reattached(): Promise<void> {
+		return this.#reattached.promise;
+	}
+
 	/**
 	 * Starts following omp: attaches to the sessions the last server left running, seeds the user's notes and moves each
 	 * project's older notes to their places now, watches the session files and the inboxes, takes the owner lock when it
@@ -450,6 +456,7 @@ export class Dashboard {
 		this.#publisher = publisher;
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
 		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) }, survived => this.#interrupted.recover(survived));
+		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		seedUserNotes(userNotesDir);
 		for (const project of this.#projects.value) moveOldNotes(projectNotesDir(project.id));

@@ -77,7 +77,7 @@ The server lives in `src/`:
   Routines and scheduled sends register only edits: their run-now and send-now actions stay with their runners, and notices keep their asynchronous action handler.
 - `src/server/broadcasts.ts`: `Broadcasts`, what every socket hears on the `roster` topic: the roster, the past list, plan usage, and the whole lists from `ListRegistry`.
   Opening sockets get every registered list; `pushList` publishes only a message that changed, while roster and past messages keep their row-level deltas.
-- `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers.
+- `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie), `refuseUntil`, which holds the dashboard socket back until the sessions are reattached, and the JSON answer helpers.
   `/api/` requests and sockets are admitted by the cookie alone, so a stray `?token=` on a signed-in request changes nothing; only `/` reads `?token=`, to set the cookie.
   `src/server/auth.ts` keeps the token file and parses the cookie, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
 - `src/server/routes.ts`: the `/api/` endpoints, in eight groups (sessions, integrations, providers, calendar, Gmail, pull requests, files, and todos), each handed only its part of `RouteEnv`.

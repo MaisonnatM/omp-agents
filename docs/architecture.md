@@ -282,7 +282,7 @@ A session's first message, a suggestion, and an edited prompt all take this path
 Each time a dashboard session starts, exits, or starts or ends a turn, the server writes the session ids of the ones that run and of those whose turn runs.
 A session that exits without the page's `end` request joins the interrupted list, mid-turn if its turn ran.
 At its next start, the server first attaches to the sessions whose keeper still runs, then reads the others that ran when the last server stopped as interrupted, with the turn state they last had (`InterruptedSessions.recover`): their omp exited while no server watched, as when the computer restarted.
-A session this server starts before then is saved as running, but its report leaves alone the sessions the last server left running, so it cannot erase those that did not survive.
+The server listens before then, so a taken port fails before any keeper is joined, but refuses the dashboard socket with a 503 until `recover` has run (`refuseUntil` in `src/server/http.ts`), so no page starts or resumes a session meanwhile; the page retries as after any failed connect, then sends `watch` and its waiting requests.
 A session that runs again leaves the list, and `dismiss-interrupted` takes one out.
 Each past row carries `interrupted`.
 `resume-all` resumes several past sessions at once, each the way a `start` with `resume` does, then sends `continue` as a prompt to each one that stopped mid-turn.
