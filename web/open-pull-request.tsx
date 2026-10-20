@@ -38,23 +38,28 @@ export function offeredPrompt({ branch, control }: OpenPullRequestHost): string 
 	return openPullRequestPrompt(branch.name, branch.defaultBranch);
 }
 
-/** A press of **Open PR** the session has not shown it took yet: the prompt it sent, and whether the server answered the send. */
-export interface Flight {
-	prompt: string;
-	answered: boolean;
-}
+/**
+ * A press of **Open PR** under way: in `flight` until the session shows it took the prompt, with whether the server
+ * answered the send; then `seen` until the session is next idle.
+ */
+export type Press = { phase: "flight"; prompt: string; answered: boolean } | { phase: "seen"; prompt: string };
 
 /**
- * Where `prompt` stands in `host`, whose transcript's last turn the prompt `last` opened: in `flight` from the press until
- * the session shows it took it, by queueing it or opening a turn with it, or until the server answered and the session is
- * idle; then `seen` while the queue holds it or, until the session is idle, while it opened the last turn; else `null`.
- * A session that waits on a question, or whose status is not known yet, has not ended the turn.
+ * The press under way on `prompt` once `host`, whose transcript's last turn the prompt `last` opened, moved on from `press`;
+ * `press` itself while nothing changed for it. A press is in `flight` until the session shows it took the prompt, by
+ * queueing it or opening a turn with it, or until the server answered and the session is idle. Once seen, it stays `seen`
+ * until the session is next idle with the prompt not queued, whatever is steered or queued after it; a session that waits
+ * on a question, or whose status is not known yet, has not ended the turn. Without a press, the prompt is `seen` while
+ * queued or while it opened the running turn, as when another page pressed it.
  */
-export function phaseOf(prompt: string, host: OpenPullRequestHost, last: string | null, flight: Flight | null): "flight" | "seen" | null {
+export function pressAfter(prompt: string, host: OpenPullRequestHost, last: string | null, press: Press | null): Press | null {
 	const queued = host.queue.steering.includes(prompt) || host.queue.followUp.includes(prompt);
 	const idle = host.status === "idle";
-	if (flight?.prompt === prompt && !queued && last !== prompt && !(flight.answered && idle)) return "flight";
-	return queued || (!idle && last === prompt) ? "seen" : null;
+	const seen = press?.phase === "seen" && press.prompt === prompt;
+	if (queued || (!idle && last === prompt)) return seen ? press : { phase: "seen", prompt };
+	if (press?.prompt !== prompt) return null;
+	if (press.phase === "seen") return idle ? null : press;
+	return last === prompt || (press.answered && idle) ? null : press;
 }
 
 /** Where a session stands on **Open PR**: not offered, ready with the prompt to send, or opening while its prompt is in flight or seen. */
@@ -66,35 +71,35 @@ const OPENING: OpenPullRequest = { kind: "opening" };
 /** The text of the prompt that opened a pane's last turn, the user's or the dashboard's. */
 const lastPrompt = ({ items }: PaneData): string | null => items.findLast(opensTurn)?.text ?? null;
 
-/** The press in flight per session id. */
-const flights = keyedStore<Flight | null>(null);
+/** The press under way per session id. */
+const presses = keyedStore<Press | null>(null);
 
 /**
  * **Open PR** for the session `view` shows, whose roster row is `host`: where it stands, and `run`, which sends its
  * prompt as the composer would now, queued as a follow-up while a turn runs. A subagent's view, a past one, or none stands at `none`.
- * The header's button and the command menu both call it, and either one ends a flight once the session shows it took the prompt.
+ * The header's button and the command menu both call it, and either one records the press as seen, or ends it, as the session moves.
  */
 export function useOpenPullRequest(view: View | null, host: RosterHost | null | undefined, request: Dashboard["request"]): { state: OpenPullRequest; run: () => void } {
 	const session: { view: LiveView; host: RosterHost } | null = view?.kind === "live" && view.agentId === null && host ? { view, host } : null;
 	const last = usePaneSelect(session && session.view, lastPrompt);
 	const key = session?.host.sessionId ?? "";
-	const flight = flights.use(key);
+	const press = presses.use(key);
 	const prompt = session && offeredPrompt(session.host);
-	const phase = session && prompt !== null ? phaseOf(prompt, session.host, last, flight) : null;
+	const next = session && prompt !== null ? pressAfter(prompt, session.host, last, press) : null;
 	useEffect(() => {
-		if (flight && phase !== "flight") flights.set(key, null);
-	}, [flight, phase, key]);
-	const state: OpenPullRequest = prompt === null ? NONE : phase === null ? { kind: "ready", prompt } : OPENING;
+		if (next !== press) presses.set(key, next);
+	}, [next, press, key]);
+	const state: OpenPullRequest = prompt === null ? NONE : next === null ? { kind: "ready", prompt } : OPENING;
 	const run = (): void => {
-		if (!session || state.kind !== "ready" || flights.get(key)) return;
-		const sent: Flight = { prompt: state.prompt, answered: false };
-		flights.set(key, sent);
+		if (!session || state.kind !== "ready" || presses.get(key)) return;
+		const sent: Press = { phase: "flight", prompt: state.prompt, answered: false };
+		presses.set(key, sent);
 		request({ t: "prompt", view: session.view, text: state.prompt, images: [], delivery: deliveryOf(subjectOf(session.view, session.host, null)) }).then(
 			() => {
-				if (flights.get(key) === sent) flights.set(key, { ...sent, answered: true });
+				if (presses.get(key) === sent) presses.set(key, { ...sent, answered: true });
 			},
 			(error: unknown) => {
-				if (flights.get(key) === sent) flights.set(key, null);
+				if (presses.get(key) === sent) presses.set(key, null);
 				toasts.add({ title: "Could not send Open PR", description: errorText(error) });
 			},
 		);
@@ -105,7 +110,7 @@ export function useOpenPullRequest(view: View | null, host: RosterHost | null | 
 /**
  * **Open PR**, after the session's other controls, while it works on a branch other than its repository's default branch
  * that heads no pull request yet: it sends the session the prompt that reviews, pushes, and opens one, queued as a
- * follow-up while a turn runs, and reads `Opening PR…` from the press until the turn that prompt starts ends.
+ * follow-up while a turn runs, and reads `Opening PR…` from the press until the session is next idle after it took the prompt.
  */
 export function OpenPullRequestButton({ view, host }: { view: LiveView; host: RosterHost | null }) {
 	const { request } = useDashboardActions();

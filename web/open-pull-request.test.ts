@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SessionBranch } from "../src/shared/sessions";
-import { type Flight, offeredPrompt, type OpenPullRequestHost, phaseOf } from "./open-pull-request";
+import { offeredPrompt, type OpenPullRequestHost, type Press, pressAfter } from "./open-pull-request";
 
 const onBranch = (fields: Partial<SessionBranch> = {}): SessionBranch => ({ name: "me/fix-login", linked: true, defaultBranch: "main", pullRequest: null, ...fields });
 const host = (fields: Partial<OpenPullRequestHost> = {}): OpenPullRequestHost => ({
@@ -12,9 +12,20 @@ const host = (fields: Partial<OpenPullRequestHost> = {}): OpenPullRequestHost =>
 	...fields,
 });
 const PROMPT = offeredPrompt(host()) ?? "";
-const pressed: Flight = { prompt: PROMPT, answered: false };
-const answered: Flight = { prompt: PROMPT, answered: true };
+const pressed: Press = { phase: "flight", prompt: PROMPT, answered: false };
+const answered: Press = { phase: "flight", prompt: PROMPT, answered: true };
 const earlier = "an earlier prompt";
+const steer = "use the staging remote";
+const followUp = { steering: [], followUp: [PROMPT] };
+
+/** The phase after each step, carrying the press from step to step as the hook does; `answer` marks the send answered first. */
+function phases(steps: { host: OpenPullRequestHost; last: string | null; answer?: true }[], press: Press | null = pressed): (Press["phase"] | null)[] {
+	return steps.map(step => {
+		const from = step.answer && press?.phase === "flight" ? { ...press, answered: true } : press;
+		press = pressAfter(PROMPT, step.host, step.last, from);
+		return press?.phase ?? null;
+	});
+}
 
 test("offers Open PR only to a session the dashboard can prompt, on a branch other than the default one that heads no pull request", () => {
 	const offered = [
@@ -37,46 +48,61 @@ test("the prompt passes the branch and base to git and gh as quoted shell words"
 	expect(prompt).toContain("gh pr create --base 'trunk' --head 'me/$(x);'\\''y'");
 });
 
-describe("phaseOf", () => {
+describe("pressAfter", () => {
 	test("keeps a press in flight until the session shows it took the prompt, or the server answered and no turn runs", () => {
 		expect([
-			phaseOf(PROMPT, host(), null, pressed),
-			phaseOf(PROMPT, host({ status: "working" }), earlier, answered),
-			phaseOf(PROMPT, host(), earlier, answered),
-		]).toEqual(["flight", "flight", null]);
+			pressAfter(PROMPT, host(), null, pressed)?.phase,
+			pressAfter(PROMPT, host({ status: "working" }), earlier, answered)?.phase,
+			pressAfter(PROMPT, host({ status: "needs-input" }), earlier, answered)?.phase,
+			pressAfter(PROMPT, host({ status: "unknown" }), earlier, answered)?.phase,
+			pressAfter(PROMPT, host(), earlier, answered),
+		]).toEqual(["flight", "flight", "flight", "flight", null]);
 	});
 
-	test("an idle click that lands releases once the turn it opened ends, though no queue ever held the prompt", () => {
+	test("an idle click stays seen through its turn, steers sent during it, and a question, and releases once the session is next idle", () => {
+		expect(
+			phases([
+				{ host: host({ status: "working" }), last: PROMPT, answer: true },
+				{ host: host({ status: "working" }), last: steer },
+				{ host: host({ status: "needs-input" }), last: steer },
+				{ host: host({ status: "unknown" }), last: steer },
+				{ host: host({ status: "working", queue: { steering: [], followUp: ["and then the docs"] } }), last: steer },
+				{ host: host({ status: "idle" }), last: steer },
+			]),
+		).toEqual(["seen", "seen", "seen", "seen", "seen", null]);
+	});
+
+	test("a follow-up is seen from the queue on, stays seen when taken back out while a turn runs, and releases once the session is next idle", () => {
+		expect(
+			phases([
+				{ host: host({ status: "working", queue: followUp }), last: earlier },
+				{ host: host({ status: "working" }), last: earlier },
+				{ host: host({ status: "idle" }), last: earlier },
+			]),
+		).toEqual(["seen", "seen", null]);
+		expect(
+			phases([
+				{ host: host({ status: "working", queue: followUp }), last: earlier },
+				{ host: host({ status: "working" }), last: PROMPT },
+				{ host: host({ status: "idle" }), last: PROMPT },
+			]),
+		).toEqual(["seen", "seen", null]);
+	});
+
+	test("without a press, the prompt is seen while queued or while it opened the running turn", () => {
 		expect([
-			phaseOf(PROMPT, host(), PROMPT, pressed),
-			phaseOf(PROMPT, host({ status: "working" }), PROMPT, answered),
-			phaseOf(PROMPT, host({ status: "idle" }), PROMPT, answered),
-		]).toEqual([null, "seen", null]);
+			pressAfter(PROMPT, host({ status: "working", queue: followUp }), earlier, null)?.phase,
+			pressAfter(PROMPT, host({ status: "needs-input" }), PROMPT, null)?.phase,
+			pressAfter(PROMPT, host({ status: "working" }), earlier, null),
+			pressAfter(PROMPT, host(), PROMPT, null),
+		]).toEqual(["seen", "seen", null, null]);
 	});
 
-	test("a follow-up is seen while queued and while its turn runs, and released once that turn ends or another runs", () => {
-		const queued = { steering: [], followUp: [PROMPT] };
-		expect([
-			phaseOf(PROMPT, host({ status: "working", queue: queued }), earlier, pressed),
-			phaseOf(PROMPT, host({ status: "working", queue: queued }), earlier, null),
-			phaseOf(PROMPT, host({ status: "working" }), PROMPT, null),
-			phaseOf(PROMPT, host({ status: "idle" }), PROMPT, null),
-			phaseOf(PROMPT, host({ status: "working" }), "a later prompt", null),
-		]).toEqual(["seen", "seen", "seen", null, null]);
-	});
-
-	test("a session that waits on a question or reports no status yet has not ended the turn: an answered press stays in flight and the turn it opened stays seen", () => {
-		expect([
-			phaseOf(PROMPT, host({ status: "needs-input" }), earlier, answered),
-			phaseOf(PROMPT, host({ status: "unknown" }), earlier, answered),
-			phaseOf(PROMPT, host({ status: "needs-input" }), PROMPT, null),
-			phaseOf(PROMPT, host({ status: "unknown" }), PROMPT, null),
-			phaseOf(PROMPT, host({ status: "needs-input" }), "a later prompt", null),
-		]).toEqual(["flight", "flight", "seen", "seen", null]);
-	});
-
-	test("a press for a prompt the session no longer offers is not in flight", () => {
+	test("keeps the same press while nothing changed for it, and drops a press for a prompt the session no longer offers", () => {
+		const seen: Press = { phase: "seen", prompt: PROMPT };
+		expect(pressAfter(PROMPT, host({ status: "working" }), steer, seen)).toBe(seen);
+		expect(pressAfter(PROMPT, host(), null, pressed)).toBe(pressed);
 		const other = offeredPrompt(host({ branch: onBranch({ name: "me/other" }) })) ?? "";
-		expect(phaseOf(other, host({ branch: onBranch({ name: "me/other" }) }), null, pressed)).toBeNull();
+		expect(pressAfter(other, host({ branch: onBranch({ name: "me/other" }) }), null, pressed)).toBeNull();
 	});
 });

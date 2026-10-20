@@ -355,7 +355,8 @@ An action that fails shows its error, and its control becomes available again.
   The default branch is the one `origin/HEAD` names, so a repository whose clone never recorded it shows no **Open PR** until `git remote set-head origin --auto` records it, which a session there notices at its next write.
   **Open PR** sends the session one prompt: commit the finished work, collect the diff against `origin/<default branch>`, run one `thermo-nuclear-code-quality-review` subagent on it, apply its in-scope findings that keep behavior the same and list the skipped ones with a reason, run the project's checks again, push, open the pull request with `gh pr create`, and report its link.
   The prompt shows in the transcript as yours, and while a turn runs it waits as a queued follow-up, as a message the composer sends then does.
-  The button reads **Opening PR…** and takes no second press, there or in the command menu, from the press until that prompt's turn ends, or until you take it back out of the queue while no turn runs.
+  The button reads **Opening PR…** and takes no second press, there or in the command menu, from the press until the session is next idle after it took the prompt, through messages you steer or queue meanwhile and questions it asks.
+  Taking the queued prompt back out while a turn runs keeps **Opening PR…** until that turn ends.
   It goes once a read of the pull request list names the new pull request; a second send before then reports the open pull request's link and stops.
   **Open pull request** in the command menu does the same for the focused pane's session while the panes show.
 - The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
