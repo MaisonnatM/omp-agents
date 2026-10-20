@@ -15,6 +15,7 @@ import {
 	PanelLeft,
 	PanelRight,
 	Plus,
+	RefreshCw,
 	Repeat,
 	Search,
 	SquareTerminal,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Project } from "../../../src/shared/projects";
+import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoCategory } from "../../../src/user-todos-shared";
@@ -48,7 +50,8 @@ import { localDay } from "../../days";
 import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
-import { useConversationHits, useSearchSources } from "../../reads";
+import { useConversationHits, useRead, useSearchSources } from "../../reads";
+import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
 import { hashForProjects, type OpenMode, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
@@ -144,6 +147,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	const search = query.trim();
 	const resuming = starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null;
 	const hits = useConversationHits(viewId === "root" ? search : "");
+	const selfUpdate = useRead<DashboardUpdateStatus>(DASHBOARD_UPDATE_URL).data;
 
 	const sessionItems = useMemo((): PaletteItem[] => {
 		const sessionItem = (entry: SessionEntry): PaletteItem => {
@@ -220,6 +224,23 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			kind: "Command",
 			actions: [[{ id: "open", title: "Open", icon, run: { kind: "push", view: target } }]],
 		});
+		/** Offered only where the server runs from a checkout; a packaged app updates through its own menu. */
+		const updateItem = (status: DashboardUpdateStatus | null): PaletteItem[] =>
+			status?.kind === "checkout"
+				? [
+						{
+							id: "command:update-dashboard",
+							section: "commands",
+							title: "Update dashboard",
+							subtitle: status.behind === 0 ? `omp-agents is current with origin/${status.branch}` : `${status.behind === 1 ? "1 new commit" : `${status.behind} new commits`} on ${status.branch}`,
+							keywords: ["omp-agents", "pull", "restart", "upgrade"],
+							icon: RefreshCw,
+							accessories: [],
+							kind: "Command",
+							actions: [[{ id: "run", title: "Pull and restart", icon: RefreshCw, run: { kind: "do", fn: () => void updateDashboard() } }]],
+						},
+					]
+				: [];
 		return [
 			...paletteCommands(handlers, unavailable).map(
 				({ id, command, label }): PaletteItem => ({
@@ -236,8 +257,9 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			),
 			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
+			...updateItem(selfUpdate),
 		];
-	}, [handlers, unavailable, tabs]);
+	}, [handlers, unavailable, tabs, selfUpdate]);
 
 	const workspaceItems = useMemo((): PaletteItem[] => {
 		const pickWorkspace = (cwd: string | null): void => {

@@ -7,7 +7,7 @@ import type { PlanUsage, PlanWindow } from "../shared/models";
 import type { AgentState } from "../shared/moves";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
-import { ACTIVITY_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -68,6 +68,12 @@ interface State {
 	localEvents?: FoundEvent[];
 	googleEvents?: FoundEvent[];
 	googleError?: string;
+	/** The commits origin's branch holds past the running omp-agents build. */
+	dashboardCommits?: number;
+	/** Why updating omp-agents is refused, when it is. */
+	dashboardRefusal?: string;
+	/** How many times the dashboard check fetched omp-agents' branch. */
+	dashboardFetches?: number;
 	now?: number;
 }
 
@@ -89,6 +95,14 @@ function sources(state: State): NoticeSources {
 		},
 		upgradeModel: async update => {
 			state.models = state.models.filter(model => model !== update);
+		},
+		dashboardCommits: async () => {
+			state.dashboardFetches = (state.dashboardFetches ?? 0) + 1;
+			return state.dashboardCommits ? { branch: "main", running: "a1b2c3d4", commits: state.dashboardCommits } : null;
+		},
+		updateDashboard: async () => {
+			if (state.dashboardRefusal) throw new Error(state.dashboardRefusal);
+			return { kind: "restarting", from: "a1b2c3d4", to: "e5f6a7b8c9", installed: false };
 		},
 		pullRequests: async () => {
 			const repo = { owner: "acme", repo: "webapp", cwds: ["/code/webapp"] };
@@ -155,6 +169,24 @@ describe("Notices", () => {
 		expect(flaky.list.map(notice => "status" in notice && notice.status)[0]).toEqual({ state: "failed", error: "Update failed: offline" });
 		await flaky.apply(["omp:18.8.5"], "update");
 		expect(flaky.list.map(notice => "status" in notice && notice.status)[0]).toEqual({ state: "updated", note: "omp 18.8.5 is installed. Restart omp-agents to load it." });
+	});
+
+	test("new omp-agents commits grow one notice per running build, whose update refuses with its reason and then restarts without fetching again", async () => {
+		const state: State = { latest: null, installed: "18.8.0", models: [], dashboardCommits: 1 };
+		const notices = new Notices(noticesPath(), sources(state), () => {});
+		await notices.check(DASHBOARD_KINDS);
+		state.dashboardCommits = 3;
+		await notices.check(DASHBOARD_KINDS);
+		expect(notices.list).toEqual([{ id: "dashboard:a1b2c3d4", at: 0, seen: false, read: false, kind: "dashboard", branch: "main", commits: 3, status: { state: "available" } }]);
+
+		state.dashboardRefusal = "/code/omp-agents has changes to tracked files (bun.lock).";
+		await notices.apply(["dashboard:a1b2c3d4"], "update");
+		expect(notices.list.map(notice => "status" in notice && notice.status)).toEqual([{ state: "failed", error: "/code/omp-agents has changes to tracked files (bun.lock)." }]);
+
+		state.dashboardRefusal = undefined;
+		await notices.apply(["dashboard:a1b2c3d4"], "update");
+		expect(notices.list.map(notice => "status" in notice && notice.status)).toEqual([{ state: "updated", note: "Restarting omp-agents at e5f6a7b…" }]);
+		expect(state.dashboardFetches).toBe(2);
 	});
 
 	test("a check that fails keeps the notices and marks the last one found", async () => {

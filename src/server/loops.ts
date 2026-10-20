@@ -18,6 +18,8 @@ const NOTICE_CHECK_MS = 6 * 60 * 60_000;
 const ACTIVITY_CHECK_MS = 2 * 60_000;
 /** Each pull fetches every workspace repository's default branch whose automatic pulls are on. */
 const PULL_MS = 5 * 60_000;
+/** Each dashboard check fetches the branch the server runs from. */
+const DASHBOARD_CHECK_MS = 5 * 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -38,6 +40,8 @@ export interface LoopHandlers {
 	onActivityTick(): Promise<void>;
 	/** At once, then every {@link PULL_MS}, listener or not. */
 	onPullTick(): Promise<void>;
+	/** At once, then every {@link DASHBOARD_CHECK_MS}, listener or not. */
+	onDashboardTick(): Promise<void>;
 }
 
 /**
@@ -111,6 +115,7 @@ export class Loops {
 			repeat("update check", this.#on.onNoticeTick, NOTICE_CHECK_MS, 0),
 			repeat("activity check", this.#on.onActivityTick, ACTIVITY_CHECK_MS),
 			repeat("pull", this.#on.onPullTick, PULL_MS, 0),
+			repeat("dashboard check", this.#on.onDashboardTick, DASHBOARD_CHECK_MS, 0),
 		];
 	}
 

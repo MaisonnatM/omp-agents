@@ -53,7 +53,7 @@ import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops, repeat } from "./loops";
 import { cleanupEnds, MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
 import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
@@ -65,6 +65,7 @@ import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
+import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
@@ -128,6 +129,7 @@ export class Dashboard {
 	#stopMergeQueue = (): void => {};
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
+	readonly #selfUpdate: SelfUpdate;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
 	#publisher: Publisher | null = null;
 	/** Why the last registry listing failed, shown with the roster. */
@@ -138,7 +140,9 @@ export class Dashboard {
 	#activityFresh = false;
 	#usage: Extract<ServerMsg, { t: "usage" }> | null = null;
 
-	constructor(port: number) {
+	/** `selfUpdate` is **Update dashboard**, which pulls the checkout the server runs from and restarts the server. */
+	constructor(port: number, selfUpdate: SelfUpdate) {
+		this.#selfUpdate = selfUpdate;
 		// An older version kept the workspace list in `projects.json`, so it moves before the projects load from that name.
 		adoptOldWorkspaces(projectsFile, workspacesFile);
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
@@ -171,6 +175,8 @@ export class Dashboard {
 				updateOmp,
 				modelUpdates,
 				upgradeModel,
+				dashboardCommits: () => selfUpdate.newCommits(),
+				updateDashboard: () => selfUpdate.update(),
 				pullRequests: async () => ({ list: await loadPullRequests(this.knownCwds(), false), agent: agentOn(sessions.rows(files.factsOf)) }),
 				slack: async () => ((await integrationSignedIn("slack")) ? waitingOnYou(integrationFetch("slack"), Date.now()) : []),
 				plans: async () => {
@@ -413,6 +419,7 @@ export class Dashboard {
 			onPullTick: async () => {
 				if (ownerLock.held) await this.#sourceControl.pull(this.#workspaceCwds());
 			},
+			onDashboardTick: () => notices.check(DASHBOARD_KINDS),
 		});
 		this.#requests = new RequestLedger(createClientHandler({
 			sessions,
@@ -494,6 +501,7 @@ export class Dashboard {
 					return { merges: [...this.#mergeQueue.list], merged };
 				},
 			},
+			dashboard: this.#selfUpdate,
 		});
 	}
 

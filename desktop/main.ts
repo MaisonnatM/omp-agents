@@ -284,7 +284,7 @@ function installStarterKit(): void {
 	});
 }
 
-/** The update check, in a packaged app alone: a checkout updates through `git pull`. */
+/** The update check, in a packaged app alone: a checkout updates through the dashboard's **Update dashboard**, which pulls it and restarts the server. */
 let updates: Updates | null = null;
 
 /** Stops the server this shell started, letting it end its sessions first; resolves at once when it started none. */

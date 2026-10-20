@@ -51,9 +51,10 @@ const PROJECT_BADGE: Record<Extract<NoticeFace, { kind: "project" }>["about"], {
 	done: { icon: CircleCheck, tone: "bg-emerald-500 text-white" },
 };
 
-/** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, Google Calendar or this computer's calendar, or omp. */
+/** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, Google Calendar or this computer's calendar, omp, or omp-agents. */
 function originOf(notice: Notice): { logo: ReactNode; label: string } {
 	const mark = "size-3.5 shrink-0";
+	const sparkles = <Sparkles aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />;
 	switch (notice.kind) {
 		case "pull-request":
 			return { logo: <OrgIcon org="github" className={mark} />, label: "GitHub" };
@@ -70,8 +71,15 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 				: { logo: <BrandMark logo={GOOGLE_CALENDAR_LOGO} className={mark} />, label: "Google Calendar" };
 		case "project":
 			return { logo: <Users aria-hidden className={mark} />, label: notice.project };
-		default:
-			return { logo: <Sparkles aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />, label: "omp" };
+		case "omp":
+		case "model":
+			return { logo: sparkles, label: "omp" };
+		case "dashboard":
+			return { logo: sparkles, label: "omp-agents" };
+		default: {
+			const unhandled: never = notice;
+			return unhandled;
+		}
 	}
 }
 
@@ -225,6 +233,10 @@ function NoticeAction({ id, action, send, onDone }: { id: string; action: Action
 					{QUICK_ACTIONS[action.action].label}
 				</Button>
 			);
+		}
+		default: {
+			const unhandled: never = action;
+			return unhandled;
 		}
 	}
 }

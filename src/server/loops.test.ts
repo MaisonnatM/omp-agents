@@ -30,6 +30,7 @@ function recording(calls: string[]): LoopHandlers {
 		onNoticeTick: tick("notice"),
 		onActivityTick: tick("activity"),
 		onPullTick: tick("pull"),
+		onDashboardTick: tick("dashboard"),
 	};
 }
 

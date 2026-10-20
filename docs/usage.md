@@ -29,6 +29,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Settings](#settings)
 - [Notifications](#notifications)
   - [Session notifications](#session-notifications)
+- [Updating omp-agents](#updating-omp-agents)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Desktop app](#desktop-app)
 - [Limitations](#limitations)
@@ -1435,11 +1436,14 @@ An action that fails shows its error, and its control becomes available again.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
   - **Slack**: a message from someone else in a direct or group conversation you have not answered since, one notice per conversation, and each mention of you in a channel, from the last three days.
     It needs the Slack sign-in of **Settings › Integrations**, and the server checks it with the pull requests.
-  - **Updates**: a newer omp release or a newer model, checked at startup, every six hours, and after each update.
+  - **Updates**: a newer omp release or a newer model, checked at startup, every six hours, and after each update, and new commits for omp-agents itself, checked at startup and every five minutes.
     - A newer omp release than the one installed, on the channel that omp's `update.channel` setting picks.
       Turning off omp's `startup.checkUpdate` setting turns this check off too.
     - A newer Claude or OpenAI model than one that your model roles or fallback chains name, from the same provider and the same line, such as Claude Opus 5.5 to Claude Opus 5.6.
       Only models that `omp models` lists on a connected provider count, and dated snapshots are left out.
+    - **omp-agents update: N new commits on main**, when the server runs from a git checkout and its branch on origin holds commits past the one it runs.
+      One notice stands for the running build, so more commits raise its count rather than toast again.
+      The packaged app updates through **omp agents › Check for Updates…** instead.
   - **Providers**: a provider that stopped serving, checked after each `omp usage` run, every minute.
     - A plan window that `omp usage` reports used up, such as Cursor's `Other Models`, with when it resets and how many reset credits the plan holds.
       The notice goes once the window resets.
@@ -1458,7 +1462,7 @@ An action that fails shows its error, and its control becomes available again.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
-  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or **Calendar** for an event kept on this computer, or omp for an update.
+  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or **Calendar** for an event kept on this computer, omp for an update of omp or a model, or omp-agents for its own.
   A pull request's, Slack message's, provider's, or event's toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts.
   A pull request's, Slack message's, or provider's toast closes after a few seconds; an event's stays until you dismiss it or the event ends, and an update's until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
@@ -1467,6 +1471,7 @@ An action that fails shows its error, and its control becomes available again.
     An install that `omp update` leaves older than the notice's release, such as one that Nix manages, reports as failed with omp's last line of output.
   - For a model, it puts the new model in place of the old one in every role and fallback chain of `~/.omp/agent/config.yml` that names it, and keeps each role's thinking level, as **Settings › Models** would save it.
     A chain keyed by the old model keeps its key, and a workspace's `.omp/config.yml` stays as it was.
+  - For omp-agents, it is **Update dashboard**, as in [Updating omp-agents](#updating-omp-agents).
 - **×** clears a notice from the bell.
   A cleared update comes back with a newer version, a cleared pull request notice when the pull request comes back to the move after a while, a cleared Slack notice with a newer message, a cleared plan notice when the window runs out again a while after it reset, and a cleared credits notice when the credits run out again a while after a request worked.
 - The server keeps which notices were seen, read, and cleared in `notices.json` beside its access token.
@@ -1482,6 +1487,18 @@ An action that fails shows its error, and its control becomes available again.
 - The desktop app shows them unless **Settings › Preferences › Notifications** turns them off.
   A browser shows them only once you turn that switch on and allow the dashboard's notifications when the browser asks; when it blocks them, the switch says so.
   Each window keeps the switch in its own localStorage.
+
+## Updating omp-agents
+
+**Update dashboard**, from the bell's omp-agents notice, its toast, or the command menu, loads new commits into a dashboard that runs from a git checkout, in a browser tab, from `bun start`, or in `bun run desktop`.
+
+- It fast-forwards the checkout's branch to its branch on origin, and runs `bun install --frozen-lockfile` when `bun.lock` changed.
+- It never stashes, resets, or merges: a checkout on another branch than the server started on, with changes to tracked files, or with commits origin lacks stays as it was, and the notice or a toast says why.
+  Untracked files do not block it.
+- Then the server restarts on the same port, in the same terminal or desktop window, and the page reloads into the new build; a toast says so, and the menu says when there was nothing new.
+  Sessions keep running through the restart, a running turn included, and show live again once the server is back.
+- Changes to `desktop/` load only when the desktop app starts again.
+- Agents load new commits through `GET` and `PUT /api/dashboard/update` rather than by killing its processes, and the `PUT` restarts only when origin has new commits; the starter kit's `AGENTS.md` shows how, and [How omp-agents works](architecture.md#updating-the-dashboard) describes the endpoint.
 
 ## Keyboard shortcuts
 
@@ -1574,6 +1591,7 @@ Alt is Option on macOS.
   A session from another workspace switches the sidebar to that workspace.
   Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session, Cmd+Shift+C copies its path, and Cmd+Shift+X ends it, without opening that list.
   **Choose workspace…** switches the sidebar's workspace, and **Create todo** asks for a todo's title; Esc or Backspace in the empty field goes back.
+  **Update dashboard**, listed when the server runs from a git checkout, names the new commits on its branch and runs [Updating omp-agents](#updating-omp-agents).
   The bar at the bottom names where you are, what Enter does, and **Actions**, which opens the same list as Cmd+K.
   Esc closes the action list, then goes back, then clears what you typed, then closes the menu.
   Whatever you type also offers **Create todo**, last, which adds it at the end of **All**, with no category.

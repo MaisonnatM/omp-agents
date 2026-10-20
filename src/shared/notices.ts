@@ -1,5 +1,5 @@
 /**
- * What the bell lists: a newer omp or routed model, a pull request whose next move is yours, a Slack message that
+ * What the bell lists: a newer omp, routed model, or omp-agents build, a pull request whose next move is yours, a Slack message that
  * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), a calendar
  * event that starts soon, and a project that needs you.
  */
@@ -32,8 +32,14 @@ export type NoticeStatus =
 	| { state: "updated"; note: string }
 	| { state: "failed"; error: string };
 
-/** An omp release newer than the one installed, or a newer version of a routed model. */
-export type UpdateSubject = { kind: "omp"; current: string; latest: string } | ({ kind: "model" } & ModelUpdate);
+/**
+ * An omp release newer than the one installed, a newer version of a routed model, or `commits` new commits on `branch` at
+ * origin past the commit the omp-agents server runs from its checkout.
+ */
+export type UpdateSubject =
+	| { kind: "omp"; current: string; latest: string }
+	| ({ kind: "model" } & ModelUpdate)
+	| { kind: "dashboard"; branch: string; commits: number };
 
 /** A pull request of a workspace whose next move is yours, with the workspace directory a quick action on it starts in. */
 export interface PullRequestSubject {
@@ -130,6 +136,6 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| ProjectSubject
 );
 
-/** `update` installs the release or rewrites the routing; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */
+/** `update` installs the release, rewrites the routing, or pulls omp-agents and restarts it; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */
 export const NOTICE_OPS = ["update", "seen", "read", "clear"] as const;
 export type NoticeOp = (typeof NOTICE_OPS)[number];

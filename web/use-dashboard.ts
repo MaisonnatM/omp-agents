@@ -162,6 +162,8 @@ export function useDashboard(): Dashboard {
 		let retryMs = 500;
 		let timer: number | undefined;
 		let disposed = false;
+		/** The build of the server the page first reached; a later socket that reaches another build reloads the page into it. */
+		let build: string | null = null;
 		const connect = (): void => {
 			const ws = new WebSocket(socketUrl(`/ws?page=${PAGE_ID}`));
 			socketRef.current = ws;
@@ -174,6 +176,10 @@ export function useDashboard(): Dashboard {
 			ws.onmessage = event => {
 				const msg = JSON.parse(String(event.data)) as ServerMsg;
 				switch (msg.t) {
+					case "build":
+						if (build !== null && build !== msg.id) location.reload();
+						build = msg.id;
+						return;
 					case "items":
 					case "work":
 					case "media":

@@ -13,6 +13,8 @@ import type { Turn } from "./trajectory";
 import type { Workspace, WorkspaceList } from "./workspaces";
 
 export type ServerMsg =
+	/** The page build this server serves, first on every socket: a page another server built, before a restart, reloads. */
+	| { t: "build"; id: string }
 	/** `reset` replaces the roster with `hosts`; otherwise `hosts` replace or join by `instanceId` and `removed` leave. `error` is why the registry could not be listed, and comes with every message. */
 	| { t: "roster"; reset: boolean; hosts: RosterHost[]; removed: string[]; error: string | null }
 	/** `reset` replaces the list with `sessions`; otherwise `sessions` replace or join by `sessionId` and `removed` leave. The page orders them with {@link newestPastFirst}. */

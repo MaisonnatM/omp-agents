@@ -34,6 +34,9 @@ function readPage(dir: string): Map<string, Blob> {
 /** The page this server serves: the packaged app's prebuilt one, else a fresh build of the checkout's. */
 export const loadPage = async (): Promise<Page> => (prebuiltPageDir ? readPage(prebuiltPageDir) : buildPage());
 
+/** What names `page`'s build: its `index.html` names every chunk by the hash of its content. */
+export const pageBuild = async (page: Page): Promise<string> => Bun.hash(await (page.get("/index.html")?.text() ?? "")).toString(36);
+
 const NO_STORE = { "cache-control": "no-store" };
 
 const html = (status: number, body: string): Response =>

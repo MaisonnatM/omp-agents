@@ -24,6 +24,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Notifications](#notifications)
   - [Session notifications](#session-notifications)
 - [Merges, and the cleanup after one](#merges-and-the-cleanup-after-one)
+- [Updating the dashboard](#updating-the-dashboard)
 - [HTTP API](#http-api)
   - [Integrations](#integrations)
   - [MCP servers](#mcp-servers)
@@ -447,6 +448,7 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
   The server calls its `shutdown()` when that pipe ends, which it does however the shell exits, `SIGKILL` included, so no server outlives the app and holds the port.
   On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to write its stores and let go of its sessions.
   Quitting leaves the sessions the server started running, as a restart or a crash does: the server cannot tell a quit from a restart, **Restart to Install** quits too, and the next launch shows them live again, while **End session** stays the one way to stop a session.
+- **Update dashboard** runs the server again inside the same process ([Updating the dashboard](#updating-the-dashboard)), so the shell keeps its child, its pipes, and the window; the page in the window reloads itself once its socket hears a new build, as a browser tab's does.
 - The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`.
   A custom scheme for the page would fail that check.
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
@@ -751,11 +753,12 @@ Each server keeps its own copy in memory, as with the workspaces, so a routine's
 ## Notifications
 
 `src/server/notices.ts` owns the bell's notices: what the last checks found, the status of each update a page started, and which notices the user saw, read, or cleared, which it keeps in `notices.json` beside the access token.
-Each kind has its own check, and `src/server/loops.ts` runs four of them.
+Each kind has its own check, and `src/server/loops.ts` runs five of them.
 The update check (`UPDATE_KINDS`) runs at startup and every six hours, whether or not a page is connected, and again after each update that succeeds.
 The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, and when a socket opens unless it ran since the last tick that found none.
 The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run, at startup and every minute, whether or not a page is connected.
 The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page is connected.
+The dashboard check (`DASHBOARD_KINDS`) runs at startup and every five minutes, whether or not a page is connected: `SelfUpdate.newCommits` fetches the branch the server runs from origin and counts the commits past the running one.
 
 - `latestOmp` in `src/omp/release.ts` asks `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts` for the newest release on omp's `update.channel`, unless `startup.checkUpdate` is off.
   `installedOmp` reads the version from the installed package's `package.json` on each check, so the check is right after an update, before a restart.
@@ -780,7 +783,8 @@ The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page i
 A check that fails keeps what the last one found for its kind, and the marks for it, and logs each distinct error once.
 A repository GitHub did not answer for keeps its pull requests' notices the same way.
 A notice whose update runs or ran stays after a check stops finding it, so the page shows how the update ended.
-A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, or `event:local/<id>:<start>` and `event:google/<account>/<calendar id>/<event id>:<start>`, so a moved event is news again.
+A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `dashboard:<running commit>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, or `event:local/<id>:<start>` and `event:google/<account>/<calendar id>/<event id>:<start>`, so a moved event is news again.
+The dashboard notice names the running commit rather than origin's, so new commits raise its count instead of toasting again, and only a restart onto another commit makes a new one.
 A plan notice's id leaves out the reset time, which a provider may report a little differently on each run, and a credits notice's leaves out its first failure, which moves once that failure is older than the day the check reads; the window's reset or a request that works ends the notice, and the next time it comes after its marks lapse is news.
 A Slack notice dates from its message, and a credits notice from the first failure the check reads.
 A pull request notice dates from the check that found it, since the pull request's last update on GitHub may predate the move, except on its repository's first answer since startup, which dates each from that update, so a workspace found later or a repository GitHub answers again does not bring old pull requests as news.
@@ -795,6 +799,8 @@ Every socket hears the list as a `notices` message on the roster topic after eac
 The server keeps the omp modules it loaded until it restarts, and `src/omp/modules.ts` names any export the new release dropped at the next start.
 `update` on a model calls `upgradeModel` in `src/settings.ts`, which turns `upgradeEdits` into routing edits and writes each with `writeRouting`, under the same lock as a Settings › Models save.
 A role or chain entry keeps whatever follows the model in its selector, such as `:high` or `:auto`, and each chain that names the model is written whole.
+`update` on omp-agents' own notice calls `SelfUpdate.update`, as [Updating the dashboard](#updating-the-dashboard) says, and fails with its refusal.
+No check follows its success, unlike omp's and a model's: the server restarts and checks at startup, and a fetch run now would still hold `.git`'s lock when that check fetches.
 
 ### Session notifications
 
@@ -841,6 +847,34 @@ So a session busy at the merge ends once idle, one whose other pull request clos
 It ends each through `endSession`, or through the project runner's `endFinished` for a worker; either removes its linked worktree through `Worktrees.removeCheckout`, which keeps it while any live session, a terminal one included, still uses it, or it has changes.
 Either rejects a session that is gone or no longer idle, since the cleanup read its status before the checkout, so a session that started a turn meanwhile waits for the next look.
 Then it deletes the local branch it worked on when that is the head branch of a merged pull request of the repository `origin` names in its checkout, through `Worktrees.deleteMergedBranch`: only when the branch's commit is the merged head or one it contains, fetched from `origin` when missing, as after the queue updated the branch on GitHub, through `git update-ref -d` with that commit as the old value, so a commit made meanwhile keeps it, and never a branch a worktree has checked out.
+
+## Updating the dashboard
+
+`src/server/self-update.ts` is **Update dashboard**.
+At startup `SelfUpdate.forServer` reads the checkout the server runs from: its top directory, the branch checked out, and that branch's commit, the running build.
+A packaged app, a detached HEAD, a directory outside git, or a system without `process.execve` offers no update, and says why.
+
+`SelfUpdate` runs its status reads, its checks, and its updates one at a time, so a check never fetches under a fast-forward.
+Once an update starts the restart, a later check answers nothing without fetching, so no fetch outlives `execve` and holds `.git`'s lock when the new server checks.
+An update never stashes, resets, or merges:
+
+- It refuses when the checkout moved to another branch since the server started, has changes to tracked files (untracked files do not count), or `origin/<branch>` was never fetched, as for a branch never pushed.
+- It fetches `origin/<branch>`, refuses when the branch has commits origin lacks, and otherwise fast-forwards with `git merge --ff-only`, its only write.
+- It answers `current` when the checkout then holds the running commit.
+- It reads each git exit code exactly: `diff --quiet` and `merge-base --is-ancestor` answer 0 or 1, and any other code, a timeout's included, refuses with git's `fatal:` or `error:` line rather than reading as an answer.
+- Otherwise it runs `bun install --frozen-lockfile` when `bun.lock` differs between the running commit and the new one, and answers `restarting`; a failed install leaves the server running and says so.
+- 300 ms after answering, so the answer reaches the page or agent that asked, the server restarts: `restart` in `src/server.ts` stops as a shutdown does, letting go of the sessions it started, which run on in their keepers, and writing its stores, and calls `process.execve` with its own command and environment.
+  The new server attaches to those sessions again as any start does.
+  It keeps the owner lock, which names its pid and port, so no other server takes over the routines while it starts again; a signal or the desktop shell's pipe ending during a restart makes it exit instead.
+  The new server keeps the pid, the port, and the standard streams, so a terminal keeps its job and the desktop shell its child, and it builds the page of the checkout as it now is.
+- Every later update until then answers the same `restarting`.
+
+The desktop shell's own code in `desktop/` loads only when the app starts again.
+Every socket's first message is `{ t: "build", id }`, a hash of the served `index.html`, which names each chunk by its content's hash; the page keeps the first id it heard and reloads when a later socket brings another, so a browser tab or the desktop window follows a restart to the new page.
+
+`GET /api/dashboard/update` answers `DashboardUpdateStatus` from `src/shared/dashboard-update.ts` without asking origin: `unavailable` with its reason, or the branch, the running commit, and `behind`, the commits `origin/<branch>` held past it at the last fetch.
+`PUT /api/dashboard/update` with any JSON body runs `SelfUpdate.update` and answers `{ kind: "current" }` or `{ kind: "restarting", from, to, installed }`, or 409 with the refusal.
+An agent reaches both with `curl`, with the token's cookie and, for the `PUT`, an `Origin` that matches the host; the starter kit's `AGENTS.md` tells agents to load new commits this way, never by killing its processes.
 
 ## HTTP API
 
