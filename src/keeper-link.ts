@@ -60,6 +60,10 @@ function parseMeta(value: unknown): KeeperMeta | null {
 /** A keeper that took the connection and did not greet within `greetMs`, which the connection then hung up on. */
 class KeeperSilent extends Error {}
 
+/** The connect errors of a socket nobody listens on yet, or any more; a keeper that has not listened yet is retried. */
+const NOT_LISTENING: Record<string, true> = { ENOENT: true, ECONNREFUSED: true };
+const notListening = (error: unknown): boolean => isObject(error) && typeof error.code === "string" && Object.hasOwn(NOT_LISTENING, error.code);
+
 /**
  * Connects to the keeper of session `instanceId` and reads its greeting. Rejects when none listens there, or it hangs
  * up before it greets, as one does whose omp exited before it was ready, or it does not greet within `greetMs`.
@@ -124,12 +128,16 @@ function connect(dir: string, instanceId: string, greetMs: number | null): Promi
 			},
 		});
 	});
+	/** Why the connection failed when no keeper listens; any other failure before the greeting is a hang-up. */
+	let unreachable: unknown = null;
 	socket.on("error", error => {
-		if (!greeted) reject(error);
+		if (notListening(error)) unreachable = error;
 	});
 	socket.on("close", () => {
 		clearTimeout(silence);
-		if (!greeted) reject(new Error(`The session keeper hung up before omp was ready. ${tail(log)}`.trim()));
+		// A keeper whose omp exited closes its listener and exits, and Linux resets a connection still waiting in the
+		// listener's backlog: that reset, like a plain close, means the keeper hung up, and the reason is in its log.
+		if (!greeted) reject(unreachable ?? new Error(`The session keeper hung up before omp was ready. ${tail(log)}`.trim()));
 		else if (!detached) {
 			// The keeper hangs up once omp exited, so its log holds all omp wrote.
 			lastStderr = tail(log);
@@ -186,8 +194,7 @@ export async function startKeeper(dir: string, instanceId: string, { cwd, argv, 
 		try {
 			return await connect(dir, instanceId, null);
 		} catch (error) {
-			const code = isObject(error) ? error.code : undefined;
-			if (code !== "ENOENT" && code !== "ECONNREFUSED") throw error;
+			if (!notListening(error)) throw error;
 		}
 		if (!Number.isSafeInteger(pid) || !running()) throw new Error(`The session keeper exited. ${tail(log)}`.trim());
 		if (Date.now() > deadline) {

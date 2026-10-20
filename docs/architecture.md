@@ -324,6 +324,7 @@ omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits
 A keeper (`src/keeper.ts`) holds one session's omp: it runs omp with piped stdio, and lends that stdio to one server at a time through a Unix socket, `sessions/<port>/<instance id>.sock` beside the access token, with omp's stderr in the `.log` beside it and its own pid in the `.pid`, written before it listens.
 The directory is per port, so a server on another port, such as a smoke run, never takes over this one's sessions.
 `startKeeper` in `src/keeper-link.ts` starts it through `/bin/sh`, which backgrounds it and exits, and Bun's `detached` makes it a session leader: no signal to the server's process group, and no kill of the server's process tree, reaches it.
+It retries while nobody listens on the socket yet; any other end of the connection before the greeting, a close or the reset Linux sends to a connection still waiting in the backlog of a keeper that exited, means the keeper hung up, and the start fails with the tail of omp's stderr from the log.
 Of omp's modules the keeper loads only `rpc-frame.ts`, whose path the server passes it (`rpcFrameFile` in `src/omp/modules.ts`); the packaged app ships the keeper as `keeper.js` beside `server.js` (`keeperScript` in `src/server/resources.ts`).
 
 Each connection starts with the keeper's greeting, `omp_agents_keeper` with omp's pid and the `meta` the server passed at the start (`startedAt` and the directory omp started in), then omp's own `ready` line again.

@@ -260,6 +260,30 @@ describe("session keeper", () => {
 		expect(existsSync(join(dir, "s1.sock"))).toBe(false);
 	});
 
+	test("a keeper that exits with the connection still waiting to be accepted reports what omp wrote, not the reset", async () => {
+		const dir = scratch();
+		// As a keeper whose omp exited: omp's stderr is in the log, and the keeper closes its listener and exits before its
+		// loop accepts the waiting connection, which Linux then resets.
+		writeFileSync(
+			join(dir, "exiting.ts"),
+			`import { writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+writeFileSync(${JSON.stringify(join(dir, "s1.log"))}, "no model is signed in\\n");
+const server = createServer(() => {});
+server.listen(${JSON.stringify(join(dir, "s1.sock"))}, () => {
+	console.log("listening");
+	Bun.sleepSync(300);
+	server.close();
+	process.exit(3);
+});
+`,
+		);
+		const keeper = Bun.spawn([process.execPath, join(dir, "exiting.ts")], { stdout: "pipe" });
+		await keeper.stdout.getReader().read();
+		await expect(attachKeeper(dir, "s1")).rejects.toThrow("The session keeper hung up before omp was ready. no model is signed in");
+		expect(await keeper.exited).toBe(3);
+	});
+
 	test("a keeper that is gone leaves nothing to attach to, and its files go", async () => {
 		const dir = scratch();
 		writeFileSync(join(dir, "s1.sock"), "");
