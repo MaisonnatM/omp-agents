@@ -29,6 +29,7 @@ type StatusView = { [Kind in StatusItem["kind"]]: ItemView<Extract<StatusItem, {
 /** How the details' Status says each fact. */
 const STATUS_VIEW: StatusView = {
 	ready: { tone: "done", icon: GitMerge, text: () => "Ready to merge" },
+	behind: { tone: "waiting", icon: GitMerge, text: ({ base }) => `Behind ${base}, so a merge updates its branch first` },
 	draft: { tone: "waiting", icon: GitPullRequestDraft, text: () => "Draft, not ready for review" },
 	conflicts: { tone: "blocked", icon: GitMerge, text: ({ base }) => `Merge conflicts with ${base}`, fix: "resolve-conflicts" },
 	"checks-failing": { tone: "blocked", icon: CircleX, text: ({ count }) => `${plural(count, "check")} failed`, fix: "fix-ci" },

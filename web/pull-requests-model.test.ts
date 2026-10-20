@@ -27,6 +27,7 @@ import {
 	withThreadResolved,
 	yourMoveCount,
 } from "./pull-requests-model";
+import { viewOf } from "./components/pull-requests/pr-details/status-view";
 
 const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
 	owner: "acme",
@@ -377,6 +378,13 @@ describe("pull request status", () => {
 		expect(
 			pullRequestStatus(detail({ review: "approved", reviewers: [{ ...teammate, state: "approved" }], checks: "passing", checkRuns: [check("passing"), check("skipped")] })),
 		).toEqual([{ kind: "ready" }, { kind: "approved", by: ["teammate"] }, { kind: "checks-passing", passed: 1, skipped: 1 }]);
+	});
+
+	test("a ready PR behind its base says its branch is updated first, and still offers the merge", () => {
+		const behind = detail({ review: "approved", reviewers: [{ ...teammate, state: "approved" }], checks: "passing", checkRuns: [check("passing")], mergeState: "behind" });
+		expect(pullRequestStatus(behind).map(item => viewOf(item).text(item))).toEqual(["Behind main, so a merge updates its branch first", "Approved by teammate", "1 check passed"]);
+		const facts = actionFacts(pr(7, { review: "approved", checks: "passing" }), behind);
+		expect(facts && moveOf(facts, null)).toBe("merge");
 	});
 
 	test("a draft says so and names whom it waits on; a merged or closed PR has no status", () => {
