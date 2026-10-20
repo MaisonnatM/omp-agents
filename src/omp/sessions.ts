@@ -84,9 +84,10 @@ export async function endsMidTurn(sessionFile: string): Promise<boolean> {
 	const byId = new Map(entries.map(entry => [entry.id, entry]));
 	// omp checks the branch from the leaf it replays to, which a late usage entry can move off the last entry.
 	const leafId = sessionEntries.resolveSessionLeafId(entries);
+	const leaf = leafId === null ? undefined : byId.get(leafId);
 	const branch: FileEntry[] = [];
 	const seen = new Set<string>();
-	for (let entry = leafId ? byId.get(leafId) : undefined; entry && !seen.has(entry.id); entry = entry.parentId ? byId.get(entry.parentId) : undefined) {
+	for (let entry = leaf; entry && !seen.has(entry.id); entry = entry.parentId ? byId.get(entry.parentId) : undefined) {
 		seen.add(entry.id);
 		branch.push(entry);
 	}

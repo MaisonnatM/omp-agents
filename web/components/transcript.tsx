@@ -148,7 +148,7 @@ export const HIDE_THINKING_KEY = "omp-agents.hide-thinking";
 
 /**
  * Where a `task` row's subagents open: the live session the transcript belongs to, its registered subagents for their
- * status, and the page's open. `onCancel` stops a running subagent for good, settling once the server has asked omp to;
+ * status, and the page's open. `onCancel` cancels a running subagent, as omp's Agent Hub kill does, settling once the server has asked omp to;
  * `null` in a room the dashboard cannot write to. The context is `null` in a past session, whose subagents have no view of their own.
  */
 export const SubagentLinks = createContext<{
@@ -166,7 +166,7 @@ function CancelAgentButton({ view, onCancel, running }: { view: LiveView & { age
 	const cancel = useAction(() => onCancel(view), "Could not cancel the subagent");
 	if (!running && !cancel.pending) return null;
 	return (
-		<Tooltip content={cancel.pending ? "Cancelling…" : "Cancel subagent: stop it for good, leaving the session's turn running"}>
+		<Tooltip content={cancel.pending ? "Cancelling…" : "Cancel subagent, leaving the session's turn running"}>
 			<Button
 				variant="ghost"
 				size="icon"
