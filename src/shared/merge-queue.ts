@@ -15,6 +15,16 @@ export interface QueuedPullRequest extends PullRequest {
 /** Where a queued merge stands: waiting on GitHub, or stopped with the reason. */
 export type QueuedMergeState = { kind: "waiting"; why: string } | { kind: "failed"; why: string };
 
+/** The changes the queue asks GitHub for that a read can show only later. */
+export const SETTLE_STEPS = ["retarget", "ready", "update", "arm"] as const;
+export type SettleStep = (typeof SETTLE_STEPS)[number];
+
+/** A change the queue asked GitHub for at `at`, in ms since the epoch, that no read has shown yet. */
+export interface Settling {
+	step: SettleStep;
+	at: number;
+}
+
 export interface QueuedMerge {
 	id: string;
 	method: MergeMethod;
@@ -26,8 +36,8 @@ export interface QueuedMerge {
 	merged: number;
 	/** Whether the queue armed GitHub's auto-merge on the first. */
 	auto: boolean;
-	/** When the queue last updated the first one's branch, in ms since the epoch; `null` when it has not. */
-	updatedAt: number | null;
+	/** The last change the queue asked GitHub for on the first, until a read shows it; `null` when none is still to show. */
+	settling: Settling | null;
 	state: QueuedMergeState;
 }
 
@@ -57,7 +67,7 @@ export const isQueuedMerge: Guard<QueuedMerge> = fields<QueuedMerge>({
 	prs: arrayOf(isQueuedPullRequest),
 	merged: isNumber,
 	auto: (value): value is boolean => typeof value === "boolean",
-	updatedAt: nullable(isNumber),
+	settling: nullable(fields<Settling>({ step: oneOf(SETTLE_STEPS), at: isNumber })),
 	state: tagged<QueuedMergeState, "kind">("kind", { waiting: { why: isString }, failed: { why: isString } }),
 });
 

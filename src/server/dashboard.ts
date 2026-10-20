@@ -359,7 +359,11 @@ export class Dashboard {
 				const role = projects.roleOf(sessionId);
 				if (role?.role === "worker") return projectRunner.endFinished(role.projectId, role.workerId);
 				const session = sessions.bySessionId(sessionId);
-				if (session) await this.#endLive(session);
+				if (!session) throw new Error("It does not run.");
+				// The cleanup saw it idle before it read the checkout; one that started a turn since waits for the next look.
+				const { status } = session.row();
+				if (status !== "idle") throw new Error(`It is ${status}, not idle.`);
+				await this.#endLive(session);
 			},
 			deleteBranch: (gitDir, branch, head) => worktrees.deleteMergedBranch(gitDir, branch, head),
 		}));

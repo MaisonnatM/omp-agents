@@ -10,14 +10,22 @@ import { ReducerFile } from "../fs";
 import { errorText } from "../json";
 import { type MergeStatus } from "../pull-request-merge";
 import { mergesNow, type PullRequest, pullRequestName, repoKey } from "../shared/github";
-import { isQueuedMerge, type MergeQueueChange, type QueuedMerge, type QueuedPullRequest, queuedMergeOf } from "../shared/merge-queue";
+import { isQueuedMerge, type MergeQueueChange, type QueuedMerge, type QueuedPullRequest, queuedMergeOf, type SettleStep } from "../shared/merge-queue";
 import type { MergeMethod } from "../shared/source-control";
 import { SerialLane } from "../serial-lane";
 
-/** How long GitHub may still report a branch the queue updated as behind, before the queue updates it again. */
-const UPDATE_SETTLE_MS = 60_000;
-/** The most steps one look takes, so a change GitHub has not shown yet, such as a retarget, is not made again and again. */
+/** How long a change the queue asked GitHub for may not show in its reads, before the queue asks for it again. */
+const SETTLE_MS = 60_000;
+/** The most steps one look takes, which bounds the GitHub calls of one tick whatever its reads say. */
 const STEPS_PER_LOOK = 6;
+
+/** What a merge waits for while GitHub does not show a change the queue asked for yet. */
+const SETTLE_WHY: Record<SettleStep, string> = {
+	retarget: "Waiting for GitHub to show the new base",
+	ready: "Waiting for GitHub to show it ready for review",
+	update: "Updating the branch",
+	arm: "GitHub merges it once it is ready",
+};
 
 /** What the queue asks of GitHub; each mutation names the pull request by its node id. */
 export interface MergeGitHub {
@@ -46,28 +54,53 @@ export interface MergeQueueDeps {
 }
 
 /** The one step a queued merge takes next, from where its first pull request stands now. */
-export type MergeStep = { kind: "merged" } | { kind: "fail"; why: string } | { kind: "wait"; why: string } | { kind: "retarget" | "ready" | "update" | "merge" | "arm" | "adopt" };
+export type MergeStep = { kind: "merged" } | { kind: "fail"; why: string } | { kind: "wait"; why: string } | { kind: SettleStep | "merge" | "adopt" };
 
-/** The step `merge` takes next, given where its first pull request stands at `now`. */
+/** The step `merge` takes next, given where its first pull request stands at `now`; it waits while the read still asks for a change the queue asked GitHub for less than {@link SETTLE_MS} ago. */
 export function nextStep(merge: QueuedMerge, status: MergeStatus, now: number): MergeStep {
 	const [pr] = merge.prs;
 	if (!pr) return { kind: "merged" };
+	const step = askedStep(merge, pr, status);
+	const { settling } = merge;
+	return settling !== null && step.kind === settling.step && now - settling.at < SETTLE_MS ? { kind: "wait", why: SETTLE_WHY[settling.step] } : step;
+}
+
+/** The step the read `status` of `pr`, the first of `merge`, asks for. */
+function askedStep(merge: QueuedMerge, pr: QueuedPullRequest, status: MergeStatus): MergeStep {
 	const name = `#${pr.number}`;
 	if (status.state === "merged") return { kind: "merged" };
 	if (status.state === "closed") return { kind: "fail", why: `${name} was closed.` };
 	// GitHub writes the queue's update of the branch later, as a merge of the base whose first parent is the head pinned before it.
-	const updated = merge.updatedAt !== null && status.parents.length === 2 && status.parents[0] === pr.head;
+	const updated = merge.settling?.step === "update" && status.parents.length === 2 && status.parents[0] === pr.head;
 	if (status.head !== pr.head) return updated ? { kind: "adopt" } : { kind: "fail", why: `${name}'s branch moved after the merge was queued; review it and merge again.` };
 	if (status.base !== merge.base) return { kind: "retarget" };
 	if (status.draft) return { kind: "ready" };
 	if (status.mergeState === "dirty") return { kind: "fail", why: `${name} conflicts with ${merge.base}.` };
 	if (status.checks === "failing") return { kind: "fail", why: `${name}'s checks failed.` };
-	if (status.mergeState === "behind") return merge.updatedAt !== null && now - merge.updatedAt < UPDATE_SETTLE_MS ? { kind: "wait", why: "Updating the branch" } : { kind: "update" };
+	if (status.mergeState === "behind") return { kind: "update" };
 	if (status.autoArmed) return { kind: "wait", why: "GitHub merges it once it is ready" };
 	if (mergesNow(status)) return { kind: "merge" };
 	if (status.mergeState === "unknown") return { kind: "wait", why: "GitHub is checking whether it can merge" };
 	if (status.autoAllowed) return { kind: "arm" };
 	return { kind: "wait", why: status.checks === "pending" ? "Waiting for checks" : "Waiting for a review or a rule of the base branch" };
+}
+
+/** Whether the read `status` of `pr`, the first of `merge`, shows `step`; an update shows as the new head that adopt takes. */
+function shows(step: SettleStep, merge: QueuedMerge, pr: QueuedPullRequest, status: MergeStatus): boolean {
+	switch (step) {
+		case "retarget":
+			return status.base === merge.base;
+		case "ready":
+			return !status.draft;
+		case "update":
+			return status.head !== pr.head;
+		case "arm":
+			return status.autoArmed;
+		default: {
+			const unhandled: never = step;
+			return unhandled;
+		}
+	}
 }
 
 /**
@@ -170,7 +203,7 @@ export class MergeQueue {
 		const order = stackOrder(read);
 		if (!order) throw new Error("These pull requests do not form one stack.");
 		const prs = order.map(({ base: _, ...pr }) => pr);
-		const merge: QueuedMerge = { id: this.#deps.newId(), method, base: order[0]!.base, prs, merged: 0, auto: false, updatedAt: null, state: { kind: "waiting", why: "Queued" } };
+		const merge: QueuedMerge = { id: this.#deps.newId(), method, base: order[0]!.base, prs, merged: 0, auto: false, settling: null, state: { kind: "waiting", why: "Queued" } };
 		// A server beside this one may have queued one of them while this one read GitHub; the add then changes nothing.
 		if (!this.#edit({ op: "add", merge })) refuseQueued(prs);
 		const merged: QueuedPullRequest[] = [];
@@ -194,7 +227,7 @@ export class MergeQueue {
 	}
 
 	/**
-	 * Takes merge `id`'s next step, and the steps after it that need no wait, such as the next of a stack once one merges,
+	 * Takes merge `id`'s next step, and the steps after it until one waits, such as the next of a stack once one merges,
 	 * adding each pull request it merges to `merged`. Each step reads `merges.json` first, so a merge cancelled meanwhile stops.
 	 */
 	async #step(id: string, merged: QueuedPullRequest[]): Promise<void> {
@@ -212,14 +245,16 @@ export class MergeQueue {
 				this.#patch(id, { state: { kind: "waiting", why: `Cannot read ${pullRequestName(pr)}: ${errorText(error)}` } });
 				return;
 			}
-			const step = nextStep(merge, status, this.#deps.now());
+			const at = this.#deps.now();
+			const step = nextStep(merge, status, at);
+			const settling = merge.settling && !shows(merge.settling.step, merge, pr, status) ? merge.settling : null;
 			try {
 				switch (step.kind) {
 					case "wait":
-						this.#patch(id, { state: { kind: "waiting", why: step.why } });
+						this.#patch(id, { settling, state: { kind: "waiting", why: step.why } });
 						return;
 					case "fail":
-						this.#patch(id, { state: { kind: "failed", why: step.why } });
+						this.#patch(id, { settling, state: { kind: "failed", why: step.why } });
 						return;
 					case "merged":
 						this.#landed(merge, pr, merged);
@@ -228,31 +263,30 @@ export class MergeQueue {
 						await github.merge(status.id, merge.method, pr.head);
 						this.#landed(merge, pr, merged);
 						continue;
+					case "adopt":
+						if (!this.#patch(id, { settling, prs: [{ ...pr, head: status.head }, ...merge.prs.slice(1)] })) return;
+						continue;
 					case "retarget":
 						await github.retarget(status.id, merge.base);
-						if (!this.#patch(id, { state: { kind: "waiting", why: `Retargeted onto ${merge.base}` } })) return;
-						continue;
+						break;
 					case "ready":
 						await github.ready(status.id);
-						if (!this.#patch(id, { state: { kind: "waiting", why: "Marked ready for review" } })) return;
-						continue;
+						break;
 					case "update":
 						await github.update(status.id, pr.head);
-						this.#patch(id, { updatedAt: this.#deps.now(), state: { kind: "waiting", why: "Updating the branch" } });
-						return;
-					case "adopt":
-						if (!this.#patch(id, { prs: [{ ...pr, head: status.head }, ...merge.prs.slice(1)] })) return;
-						continue;
+						break;
 					case "arm":
 						await github.arm(status.id, merge.method, pr.head);
-						// Cancelled while GitHub armed it: the cancel saw nothing to turn off.
-						if (!this.#patch(id, { auto: true, state: { kind: "waiting", why: "GitHub merges it once it is ready" } })) await github.disarm(status.id);
-						return;
+						break;
 					default: {
 						const unhandled: never = step;
 						return unhandled;
 					}
 				}
+				if (this.#patch(id, { auto: merge.auto || step.kind === "arm", settling: { step: step.kind, at }, state: { kind: "waiting", why: SETTLE_WHY[step.kind] } })) continue;
+				// Cancelled while GitHub armed it: the cancel saw nothing to turn off.
+				if (step.kind === "arm") await github.disarm(status.id);
+				return;
 			} catch (error) {
 				this.#patch(id, { state: { kind: "failed", why: `GitHub refused to ${step.kind} ${pullRequestName(pr)}: ${errorText(error)}` } });
 				return;
@@ -264,7 +298,7 @@ export class MergeQueue {
 	#landed(merge: QueuedMerge, pr: QueuedPullRequest, merged: QueuedPullRequest[]): void {
 		const rest = merge.prs.slice(1);
 		if (rest.length === 0) this.#edit({ op: "remove", id: merge.id });
-		else this.#patch(merge.id, { prs: rest, merged: merge.merged + 1, auto: false, updatedAt: null, state: { kind: "waiting", why: `Merged #${pr.number}` } });
+		else this.#patch(merge.id, { prs: rest, merged: merge.merged + 1, auto: false, settling: null, state: { kind: "waiting", why: `Merged #${pr.number}` } });
 		merged.push(pr);
 		this.#deps.onMerged(pr);
 	}

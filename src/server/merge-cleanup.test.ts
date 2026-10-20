@@ -12,12 +12,22 @@ function harness() {
 		github: new Map<number, PullRequestState>(),
 		/** The sessions whose end fails. */
 		failing: new Set<string>(),
+		/** What GitHub's read of the pull requests, and the read of a checkout, wait on before they answer. */
+		reading: Promise.resolve(),
+		checking: Promise.resolve(),
 		log: [] as string[],
 	};
 	const cleanup = new MergeCleanup({
 		sessions: () => state.sessions,
-		states: async prs => new Map(prs.flatMap(one => (state.github.has(one.number) ? [[prKey(one), state.github.get(one.number)!]] : []))),
-		checkout: async dir => ({ gitDir: `${dir}/.git`, repo: { owner: "o", repo: "r" } }),
+		states: async prs => {
+			const answer = new Map(prs.flatMap(one => (state.github.has(one.number) ? [[prKey(one), state.github.get(one.number)!]] : [])));
+			await state.reading;
+			return answer;
+		},
+		checkout: async dir => {
+			await state.checking;
+			return { gitDir: `${dir}/.git`, repo: { owner: "o", repo: "r" } };
+		},
 		end: async sessionId => {
 			if (state.failing.has(sessionId)) throw new Error("omp did not answer");
 			state.log.push(`end ${sessionId}`);
@@ -121,5 +131,24 @@ describe("MergeCleanup", () => {
 		state.sessions = [session("s1", [12])];
 		await cleanup.merged({ ...pr(13), branch: "feat", head: "abc" });
 		expect(state.log).toEqual([]);
+	});
+
+	test("a look that read a pull request open before the queue merged it keeps the merge, and deletes the branch at the head the queue merged", async () => {
+		const { cleanup, state, look } = harness();
+		state.sessions = [session("s1", [12])];
+		state.github.set(12, { state: "open", branch: "feat", head: "h1" });
+		await look();
+		const reading = Promise.withResolvers<void>();
+		const checking = Promise.withResolvers<void>();
+		state.reading = reading.promise;
+		state.checking = checking.promise;
+		await cleanup.tick();
+		const stale = cleanup.tick();
+		const merging = cleanup.merged({ ...pr(12), branch: "feat", head: "abc" });
+		reading.resolve();
+		await stale;
+		checking.resolve();
+		await merging;
+		expect(state.log).toEqual(["end s1", "delete /wt/s1/.git feat abc"]);
 	});
 });

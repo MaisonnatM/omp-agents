@@ -302,12 +302,16 @@ export class ProjectRunner implements ProjectControl {
 
 	/**
 	 * Ends worker `workerId` of project `projectId`, which the cleanup after a merge found idle with every pull request
-	 * merged or closed, as end_worker does, then tells its coordinator; settles once it ended, and rejects when it did not.
+	 * merged or closed, as end_worker does, then tells its coordinator; settles once it ended, and rejects when it did not,
+	 * such as when the worker is gone or started a turn since, so the cleanup tries again.
 	 */
 	async endFinished(projectId: string, workerId: WorkerId): Promise<void> {
 		const project = this.#deps.file.get(projectId);
 		const worker = project && !project.archived ? project.workers.find(candidate => candidate.id === workerId) : undefined;
-		if (!worker) return;
+		if (!worker) throw new Error(`Project ${projectId} has no worker ${workerId}.`);
+		const status = this.#deps.bySessionId(worker.sessionId)?.status;
+		if (status === undefined) throw new Error(`${worker.id} does not run.`);
+		if (status !== "idle") throw new Error(`${worker.id} is ${status}, not idle.`);
 		await this.#end(worker);
 		this.notify(projectId, { source: "GitHub", title: `Ended ${worker.id} ${JSON.stringify(worker.title)}`, text: "Idle, with every pull request merged or closed.", url: null });
 	}

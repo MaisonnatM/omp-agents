@@ -31,7 +31,7 @@ const queued = (overrides: Partial<QueuedMerge> = {}): QueuedMerge => ({
 	prs: [{ owner: "o", repo: "r", number: 12, title: "Feat", branch: "feat", head: "h1" }],
 	merged: 0,
 	auto: false,
-	updatedAt: null,
+	settling: null,
 	state: { kind: "waiting", why: "Queued" },
 	...overrides,
 });
@@ -40,8 +40,8 @@ describe("nextStep", () => {
 	test("a pull request ready now merges; a behind one updates its branch; pending checks wait or arm auto-merge", () => {
 		expect(nextStep(queued(), status(), T0)).toEqual({ kind: "merge" });
 		expect(nextStep(queued(), status({ mergeState: "behind" }), T0)).toEqual({ kind: "update" });
-		expect(nextStep(queued({ updatedAt: T0 - 5_000 }), status({ mergeState: "behind" }), T0)).toEqual({ kind: "wait", why: "Updating the branch" });
-		expect(nextStep(queued({ updatedAt: T0 - 120_000 }), status({ mergeState: "behind" }), T0)).toEqual({ kind: "update" });
+		expect(nextStep(queued({ settling: { step: "update", at: T0 - 5_000 } }), status({ mergeState: "behind" }), T0)).toEqual({ kind: "wait", why: "Updating the branch" });
+		expect(nextStep(queued({ settling: { step: "update", at: T0 - 120_000 } }), status({ mergeState: "behind" }), T0)).toEqual({ kind: "update" });
 		expect(nextStep(queued(), status({ mergeState: "blocked", checks: "pending" }), T0)).toEqual({ kind: "wait", why: "Waiting for checks" });
 		expect(nextStep(queued(), status({ mergeState: "clean", checks: "pending" }), T0)).toEqual({ kind: "wait", why: "Waiting for checks" });
 		expect(nextStep(queued(), status({ mergeState: "blocked", checks: "pending", autoAllowed: true }), T0)).toEqual({ kind: "arm" });
@@ -53,12 +53,21 @@ describe("nextStep", () => {
 		expect(nextStep(queued(), status({ draft: true, mergeState: "draft" }), T0)).toEqual({ kind: "ready" });
 	});
 
+	test("a change the queue asked for that the read does not show yet waits for a minute, and a step the read asks for next goes ahead", () => {
+		expect(nextStep(queued({ settling: { step: "retarget", at: T0 - 5_000 } }), status({ base: "feat-lower" }), T0)).toEqual({ kind: "wait", why: "Waiting for GitHub to show the new base" });
+		expect(nextStep(queued({ settling: { step: "ready", at: T0 - 5_000 } }), status({ draft: true, mergeState: "draft" }), T0)).toEqual({ kind: "wait", why: "Waiting for GitHub to show it ready for review" });
+		expect(nextStep(queued({ settling: { step: "ready", at: T0 - 120_000 } }), status({ draft: true, mergeState: "draft" }), T0)).toEqual({ kind: "ready" });
+		expect(nextStep(queued({ settling: { step: "retarget", at: T0 - 5_000 } }), status({ draft: true, mergeState: "draft" }), T0)).toEqual({ kind: "ready" });
+		expect(nextStep(queued({ settling: { step: "arm", at: T0 - 5_000 } }), status({ mergeState: "blocked", checks: "pending", autoAllowed: true }), T0)).toEqual({ kind: "wait", why: "GitHub merges it once it is ready" });
+	});
+
 	test("it stops on a close, a moved branch, conflicts, and failing checks, with the reason", () => {
 		expect(nextStep(queued(), status({ state: "merged" }), T0)).toEqual({ kind: "merged" });
 		expect(nextStep(queued(), status({ state: "closed" }), T0)).toEqual({ kind: "fail", why: "#12 was closed." });
-		expect(nextStep(queued({ updatedAt: T0 }), status({ head: "h2", parents: ["h1", "b1"] }), T0)).toEqual({ kind: "adopt" });
-		expect(nextStep(queued({ updatedAt: T0 }), status({ head: "h2", parents: ["h1"] }), T0)).toMatchObject({ kind: "fail" });
-		expect(nextStep(queued({ updatedAt: T0 }), status({ head: "h2", parents: ["x9", "h1"] }), T0)).toMatchObject({ kind: "fail" });
+		expect(nextStep(queued({ settling: { step: "update", at: T0 } }), status({ head: "h2", parents: ["h1", "b1"] }), T0)).toEqual({ kind: "adopt" });
+		expect(nextStep(queued({ settling: { step: "update", at: T0 } }), status({ head: "h2", parents: ["h1"] }), T0)).toMatchObject({ kind: "fail" });
+		expect(nextStep(queued({ settling: { step: "update", at: T0 } }), status({ head: "h2", parents: ["x9", "h1"] }), T0)).toMatchObject({ kind: "fail" });
+		expect(nextStep(queued({ settling: { step: "ready", at: T0 } }), status({ head: "h2", parents: ["h1", "b1"] }), T0)).toMatchObject({ kind: "fail" });
 		expect(nextStep(queued(), status({ head: "h2", parents: ["h1", "b1"] }), T0)).toMatchObject({ kind: "fail" });
 		expect(nextStep(queued(), status({ head: "h9" }), T0)).toEqual({ kind: "fail", why: "#12's branch moved after the merge was queued; review it and merge again." });
 		expect(nextStep(queued(), status({ mergeState: "dirty" }), T0)).toEqual({ kind: "fail", why: "#12 conflicts with main." });
@@ -79,12 +88,24 @@ describe("stackOrder", () => {
 	});
 });
 
-/** A GitHub of pull requests by number that answers the queue's reads and takes its steps, logging each. */
-function fakeGitHub(statuses: Map<number, MergeStatus>) {
+/**
+ * A GitHub of pull requests by number that answers the queue's reads and takes its steps, logging each. With `lag`, the
+ * read right after a retarget, a ready, an update, or an arm still shows the pull request as it was before it.
+ */
+function fakeGitHub(statuses: Map<number, MergeStatus>, lag: boolean) {
 	const log: string[] = [];
+	const pending: (() => void)[] = [];
+	const later = (effect: () => void): void => {
+		if (lag) pending.push(effect);
+		else effect();
+	};
 	const byId = (id: string): MergeStatus => [...statuses.values()].find(one => one.id === id)!;
 	const github: MergeGitHub = {
-		status: async (pr: PullRequest) => ({ ...statuses.get(pr.number)! }),
+		status: async (pr: PullRequest) => {
+			const answer = { ...statuses.get(pr.number)! };
+			for (const effect of pending.splice(0)) effect();
+			return answer;
+		},
 		merge: async (id, method, head) => {
 			const pr = byId(id);
 			log.push(`merge ${id} ${method} ${head}`);
@@ -93,25 +114,27 @@ function fakeGitHub(statuses: Map<number, MergeStatus>) {
 		},
 		update: async (id, head) => {
 			log.push(`update ${id} ${head}`);
-			const pr = byId(id);
-			Object.assign(pr, { head: `${head}+`, parents: [head, "base1"], mergeState: "clean" });
+			later(() => Object.assign(byId(id), { head: `${head}+`, parents: [head, "base1"], mergeState: "clean" }));
 		},
-		arm: async id => void log.push(`arm ${id}`),
+		arm: async id => {
+			log.push(`arm ${id}`);
+			later(() => void (byId(id).autoArmed = true));
+		},
 		disarm: async id => void log.push(`disarm ${id}`),
 		retarget: async (id, base) => {
 			log.push(`retarget ${id} ${base}`);
-			Object.assign(byId(id), { base, mergeState: "behind" });
+			later(() => Object.assign(byId(id), { base, mergeState: "behind" }));
 		},
 		ready: async id => {
 			log.push(`ready ${id}`);
-			byId(id).draft = false;
+			later(() => void (byId(id).draft = false));
 		},
 	};
 	return { github, log };
 }
 
-function queue(statuses: Map<number, MergeStatus>, { now = () => T0, active = (): boolean => true, path = mergesPath() } = {}) {
-	const { github, log } = fakeGitHub(statuses);
+function queue(statuses: Map<number, MergeStatus>, { now = () => T0, active = (): boolean => true, path = mergesPath(), lag = false } = {}) {
+	const { github, log } = fakeGitHub(statuses, lag);
 	const merged: QueuedPullRequest[] = [];
 	let ids = 0;
 	const merges = new MergeQueue({ path, github, now, newId: () => `m${++ids}`, active, onChange: () => {}, onMerged: pr => void merged.push(pr) });
@@ -126,12 +149,42 @@ describe("MergeQueue", () => {
 		]);
 		const { merges, log, merged } = queue(statuses);
 		const answered = await merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 2, head: null }, { owner: "o", repo: "r", number: 1, head: "l1" }] });
-		expect(answered.map(prKey)).toEqual(["o/r#1"]);
-		expect(log).toEqual(["merge N1 squash l1", "retarget N2 main", "ready N2", "update N2 u1"]);
-		expect(merges.list).toMatchObject([{ base: "main", merged: 1, prs: [{ number: 2, head: "u1" }], updatedAt: T0, state: { kind: "waiting", why: "Updating the branch" } }]);
+		expect(answered.map(prKey)).toEqual(["o/r#1", "o/r#2"]);
+		expect(log).toEqual(["merge N1 squash l1", "retarget N2 main", "ready N2", "update N2 u1", "merge N2 squash u1+"]);
+		expect(merged.map(prKey)).toEqual(["o/r#1", "o/r#2"]);
+		expect(merges.list).toEqual([]);
+	});
+
+	test("a change GitHub shows only a read later is asked for once: the queue waits on the retarget, the ready, and the update until a read shows each", async () => {
+		const statuses = new Map([
+			[1, status({ id: "N1", branch: "lower", head: "l1", base: "main" })],
+			[2, status({ id: "N2", branch: "upper", head: "u1", base: "lower", draft: true, mergeState: "draft" })],
+		]);
+		const { merges, log, merged } = queue(statuses, { lag: true });
+		await merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 1, head: "l1" }, { owner: "o", repo: "r", number: 2, head: "u1" }] });
+		expect(log).toEqual(["merge N1 squash l1", "retarget N2 main"]);
+		expect(merges.list).toMatchObject([{ settling: { step: "retarget", at: T0 }, state: { kind: "waiting", why: "Waiting for GitHub to show the new base" } }]);
+		await merges.tick();
+		expect(log.slice(2)).toEqual(["ready N2"]);
+		expect(merges.list).toMatchObject([{ settling: { step: "ready", at: T0 }, state: { kind: "waiting", why: "Waiting for GitHub to show it ready for review" } }]);
+		await merges.tick();
+		expect(log.slice(3)).toEqual(["update N2 u1"]);
+		expect(merges.list).toMatchObject([{ settling: { step: "update", at: T0 }, state: { kind: "waiting", why: "Updating the branch" } }]);
 		await merges.tick();
 		expect(log.slice(4)).toEqual(["merge N2 squash u1+"]);
 		expect(merged.map(prKey)).toEqual(["o/r#1", "o/r#2"]);
+		expect(merges.list).toEqual([]);
+	});
+
+	test("an auto-merge GitHub shows only a read later is armed once, and a cancel turns it off", async () => {
+		const statuses = new Map([[12, status({ id: "N12", mergeState: "blocked", checks: "pending", autoAllowed: true })]]);
+		const { merges, log } = queue(statuses, { lag: true });
+		await merges.apply({ op: "add", method: "squash", prs: [{ owner: "o", repo: "r", number: 12, head: "h1" }] });
+		await merges.tick();
+		expect(log).toEqual(["arm N12"]);
+		expect(merges.list).toMatchObject([{ auto: true, settling: null, state: { kind: "waiting", why: "GitHub merges it once it is ready" } }]);
+		await merges.apply({ op: "cancel", id: "m1" });
+		expect(log).toEqual(["arm N12", "disarm N12"]);
 		expect(merges.list).toEqual([]);
 	});
 

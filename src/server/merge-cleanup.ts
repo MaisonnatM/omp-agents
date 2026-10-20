@@ -5,12 +5,14 @@
  * while any live session, a terminal one included, still works in it or it has changes, and the
  * branch only while it still points at the merged commit. It hears of a merge the queue made at once, and looks every two
  * minutes for one made anywhere else; the first look at a pull request only records it, so a dashboard start ends nothing
- * for a merge made before it. Every look settles the sessions a merge left waiting again, so one whose end failed, or
- * whose last pull request closed later, ends then.
+ * for a merge made before it. Merges and looks run one at a time, and a pull request once merged or closed is not read
+ * again, so a look that read it open never undoes a merge. Every look settles the sessions a merge left waiting again, so
+ * one whose end failed, or whose last pull request closed later, ends then.
  */
 import { errorText } from "../json";
 import type { PullRequestState } from "../pull-request-merge";
 import { type PullRequest, prKey, type Repo, repoKey, samePullRequest } from "../shared/github";
+import { SerialLane } from "../serial-lane";
 
 /** How many minutes pass between two looks. */
 const CLEANUP_WATCH_MINUTES = 2;
@@ -39,7 +41,7 @@ export interface MergeCleanupDeps {
 	states(prs: readonly PullRequest[]): Promise<Map<string, PullRequestState>>;
 	/** The checkout `dir` is in, read before the session's worktree goes; `null` outside git. */
 	checkout(dir: string): Promise<CleanupCheckout | null>;
-	/** Ends session `sessionId` as **End session** does, which removes its linked worktree unless something keeps it; rejects when it did not end. */
+	/** Ends session `sessionId` as **End session** does, which removes its linked worktree unless something keeps it; rejects when it did not end, such as one gone or no longer idle. */
 	end(sessionId: string): Promise<void>;
 	/** Deletes `branch` of `gitDir` while it still points at `head` and no worktree holds it. */
 	deleteBranch(gitDir: string, branch: string, head: string): Promise<boolean>;
@@ -64,14 +66,13 @@ export function cleanupEnds(host: CleanupHost, cleanUp: boolean): boolean {
 
 export class MergeCleanup {
 	readonly #deps: MergeCleanupDeps;
-	/** Each pull request of a live session as the last look saw it, by {@link prKey}. */
+	/** Each pull request of a live session as the last look saw it, or as the queue merged it, by {@link prKey}; one merged or closed stays so. */
 	readonly #seen = new Map<string, PullRequestState>();
 	/** The sessions linked to a pull request that merged while this server watched: each ends once it is idle with every pull request settled. */
 	readonly #finishing = new Set<string>();
-	/** The sessions it is ending, which it never ends twice. */
-	readonly #ending = new Set<string>();
+	/** Merges and looks, one at a time, so a look never reads `#seen` across a merge. */
+	readonly #lane = new SerialLane();
 	#minutes = 0;
-	#looking = false;
 
 	constructor(deps: MergeCleanupDeps) {
 		this.#deps = deps;
@@ -79,22 +80,21 @@ export class MergeCleanup {
 
 	/** The queue merged `pr`, whose head was `branch` at `head`: cleans up after it now rather than at the next look, and settles once that cleanup does. */
 	merged(pr: PullRequest & Omit<PullRequestState, "state">): Promise<void> {
-		this.#seen.set(prKey(pr), { state: "merged", branch: pr.branch, head: pr.head });
-		this.#watch([pr]);
-		return this.#settle();
+		return this.#lane.run(() => {
+			this.#seen.set(prKey(pr), { state: "merged", branch: pr.branch, head: pr.head });
+			this.#watch([pr]);
+			return this.#settle();
+		});
 	}
 
-	/** A minute passed: every {@link CLEANUP_WATCH_MINUTES}, reads the live sessions' pull requests not yet merged or closed, then settles; a look while one runs is skipped. */
+	/** A minute passed: every {@link CLEANUP_WATCH_MINUTES}, reads the live sessions' pull requests not yet merged or closed, then settles; a look while the cleanup runs waits for the next minute. */
 	async tick(): Promise<void> {
-		if (++this.#minutes < CLEANUP_WATCH_MINUTES || this.#looking) return;
+		if (++this.#minutes < CLEANUP_WATCH_MINUTES || this.#lane.busy) return;
 		this.#minutes = 0;
-		this.#looking = true;
-		try {
+		await this.#lane.run(async () => {
 			await this.#look();
 			await this.#settle();
-		} finally {
-			this.#looking = false;
-		}
+		});
 	}
 
 	async #look(): Promise<void> {
@@ -132,17 +132,14 @@ export class MergeCleanup {
 		if (this.#finishing.size === 0) return;
 		const live = this.#deps.sessions();
 		for (const sessionId of this.#finishing) if (!live.some(session => session.sessionId === sessionId)) this.#finishing.delete(sessionId);
-		const done = live.filter(session => this.#finishing.has(session.sessionId) && !this.#ending.has(session.sessionId) && session.idle && session.pullRequests.every(pr => this.#settled(pr)));
+		const done = live.filter(session => this.#finishing.has(session.sessionId) && session.idle && session.pullRequests.every(pr => this.#settled(pr)));
 		await Promise.all(
 			done.map(async session => {
-				this.#ending.add(session.sessionId);
 				try {
 					await this.#finish(session);
 					this.#finishing.delete(session.sessionId);
 				} catch (error) {
 					console.error(`omp-agents: cannot end session ${session.sessionId} after its merge: ${errorText(error)}`);
-				} finally {
-					this.#ending.delete(session.sessionId);
 				}
 			}),
 		);
