@@ -103,7 +103,7 @@ export type ClientMsg =
 	| { t: "set-fast"; instanceId: string; enabled: boolean }
 	/** Reply to one of a live session's pending `requests`. */
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
-	/** Cancel a running subagent of a live session without stopping the session's turn; it cannot be revived after. */
+	/** Cancel a running subagent of a live session without stopping the session's turn. */
 	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
 	/** Change the Todo page's list; every socket then gets the list as it is after. */
 	| { t: "user-todo"; change: UserTodoChange }
