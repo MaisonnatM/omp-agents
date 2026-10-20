@@ -62,6 +62,21 @@ describe("endsMidTurn", () => {
 		};
 		expect(await endsMidTurn(sessionFile([header, prompt, toolCall, killed, abort]))).toBe(false);
 	});
+
+	test("a late usage record on an older branch does not hide the leaf that omp resumes", async () => {
+		const usage = {
+			type: "model_usage",
+			id: "m1",
+			parentId: "u1",
+			timestamp: at,
+			purpose: "title",
+			...model,
+			usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+			stopReason: "stop",
+			activeLeafId: "x1",
+		};
+		expect(await endsMidTurn(sessionFile([header, prompt, toolCall, killed, usage]))).toBe(true);
+	});
 });
 
 describe("sessionFileOf", () => {

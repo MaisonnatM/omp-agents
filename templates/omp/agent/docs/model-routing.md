@@ -54,7 +54,7 @@ Read back every changed setting, including `modelProviderOrder` or usage policy 
 
 Paid fallback is opt-in and requires explicit approval to incur Cursor on-demand charges.
 The starter config does not enable it.
-This setting requires the [patched OMP runtime](https://github.com/MaisonnatM/omp-agents/blob/main/docs/architecture.md#omp-modules); stock OMP `18.11.1` does not support it.
+This setting requires the [patched OMP runtime](https://github.com/MaisonnatM/omp-agents/blob/main/docs/architecture.md#omp-modules); stock OMP `18.12.3` does not support it.
 Confirm that `omp config get retry.paidFallback` succeeds before enabling it, then read back the configured selector:
 
 ```sh

@@ -72,6 +72,10 @@ export interface FileEntry extends Record<string, unknown> {
 export interface LoaderModule {
 	loadEntriesFromFile(filePath: string): Promise<FileEntry[]>;
 }
+/** omp's session entries (src/session/session-entries.ts): the leaf a load replays to, which a late `model_usage` entry can point back at. */
+export interface SessionEntriesModule {
+	resolveSessionLeafId(entries: readonly FileEntry[]): string | null;
+}
 /** omp's session context (src/session/session-context.ts): the messages a request on the branch ending at `leafId` sends. */
 export interface SessionContextModule {
 	buildSessionContext(entries: FileEntry[], leafId: string | null, byId: Map<string, FileEntry>): { messages: object[] };
@@ -610,6 +614,7 @@ export const listing = await load<ListingModule>(join(srcDir, "session", "sessio
 });
 export const storage = await load<StorageModule>(join(srcDir, "session", "session-storage.ts"), { FileSessionStorage: "function" });
 export const loader = await load<LoaderModule>(join(srcDir, "session", "session-loader.ts"), { loadEntriesFromFile: "function" });
+export const sessionEntries = await load<SessionEntriesModule>(join(srcDir, "session", "session-entries.ts"), { resolveSessionLeafId: "function" });
 export interface OmpSessionManager {
 	getSessionId(): string;
 	getCwd(): string;

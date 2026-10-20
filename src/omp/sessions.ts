@@ -3,7 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { oneLine } from "../session-entries";
 import type { SessionSource } from "../shared/sessions";
 import { isDashboardPrompt } from "../shared/transcript";
-import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, storage } from "./modules";
+import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, sessionEntries, storage } from "./modules";
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
 export const sessionsDir: string = dirs.getSessionsDir();
@@ -82,10 +82,12 @@ export async function readSessionFile(path: string): Promise<SavedSession | null
 export async function endsMidTurn(sessionFile: string): Promise<boolean> {
 	const entries = (await loader.loadEntriesFromFile(sessionFile)).filter(entry => entry.type !== "session");
 	const byId = new Map(entries.map(entry => [entry.id, entry]));
-	// omp checks the branch from the leaf, which on load is the last entry.
+	// omp checks the branch from the leaf it replays to, which a late usage entry can move off the last entry.
+	const leafId = sessionEntries.resolveSessionLeafId(entries);
+	const leaf = leafId === null ? undefined : byId.get(leafId);
 	const branch: FileEntry[] = [];
 	const seen = new Set<string>();
-	for (let entry = entries.at(-1); entry && !seen.has(entry.id); entry = entry.parentId ? byId.get(entry.parentId) : undefined) {
+	for (let entry = leaf; entry && !seen.has(entry.id); entry = entry.parentId ? byId.get(entry.parentId) : undefined) {
 		seen.add(entry.id);
 		branch.push(entry);
 	}

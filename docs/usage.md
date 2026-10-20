@@ -297,8 +297,8 @@ An action that fails shows its error, and its control becomes available again.
   In a subagent of a session that the dashboard started, a message steers a running subagent at its next step, through omp's RPC `steer_subagent`.
   omp's RPC mode reaches only a running subagent, so the composer offers no follow-up there and is disabled once the subagent stops.
   The composer is also disabled for aborted subagents and read-only rooms.
-- The stop button after a running subagent's link cancels it for good, as the kill in omp's Agent Hub does, and leaves the session's own turn running.
-  The subagent's task ends with an aborted result, and omp cannot revive it.
+- The stop button after a running subagent's link cancels it, as the kill in omp's Agent Hub does, and leaves the session's own turn running.
+  The subagent's task ends with an aborted result; since omp 18.12.3, a message or a revive in omp resumes it from its transcript, while the dashboard's composer stays disabled for it.
   It is offered in every room that the dashboard can write to.
 - The conversation follows new output while you are at the bottom.
   Scrolling up pauses that follow; the down-arrow button jumps back to the latest message.
