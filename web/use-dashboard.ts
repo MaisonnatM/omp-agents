@@ -4,6 +4,7 @@ import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/share
 import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText, socketUrl } from "./api";
+import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyPaneMessage, retainPanes, retainTrajectories, useShownTrajectories } from "./pane-store";
 import {
@@ -193,6 +194,13 @@ export function useDashboard(): Dashboard {
 						return;
 					case "started": {
 						const start = pendingStart(startsRef.current, msg.reqId);
+						if (start && msg.result.ok) {
+							const { op } = start;
+							// A fork's composer opens on the prompt it branched at, to edit, and a sent first message leaves the new-session draft.
+							// Both are written before `answer` shows the layout, which mounts the fork's composer.
+							if (op.kind === "fork" && op.point.prefill && msg.result.prompt) putDraft(liveDraftKey({ kind: "live", instanceId: msg.result.instanceId, agentId: null }), msg.result.prompt);
+							if (op.kind === "new") clearDraft(newDraftKey(op.todoId));
+						}
 						answer(msg, start && msg.result.ok ? layoutAfterStart(layoutRef.current, start.op, msg.result.instanceId) : null);
 						return;
 					}
