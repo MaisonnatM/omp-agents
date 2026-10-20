@@ -8,7 +8,7 @@ import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
-import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionMeta } from "./session-meta";
+import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -71,7 +71,17 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			(shown ? hostLabel(shown) : view.instanceId)
 		);
 	return (
-		<Header title={title} trailing={titleAction} status={status} alert={!ending && phase.phase === "ended"}>
+		<Header
+			title={title}
+			trailing={
+				<>
+					{subject.kind === "session" && shown && <SessionIdCopy id={shown.sessionId} />}
+					{titleAction}
+				</>
+			}
+			status={status}
+			alert={!ending && phase.phase === "ended"}
+		>
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip

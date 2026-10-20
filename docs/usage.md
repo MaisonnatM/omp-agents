@@ -342,6 +342,7 @@ An action that fails shows its error, and its control becomes available again.
   In a linked worktree it is the branch checked out there now.
   In a repository's main checkout it is the branch checked out there when the session last wrote, so a past session keeps its branch after the checkout moves to another one.
   A session on a detached HEAD, outside git, or in a directory that is gone shows no branch.
+- Right after a session's title, live or past, before the trajectory switch, a fingerprint button copies the session's ID, which its tooltip names; its icon turns into a check mark for a moment.
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
 - Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
