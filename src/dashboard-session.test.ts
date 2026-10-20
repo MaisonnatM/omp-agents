@@ -252,9 +252,35 @@ describe("DashboardSession turns", () => {
 			type: "agent_end",
 			messages: [assistant("Done: ok\n\nSuggestions:\n1. Ship it"), { role: "assistant", content: [{ type: "toolCall", id: "t1" }] }, { role: "toolResult", content: [] }],
 		});
-		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok" }]);
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", limit: null }]);
 		client.fire({ type: "agent_end", messages: [] });
-		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null });
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, limit: null });
+	});
+
+	test("a terminal agent_end whose last message failed on a usage limit reports the limit; a handover does not", async () => {
+		const { client, updates } = await startSession();
+		const limited = {
+			role: "assistant",
+			content: [],
+			stopReason: "error",
+			provider: "opencode-go",
+			errorStatus: 429,
+			errorMessage: "429 Go usage limit exceeded retry-after-ms=200813000\nGo usage limit exceeded (type=GoUsageLimitError)",
+		};
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "agent_end", isTerminal: false, messages: [limited] });
+		client.fire({ type: "agent_end", messages: [limited] });
+		expect(updates.filter(update => update.kind === "turn-ended")).toEqual([{ kind: "turn-ended", reply: null, limit: { provider: "opencode-go", retryAfterMs: 200_813_000 } }]);
+	});
+
+	test("a turn's start is reported after the roster update that shows it working, and its end before the one that shows it idle", async () => {
+		const { session, client, updates } = await startSession();
+		const order = () => updates.map(update => update.kind).filter(kind => kind === "turn-started" || kind === "turn-ended" || kind === "roster");
+		const from = order().length;
+		client.fire({ type: "agent_start" });
+		expect([order().slice(from), session.status]).toEqual([["roster", "turn-started"], "working"]);
+		client.fire({ type: "agent_end", messages: [] });
+		expect([order().slice(from + 2, from + 4), session.status]).toEqual([["turn-ended", "roster"], "idle"]);
 	});
 
 	test("a queue_update replaces both queues, and one with a malformed queue changes nothing", async () => {
@@ -706,6 +732,27 @@ describe("DashboardSession reattach", () => {
 		client.fire({ type: "agent_end", messages: [] });
 		await settle();
 		expect(session.status).toBe("idle");
+	});
+
+	test("a session attached mid-turn whose turn ends on a usage limit reports the limit before it reads idle", async () => {
+		const client = new FakeClient();
+		keptOmp(client);
+		client.getState = async () => ({ ...STATE, isStreaming: true });
+		const updates: DashboardUpdate[] = [];
+		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update));
+		session.answer("q1", { kind: "confirm", confirmed: true });
+		const from = updates.length;
+		const limited = {
+			role: "assistant",
+			content: [],
+			stopReason: "error",
+			provider: "opencode-go",
+			errorStatus: 429,
+			errorMessage: "429 Go usage limit exceeded retry-after-ms=200813000\nGo usage limit exceeded (type=GoUsageLimitError)",
+		};
+		client.fire({ type: "agent_end", messages: [limited] });
+		const ended = updates.slice(from).filter(update => update.kind === "turn-ended" || update.kind === "roster");
+		expect([ended.slice(0, 2), session.status]).toEqual([[{ kind: "turn-ended", reply: null, limit: { provider: "opencode-go", retryAfterMs: 200_813_000 } }, { kind: "roster" }], "idle"]);
 	});
 
 	test("a session file with no directory in its header and a broken replay marker attaches where omp started, as a replay", async () => {

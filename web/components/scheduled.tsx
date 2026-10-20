@@ -2,7 +2,7 @@
 import { AlarmClock, Ellipsis, Pencil, Send, X } from "lucide-react";
 import { createContext, useContext, useState } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";
-import type { ScheduledChange, ScheduledSend, ScheduledTarget } from "../../src/shared/scheduled";
+import { CONTINUE_PROMPT, type ScheduledChange, type ScheduledSend, type ScheduledTarget } from "../../src/shared/scheduled";
 import { hashForSession } from "../../src/shared/sessions";
 import { hashForScheduled } from "../routing";
 import { ROW_END, RowLine, WorkspaceBadge } from "./session-row";
@@ -140,8 +140,33 @@ export function ScheduleButton({ draft, files, disabled, pending, onSchedule }: 
 	);
 }
 
-/** `Anthropic 5h reset · Today at 14:32`, or the time alone for one picked by hand. */
-export const whenLabel = (send: ScheduledSend, now: number): string => (send.reset ? `${send.reset} reset · ${whenWords(send.at, now)}` : whenWords(send.at, now));
+/**
+ * `Anthropic 5h reset · Today at 14:32`, or the time alone for one picked by hand. A continue says so:
+ * `Continues when Anthropic 5h resets · Today at 14:32`, or, when its provider named no reset, that it tries at a guessed time.
+ */
+export function whenLabel(send: ScheduledSend, now: number): string {
+	const when = whenWords(send.at, now);
+	if (send.target.kind === "continue") {
+		return send.reset ? `Continues when ${send.reset} resets · ${when}` : `Continues · ${when} · ${send.target.provider} did not say when its limit resets`;
+	}
+	return send.reset ? `${send.reset} reset · ${when}` : when;
+}
+
+/** The text a send delivers: its message, a continue's prompt, or a new session's first message. */
+function sentText(target: ScheduledTarget): string {
+	switch (target.kind) {
+		case "message":
+			return target.text;
+		case "continue":
+			return CONTINUE_PROMPT;
+		case "start":
+			return target.request.prompt;
+		default: {
+			const unhandled: never = target;
+			return unhandled;
+		}
+	}
+}
 
 /** What a send's row says of its state, `null` while it waits. */
 function stateLabel(send: ScheduledSend): string | null {
@@ -194,7 +219,7 @@ function ScheduledRow({ send, text, now, editing, onEdit }: ScheduledRowProps) {
 
 /** The messages scheduled for session `sessionId`, above its composer; `onEdit` gets the text of one **Edit** took off the schedule. */
 export function ScheduledMessages({ sessionId, onEdit }: { sessionId: string | null; onEdit: (text: string) => void }) {
-	const sends = useContext(ScheduledSends).flatMap(send => (send.target.kind === "message" && send.target.sessionId === sessionId ? [{ send, text: send.target.text }] : []));
+	const sends = useContext(ScheduledSends).flatMap(send => (send.target.kind !== "start" && send.target.sessionId === sessionId ? [{ send, text: sentText(send.target) }] : []));
 	const now = useMinute();
 	// Held here rather than in a row: a send that goes during the take leaves its row, and the refusal still has to toast.
 	const edit = useScheduledEdit(onEdit);
@@ -208,8 +233,24 @@ export function ScheduledMessages({ sessionId, onEdit }: { sessionId: string | n
 	);
 }
 
-/** Where a send's row and its menu's **Edit** lead: a message to its session, whose composer edits it, and a start to its own page. */
-const hashOf = (send: ScheduledSend): string => (send.target.kind === "message" ? hashForSession(send.target.sessionId) : hashForScheduled(send.id));
+/** Where a send's row and its menu's **Edit** lead: a message or a continue to its session, whose composer edits it, and a start to its own page. */
+const hashOf = (send: ScheduledSend): string => (send.target.kind === "start" ? hashForScheduled(send.id) : hashForSession(send.target.sessionId));
+
+/** What the sidebar says a send is, after its text. */
+function whatOf(target: ScheduledTarget): string {
+	switch (target.kind) {
+		case "message":
+			return "Message";
+		case "continue":
+			return `Continue after the ${target.provider} usage limit`;
+		case "start":
+			return `New session in ${folderName(target.request.cwd) ?? target.request.cwd}`;
+		default: {
+			const unhandled: never = target;
+			return unhandled;
+		}
+	}
+}
 
 function ScheduledMenu({ send, label }: { send: ScheduledSend; label: string }) {
 	const [open, setOpen] = useState(false);
@@ -254,9 +295,9 @@ export function ScheduledGroup({ openId, showWorkspace, open, onOpenChange }: { 
 			<SidebarMenu aria-label="Scheduled messages and sessions">
 				{sends.map(send => {
 					const { target } = send;
-					const label = promptLabel(target.kind === "message" ? target.text : target.request.prompt);
+					const label = promptLabel(sentText(target));
 					const state = stateLabel(send);
-					const where = target.kind === "start" ? `New session in ${folderName(target.request.cwd) ?? target.request.cwd}` : "Message";
+					const where = whatOf(target);
 					const active = send.id === openId;
 					return (
 						<SidebarMenuItem key={send.id}>

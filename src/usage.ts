@@ -12,6 +12,14 @@ const PROVIDER_NAMES: Record<string, string> = {
 	cursor: "Cursor",
 };
 
+/** The name the page shows for omp's provider id `provider`: `Anthropic` for `anthropic`, `Minimax Code` for `minimax-code`. */
+export const providerName = (provider: string): string =>
+	PROVIDER_NAMES[provider] ??
+	provider
+		.split(/[-_]/)
+		.map(part => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(" ");
+
 /** Some providers report only the used fraction, some only absolute amounts. */
 function remainingOf(amount: Record<string, unknown>): number | undefined {
 	const remaining = num(amount.remainingFraction);
@@ -91,12 +99,7 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 		const metadata = isObject(report.metadata) ? report.metadata : {};
 		plans.push({
 			provider,
-			name:
-				PROVIDER_NAMES[provider] ??
-				provider
-					.split(/[-_]/)
-					.map(part => part.charAt(0).toUpperCase() + part.slice(1))
-					.join(" "),
+			name: providerName(provider),
 			account: str(metadata.email) || str(metadata.accountId) || null,
 			windows: windows.map(window =>
 				windows.some(other => other !== window && other.label === window.label) ? { ...window, label: window.title } : window,

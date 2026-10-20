@@ -16,7 +16,7 @@ import { PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
 import { expandHome } from "../paths";
 import { type ModelOption, modelOfSelector } from "../shared/models";
 import { slug } from "../shared/slug";
-import { isBusy, type Project, type ProjectEvent, type QueuedWorker, type Worker, type WorkerId, type WorkerPhase, type WorkerStart, workerPhase } from "../shared/projects";
+import { type Project, type ProjectEvent, type QueuedWorker, type Worker, type WorkerId, type WorkerPhase, type WorkerStart, workerPhase } from "../shared/projects";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult, type UserAnswer, type UserRequest } from "../shared/sessions";
 import { type ProjectControl, projectTools, updateText, type WorkerSpec, type WorkerStarted } from "./project-tools";
 import type { ProjectFacts } from "./notices";
@@ -52,12 +52,18 @@ export function projectsExtensionArgs(): string[] {
 /** What the runner asks of a live session. */
 export interface RunnerSession {
 	sessionId: string;
+	/** Its live status, as the page shows it. */
 	status: HostStatus;
+	/** Whether it is still on its task: a turn runs or waits on a question, or a usage limit stopped it and its continue waits. */
+	occupied: boolean;
 	requests: UserRequest[];
 	/** Sends `text` as a follow-up while a turn runs, else as a prompt; rejects when omp does not take it. */
 	prompt(text: string): Promise<void>;
 	answer(requestId: string, answer: UserAnswer): void;
 }
+
+/** Whether a session with live `status` is still on its task: a turn runs or waits on a question, or it is `held` for its usage limit's continue. */
+export const occupiedBy = (status: HostStatus, held: boolean): boolean => status === "working" || status === "needs-input" || held;
 
 export interface ProjectRunnerDeps {
 	file: ProjectsFile;
@@ -309,9 +315,10 @@ export class ProjectRunner implements ProjectControl {
 		const project = this.#deps.file.get(projectId);
 		const worker = project && !project.archived ? project.workers.find(candidate => candidate.id === workerId) : undefined;
 		if (!worker) throw new Error(`Project ${projectId} has no worker ${workerId}.`);
-		const status = this.#deps.bySessionId(worker.sessionId)?.status;
-		if (status === undefined) throw new Error(`${worker.id} does not run.`);
-		if (status !== "idle") throw new Error(`${worker.id} is ${status}, not idle.`);
+		const session = this.#deps.bySessionId(worker.sessionId);
+		if (!session) throw new Error(`${worker.id} does not run.`);
+		if (session.status !== "idle") throw new Error(`${worker.id} is ${session.status}, not idle.`);
+		if (session.occupied) throw new Error(`${worker.id} waits on its continue after a usage limit.`);
 		await this.#end(worker);
 		this.notify(projectId, { source: "GitHub", title: `Ended ${worker.id} ${JSON.stringify(worker.title)}`, text: "Idle, with every pull request merged or closed.", url: null });
 	}
@@ -334,8 +341,13 @@ export class ProjectRunner implements ProjectControl {
 			.filter(project => !project.archived)
 			.map(project => ({
 				project,
-				coordinator: this.#deps.bySessionId(project.coordinator.sessionId)?.status ?? null,
-				workers: project.workers.map(worker => ({ worker, phase: this.phaseOf(worker), questions: this.questionsOf(worker) })),
+				coordinatorOccupied: this.#deps.bySessionId(project.coordinator.sessionId)?.occupied ?? false,
+				workers: project.workers.map(worker => ({
+					worker,
+					phase: this.phaseOf(worker),
+					occupied: this.#deps.bySessionId(worker.sessionId)?.occupied ?? false,
+					questions: this.questionsOf(worker),
+				})),
 			}));
 	}
 
@@ -369,10 +381,10 @@ export class ProjectRunner implements ProjectControl {
 		return ownLaunch;
 	}
 
-	/** How many of `project`'s slots are taken: its working or asking workers, and the ones starting. */
+	/** How many of `project`'s slots are taken: its occupied workers, and the ones starting. */
 	#busy(project: Project): number {
 		const launching = [...this.#launching.values()].filter(id => id === project.id).length;
-		return project.workers.filter(worker => isBusy(this.phaseOf(worker))).length + launching;
+		return project.workers.filter(worker => this.#deps.bySessionId(worker.sessionId)?.occupied).length + launching;
 	}
 
 	/** How `spec` starts: its directory resolved and its branch named. */
@@ -483,7 +495,7 @@ export class ProjectRunner implements ProjectControl {
 		const project = this.#deps.file.get(projectId);
 		if (!project || project.archived || project.updates.length === 0 || this.#sending.has(projectId)) return;
 		const coordinator = this.#deps.bySessionId(project.coordinator.sessionId);
-		if (coordinator?.status !== "idle") return;
+		if (coordinator?.status !== "idle" || coordinator.occupied) return;
 		const updateIds = project.updates.map(update => update.id);
 		this.#sending.add(projectId);
 		void coordinator.prompt(updateText(project, project.updates)).then(

@@ -543,6 +543,27 @@ export interface StatsDbModule {
 export interface RateLimitModule {
 	is402BillingCapBody(message: string | undefined): boolean;
 }
+/** The fields of an assistant message that failed which omp's classifier reads (pi-ai src/types.ts `AssistantMessage`). */
+export interface FailedMessage {
+	api?: string;
+	provider?: string;
+	model?: string;
+	errorId?: number;
+	errorMessage?: string;
+	errorClassificationMessage?: string;
+	errorStatus?: number;
+}
+/** omp's error flags (pi-ai src/error/flags.ts): the kind of a failed request, as its retry and credential rotation decide. */
+export interface ErrorFlagsModule {
+	Flag: { UsageLimit: number };
+	/** The message's flags, from its recorded `errorId` and its error text; it writes them back into `errorId`. */
+	classifyMessage(message: FailedMessage): number;
+	is(id: number | undefined, flag: number): boolean;
+}
+/** omp's retry hints (pi-utils src/fetch-retry.ts): the wait in milliseconds an error's text names, such as `retry-after-ms=…` or `resets in 2h`. */
+export interface FetchRetryModule {
+	extractRetryHint(source: null, body: string): number | undefined;
+}
 
 type Kind = "function" | "number" | "object";
 
@@ -757,3 +778,9 @@ export const statsRollup = await load<StatsRollupModule>(join(statsSrc, "rollup.
 export const statsLive = await load<StatsLiveModule>(join(statsSrc, "live.ts"), { statsLive: "function" });
 export const statsDb = await load<StatsDbModule>(join(statsSrc, "db.ts"), { initDb: "function" });
 export const rateLimit = await load<RateLimitModule>(join(dirname(packageDir), "pi-ai", "src", "error", "rate-limit.ts"), { is402BillingCapBody: "function" });
+export const errorFlags = await load<ErrorFlagsModule>(join(dirname(packageDir), "pi-ai", "src", "error", "flags.ts"), {
+	"Flag.UsageLimit": "number",
+	classifyMessage: "function",
+	is: "function",
+});
+export const fetchRetry = await load<FetchRetryModule>(join(utilsSrc, "fetch-retry.ts"), { extractRetryHint: "function" });

@@ -35,7 +35,6 @@ import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
-import type { ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -57,12 +56,13 @@ import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, P
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
 import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
-import { ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
+import { occupiedBy, ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
 import { ProjectWatch } from "./project-watch";
 import { ProjectsFile } from "./projects-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
+import { AutoContinue } from "./auto-continue";
 import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
 import type { SelfUpdate } from "./self-update";
@@ -73,6 +73,7 @@ import { createClientHandler } from "./socket";
 import { createStarter, reattachAll, type Starter } from "./start";
 import { TodoInbox } from "./todo-inbox";
 import { UserTodosFile } from "./user-todos-file";
+import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
 import { parseClientMsg } from "./wire";
 import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
@@ -121,6 +122,7 @@ export class Dashboard {
 	readonly #endInbox: EndInbox;
 	readonly #runner: RoutineRunner;
 	readonly #scheduledRunner: ScheduledRunner;
+	readonly #autoContinue: AutoContinue;
 	readonly #projectRunner: ProjectRunner;
 	readonly #projectWatch: ProjectWatch;
 	readonly #mergeQueue: MergeQueue;
@@ -138,7 +140,7 @@ export class Dashboard {
 	#registryFresh = false;
 	/** Whether the activity was checked since the last activity tick found no listener. */
 	#activityFresh = false;
-	#usage: Extract<ServerMsg, { t: "usage" }> | null = null;
+	readonly #usage: UsagePoll;
 
 	/** `selfUpdate` is **Update dashboard**, which pulls the checkout the server runs from and restarts the server. */
 	constructor(port: number, selfUpdate: SelfUpdate) {
@@ -180,9 +182,10 @@ export class Dashboard {
 				pullRequests: async () => ({ list: await loadPullRequests(this.knownCwds(), false), agent: agentOn(sessions.rows(files.factsOf)) }),
 				slack: async () => ((await integrationSignedIn("slack")) ? waitingOnYou(integrationFetch("slack"), Date.now()) : []),
 				plans: async () => {
-					if (this.#usage === null) throw new Error("omp usage has not run yet");
-					if (this.#usage.error !== null) throw new Error(this.#usage.error);
-					return this.#usage.plans;
+					const usage = this.#usage.report;
+					if (usage === null) throw new Error("omp usage has not run yet");
+					if (usage.error !== null) throw new Error(usage.error);
+					return usage.plans;
 				},
 				creditRuns: () => readCreditRuns(Date.now()),
 				localEvents: () =>
@@ -224,7 +227,7 @@ export class Dashboard {
 			},
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
-		}, kind => this.#broadcasts.pushList(kind)));
+		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
@@ -234,6 +237,7 @@ export class Dashboard {
 			beforeRosterPush: () => views.sync(),
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
+		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), { active: () => ownerLock.held });
 		const starter = createStarter({
 			sessions,
@@ -295,7 +299,9 @@ export class Dashboard {
 			start: startSession,
 			session(instanceId) {
 				const session = sessions.get(instanceId);
-				return session ? { status: session.row().status, sessionId: session.sessionId, end: () => session.end() } : null;
+				if (!session) return null;
+				const { status } = session.row();
+				return { status, occupied: occupiedBy(status, autoContinue.held(session.sessionId)), sessionId: session.sessionId, end: () => session.end() };
 			},
 			now: Date.now,
 			async exec(command, cwd) {
@@ -312,11 +318,36 @@ export class Dashboard {
 			start: startSession,
 			reach,
 			now: Date.now,
-			onChange: () => broadcasts.pushList("scheduled"),
+			onChange: () => this.#publishScheduled(),
+		}));
+		const autoContinue = (this.#autoContinue = new AutoContinue({
+			file: scheduled,
+			plans: async () => {
+				const { plans, error } = await this.#usage.fresh();
+				if (error !== null) throw new Error(error);
+				return plans;
+			},
+			now: Date.now,
+			onChange: () => this.#publishScheduled(),
+			released: (sessionId, reply) => {
+				const session = sessions.bySessionId(sessionId);
+				if (!session) return;
+				// A continue that went left the session working; one canceled or dismissed leaves the turn ended where the limit stopped it.
+				if (session.row().status === "idle") projectRunner.turnEnded(session.instanceId, reply);
+				runner.observe(session.instanceId);
+				projectRunner.observe(session.instanceId);
+			},
 		}));
 		const runnerSession = (session: LiveSession): RunnerSession => {
 			const { status, requests } = session.row();
-			return { sessionId: session.sessionId, status, requests, prompt: text => session.prompt(null, text, [], "followUp"), answer: (requestId, answer) => session.answer(requestId, answer) };
+			return {
+				sessionId: session.sessionId,
+				status,
+				occupied: occupiedBy(status, autoContinue.held(session.sessionId)),
+				requests,
+				prompt: text => session.prompt(null, text, [], "followUp"),
+				answer: (requestId, answer) => session.answer(requestId, answer),
+			};
 		};
 		const liveRunner = (session: LiveSession | undefined): RunnerSession | null => (session ? runnerSession(session) : null);
 		const projectRunner = (this.#projectRunner = new ProjectRunner({
@@ -395,14 +426,11 @@ export class Dashboard {
 				if (await files.refresh()) this.#onFilesChanged();
 			},
 			onRescanTick: () => this.#rescanFiles(),
-			onUsageTick: async () => {
-				this.#usage = await broadcasts.refreshUsage();
-				await notices.check(PROVIDER_KINDS);
-			},
+			onUsageTick: () => this.#usage.tick(broadcasts.listening()),
 			onMinuteTick: async () => {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
-				broadcasts.pushList("scheduled");
+				this.#publishScheduled();
 				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -438,6 +466,7 @@ export class Dashboard {
 				if (sessions.markRead(instanceId)) broadcasts.rosterChanged();
 			},
 			stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
+			cancelContinue: sessionId => autoContinue.cancel(sessionId),
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
 			changeNotices: (ids, op) => notices.apply(ids, op),
@@ -575,6 +604,7 @@ export class Dashboard {
 		// The registry was not polled while nobody listened; list it now rather than at the next tick.
 		if (!this.#registryFresh) void this.#listRegistry();
 		if (!this.#activityFresh) void this.#checkActivity();
+		void this.#usage.opened();
 	}
 
 	/** A message on a dashboard socket; one that is not a client message is dropped. */
@@ -635,14 +665,22 @@ export class Dashboard {
 				this.#broadcasts.syncRoster();
 				this.#projectRunner.switched(instanceId);
 				return;
-			case "turn-started":
+			case "turn-started": {
 				if (this.#sessions.markRead(instanceId)) this.#broadcasts.rosterChanged();
+				// Whoever prompted, the session works again; its own continue, already claimed, stays.
+				const sessionId = this.#sessions.get(instanceId)?.sessionId;
+				if (sessionId) this.#autoContinue.cancel(sessionId);
 				return;
-			case "turn-ended":
+			}
+			case "turn-ended": {
 				this.#sessions.markUnread(instanceId, update.reply);
-				this.#projectRunner.turnEnded(instanceId, update.reply);
+				// A session started here that a usage limit stopped is held for its continue; its project hears of the turn only if the continue never goes.
+				const sessionId = this.#sessions.started(instanceId)?.sessionId;
+				if (update.limit && sessionId) void this.#autoContinue.limited(sessionId, update.limit, update.reply);
+				else this.#projectRunner.turnEnded(instanceId, update.reply);
 				this.#broadcasts.rosterChanged();
 				return;
+			}
 			default: {
 				const unhandled: never = update;
 				return unhandled;
@@ -655,12 +693,14 @@ export class Dashboard {
 		this.#lists.apply("user-todos", { op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
 	}
 
-	/** Ends `session` as **End session** does, then removes the linked worktree it worked in: the one its bash calls last ran in, else its own directory's. */
-	#endLive(session: LiveSession): Promise<void> {
-		return endSession(
-			{ sessionId: session.sessionId, workDir: this.#files.factsOf(session.sessionId).worktree ?? session.cwd, end: () => session.end() },
-			dir => this.#worktrees.removeCheckout(dir),
-		);
+	/**
+	 * Ends `session` as **End session** does, then removes the linked worktree it worked in: the one its bash calls last ran in, else its own directory's.
+	 * The continue it waits on goes with it.
+	 */
+	async #endLive(session: LiveSession): Promise<void> {
+		const { sessionId } = session;
+		await endSession({ sessionId, workDir: this.#files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() }, dir => this.#worktrees.removeCheckout(dir));
+		this.#autoContinue.cancel(sessionId);
 	}
 
 	/** Takes over routines and the todo inbox when the server that ran them is gone; whether this server runs them. */
@@ -687,6 +727,12 @@ export class Dashboard {
 	#checkActivity(): Promise<void> {
 		this.#activityFresh = true;
 		return this.#notices.check(ACTIVITY_KINDS);
+	}
+
+	/** The scheduled sends changed, here or on another server: every socket hears them, and a held session whose continue went or left them is released. */
+	#publishScheduled(): void {
+		this.#broadcasts.pushList("scheduled");
+		this.#autoContinue.sendsChanged();
 	}
 
 	/** The session list changed: views may now find their file, and the past list is out of date. */

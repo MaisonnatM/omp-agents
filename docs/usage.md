@@ -12,6 +12,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Conversations](#conversations)
 - [Composer](#composer)
 - [Send later](#send-later)
+  - [Continue after a usage limit](#continue-after-a-usage-limit)
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
 - [Replay from here](#replay-from-here)
@@ -122,7 +123,7 @@ An action that fails shows its error, and its control becomes available again.
   Hover or focus a window to see omp's full limit name and when it resets.
   Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
-  The server runs `omp usage --json` at startup and every minute after that.
+  The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
 - The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
   The strip reads them again every five seconds while the page is visible.
 - **Terminal**, at the start of the strip's right side, shows or hides the [terminal](#terminal).
@@ -498,6 +499,19 @@ An action that fails shows its error, and its control becomes available again.
 - A scheduled message carries text only: the clock button is off while the draft holds attached files or starts with a `!` or `$` command.
 - Sends go on the dashboard's minute tick, so a send can go up to a minute after its time.
   A send whose time passed while the dashboard was closed goes at the first tick after it starts.
+
+### Continue after a usage limit
+
+- When a provider's usage limit ends a turn of a session the dashboard started, such as MiniMax's `429 Token Plan usage limit reached` or Anthropic's used-up 5-hour window, the dashboard schedules `continue` for that session, the way **Send later** would.
+  It reads `omp usage` again then, and when every account of that provider has a used-up window, it waits until the soonest account's windows reset, one minute after, such as **Continues when Anthropic 5h resets · Today at 14:32** above the composer.
+  Otherwise it waits as long as the provider's error asked, **Continues when Anthropic limit resets**; when the error names no wait, it tries again in one hour and the row says the provider did not say when its limit resets.
+  Only the main agent's turn counts: a turn whose subagents hit the limit continues once the main agent's own turn ends on it, and the subagents get no continue of their own.
+- The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit.
+- A session waits on one continue at most: a later limit moves it to the new reset.
+  Any new turn of that session cancels it, whoever sends the prompt: you, a project's coordinator or its updates, or a scheduled message; so do an edited prompt and **End session**.
+- Until the continue goes, fails, or you cancel it, the session stays on its task: a routine does not end the session, a project worker keeps its slot, its coordinator hears the worker finished only if the continue fails or is canceled, and the bell does not call the project done.
+  The sidebar and the **Projects** page still show it idle, and it stays on its task when the dashboard restarts.
+- omp's own `retry.waitForUsageReset` setting instead keeps the turn waiting inside omp, so a turn it holds never ends on the limit.
 
 ## Questions
 
@@ -1444,7 +1458,7 @@ An action that fails shows its error, and its control becomes available again.
     - **omp-agents update: N new commits on main**, when the server runs from a git checkout and its branch on origin holds commits past the one it runs.
       One notice stands for the running build, so more commits raise its count rather than toast again.
       The packaged app updates through **omp agents › Check for Updates…** instead.
-  - **Providers**: a provider that stopped serving, checked after each `omp usage` run, every minute.
+  - **Providers**: a provider that stopped serving, checked after each `omp usage` run, every minute while a page is open.
     - A plan window that `omp usage` reports used up, such as Cursor's `Other Models`, with when it resets and how many reset credits the plan holds.
       The notice goes once the window resets.
     - A provider whose prepaid credits ran out, such as OpenRouter answering `402 Insufficient credits`: a request to it failed for that in the last day, and none has worked since; the notice counts those failures since the first one.

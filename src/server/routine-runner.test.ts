@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { applyPins } from "../shared/pins";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
+import { occupiedBy } from "./project-runner";
 import { RoutineRunner, SESSION_START_DEADLINE_MS } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 
@@ -53,7 +54,8 @@ interface FakeExec {
 
 /** A runner over `file` with a fake clock, starter, sessions, commands, and pins. */
 function harness(file: RoutinesFile) {
-	const sessions = new Map<string, { status: HostStatus; ended: boolean }>();
+	/** `held`: a usage limit stopped its turn, and its continue waits. */
+	const sessions = new Map<string, { status: HostStatus; held: boolean; ended: boolean }>();
 	const fake = {
 		now: T0 + HOUR,
 		requests: [] as StartRequest[],
@@ -74,7 +76,7 @@ function harness(file: RoutinesFile) {
 			fake.requests.push(request);
 			if (fake.failWith !== null) return { ok: false, error: fake.failWith };
 			const instanceId = `i${fake.requests.length}`;
-			sessions.set(instanceId, { status: "unknown", ended: false });
+			sessions.set(instanceId, { status: "unknown", held: false, ended: false });
 			return { ok: true, instanceId, cwd: "/work/webapp", prompt: null };
 		},
 		session(instanceId) {
@@ -82,6 +84,7 @@ function harness(file: RoutinesFile) {
 			if (!session || session.ended) return null;
 			return {
 				status: session.status,
+				occupied: occupiedBy(session.status, session.held),
 				sessionId: `s-${instanceId}`,
 				end: async () => {
 					session.ended = true;
@@ -233,6 +236,25 @@ describe("RoutineRunner", () => {
 		runner.observe("i1");
 		await Promise.resolve();
 		expect(fake.sessions.get("i1")?.ended).toBe(true);
+	});
+
+	test("a session a usage limit holds reads idle but keeps its slot, and ends once its hold ends", async () => {
+		const { runner, fake } = harness(fileWith(routinesPath()));
+		await runner.tick();
+		const session = fake.sessions.get("i1")!;
+		session.status = "working";
+		runner.observe("i1");
+		session.status = "idle";
+		session.held = true;
+		runner.observe("i1");
+		await runner.tick();
+		fake.now += SESSION_START_DEADLINE_MS;
+		await runner.tick();
+		expect([session.ended, fake.log]).toEqual([false, []]);
+		session.held = false;
+		runner.observe("i1");
+		await Promise.resolve();
+		expect([session.ended, fake.log]).toEqual([true, ["end s-i1"]]);
 	});
 
 	test("a prompt routine starts no second session while its last one still runs", async () => {

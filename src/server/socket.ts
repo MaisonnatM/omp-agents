@@ -28,6 +28,8 @@ export interface SocketEnv {
 	markRead(instanceId: string): void;
 	/** Whether interrupted session `sessionId` stopped while its turn ran. */
 	stoppedMidTurn(sessionId: string): boolean;
+	/** Cancels the continue session `sessionId` waits on. */
+	cancelContinue(sessionId: string): void;
 	/** Run routine `id` now, whatever its schedule. */
 	runRoutine(id: string): Promise<void>;
 	/** Send scheduled send `id` now, whatever its time, or try a failed one again. */
@@ -88,7 +90,14 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 		}
 	},
 	flush: ({ sessions }, _peer, { instanceId }) => sessions.get(instanceId)?.flush(),
-	"edit-prompt": ({ sessions }, _peer, { instanceId, entryId, text }) => sessions.started(instanceId)?.editPrompt(entryId, text),
+	async "edit-prompt"({ sessions, cancelContinue }, _peer, { instanceId, entryId, text }) {
+		const session = sessions.started(instanceId);
+		if (!session) return;
+		// The edit moves the session to a new id, whose turn start cannot cancel the old id's continue.
+		const { sessionId } = session;
+		await session.editPrompt(entryId, text);
+		cancelContinue(sessionId);
+	},
 	"cancel-agent": ({ sessions }, _peer, { view }) => sessions.get(view.instanceId)?.cancelAgent(view.agentId),
 	async start({ start }, peer, msg) {
 		peer.send({ t: "started", reqId: msg.reqId, result: await start(msg) });

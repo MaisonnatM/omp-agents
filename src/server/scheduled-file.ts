@@ -5,7 +5,10 @@
  */
 import { ReducerFile } from "../fs";
 import { isObject, isSafeInteger, parseAll } from "../json";
-import { applyScheduled, parseScheduledSpec, type ScheduledChange, type ScheduledSend, type ScheduledState } from "../shared/scheduled";
+import { applyScheduled, type ContinueChange, parseScheduledSpec, type ScheduledChange, type ScheduledSend, type ScheduledState } from "../shared/scheduled";
+
+/** What changes the file: a page's edit, or the server's own of a continue. */
+type FileChange = Exclude<ScheduledChange, { op: "send-now" }> | ContinueChange;
 
 function parseState(value: unknown): ScheduledState | null {
 	if (!isObject(value)) return null;
@@ -20,7 +23,7 @@ function parseSend(value: unknown): ScheduledSend | null {
 	return spec && state && { ...spec.ok, createdAt: value.createdAt, state };
 }
 
-export class ScheduledFile extends ReducerFile<ScheduledSend[], [change: Exclude<ScheduledChange, { op: "send-now" }>, now: number]> {
+export class ScheduledFile extends ReducerFile<ScheduledSend[], [change: FileChange, now: number]> {
 	constructor(path: string) {
 		super(path, {
 			parse: value => (isObject(value) ? parseAll(value.sends, parseSend) : null),
@@ -36,7 +39,7 @@ export class ScheduledFile extends ReducerFile<ScheduledSend[], [change: Exclude
 	 * Applies `change` at time `now` and saves; whether it changed anything. A refused take throws and saves nothing.
 	 * A take writes at once, as a claim does, so a server that claims next reads the send gone before the page restores its text.
 	 */
-	override apply(change: Exclude<ScheduledChange, { op: "send-now" }>, now: number): boolean {
+	override apply(change: FileChange, now: number): boolean {
 		const changed = super.apply(change, now);
 		if (change.op === "take") this.flush();
 		return changed;

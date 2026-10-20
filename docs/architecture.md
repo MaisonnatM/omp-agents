@@ -100,6 +100,7 @@ The main ones:
   `pi-catalog/src/types.ts` defines their model and usage arguments, including Anthropic's cache-write lifetimes.
 - Request context: `buildSessionContext` in `pi-coding-agent/src/session/session-context.ts`, the messages a request on a branch sends, `Tokenizer` in `pi-agent-core/src/tokenizer.ts`, and `resolveModelTokenizer` in `pi-catalog/src/model-tokenizer.ts`, which `src/omp/context-index.ts` uses to count each request's context sources; `getStatsDbPath` in `pi-utils/src/dirs.ts` places its index beside omp-stats' database.
 - Request errors: `is402BillingCapBody` in `pi-ai/src/error/rate-limit.ts`, the test omp's credential rotation applies to a 402, which `creditRuns` in `src/omp/stats.ts` uses to tell a provider out of prepaid credits from a 402 that asks for a smaller request.
+  `classifyMessage`, `is`, and `Flag.UsageLimit` in `pi-ai/src/error/flags.ts`, and `extractRetryHint` in `pi-utils/src/fetch-retry.ts`, tell a turn that a usage limit ended and the wait its error names, for `usageLimitOf` in `src/omp/usage-limit.ts`; see [Dashboard sessions](#dashboard-sessions).
 - Updates: `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts`, the `startup.checkUpdate` and `update.channel` readers in `pi-coding-agent/src/modes/settings.ts`, and `classifyModel` in `pi-catalog/src/identity/index.ts`, which `src/omp/release.ts` and `src/omp/model-updates.ts` use; see [Notifications](#notifications).
 
 ## Transcripts
@@ -269,6 +270,10 @@ omp's RPC mode does not title a session from its first prompt, as its terminal d
 While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
 `RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`.
 An `agent_end` that ends the run, not one that hands over to a queued follow-up (`isTerminal: false`), makes the session report `turn-ended` with its last reply: the text of the last assistant message that has any, without the suggested prompts `splitSuggestions` takes off, or `null` when none has text; the project runner reads it ([Projects](#projects)).
+The same update carries `limit`, the provider's usage limit the run ended on, or `null`: `turnUpdate` in `src/live-session.ts` reads it with `usageLimitOf` in `src/omp/usage-limit.ts`, which reads the run's last assistant message, and counts it when its `stopReason` is `error` and omp's `classifyMessage` flags it `UsageLimit`, the same test omp's retry and credential rotation apply.
+It keeps the wait the error names, such as `retry-after-ms=…`, through omp's `extractRetryHint`; see [Scheduled sends](#scheduled-sends) for the continue the server schedules for a session it started, including one it attached to after a restart.
+A dashboard session reports `turn-ended` before the roster update that shows it idle, so the server holds a session the limit stopped before the routine and project runners see it idle.
+Each main-agent `agent_start` makes the session report `turn-started` once its status reads working, whoever prompted it, which cancels a continue the session waits on.
 A session keeps running when the server stops, restarts, or crashes; only **End session**, or omp exiting on its own, ends it.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one that ended.
 
@@ -493,6 +498,8 @@ Plan quota comes from `omp usage --json`, run through this same package's CLI.
 omp builds those reports from its auth storage, extensions, and credential broker, so the server reads the command's output instead of rebuilding that setup.
 omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code.
 When the output is not a usage report, the footer shows the last line omp wrote to stderr.
+`UsagePoll` in `src/server/usage-poll.ts` runs it every minute while a socket listens, as `Dashboard` lists the registry, and when a socket opens unless the run and the plan notice check after it both succeeded since the last tick that found none, so no page means no `omp usage` runs.
+A continue that a usage limit schedules ([Scheduled sends](#scheduled-sends)) runs it at once whatever the listeners, for fresh reset times, without the plan notice check and without marking it done, so the next page to open still checks; one run under way serves every caller.
 `parsePlanUsage` keeps each limit's omp id and whether omp reports it `exhausted`, which, when omp gives no status, means nothing is left; a window omp lets run past its limit, as Codex's does, is not used up.
 It keeps a report's `resetCredits` as omp's `availableCount`, which counts banked credits whether or not one can be redeemed now, and the soonest expiry among the credits omp counts, those neither `expired` nor `redeemed` with some left, or `null` when it is 0.
 A limit in `usd` without a window, such as omp's `anthropic:extra` when Claude extra usage is on, becomes the plan's `extra`: the dollars spent, the monthly cap or `null`, and whether it is used up; a plan with only extra usage still counts.
@@ -626,7 +633,7 @@ Each server keeps its own copy of `routines.json` and `todos.json` in memory and
 
 A scheduled send is one message to a session, or one new session's start, that waits for a time; see [Send later](usage.md#send-later) for what the user sees.
 `src/shared/scheduled.ts` holds its shapes, `ScheduledSend`, `ScheduledTarget`, and `ScheduledChange`, and the rules the server applies, `applyScheduled` and `isDueSend`.
-A target is `{ kind: "message", sessionId, text }` or `{ kind: "start", request }`, where `request` is the `NewSessionRequest` that the new-session draft's **Start session** would send, without images.
+A target is `{ kind: "message", sessionId, text }`, `{ kind: "start", request }`, where `request` is the `NewSessionRequest` that the new-session draft's **Start session** would send, without images, or `{ kind: "continue", sessionId, provider, reply }`, which only the server schedules, below.
 The page resolves a plan window's reset to a time before it sends the change: `at` is the window's `resetsAt` plus `RESET_MARGIN_MS`, one minute, and `reset` only names the window for the lists.
 So a send never moves when `omp usage` later reports another reset time.
 
@@ -652,6 +659,25 @@ Every socket hears the sends after each change and each claim, send, or failure 
 Each server also reads the file and sends the list on its minute tick, so pages on a server that does not send see what the owner did.
 A send is at most a minute late, and one whose time passed while no server ran goes at the first tick after one starts.
 A message whose session runs live on a server that does not own the unattended work goes to a resumed copy on the owner, since each server reaches only the dashboard sessions it started.
+
+`src/server/auto-continue.ts` schedules a `{ kind: "continue", sessionId, provider, reply }` send when a dashboard session's `turn-ended` carries a usage limit ([Dashboard sessions](#dashboard-sessions)), `reply` being that turn's last reply; the runner delivers it as the message `continue`.
+`continueWhen` picks its time after reading `omp usage` again, once a run already under way, which may have started before the limit, finished: when every one of the provider's accounts has a used-up window, the latest reset among each account's used-up windows, then the soonest account, since omp moves to any account that serves, plus `RESET_MARGIN_MS`, with `reset` naming the window as the **Send later** menu does.
+Otherwise, an account with nothing used up being one that could serve now, it waits the error's own retry hint plus the margin, with `reset` `<provider> limit`, and with neither one hour, `UNKNOWN_RESET_WAIT_MS`, with `reset` `null`, which the page words as an unknown reset; a failed `omp usage` run counts as no window.
+`applyScheduled` takes the server's `ContinueChange`s: `continue` replaces the waiting or failed continue of its session, and `drop-continue` drops it; both leave one under way, which may already have reached the session.
+The socket's `schedule` parser refuses a page's `add` or `update` of a continue, while `scheduled.json` keeps them.
+`AutoContinue.cancel` runs on the session's `turn-started`, which `DashboardSession` emits at each main-agent `agent_start` whoever prompted: the page, a project's update or `message_worker`, or a scheduled message.
+The continue's own turn does not cancel it, since the runner claimed it first and `drop-continue` leaves one under way.
+An `edit-prompt` cancels the old session id's continue, since the edited turn starts under the new id, and ending the session through `Dashboard`'s `#endLive` cancels it too.
+A cancel that arrives while the usage read runs keeps the continue from being scheduled.
+
+`AutoContinue.held` reads the hold from the schedule: a session is held while `scheduled.json` has a continue for it that waits or is under way, or while its limit's usage read runs, the one part kept in memory.
+A continue that failed never goes on its own, so it holds nothing: the runner's failure reaches `sendsChanged` like any change, which releases the session, while the row stays for **Try again** or **Dismiss**.
+So a session the server attached to after a restart is still held while its continue waits.
+The routine and project runners read a session's real `status` and its `occupied`: a turn runs or waits on a question (`occupiedBy` in `src/server/project-runner.ts`), or `AutoContinue` holds it.
+An occupied session is not ended by a routine or by `endFinished`, the cleanup after a merge, which rejects it so the cleanup tries again; it takes a project worker slot and gets no project updates; the bell's project notices keep the real worker phase, and an occupied worker or coordinator keeps "all done" off and an occupied coordinator keeps worker questions out.
+The page reads the roster, so a held session shows idle; the project runner hears of the held turn, with the `reply` its continue saved, only when the hold ends with the session idle.
+`AutoContinue.sendsChanged` compares the held sessions with those it last saw, starting from the file as the server starts, and releases each that is no longer held.
+Every change to the sends goes through `Dashboard`'s `#publishScheduled`, which tells every socket and calls `sendsChanged`: the page's edits, through the list registry's push, the runner's claims, sends, and failures, `AutoContinue`'s own continues and cancels, and the minute tick's read of the file, which brings in what another server did.
 
 ## Projects
 
@@ -756,7 +782,7 @@ Each server keeps its own copy in memory, as with the workspaces, so a routine's
 Each kind has its own check, and `src/server/loops.ts` runs five of them.
 The update check (`UPDATE_KINDS`) runs at startup and every six hours, whether or not a page is connected, and again after each update that succeeds.
 The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, and when a socket opens unless it ran since the last tick that found none.
-The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run, at startup and every minute, whether or not a page is connected.
+The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run of the usage tick, every minute while a socket listens, and when a socket opens unless it succeeded since the last tick that found none; a continue's own run skips it ([Plan quota](#plan-quota)).
 The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page is connected.
 The dashboard check (`DASHBOARD_KINDS`) runs at startup and every five minutes, whether or not a page is connected: `SelfUpdate.newCommits` fetches the branch the server runs from origin and counts the commits past the running one.
 
@@ -806,7 +832,8 @@ No check follows its success, unlike omp's and a model's: the server restarts an
 
 The Dock badge and the session notifications count on the roster: the server keeps whether each live session waits on you, and each page decides what to show of it.
 A row's `status` of `needs-input` says that the session asks something, and its `unread` names the turn it ended since you last looked: when, and the first line of its last reply.
-Both transports report the main agent's turn as a `TurnUpdate` from `turnUpdate` in `src/live-session.ts`: `turn-started` at `agent_start`, and `turn-ended` with its last reply at an `agent_end` that ends the run, not one that hands over to a queued follow-up.
+Both transports report the main agent's turn as a `TurnUpdate` from `turnUpdate` in `src/live-session.ts`: `turn-started` at `agent_start`, and `turn-ended` with its last reply and its usage limit at an `agent_end` that ends the run, not one that hands over to a queued follow-up.
+The same `turn-started` cancels a continue the session waits on, and only a `turn-ended` with a limit from a session this server started schedules one ([Scheduled sends](#scheduled-sends)).
 `Dashboard` applies each in `#onLiveUpdate` through `LiveSessions`, which keeps the unread turns privately by instance id in memory, adds them to each row in `rows()`, and drops one when its session leaves.
 `turn-ended` sets the turn with `markUnread` and always pushes the roster; `turn-started` clears it with `markRead` and pushes the roster only when a turn was unread.
 A page sends `{ t: "read", instanceId }` while a pane shows the session's main agent in a focused window, which `LiveSessions.markRead` clears for every page.

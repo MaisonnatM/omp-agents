@@ -1,6 +1,6 @@
 /** The times the Send later menu offers. */
 import type { PlanUsage } from "../src/shared/models";
-import { RESET_MARGIN_MS } from "../src/shared/scheduled";
+import { RESET_MARGIN_MS, resetName } from "../src/shared/scheduled";
 
 /** A time to send at: a plan window's reset, named by `reset`, or one picked by hand, with `reset` `null`. */
 export interface ScheduleWhen {
@@ -13,13 +13,11 @@ export interface ScheduleWhen {
  * A window reads as its plan's name and its label, with the account only when two plans share that name.
  */
 export function resetChoices(plans: readonly PlanUsage[], now: number): ScheduleWhen[] {
-	const shared = new Set(plans.filter((plan, index) => plans.findIndex(other => other.name === plan.name) !== index).map(plan => plan.name));
-	const windows = plans.flatMap(plan => {
-		const name = plan.account && shared.has(plan.name) ? `${plan.name} · ${plan.account}` : plan.name;
-		return plan.windows.flatMap(window =>
-			window.resetsAt !== null && window.resetsAt > now ? [{ at: window.resetsAt + RESET_MARGIN_MS, reset: `${name} ${window.label}`, exhausted: window.exhausted }] : [],
-		);
-	});
+	const windows = plans.flatMap(plan =>
+		plan.windows.flatMap(window =>
+			window.resetsAt !== null && window.resetsAt > now ? [{ at: window.resetsAt + RESET_MARGIN_MS, reset: resetName(plans, plan, window), exhausted: window.exhausted }] : [],
+		),
+	);
 	return windows.sort((a, b) => Number(b.exhausted) - Number(a.exhausted) || a.at - b.at).map(({ at, reset }) => ({ at, reset }));
 }
 

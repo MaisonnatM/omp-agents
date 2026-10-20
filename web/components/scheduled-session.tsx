@@ -24,7 +24,7 @@ interface ScheduledSessionProps {
 export function ScheduledSession({ id, workspaces, connected, completions, todoOf }: ScheduledSessionProps) {
 	const send = useContext(ScheduledSends).find(candidate => candidate.id === id);
 	if (!send) return <p className="m-auto text-sm text-muted-foreground">It is no longer scheduled: it started, or was canceled.</p>;
-	if (send.target.kind === "message") {
+	if (send.target.kind !== "start") {
 		return (
 			<p className="m-auto text-sm text-muted-foreground">
 				A scheduled message waits above its session's composer. <a className="underline" href={hashForSession(send.target.sessionId)}>Open the session</a>

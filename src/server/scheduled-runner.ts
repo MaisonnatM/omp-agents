@@ -5,7 +5,7 @@
  */
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
-import { isDueSend, type ScheduledTarget } from "../shared/scheduled";
+import { CONTINUE_PROMPT, isDueSend, type ScheduledTarget } from "../shared/scheduled";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { ScheduledFile } from "./scheduled-file";
 
@@ -64,12 +64,20 @@ export class ScheduledRunner {
 	}
 
 	async #deliver(target: ScheduledTarget): Promise<void> {
-		if (target.kind === "start") {
-			const result = await this.#deps.start(target.request);
-			if (!result.ok) throw new Error(result.error);
-			return;
+		switch (target.kind) {
+			case "start": {
+				const result = await this.#deps.start(target.request);
+				if (!result.ok) throw new Error(result.error);
+				return;
+			}
+			case "message":
+				return (await this.#deps.reach(target.sessionId)).prompt(null, target.text, [], "followUp");
+			case "continue":
+				return (await this.#deps.reach(target.sessionId)).prompt(null, CONTINUE_PROMPT, [], "followUp");
+			default: {
+				const unhandled: never = target;
+				return unhandled;
+			}
 		}
-		const recipient = await this.#deps.reach(target.sessionId);
-		await recipient.prompt(null, target.text, [], "followUp");
 	}
 }
