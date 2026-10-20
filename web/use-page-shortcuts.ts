@@ -24,6 +24,8 @@ export interface PageShortcutInput {
 	linearCallable: boolean;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;
+	/** Sends the focused session **Open PR**'s prompt, or `null` while its header offers no **Open PR** to press. */
+	openPullRequest: (() => void) | null;
 	palette: PaletteState | null;
 	dispatchPalette: Dispatch<PaletteEvent>;
 	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
@@ -130,10 +132,16 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				show({ ...layout, maximized: false });
 			},
 			terminal: () => latest.current.toggleTerminal(),
+			openPullRequest: () => {
+				const { openPullRequest } = latest.current;
+				if (!openPullRequest) return false;
+				openPullRequest();
+			},
 		};
 	}, []);
 	useShortcuts(handlers);
 	const { signedOutTabs, linearCallable, hasDetails } = input;
+	const canOpenPullRequest = input.openPullRequest !== null;
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
 		() =>
@@ -142,8 +150,9 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				...(signedOutTabs satisfies ReadonlySet<ShortcutId>),
 				...(linearCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
+				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
 			]),
-		[signedOutTabs, linearCallable, hasDetails],
+		[signedOutTabs, linearCallable, hasDetails, canOpenPullRequest],
 	);
 	return { handlers, unavailable };
 }

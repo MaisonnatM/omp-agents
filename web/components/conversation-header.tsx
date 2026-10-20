@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
+import { OpenPullRequestButton } from "../open-pull-request";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
@@ -32,7 +33,7 @@ interface ConversationHeaderProps {
 /**
  * A live session's title, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
  * the connection status; a session's Linear issues, pull requests, and the branch it works on, which copies a `cd` into its
- * linked worktree when clicked; its directory in Cursor;
+ * linked worktree when clicked; **Open PR** while its branch can take one; its directory in Cursor;
  * and End session, which shows it is ending until the server answers, though the session may leave the roster before then.
  */
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
@@ -83,6 +84,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			alert={!ending && phase.phase === "ended"}
 		>
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
+			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={

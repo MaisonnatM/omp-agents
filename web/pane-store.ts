@@ -97,10 +97,10 @@ export function applyPaneMessage(msg: PaneMsg): void {
 
 /**
  * A field of `view`'s data, rendering again only when that field changes. A streamed token changes `items` alone, so a
- * component that reads another field never renders for it; each hook below names the field it reads.
+ * component that reads another field never renders for it; each hook below names the field it reads. With no view it reads an empty pane.
  */
-export function usePaneSelect<S>(view: View, select: (pane: PaneData) => S, equal?: (a: S, b: S) => boolean): S {
-	return panes.useSelect(hashForView(view), select, equal);
+export function usePaneSelect<S>(view: View | null, select: (pane: PaneData) => S, equal?: (a: S, b: S) => boolean): S {
+	return panes.useSelect(view ? hashForView(view) : "", select, equal);
 }
 
 const itemsOf = (pane: PaneData): Item[] => pane.items;

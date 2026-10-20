@@ -1,5 +1,5 @@
 /** What a pane talks to, a session or one of its subagents, as the facts the header and composer need. */
-import type { AgentRow, ControlPhase, LiveView, MessageQueue, RosterHost, UserRequest } from "../../src/shared/sessions";
+import type { AgentRow, ControlPhase, Delivery, LiveView, MessageQueue, RosterHost, UserRequest } from "../../src/shared/sessions";
 import type { ShellReach } from "./composer";
 
 const SESSION_GONE: ControlPhase = { phase: "ended", reason: "This session is no longer running." };
@@ -37,6 +37,9 @@ export type Subject =
 			switchable: Extract<RosterHost, { source: "dashboard" }> | null;
 	  })
 	| (Facts & { kind: "subagent" });
+
+/** How a message to `subject` goes now: a follow-up held until the running turn ends, where one can be held, else a steer, which an idle agent takes as a new prompt. */
+export const deliveryOf = ({ working, followUps }: Pick<Facts, "working" | "followUps">): Delivery => (working && followUps ? "followUp" : "steer");
 
 /** The one place that tells a session from a subagent: `view` against the roster row and the last one seen. */
 export function subjectOf(view: LiveView, host: RosterHost | null, lastHost: RosterHost | null): Subject {

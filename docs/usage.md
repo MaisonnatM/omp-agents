@@ -351,6 +351,14 @@ An action that fails shows its error, and its control becomes available again.
 - Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
   Its menu opens each one on GitHub, on Graphite, or in its details on the Pull requests page; the button shows only for a session with a pull request.
   Past sessions show both before **Resume**.
+- Next, before **End session**, a running session that the dashboard can prompt shows **Open PR** while it works on a branch other than its repository's default branch and the pull request list names no pull request from that branch.
+  The default branch is the one `origin/HEAD` names, so a repository whose clone never recorded it shows no **Open PR** until `git remote set-head origin --auto` records it, which a session there notices at its next write.
+  **Open PR** sends the session one prompt: commit the finished work, collect the diff against `origin/<default branch>`, run one `thermo-nuclear-code-quality-review` subagent on it, apply its in-scope findings that keep behavior the same and list the skipped ones with a reason, run the project's checks again, push, open the pull request with `gh pr create`, and report its link.
+  The prompt shows in the transcript as yours, and while a turn runs it waits as a queued follow-up, as a message the composer sends then does.
+  The button reads **Opening PR…** and takes no second press, there or in the command menu, from the press until the session is next idle after it took the prompt, through messages you steer or queue meanwhile and questions it asks.
+  Taking the queued prompt back out while a turn runs keeps **Opening PR…** until that turn ends.
+  It goes once a read of the pull request list names the new pull request; a second send before then reports the open pull request's link and stops.
+  **Open pull request** in the command menu does the same for the focused pane's session while the panes show.
 - The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
   The label leaves out the provider, the vendor prefix, and a release date, joins version parts with dots, and puts a `:` suffix such as a thinking level in parentheses (`Sonnet 5.5 (high)`).
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
@@ -624,8 +632,8 @@ An action that fails shows its error, and its control becomes available again.
   A `gt submit` or `gt ss` call is a submission too, even when it printed nothing, as with `-q`: of the branch it names with `--branch`, else of the branch checked out where it ran, at the time it ran, in the main checkout too, but not of a `--dry-run`.
   Where it ran follows the bash call's `cwd`, a `cd` earlier in the same command, and `--cwd`; when it ran picks the branch from that worktree's HEAD reflog, so a later switch leaves the link alone.
   Work is one of the session's own tool calls: `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready` with a PR number or URL; a `git push` whose output shows that it updated a PR's head branch; or an omp `pr://` read.
-  Work is also the branch checked out in the linked worktree the session works in, its own directory or the worktree its bash calls last ran in, when a PR heads that branch; a switch to another branch links that branch's PR at the session's next write.
-  A repository's main checkout links no PR by its branch, since every session started there shares it.
+  Work is also the branch the session works on when a PR heads it: the branch checked out in the linked worktree the session works in, its own directory or the worktree its bash calls last ran in, or in a repository's main checkout a branch other than the default one that `origin/HEAD` names; a switch to another branch links that branch's PR at the session's next write.
+  A main checkout's default branch links no PR, since every session started there shares it.
   A bare number belongs to the repository that `origin` names in the session's working directory, unless the command passes `-R` or `--repo`.
   A push, a submit, or a worktree's branch links once the Pull requests page has listed the PR that the branch heads, because only that list knows which branch heads which PR.
   A submit links only while the directory it ran in exists.

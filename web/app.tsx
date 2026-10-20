@@ -28,6 +28,7 @@ import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
+import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
 import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
@@ -135,6 +136,8 @@ export function App() {
 	);
 
 	const { setShortcutsOpen, setFilePath, setNewTicket, dispatchPalette } = overlays;
+	// The command menu's **Open pull request** acts on the focused pane's session while the panes show, as its header's **Open PR** does.
+	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
 	const { handlers, unavailable } = usePageShortcuts({
 		page,
 		layout,
@@ -147,6 +150,7 @@ export function App() {
 		tabs,
 		linearCallable,
 		hasDetails: detailsView !== null,
+		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
 		palette: overlays.palette,
 		dispatchPalette,
 		setShortcutsOpen,

@@ -125,6 +125,13 @@ export function branchAt(history: HeadHistory, at: number): string | null {
 	return branch;
 }
 
+/** The branch `origin/HEAD` names in `dir`'s repository, its default branch; `null` outside git or when git has not recorded one. */
+export async function defaultBranchOf(dir: string): Promise<string | null> {
+	const { code, stdout } = await run(["git", "-C", dir, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+	const ref = stdout.trim();
+	return code === 0 && ref.startsWith("origin/") ? ref.slice("origin/".length) : null;
+}
+
 /** The checkout `cwd` is in, `null` when it is in none. */
 export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
 	const at = await worktreeAt(cwd);

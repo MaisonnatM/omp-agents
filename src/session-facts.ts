@@ -3,9 +3,9 @@
  * A submission is a per-branch line `gt submit` prints, the URL a `gh pr create` call prints, or the branch a
  * `gt submit` call submitted, which links even when the call printed nothing (`-q`). Work is a
  * `gh pr checkout|edit|comment|review|merge|ready` call that names a PR, a `git push` that updated a PR's head
- * branch, an omp `pr://` read, or the branch checked out in the linked worktree the session works in, when a PR
- * heads it. A PR a session only quoted, listed, or was handed is not linked to it; nor is the main checkout's
- * branch, which every session started there shares.
+ * branch, an omp `pr://` read, or the branch the session works on, when a PR heads it: the one checked out in its
+ * linked worktree, or in a main checkout one other than the default branch. A PR a session only quoted, listed, or
+ * was handed is not linked to it; nor is the main checkout's default branch, which every session started there shares.
  *
  * The same scan collects the Linear issues a session worked on: the ones omp's Linear MCP tools read
  * (`get_issue`, `list_comments`), changed or opened (`save_issue`), or commented on (`save_comment`), and the
@@ -19,7 +19,7 @@
  */
 import { access } from "node:fs/promises";
 import { resolve } from "node:path";
-import { branchAt, type HeadHistory, type WorktreeAt } from "./git";
+import { branchAt, defaultBranchOf, type HeadHistory, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
@@ -384,9 +384,15 @@ interface SessionScan {
 	workDirs: string[];
 	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
 	worktree: string | null;
-	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it. */
+	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it; only `#resolve` writes it, whole, from git's answer, the default branch, and the pull request it heads. */
 	branch: SessionBranch | null;
 }
+
+/** What git says of the branch a session works on. */
+type GitBranch = Pick<SessionBranch, "name" | "linked">;
+
+/** The directory whose checkout a session works on: its linked worktree, else `cwd`. */
+const workDirOf = (session: SessionScan): string => session.worktree ?? session.cwd;
 
 const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
 
@@ -404,15 +410,15 @@ function once<T>(ask: (dir: string) => Promise<T>): (dir: string) => Promise<T> 
 }
 
 /**
- * The branch a session that last wrote at `at`, in ms, works on in `dir`: in a linked worktree the one checked out now,
- * in a main checkout the one checked out at `at`; `null` on a detached HEAD, outside git, or once `dir` is gone.
+ * What git says of the branch a session that last wrote at `at`, in ms, works on in `dir`: in a linked worktree the one
+ * checked out now, in a main checkout the one checked out at `at`; `null` on a detached HEAD, outside git, or once `dir` is gone.
  */
-async function sessionBranch(
+async function gitBranch(
 	dir: string,
 	at: number,
 	worktreeAt: (dir: string) => Promise<WorktreeAt | null>,
 	historyOf: (dir: string) => Promise<HeadHistory | null>,
-): Promise<SessionBranch | null> {
+): Promise<GitBranch | null> {
 	if (!(await exists(dir))) return null;
 	const checkout = await worktreeAt(dir);
 	if (!checkout) return null;
@@ -420,6 +426,14 @@ async function sessionBranch(
 	const history = await historyOf(dir);
 	const name = history && branchAt(history, at);
 	return name ? { name, linked: false } : null;
+}
+
+/**
+ * The branch whose PR a session on `branch` links: a linked worktree's, or a main checkout's other than its default
+ * branch `defaultBranch`, which every session there shares; `null` for none, and while git names no default.
+ */
+function linkingBranch(branch: GitBranch | null, defaultBranch: string | null): string | null {
+	return branch && (branch.linked || (defaultBranch !== null && branch.name !== defaultBranch)) ? branch.name : null;
 }
 
 /** The branch a `gt submit` from session directory `cwd` submitted, in the repository `origin` names where it ran; `null` once that directory is gone. */
@@ -468,6 +482,8 @@ export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
 	/** The PRs the pull request list holds, by `owner/repo:branch` of their head. */
 	readonly #heads = new Map<string, PullRequest>();
+	/** Each directory's default branch as `origin/HEAD` last named it, read again whenever a session working there writes; `null` while git names none. */
+	readonly #defaultBranches = new Map<string, string | null>();
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
 	readonly #worktreeAt: (dir: string) => Promise<WorktreeAt | null>;
 	readonly #headHistory: (dir: string) => Promise<HeadHistory | null>;
@@ -518,7 +534,7 @@ export class SessionFactsIndex {
 		return run;
 	}
 
-	/** Which branch heads which PR in `repo`, from the pull request list's PRs of it. Returns whether any session's pull requests changed. */
+	/** Which branch heads which PR in `repo`, from the pull request list's PRs of it. Returns whether any session's pull requests, or the PR its branch heads, changed. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): boolean {
 		const prefix = headKey(repo, "");
 		for (const key of this.#heads.keys()) if (key.startsWith(prefix)) this.#heads.delete(key);
@@ -532,18 +548,27 @@ export class SessionFactsIndex {
 		return changed;
 	}
 
-	/** Recompute a session's pull requests, from its transcripts' refs and then its linked worktree's branch; returns whether they changed. */
-	#resolve(session: SessionScan): boolean {
-		const { repo, branch } = session;
+	/**
+	 * Recompute a session's pull requests, from its transcripts' refs and then its branch, and its `branch` whole from `git`,
+	 * what git last said of it, with its default branch and the PR it heads; returns whether either changed.
+	 */
+	#resolve(session: SessionScan, git: GitBranch | null = session.branch): boolean {
+		const { repo } = session;
+		const defaultBranch = this.#defaultBranches.get(workDirOf(session)) ?? null;
+		const linking = repo ? linkingBranch(git, defaultBranch) : null;
+		const headed = repo && linking ? (this.#heads.get(headKey(repo, linking)) ?? null) : null;
+		const branch: SessionBranch | null = git && { name: git.name, linked: git.linked, defaultBranch, pullRequest: headed };
+		const branchChanged = JSON.stringify(branch) !== JSON.stringify(session.branch);
+		if (branchChanged) session.branch = branch;
 		const refs = session.refs.flatMap((ref): PullRequestRef[] => {
 			if (ref.kind !== "submit") return [ref];
 			const submitted = session.submitted.get(refKey(ref));
 			return submitted ? [submitted] : [];
 		});
-		const pullRequests = resolveLinks(repo && branch?.linked ? [...refs, { kind: "branch", ...repo, branch: branch.name, link: "worked" }] : refs, repo, this.#heads);
+		const pullRequests = resolveLinks(repo && linking ? [...refs, { kind: "branch", ...repo, branch: linking, link: "worked" }] : refs, repo, this.#heads);
 		const before = session.pullRequests;
 		const same = pullRequests.length === before.length && pullRequests.every((pr, i) => prKey(pr) === prKey(before[i]!) && pr.link === before[i]!.link);
-		if (same) return false;
+		if (same) return branchChanged;
 		session.pullRequests = pullRequests;
 		return true;
 	}
@@ -585,15 +610,28 @@ export class SessionFactsIndex {
 			changed = true;
 		});
 		// A session that wrote to its transcript may have switched branch since: two `git` calls per writing session's directory per refresh, and two more for a main checkout's HEAD reflog.
-		const branches = await mapLimit(scans, SCAN_PARALLEL, ({ session, writtenAt }) => sessionBranch(session.worktree ?? session.cwd, writtenAt, worktreeAt, historyOf));
-		scans.forEach(({ session }, i) => {
-			const branch = branches[i]!;
-			if (branch?.name === session.branch?.name && branch?.linked === session.branch?.linked) return;
-			session.branch = branch;
-			changed = true;
+		// The answers stay here until `#resolve` publishes each branch whole, since a roster push can read `branch` during the awaits below.
+		const reads = await mapLimit(scans, SCAN_PARALLEL, ({ session, writtenAt }) => gitBranch(workDirOf(session), writtenAt, worktreeAt, historyOf));
+		const branches = new Map(scans.map(({ session }, i) => [session, reads[i]!]));
+		const gitOf = (session: SessionScan): GitBranch | null => (branches.has(session) ? branches.get(session)! : session.branch);
+		// `origin/HEAD` may have moved too: one more `git` call per writing session's directory with a branch.
+		const dirs = [...new Set(touched.flatMap(session => (gitOf(session) ? [workDirOf(session)] : [])))];
+		const defaults = await mapLimit(dirs, SCAN_PARALLEL, defaultBranchOf);
+		const redirected = new Set<string>();
+		dirs.forEach((dir, i) => {
+			if ((this.#defaultBranches.get(dir) ?? null) === defaults[i]) return;
+			this.#defaultBranches.set(dir, defaults[i]!);
+			redirected.add(dir);
 		});
-		// One `git` call per directory, and only for sessions that name a PR by number alone or sit on a linked worktree's branch.
-		const unknownRepo = touched.filter(session => session.repo === null && (session.branch?.linked || session.refs.some(ref => ref.kind === "number")));
+		// Every session working in a directory whose default branch moved resolves again, not only the ones that wrote.
+		const resolving = new Set(touched);
+		if (redirected.size > 0) for (const session of this.#sessions.values()) if (redirected.has(workDirOf(session))) resolving.add(session);
+		// One `git` call per directory, and only for sessions that name a PR by number alone or work on a branch that links the PR it heads.
+		const unknownRepo = [...resolving].filter(
+			session =>
+				session.repo === null &&
+				(linkingBranch(gitOf(session), this.#defaultBranches.get(workDirOf(session)) ?? null) !== null || session.refs.some(ref => ref.kind === "number")),
+		);
 		await mapLimit(unknownRepo, SCAN_PARALLEL, async session => {
 			session.repo = await repoOf(session.cwd);
 		});
@@ -603,7 +641,7 @@ export class SessionFactsIndex {
 			const submitted = await submittedBranch(ref, session.cwd, repoOf, historyOf);
 			if (submitted) session.submitted.set(refKey(ref), submitted);
 		});
-		for (const session of touched) if (this.#resolve(session)) changed = true;
+		for (const session of resolving) if (this.#resolve(session, gitOf(session))) changed = true;
 		return changed;
 	}
 

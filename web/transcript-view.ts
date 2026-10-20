@@ -11,7 +11,7 @@ type DashboardItem = Extract<Item, { kind: "dashboard" }>;
 export type Block = { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
 
 /** Whether `item` opens a turn: a prompt, the user's or one the dashboard sent in their place, which shows nothing. */
-const opensTurn = (item: Item): boolean => item.kind === "user" || item.kind === "dashboard";
+export const opensTurn = (item: Item): item is Extract<Item, { kind: "user" | "dashboard" }> => item.kind === "user" || item.kind === "dashboard";
 
 const blockKey = (block: Block): string => (block.kind === "item" ? block.item.id : block.id);
 
