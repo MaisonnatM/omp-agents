@@ -83,7 +83,8 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 		const socket = join(dir, "stuck.sock");
 		writeFileSync(join(dir, "keeper.ts"), STUCK_KEEPER);
 		const keeper = Bun.spawn([process.execPath, join(dir, "keeper.ts"), socket, pidFileOf(socket)], { stdout: "pipe" });
-		const job = Number((await keeper.stdout.getReader().read()).value?.toString().trim());
+		const job = Number(new TextDecoder().decode((await keeper.stdout.getReader().read()).value));
+		expect(alive(job)).toBe(true);
 		const attach = keeperLink.attachKeeper;
 		spyOn(keeperLink, "attachKeeper").mockImplementation((_dir, instanceId) => attach(dir, instanceId));
 		spyOn(rpc, "keptSessions").mockReturnValue(["stuck"]);

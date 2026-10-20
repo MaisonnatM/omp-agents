@@ -36,12 +36,45 @@ function descendants(table: ProcessTable, root: number): Processes {
 }
 
 /** Sends `name` to `pid`, which may be gone already. */
-export function signal(pid: number, name: NodeJS.Signals): void {
+function signal(pid: number, name: NodeJS.Signals): void {
 	try {
 		process.kill(pid, name);
 	} catch {
 		// Gone already.
 	}
+}
+
+/** Forgets the processes `table` no longer lists under their start time; whether there was a table. */
+function forgetGone(processes: Processes, table: ProcessTable | null): boolean {
+	if (!table) return false;
+	for (const [pid, started] of processes) if (table.get(pid)?.started !== started) processes.delete(pid);
+	return true;
+}
+
+/**
+ * Stops `processes`: SIGTERM, then SIGKILL after `graceMs` to those `ps` still lists under the start time they had, so
+ * a pid that a later process reuses is never signalled. Settles once none runs, or at the grace's end.
+ */
+async function terminate(processes: Processes, graceMs: number): Promise<void> {
+	let listed = forgetGone(processes, processTable());
+	for (const pid of processes.keys()) signal(pid, "SIGTERM");
+	const deadline = Date.now() + graceMs;
+	while ((processes.size > 0 || !listed) && Date.now() < deadline) {
+		await Bun.sleep(50);
+		listed = forgetGone(processes, processTable());
+	}
+	for (const pid of processes.keys()) signal(pid, "SIGKILL");
+	if (!listed) console.error(`omp-agents: ps failed, so these processes may still run: ${[...processes.keys()].join(" ")}`);
+}
+
+/** Stops `root` and every process under it now, as one `ps` finds them, by {@link terminate}. */
+export async function stopTree(root: number, graceMs: number): Promise<void> {
+	const table = processTable();
+	if (!table) return void console.error(`omp-agents: ps failed, so process ${root} and what it started may still run`);
+	const started = table.get(root)?.started;
+	const tree: Processes = new Map(started === undefined ? [] : [[root, started]]);
+	for (const [pid, at] of descendants(table, root)) tree.set(pid, at);
+	await terminate(tree, graceMs);
 }
 
 export interface CensusTimes {
@@ -72,7 +105,7 @@ export class ProcessCensus {
 	note(): boolean {
 		const table = processTable();
 		if (!table) return false;
-		this.#forgetGone(table);
+		forgetGone(this.#noted, table);
 		for (const [pid, started] of descendants(table, this.#root)) this.#noted.set(pid, started);
 		return true;
 	}
@@ -94,23 +127,8 @@ export class ProcessCensus {
 		this.#reaping ??= (async () => {
 			clearInterval(this.#every);
 			clearTimeout(this.#soon);
-			let listed = this.#forgetGone(processTable());
-			for (const pid of this.#noted.keys()) signal(pid, "SIGTERM");
-			const deadline = Date.now() + this.#times.graceMs;
-			while ((this.#noted.size > 0 || !listed) && Date.now() < deadline) {
-				await Bun.sleep(50);
-				listed = this.#forgetGone(processTable());
-			}
-			for (const pid of this.#noted.keys()) signal(pid, "SIGKILL");
-			if (!listed) console.error(`omp-agents keeper: ps failed, so these processes omp started may still run: ${[...this.#noted.keys()].join(" ")}`);
+			await terminate(this.#noted, this.#times.graceMs);
 		})();
 		return this.#reaping;
-	}
-
-	/** Forgets the noted processes `table` no longer lists under their start time; whether there was a table. */
-	#forgetGone(table: ProcessTable | null): boolean {
-		if (!table) return false;
-		for (const [pid, started] of this.#noted) if (table.get(pid)?.started !== started) this.#noted.delete(pid);
-		return true;
 	}
 }

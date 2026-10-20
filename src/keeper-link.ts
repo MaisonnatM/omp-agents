@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { isObject } from "./json";
 import { HELLO, type KeeperMeta, pidFileOf, STOP } from "./keeper-wire";
 import type { RpcProcess } from "./omp/modules";
-import { ProcessCensus, signal } from "./process-census";
+import { stopTree } from "./process-census";
 import { keeperScript } from "./server/resources";
 
 /** One connection to a keeper. */
@@ -199,8 +199,8 @@ export async function startKeeper(dir: string, instanceId: string, { cwd, argv, 
 }
 
 /**
- * Stops the keeper whose pid `pidFile` records, with its omp and every process under it, without its help: SIGTERM,
- * then SIGKILL to what is left after {@link STUCK_GRACE_MS}. Whether the file named a pid.
+ * Stops the keeper whose pid `pidFile` records, with its omp and every process under it, without its help, by
+ * {@link stopTree}. Whether the file named a pid.
  */
 async function endKeeper(pidFile: string): Promise<boolean> {
 	let pid: number;
@@ -210,11 +210,7 @@ async function endKeeper(pidFile: string): Promise<boolean> {
 		return false;
 	}
 	if (!Number.isSafeInteger(pid) || pid <= 1) return false;
-	const tree = new ProcessCensus(pid, { everyMs: STUCK_GRACE_MS, soonMs: STUCK_GRACE_MS, graceMs: STUCK_GRACE_MS });
-	tree.note();
-	signal(pid, "SIGTERM");
-	await tree.reap();
-	signal(pid, "SIGKILL");
+	await stopTree(pid, STUCK_GRACE_MS);
 	return true;
 }
 
