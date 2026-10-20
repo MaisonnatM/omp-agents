@@ -371,7 +371,8 @@ export type StatusItem =
 	| { kind: "approved"; by: string[] }
 	| { kind: "review-required"; waitingOn: string[] }
 	| { kind: "threads"; count: number; exact: boolean }
-	| { kind: "ready" };
+	| { kind: "ready" }
+	| { kind: "behind"; base: string };
 
 /** What stands between an open or draft pull request and its merge, blockers first; nothing once it is merged or closed. */
 export function pullRequestStatus(detail: PullRequestDetail): StatusItem[] {
@@ -381,7 +382,7 @@ export function pullRequestStatus(detail: PullRequestDetail): StatusItem[] {
 	const failing = count("failing");
 	const pending = count("pending");
 	const items: StatusItem[] = [];
-	if (readyToMerge(detail)) items.push({ kind: "ready" });
+	if (readyToMerge(detail)) items.push(detail.mergeState === "behind" ? { kind: "behind", base: detail.base } : { kind: "ready" });
 	if (detail.state === "draft") items.push({ kind: "draft" });
 	if (detail.conflicts) items.push({ kind: "conflicts", base: detail.base });
 	if (failing > 0) items.push({ kind: "checks-failing", count: failing });

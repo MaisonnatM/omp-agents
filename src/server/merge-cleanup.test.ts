@@ -15,6 +15,8 @@ function harness() {
 		/** What GitHub's read of the pull requests, and the read of a checkout, wait on before they answer. */
 		reading: Promise.resolve(),
 		checking: Promise.resolve(),
+		/** Called as the read of the checkout `dir` starts. */
+		onCheckout: (_dir: string) => {},
 		log: [] as string[],
 	};
 	const cleanup = new MergeCleanup({
@@ -25,6 +27,7 @@ function harness() {
 			return answer;
 		},
 		checkout: async dir => {
+			state.onCheckout(dir);
 			await state.checking;
 			return { gitDir: `${dir}/.git`, repo: { owner: "o", repo: "r" } };
 		},
@@ -49,6 +52,7 @@ function harness() {
 const session = (sessionId: string, numbers: number[], overrides: Partial<CleanupSession> = {}): CleanupSession => ({
 	sessionId,
 	idle: true,
+	occupied: false,
 	pullRequests: numbers.map(number => pr(number)),
 	workDir: `/wt/${sessionId}`,
 	branch: "feat",
@@ -107,14 +111,46 @@ describe("MergeCleanup", () => {
 
 	test("a session that works when its pull request merges ends once it is idle, and one whose end fails is tried again at the next look", async () => {
 		const { cleanup, state, look } = harness();
-		state.sessions = [session("busy", [12], { idle: false }), session("stuck", [12])];
+		state.sessions = [session("busy", [12], { idle: false, occupied: true }), session("stuck", [12])];
 		state.failing.add("stuck");
 		await cleanup.merged({ ...pr(12), branch: "feat", head: "abc" });
 		expect(state.log).toEqual([]);
-		state.sessions = state.sessions.map(one => ({ ...one, idle: true }));
+		state.sessions = state.sessions.map(one => ({ ...one, idle: true, occupied: false }));
 		state.failing.clear();
 		await look();
 		expect(state.log.toSorted()).toEqual(["delete /wt/busy/.git feat abc", "delete /wt/stuck/.git feat abc", "end busy", "end stuck"]);
+	});
+
+	test("a session held for its usage limit's continue is not ended at the merge or at a look, and ends at the look after its hold ends", async () => {
+		const { cleanup, state, look } = harness();
+		state.sessions = [session("held", [12], { occupied: true })];
+		await cleanup.merged({ ...pr(12), branch: "feat", head: "abc" });
+		await look();
+		expect(state.log).toEqual([]);
+		state.sessions = [session("held", [12])];
+		await look();
+		expect(state.log).toEqual(["end held", "delete /wt/held/.git feat abc"]);
+	});
+
+	test("a session that starts a turn, or is held, while its checkout is read waits for the next look", async () => {
+		const { cleanup, state, look } = harness();
+		state.sessions = [session("prompted", [12]), session("held", [12])];
+		const checking = Promise.withResolvers<void>();
+		state.checking = checking.promise;
+		const reading = new Set<string>();
+		const bothRead = Promise.withResolvers<void>();
+		state.onCheckout = dir => {
+			if (reading.add(dir).size === 2) bothRead.resolve();
+		};
+		const merging = cleanup.merged({ ...pr(12), branch: "feat", head: "abc" });
+		await bothRead.promise;
+		state.sessions = [session("prompted", [12], { idle: false, occupied: true }), session("held", [12], { occupied: true })];
+		checking.resolve();
+		await merging;
+		expect(state.log).toEqual([]);
+		state.sessions = [session("prompted", [12]), session("held", [12])];
+		await look();
+		expect(state.log.toSorted()).toEqual(["delete /wt/held/.git feat abc", "delete /wt/prompted/.git feat abc", "end held", "end prompted"]);
 	});
 
 	test("a session in a main checkout ends without a branch deleted, a branch of another repository's pull request stays, and one session never ends twice", async () => {
