@@ -25,6 +25,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Notifications](#notifications)
   - [Session notifications](#session-notifications)
 - [Merges, and the cleanup after one](#merges-and-the-cleanup-after-one)
+- [Review drafts](#review-drafts)
 - [Updating the dashboard](#updating-the-dashboard)
 - [HTTP API](#http-api)
   - [Integrations](#integrations)
@@ -432,7 +433,7 @@ A prompt that fails comes back to the composer with its files and a note, and a 
 A handler's error goes to the server's log once, with its message type, on the run that threw.
 A page loaded before page ids tags its requests with no `floor`, so the server drops them until the page reloads.
 
-`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, projects, and notices.
+`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, projects, notices, and review drafts.
 `Dashboard` registers each typed message builder once, beside its store's edit function when it has synchronous edits.
 `Broadcasts.open` iterates these registrations, so a new list needs no separate opening-snapshot or push method.
 `Broadcasts.pushList(kind)` uses that same builder and suppresses an identical whole-list message; roster and past messages still send their row-level deltas.
@@ -899,6 +900,28 @@ It ends each through `endSession`, or through the project runner's `endFinished`
 Its status was read before the checkout, so it reads the session again just before the end and refuses one that started a turn or was held meanwhile, which waits for the next look; either end rejects a session that is gone.
 Then it deletes the local branch it worked on when that is the head branch of a merged pull request of the repository `origin` names in its checkout, through `Worktrees.deleteMergedBranch`: only when the branch's commit is the merged head or one it contains, fetched from `origin` when missing, as after the queue updated the branch on GitHub, through `git update-ref -d` with that commit as the old value, so a commit made meanwhile keeps it, and never a branch a worktree has checked out.
 
+## Review drafts
+
+A **Review** quick action's session writes its review into a draft the dashboard keeps, and the user posts it from the pull request's **Review draft** tab; see [Pull requests](usage.md#pull-requests) for what the user sees.
+`src/shared/review-drafts.ts` holds the shapes and the rules both sides apply: `ReviewDraft`, one per pull request, with the `head` commit the session reviewed, a `verdict`, a `summary`, `findings`, `savedAt`, and `posted`, the review it became; `ReviewFinding`, `{ id, path, line, body, state }`, its `line` `null` for a finding on a whole file and its `state` `pending`, `accepted`, or `dismissed`; and `Reviewer`, which pull request a session reviews.
+`applyReviewDraft` reduces a `ReviewDraftChange` over `ReviewDraftState`, `{ drafts, reviewers }`: the page's `ReviewDraftEdit`s, which change a draft not yet posted, and the server's `save`, `posted`, `bind`, and `relink`.
+A `save` replaces the pull request's draft whole and drops drafts posted more than 14 days before it; `posted` marks a draft only while its head is the one posted and it is not posted yet; `bind` keeps the latest 200 reviewers.
+`ReviewDraftsFile` in `src/server/review-drafts-file.ts` keeps that state in `review-drafts.json` beside the access token, `shared` so every server on this machine reads the others' writes, and every socket hears the drafts as a `review-drafts` message, also sent when a socket opens; the page edits them with a `review-draft` message, which `parseReviewDraftEdit` in `src/server/wire.ts` checks.
+
+`ReviewDrafts` in `src/server/review-drafts.ts` owns the tool and the post.
+A start asks for the tool with `NewSessionRequest.reviewDraft`, which `parseNewSessionRequest` takes only with a pull request subject and which `startTarget` in `web/quick-actions.ts` sets only for **Review**; **Thermonuclear review** never gets it.
+`join` wraps the project runner's `launchFor` as the starter and `reattachAll` call it: such a start, or the resume of a session a `Reviewer` names, gets the strict host tool `save_review_draft`, bound to that pull request, so the model cannot write another one's draft, and its `attach` saves the `Reviewer`; a session reattached at startup gets it again the same way.
+A `switched` update relinks the reviewer to the session's new id, since a `/move` or a new session in the same process keeps the tool; `exited` forgets the instance.
+The tool takes `commit`, the 40-character head the session reviewed, `verdict`, `summary`, and `findings`, at most 100, each with `path`, `line`, a line number or `null`, and `body`; it throws, so the model sees why, on anything else, and the summary and each body hold at most GitHub's 65536 characters.
+It numbers the findings `f1` on, all `pending`, trims a leading `./` from each path, and answers that the draft waits for the user and that the session must not post anything on GitHub.
+
+`reviewPayload` turns a draft into the body of `POST /repos/{owner}/{repo}/pulls/{number}/reviews`: `commit_id` the draft's head, `event` from the verdict, a comment on the head side for each accepted finding on a line the diff shows, and the other accepted findings as Markdown list items after the summary, since GitHub refuses a comment on a line outside the diff.
+`diffLinesOf` reads those lines from each file's `patch` in GitHub's files answer, which `readReviewTarget` in `src/pull-request-review.ts` reads with the pull request's head.
+`postRefusal` refuses a posted draft, a head that moved since the review, **Request changes** with no summary, and a draft with nothing accepted and no summary; the preview and the post both read the target fresh and run the same two functions, so the preview shows exactly what posts.
+`post` posts through one `gh api` call (`ghRestPost` in `src/github.ts`) and saves `posted`.
+Before it posts, it lists the pull request's reviews and takes one of the viewer's on the same commit, in the state the verdict makes, with the same body and the same comments by path and words, as the review already posted, so a retry after a lost answer marks the draft instead of posting twice; an empty reply review, which GitHub makes for each thread reply, never matches.
+Two posts of one draft at once share one promise.
+
 ## Updating the dashboard
 
 `src/server/self-update.ts` is **Update dashboard**.
@@ -1023,6 +1046,9 @@ Each answer carries how many writes had answered when it was asked, so an answer
 `PUT /api/merge-queue` takes a `MergeQueueChange` from `src/shared/merge-queue.ts`, checked by `parseMergeQueueChange` in `src/server/wire.ts`: `{ op: "add", method, prs }`, one to `MAX_QUEUED_STACK` (20) pull requests in any order, each with the head commit the confirmation showed or `null`, or `{ op: "cancel", id }`.
 It answers a `MergeQueueAnswer`, the queued merges after it, which every socket also hears as a `merges` message, and the pull requests it merged on the way, which `writeMergeQueue` in `web/reads.ts` marks merged in the list at once; a refusal, such as a branch that moved or a pull request already queued, is a 409 with the reason.
 The details' answer carries GitHub's `mergeStateStatus` as `mergeState`, which `mergesNow` in `src/shared/github.ts` reads to word the confirmation as a merge now or once it is ready.
+
+`GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>` answers a `ReviewPreview` from `src/shared/review-drafts.ts`: the `payload` posting would send, the pull request's `head` now, and the `refusal`, or `null`; see [Review drafts](#review-drafts).
+`PUT /api/review-draft/post` takes `{ owner, repo, number }`, posts that pull request's draft as one review, and answers the draft marked posted, which every socket also hears; a refusal, or GitHub's own, is a 409 with the reason.
 
 `GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
 `gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.

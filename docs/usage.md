@@ -724,6 +724,7 @@ An action that fails shows its error, and its control becomes available again.
   A running session's chip starts with the sidebar's status dot: green while it works, amber while it waits on a question, blue once its turn ended.
   In the sidebar the chip shows only an agent icon and that dot, with the session's name in its tooltip; the table shows the name.
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
+  A pull request whose **Review** session saved a review draft you have not posted shows a violet **Review draft** tag before its number, in the sidebar and in the table.
   The table shows up to two reviewers' pictures and lists the rest under `+N`; with no reviewer, an icon shows the review state.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
   The row's `⋯` menu is always visible in the table; in the sidebar it shows while you hover or focus the row, while a session starts on it, or while a change goes to GitHub.
@@ -772,7 +773,7 @@ An action that fails shows its error, and its control becomes available again.
   The server keeps the queued merges in `merges.json` beside its access token, so a restart picks them up where they were; with dashboards on two ports, the one that runs routines carries out every merge, so a merge clicked on the other starts within 15 seconds.
   The `⋯` menu beside it holds the other quick actions, then the state changes: **Convert to draft** and **Close pull request** on an open pull request, **Mark ready for review** and **Close pull request** on a draft, and **Reopen pull request** on a closed one.
   It ends with **Open on GitHub** and **Open on Graphite**, each with its logo.
-- Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, and **Code**.
+- Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, **Code**, and **Review draft** while a review draft of the pull request is kept, with the count of its findings still pending.
   Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
 - **Summary** lists the pull request's labels and the sessions on it.
@@ -800,6 +801,17 @@ An action that fails shows its error, and its control becomes available again.
   It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
   Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
   In the session details sidebar's **PRs** tab, **Code** lists the files instead; a click on one opens the explorer in a dialog at that file, where the others open in place.
+- **Review draft** holds what a **Review** session wrote about the pull request, for you to post as your review.
+  It says which commit the session reviewed; when the pull request moved on since, a warning names both commits, and the draft cannot post until a new **Review** session saves a draft of the new head.
+  **Verdict** picks **Comment**, **Approve**, or **Request changes**, and **Summary** holds the review's words, kept once the field loses focus.
+  **Findings** lists one card per issue the session found, under the file and line it is on, each **Pending** until you **Accept** or **Dismiss** it, which **Unaccept** and **Restore** undo; **Accept N pending** accepts every pending one, and **Edit** changes a finding's file, line, and words.
+  **Preview** shows exactly what posting sends: the verdict, the body, and each line comment.
+  An accepted finding on a line the diff shows becomes a comment on that line; one on another line, or on no line, joins the body as a list item after the summary, since GitHub takes comments only on lines its diff shows.
+  **Post review** reads the pull request again and asks you to confirm, naming the verdict, the count of line comments, and the commit; **Post review** there sends one review on the commit the session reviewed.
+  It refuses when the pull request moved on, when nothing is accepted and the summary is empty, and when **Request changes** has no summary.
+  Once posted, the tab says when, links to the review on GitHub, and takes no more changes; posting again, even after a lost answer, never posts a second review, since the server first looks for the review it would post among yours on that commit.
+  **Discard draft** deletes the draft, posted or not.
+  The server keeps the drafts in `review-drafts.json` beside its access token, and drops a posted draft two weeks after it posted, the next time a session saves a draft.
 - Each opening reads the pull request again; the server keeps its answer for 30 seconds.
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.
@@ -817,6 +829,8 @@ An action that fails shows its error, and its control becomes available again.
   The session also shows in the sessions sidebar.
   Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
   **Fix CI and conflicts** rebases the branch and resolves its conflicts first, then fixes the checks that still fail on the rebased branch, in one session.
+  **Review** reviews the pull request's head commit and saves what it finds as the pull request's review draft, through the dashboard's `save_review_draft` tool, which only that session gets, and resumes of it too; it posts nothing on GitHub, and the draft waits on the **Review draft** tab for you to post it.
+  A new draft of the same pull request replaces the one before it, findings and edits included.
   **Thermonuclear review** runs the `thermonuclear-reviewer` agent on the pull request's diff.
   On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   A merged pull request has none.

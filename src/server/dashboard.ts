@@ -25,7 +25,8 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
@@ -61,6 +62,8 @@ import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./proje
 import { occupiedBy, ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
 import { ProjectWatch } from "./project-watch";
 import { ProjectsFile } from "./projects-file";
+import { ReviewDrafts } from "./review-drafts";
+import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
@@ -99,6 +102,12 @@ export class Dashboard {
 	readonly #workspaces: WorkspacesFile;
 	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
+	readonly #reviewDrafts = new ReviewDrafts({
+		file: new ReviewDraftsFile(reviewDraftsFile),
+		github: { target: readReviewTarget, reviews: listReviews, reviewComments: listReviewComments, viewer: viewerLogin, post: postReview },
+		now: Date.now,
+		onChange: () => this.#broadcasts.pushList("review-drafts"),
+	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
@@ -231,6 +240,7 @@ export class Dashboard {
 			},
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
+			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
 		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -257,7 +267,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			projects: { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) },
+			projects: { launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)) },
 		});
 		const worktrees = (this.#worktrees = new Worktrees({
 			knownCwds: () => this.knownCwds(),
@@ -533,6 +543,8 @@ export class Dashboard {
 					const merged = await this.#mergeQueue.apply(change);
 					return { merges: [...this.#mergeQueue.list], merged };
 				},
+				previewReviewDraft: pr => this.#reviewDrafts.preview(pr),
+				postReviewDraft: pr => this.#reviewDrafts.post(pr),
 			},
 			dashboard: this.#selfUpdate,
 		});
@@ -551,7 +563,7 @@ export class Dashboard {
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) }, survived => this.#interrupted.recover(survived));
+		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)) }, survived => this.#interrupted.recover(survived));
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		seedUserNotes(userNotesDir);
@@ -655,6 +667,7 @@ export class Dashboard {
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#projectRunner.exited(instanceId);
+				this.#reviewDrafts.exited(instanceId);
 				this.#sessions.remove(instanceId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
@@ -663,12 +676,15 @@ export class Dashboard {
 			case "written":
 				this.#loops.fileChanged(update.path);
 				return;
-			case "switched":
+			case "switched": {
 				// Before the edited prompt's events, so they land in the new file's transcript.
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
 				this.#projectRunner.switched(instanceId);
+				const sessionId = this.#sessions.get(instanceId)?.sessionId;
+				if (sessionId) this.#reviewDrafts.switched(instanceId, sessionId);
 				return;
+			}
 			case "turn-started": {
 				if (this.#sessions.markRead(instanceId)) this.#broadcasts.rosterChanged();
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.

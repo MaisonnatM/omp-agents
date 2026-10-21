@@ -3,6 +3,7 @@
  * The Pull requests page's quick actions and the routines both read them, so the server and the page share one prompt.
  */
 import { type PullRequestSummary, pullRequestUrl } from "./shared/github";
+import { REVIEW_DRAFT_TOOL } from "./shared/review-drafts";
 
 export type PullRequestActionId = "fix-ci-and-conflicts" | "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 
@@ -69,10 +70,10 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 	},
 	review: {
 		label: "Review",
-		description: "Start a session that reviews the pull request",
+		description: "Start a session that reviews the pull request into a draft you post",
 		applies: pr => pr.role === "reviewer" && pr.state !== "merged",
 		prompt: pr =>
-			`${pullRequestContext(pr)} ${pr.author.login} asked you to review it. Read the description and the diff, check it for correctness, regressions, and missing tests, and report your findings here with file and line references. Do not post anything on GitHub.`,
+			`${pullRequestContext(pr)} ${pr.author.login} asked you to review it. Read the description and the diff, and check it for correctness, regressions, and missing tests. Note the head commit you reviewed with \`gh pr view ${pr.number} -R ${pr.owner}/${pr.repo} --json headRefOid\`. Then save your review with the \`${REVIEW_DRAFT_TOOL}\` tool: a verdict, a summary, and one finding per issue, each with its file and the line at that commit. The user reads the draft in the dashboard, accepts or dismisses each finding, and posts it. Do not post anything on GitHub yourself.`,
 	},
 	"thermonuclear-review": {
 		label: "Thermonuclear review",

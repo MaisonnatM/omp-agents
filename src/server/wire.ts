@@ -31,6 +31,7 @@ import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
+import { FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit } from "../shared/review-drafts";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
@@ -120,6 +121,37 @@ function parsePinChange(value: unknown): Parsed<PinChange> {
 	const { op, sessionIds } = value;
 	if (op !== "pin" && op !== "unpin") return null;
 	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { ok: { op, sessionIds } } : null;
+}
+
+/** A finding id as `save_review_draft` numbers them. */
+const FINDING_ID = /^f\d{1,4}$/;
+
+/** A change to the draft of a pull request: its verdict, its summary, one finding's place and text, findings' states, or its discard. */
+export function parseReviewDraftEdit(value: unknown): Parsed<ReviewDraftEdit> {
+	if (!isObject(value) || !isObject(value.pr)) return null;
+	const parsed = parsePullRequest(value.pr.owner, value.pr.repo, value.pr.number);
+	if (!parsed) return null;
+	const pr = parsed.ok;
+	switch (value.op) {
+		case "verdict":
+			return oneOf(REVIEW_VERDICTS)(value.verdict) ? { ok: { op: "verdict", pr, verdict: value.verdict } } : null;
+		case "summary":
+			return typeof value.summary === "string" && value.summary.length <= MAX_COMMENT_BODY ? { ok: { op: "summary", pr, summary: value.summary } } : null;
+		case "finding": {
+			const { id, path, line, body } = value;
+			if (typeof id !== "string" || !FINDING_ID.test(id) || !isNonEmpty(path) || !isCommentBody(body)) return null;
+			return line === null || (isSafeInteger(line) && line >= 1) ? { ok: { op: "finding", pr, id, path: path.trim(), line, body } } : null;
+		}
+		case "finding-state": {
+			const { ids, state } = value;
+			if (!Array.isArray(ids) || ids.length === 0 || !ids.every(id => typeof id === "string" && FINDING_ID.test(id))) return null;
+			return oneOf(FINDING_STATES)(state) ? { ok: { op: "finding-state", pr, ids, state } } : null;
+		}
+		case "discard":
+			return { ok: { op: "discard", pr } };
+		default:
+			return null;
+	}
 }
 
 /** A rename or an archive of a project; the server makes every other change. */
@@ -293,6 +325,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	project(value) {
 		const change = parseProjectEdit(value.change);
 		return change && { ok: { t: "project", change: change.ok } };
+	},
+	"review-draft"(value) {
+		const change = parseReviewDraftEdit(value.change);
+		return change && { ok: { t: "review-draft", change: change.ok } };
 	},
 	notice: ({ ids, op }) => (Array.isArray(ids) && ids.length > 0 && ids.every(isNonEmpty) && isNoticeOp(op) ? { ok: { t: "notice", ids, op } } : null),
 };

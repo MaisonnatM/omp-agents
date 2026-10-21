@@ -10,6 +10,7 @@ import { ListRegistry } from "./list-registry";
 import { PinsFile } from "./pins-file";
 import { ProjectsFile } from "./projects-file";
 import { RequestLedger } from "./request-ledger";
+import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { createClientHandler, type SocketEnv } from "./socket";
@@ -41,6 +42,7 @@ function setup(initial: PastSession[]) {
 	const workspaces = new WorkspacesFile(join(dir, "workspaces.json"));
 	const pins = new PinsFile(join(dir, "pins.json"));
 	const projects = new ProjectsFile(join(dir, "projects.json"));
+	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
@@ -57,6 +59,7 @@ function setup(initial: PastSession[]) {
 		},
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 		projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
+		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change) },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 	}, kind => broadcasts.pushList(kind));
@@ -180,6 +183,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);
 		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
 		expect(lists.apply("projects", { op: "rename", id: "missing", name: "new" }, peer)).toBe(false);
+		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
 		expect(published).toEqual([]);
 	});

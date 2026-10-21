@@ -1,6 +1,7 @@
 /** The React contexts that hand the dashboard's stable actions and changing status to the sidebar, panes, and pages. */
 import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
+import type { ReviewDraft } from "../../src/shared/review-drafts";
 import type { MentionLists } from "../mentions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
@@ -56,6 +57,8 @@ export interface DashboardStatus {
 	pullRequestsScope: string | null;
 	/** The merges the server waits to make until GitHub allows them, which a pull request's row, its details, and a session's stack show. */
 	merges: readonly QueuedMerge[];
+	/** The review drafts the server keeps, which a pull request's row and its details show. */
+	reviewDrafts: readonly ReviewDraft[];
 }
 
 export const DashboardStatusContext = createContext<DashboardStatus | null>(null);

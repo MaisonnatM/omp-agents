@@ -1,8 +1,9 @@
-/** A pull request's row in the lists, with its move badge, checks icon, review state, diff size, and `⋯` menu. */
-import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
+/** A pull request's row in the lists, with its move badge, review draft tag, checks icon, review state, diff size, and `⋯` menu. */
+import { CircleCheck, CircleX, ClipboardPen, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
 import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import { type MoveId, readyOnceChecksPass } from "../../../src/shared/moves";
+import { reviewDraftOf, waitsOnYou } from "../../../src/shared/review-drafts";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -18,6 +19,7 @@ import { DROP_LINE, type DragItem } from "../../use-drag-order";
 import { Age } from "../age";
 import { BranchLabel, BranchName, releaseBranch } from "../git";
 import { SessionChip } from "../session-chip";
+import { useDashboardStatus } from "../dashboard-context";
 import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
 import { MergePopover, useMergeTarget } from "./merge-popover";
@@ -36,6 +38,20 @@ function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
 		>
 			{draft ? "Draft" : "Live"}
 		</span>
+	);
+}
+
+/** **Review draft** while a Review session's draft of the pull request waits for you to post it. */
+function ReviewDraftTag({ pr }: { pr: PullRequest }) {
+	const { reviewDrafts } = useDashboardStatus();
+	if (!waitsOnYou(reviewDraftOf(reviewDrafts, pr))) return null;
+	return (
+		<Tooltip content="A review draft waits for you to post it">
+			<span className="flex shrink-0 items-center gap-0.5 rounded-full bg-violet-500/15 px-1.5 text-[10px] leading-4 font-medium text-violet-700 dark:text-violet-300">
+				<ClipboardPen aria-hidden className="size-3" />
+				Review draft
+			</span>
+		</Tooltip>
 	);
 }
 
@@ -435,6 +451,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
 					<RowMoveBadge pr={pr} move={move} {...actions} />
 					<StateTag pr={pr} move={move} />
+					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<span aria-hidden>·</span>
@@ -490,6 +507,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					<span className="shrink-0">{pr.author.login}</span>
 					<span aria-hidden>·</span>
 					<StateTag pr={pr} move={move} />
+					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<ConversationCount pr={pr} />
