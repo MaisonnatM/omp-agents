@@ -203,6 +203,9 @@ Every transcript comes from the session files on this machine, not from a networ
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
   It also sets the `pullRequest` of each such session's `branch`, the PR it heads, and so links the PR of a main checkout's branch other than the default one too; the header's **Open PR** shows only while it is `null`.
+- The list names a new PR only at the page's next read, up to a minute after the session opened it, and only once GitHub's search has indexed it, some seconds after.
+  So when a session's transcripts name a PR it did not link before, such as the URL `gh pr create` prints, while its branch heads none yet, the server asks GitHub at once which PR that branch heads, through one `gh api graphql` call outside the search (`branchPullRequest` in `src/pull-requests.ts`), and sets `pullRequest` from the answer.
+  The answer outlives later reads of the list, which search may still leave without the PR, until one names that branch, whose PR then takes its place.
 
 ## Terminal sessions
 

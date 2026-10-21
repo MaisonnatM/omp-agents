@@ -401,6 +401,40 @@ describe("SessionFactsIndex", () => {
 		expect(offGitHub.factsOf(inWorktree).branch).toEqual({ name: "wip", linked: true, defaultBranch: "main", pullRequest: null });
 	});
 
+	test("asks GitHub which PR its branch heads whenever its transcripts name a new PR, keeps the answer until the pull request list names the branch", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(session, `${toolCall("r", "read", { path: "pr://10" })}\n`);
+		const repo = { owner: "acme", repo: "webapp" };
+		let heading: { owner: string; repo: string; number: number } | null = null;
+		const asked: string[] = [];
+		const index = new SessionFactsIndex(async () => repo, worktreeAt, headHistory, [], async (at, branch) => {
+			asked.push(`${at.owner}/${at.repo}:${branch}`);
+			return heading;
+		});
+		const listed = (modifiedAt: number) => [{ path: session, cwd: join(parent, "app-wip"), modifiedAt }];
+
+		await index.refresh(listed(1));
+		expect(index.factsOf(session).branch).toEqual({ name: "wip", linked: true, defaultBranch: "main", pullRequest: null });
+		heading = { ...repo, number: 9 };
+		appendFileSync(session, `${bashCall("create", "gh pr create --base main --head wip")}\n${result("create", "https://github.com/acme/webapp/pull/9")}\n`);
+		expect(await index.refresh(listed(2))).toBe(true);
+		expect(index.factsOf(session).branch).toEqual({ name: "wip", linked: true, defaultBranch: "main", pullRequest: { ...repo, number: 9 } });
+		appendFileSync(session, `${bashCall("t", "bun test")}\n`);
+		await index.refresh(listed(3));
+		expect(asked).toEqual(["acme/webapp:wip", "acme/webapp:wip"]);
+
+		expect(index.learnHeads(repo, [])).toBe(false);
+		expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 9 });
+		expect(index.learnHeads(repo, [{ ...repo, number: 11, head: "wip" }])).toBe(true);
+		expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 11 });
+		expect(index.learnHeads(repo, [])).toBe(true);
+		expect(index.factsOf(session).branch?.pullRequest).toBeNull();
+	});
+
 	test("names the branch a main checkout had checked out when the session last wrote, links the PR a non-default one heads as origin/HEAD moves, keeps it through later checkouts, and none on a detached HEAD", async () => {
 		const parent = realpathSync(sessionDir());
 		const main = await repoWithWorktrees(parent);

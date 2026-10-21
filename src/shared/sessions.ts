@@ -68,7 +68,7 @@ export interface SessionBranch {
 	linked: boolean;
 	/** The repository's default branch, as `origin/HEAD` names it, which a pull request from this branch merges into; `null` when git has not recorded one. */
 	defaultBranch: string | null;
-	/** The pull request the pull request list says this branch heads, open or merged; `null` while the list names none. */
+	/** The pull request this branch heads, open or merged, as the pull request list says or GitHub answered when the session named a new PR; `null` while neither names one. */
 	pullRequest: PullRequest | null;
 }
 

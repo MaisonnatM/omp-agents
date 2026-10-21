@@ -2,7 +2,7 @@ import { describe, expect, setSystemTime, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadPullRequests, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, repoOf } from "./pull-requests";
+import { loadPullRequests, parseBranchAnswer, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, repoOf } from "./pull-requests";
 import { runChecked } from "./proc";
 
 const repo = { owner: "acme", repo: "webapp" };
@@ -50,6 +50,11 @@ describe("parseMergedAnswer", () => {
 		};
 		expect(parseMergedAnswer(answer, ["landed", "open", "none", "closed"])).toEqual(new Map([["landed", { number: 7, mergedAt: Date.parse("2026-10-01T10:00:00Z") }]]));
 	});
+});
+
+test("parseBranchAnswer names the pull request the branch heads in its repository, and none when it heads none", () => {
+	const heads = (nodes: unknown[]) => parseBranchAnswer({ data: { repository: { pullRequests: { nodes } } } }, repo);
+	expect([heads([{ number: 9 }]), heads([])]).toEqual([{ owner: "acme", repo: "webapp", number: 9 }, null]);
 });
 
 test("a workspace without a GitHub origin is retried after its negative cache expires", async () => {

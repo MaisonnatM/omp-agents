@@ -482,29 +482,35 @@ export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
 	/** The PRs the pull request list holds, by `owner/repo:branch` of their head. */
 	readonly #heads = new Map<string, PullRequest>();
+	/** What GitHub answered for a branch the list did not name yet, by the same key: search indexes a new PR some seconds late, so it outlives list reads until one names the branch. */
+	readonly #answered = new Map<string, PullRequest>();
 	/** Each directory's default branch as `origin/HEAD` last named it, read again whenever a session working there writes; `null` while git names none. */
 	readonly #defaultBranches = new Map<string, string | null>();
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
 	readonly #worktreeAt: (dir: string) => Promise<WorktreeAt | null>;
 	readonly #headHistory: (dir: string) => Promise<HeadHistory | null>;
 	readonly #ownFileFolds: readonly OwnFileFolds[];
+	readonly #branchPullRequest: (repo: Repo, branch: string) => Promise<PullRequest | null>;
 	#chain: Promise<unknown> = Promise.resolve();
 
 	/**
 	 * `repoOf`: the GitHub repository `origin` names in a working directory. `worktreeAt`: the git worktree a directory is in.
 	 * `headHistory`: the branch and HEAD reflog checkouts of the worktree a directory is in.
 	 * `ownFileFolds`: other folds of each session's own file, fed from the index's read of it.
+	 * `branchPullRequest`: the newest open or merged PR whose head is a branch, as GitHub has it now; none when omitted.
 	 */
 	constructor(
 		repoOf: (cwd: string) => Promise<Repo | null>,
 		worktreeAt: (dir: string) => Promise<WorktreeAt | null>,
 		headHistory: (dir: string) => Promise<HeadHistory | null>,
 		ownFileFolds: readonly OwnFileFolds[] = [],
+		branchPullRequest: (repo: Repo, branch: string) => Promise<PullRequest | null> = async () => null,
 	) {
 		this.#repoOf = repoOf;
 		this.#worktreeAt = worktreeAt;
 		this.#headHistory = headHistory;
 		this.#ownFileFolds = ownFileFolds;
+		this.#branchPullRequest = branchPullRequest;
 	}
 
 	/**
@@ -542,6 +548,11 @@ export class SessionFactsIndex {
 		for (const pr of pullRequests) {
 			const key = headKey(pr, pr.head);
 			if (!this.#heads.has(key)) this.#heads.set(key, { owner: pr.owner, repo: pr.repo, number: pr.number });
+		}
+		for (const [key, pr] of this.#answered) {
+			if (!key.startsWith(prefix)) continue;
+			if (this.#heads.has(key)) this.#answered.delete(key);
+			else this.#heads.set(key, pr);
 		}
 		let changed = false;
 		for (const session of this.#sessions.values()) if (this.#resolve(session)) changed = true;
@@ -641,7 +652,24 @@ export class SessionFactsIndex {
 			const submitted = await submittedBranch(ref, session.cwd, repoOf, historyOf);
 			if (submitted) session.submitted.set(refKey(ref), submitted);
 		});
+		const before = new Map([...resolving].map(session => [session, session.pullRequests]));
 		for (const session of resolving) if (this.#resolve(session, gitOf(session))) changed = true;
+		// The pull request list names a new PR only at the page's next read, up to a minute later, and once GitHub's search has indexed it;
+		// a PR the transcripts just named may be the one the branch now heads, so GitHub is asked about the branch itself at once.
+		const unheaded = [...resolving].flatMap(session => {
+			const known = new Set(before.get(session)!.map(prKey));
+			const linking = linkingBranch(session.branch, this.#defaultBranches.get(workDirOf(session)) ?? null);
+			const named = session.pullRequests.some(pr => !known.has(prKey(pr)));
+			return session.repo && linking && named && session.branch?.pullRequest === null ? [{ repo: session.repo, branch: linking }] : [];
+		});
+		const found = await mapLimit(unheaded, SCAN_PARALLEL, ({ repo, branch }) => this.#branchPullRequest(repo, branch).catch(() => null));
+		unheaded.forEach(({ repo, branch }, i) => {
+			const pr = found[i];
+			if (!pr) return;
+			this.#heads.set(headKey(repo, branch), pr);
+			this.#answered.set(headKey(repo, branch), pr);
+		});
+		if (found.some(Boolean)) for (const session of this.#sessions.values()) if (this.#resolve(session)) changed = true;
 		return changed;
 	}
 
