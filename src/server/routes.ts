@@ -46,8 +46,6 @@ import { parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
 import { findMediaFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
-import { readRunProfile, type RunLocally, RunRefused } from "../run-locally";
-import { MAX_RUN_SERVICES } from "../shared/run-locally";
 import type { Worktrees } from "../worktrees";
 import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
 import { answer, fail, type Guards } from "./http";
@@ -55,7 +53,7 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
-import { MAX_QUEUED_STACK, parseBranchRelease, parseRunRequest, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
+import { MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
@@ -105,11 +103,10 @@ export interface CalendarRoutesEnv {
 	localEvents: LocalEventsFile;
 }
 
-/** What the file routes read: the registered worktrees, the terminal panel's shells, and **Run locally**. */
+/** What the file routes read: the registered worktrees and the terminal panel's shells. */
 export interface FileRoutesEnv {
 	worktrees: Worktrees;
 	terminals: Terminals;
-	runLocally: RunLocally;
 }
 
 /** What the todo routes read and write: the Todo page's list. */
@@ -763,24 +760,6 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		({ cwd, branch }) => env.worktrees.releaseBranch(cwd, branch),
 	);
 
-	/** `GET /api/run-profile?cwd=`: the run profile kept in `cwd`'s repository. */
-	const runProfile = get(async params => {
-		const cwd = await directoryOf(params.get("cwd") ?? "");
-		return cwd ? answer(() => readRunProfile(cwd)) : fail(404, "Expected cwd, a directory in a repository.");
-	});
-
-	/** `PUT /api/run-locally` `{ cwd, branch, profile }`: run `branch` locally with the services `profile` names, saving it as the repository's. */
-	const runLocally = write(
-		async body => {
-			const request = checked(parseRunRequest(body), `Expected { cwd, branch, profile: { install, services } } with cwd an absolute directory and up to ${MAX_RUN_SERVICES} one-line services`);
-			if (request instanceof Response) return request;
-			const cwd = await directoryOf(request.cwd);
-			return cwd ? { ...request, cwd } : fail(404, `${request.cwd.trim()} is not a directory.`);
-		},
-		({ cwd, branch, profile }) => env.runLocally.run(cwd, branch, profile),
-		err => (err instanceof RunRefused ? fail(409, err.message) : null),
-	);
-
 	const systemLoad = new SystemLoadReader();
 	/** `GET /api/system`: the CPU percent since the previous read, the memory available, and the disk space free, for the status bar. */
 	const system = get(() => answer(() => systemLoad.read()));
@@ -841,8 +820,6 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		"/api/worktree/release": { PUT: branchRelease },
 		"/api/system": { GET: system },
 		"/api/terminals": { GET: terminals },
-		"/api/run-profile": { GET: runProfile },
-		"/api/run-locally": { PUT: runLocally },
 		"/api/image": { GET: image },
 		"/api/attachment/document": { PUT: promptDocument },
 		"/api/file": { GET: textFile },

@@ -6,7 +6,6 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 
 - [Sessions sidebar](#sessions-sidebar)
 - [Terminal](#terminal)
-  - [Run locally](#run-locally)
 - [Session details sidebar](#session-details-sidebar)
 - [Session changes](#session-changes)
 - [Panes, splits, and links](#panes-splits-and-links)
@@ -147,22 +146,6 @@ An action that fails shows its error, and its control becomes available again.
   A tab whose server stopped reads **(disconnected)** until you close it.
 - Drag the panel's top edge, or focus it and press ↑ or ↓, to change its height; double-click the edge to reset it.
   Its height, and whether it shows, is saved in the browser's localStorage.
-
-### Run locally
-
-- The play button after the branch of a session's header, and after the number of a pull request's row while you hover or focus it, runs that branch locally: it opens a form with the repository's services and its install command.
-- Services take one command per line, such as `npm run dev` or `task app:run`, up to 8; the install command, such as `npm install`, may stay empty.
-  **Run** saves both in the repository's git config (`omp-agents.run-service` and `omp-agents.run-install`), shared by all its worktrees, so the next run's form starts with them.
-- **Run** then, in order:
-  - Stops the services the repository's previous run started, and waits up to 10 seconds for them to exit, so their ports are free.
-  - Removes the linked worktree that has the branch checked out, with the checks of copying a session's branch.
-  - Checks the branch out in the main checkout, fetching it from `origin` first and fast-forwarding it to its upstream when it can, and refuses while the main checkout has uncommitted changes to tracked files.
-    When those checks keep the worktree, such as one a live session uses or one with uncommitted changes, the services run in that worktree and the main checkout stays as it is.
-  - Runs the install command when a lockfile, such as `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock`, changed between the commit checked out before and the branch, or when `package.json` exists without `node_modules`; a failing install stops the run and its toast shows the end of its output.
-  - Starts each service in a terminal tab named by its command, shows the terminal, and selects the last tab.
-- A toast names where the branch runs, the worktree it removed or kept, whether it installed, and how many services of the previous run it stopped.
-- The services are ordinary terminal tabs: close a tab to stop its service.
-  Only the services of the last run since the server started count as the previous run.
 
 ## Session details sidebar
 
@@ -398,7 +381,6 @@ An action that fails shows its error, and its control becomes available again.
   It applies the checks of **Settings → Worktrees**: it never removes a repository's main checkout, a locked checkout, one with uncommitted or untracked changes, one a live session or this dashboard uses, or one with a nested repository.
   A toast names the worktree it removed, or the one it kept and why; a branch that no linked worktree has checked out shows no toast.
   Copying the branch of a pull request's details or of a Linear issue only copies.
-- The play button after a session header's branch runs it locally; see [Run locally](#run-locally).
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 
@@ -745,7 +727,6 @@ An action that fails shows its error, and its control becomes available again.
   The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, conversations, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
   Conversations count the pull request's comments and review threads, resolved ones too, as GitHub's own list does, beside a speech bubble; a pull request with none shows no count.
   A narrow page drops the sessions, stack, and line columns.
-  While you hover or focus a row, in the sidebar and in the table, a play button after its number runs the pull request's branch locally, without opening the pull request; see [Run locally](#run-locally).
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
   A pull request that a running session asks you about is **Answer**, and one that a running session works on is **Working**.

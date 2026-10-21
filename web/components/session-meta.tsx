@@ -20,7 +20,6 @@ import { StackRail } from "./pull-requests/pr-details/stack";
 import { MergePopover, QueuedMergeNote, useMergeTarget } from "./pull-requests/merge-popover";
 import { useDashboardStatus } from "./dashboard-context";
 import { OrgIcon } from "./org-icon";
-import { RunLocallyButton } from "./run-locally";
 import { useCopy } from "../use-copy";
 
 export const PARENT_CRUMB = "font-normal text-muted-foreground";
@@ -28,13 +27,12 @@ export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
 const TicketsIcon = PAGE_ICON.tickets;
 const NO_TICKETS: never[] = [];
 
-/** A session header's controls before its own buttons: the branch it works on, which copies its name and removes its linked worktree when clicked, and **Run locally**; its Linear issues; and its pull requests. */
+/** A session header's controls before its own buttons: the branch it works on, which copies its name and removes its linked worktree when clicked; its Linear issues; and its pull requests. */
 export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "pullRequests" | "branch"> & { cwd: string } }) {
 	const { branch, cwd } = facts;
 	return (
 		<>
 			{branch && <BranchName name={branch.name} onCopy={() => releaseBranch(cwd, branch.name)} className="max-w-48 font-mono text-xs text-muted-foreground" />}
-			{branch && <RunLocallyButton cwd={cwd} branch={branch.name} />}
 			<TicketMenu tickets={facts.tickets} />
 			<PullRequestButton pullRequests={facts.pullRequests} />
 		</>

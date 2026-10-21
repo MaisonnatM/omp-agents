@@ -1,5 +1,4 @@
 /** The React contexts that hand the dashboard's stable actions and changing status to the sidebar, panes, and pages. */
-import type { TerminalInfo } from "../../src/shared/terminals";
 import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
@@ -28,8 +27,6 @@ export interface DashboardActions {
 	openNewTicket: (title: string) => void;
 	/** What opens `cwd`'s Models settings by picking it in the sidebar, or `null` when the sidebar cannot pick it, as for `/tmp` or a hidden workspace. */
 	workspaceSettings: (cwd: string) => (() => void) | null;
-	/** Show the terminal panel with a tab for each of `terminals`, shells the server started, such as **Run locally**'s services. */
-	revealTerminals: (terminals: TerminalInfo[]) => void;
 }
 
 export const DashboardActionsContext = createContext<DashboardActions | null>(null);

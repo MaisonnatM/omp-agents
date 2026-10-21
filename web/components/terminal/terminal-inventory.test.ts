@@ -3,7 +3,7 @@ import type { TerminalInfo } from "../../../src/shared/terminals";
 import { ApiError } from "../../api";
 import { readTerminalTabs } from "./terminal-inventory";
 
-const running: TerminalInfo = { id: "t1", cwd: "/work", cwdDisplay: "~/work", title: null };
+const running: TerminalInfo = { id: "t1", cwd: "/work", cwdDisplay: "~/work" };
 
 test("a failed read of the running shells reports the failure and starts no shell", async () => {
 	let asked = false;

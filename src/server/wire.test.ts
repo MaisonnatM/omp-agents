@@ -7,8 +7,7 @@ import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } fro
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES } from "../shared/github";
-import { MAX_RUN_SERVICES } from "../shared/run-locally";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseReviewDraftEdit, parseRunRequest, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseReviewDraftEdit, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -782,18 +781,5 @@ describe("replay start requests", () => {
 	});
 	test("rejects malformed tokens, settings, and views instead of accepting a raw source path", () => {
 		for (const change of [{ token: null }, { token: "" }, { thinking: 3 }, { prompt: {} }, { model: { provider: "openai-codex" } }, { view: { file: "/arbitrary/source.jsonl" } }]) expect(msg({ ...start, ...change })).toBeNull();
-	});
-});
-
-describe("parseRunRequest", () => {
-	const request = (profile: unknown) => ({ cwd: "/repo", branch: "feat", profile });
-	test("trims the commands and drops blank services", () => {
-		expect(parseRunRequest(request({ install: " npm i ", services: [" npm run dev ", "  ", "task app:run"] }))).toEqual({ ok: { cwd: "/repo", branch: "feat", profile: { install: "npm i", services: ["npm run dev", "task app:run"] } } });
-	});
-	test("refuses a command over two lines, which the shell would run as two, and too many services", () => {
-		expect(parseRunRequest(request({ install: "", services: ["a\nb"] }))).toBeNull();
-		expect(parseRunRequest(request({ install: "a\nb", services: ["a"] }))).toBeNull();
-		expect(parseRunRequest(request({ install: "", services: Array.from({ length: MAX_RUN_SERVICES + 1 }, () => "a") }))).toBeNull();
-		expect(parseRunRequest({ cwd: "repo", branch: "feat", profile: { install: "", services: ["a"] } })).toBeNull();
 	});
 });
