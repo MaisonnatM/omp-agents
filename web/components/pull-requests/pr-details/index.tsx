@@ -1,15 +1,15 @@
 /** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, Code, and Review draft tabs. */
 import { ClipboardPen, FileDiff, FileText, History, MessageSquare } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { commentCount, moveAction, openThreads, pullRequestStatus, reason } from "../../../pull-requests-model";
+import { commentCount, openThreads } from "../../../pull-requests-model";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
-import { type AgentState, actionFacts, type MoveId, moveOf } from "../../../../src/shared/moves";
+import { actionFacts } from "../../../../src/shared/moves";
 import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../../../routing";
 import { useEditableRead } from "../../../editable-read";
 import { useRead, writePullRequest } from "../../../reads";
@@ -24,32 +24,13 @@ import { Code } from "./code";
 import { Comments } from "./comments";
 import { DetailHeader } from "./header";
 import { ReviewDraftPanel } from "./review-draft";
-import { placeFixes } from "./status-view";
 import { Summary } from "./summary";
 
-/** What the pull request waits on next, from its action facts. */
-export interface NextMove {
-	move: MoveId;
-	reason: string;
-	/** The quick action that makes the move, when one applies. */
-	action: PullRequestActionId | null;
-	/** The running session that works on it or asks you, for the moves an agent holds. */
-	session: RosterHost | null;
-}
-
-/** What `facts` wait on next, given where the sessions on it stand and the running `sessions` on it. */
-function nextMove(facts: PullRequestSummary, agent: AgentState | null, sessions: RosterHost[]): NextMove {
-	const move = moveOf(facts, agent);
-	const holder = move === "answer" ? "needs-input" : move === "agent" ? "working" : null;
-	return { move, reason: reason(facts, move), action: moveAction(facts, move), session: sessions.find(host => host.status === holder) ?? null };
-}
 
 export interface DetailContentProps {
 	pr: PullRequest;
 	/** Its pull request list entry, for who you are to it; `null` when the list does not hold it, so no move or quick action applies, since a start needs the workspace the list names. */
 	listed: PullRequestSummary | null;
-	/** Where the running sessions on it stand. */
-	agent: AgentState | null;
 	/** The quick action whose session is starting for it, if any. */
 	pending: QuickActionsProps["pending"];
 	/** Starts `action` on the pull request, as `facts` describe it. */
@@ -89,7 +70,7 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
  * of the other actions; then Summary, Comments, Timeline, and Code tabs, and a Review draft tab while a Review session's
  * draft of it is kept, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace, cwd }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace, cwd }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
 	// The list's state of it joins `version`, so a change made from its row, or one the list reads from GitHub, reads the details again.
 	const { data: detail, error, saveError, edit, write, reload } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, `${String(version)}:${listed?.state ?? "unlisted"}`);
@@ -122,23 +103,47 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
 		else if (value !== "code" && files) location.hash = hashForPullRequests(pr);
 	};
-	// The list's entry says who you are to it; the details, once read, say where it stands, as the Status shows.
 	const facts = listed && actionFacts(listed, detail);
-	const next = facts && nextMove(facts, agent, sessions);
 	const quick: QuickActionsProps = { actions: facts ? pullRequestActions(facts) : [], pending, onRun: (action: PullRequestActionId) => facts && onRun(facts, action) };
-	const offered = quick.actions.filter(action => action !== next?.action);
-	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
-	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	const page = placement === "page";
 	const options = usePullRequestOptions(pr);
 	const comments = detail ? commentCount(detail) : 0;
 	const timeline = detail ? detail.conversation.length + openThreads(detail).length : 0;
 	const pendingFindings = draft && !draft.posted ? draft.findings.filter(finding => finding.state === "pending").length : 0;
+	const rootRef = useRef<HTMLDivElement>(null);
+	const foldRef = useRef<HTMLDivElement>(null);
+	const [condensedByTab, setCondensedByTab] = useState<Partial<Record<DetailTab, boolean>>>({});
+	const condensed = condensedByTab[tab] ?? false;
+	const compensation = useRef<{ scroller: HTMLElement; top: number } | null>(null);
+	useLayoutEffect(() => {
+		if (!compensation.current) return;
+		const { scroller, top } = compensation.current;
+		compensation.current = null;
+		scroller.scrollTop = Math.max(0, top);
+	}, [condensed]);
+	useEffect(() => {
+		const root = rootRef.current;
+		if (!root) return;
+		const onScroll = (event: Event) => {
+			const scroller = event.target;
+			if (!(scroller instanceof HTMLElement)) return;
+			if (!scroller.contains(root) && !root.contains(scroller)) return;
+			const fold = foldRef.current?.scrollHeight ?? 0;
+			if (condensed && scroller.scrollTop < 4 && fold > 0) setCondensedByTab(previous => ({ ...previous, [tab]: false }));
+			else if (!condensed && fold > 0 && scroller.scrollTop > fold + 32) {
+				const compact = root.querySelector<HTMLElement>("[data-pr-condensed]")?.scrollHeight ?? 0;
+				compensation.current = { scroller, top: scroller.scrollTop - (fold - compact) };
+				setCondensedByTab(previous => ({ ...previous, [tab]: true }));
+			}
+		};
+		document.addEventListener("scroll", onScroll, true);
+		return () => document.removeEventListener("scroll", onScroll, true);
+	}, [tab, condensed]);
 	return (
-		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
-			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
-				<DetailHeader pr={pr} detail={detail} readError={error} stack={stack} next={next} actions={otherActions} quick={quick} placed={placed} options={options} onOpen={onOpen} onSave={save} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} />
-				<div className={cn("flex flex-wrap items-center gap-2 border-b border-border py-2", page && "px-6")}>
+		<div ref={rootRef} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
+			<div className={cn("sticky top-0 z-10 shrink-0 bg-background", !page && "-mx-4 pt-2")}>
+				<DetailHeader pr={pr} detail={detail} stack={stack} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
+				<div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
 					<SizeProvider size="compact">
 						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
 							<TabsList aria-label="Show">
@@ -173,7 +178,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 					<Code pr={pr} detail={detail} placement={placement} path={files?.path ?? null} version={version} />
 				</div>
 			) : (
-				<div className={cn(page && "min-h-0 flex-1 overflow-y-auto px-6")}>
+				<div className={cn("shrink-0", page && "px-6")}>
 					<div className="space-y-6 py-4">
 						{saveError && (
 							<p role="alert" className={ERROR_TEXT}>

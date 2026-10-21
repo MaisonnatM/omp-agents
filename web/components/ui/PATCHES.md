@@ -43,6 +43,8 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/button.tsx`: `loading` also sets `aria-busy`; otherwise the caller's `aria-busy` is preserved.
 - `ui/button.tsx`: T3 Code's `outline`, `ghost-muted`, `glass`, `destructive-outline`, and `warning-outline` variants, drawn on the button's surface layer so they keep Fluid's press effect, with their border as the layer's 1px ring.
   `glass` is always a pill and uses the `surface-glass` utility from `web/globals.css`.
+- `ui/button.tsx`: an `xs` size (24px tall, 12px text, 14px icons, 8px sides) and an `icon-xs` size (24px square), T3 Code's header sizes; the SizeProvider never resolves to them, so a caller asks for them by name.
+- `ui/button.tsx`: the primary surface and label use `--primary` and `--primary-foreground`, including hover and pressed fills, so the shared token controls the primary action throughout the app.
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`.
   Long labels wrap at 16rem.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.

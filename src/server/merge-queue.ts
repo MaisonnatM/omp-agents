@@ -9,7 +9,7 @@
 import { ReducerFile } from "../fs";
 import { errorText } from "../json";
 import { type MergeStatus } from "../pull-request-merge";
-import { mergesNow, type PullRequest, pullRequestName, repoKey } from "../shared/github";
+import { mergesNow, type PullRequest, pullRequestName, repoKey, type UpdateMethod } from "../shared/github";
 import { isQueuedMerge, type MergeQueueChange, type QueuedMerge, type QueuedPullRequest, queuedMergeOf, type SettleStep } from "../shared/merge-queue";
 import type { MergeMethod } from "../shared/source-control";
 import { SerialLane } from "../serial-lane";
@@ -31,8 +31,8 @@ const SETTLE_WHY: Record<SettleStep, string> = {
 export interface MergeGitHub {
 	status(pr: PullRequest): Promise<MergeStatus>;
 	merge(id: string, method: MergeMethod, head: string): Promise<void>;
-	/** Asks GitHub to merge the base into the branch, only while its head is `head`; GitHub makes the commit after it answers. */
-	update(id: string, head: string): Promise<void>;
+	/** Updates the branch only while its head is `head`; GitHub finishes after it answers. */
+	update(id: string, head: string, method: UpdateMethod): Promise<void>;
 	arm(id: string, method: MergeMethod, head: string): Promise<void>;
 	disarm(id: string): Promise<void>;
 	retarget(id: string, base: string): Promise<void>;
@@ -273,7 +273,7 @@ export class MergeQueue {
 						await github.ready(status.id);
 						break;
 					case "update":
-						await github.update(status.id, pr.head);
+						await github.update(status.id, pr.head, "merge");
 						break;
 					case "arm":
 						await github.arm(status.id, merge.method, pr.head);

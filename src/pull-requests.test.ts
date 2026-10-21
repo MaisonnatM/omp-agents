@@ -1,13 +1,25 @@
-import { describe, expect, setSystemTime, test } from "bun:test";
+import { describe, expect, setSystemTime, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadPullRequests, parseBranchAnswer, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, repoOf } from "./pull-requests";
+import { loadPullRequests, parseBranchAnswer, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, readBehindBy, repoOf } from "./pull-requests";
 import { runChecked } from "./proc";
+import * as proc from "./proc";
 
 const repo = { owner: "acme", repo: "webapp" };
 const me = { login: "me", avatarUrl: "https://avatars.example/me" };
 
+
+test("base freshness reads GitHub's behind count and leaves unavailable comparisons unknown", async () => {
+	const read = spyOn(proc, "runJson").mockResolvedValueOnce({ behind_by: 12 }).mockRejectedValueOnce(new Error("Not Found"));
+	try {
+		expect(await readBehindBy({ ...repo, number: 7 }, "release/main", "abc")).toBe(12);
+		expect(read.mock.calls[0]?.[0]).toEqual(["gh", "api", "repos/acme/webapp/compare/release%2Fmain...abc?per_page=1"]);
+		expect(await readBehindBy({ ...repo, number: 8 }, "main", "deleted")).toBeNull();
+	} finally {
+		read.mockRestore();
+	}
+});
 const node = (number: number, fields: Record<string, unknown>) => ({
 	number,
 	title: `PR ${number}`,

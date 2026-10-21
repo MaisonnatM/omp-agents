@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LinkedPullRequest, PullRequestSummary, PullRequestCheck, PullRequestComment, PullRequestDetail, PullRequestThread, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
+import type { LinkedPullRequest, PullRequestSummary, PullRequestComment, PullRequestDetail, PullRequestThread, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
@@ -17,7 +17,6 @@ import {
 	openThreads,
 	orderedRepos,
 	placedManual,
-	pullRequestStatus,
 	reason,
 	sectionTitles,
 	shownPullRequests,
@@ -27,7 +26,6 @@ import {
 	withThreadResolved,
 	yourMoveCount,
 } from "./pull-requests-model";
-import { viewOf } from "./components/pull-requests/pr-details/status-view";
 
 const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
 	owner: "acme",
@@ -315,7 +313,7 @@ describe("pull request order", () => {
 	});
 });
 
-describe("pull request status", () => {
+describe("pull request details", () => {
 	const detail = (fields: Partial<PullRequestDetail>): PullRequestDetail => ({
 		owner: "acme",
 		repo: "webapp",
@@ -345,57 +343,10 @@ describe("pull request status", () => {
 		headOid: "",
 		mergeMethods: [],
 		mergeState: "clean",
+		behindBy: null,
 		canComment: false,
 		...fields,
 	});
-	const check = (state: PullRequestCheck["state"]) => ({ name: state, state, url: null });
-
-	test("lists blockers first, then what waits, then what is done", () => {
-		expect(
-			pullRequestStatus(
-				detail({
-					conflicts: true,
-					review: "changes-requested",
-					reviewers: [
-						{ ...teammate, state: "changes-requested" },
-						{ login: "lead", avatarUrl: null, state: "requested" },
-					],
-					checks: "failing",
-					checkRuns: [check("failing"), check("pending"), check("passing")],
-					unresolved: { count: 1, exact: true },
-				}),
-			),
-		).toEqual([
-			{ kind: "conflicts", base: "main" },
-			{ kind: "checks-failing", count: 1 },
-			{ kind: "changes-requested", by: ["teammate"] },
-			{ kind: "threads", count: 1, exact: true },
-			{ kind: "checks-pending", count: 1 },
-		]);
-	});
-
-	test("an approved PR with settled checks and no open thread leads with ready to merge", () => {
-		expect(
-			pullRequestStatus(detail({ review: "approved", reviewers: [{ ...teammate, state: "approved" }], checks: "passing", checkRuns: [check("passing"), check("skipped")] })),
-		).toEqual([{ kind: "ready" }, { kind: "approved", by: ["teammate"] }, { kind: "checks-passing", passed: 1, skipped: 1 }]);
-	});
-
-	test("a ready PR behind its base says its branch is updated first, and still offers the merge", () => {
-		const behind = detail({ review: "approved", reviewers: [{ ...teammate, state: "approved" }], checks: "passing", checkRuns: [check("passing")], mergeState: "behind" });
-		expect(pullRequestStatus(behind).map(item => viewOf(item).text(item))).toEqual(["Behind main, so a merge updates its branch first", "Approved by teammate", "1 check passed"]);
-		const facts = actionFacts(pr(7, { review: "approved", checks: "passing" }), behind);
-		expect(facts && moveOf(facts, null)).toBe("merge");
-	});
-
-	test("a draft says so and names whom it waits on; a merged or closed PR has no status", () => {
-		expect(pullRequestStatus(detail({ state: "draft", reviewers: [{ ...teammate, state: "requested" }] }))).toEqual([
-			{ kind: "draft" },
-			{ kind: "review-required", waitingOn: ["teammate"] },
-		]);
-		expect(pullRequestStatus(detail({ state: "merged" }))).toEqual([]);
-		expect(pullRequestStatus(detail({ state: "closed", conflicts: true }))).toEqual([]);
-	});
-
 	test("the details' facts, not the list's older ones, decide the move and quick actions", () => {
 		const ready = pr(7, { review: "approved", checks: "passing" });
 		expect(moveOf(ready, null)).toBe("merge");
@@ -429,12 +380,7 @@ describe("pull request status", () => {
 		const before = detail({ threads: [thread("PRRT_a", false), thread("PRRT_b", false)], unresolved: { count: 2, exact: false } });
 		const resolved = withThreadResolved(before, "PRRT_a", true);
 		expect(resolved).toEqual({ threads: [thread("PRRT_a", true), thread("PRRT_b", false)], unresolved: { count: 1, exact: false } });
-		expect(pullRequestStatus({ ...before, ...resolved })).toContainEqual({ kind: "threads", count: 1, exact: false });
 		expect(withThreadResolved({ ...before, ...resolved }, "PRRT_a", false)).toEqual({ threads: before.threads, unresolved: { count: 2, exact: false } });
-		const lastOpen = detail({ threads: [thread("PRRT_a", false)], unresolved: { count: 1, exact: true } });
-		const kinds = (shown: PullRequestDetail) => pullRequestStatus(shown).map(({ kind }) => kind);
-		expect(kinds(lastOpen)).toEqual(["threads", "review-required"]);
-		expect(kinds({ ...lastOpen, ...withThreadResolved(lastOpen, "PRRT_a", true) })).toEqual(["review-required"]);
 	});
 });
 

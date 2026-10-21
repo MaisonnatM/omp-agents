@@ -6,6 +6,7 @@ import { createCache } from "./cache";
 import { dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
 import { runChecked } from "./proc";
 import { loadPullRequestDetail } from "./pull-requests";
+import { GITHUB_MERGES } from "./pull-request-merge";
 import { isObject, str } from "./json";
 import { type Person, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
 import { MEDIA_FILE_TYPES, mediaExtension } from "./shared/transcript";
@@ -77,6 +78,15 @@ const REPLY_MUTATION = `mutation($thread: ID!, $body: String!) {
 export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promise<PullRequestDetail> {
 	const base = `repos/${pr.owner}/${pr.repo}`;
 	switch (change.field) {
+		case "title":
+			await ghRestWrite("PATCH", `${base}/pulls/${pr.number}`, [["title", change.title]]);
+			break;
+		case "update": {
+			const status = await GITHUB_MERGES.status(pr);
+			if (status.state !== "open") throw new Error("Only an open pull request can update its branch");
+			await GITHUB_MERGES.update(status.id, status.head, change.method);
+			break;
+		}
 		case "label":
 			if (change.on) await ghRestWrite("POST", `${base}/issues/${pr.number}/labels`, [["labels[]", change.name]]);
 			else await ghRestWrite("DELETE", `${base}/issues/${pr.number}/labels/${encodeURIComponent(change.name)}`);

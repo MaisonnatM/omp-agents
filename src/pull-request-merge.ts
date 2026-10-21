@@ -4,7 +4,7 @@
  */
 import { dataOf, ghGraphql, ghMutation, mergeStateOf, STATUS } from "./github";
 import { isObject, str } from "./json";
-import { type CheckState, type MergeState, type PullRequest, pullRequestName, prKey } from "./shared/github";
+import { type CheckState, type MergeState, type PullRequest, pullRequestName, prKey, type UpdateMethod } from "./shared/github";
 import type { MergeMethod } from "./shared/source-control";
 
 /** Where a pull request stands for a merge, read live. */
@@ -77,13 +77,13 @@ export async function mergePullRequest(id: string, method: MergeMethod, head: st
 	await ghMutation(MERGE_MUTATION, { id, method: method.toUpperCase(), head });
 }
 
-const UPDATE_MUTATION = `mutation($id: ID!, $head: GitObjectID!) {
-	updatePullRequestBranch(input: { pullRequestId: $id, expectedHeadOid: $head, updateMethod: MERGE }) { clientMutationId }
+const UPDATE_MUTATION = `mutation($id: ID!, $head: GitObjectID!, $method: PullRequestBranchUpdateMethod!) {
+	updatePullRequestBranch(input: { pullRequestId: $id, expectedHeadOid: $head, updateMethod: $method }) { clientMutationId }
 }`;
 
-/** Asks GitHub to merge the base into pull request `id`'s branch, only while its head is still `head`; GitHub writes the merge commit after it answers. */
-export async function updateBranch(id: string, head: string): Promise<void> {
-	await ghMutation(UPDATE_MUTATION, { id, head });
+/** Brings the branch up to date only while its head is still `head`; GitHub writes the update after it answers. */
+export async function updateBranch(id: string, head: string, method: UpdateMethod): Promise<void> {
+	await ghMutation(UPDATE_MUTATION, { id, head, method: method.toUpperCase() });
 }
 
 const ARM_MUTATION = `mutation($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {

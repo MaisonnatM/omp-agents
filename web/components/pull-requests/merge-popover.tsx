@@ -1,8 +1,3 @@
-/**
- * The confirmation before a pull request merges on GitHub, which the details' merge button, a row's **Merge** badge, the
- * bell's **Merge**, and a session's stack open. Every merge goes to the server's merge queue, which merges at once when
- * GitHub allows it and otherwise once it is ready.
- */
 import { GitMerge, Layers } from "lucide-react";
 import { type ReactElement, useState } from "react";
 import { Radio } from "@base-ui/react/radio";
@@ -88,7 +83,7 @@ export interface MergePopoverProps {
 	onOpenChange: (open: boolean) => void;
 	/** The trigger's tooltip, if any. */
 	tooltip?: string;
-	/** Which edge of the trigger the confirmation lines up with: the header's button sits at the right, a row's badge at the left. */
+	/** Which edge of the trigger the confirmation lines up with. */
 	align?: "start" | "end";
 	children: (trigger: MergeTrigger) => ReactElement;
 }

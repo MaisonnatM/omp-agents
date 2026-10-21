@@ -1,7 +1,6 @@
 /** `PullRequestDetailPage`: one pull request in the main area, with the quick actions that start a session on it. */
 import { ArrowLeft } from "lucide-react";
 import { type PullRequestList, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
-import { agentOn } from "../../../src/shared/moves";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
@@ -77,7 +76,6 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 				key={rowId(target)}
 				pr={target}
 				listed={listed ? listed.pr : null}
-				agent={agentOn(hosts)(target)}
 				pending={pendingOf(quick, item)}
 				onRun={(facts, action) => listed && start(pullRequestStart(facts, action, listed.cwd, readPinnedSkill()))}
 				sessions={sessions}

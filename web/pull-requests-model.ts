@@ -1,7 +1,7 @@
 /** Pull request links, what each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestCheck, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
-import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
+import { type AgentOn, hasOpenThreads, type MoveId, moveOf } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
@@ -307,34 +307,6 @@ export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr:
 /** Every pull request `repos` lists, leaving out the repositories GitHub could not read. */
 export const listedPullRequests = (repos: readonly RepoPullRequests[]): PullRequestSummary[] => repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests));
 
-/** A pull request's state changes on GitHub, as its `⋯` menus offer them. */
-export type StateActionId = "ready" | "draft" | "close" | "reopen";
-
-export const STATE_ACTIONS: Record<StateActionId, { label: string; to: SettableState }> = {
-	ready: { label: "Mark ready for review", to: "open" },
-	draft: { label: "Convert to draft", to: "draft" },
-	close: { label: "Close pull request", to: "closed" },
-	reopen: { label: "Reopen pull request", to: "open" },
-};
-
-/** The state changes a pull request in `state` offers, in menu order; a merged one offers none. */
-export function stateActions(state: PullRequestDetail["state"]): StateActionId[] {
-	switch (state) {
-		case "open":
-			return ["draft", "close"];
-		case "draft":
-			return ["ready", "close"];
-		case "closed":
-			return ["reopen"];
-		case "merged":
-			return [];
-		default: {
-			const never: never = state;
-			return never;
-		}
-	}
-}
-
 /** A change a row makes that moves its pull request in the list: a state change; a merge goes through the merge queue. */
 export type ListChange = Extract<PullRequestChange, { field: "state" }>;
 
@@ -359,41 +331,6 @@ export function withPullRequestState(list: PullRequestList, pr: PullRequest, sta
 
 /** How many pull requests in the list wait on your move. */
 export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): number => listedPullRequests(repos).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
-
-/** One fact about where a pull request stands, as its details' Status lists it. */
-export type StatusItem =
-	| { kind: "draft" }
-	| { kind: "conflicts"; base: string }
-	| { kind: "checks-failing"; count: number }
-	| { kind: "checks-pending"; count: number }
-	| { kind: "checks-passing"; passed: number; skipped: number }
-	| { kind: "changes-requested"; by: string[] }
-	| { kind: "approved"; by: string[] }
-	| { kind: "review-required"; waitingOn: string[] }
-	| { kind: "threads"; count: number; exact: boolean }
-	| { kind: "ready" }
-	| { kind: "behind"; base: string };
-
-/** What stands between an open or draft pull request and its merge, blockers first; nothing once it is merged or closed. */
-export function pullRequestStatus(detail: PullRequestDetail): StatusItem[] {
-	if (detail.state === "merged" || detail.state === "closed") return [];
-	const count = (state: PullRequestCheck["state"]): number => detail.checkRuns.filter(check => check.state === state).length;
-	const by = (state: PullRequestDetail["reviewers"][number]["state"]): string[] => detail.reviewers.filter(reviewer => reviewer.state === state).map(({ login }) => login);
-	const failing = count("failing");
-	const pending = count("pending");
-	const items: StatusItem[] = [];
-	if (readyToMerge(detail)) items.push(detail.mergeState === "behind" ? { kind: "behind", base: detail.base } : { kind: "ready" });
-	if (detail.state === "draft") items.push({ kind: "draft" });
-	if (detail.conflicts) items.push({ kind: "conflicts", base: detail.base });
-	if (failing > 0) items.push({ kind: "checks-failing", count: failing });
-	if (detail.review === "changes-requested") items.push({ kind: "changes-requested", by: by("changes-requested") });
-	if (hasOpenThreads(detail)) items.push({ kind: "threads", count: detail.unresolved.count, exact: detail.unresolved.exact });
-	if (pending > 0) items.push({ kind: "checks-pending", count: pending });
-	if (detail.review === "review-required") items.push({ kind: "review-required", waitingOn: by("requested") });
-	if (detail.review === "approved") items.push({ kind: "approved", by: by("approved") });
-	if (detail.checks === "passing") items.push({ kind: "checks-passing", passed: count("passing"), skipped: count("skipped") });
-	return items;
-}
 
 /** The review threads not yet resolved, in GitHub's order. */
 export const openThreads = ({ threads }: Pick<PullRequestDetail, "threads">): PullRequestThread[] => threads.filter(thread => !thread.resolved);

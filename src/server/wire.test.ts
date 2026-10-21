@@ -432,13 +432,21 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "draft" } })?.ok).toEqual({ ...pr, change: { field: "state", state: "draft" } });
 	});
 
+	test("takes a title or a merge/rebase branch update, but not a blank or oversized title or squash update", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "A clear title" } })?.ok).toEqual({ ...pr, change: { field: "title", title: "A clear title" } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "update", method: "merge" } })?.ok).toEqual({ ...pr, change: { field: "update", method: "merge" } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "update", method: "rebase" } })?.ok).toEqual({ ...pr, change: { field: "update", method: "rebase" } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "update", method: "squash" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: " " } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "a".repeat(257) } })).toBeNull();
+	});
+
 	test("rejects the merged state, a merge, which goes through the merge queue, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "merged" } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "merge", method: "squash", head: "a".repeat(40) } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: " ", on: true } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "org/team", on: true } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "bug" } })).toBeNull();
-		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "x" } })).toBeNull();
 		expect(parsePullRequestEdit({ owner: "a", repo: "b", change: { field: "state", state: "open" } })).toBeNull();
 	});
 
