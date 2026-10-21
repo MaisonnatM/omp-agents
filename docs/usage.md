@@ -150,12 +150,12 @@ An action that fails shows its error, and its control becomes available again.
 
 ### Run locally
 
-- The play button after the branch of a session's header, and after the copy-branch icon of a pull request's row while you hover or focus it, runs that branch locally: it opens a form with the repository's services and its install command.
+- The play button after the branch of a session's header, and after the number of a pull request's row while you hover or focus it, runs that branch locally: it opens a form with the repository's services and its install command.
 - Services take one command per line, such as `npm run dev` or `task app:run`, up to 8; the install command, such as `npm install`, may stay empty.
   **Run** saves both in the repository's git config (`omp-agents.run-service` and `omp-agents.run-install`), shared by all its worktrees, so the next run's form starts with them.
 - **Run** then, in order:
   - Stops the services the repository's previous run started, and waits up to 10 seconds for them to exit, so their ports are free.
-  - Removes the linked worktree that has the branch checked out, with the checks of copying a branch.
+  - Removes the linked worktree that has the branch checked out, with the checks of copying a session's branch.
   - Checks the branch out in the main checkout, fetching it from `origin` first and fast-forwarding it to its upstream when it can, and refuses while the main checkout has uncommitted changes to tracked files.
     When those checks keep the worktree, such as one a live session uses or one with uncommitted changes, the services run in that worktree and the main checkout stays as it is.
   - Runs the install command when a lockfile, such as `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock`, changed between the commit checked out before and the branch, or when `package.json` exists without `node_modules`; a failing install stops the run and its toast shows the end of its output.
@@ -384,9 +384,9 @@ An action that fails shows its error, and its control becomes available again.
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
   Hover it to see the full model selector.
   The settings page labels models the same way.
-- Click the branch of a pull request's row or details, of a session's header, or of a Linear issue's detail view to copy it; its icon turns into a check mark for a moment.
+- Click the branch of a pull request's details, of a session's header, or of a Linear issue's detail view to copy it; its icon turns into a check mark for a moment.
   A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a session's header, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
-  Copying the branch of a pull request's row or of a session's header also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
+  Copying the branch of a session's header also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
   It applies the checks of **Settings → Worktrees**: it never removes a repository's main checkout, a locked checkout, one with uncommitted or untracked changes, one a live session or this dashboard uses, or one with a nested repository.
   A toast names the worktree it removed, or the one it kept and why; a branch that no linked worktree has checked out shows no toast.
   Copying the branch of a pull request's details or of a Linear issue only copies.
@@ -737,9 +737,7 @@ An action that fails shows its error, and its control becomes available again.
   The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, conversations, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
   Conversations count the pull request's comments and review threads, resolved ones too, as GitHub's own list does, beside a speech bubble; a pull request with none shows no count.
   A narrow page drops the sessions, stack, and line columns.
-  While you hover or focus a row, in the sidebar and in the table, a branch icon after its number copies the pull request's branch, which its tooltip names, without opening the pull request.
-  Copying it also removes the linked worktree of the workspace's repository that has that branch checked out, with the same checks and toasts as copying a session's branch.
-  A play button after it runs the branch locally; see [Run locally](#run-locally).
+  While you hover or focus a row, in the sidebar and in the table, a play button after its number runs the pull request's branch locally, without opening the pull request; see [Run locally](#run-locally).
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
   A pull request that a running session asks you about is **Answer**, and one that a running session works on is **Working**.
@@ -791,7 +789,7 @@ An action that fails shows its error, and its control becomes available again.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
 - The details of a pull request open with a header: the repository and number, a link to it on GitHub, then the title, its author, when it last changed, and `gh pr checkout <number>`, which a click copies.
   Its next line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
-  Clicking the branch it brings copies its name and removes the linked worktree that has it checked out, as a row's copy-branch button does.
+  Clicking the branch it brings copies its name and removes the linked worktree that has it checked out, as a session header's branch does.
   The header ends with **Status** and **Reviewers**, each label beside its value at every width.
   **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
   A pull request otherwise ready to merge whose branch is behind its base, under a rule that wants it up to date, says **Behind** its base in place of **Ready to merge**, and still offers its merge, which updates the branch first.

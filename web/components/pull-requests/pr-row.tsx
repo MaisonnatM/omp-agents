@@ -17,7 +17,7 @@ import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { type Action, useAction } from "../../use-action";
 import { DROP_LINE, type DragItem } from "../../use-drag-order";
 import { Age } from "../age";
-import { BranchLabel, BranchName, releaseBranch } from "../git";
+import { BranchLabel } from "../git";
 import { SessionChip } from "../session-chip";
 import { useDashboardStatus } from "../dashboard-context";
 import { StatusDot, statusLabel } from "../status-dot";
@@ -454,7 +454,6 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<StateTag pr={pr} move={move} />
 					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
-					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<RunLocallyButton cwd={actions.cwd} branch={pr.head} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
@@ -511,7 +510,6 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					<StateTag pr={pr} move={move} />
 					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
-					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<RunLocallyButton cwd={actions.cwd} branch={pr.head} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<ConversationCount pr={pr} />
 					{why && (

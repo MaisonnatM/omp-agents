@@ -1123,7 +1123,7 @@ Starts that create no worktree, such as a resume or a routine's session, stay pa
 `PUT /api/worktree/release` takes `{ cwd, branch }`, an absolute directory in a repository and a branch name, checked by `parseBranchRelease` in `src/server/wire.ts`, and answers 404 when `cwd` is not a directory.
 `Worktrees.releaseBranch` lists the repository's worktrees, picks the linked one that has `branch` checked out, never the main, a bare, or a prunable registration, and removes it through `removeCheckout` without waiting for a session to leave.
 It answers a `BranchRelease` from `src/shared/git.ts`: `{ kind: "none" }` when no linked worktree has the branch, `{ kind: "removed", path }`, or `{ kind: "kept", path, why }` with the blockers' messages or Git's error.
-The page sends it when you copy a branch from a pull request row.
+The page sends it when you copy a session header's branch or a pull request details' branch.
 
 `GET /api/run-profile?cwd=` answers the repository's `RunProfile` from `src/shared/run-locally.ts`, `{ install, services }`, read from its local git config by `readRunProfile` in `src/run-locally.ts`.
 `PUT /api/run-locally` takes a `RunRequest`, `{ cwd, branch, profile }`, checked by `parseRunRequest` in `src/server/wire.ts`: one-line commands, blank services dropped, at most `MAX_RUN_SERVICES` (8).
