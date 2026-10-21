@@ -33,7 +33,7 @@ Settings, in `config.yml`:
 - `retry.fallbackChains`: Codex first, Cursor Composer for cheap roles, and open-weight OpenRouter last, with quota-aware skipping enabled.
   Cursor Grok is opt-in rather than an automatic fallback; existing fallback settings are preserved unless `--force` is used.
 - `modelProviderOrder`: the same four providers in the same order.
-- `task.isolation`: subagents work in their own worktree, and successful changes apply back as a patch.
+- `task.isolation`: `isolated: true` subagents work in their own clone, and successful changes apply back as a patch.
   At most two subagents run at once.
 - `collab.autoStart: control`: every terminal session publishes itself so that the omp-agents dashboard can drive it.
 
@@ -66,9 +66,8 @@ Files, in `agent/`:
   `bun ~/.omp/agent/extensions/request-log.ts <session.jsonl>` rebuilds every recorded request and checks its hash, and a request number after the path prints that request's body.
   The record is the body this extension receives, after the extensions that load before it; Anthropic can still withhold a disabled field afterwards, Codex over WebSocket sends only the new input after the first request, and compaction, summary, and title requests are not recorded.
   The blobs hold what the provider received, including your `AGENTS.md` files, environment details, and any secret that reached the conversation, so keep `~/.omp/agent/blobs/` as private as the session files.
-- `extensions/worktree-guard.ts`: holds back a session's first `edit` or `write` in a repository's main checkout and tells the agent to work in a linked worktree.
-  While that checkout is on its default branch (`origin/HEAD`, else `main` or `master`), every attempt is held back; on another branch, trying the same call again goes through, for when you asked it to work in place.
-  The clones omp makes for `isolated: true` subagents are not main checkouts, so their edits pass.
+- `extensions/worktree-guard.ts`: blocks every `edit` or `write` in a repository's main checkout while it is on its default branch (`origin/HEAD`, else `main` or `master`), and tells the agent to work in a linked worktree.
+  On any other branch the main checkout is edited in place, as `AGENTS.md` asks, and the clones omp makes for `isolated: true` subagents pass too.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add/check changes.
   An omitted or empty `due` value means no due date; a nonempty value must use `YYYY-MM-DD`.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.

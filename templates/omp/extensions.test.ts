@@ -148,7 +148,7 @@ describe("worktree guard", () => {
 	git("clone", "-q", "main", "plain");
 	afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-	test.each([["main", true], ["plain", true], ["isolated/m", false]])("a first write in the %s clone", (checkout, blocked) => {
+	test.each([["main", true], ["plain", true], ["feature", false], ["isolated/m", false]])("a first write in the %s clone", (checkout, blocked) => {
 		const { result } = exercise("worktree-guard", { write: join(root, checkout, "file.txt") });
 		expect(result?.block ?? false).toBe(blocked);
 	});

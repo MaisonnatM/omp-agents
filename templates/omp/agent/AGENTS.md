@@ -5,14 +5,12 @@ If `PI_CODING_AGENT_DIR` is set, substitute that directory for `~/.omp/agent` in
 
 ## Git safety
 
-When the checkout is on the default branch (`main`), create a dedicated worktree on a new branch off it before making changes.
-When the checkout is on any other local branch, work in place: edit, check, and commit on that branch alongside its existing local changes, without a worktree.
-In a worktree, do all edits, checks, and commits there; reuse an existing worktree for the same task.
-Skip the worktree also for read-only investigation or an explicit user request to work in place.
-On the default branch, every subagent that edits files in a Git repository uses `isolated: true`, independently of the session's own worktree; a read-only one, such as a scout, runs without it.
+Where to edit follows the branch of the checkout the session runs in, its cwd.
+On the default branch (`main`), create a dedicated worktree on a new branch off it before making changes, do all edits, checks, and commits there, and reuse an existing worktree for the same task; every subagent that edits files uses `isolated: true`, since its cwd is still the checkout on `main`.
+On any other local branch, including a linked worktree, work in place: edit, check, and commit on that branch alongside its existing local changes, and spawn editing subagents without `isolated` in the same checkout, in parallel only on disjoint files.
+Read-only subagents, such as a scout or the thermonuclear reviewer, run without `isolated`; competing attempts at the same change, such as several runners given one task to compare, always use it.
 Isolation fails when the session's cwd is not a Git repository: create a worktree for the subagent instead and name its path in the task.
-On any other local branch, editing subagents also work in place: spawn them without `isolated` in the same checkout, and run two at once only on disjoint files.
-Competing attempts at the same change, such as arena runners, still use `isolated: true`.
+Read-only investigation needs no worktree; a request to work in place on `main` still needs a branch, which `git switch -c <branch>` in the main checkout gives.
 Force-pushes and rewriting `main` still require explicit approval.
 
 ## Test servers

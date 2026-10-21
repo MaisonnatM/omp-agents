@@ -58,7 +58,7 @@ modelProviderOrder:
   - cursor
   - openrouter
 
-# Subagents work in their own worktree; successful changes apply back as a patch.
+# `isolated: true` subagents work in their own clone; successful changes apply back as a patch.
 task:
   isolation:
     enabled: true
