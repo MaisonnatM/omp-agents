@@ -579,6 +579,7 @@ It also links [decisions](decisions.md), why each design choice was made, [`LEAR
 It is not loaded or applied by the dashboard; [omp modules](architecture.md#omp-modules) describes its base, application, and installation boundary.
 `scripts/omp-release.ts` (`bun run omp-release [version]`) checks an omp release against this codebase: it installs that release and the tested one, runs `src/omp/modules.ts` and `bun test` against the release, and writes a report of the test result, the omp files that changed between the two, and their changelogs to `node_modules/.cache/`.
 `.agents/skills/omp-release/SKILL.md` is the skill an agent follows to sort that report into what must change, what to adopt, and docs drift, and to open the version bump when only the pins must change.
+`scripts/pr-parity.ts` (`bun scripts/pr-parity.ts --omp <sign-in address> [--t3 <url>]`) screenshots the pull request panel of a running dashboard, and of T3 Code when `--t3` names one, in the same states at one viewport and panel width, masks avatars and relative times, and writes the PNGs, side-by-side and pixelmatch diff images, and a `report.md` of diff ratios to `tmp/parity/<run>/`; [Parity harness](agent-smoke.md#parity-harness) says how to run it.
 
 ## Desktop
 
