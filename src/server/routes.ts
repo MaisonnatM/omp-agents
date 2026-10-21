@@ -6,7 +6,7 @@
 import { join } from "node:path";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
-import { errorText, type Parsed } from "../json";
+import { errorText, isObject, type Parsed } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import type { FileUsage } from "../foreign/usage";
@@ -33,7 +33,8 @@ import { ClientConfigError } from "../mcp-clients";
 import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
-import { type PullRequest, prKey, type Repo } from "../shared/github";
+import { parsePullRequest, type PullRequest, prKey, type Repo } from "../shared/github";
+import type { ReviewDraft, ReviewPreview } from "../shared/review-drafts";
 import type { ProjectNotesAnswer } from "../shared/projects";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
@@ -134,6 +135,10 @@ export interface RouteEnv {
 export interface PullRequestRoutesEnv {
 	/** Apply `change` to the merge queue; answers the queued merges after it and what it merged, or rejects with why it refused. */
 	changeMergeQueue(change: MergeQueueChange): Promise<MergeQueueAnswer>;
+	/** What posting the pull request's review draft sends now, and why it cannot post, if it cannot; rejects when there is no draft. */
+	previewReviewDraft(pr: PullRequest): Promise<ReviewPreview>;
+	/** Posts the pull request's review draft once and answers it marked posted; rejects with why it cannot. */
+	postReviewDraft(pr: PullRequest): Promise<ReviewDraft>;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -618,7 +623,7 @@ function gmailRoutes({ get, write }: RouteKit, gmail: GmailAccounts): Routes {
 	};
 }
 
-/** GitHub pull requests in full: details, stack, options, edits, merges that wait until they are ready, and their changed files. */
+/** GitHub pull requests in full: details, stack, options, edits, merges that wait until they are ready, review drafts' preview and post, and their changed files. */
 function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv): Routes {
 	/** A read of the pull request `?owner=&repo=&number=` names, refused with `badRequest`. */
 	const pullRequestGet = (badRequest: string, read: (pr: PullRequest, params: URLSearchParams) => Promise<Response>): Handler =>
@@ -670,9 +675,21 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 		err => fail(409, errorText(err)),
 	);
 
+	/** `GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>`: the `ReviewPreview` of that pull request's review draft, against its head now. */
+	const reviewDraftPreview = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => env.previewReviewDraft(pr)));
+
+	/** `PUT /api/review-draft/post`: `{ owner, repo, number }`, whose review draft posts as one review; answers the draft marked posted. */
+	const reviewDraftPost = write(
+		body => checked(isObject(body) ? parsePullRequest(body.owner, body.repo, body.number) : null, "Expected { owner, repo, number }"),
+		env.postReviewDraft,
+		err => fail(409, errorText(err)),
+	);
+
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/merge-queue": { PUT: mergeQueue },
+		"/api/review-draft/preview": { GET: reviewDraftPreview },
+		"/api/review-draft/post": { PUT: reviewDraftPost },
 		"/api/pull-request/title": { GET: pullRequestTitle },
 		"/api/pull-request/options": { GET: pullRequestOptions },
 		"/api/pull-request/stack": { GET: pullRequestStack },

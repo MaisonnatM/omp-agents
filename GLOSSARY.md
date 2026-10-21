@@ -67,6 +67,10 @@ _Avoid_: Favorite, bookmark
 An entry under the bell: what a check found or how an update went.
 _Avoid_: Alert, notification (reserved for session notifications)
 
+**Review draft**:
+The review a **Review** session saved of one pull request, with its verdict, summary, and findings, which waits in the dashboard for the user to accept, edit, and post.
+_Avoid_: Pending review (GitHub's own unsubmitted review), draft review
+
 ## Unattended work
 
 **Routine**:

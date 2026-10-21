@@ -6,6 +6,7 @@ import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
 import type { Project, ProjectEdit } from "./projects";
+import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
@@ -55,6 +56,8 @@ export type ServerMsg =
 	| { t: "notices"; list: Notice[] }
 	/** Every merge the server waits to make until GitHub allows it, whole, sent when a socket opens and after every change. */
 	| { t: "merges"; list: QueuedMerge[] }
+	/** Every review draft, posted ones too, whole, sent when a socket opens and after every change. */
+	| { t: "review-drafts"; list: ReviewDraft[] }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
 
@@ -115,6 +118,8 @@ export type ClientMsg =
 	| { t: "pin"; change: PinChange }
 	/** Rename or archive a project; every socket then gets the projects as they are after. */
 	| { t: "project"; change: ProjectEdit }
+	/** Change a review draft's verdict, summary, or findings, or discard it; every socket then gets the drafts as they are after. */
+	| { t: "review-draft"; change: ReviewDraftEdit }
 	/** Update notices `ids`, mark them seen or read, or clear them. */
 	| { t: "notice"; ids: string[]; op: NoticeOp };
 

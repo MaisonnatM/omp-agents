@@ -5,7 +5,7 @@ import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseReviewDraftEdit, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -295,6 +295,10 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } } })).toMatchObject({
 			subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } },
 		});
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } }, reviewDraft: true })).toMatchObject({
+			reviewDraft: true,
+		});
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi" })).toMatchObject({ reviewDraft: false });
 		expect(msg({ t: "start", reqId: 5, kind: "fork", view: { kind: "past", sessionId: "s1" }, entryId: "e1" })).toEqual({
 			t: "start",
 			reqId: 5,
@@ -319,6 +323,8 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "two words" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "eng 7" } })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "ENG-7" }, reviewDraft: true })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", reviewDraft: "yes" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 0 } } })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "fork", view: live, entryId: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "resume", sessionId: "" })).toBeNull();
@@ -434,6 +440,33 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "" } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: "x".repeat(65_537) } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "comment", body: 42 } })).toBeNull();
+	});
+});
+
+describe("parseReviewDraftEdit", () => {
+	const pr = { owner: "acme", repo: "app", number: 7 };
+
+	test("takes a verdict, a summary, one finding's place and text, findings' states, and a discard", () => {
+		expect(parseReviewDraftEdit({ pr, op: "verdict", verdict: "request-changes" })?.ok).toEqual({ pr, op: "verdict", verdict: "request-changes" });
+		expect(parseReviewDraftEdit({ pr, op: "summary", summary: "" })?.ok).toEqual({ pr, op: "summary", summary: "" });
+		expect(parseReviewDraftEdit({ pr, op: "finding", id: "f2", path: " src/a.ts ", line: null, body: "Nit." })?.ok).toEqual({ pr, op: "finding", id: "f2", path: "src/a.ts", line: null, body: "Nit." });
+		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: ["f1", "f3"], state: "dismissed" })?.ok).toEqual({ pr, op: "finding-state", ids: ["f1", "f3"], state: "dismissed" });
+		expect(parseReviewDraftEdit({ pr, op: "discard", extra: 1 })?.ok).toEqual({ pr, op: "discard" });
+	});
+
+	test("rejects an unknown verdict or state, a finding on line 0, a blank body, an id it did not number, and no pull request", () => {
+		expect(parseReviewDraftEdit({ pr, op: "verdict", verdict: "lgtm" })).toBeNull();
+		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: ["f1"], state: "done" })).toBeNull();
+		expect(parseReviewDraftEdit({ pr, op: "finding", id: "f1", path: "a.ts", line: 0, body: "x" })).toBeNull();
+		expect(parseReviewDraftEdit({ pr, op: "finding", id: "f1", path: "a.ts", line: 3, body: " " })).toBeNull();
+		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: ["x1"], state: "accepted" })).toBeNull();
+		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: [], state: "accepted" })).toBeNull();
+		expect(parseReviewDraftEdit({ op: "discard" })).toBeNull();
+	});
+
+	test("rides the review-draft message", () => {
+		expect(msg({ t: "review-draft", change: { pr, op: "discard" } })).toEqual({ t: "review-draft", change: { pr, op: "discard" } });
+		expect(msg({ t: "review-draft", change: { pr, op: "nope" } })).toBeNull();
 	});
 });
 

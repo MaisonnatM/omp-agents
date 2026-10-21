@@ -3,6 +3,7 @@ import type { RoutineChange } from "../routines";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
 import type { ServerMsg } from "../shared/protocol";
+import type { ReviewDraftEdit } from "../shared/review-drafts";
 import type { ScheduledChange } from "../shared/scheduled";
 import type { WorkspaceChange } from "../shared/workspaces";
 import type { UserTodoChange } from "../user-todos-shared";
@@ -15,6 +16,7 @@ interface ListChanges {
 	workspaces: WorkspaceChange;
 	pins: PinChange;
 	projects: ProjectEdit;
+	"review-drafts": ReviewDraftEdit;
 }
 
 /** The lists only the server changes, through actions of their own: the bell's notices, and the queued merges. */

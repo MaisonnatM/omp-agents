@@ -1,7 +1,8 @@
-/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, and Code tabs. */
-import { FileDiff, FileText, History, MessageSquare } from "lucide-react";
+/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, Code, and Review draft tabs. */
+import { ClipboardPen, FileDiff, FileText, History, MessageSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
+import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
@@ -13,6 +14,7 @@ import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../
 import { useEditableRead } from "../../../editable-read";
 import { useRead, writePullRequest } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
+import { useDashboardStatus } from "../../dashboard-context";
 import { ERROR_TEXT } from "../../form-dialog";
 import { usePullRequestOptions } from "../pr-fields";
 import { LoadNote } from "../../sheet-details";
@@ -21,6 +23,7 @@ import { ChecksSummary } from "./checks";
 import { Code } from "./code";
 import { Comments } from "./comments";
 import { DetailHeader } from "./header";
+import { ReviewDraftPanel } from "./review-draft";
 import { placeFixes } from "./status-view";
 import { Summary } from "./summary";
 
@@ -72,10 +75,10 @@ export interface DetailContentProps {
 
 export type Placement = "page" | "sidebar";
 
-type DetailTab = "summary" | "comments" | "timeline" | "code";
+type DetailTab = "summary" | "comments" | "timeline" | "code" | "review";
 
 /**
- * The four labels and their counts outgrow the sidebar's default width, with or without the checks beside them, so
+ * The labels and their counts outgrow the sidebar's default width, with or without the checks beside them, so
  * below 30rem the tabs show their icons alone, which the tooltip and screen readers still name.
  */
 const TAB_CLASS = "@min-[30rem]/pr:[&>svg]:hidden @max-[30rem]/pr:px-1.5";
@@ -83,7 +86,8 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
 
 /**
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
- * of the other actions; then Summary, Comments, Timeline, and Code tabs, with the checks at a glance on the tab bar.
+ * of the other actions; then Summary, Comments, Timeline, and Code tabs, and a Review draft tab while a Review session's
+ * draft of it is kept, with the checks at a glance on the tab bar.
  */
 export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace, cwd }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
@@ -101,16 +105,19 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 		await write(() => put(change));
 	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
-	const [tab, setTab] = useState<DetailTab>(files ? "code" : "summary");
+	const [picked, setPicked] = useState<DetailTab>(files ? "code" : "summary");
+	const draft = reviewDraftOf(useDashboardStatus().reviewDrafts, pr);
+	// A discarded draft takes its tab with it.
+	const tab = picked === "review" && !draft ? "summary" : picked;
 	useEffect(() => {
-		if (files) setTab("code");
+		if (files) setPicked("code");
 	}, [files]);
 	useEffect(() => {
 		// The sidebar's details must leave the cursor in the pane's composer.
 		if (placement === "page") headingRef.current?.focus({ preventScroll: true });
 	}, [placement]);
 	const choose = (value: DetailTab): void => {
-		setTab(value);
+		setPicked(value);
 		if (placement !== "page") return;
 		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
 		else if (value !== "code" && files) location.hash = hashForPullRequests(pr);
@@ -126,6 +133,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	const options = usePullRequestOptions(pr);
 	const comments = detail ? commentCount(detail) : 0;
 	const timeline = detail ? detail.conversation.length + openThreads(detail).length : 0;
+	const pendingFindings = draft && !draft.posted ? draft.findings.filter(finding => finding.state === "pending").length : 0;
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
 			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
@@ -138,6 +146,18 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 								<TabItem value="comments" label="Comments" icon={MessageSquare} tooltip="Comments" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={comments || undefined} aria-label={`Comments, ${comments} comments`} />
 								<TabItem value="timeline" label="Timeline" icon={History} tooltip="Timeline" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={timeline || undefined} aria-label={`Timeline, ${timeline} comments`} />
 								<TabItem value="code" label="Code" icon={FileDiff} tooltip="Code" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
+								{draft && (
+									<TabItem
+										value="review"
+										label="Review draft"
+										icon={ClipboardPen}
+										tooltip={draft.posted ? "Review draft, posted" : "Review draft, waiting for you to post it"}
+										className={TAB_CLASS}
+										labelClassName={LABEL_CLASS}
+										badge={pendingFindings || undefined}
+										aria-label={`Review draft, ${pendingFindings} pending findings`}
+									/>
+								)}
 							</TabsList>
 						</Tabs>
 					</SizeProvider>
@@ -164,8 +184,10 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 							<Summary pr={pr} detail={detail} options={options} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
 						) : tab === "comments" ? (
 							<Comments detail={detail} save={save} send={send} />
-						) : (
+						) : tab === "timeline" ? (
 							<Timeline detail={detail} />
+						) : (
+							draft && <ReviewDraftPanel draft={draft} headOid={detail.headOid} />
 						)}
 					</div>
 				</div>

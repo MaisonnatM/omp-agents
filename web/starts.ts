@@ -52,7 +52,7 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId, reviewDraft: false };
 		case "quick":
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, ...startTarget(op.subject) };
 		case "fork":

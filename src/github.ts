@@ -60,6 +60,11 @@ export async function ghRestWrite(method: "POST" | "PATCH" | "DELETE", path: str
 	await runChecked(["gh", "api", "-X", method, path, ...fields.flatMap(([name, value]) => ["-f", `${name}=${value}`])], { timeoutMs: GH_TIMEOUT_MS });
 }
 
+/** `gh api`'s answer to POST `body` on REST `path`, sent whole as JSON for a body that nests, such as a review's comments; GitHub's refusal comes back as its answer. */
+export function ghRestPost(path: string, body: unknown): Promise<unknown> {
+	return runJson(["gh", "api", "-X", "POST", path, "--input", "-"], { input: JSON.stringify(body), timeoutMs: GH_TIMEOUT_MS });
+}
+
 /** GitHub's error messages in a `gh api graphql` answer, joined; empty when it reports none. */
 function errorsOf(answer: unknown): string {
 	const errors = isObject(answer) && Array.isArray(answer.errors) ? answer.errors : [];
