@@ -1497,6 +1497,12 @@ The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.ts
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 
+The pull request detail tabs use `web/components/segmented-tabs.tsx`, a reusable Radix Tabs wrapper with T3's 24px segmented styling.
+Radix owns automatic arrow-key selection, roving focus, and the tab-to-panel ARIA links.
+`presentChecks` in `web/pull-request-checks.ts` derives the status line and attention, running, and completed groups from `PullRequestDetail.checkRuns`.
+The check transport remains `{ name, state, url }`, with no timing or separate workflow-approval fields.
+Skipped checks stay in the completed group but never count as passed.
+
 The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.

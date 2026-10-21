@@ -69,3 +69,12 @@ Fluid's tokens that T3 lacks stay, and the button keeps Fluid's two-step size la
 T3's 24px `xs` and `icon-xs` join it only as sizes a caller names, since the pull request header's actions are 24px in T3 and a 28px compact button would not match them.
 Primary buttons use `--primary` and `--primary-foreground` for their surface, press effect, and label, so the shared theme tokens apply throughout the app rather than leaving the primary action black.
 See [Interface map](code-layout.md#interface-map) and the [parity harness](agent-smoke.md#parity-harness), which measures the panel against T3's.
+
+## Pull request detail tabs keep tab semantics in T3's segmented control
+
+`web/components/segmented-tabs.tsx` uses Radix Tabs for selection, keyboard focus, and panel relationships, rather than copying T3's toggle semantics.
+Its 24px items and selected backgrounds match T3 without changing Fluid's tabs elsewhere in the dashboard.
+Count badges are omitted from the strip, while accessible names keep comment and pending-finding counts.
+The checks popover follows T3's attention, running, and completed order and folds completed checks only while another check needs attention or is running.
+The existing check shape has no durations or separate workflow-approval state, so the page presents only the statuses and links the server reports.
+See [Pull requests](usage.md#pull-requests).

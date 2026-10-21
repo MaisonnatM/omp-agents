@@ -138,7 +138,7 @@ export function DetailHeader({ pr, detail, stack, quick, onSave, send, onMergeQu
 		</span>
 	);
 	return (
-		<header className="@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 border-b border-border/60 pt-2">
+		<header className="@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 pt-2">
 			<div className="grid h-7 min-w-0 items-center overflow-hidden pl-4">
 				<div className="col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
 					{!condensed && <a href={`https://github.com/${pr.owner}/${pr.repo}`} target="_blank" rel="noreferrer" className="min-w-0 truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{pr.owner}/{pr.repo}</a>}
