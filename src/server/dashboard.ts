@@ -28,6 +28,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { comparisonsDir } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { replayComparison, replayDetail } from "../replay";
@@ -47,6 +48,7 @@ import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
+import { Comparisons } from "./comparisons";
 import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
 import { InterruptedSessions } from "./interrupted";
@@ -133,6 +135,7 @@ export class Dashboard {
 	readonly #lists: ListRegistry;
 	readonly #todoInbox: TodoInbox;
 	readonly #worktrees: Worktrees;
+	readonly #comparisons: Comparisons;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
@@ -247,6 +250,7 @@ export class Dashboard {
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
+			comparisons: { msg: () => ({ t: "comparisons", comparisons: this.#comparisons.list }) },
 		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -273,6 +277,8 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
+			toolsFor: (request, instanceId) => this.#comparisons.prepare(request, instanceId),
+			registered: session => this.#comparisons.registered(session),
 			projects: { launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)) },
 		});
 		const worktrees = (this.#worktrees = new Worktrees({
@@ -288,6 +294,11 @@ export class Dashboard {
 			},
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
+		this.#comparisons = new Comparisons({
+			dir: comparisonsDir, port, sessions, worktrees, start: starter,
+			cancelContinue: id => this.#autoContinue.cancel(id),
+			changed: () => broadcasts.pushList("comparisons"),
+		});
 		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "replay" || request.kind === "new" && request.branch !== null);
 		const startSession = (this.#startSession = request => startWith(request, null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
@@ -433,6 +444,7 @@ export class Dashboard {
 		});
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
+				await this.#comparisons.refresh();
 				if (broadcasts.listening()) await this.#listRegistry();
 				else this.#registryFresh = false;
 			},
@@ -475,6 +487,7 @@ export class Dashboard {
 			start: startSession,
 			createProject: spec => projectRunner.create(spec),
 			lists,
+			comparisons: this.#comparisons,
 			end: async instanceId => {
 				const session = sessions.get(instanceId);
 				if (session) await this.#endLive(session);
@@ -570,8 +583,10 @@ export class Dashboard {
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
+		await this.#comparisons.recover();
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)) }, survived => this.#interrupted.recover(survived));
+		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)) }, survived => this.#interrupted.recover(survived), this.#comparisons);
+		await this.#comparisons.attached();
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		seedUserNotes(userNotesDir);
@@ -604,6 +619,7 @@ export class Dashboard {
 	async stop(): Promise<void> {
 		this.#loops.stop();
 		this.#stopMergeQueue();
+		await this.#comparisons.stop();
 		this.#projectRunner.stop();
 		this.#todoInbox.stop();
 		this.#endInbox.stop();
@@ -619,6 +635,7 @@ export class Dashboard {
 	exited(): void {
 		flushJsonFiles();
 		this.#ownerLock.release();
+		this.#comparisons.release();
 	}
 
 	/** A dashboard socket opened. */
@@ -656,6 +673,7 @@ export class Dashboard {
 
 	/** Where every live session's update goes: the views, the broadcasts, the routines, the projects, and the loops. */
 	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
+		this.#comparisons?.observe(instanceId);
 		switch (update.kind) {
 			case "roster":
 				this.#runner.observe(instanceId);

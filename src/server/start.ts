@@ -36,10 +36,20 @@ export interface StartEnv {
 	/** How a start joins a project: the one `project` names, else the one a resumed session belongs to, else none. */
 	projects: { launchFor(request: StartRequest, project: ProjectLaunch | null): ProjectJoin };
 	mayDiscardReplay(cwd: string): Promise<string | null>;
+	toolsFor?(request: StartRequest, instanceId: string): RpcLaunch["tools"];
+	registered?(session: DashboardSession): Promise<void>;
+}
+
+export interface ReservedLaunch {
+	instanceId: string;
+	rpc: RpcLaunch;
+	registered(session: Pick<DashboardSession, "instanceId" | "sessionId">): Promise<void>;
+	beforePrompt(): Promise<void>;
+	admitted(): Promise<void>;
 }
 
 /** Starts `request`; `project` is the project runner's reason for it, which a page's start never has. */
-export type Starter = (request: StartRequest, project: ProjectLaunch | null) => Promise<StartResult>;
+export type Starter = (request: StartRequest, project: ProjectLaunch | null, reserved?: ReservedLaunch) => Promise<StartResult>;
 
 /** Runs `start` requests; one ready session per success, none on failure. */
 export function createStarter(env: StartEnv): Starter {
@@ -47,8 +57,8 @@ export function createStarter(env: StartEnv): Starter {
 	/** Past sessions being resumed, so a second click starts no second omp on the same file. */
 	const resuming = new Set<string>();
 
-	async function launch(failure: string, spawn: Spawn): Promise<{ started: Started } | { error: string }> {
-		const { instanceId, emit } = sessions.allocate();
+	async function launch(failure: string, spawn: Spawn, reserved?: ReservedLaunch): Promise<{ started: Started } | { error: string }> {
+		const { instanceId, emit } = sessions.allocate(reserved?.instanceId);
 		try {
 			return { started: await spawn(instanceId, emit) };
 		} catch (err) {
@@ -57,7 +67,7 @@ export function createStarter(env: StartEnv): Starter {
 	}
 
 	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its project's extensions and host tools. */
-	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<{ started: Started } | { error: string }> {
+	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch, reserved?: ReservedLaunch): Promise<{ started: Started } | { error: string }> {
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
@@ -83,7 +93,7 @@ export function createStarter(env: StartEnv): Starter {
 					session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
 					prompt: null,
 					first: { text, images },
-				}));
+				}), reserved);
 			}
 			case "fork": {
 				const source = env.pathFor(request.view);
@@ -113,7 +123,7 @@ export function createStarter(env: StartEnv): Starter {
 				if (formatOf(path).source !== "omp") return { error: "Cannot resume: this session is read-only. Only omp sessions resume here." };
 				resuming.add(sessionId);
 				try {
-					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }));
+					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, { ...rpcLaunch, tools: [...rpcLaunch.tools, ...(env.toolsFor?.(request, id) ?? [])] }, emit), prompt: null }));
 				} finally {
 					resuming.delete(sessionId);
 				}
@@ -121,9 +131,10 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	return async (request, project) => {
+	return async (request, project, reserved) => {
 		const join = env.projects.launchFor(request, project);
-		const outcome = await spawnFor(request, join.rpc);
+		const rpc = reserved ? { args: [...join.rpc.args, ...reserved.rpc.args], tools: [...join.rpc.tools, ...reserved.rpc.tools] } : join.rpc;
+		const outcome = await spawnFor(request, rpc, reserved);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
@@ -134,8 +145,16 @@ export function createStarter(env: StartEnv): Starter {
 		// The todo and the project link first, so the session's first turn already knows the todo it works on and its role.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		join.attach(session);
+		await env.registered?.(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
-		if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);
+		if (reserved) {
+			await reserved.registered(session);
+			if (first) {
+				await reserved.beforePrompt();
+				await session.prompt(null, first.text, first.images, "steer");
+				await reserved.admitted();
+			}
+		} else if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
 	};
@@ -149,12 +168,12 @@ interface Attached {
 }
 
 /** Attaches to session `instanceId`; `null` when it cannot, which leaves its omp running for the next server. */
-async function attach(sessions: LiveSessions, projects: StartEnv["projects"], instanceId: string): Promise<Attached | null> {
+async function attach(sessions: LiveSessions, projects: StartEnv["projects"], instanceId: string, tools: RpcLaunch["tools"] = [], directory?: string): Promise<Attached | null> {
 	const { emit } = sessions.allocate(instanceId);
 	const held: DashboardUpdate[] = [];
 	let report = (update: DashboardUpdate): void => void held.push(update);
 	try {
-		const session = await DashboardSession.reattach(instanceId, sessionId => projects.launchFor({ kind: "resume", sessionId }, null).rpc.tools, update => report(update));
+		const session = await DashboardSession.reattach(instanceId, sessionId => [...projects.launchFor({ kind: "resume", sessionId }, null).rpc.tools, ...tools], update => report(update), directory);
 		return {
 			session,
 			publish: () => {
@@ -174,8 +193,8 @@ async function attach(sessions: LiveSessions, projects: StartEnv["projects"], in
  * it reported, so no report reaches the server before it knows which sessions survived. One it reaches but cannot
  * attach to runs on unlisted, and the next server tries again.
  */
-export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"], recover: (survived: ReadonlySet<string>) => void): Promise<void> {
-	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, projects, instanceId)))).filter(
+export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"], recover: (survived: ReadonlySet<string>) => void, membership?: { mayAttach(instanceId: string): boolean; tools(instanceId: string): RpcLaunch["tools"]; instances(): string[]; keeperDirectory(instanceId: string): string | undefined }): Promise<void> {
+	const attached = (await Promise.all([...new Set([...keptSessions(), ...(membership?.instances() ?? [])])].filter(id => !membership || membership.mayAttach(id)).map(instanceId => attach(sessions, projects, instanceId, membership?.tools(instanceId), membership?.keeperDirectory(instanceId))))).filter(
 		(kept): kept is Attached => kept !== null && !kept.session.finished(),
 	);
 	recover(new Set(attached.map(({ session }) => session.sessionId)));

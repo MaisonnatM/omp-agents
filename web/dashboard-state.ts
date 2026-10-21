@@ -1,4 +1,5 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
+import type { ComparisonSnapshot } from "../src/shared/comparisons";
 import type { PlanUsage } from "../src/shared/models";
 import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
@@ -54,6 +55,7 @@ export interface DashboardState {
 	pins: string[];
 	/** Every project, archived ones too, empty until the server first sends them. */
 	projects: Project[];
+	comparisons: ComparisonSnapshot[] | null;
 	/** What the bell lists, empty until the server first sends it. */
 	notices: Notice[];
 	/** The merges the server waits to make until GitHub allows them, empty until the server first sends them. */
@@ -65,7 +67,7 @@ export interface DashboardState {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "comparisons" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -181,6 +183,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, pins: action.sessionIds };
 		case "projects":
 			return { ...state, projects: action.projects };
+		case "comparisons":
+			return { ...state, comparisons: action.comparisons };
 		case "notices":
 			return { ...state, notices: action.list };
 		case "merges":
@@ -222,6 +226,7 @@ export function initialState(route: Route): DashboardState {
 		workspaceList: { added: [], hidden: [] },
 		pins: [],
 		projects: [],
+		comparisons: null,
 		notices: [],
 		merges: [],
 		reviewDrafts: [],

@@ -123,6 +123,7 @@ export type Page =
 	| { kind: "calendar" }
 	| ({ kind: "inbox" } & InboxRoute)
 	| ({ kind: "new" } & NewSessionRoute)
+	| { kind: "comparisons"; id: string | null }
 	| ({ kind: "scheduled" } & ScheduledRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
@@ -181,6 +182,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
 	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
+	comparisons: rest => ({ kind: "comparisons", id: rest ? decodeSegment(rest) : null }),
 	"pull-requests": rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
 		if (!match) return { kind: "pull-requests", target: null };
@@ -232,6 +234,7 @@ function restOfPage(page: Page): string | null {
 		case "inbox":
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
+		case "comparisons":
 			return page.id === null ? null : encodeURIComponent(page.id);
 		case "projects":
 			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
@@ -259,6 +262,7 @@ function queryOfPage(page: Page): string | null {
 		case "calendar":
 		case "inbox":
 		case "scheduled":
+		case "comparisons":
 			return null;
 		default: {
 			const never: never = page;
@@ -286,6 +290,7 @@ export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
+export const hashForComparisons = (id: string | null = null): string => hashForPage({ kind: "comparisons", id });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

@@ -16,6 +16,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
   - [Continue after a usage limit](#continue-after-a-usage-limit)
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
+- [Design comparisons](#design-comparisons)
 - [Replay from here](#replay-from-here)
 - [Pull requests](#pull-requests)
 - [Linear tickets](#linear-tickets)
@@ -634,6 +635,41 @@ An action that fails shows its error, and its control becomes available again.
   The session then rewinds to just before that message and runs the edited one, in the same pane and omp process, stopping a running turn first.
   omp moves the session to a new file, as `/branch` does, so the conversation before the edit stays under the past sessions.
   Only a plain text message that omp has saved can be edited: not a skill prompt, one with images or files, or a message in a terminal session.
+
+## Design comparisons
+
+- **Variants** above the new-session composer turns one prompt into several sessions that try the same design at once; **Single session** turns it back.
+  It shows three variant rows at first; **Add variant** adds another and each row's × removes it, down to two.
+  There is no upper limit.
+- Every variant gets the same prompt, attachments, and skill.
+  The composer's model and effort apply to every row unless a row picks its own, which shows **Use common selection** to go back.
+- **Shared base**, `HEAD` at first, names the commit every variant starts from.
+  The server resolves it once when you send, so every variant starts from the same commit even if the branch moves while they start.
+- Sending starts the comparison and opens its page, `#comparisons/<id>`.
+  Each variant runs as an ordinary dashboard session, on a fresh branch `variants/<id>/<n>-<suffix>` in its own worktree, in the same subdirectory of the repository as the draft's directory.
+  A start that fails on one variant shows on its card; the others keep running, and none is started again in its place.
+  A failed variant's worktree stays, and only a variant that started can be kept, so when none started, remove their worktrees in **Settings › Worktrees**.
+  If the page loses its connection before the server answers, it shows **Check this comparison** instead of starting another, since the first send may have started it.
+- Each variant has a `publish_variant_screenshot` tool and is asked to capture a real screenshot of its design and publish it.
+  The server checks that the file is a PNG, JPEG, GIF, or WebP image of at most 20 MB and copies it out of the worktree, so the comparison keeps it after the worktree goes.
+  A new publication replaces the variant's previous screenshot; the dashboard never takes a screenshot itself.
+- The comparison page shows every variant's card side by side, wrapping onto more rows on a narrow window.
+  A card shows the variant's latest screenshot, which a click enlarges, its requested and actual model, its branch, and where its start, first prompt, stop, and worktree stand.
+  While a newer screenshot loads, or when it fails to load, the card keeps showing the previous one and says so.
+  **Open session** opens the variant's session; **All comparisons** lists every comparison, newest first, and **Design comparisons** in the **Sessions** tab and **Comparisons** in the new-session draft's header link there too.
+- **Keep this one** asks first, then stops every other variant, its background processes included, and keeps the chosen one's session, worktree, and branch.
+  Variants that had not started yet are cancelled.
+  A variant whose stop cannot be confirmed shows why, and **Retry stopping siblings** tries again.
+- Once the others stopped, **Losing worktrees** lists each one's path with its tracked changes, untracked files, and ignored files, and anything else that blocks its removal.
+  **Keep worktrees** leaves them all in place.
+  **Discard worktrees…** asks again, listing the same files, then removes them with their changes.
+  Discarding lifts only the uncommitted-changes check: a locked worktree, one a live session or a nested repository uses, a directory the comparison did not create, or files that changed since the list was read still keep it, and the card says why.
+  Every branch stays, the winner's included, so a discarded variant's commits can still be checked out.
+- The server keeps each comparison under the data directory, in `omp-agents/comparisons/<id>/`, so it survives a restart.
+  A variant that was mid-start when the server stopped shows as failed rather than starting again, and one whose first prompt may not have reached omp says so instead of sending it twice.
+  The loss list does not survive a restart; review it again before discarding.
+- A comparison belongs to the server that started it.
+  Another server's dashboard shows its saved results with **Open owning dashboard**, a link to that server, and offers none of its actions.
 
 ## Replay from here
 

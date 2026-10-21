@@ -12,6 +12,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "New session";
 		case "scheduled":
 			return "Scheduled session";
+		case "comparisons":
+			return "Design variants";
 		case "settings":
 			return "Settings";
 		case "pull-requests":

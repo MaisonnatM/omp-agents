@@ -195,9 +195,9 @@ export function startRpc(instanceId: string, cwd: string, onFrame: (frame: Recor
  * Attaches to session `instanceId`, which a previous server started and whose omp still runs. `onFrame` first gets the
  * questions omp still waits on. omp keeps the tools the last server served it until the caller replaces them.
  */
-export function attachRpc(instanceId: string, onFrame: (frame: Record<string, unknown>) => void): Promise<RpcChild> {
-	return drive(() => attachKeeper(keepersDir, instanceId), onFrame, PLAIN_LAUNCH);
+export function attachRpc(instanceId: string, onFrame: (frame: Record<string, unknown>) => void, directory = keepersDir): Promise<RpcChild> {
+	return drive(() => attachKeeper(directory, instanceId), onFrame, PLAIN_LAUNCH);
 }
 
 /** The instance ids of the sessions a previous server started whose keeper may still run. */
-export const keptSessions = (): string[] => listKeepers(keepersDir);
+export const keptSessions = (directory = keepersDir): string[] => listKeepers(directory);
