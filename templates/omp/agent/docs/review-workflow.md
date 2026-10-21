@@ -2,7 +2,7 @@
 
 ## Thermonuclear review
 
-When the user invokes `thermo-nuclear-code-quality-review`, asks for a thermonuclear review, or requests a deep code quality audit, spawn `task` with `agent: "thermonuclear-reviewer"` and `isolated: true` for a Git repository.
+When the user invokes `thermo-nuclear-code-quality-review`, asks for a thermonuclear review, or requests a deep code quality audit, spawn `task` with `agent: "thermonuclear-reviewer"`; it is read-only, so it runs without `isolated` in the session's checkout.
 Its `model: "@plan"` frontmatter follows `modelRoles.plan` and that role's fallback chain on any provider.
 Pass the review scope and user arguments, then relay the findings verbatim.
 Run the skill through this agent, not in the session model.
