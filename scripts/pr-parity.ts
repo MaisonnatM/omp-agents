@@ -111,7 +111,7 @@ const t3 = (base: string): App => ({
 	panel: page => page.locator("div.flex-col.bg-background", { has: page.locator('nav[aria-label="Pull request tabs"]') }).last(),
 	tab: (panel, tab) => panel.locator('nav[aria-label="Pull request tabs"]').getByText(TAB_LABEL[tab], { exact: true }),
 	control: (panel, control) => {
-		if (control === "checks") return panel.getByLabel(/^(Open )?checks:/i).first();
+		if (control === "checks") return panel.getByRole("button", { name: /^(Open )?checks:/i });
 		if (control === "menu") return panel.getByRole("button", { name: "More pull request actions" });
 		return panel.getByRole("button", { name: "Check out" });
 	},
