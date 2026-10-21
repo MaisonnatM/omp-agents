@@ -15,10 +15,10 @@ const CHECK_RUN: Record<CheckRunState, { Icon: LucideIcon; color: string; label:
 };
 
 const CHECKS_STATE = {
-	failing: { ...CHECK_RUN.failing, label: "Some checks were not successful" },
-	pending: { Icon: CircleDot, color: "text-amber-600 dark:text-amber-400/90", label: "Some checks haven't completed yet" },
-	passing: { ...CHECK_RUN.passing, label: "All checks have passed" },
-	none: { Icon: CircleDot, color: "text-muted-foreground", label: "No checks reported" },
+	failing: CHECK_RUN.failing,
+	pending: { Icon: CircleDot, color: "text-amber-600 dark:text-amber-400/90" },
+	passing: CHECK_RUN.passing,
+	none: { Icon: CircleDot, color: "text-muted-foreground" },
 };
 
 function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) {
@@ -55,7 +55,7 @@ function Checks({ summary }: { summary: ChecksPresentation }) {
 
 export function ChecksSummary({ checks }: { checks: PullRequestCheck[] }) {
 	const summary = presentChecks(checks);
-	const { Icon, color, label } = CHECKS_STATE[summary.state];
+	const { Icon, color } = CHECKS_STATE[summary.state];
 	return (
 		<span className="ml-auto flex h-4 min-w-0 flex-1 flex-wrap content-start items-center justify-end gap-x-1.5 overflow-hidden text-xs text-muted-foreground">
 			{summary.state === "none" ? <Icon aria-hidden className="size-3.5 shrink-0" /> : (
@@ -66,7 +66,7 @@ export function ChecksSummary({ checks }: { checks: PullRequestCheck[] }) {
 						</button>
 					</PopoverTrigger>
 					<PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] space-y-2 p-3">
-						<p className="text-sm font-medium">{label}</p>
+						<p className="text-sm font-medium">{summary.heading}</p>
 						<p className="text-xs text-muted-foreground">{summary.text}</p>
 						<Checks summary={summary} />
 					</PopoverContent>

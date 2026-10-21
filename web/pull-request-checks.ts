@@ -2,6 +2,7 @@ import type { CheckState, PullRequestCheck } from "../src/shared/github";
 
 export interface ChecksPresentation {
 	state: CheckState;
+	heading: string;
 	text: string;
 	attention: PullRequestCheck[];
 	running: PullRequestCheck[];
@@ -22,6 +23,13 @@ export function presentChecks(checks: readonly PullRequestCheck[]): ChecksPresen
 		}
 	}
 	const state: CheckState = checks.length === 0 ? "none" : attention.length > 0 ? "failing" : running.length > 0 ? "pending" : "passing";
+	const heading = state === "none"
+		? "No checks reported"
+		: state === "failing"
+			? "Some checks were not successful"
+			: state === "pending"
+				? "Some checks haven't completed yet"
+				: passed === checks.length ? "All checks have passed" : "Checks completed";
 	const text = checks.length === 0
 		? "No checks reported"
 		: attention.length > 0
@@ -29,5 +37,5 @@ export function presentChecks(checks: readonly PullRequestCheck[]): ChecksPresen
 			: running.length > 0
 				? `${running.length} of ${checks.length} running`
 				: passed === checks.length ? "All checks passed" : `${passed} of ${checks.length} passing`;
-	return { state, text, attention, running, completed };
+	return { state, heading, text, attention, running, completed };
 }
