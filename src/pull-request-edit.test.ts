@@ -1,5 +1,10 @@
-import { describe, expect, test } from "bun:test";
-import { stateSteps } from "./pull-request-edit";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
+import * as proc from "./proc";
+import { attachToPullRequest, stateSteps } from "./pull-request-edit";
+
+afterEach(() => mock.restore());
 
 describe("stateSteps", () => {
 	const open = { open: true, draft: false };
@@ -25,5 +30,42 @@ describe("stateSteps", () => {
 		expect(stateSteps(closed, "draft")).toEqual(["reopenPullRequest", "convertPullRequestToDraft"]);
 		expect(stateSteps(closedDraft, "open")).toEqual(["reopenPullRequest", "markPullRequestReadyForReview"]);
 		expect(stateSteps(closedDraft, "draft")).toEqual(["reopenPullRequest"]);
+	});
+});
+
+describe("attachToPullRequest", () => {
+	const attachment = {
+		owner: "acme",
+		repo: "app",
+		number: 7,
+		files: [
+			{ name: "page.png", type: "image/png" as const, data: Buffer.from("png").toString("base64"), alt: "The sidebar #2" },
+			{ name: "shot 1", type: "image/jpeg" as const, data: Buffer.from("jpg").toString("base64"), alt: "" },
+			{ name: "../diagram.png", type: "image/svg+xml" as const, data: Buffer.from("<svg/>").toString("base64"), alt: "Flow" },
+		],
+	};
+
+	test("runs gh pr edit with each image as a temporary file named for its type, its alt text after the #, then removes the files", async () => {
+		let written: string[] = [];
+		const gh = spyOn(proc, "runChecked").mockImplementation(async argv => {
+			written = argv.filter((_, index) => argv[index - 1] === "--attach").map(arg => readFileSync(arg.slice(0, arg.indexOf("#")), "utf8"));
+			return "";
+		});
+
+		await attachToPullRequest(attachment);
+
+		const argv = gh.mock.calls[0]![0];
+		const dir = dirname(argv[7]!);
+		expect(argv).toEqual(["gh", "pr", "edit", "7", "-R", "acme/app", "--attach", `${dir}/1-page.png#The sidebar #2`, "--attach", `${dir}/2-shot_1.jpg#`, "--attach", `${dir}/3-.._diagram.png.svg#Flow`]);
+		expect(written).toEqual(["png", "jpg", "<svg/>"]);
+		expect(existsSync(dir)).toBe(false);
+	});
+
+	test("removes the temporary files when gh fails, and throws its error", async () => {
+		const gh = spyOn(proc, "runChecked").mockRejectedValue(new Error("HTTP 422: upload failed"));
+
+		await expect(attachToPullRequest(attachment)).rejects.toThrow("HTTP 422: upload failed");
+
+		expect(existsSync(dirname(gh.mock.calls[0]![0][7]!))).toBe(false);
 	});
 });

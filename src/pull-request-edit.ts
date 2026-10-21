@@ -1,11 +1,18 @@
-/** A pull request's labels, review requests, state, review threads, and comments, changed from its details through `gh`, and the choices its pickers offer. */
+/** A pull request's labels, review requests, state, review threads, comments, and description images, changed from the dashboard through `gh`, and the choices its pickers offer. */
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { extname, join } from "node:path";
 import { createCache } from "./cache";
 import { dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
+import { runChecked } from "./proc";
 import { loadPullRequestDetail } from "./pull-requests";
 import { isObject, str } from "./json";
-import { type Person, type PullRequest, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
+import { type Person, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
+import { MEDIA_FILE_TYPES, mediaExtension } from "./shared/transcript";
 
 const OPTIONS_TTL_MS = 5 * 60_000;
+/** `gh` uploads each of up to 50 images of up to 10 MB before it edits the description, so it gets longer than one API call. */
+const ATTACH_TIMEOUT_MS = 180_000;
 
 const options = createCache<PullRequestOptions>(OPTIONS_TTL_MS);
 
@@ -91,4 +98,26 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 			break;
 	}
 	return loadPullRequestDetail(pr, true);
+}
+
+/**
+ * Appends `files` to the pull request's description with `gh pr edit --attach`, which uploads each and keeps the body
+ * as it was. `gh` reads an image's type from its file's extension, so each temporary file ends in its type's.
+ * @throws `gh`'s last error line; when some uploads failed, `gh` still added the others.
+ */
+export async function attachToPullRequest({ owner, repo, number, files }: PullRequestAttachment): Promise<void> {
+	const dir = await mkdtemp(join(tmpdir(), "omp-agents-attach-"));
+	try {
+		const args = await Promise.all(
+			files.map(async (file, index) => {
+				const name = `${index + 1}-${file.name.replace(/[^\w.-]/g, "_")}`;
+				const path = join(dir, MEDIA_FILE_TYPES[extname(name).slice(1).toLowerCase()] === file.type ? name : `${name}.${mediaExtension(file.type)}`);
+				await writeFile(path, Buffer.from(file.data, "base64"));
+				return ["--attach", `${path}#${file.alt}`];
+			}),
+		);
+		await runChecked(["gh", "pr", "edit", String(number), "-R", `${owner}/${repo}`, ...args.flat()], { timeoutMs: ATTACH_TIMEOUT_MS });
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
 }

@@ -24,6 +24,28 @@ export function parsePullRequest(owner: unknown, repo: unknown, number: unknown)
 	return typeof number === "number" && Number.isSafeInteger(number) && number >= 1 ? { ok: { owner, repo, number } } : null;
 }
 
+/** The most files one `gh pr edit --attach` command takes. */
+export const MAX_PULL_REQUEST_ATTACHMENTS = 50;
+
+/** The largest image `gh` uploads, in bytes. */
+export const MAX_PULL_REQUEST_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/** The image types `gh` uploads, which it reads from the file's extension. */
+export const PULL_REQUEST_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"] as const;
+
+/** One image for a pull request's description: its file name, type, bytes in base64, and the alt text it shows with. */
+export interface PullRequestImage {
+	name: string;
+	type: (typeof PULL_REQUEST_IMAGE_TYPES)[number];
+	data: string;
+	alt: string;
+}
+
+/** The body of `PUT /api/pull-request/attachment`: images that `gh pr edit --attach` appends to a pull request's description. */
+export interface PullRequestAttachment extends PullRequest {
+	files: PullRequestImage[];
+}
+
 /** A GitHub repository's key in maps and lookups: `owner/repo`, lowercased, since GitHub matches names in any case. */
 export const repoKey = ({ owner, repo }: Repo): string => `${owner}/${repo}`.toLowerCase();
 

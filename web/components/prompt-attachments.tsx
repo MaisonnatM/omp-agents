@@ -28,7 +28,7 @@ export interface PromptAttachments {
 }
 
 /** `file`'s bytes in base64, as the server's JSON bodies carry a file. */
-export function fileBase64(file: File): Promise<string> {
+export function fileBase64(file: Blob): Promise<string> {
 	const { promise, resolve, reject } = Promise.withResolvers<string>();
 	const reader = new FileReader();
 	reader.onload = () => {

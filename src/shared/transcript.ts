@@ -33,6 +33,12 @@ export const MEDIA_FILE_EXTENSIONS: readonly string[] = Object.keys(MEDIA_FILE_T
 /** Whether a media file, by its extension, plays as a video rather than showing as an image. */
 export const isVideoExtension = (extension: string): boolean => MEDIA_FILE_TYPES[extension.toLowerCase()]?.startsWith("video/") ?? false;
 
+/** The extension a file of MIME type `type` takes, the first that {@link MEDIA_FILE_TYPES} gives it; `null` for a type it lacks. */
+export const mediaExtension = (type: string): string | null => MEDIA_FILE_EXTENSIONS.find(extension => MEDIA_FILE_TYPES[extension] === type) ?? null;
+
+/** The address of the image or video at absolute or `~/` path `path`, `GET /api/media`. */
+export const mediaUrl = (path: string): string => `/api/media?${new URLSearchParams({ path })}`;
+
 /** How a prompt the dashboard sends in the user's place starts; the agent reads it, the user never sees it as theirs. */
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
 
@@ -132,10 +138,12 @@ export function fileStatus(changes: ChangedFile["changes"]): FileStatus {
 	return changes[0].kind === "created" ? "created" : "edited";
 }
 
-/** One image an agent's tool returned, such as a browser screenshot or a `read` of an image file. */
+/** One image an agent's tool returned, such as a browser screenshot or a `read` of an image file, or an image file the session wrote and a tool call named. */
 export interface AgentMedia {
-	/** `/api/image?hash=…&type=…`, or a `data:` URL for an image omp kept in the session file. */
+	/** `/api/image?hash=…&type=…`, a `data:` URL for an image omp kept in the session file, or {@link mediaUrl} of a written file. */
 	src: string;
+	/** The image file on this computer, absolute: one a tool call or its result named and the session wrote, or the file a `read` returned; `null` for an image only the tool returned, such as a browser screenshot. */
+	path: string | null;
 	/** The agent whose transcript holds it, by subagent id; `null` for a session's main agent. */
 	agentId: string | null;
 	tool: string;

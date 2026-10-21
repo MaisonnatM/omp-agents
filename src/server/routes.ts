@@ -23,7 +23,7 @@ import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
 import { readStats, windowOf } from "../omp/stats";
 import { directoryOf } from "../paths";
-import { loadPullRequestOptions, savePullRequest } from "../pull-request-edit";
+import { attachToPullRequest, loadPullRequestOptions, savePullRequest } from "../pull-request-edit";
 import { listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
@@ -33,7 +33,7 @@ import { ClientConfigError } from "../mcp-clients";
 import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
-import { parsePullRequest, type PullRequest, prKey, type Repo } from "../shared/github";
+import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, prKey, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview } from "../shared/review-drafts";
 import type { ProjectNotesAnswer } from "../shared/projects";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
@@ -55,7 +55,7 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
-import { MAX_QUEUED_STACK, parseBranchRelease, parseRunRequest, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
+import { MAX_QUEUED_STACK, parseBranchRelease, parseRunRequest, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
@@ -663,6 +663,19 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 		savePullRequest,
 	);
 
+	/** `PUT /api/pull-request/attachment`: `PullRequestAttachment`, whose images `gh pr edit --attach` appends to that pull request's description; answers `{}`. */
+	const pullRequestAttach = write(
+		body =>
+			checked(
+				parsePullRequestAttachment(body),
+				`Expected { owner, repo, number, files } with 1 to ${MAX_PULL_REQUEST_ATTACHMENTS} PNG, JPEG, GIF, WebP, or SVG images, each with a name, alt text, and at most ${MAX_PULL_REQUEST_IMAGE_BYTES / 1024 / 1024} MB in base64`,
+			),
+		async attachment => {
+			await attachToPullRequest(attachment);
+			return {};
+		},
+	);
+
 	/** `GET /api/pull-request/options?owner=<o>&repo=<r>`: the labels and reviewers that repository's pull requests can take. */
 	const pullRequestOptions = get(params => {
 		const repo = checked(parseRepoQuery(params), "Expected ?owner=&repo=");
@@ -699,6 +712,7 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
+		"/api/pull-request/attachment": { PUT: pullRequestAttach },
 		"/api/merge-queue": { PUT: mergeQueue },
 		"/api/review-draft/preview": { GET: reviewDraftPreview },
 		"/api/review-draft/post": { PUT: reviewDraftPost },

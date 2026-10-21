@@ -188,12 +188,20 @@ An action that fails shows its error, and its control becomes available again.
   Opening another session clears the search.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
+  It also shows the image files the session wrote that a tool call or its result named, such as the `page.png` a script saved; a named file counts as written when it changed after the session started, so paths in source code and older files stay out.
+  Each file shows once, at the first time a tool named or returned it.
   On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
   Images you attached to your own prompts are left out, since the transcript shows them.
-  Each thumbnail names the agent whose tool returned it and how long ago.
-  Click one to see it large, with the tool and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
+  Each thumbnail names the agent whose tool returned it and how long ago; its tooltip adds the file's path for an image on this computer.
+  Click one to see it large, with the tool, its file's name, and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
   **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
   New images show up while the agents run.
+  Hover or focus a thumbnail to show its checkbox; once one image is selected, every checkbox shows and a click on a thumbnail selects it instead of opening it.
+  The bar above the images counts the selection and sends it, in the order you selected it.
+  **Add to PR description** lists the session's pull requests by number and title, and appends the images to the one you pick with `gh pr edit --attach`; it takes PNG, JPEG, GIF, WebP, and SVG images of up to 10 MB, 50 at a time.
+  An image with a file on this computer goes as that file, under its name and with its name as alt text; any other goes as shown, with the call's summary as alt text.
+  **Attach to Linear issue** lists the session's issues, and attaches each image to the one you pick, as the new-issue dialog attaches files; the images Linear refused stay selected.
+  Either button is disabled, with a tooltip saying why, when the session has no pull request or no issue; **Clear** empties the selection.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   The first one shows until you pick another: click another pull request of its **Stack**, or of **Other pull requests of the session** under it, to show it in place.
   **Other pull requests of the session** lists the session's pull requests that the stack does not show, each with whether the session submitted or worked on it.

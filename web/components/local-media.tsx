@@ -1,7 +1,8 @@
 /** The images and videos on this computer that agent text names, shown in the message and opened large in the file dialog. */
 import { Play } from "lucide-react";
 import { useContext, useState } from "react";
-import { absoluteFilePath, linkedFile, mediaUrl } from "../file-paths";
+import { mediaUrl } from "../../src/shared/transcript";
+import { absoluteFilePath, linkedFile } from "../file-paths";
 import { DashboardActionsContext } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 

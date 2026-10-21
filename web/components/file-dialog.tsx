@@ -1,9 +1,9 @@
 import { Check, Copy } from "lucide-react";
 import { useMemo, useState } from "react";
-import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
+import { MAX_TEXT_FILE_BYTES, mediaUrl, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { linkedFile, mediaUrl } from "../file-paths";
+import { linkedFile } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";

@@ -1,22 +1,53 @@
-import { Images, MessageSquare } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, GitPullRequest, Images, type LucideIcon, MessageSquare, Paperclip } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import { type LinkedPullRequest, type PullRequestDetail, pullRequestName } from "../../src/shared/github";
 import type { View } from "../../src/shared/sessions";
-import type { AgentMedia } from "../../src/shared/transcript";
+import { type AgentMedia, mediaExtension, mediaUrl } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { SidebarGroup } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
+import { errorText, putJson } from "../api";
 import { age } from "../labels";
+import { useRead } from "../reads";
+import { useAction } from "../use-action";
 import { useDashboardActions } from "./dashboard-context";
 import { DetailsEmpty } from "./details-sidebar-frame";
 import { ImageViewer } from "./media-viewer";
+import { fileBase64 } from "./prompt-attachments";
+import { toasts } from "./toaster";
 
 const agentName = (media: AgentMedia): string => media.agentId ?? "Main agent";
 
-/** Who took the image, with which tool, and what the call said it did. */
-const captionOf = (media: AgentMedia): string => [agentName(media), media.tool, media.summary].filter(Boolean).join(" · ");
+const fileName = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
+
+/** Who took the image, with which tool, its file's name, and what the call said it did. */
+const captionOf = (media: AgentMedia): string =>
+	[agentName(media), media.tool, media.path && fileName(media.path), media.summary !== media.path && media.summary].filter(Boolean).join(" · ");
 
 /** Names one image across updates: a new one arrives at the top, so its place in the list does not name it. */
 const mediaKey = (media: AgentMedia): string => `${media.agentId}:${media.at}:${media.src}`;
+
+const images = (count: number): string => (count === 1 ? "1 image" : `${count} images`);
+
+/** Its file's bytes when it has one that still loads, since a `read` returns a re-encoded copy; else the image as shown. */
+async function imageBlob(media: AgentMedia): Promise<Blob> {
+	if (media.path && media.src !== mediaUrl(media.path)) {
+		const original = await fetch(mediaUrl(media.path)).catch(() => null);
+		if (original?.ok) return original.blob();
+	}
+	const response = await fetch(media.src);
+	if (!response.ok) throw new Error(`The image did not load (HTTP ${response.status})`);
+	return response.blob();
+}
+
+/** One image as a file to send: its bytes, its file's name or else one from its place in the batch and its type, and its alt text. */
+async function imageFile(media: AgentMedia, place: number): Promise<{ name: string; type: string; data: string; alt: string }> {
+	const blob = await imageBlob(media);
+	const extension = mediaExtension(blob.type);
+	const name = media.path ? fileName(media.path) : extension ? `image-${place}.${extension}` : `image-${place}`;
+	return { name, type: blob.type, data: await fileBase64(blob), alt: media.path ? name : media.summary || name };
+}
 
 /** One image large, with what took it, the images before and after it, and a way to the agent's conversation. */
 function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; index: number; view: View; onShow: (key: string | null) => void }) {
@@ -53,34 +84,179 @@ function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; inde
 	);
 }
 
-/** The images the view's agent and its subagents' tools returned, newest first, as thumbnails that open large. */
-export function MediaTab({ media, view }: { media: AgentMedia[] | null; view: View }) {
-	const [selected, setSelected] = useState<string | null>(null);
+/** A pull request in the menu, by number and the title GitHub gives it once read. */
+function PullRequestItem({ pr, onPick }: { pr: LinkedPullRequest; onPick: () => void }) {
+	const title = useRead<Pick<PullRequestDetail, "title">>(`/api/pull-request/title?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
+	return (
+		<MenuItem onClick={onPick} title={pullRequestName(pr)}>
+			<GitPullRequest />
+			<span className="min-w-0 flex-1 truncate">
+				#{pr.number} {title.data?.title}
+			</span>
+		</MenuItem>
+	);
+}
+
+interface MediaActionsProps {
+	/** The selected images, in the order they were selected. */
+	picked: AgentMedia[];
+	pullRequests: LinkedPullRequest[];
+	tickets: string[];
+	/** The images to keep selected after a send: none when every one went, else the ones that did not. */
+	onSent: (left: AgentMedia[]) => void;
+	onClear: () => void;
+}
+
+interface TargetMenuProps {
+	label: string;
+	icon: LucideIcon;
+	/** Why the menu has nothing to offer, shown on its disabled button; `null` when it has targets. */
+	none: string | null;
+	loading: boolean;
+	disabled: boolean;
+	children: ReactNode;
+}
+
+/** A button that opens a menu of targets, or a disabled one that says why there are none. */
+function TargetMenu({ label, icon, none, loading, disabled, children }: TargetMenuProps) {
+	if (none !== null) {
+		return (
+			<Tooltip content={none} disabled>
+				<Button variant="secondary" size="compact" leadingIcon={icon} disabled>
+					{label}
+				</Button>
+			</Tooltip>
+		);
+	}
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={icon} trailingIcon={ChevronDown} loading={loading} disabled={disabled} />}>{label}</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">{children}</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/** What the selected images can go to: a pull request's description, through `gh pr edit --attach`, or a Linear issue's attachments. */
+function MediaActions({ picked, pullRequests, tickets, onSent, onClear }: MediaActionsProps) {
+	const toPullRequest = useAction(async (pr: LinkedPullRequest) => {
+		const files = await Promise.all(picked.map((media, index) => imageFile(media, index + 1)));
+		await putJson<object>("/api/pull-request/attachment", { owner: pr.owner, repo: pr.repo, number: pr.number, files });
+		toasts.add({ title: `Added ${images(picked.length)} to ${pullRequestName(pr)}` });
+		onSent([]);
+	}, "Could not add the images to the pull request");
+	const toTicket = useAction(async (issue: string) => {
+		const refused: { media: AgentMedia; reason: string }[] = [];
+		for (const [index, media] of picked.entries()) {
+			try {
+				const { name, type, data } = await imageFile(media, index + 1);
+				await putJson<object>("/api/ticket/attachment", { issue, name, type: type || "application/octet-stream", data });
+			} catch (err) {
+				refused.push({ media, reason: `${media.path ? fileName(media.path) : `image ${index + 1}`} (${errorText(err)})` });
+			}
+		}
+		const reasons = refused.map(({ reason }) => reason).join(", ");
+		if (refused.length === picked.length) throw new Error(reasons);
+		onSent(refused.map(({ media }) => media));
+		const sent = picked.length - refused.length;
+		toasts.add(
+			refused.length === 0
+				? { title: `Attached ${images(sent)} to ${issue}` }
+				: { title: `Attached ${sent} of ${images(picked.length)} to ${issue}`, description: `Linear did not take ${reasons}. Those stay selected.` },
+		);
+	}, "Could not attach the images to the Linear issue");
+	const pending = toPullRequest.pending || toTicket.pending;
+	return (
+		<div className="sticky top-0 z-20 -mx-2 -mt-2 flex flex-wrap items-center gap-1 bg-background px-4 pt-2 pb-1">
+			<span className="mr-auto text-xs text-muted-foreground tabular-nums" aria-live="polite">
+				{picked.length} selected
+			</span>
+			<TargetMenu label="Add to PR description" icon={GitPullRequest} none={pullRequests.length === 0 ? "This session has no pull request yet" : null} loading={toPullRequest.pending} disabled={pending}>
+				{pullRequests.map(pr => (
+					<PullRequestItem key={pullRequestName(pr)} pr={pr} onPick={() => toPullRequest.run(pr)} />
+				))}
+			</TargetMenu>
+			<TargetMenu label="Attach to Linear issue" icon={Paperclip} none={tickets.length === 0 ? "This session has no Linear issue yet" : null} loading={toTicket.pending} disabled={pending}>
+				{tickets.map(issue => (
+					<MenuItem key={issue} onClick={() => toTicket.run(issue)}>
+						{issue}
+					</MenuItem>
+				))}
+			</TargetMenu>
+			<Button variant="ghost" size="compact" disabled={pending} onClick={onClear}>
+				Clear
+			</Button>
+		</div>
+	);
+}
+
+interface MediaTabProps {
+	media: AgentMedia[] | null;
+	view: View;
+	/** What the session and its subagents submitted or worked on, the session's own first. */
+	pullRequests: LinkedPullRequest[];
+	/** The Linear issues the session and its subagents worked on, by identifier, the session's own first. */
+	tickets: string[];
+}
+
+/**
+ * The images the view's agent and its subagents' tools returned or wrote, newest first, as thumbnails that open large.
+ * Selected ones go to one of the session's pull requests' descriptions or to one of its Linear issues; while any is
+ * selected, a click selects instead of opening.
+ */
+export function MediaTab({ media, view, pullRequests, tickets }: MediaTabProps) {
+	const [shown, setShown] = useState<string | null>(null);
+	const [selected, setSelected] = useState<string[]>([]);
 	if (!media) return null;
-	if (media.length === 0) return <DetailsEmpty icon={Images} title="No images yet" description="Screenshots and images the agent's tools return show here." />;
-	const index = selected === null ? -1 : media.findIndex(item => mediaKey(item) === selected);
+	if (media.length === 0) return <DetailsEmpty icon={Images} title="No images yet" description="Screenshots and images the agent's tools return or write to files show here." />;
+	const index = shown === null ? -1 : media.findIndex(item => mediaKey(item) === shown);
+	const byKey = new Map(media.map(item => [mediaKey(item), item]));
+	const picked = selected.flatMap(key => byKey.get(key) ?? []);
+	const toggle = (key: string): void => setSelected(keys => (keys.includes(key) ? keys.filter(other => other !== key) : [...keys, key]));
 	return (
 		<SidebarGroup>
+			{picked.length > 0 && (
+				<MediaActions picked={picked} pullRequests={pullRequests} tickets={tickets} onSent={left => setSelected(left.map(mediaKey))} onClear={() => setSelected([])} />
+			)}
 			<ul className="grid grid-cols-2 gap-2 px-2 py-1" aria-label="Images, newest first">
-				{media.map(item => (
-					<li key={mediaKey(item)} className="min-w-0">
-						<Tooltip content={captionOf(item)} side="left">
-							<button
-								type="button"
-								onClick={() => setSelected(mediaKey(item))}
-								className="group flex w-full flex-col gap-1 rounded-md p-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+				{media.map(item => {
+					const key = mediaKey(item);
+					const checked = selected.includes(key);
+					return (
+						<li key={key} className="group relative min-w-0">
+							<Tooltip
+								content={
+									<>
+										{captionOf(item)}
+										{item.path && <span className="block font-mono break-all">{item.path}</span>}
+									</>
+								}
+								side="left"
 							>
-								<img src={item.src} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="aspect-video w-full rounded-sm border border-border bg-muted object-cover object-top" />
-								<span className="flex min-w-0 items-baseline gap-1 text-xs">
-									<span className="min-w-0 flex-1 truncate text-foreground">{agentName(item)}</span>
-									<span className="shrink-0 tabular-nums text-muted-foreground">{age(item.at)}</span>
-								</span>
-							</button>
-						</Tooltip>
-					</li>
-				))}
+								<button
+									type="button"
+									onClick={() => (picked.length > 0 ? toggle(key) : setShown(key))}
+									aria-pressed={picked.length > 0 ? checked : undefined}
+									className="flex w-full flex-col gap-1 rounded-md p-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-accent"
+								>
+									<img src={item.src} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="aspect-video w-full rounded-sm border border-border bg-muted object-cover object-top" />
+									<span className="flex min-w-0 items-baseline gap-1 text-xs">
+										<span className="min-w-0 flex-1 truncate text-foreground">{agentName(item)}</span>
+										<span className="shrink-0 tabular-nums text-muted-foreground">{age(item.at)}</span>
+									</span>
+								</button>
+							</Tooltip>
+							<input
+								type="checkbox"
+								checked={checked}
+								onChange={() => toggle(key)}
+								aria-label={`Select ${captionOf(item)}`}
+								className={`absolute top-2.5 left-2.5 size-4 accent-current group-focus-within:opacity-100 group-hover:opacity-100 ${picked.length > 0 ? "opacity-100" : "opacity-0"}`}
+							/>
+						</li>
+					);
+				})}
 			</ul>
-			{index >= 0 && <MediaViewer media={media} index={index} view={view} onShow={setSelected} />}
+			{index >= 0 && <MediaViewer media={media} index={index} view={view} onShow={setShown} />}
 		</SidebarGroup>
 	);
 }

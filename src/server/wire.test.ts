@@ -6,8 +6,9 @@ import type { RoutineSpec, Schedule } from "../routines";
 import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } from "../shared/discussions";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
+import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES } from "../shared/github";
 import { MAX_RUN_SERVICES } from "../shared/run-locally";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseReviewDraftEdit, parseRunRequest, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseReviewDraftEdit, parseRunRequest, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -706,6 +707,36 @@ describe("parseTicketAttachment", () => {
 		expect(parseTicketAttachment({ ...file, type: "" })).toBeNull();
 		expect(parseTicketAttachment({ ...file, data: "not base64!" })).toBeNull();
 		expect(parseTicketAttachment({ ...file, data: "A".repeat((MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 + 4) })).toBeNull();
+	});
+});
+
+describe("parsePullRequestAttachment", () => {
+	const image = { name: "page.png", type: "image/png" as const, data: "aGVsbG8=", alt: "The sidebar #2" };
+	const body = { owner: "acme", repo: "app", number: 7, files: [image] };
+
+	test("takes a pull request and up to the attachment limit of images in base64, each with alt text, empty alt included", () => {
+		expect(parsePullRequestAttachment(body)?.ok).toEqual(body);
+		const most = { ...body, files: Array.from({ length: MAX_PULL_REQUEST_ATTACHMENTS }, () => ({ ...image, alt: "" })) };
+		expect(parsePullRequestAttachment(most)?.ok).toEqual(most);
+	});
+
+	test("rejects no images or more than the limit, a bad pull request, and a file gh does not upload", () => {
+		expect(parsePullRequestAttachment({ ...body, files: [] })).toBeNull();
+		expect(parsePullRequestAttachment({ ...body, files: Array.from({ length: MAX_PULL_REQUEST_ATTACHMENTS + 1 }, () => image) })).toBeNull();
+		expect(parsePullRequestAttachment({ ...body, owner: "ac me" })).toBeNull();
+		expect(parsePullRequestAttachment({ ...body, repo: "" })).toBeNull();
+		expect(parsePullRequestAttachment({ ...body, number: 0 })).toBeNull();
+		for (const file of [
+			{ ...image, name: "" },
+			{ ...image, type: "image/avif" },
+			{ ...image, type: "application/pdf" },
+			{ ...image, data: "" },
+			{ ...image, data: "not base64!" },
+			{ ...image, data: "A".repeat(Math.ceil(MAX_PULL_REQUEST_IMAGE_BYTES / 3) * 4 + 4) },
+			{ ...image, alt: undefined },
+		]) {
+			expect(parsePullRequestAttachment({ ...body, files: [file] })).toBeNull();
+		}
 	});
 });
 

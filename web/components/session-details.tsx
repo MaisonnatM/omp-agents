@@ -45,7 +45,7 @@ export function SessionDetails({ view, working, sessionId, cwd, pullRequests, ti
 			cwd={cwd}
 			tabs={[
 				{ value: "files", icon: FileDiff, name: "Files", count: files?.length ?? 0, pinned: true, content: <FilesTab files={files} sessionId={sessionId} cwd={cwd} working={working} /> },
-				{ value: "media", icon: Images, name: "Media", count: media?.length ?? 0, content: <MediaTab media={media} view={view} /> },
+				{ value: "media", icon: Images, name: "Media", count: media?.length ?? 0, content: <MediaTab media={media} view={view} pullRequests={pullRequests} tickets={tickets} /> },
 				{
 					value: "pull-requests",
 					icon: GitPullRequest,

@@ -34,7 +34,21 @@ import { parseImages, parseModel, parseNewSessionRequest, parseThinking } from "
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import { MAX_RUN_SERVICES, type RunRequest } from "../shared/run-locally";
-import { GITHUB_NAME, MAX_COMMENT_BODY, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
+import {
+	GITHUB_NAME,
+	MAX_COMMENT_BODY,
+	MAX_PULL_REQUEST_ATTACHMENTS,
+	MAX_PULL_REQUEST_IMAGE_BYTES,
+	PULL_REQUEST_IMAGE_TYPES,
+	parsePullRequest,
+	type PullRequest,
+	type PullRequestAttachment,
+	type PullRequestChange,
+	type PullRequestEdit,
+	type PullRequestImage,
+	type Repo,
+	SETTABLE_STATES,
+} from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "../shared/projects";
@@ -735,21 +749,40 @@ export function parseTicketEdit(body: unknown): Parsed<TicketEdit> {
 	return fields && Object.keys(fields.ok).length > 0 ? { ok: { id: body.id, ...fields.ok } } : null;
 }
 
+/** Whether `data` is a file's bytes in standard base64, the empty file too, of at most `maxBytes`. */
+const isBase64File = (data: unknown, maxBytes: number): data is string => typeof data === "string" && data.length <= Math.ceil(maxBytes / 3) * 4 && (data === "" || BASE64.test(data));
+
 /** The body of `PUT /api/ticket/attachment`: an issue identifier, a file name and MIME type, and its bytes in base64 within the size limit. */
 export function parseTicketAttachment(body: unknown): Parsed<TicketAttachmentUpload> {
 	if (!isObject(body)) return null;
 	const { issue, name, type, data } = body;
-	if (typeof issue !== "string" || !TICKET_ID.test(issue) || !isNonEmpty(name) || !isNonEmpty(type) || typeof data !== "string") return null;
-	if (data.length > Math.ceil(MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 || (data !== "" && !BASE64.test(data))) return null;
+	if (typeof issue !== "string" || !TICKET_ID.test(issue) || !isNonEmpty(name) || !isNonEmpty(type) || !isBase64File(data, MAX_TICKET_ATTACHMENT_BYTES)) return null;
 	return { ok: { issue, name, type, data } };
+}
+
+const isPullRequestImageType = oneOf(PULL_REQUEST_IMAGE_TYPES);
+
+function parsePullRequestImage(file: unknown): PullRequestImage | null {
+	if (!isObject(file)) return null;
+	const { name, type, data, alt } = file;
+	if (!isNonEmpty(name) || !isPullRequestImageType(type) || !isBase64File(data, MAX_PULL_REQUEST_IMAGE_BYTES) || data === "" || typeof alt !== "string") return null;
+	return { name, type, data, alt };
+}
+
+/** The body of `PUT /api/pull-request/attachment`: a pull request, and 1 to 50 images, each with a name, a type `gh` uploads, its bytes in base64 within GitHub's limit, and alt text. `gh` refuses an empty file. */
+export function parsePullRequestAttachment(body: unknown): Parsed<PullRequestAttachment> {
+	if (!isObject(body)) return null;
+	const pr = parsePullRequest(body.owner, body.repo, body.number);
+	const files = parseAll(body.files, parsePullRequestImage);
+	if (!pr || !files || files.length === 0 || files.length > MAX_PULL_REQUEST_ATTACHMENTS) return null;
+	return { ok: { ...pr.ok, files } };
 }
 
 /** The body of `PUT /api/attachment/document`: a file name, and the file's bytes in base64 within the size limit. */
 export function parsePromptDocument(body: unknown): Parsed<PromptDocument> {
 	if (!isObject(body)) return null;
 	const { name, data } = body;
-	if (!isNonEmpty(name) || typeof data !== "string" || data.length > Math.ceil(MAX_PROMPT_DOCUMENT_BYTES / 3) * 4) return null;
-	return data === "" || BASE64.test(data) ? { ok: { name, data } } : null;
+	return isNonEmpty(name) && isBase64File(data, MAX_PROMPT_DOCUMENT_BYTES) ? { ok: { name, data } } : null;
 }
 
 export const SHA256 = /^[0-9a-f]{64}$/;

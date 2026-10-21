@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { MediaTree } from "./media";
@@ -24,6 +24,11 @@ const result = (id: string, toolName: string, hash: string, at: string) =>
 		message: { role: "toolResult", toolCallId: id, toolName, isError: false, content: [{ type: "text", text: "done" }, { type: "image", data: `blob:sha256:${hash}`, mimeType: "image/webp" }] },
 	});
 const src = (hash: string): string => `/api/image?hash=${hash}&type=image%2Fwebp`;
+const textResult = (id: string, toolName: string, text: string, at: string) =>
+	line({ type: "message", timestamp: at, message: { role: "toolResult", toolCallId: id, toolName, isError: false, content: [{ type: "text", text }] } });
+/** The session file's header: the session started a minute ago in `cwd`. */
+const header = (cwd: string) => line({ type: "session", version: 3, id: "s1", timestamp: new Date(Date.now() - 60_000).toISOString(), cwd });
+const fileSrc = (path: string): string => `/api/media?path=${encodeURIComponent(path)}`;
 
 /** A session file and its artifacts directory, where omp writes its subagents' transcripts. */
 function session(): { path: string; artifacts: string } {
@@ -65,9 +70,9 @@ describe("MediaTree", () => {
 
 		expect(reset).toBe(true);
 		expect(media).toEqual([
-			{ src: src(HASH_B), agentId: "Smoke", tool: "eval", summary: "Screenshotting the sidebar", at: Date.parse("2026-10-05T10:05:00Z") },
-			{ src: src(HASH_C), agentId: "Nested", tool: "eval", summary: "", at: Date.parse("2026-10-05T10:02:00Z") },
-			{ src: src(HASH_A), agentId: null, tool: "read", summary: "/tmp/shot.png", at: Date.parse("2026-10-05T10:00:00Z") },
+			{ src: src(HASH_B), path: null, agentId: "Smoke", tool: "eval", summary: "Screenshotting the sidebar", at: Date.parse("2026-10-05T10:05:00Z") },
+			{ src: src(HASH_C), path: null, agentId: "Nested", tool: "eval", summary: "", at: Date.parse("2026-10-05T10:02:00Z") },
+			{ src: src(HASH_A), path: "/tmp/shot.png", agentId: null, tool: "read", summary: "/tmp/shot.png", at: Date.parse("2026-10-05T10:00:00Z") },
 		]);
 	});
 
@@ -115,5 +120,58 @@ describe("MediaTree", () => {
 		expect(tree.covers(join(dir, "2026-10-05_s2.jsonl"))).toBe(false);
 		expect(tree.covers(join(dir, ".2026-10-05_s2.jsonl.lock"))).toBe(false);
 		expect(tree.covers(join(dir, "2026-10-05_s2", "Other.jsonl"))).toBe(false);
+	});
+
+	test("lists an image file the session wrote that a tool result names, once, at its path through /api/media", async () => {
+		const { path } = session();
+		const dir = dirname(path);
+		const shot = join(dir, "x.png");
+		writeFileSync(shot, "png");
+		writeFileSync(path, header(dir) + call("c1", "bash", { command: "bun run shoot" }, "Shooting the page") + textResult("c1", "bash", `Saved ${shot}\nOpen ${shot}.`, "2026-10-05T10:00:00Z"));
+
+		const { media } = await treeOf(path).read();
+
+		expect(media).toEqual([{ src: fileSrc(shot), path: shot, agentId: null, tool: "bash", summary: "Shooting the page", at: Date.parse("2026-10-05T10:00:00Z") }]);
+	});
+
+	test("resolves a relative path in a call's arguments against the call's own cwd, itself against the session's", async () => {
+		const { path } = session();
+		const dir = dirname(path);
+		mkdirSync(join(dir, "app", "shots"), { recursive: true });
+		writeFileSync(join(dir, "app", "shots", "y.png"), "png");
+		writeFileSync(path, header(dir) + call("c1", "bash", { command: "bun run shoot --out shots/y.png", cwd: "app" }) + textResult("c1", "bash", "done", "2026-10-05T10:00:00Z"));
+
+		const { media } = await treeOf(path).read();
+
+		expect(media.map(item => item.path)).toEqual([join(dir, "app", "shots", "y.png")]);
+	});
+
+	test("leaves out a named file modified before the session started and a named file that does not exist", async () => {
+		const { path } = session();
+		const dir = dirname(path);
+		writeFileSync(join(dir, "fresh.png"), "png");
+		writeFileSync(join(dir, "old.png"), "png");
+		utimesSync(join(dir, "old.png"), new Date("2020-01-01T00:00:00Z"), new Date("2020-01-01T00:00:00Z"));
+		writeFileSync(path, header(dir) + call("c1", "bash", { command: "ls" }) + textResult("c1", "bash", "old.png\nfresh.png\ngone.png", "2026-10-05T10:00:00Z"));
+
+		const { media } = await treeOf(path).read();
+
+		expect(media.map(item => item.path)).toEqual([join(dir, "fresh.png")]);
+	});
+
+	test("a later read of a listed file adds no second entry, while another tool's image still arrives", async () => {
+		const { path } = session();
+		const dir = dirname(path);
+		const shot = join(dir, "x.png");
+		writeFileSync(shot, "png");
+		writeFileSync(path, header(dir) + call("c1", "bash", { command: "bun run shoot" }) + textResult("c1", "bash", `Saved ${shot}`, "2026-10-05T10:00:00Z"));
+		const { tree, read } = treeOf(path);
+		expect((await read()).media.map(item => item.src)).toEqual([fileSrc(shot)]);
+
+		appendFileSync(path, call("c2", "read", { path: shot }) + result("c2", "read", HASH_A, "2026-10-05T10:01:00Z") + call("c3", "eval", {}) + result("c3", "eval", HASH_B, "2026-10-05T10:02:00Z"));
+		const appended = await read();
+
+		expect([appended.reset, appended.media.map(item => item.src)]).toEqual([false, [src(HASH_B)]]);
+		expect(tree.media.map(item => item.src)).toEqual([src(HASH_B), fileSrc(shot)]);
 	});
 });

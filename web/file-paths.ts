@@ -27,9 +27,6 @@ export function linkedFile(href: string): { path: string; kind: FileKind } | nul
 	return { path, kind: TEXT_FILE_EXTENSIONS.includes(extension) ? "text" : isVideoExtension(extension) ? "video" : "image" };
 }
 
-/** The address of the image or video at absolute or `~/` path `path`. */
-export const mediaUrl = (path: string): string => `/api/media?${new URLSearchParams({ path })}`;
-
 /** Whether `path` is absolute or `~/`, as the transcript writes a path outside the session's directory. */
 export function isAbsolutePath(path: string): boolean {
 	return path.startsWith("/") || path.startsWith("~/");
