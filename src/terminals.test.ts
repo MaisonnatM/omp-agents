@@ -73,7 +73,7 @@ describe("Terminals", () => {
 
 		const later = watch(terminal);
 		expect(later.text()).toBe(first.text());
-		expect(terminals.list()).toEqual([{ id: terminal.id, cwd: dir, cwdDisplay: dir }]);
+		expect(terminals.list()).toEqual([{ id: terminal.id, cwd: dir, cwdDisplay: dir, title: null }]);
 		later.detach();
 		terminals.dispose();
 	});

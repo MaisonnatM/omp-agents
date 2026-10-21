@@ -5,6 +5,8 @@ export interface TerminalInfo {
 	cwd: string;
 	/** `cwd` with the home directory shortened to `~`, as the tab names it. */
 	cwdDisplay: string;
+	/** What the tab says in place of the directory's name, such as the service **Run locally** started; `null` for a shell you opened. */
+	title: string | null;
 }
 
 /**

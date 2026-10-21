@@ -24,6 +24,7 @@ import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
 import { MergePopover, useMergeTarget } from "./merge-popover";
 import { PullRequestMenu } from "./pr-menu";
+import { RunLocallyButton } from "../run-locally";
 
 /** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
 function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
@@ -454,6 +455,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
+					<RunLocallyButton cwd={actions.cwd} branch={pr.head} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
 					<span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
@@ -510,6 +512,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<BranchName name={pr.head} iconOnly onCopy={() => releaseBranch(actions.cwd, pr.head)} className={cn("shrink-0", ON_ROW_HOVER)} />
+					<RunLocallyButton cwd={actions.cwd} branch={pr.head} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<ConversationCount pr={pr} />
 					{why && (
 						<>

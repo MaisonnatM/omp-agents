@@ -10,7 +10,7 @@ import { folderName } from "../../labels";
 import { useStoredState } from "../../stored-state";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { LOADING_TABS, readTerminalTabs, type TerminalTabs } from "./terminal-inventory";
-import { closeEndsShell, newTab, nextTabState, type Tab, type TabEvent, tabTerminal } from "./terminal-tab";
+import { closeEndsShell, newTab, nextTabState, restoredTab, type Tab, type TabEvent, tabTerminal } from "./terminal-tab";
 import { type TerminalHandle, TerminalView } from "./terminal-view";
 
 const OPEN_KEY = "omp-agents.terminal-open";
@@ -28,6 +28,11 @@ export interface TerminalPanelState {
 	toggle: () => void;
 	height: number;
 	setHeight: (height: number) => void;
+	/** Shells the server started, such as **Run locally**'s services, that the panel shows and adds a tab for. */
+	revealed: TerminalInfo[];
+	reveal: (terminals: TerminalInfo[]) => void;
+	/** The panel added their tabs. */
+	settleReveal: () => void;
 }
 
 export function useTerminalPanel(): TerminalPanelState {
@@ -37,7 +42,16 @@ export function useTerminalPanel(): TerminalPanelState {
 		return Number.isFinite(stored) && stored >= MIN_HEIGHT ? stored : DEFAULT_HEIGHT;
 	});
 	const toggle = useCallback(() => setOpen(shown => !shown), [setOpen]);
-	return { open, setOpen, toggle, height, setHeight };
+	const [revealed, setRevealed] = useState<TerminalInfo[]>([]);
+	const reveal = useCallback(
+		(terminals: TerminalInfo[]) => {
+			setRevealed(terminals);
+			setOpen(true);
+		},
+		[setOpen],
+	);
+	const settleReveal = useCallback(() => setRevealed([]), []);
+	return { open, setOpen, toggle, height, setHeight, revealed, reveal, settleReveal };
 }
 
 interface TerminalPanelProps {
@@ -53,7 +67,7 @@ interface TerminalPanelProps {
  * Closing a tab asks its shell to exit, a still-starting one's too, and keeps the tab mounted until its socket closes.
  */
 export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
-	const { open, setOpen, height, setHeight } = panel;
+	const { open, setOpen, height, setHeight, revealed, settleReveal } = panel;
 	const [inventory, setInventory] = useState<TerminalTabs>(LOADING_TABS);
 	const [active, setActive] = useState<string | null>(null);
 	const views = useRef(new Map<string, TerminalHandle>());
@@ -85,6 +99,15 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 			cancelled = true;
 		};
 	}, [open, inventory.state]);
+
+	// A panel still reading its shells lists the revealed ones too; a ready one adds a tab for each it lacks and shows the last.
+	useEffect(() => {
+		const last = revealed.at(-1);
+		if (inventory.state !== "ready" || !last) return;
+		setTabs(current => [...current, ...revealed.filter(terminal => !current.some(tab => tabTerminal(tab.state)?.id === terminal.id)).map(restoredTab)]);
+		setActive(last.id);
+		settleReveal();
+	}, [revealed, inventory.state, setTabs, settleReveal]);
 
 	// The last tab closing hides the panel, and the next open starts a fresh shell.
 	useEffect(() => {
@@ -134,8 +157,9 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 			<div className="flex h-8 shrink-0 items-center gap-1 px-2">
 				<div role="tablist" aria-label="Terminals" className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
 					{tabs.map(tab => {
-						const dir = tabTerminal(tab.state)?.cwdDisplay ?? ("cwd" in tab.target ? tab.target.cwd : "");
-						const name = folderName(dir) ?? dir;
+						const shell = tabTerminal(tab.state);
+						const dir = shell?.cwdDisplay ?? ("cwd" in tab.target ? tab.target.cwd : "");
+						const name = shell?.title ?? folderName(dir) ?? dir;
 						const selected = tab === shown;
 						const closing = tab.state.phase === "closing";
 						return (

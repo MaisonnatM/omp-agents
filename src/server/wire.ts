@@ -33,6 +33,7 @@ import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type Ma
 import { parseImages, parseModel, parseNewSessionRequest, parseThinking } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
+import { MAX_RUN_SERVICES, type RunRequest } from "../shared/run-locally";
 import { GITHUB_NAME, MAX_COMMENT_BODY, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
@@ -783,6 +784,17 @@ export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalReque
 /** The body of `PUT /api/worktree/release`: `{ cwd, branch }`, an absolute directory in the repository and the branch whose linked worktree goes. */
 export const parseBranchRelease = (body: unknown): Parsed<{ cwd: string; branch: string }> =>
 	isObject(body) && isNonEmpty(body.cwd) && body.cwd.startsWith("/") && isNonEmpty(body.branch) ? { ok: { cwd: body.cwd, branch: body.branch } } : null;
+
+/** The body of `PUT /api/run-locally`: an absolute directory in the repository, the branch, and the run profile, its commands one line each. */
+export function parseRunRequest(body: unknown): Parsed<RunRequest> {
+	if (!isObject(body) || !isNonEmpty(body.cwd) || !body.cwd.startsWith("/") || !isNonEmpty(body.branch) || !isObject(body.profile)) return null;
+	const { install, services } = body.profile;
+	const oneLine = (command: string): boolean => !command.includes("\n");
+	if (typeof install !== "string" || !oneLine(install) || !isTexts(services) || services.length > MAX_RUN_SERVICES) return null;
+	const commands = services.map(service => service.trim()).filter(service => service !== "");
+	if (!commands.every(oneLine)) return null;
+	return { ok: { cwd: body.cwd, branch: body.branch, profile: { install: install.trim(), services: commands } } };
+}
 
 const isWorkspaceOp = oneOf(["add", "hide", "show"] as const);
 

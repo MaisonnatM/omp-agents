@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { closeEndsShell, nextTabState, type TerminalTabState } from "./terminal-tab";
 
-const terminal: TerminalInfo = { id: "t1", cwd: "/work", cwdDisplay: "~/work" };
+const terminal: TerminalInfo = { id: "t1", cwd: "/work", cwdDisplay: "~/work", title: null };
 const starting: TerminalTabState = { phase: "starting" };
 const connected: TerminalTabState = { phase: "connected", terminal };
 

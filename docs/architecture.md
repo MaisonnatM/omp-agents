@@ -502,7 +502,7 @@ The panel's shells run on the server, in pseudo-terminals from Bun's `terminal` 
 At most `MAX_TERMINALS` (16) shells run at once; `Terminals.open` refuses another until one exits, so a page cannot fork shells without bound.
 Each shell keeps its last megabyte of output in `Scrollback`, which drops whole chunks from the front, and replays it to every socket that attaches, so a reloaded page shows what the shell printed.
 
-- `GET /api/terminals` answers the running shells as `TerminalInfo[]`, `{ id, cwd, cwdDisplay }`, from which a reloaded page reopens its tabs.
+- `GET /api/terminals` answers the running shells as `TerminalInfo[]`, `{ id, cwd, cwdDisplay, title }`, from which a reloaded page reopens its tabs; `title` names a service **Run locally** started, else `null`.
 - Each tab opens its own socket, `/ws/terminal?cwd=<dir>&cols=<n>&rows=<n>` for a new shell or `/ws/terminal?id=<id>` to attach to one; `terminalSocketPath` in `src/shared/terminals.ts` builds both.
   `parseTerminalQuery` in `src/server/wire.ts` checks the query, holding the size to 1–1000; `terminalFor` in `src/server/terminal-socket.ts` resolves `cwd` through `directoryOf` and answers 404 for one that is no directory, such as a removed worktree, 404 for an unknown `id`, and 429 past the cap, all before any shell starts.
   A reloaded page reattaches to its shells by `id`, which starts none.
@@ -1124,6 +1124,14 @@ Starts that create no worktree, such as a resume or a routine's session, stay pa
 `Worktrees.releaseBranch` lists the repository's worktrees, picks the linked one that has `branch` checked out, never the main, a bare, or a prunable registration, and removes it through `removeCheckout` without waiting for a session to leave.
 It answers a `BranchRelease` from `src/shared/git.ts`: `{ kind: "none" }` when no linked worktree has the branch, `{ kind: "removed", path }`, or `{ kind: "kept", path, why }` with the blockers' messages or Git's error.
 The page sends it when you copy a branch from a pull request row.
+
+`GET /api/run-profile?cwd=` answers the repository's `RunProfile` from `src/shared/run-locally.ts`, `{ install, services }`, read from its local git config by `readRunProfile` in `src/run-locally.ts`.
+`PUT /api/run-locally` takes a `RunRequest`, `{ cwd, branch, profile }`, checked by `parseRunRequest` in `src/server/wire.ts`: one-line commands, blank services dropped, at most `MAX_RUN_SERVICES` (8).
+`RunLocally.run` saves the profile, stops the repository's previous run, keyed by its git common directory, by hanging up on its shells and waiting up to 10 seconds for them to exit, then reads the main checkout before `Worktrees.releaseBranch`, since the release may remove the worktree `cwd` is in.
+A kept worktree runs the services where it is; otherwise the main checkout fetches the branch, checks it out, and fast-forwards it to its upstream.
+The install runs through `runShell` when `LOCKFILES` changed between the two commits or `node_modules` is missing, and each service starts in `Terminals.open` with its command as the shell's first line and as the terminal's `title`.
+It answers a `RunOutcome`, `{ dir, release, installed, terminals, stopped }`, whose `terminals` the page hands the terminal panel through the dashboard actions' `revealTerminals`.
+A main checkout with uncommitted tracked changes, a branch git cannot check out, no services, or too few free terminal slots answer 409 through `RunRefused`, before any service starts; a failed install answers 500 with the end of its output.
 
 `PUT /api/workspaces` takes a `WorkspaceChange`, `{ op, cwd }` with `op` one of `add`, `hide`, and `show`, checked by `parseWorkspaceChange` in `src/server/wire.ts`.
 `add` resolves `cwd` through `directoryOf` in `src/paths.ts`, which expands `~`, and answers 400 when it is not a directory; `hide` and `show` take an absolute path.

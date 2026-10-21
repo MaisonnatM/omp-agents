@@ -1,4 +1,5 @@
 /** The page's HTTP client. Whatever the server answers, a failure is an `ApiError` with a readable message. */
+import type { RunOutcome, RunRequest } from "../src/shared/run-locally";
 import type { BranchRelease } from "../src/shared/git";
 import type { SettingsError } from "../src/shared/models";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
@@ -66,4 +67,6 @@ export async function changeWorktrees(request: WorktreeRemovalRequest, signal?: 
 }
 
 /** Removes the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */
+export const runLocally = (request: RunRequest): Promise<RunOutcome> => putJson("/api/run-locally", request);
+
 export const releaseWorktree = (cwd: string, branch: string): Promise<BranchRelease> => putJson("/api/worktree/release", { cwd, branch });
