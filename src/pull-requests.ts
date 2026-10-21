@@ -351,6 +351,22 @@ export async function mergedPullRequests(cwd: string, branches: string[]): Promi
 	return parseMergedAnswer(await ghGraphql(mergedQuery(branches.length), vars), branches);
 }
 
+const BRANCH_QUERY = `query($owner: String!, $repo: String!, $branch: String!) { repository(owner: $owner, name: $repo) {
+	pullRequests(headRefName: $branch, states: [OPEN, MERGED], first: 1, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { number } }
+} }`;
+
+/** The pull request in `repo` from the answer to `BRANCH_QUERY`, or `null` when the branch heads none. */
+export function parseBranchAnswer(answer: unknown, repo: Repo): PullRequest | null {
+	const data = dataOf(answer);
+	const node = nodesOf(isObject(data.repository) ? data.repository.pullRequests : null)[0];
+	return isObject(node) && typeof node.number === "number" ? { owner: repo.owner, repo: repo.repo, number: node.number } : null;
+}
+
+/** The newest open or merged pull request whose head is `branch` in `repo`, read from GitHub directly rather than through its search, which indexes a new one seconds late. */
+export async function branchPullRequest(repo: Repo, branch: string): Promise<PullRequest | null> {
+	return parseBranchAnswer(await ghGraphql(BRANCH_QUERY, { owner: repo.owner, repo: repo.repo, branch }), repo);
+}
+
 /**
  * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.

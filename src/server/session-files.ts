@@ -3,6 +3,7 @@ import { headHistory, worktreeAt } from "../git";
 import { repoOf } from "../github";
 import type { SavedSession } from "../omp/sessions";
 import { displayPath } from "../paths";
+import { branchPullRequest } from "../pull-requests";
 import { SessionFactsIndex } from "../session-facts";
 import { formatOf, SESSION_FORMATS, type SessionFormat } from "../session-formats";
 import type { ConversationHit, PastSession, SessionFacts } from "../shared/sessions";
@@ -42,7 +43,7 @@ export class SessionFiles {
 	constructor(formats: readonly SessionFormat[] = SESSION_FORMATS) {
 		this.#formats = formats;
 		this.#conversations = new Conversations(formats);
-		this.facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory, [this.#conversations]);
+		this.facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory, [this.#conversations], branchPullRequest);
 	}
 
 	/** The file of session `sessionId`, or `null` while it is not listed. */

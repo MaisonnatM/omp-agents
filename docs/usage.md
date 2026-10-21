@@ -362,13 +362,13 @@ An action that fails shows its error, and its control becomes available again.
 - Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
   Its menu opens each one on GitHub, on Graphite, or in its details on the Pull requests page; the button shows only for a session with a pull request.
   Past sessions show both before **Resume**.
-- Next, before **End session**, a running session that the dashboard can prompt shows **Open PR** while it works on a branch other than its repository's default branch and the pull request list names no pull request from that branch.
+- Next, before **End session**, a running session that the dashboard can prompt shows **Open PR** while it works on a branch other than its repository's default branch and GitHub names no pull request from that branch.
   The default branch is the one `origin/HEAD` names, so a repository whose clone never recorded it shows no **Open PR** until `git remote set-head origin --auto` records it, which a session there notices at its next write.
   **Open PR** sends the session one prompt: commit the finished work, collect the diff against `origin/<default branch>`, run one `thermo-nuclear-code-quality-review` subagent on it, apply its in-scope findings that keep behavior the same and list the skipped ones with a reason, run the project's checks again, push, open the pull request with `gh pr create`, and report its link.
   The prompt shows in the transcript as yours, and while a turn runs it waits as a queued follow-up, as a message the composer sends then does.
   The button reads **Opening PR…** and takes no second press, there or in the command menu, from the press until the session is next idle after it took the prompt, through messages you steer or queue meanwhile and questions it asks.
   Taking the queued prompt back out while a turn runs keeps **Opening PR…** until that turn ends.
-  It goes once a read of the pull request list names the new pull request; a second send before then reports the open pull request's link and stops.
+  It goes once the dashboard learns of the new pull request: as soon as the session's transcript names it, such as by the link `gh pr create` prints, else at the next read of the pull request list; a second send before then reports the open pull request's link and stops.
   **Open pull request** in the command menu does the same for the focused pane's session while the panes show.
 - The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
   The label leaves out the provider, the vendor prefix, and a release date, joins version parts with dots, and puts a `:` suffix such as a thinking level in parentheses (`Sonnet 5.5 (high)`).
