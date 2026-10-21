@@ -169,8 +169,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings, revealTerminals: terminal.reveal }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket, workspaceSettings, terminal.reveal],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const replay = startOf(state.starts, "replay");

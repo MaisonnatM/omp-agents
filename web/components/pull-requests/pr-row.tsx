@@ -24,7 +24,6 @@ import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
 import { MergePopover, useMergeTarget } from "./merge-popover";
 import { PullRequestMenu } from "./pr-menu";
-import { RunLocallyButton } from "../run-locally";
 
 /** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
 function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
@@ -331,7 +330,7 @@ export interface RowProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this PR, if any. */
 	pending: QuickActionId | null;
-	/** The workspace a session on the pull request starts in, whose repository loses the worktree of the head branch when the row copies it. */
+	/** The workspace a session on the pull request starts in. */
 	cwd: string;
 	/** The same function for every row, so a row that its props leave unchanged is not drawn again. */
 	onQuickAction: (pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => void;
@@ -406,9 +405,6 @@ function openFromRow(event: MouseEvent<HTMLElement>, pr: PullRequest): void {
 	}));
 }
 
-/** Shown while the pointer is on the row or focus is in it, and always on a touch screen; it stays in the tab order. */
-const ON_ROW_HOVER = "opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100";
-
 /** The pull request's title link remains the keyboard and modifier-click target. */
 function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; targeted: boolean; className: string }) {
 	return (
@@ -454,7 +450,6 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<StateTag pr={pr} move={move} />
 					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
-					<RunLocallyButton cwd={actions.cwd} branch={pr.head} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
 					<span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
@@ -510,7 +505,6 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					<StateTag pr={pr} move={move} />
 					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
-					<RunLocallyButton cwd={actions.cwd} branch={pr.head} className={cn("shrink-0", ON_ROW_HOVER)} />
 					<ConversationCount pr={pr} />
 					{why && (
 						<>

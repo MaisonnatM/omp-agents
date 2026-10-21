@@ -36,15 +36,11 @@ export class Terminal {
 	readonly #listeners = new Set<TerminalListener>();
 	readonly #scrollback = new Scrollback(SCROLLBACK_BYTES);
 	readonly #proc: Subprocess;
-	/** Settles once the shell exited and the panel forgot it. */
-	readonly exited: Promise<void>;
 
 	constructor(
 		readonly cwd: string,
 		size: { cols: number; rows: number },
 		onExit: (terminal: Terminal) => void,
-		/** What the tab says in place of the directory's name, such as the service **Run locally** started in it. */
-		readonly title: string | null = null,
 	) {
 		const env = childEnv({ TERM: "xterm-256color", COLORTERM: "truecolor", TERM_PROGRAM: "omp-agents" });
 		this.#proc = Bun.spawn([process.env.SHELL || "/bin/sh", "-l"], {
@@ -58,7 +54,7 @@ export class Terminal {
 				},
 			},
 		});
-		this.exited = this.#proc.exited.then(() => {
+		void this.#proc.exited.then(() => {
 			for (const listener of this.#listeners) listener.exit(this.#proc.exitCode);
 			this.#listeners.clear();
 			onExit(this);
@@ -66,7 +62,7 @@ export class Terminal {
 	}
 
 	get info(): TerminalInfo {
-		return { id: this.id, cwd: this.cwd, cwdDisplay: displayPath(this.cwd), title: this.title };
+		return { id: this.id, cwd: this.cwd, cwdDisplay: displayPath(this.cwd) };
 	}
 
 	/** Replays the kept output to `listener`, then sends it what follows; returns the detach. */
@@ -97,21 +93,16 @@ export const MAX_TERMINALS = 16;
 export class Terminals {
 	readonly #all = new Map<string, Terminal>();
 
-	/** A new shell in `cwd`, titled `title` when given, or `null` while {@link MAX_TERMINALS} run. */
-	open(cwd: string, size: { cols: number; rows: number }, title: string | null = null): Terminal | null {
+	/** A new shell in `cwd`, or `null` while {@link MAX_TERMINALS} run. */
+	open(cwd: string, size: { cols: number; rows: number }): Terminal | null {
 		if (this.#all.size >= MAX_TERMINALS) return null;
-		const terminal = new Terminal(cwd, size, exited => this.#all.delete(exited.id), title);
+		const terminal = new Terminal(cwd, size, exited => this.#all.delete(exited.id));
 		this.#all.set(terminal.id, terminal);
 		return terminal;
 	}
 
 	get(id: string): Terminal | undefined {
 		return this.#all.get(id);
-	}
-
-	/** How many more shells may open. */
-	get room(): number {
-		return MAX_TERMINALS - this.#all.size;
 	}
 
 	list(): TerminalInfo[] {

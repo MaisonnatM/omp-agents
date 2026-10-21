@@ -43,7 +43,6 @@ import { agentOn } from "../shared/moves";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
-import { RunLocally } from "../run-locally";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { Broadcasts } from "./broadcasts";
@@ -544,7 +543,7 @@ export class Dashboard {
 				localEvents: this.#localEvents,
 			},
 			gmail: this.#gmail,
-			files: { worktrees: this.#worktrees, terminals: this.terminals, runLocally: new RunLocally(this.#worktrees, this.terminals) },
+			files: { worktrees: this.#worktrees, terminals: this.terminals },
 			todos: { list: () => this.#todos.value, change: change => void this.#lists.apply("user-todos", change) },
 			pullRequests: {
 				changeMergeQueue: async change => {

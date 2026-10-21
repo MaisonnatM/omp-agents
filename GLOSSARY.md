@@ -71,10 +71,6 @@ _Avoid_: Alert, notification (reserved for session notifications)
 The review a **Review** session saved of one pull request, with its verdict, summary, and findings, which waits in the dashboard for the user to accept, edit, and post.
 _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 
-**Run profile**:
-A repository's services, one command each, and its install command, which **Run locally** starts a branch with, kept in the repository's git config.
-_Avoid_: Run config, launch profile, dev script
-
 ## Unattended work
 
 **Routine**:
