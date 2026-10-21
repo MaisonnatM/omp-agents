@@ -63,6 +63,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › Sync, with its remote, **Sync** button, last outcome, conflict choices, and item switches: `SyncTab` in `web/components/settings/sync-tab.tsx`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry and some from shadcn's, with the shadcn utilities they need in `web/shadcn.css`; change them only as `web/components/ui/PATCHES.md` describes.
+- Colors, the font, text sizes, and the `surface-glass` utility: the tokens in `web/globals.css`, which are T3 Code's light and dark values for every token the two apps share, with the system font stack and T3's `text-2xs` (11px) and `text-3xs` (10px); the `--surface-*`, `--shadow-*`, `--hover`, `--active`, `--selected`, `--tint`, and `--focus-ring` tokens stay Fluid's, since T3 has none of them.
 
 ## Server
 

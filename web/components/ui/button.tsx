@@ -29,6 +29,11 @@ const buttonVariants = cva(
         secondary: "text-foreground",
         tertiary: "text-foreground",
         ghost: "text-muted-foreground hover:text-foreground",
+        "ghost-muted": "text-muted-foreground hover:text-foreground data-[pressed]:text-foreground",
+        outline: "text-foreground",
+        "destructive-outline": "text-destructive-foreground",
+        "warning-outline": "text-warning-foreground",
+        glass: "text-foreground",
       },
       // The two-step size ladder shared by every control — see /docs/sizes.
       // default = 36px control height, compact = 28px for dense surfaces.
@@ -124,6 +129,17 @@ const bgVariants: Record<string, string> = {
   // render only outside the surface box.
   ghost:
     "bg-transparent shadow-[0_0_0_1px_transparent] group-hover:bg-hover group-hover:shadow-[0_0_0_1px_var(--hover)] group-active:bg-active group-active:shadow-[0_0_0_0px_var(--active)]",
+  // T3 Code's variants. The outline family rings in --input, or in its tint on hover, over T3's faint drop shadow.
+  "ghost-muted":
+    "bg-transparent shadow-[0_0_0_1px_transparent] group-hover:bg-accent group-hover:shadow-[0_0_0_1px_var(--accent)] group-active:shadow-[0_0_0_0px_var(--accent)]",
+  outline:
+    "bg-popover dark:bg-input/32 shadow-[0_0_0_1px_var(--input),0_1px_2px_0_rgb(0_0_0/0.05),inset_0_0_0_0px_var(--input)] group-hover:bg-accent/50 dark:group-hover:bg-input/64 group-active:shadow-[0_0_0_0px_var(--input),0_0_0_0_transparent,inset_0_0_0_1px_var(--input)]",
+  "destructive-outline":
+    "bg-popover dark:bg-input/32 shadow-[0_0_0_1px_var(--input),0_1px_2px_0_rgb(0_0_0/0.05),inset_0_0_0_0px_transparent] group-hover:bg-destructive/4 group-hover:shadow-[0_0_0_1px_color-mix(in_oklab,var(--destructive)_32%,transparent),0_1px_2px_0_rgb(0_0_0/0.05),inset_0_0_0_0px_transparent] group-active:shadow-[0_0_0_0px_transparent,0_0_0_0_transparent,inset_0_0_0_1px_color-mix(in_oklab,var(--destructive)_32%,transparent)]",
+  "warning-outline":
+    "bg-warning-surface shadow-[0_0_0_1px_color-mix(in_oklab,var(--warning)_32%,transparent),0_1px_2px_0_rgb(0_0_0/0.05),inset_0_0_0_0px_transparent] group-hover:bg-warning/16 dark:group-hover:bg-warning/24 group-hover:shadow-[0_0_0_1px_color-mix(in_oklab,var(--warning)_40%,transparent),0_1px_2px_0_rgb(0_0_0/0.05),inset_0_0_0_0px_transparent] group-active:shadow-[0_0_0_0px_transparent,0_0_0_0_transparent,inset_0_0_0_1px_color-mix(in_oklab,var(--warning)_40%,transparent)]",
+  glass:
+    "surface-glass shadow-[0_0_0_1px_color-mix(in_oklab,var(--border)_60%,transparent),0_1px_3px_0_rgb(0_0_0/0.1),0_1px_2px_-1px_rgb(0_0_0/0.1)] group-hover:shadow-[0_0_0_1px_var(--border),0_1px_3px_0_rgb(0_0_0/0.1),0_1px_2px_-1px_rgb(0_0_0/0.1)] group-active:shadow-[0_0_0_0px_var(--border),0_1px_3px_0_rgb(0_0_0/0.1),0_1px_2px_-1px_rgb(0_0_0/0.1)]",
 };
 
 /* Forced-active (`active` prop): pressed colors at full size; the
@@ -137,6 +153,15 @@ const activeBgVariants: Partial<Record<string, string>> = {
     "bg-active shadow-[0_0_0_1px_var(--border),inset_0_0_0_0px_var(--border)] group-active:shadow-[0_0_0_0px_var(--border),inset_0_0_0_1px_var(--border)]",
   ghost:
     "bg-active shadow-[0_0_0_1px_var(--active)] group-active:shadow-[0_0_0_0px_var(--active)]",
+  "ghost-muted": "bg-accent shadow-[0_0_0_1px_var(--accent)] group-active:shadow-[0_0_0_0px_var(--accent)]",
+  outline:
+    "bg-accent/50 dark:bg-input/64 shadow-[0_0_0_1px_var(--input)] group-active:shadow-[0_0_0_0px_var(--input)]",
+  "destructive-outline":
+    "bg-destructive/4 shadow-[0_0_0_1px_color-mix(in_oklab,var(--destructive)_32%,transparent)] group-active:shadow-[0_0_0_0px_transparent]",
+  "warning-outline":
+    "bg-warning/16 dark:bg-warning/24 shadow-[0_0_0_1px_color-mix(in_oklab,var(--warning)_40%,transparent)] group-active:shadow-[0_0_0_0px_transparent]",
+  glass:
+    "surface-glass shadow-[0_0_0_1px_var(--border),0_1px_3px_0_rgb(0_0_0/0.1),0_1px_2px_-1px_rgb(0_0_0/0.1)] group-active:shadow-[0_0_0_0px_var(--border),0_1px_3px_0_rgb(0_0_0/0.1),0_1px_2px_-1px_rgb(0_0_0/0.1)]",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -279,6 +304,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             iconRight: !isIconOnly && !!TrailingIcon,
           }),
           shape.button,
+          variant === "glass" && "rounded-full",
           className
         )}
         // asChild roots (e.g. an anchor) don't take the disabled attribute —

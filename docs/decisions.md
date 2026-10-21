@@ -59,3 +59,11 @@ Settings sync pushes only the items `SYNC_ITEMS` names: omp's user config, instr
 Credentials, databases, sessions, and the dashboard's machine files never sync, whatever the remote holds, and neither do routines and todos, which name one machine's sessions and runs.
 A Git remote of the user's own carries them because it needs no service of ours, keeps every version, and signs in with the machine's existing git credentials.
 See [Settings sync](architecture.md#settings-sync).
+
+## The dashboard wears T3 Code's theme tokens
+
+`web/globals.css` takes T3 Code's light and dark values for the tokens the two apps share, its system font stack, and its two small text sizes, and `web/components/ui/button.tsx` adds T3's `outline`, `ghost-muted`, `glass`, `destructive-outline`, and `warning-outline` variants.
+The pull request panel is being rebuilt to look like T3 Code's, and a panel drawn from another palette, font, and border weight never matches it, however close its layout gets.
+The tokens change the whole app at once, so every page keeps one palette rather than the pull request page alone wearing T3's.
+Fluid's tokens that T3 lacks stay, and the button keeps Fluid's two-step size ladder and press effect.
+See [Interface map](code-layout.md#interface-map) and the [parity harness](agent-smoke.md#parity-harness), which measures the panel against T3's.
