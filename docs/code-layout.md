@@ -543,7 +543,7 @@ The page lives in `web/`.
   `PullRequestDetails` hands it the list entry and how to start a quick action, and `PullRequestDetailContent` derives the menu's quick actions from `actionFacts`.
   `PullRequestDetailContent` reads the pull request and its stack, and lays out the header, the tab bar, and the **Summary**, **Comments**, **Timeline**, and **Code** tabs, and the **Review draft** tab while the dashboard's status holds a draft of the pull request; on the page, **Code** is the route's `files`, so choosing it changes the address and the board's keys leave ↓ and ↑ to the explorer.
   It sends a resolve or unresolve through `useEditableRead`'s `edit`, shown at once, and a reply or comment through its `write`, so the box keeps its words until GitHub takes them; GitHub's refusal of a change shows once, above the **Summary**, **Comments**, or **Timeline** tab.
-  `pr-details/header.tsx` owns the crumbs, primary control, title editor, author and branch rows, and base freshness hover card.
+  `pr-details/header.tsx` owns the crumbs, primary control, title editor, author and branch rows, and base freshness popover.
   `pr-details/index.tsx` keeps each tab's condensed header state and its scroll thresholds.
   `summary.tsx` holds Reviewers, labels, sessions, the stack, and description.
   `stack.tsx` draws its **Stack** and the session's other pull requests, using `StackRail` on `web/components/rail.tsx`.

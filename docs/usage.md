@@ -784,7 +784,8 @@ An action that fails shows its error, and its control becomes available again.
   Clicking the head branch copies its name and removes the linked worktree that has it checked out, as a session header's branch does.
   A stacked base is amber.
   When GitHub reports that the branch is behind its base, the base turns orange and gains a warning icon.
-  Hover or focus the warning for the commit count and **Update branch** or **Update with rebase**.
+  Hover or activate the warning for the commit count and **Update branch** or **Update with rebase**.
+  Tab reaches both update actions; Escape closes the popover and returns focus to the warning.
   The primary control shows **Merged** or **Closed** for a finished pull request, **Resolve conflicts** for conflicts, and **Ready for review** for a draft.
   Otherwise it offers the selected merge method, such as **Squash and merge**, or that method **when ready** while GitHub holds the merge.
   The first click arms **Confirm merge?**, and a second click within three seconds sends the merge to the server.
