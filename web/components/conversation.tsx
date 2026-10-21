@@ -8,7 +8,7 @@ import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { liveDraftKey, useComposerDraft } from "../composer-drafts";
-import { folderName } from "../labels";
+import { folderName, hostLabel } from "../labels";
 import { useChangedFiles, useComposerData, useNextSuggestions } from "../pane-store";
 import type { ModelList } from "../reads";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
@@ -17,6 +17,7 @@ import type { ForkPoint } from "../transcript-view";
 import { useAction } from "../use-action";
 import type { Dashboard } from "../use-dashboard";
 import type { ScheduleWhen } from "../scheduled-model";
+import { AskAboutSelection } from "./ask-about-selection";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerEditor, ComposerNote, ComposerTray, DirectoryLabel, EmptyConversation, OVER_TRAY } from "./composer";
 import { QueuedMessages, useQueue } from "./composer-queue";
@@ -162,6 +163,10 @@ function LiveConversation({
 	const sendText = (text: string): void => {
 		if (blockedShortcut(text, shell) === null) submit(text, deliveryOf(subject));
 	};
+	// The discussion keeps this past later renders, so it reads the delivery the session takes when you send, not when you asked.
+	const latestSubject = useRef(subject);
+	latestSubject.current = subject;
+	const sendToSession = useCallback((text: string) => request({ t: "prompt", view, text, images: [], delivery: deliveryOf(latestSubject.current) }), [request, view]);
 
 	const directCommand = blockedShortcut(draft, shell);
 	const steerable = writable && (draft.trim() !== "" || attachments.files.length > 0) && !directCommand;
@@ -268,7 +273,9 @@ function LiveConversation({
 			{trajectory ? (
 				<Trajectory view={view} />
 			) : (
-				<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
+				<AskAboutSelection origin={{ source: shown ? `session “${hostLabel(shown)}”` : "a session", sendToSession: writable ? sendToSession : null }}>
+					<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
+				</AskAboutSelection>
 			)}
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-3">
 				{requests[0] && (

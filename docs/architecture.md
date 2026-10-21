@@ -10,6 +10,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Dashboard sessions](#dashboard-sessions)
   - [Session keepers](#session-keepers)
 - [Socket requests](#socket-requests)
+- [Ask about this](#ask-about-this)
 - [Desktop shell](#desktop-shell)
   - [Packaging and releases](#packaging-and-releases)
 - [Terminal panel](#terminal-panel)
@@ -93,6 +94,8 @@ The main ones:
   `resolveSelector` keeps the read only when its model is listed, and `routedSelectors` names every selector of the routing: each role's, and each fallback chain's key and entries.
 - Model roles: `pi-coding-agent/src/config/model-resolver.ts` (`expandRoleAlias`, `resolveRoleChain`), whose `@role` aliases `resolveRoles` in `src/omp/models.ts` follows for `GET /api/models/roles`.
   `modelEntries` reads each of the `routedSelectors` with `readSelector` and maps it to a listed model with `resolveProviderModelReference`, which follows retired variant ids such as `grok-4.7-high` and dotted spellings such as `claude-fable-5.1`.
+- Side answers: `streamSimple` in `pi-ai/src/stream.ts`, with `resolveRoleSelection` in `pi-coding-agent/src/config/model-resolver.ts` and `ModelRegistry`'s `refresh`, `getAvailable`, `getApiKey`, and `resolver` in `pi-coding-agent/src/config/model-registry.ts`, which `answerDiscussion` in `src/omp/discussion.ts` uses to answer **Ask about this** with one model call outside every session; see [Ask about this](#ask-about-this).
+  It reads the `smol` and `default` roles from the user's settings (`Settings.loadReadOnly` with `HOME` as its directory), so a project's `modelRoles` do not apply, and it loads no extension's custom provider.
 - MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `client.ts` (`connectToServer`, `listTools`, `disconnectServer`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`, `updateMCPServer`, `removeMCPServer`, `setMcpServerEnabled`, `validateServerName`, `readMCPConfigFile`), which `src/omp/mcp.ts` wraps for the tickets page, Settings › Integrations, and Settings › MCP servers.
   The MCP sign-ins and sign-outs read and write omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
   `pi-coding-agent/src/commands/token.ts` uses `refreshStoredManagedMcpOAuthCredential` from `oauth-credentials.ts` to refresh a managed token and persist its rotated refresh token before printing the access token.
@@ -440,6 +443,17 @@ A page loaded before page ids tags its requests with no `floor`, so the server d
 Socket edits, workspace HTTP edits, todo inbox changes, and routine pin changes go through the registry's typed `apply`.
 An edit that changes the list publishes it to every listener; one that changes nothing instead resends the authoritative snapshot to its requesting peer, if there is one.
 Routine and scheduled runner actions and asynchronous notice actions remain separate, publishing their list through `pushList` when they change it.
+
+## Ask about this
+
+**Ask about this** answers a question about selected text with one model call that no session sees, unlike omp's `/btw`, which sends the whole conversation and records the exchange in the session file.
+The page's `web/discussions.ts` holds the one open discussion in memory and sends each question as an untagged `discuss` socket message with an id counted per page load; `parseDiscussionRequest` in `src/server/wire.ts` holds every text to its limit in `src/shared/discussions.ts`.
+The request is the passage, its source, the earlier questions with their finished answers, and the new question, and `discussionPrompt` folds all of it into one user message, which the panel shows as sent.
+`Discussions` in `src/server/discussions.ts` runs `answerDiscussion` from `src/omp/discussion.ts` per question and sends its events back to the socket that asked as `discussion` messages: the model, the text in pieces, and an `end` with the error or `null`.
+The answers go over the socket rather than an HTTP response, which Bun would cut after its 10-second idle timeout while a slow model writes nothing, and the handler is not awaited, so a `discuss-stop` reaches a running answer.
+`discuss-stop` aborts the answer, which ends with no error, and a socket that closes aborts every answer it asked for; the page marks an answer it was waiting on as failed when its socket closes.
+`answerDiscussion` resolves omp's `smol` role, else `default`, among the models with a credential, and streams with reasoning off and at most 4,096 output tokens.
+**Send to session** is not part of this flow: the page sends the quoted passage and the answer as a `prompt`, as the composer does.
 
 ## Desktop shell
 

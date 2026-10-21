@@ -6,6 +6,7 @@ import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText, socketUrl } from "./api";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
+import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
 import { applyPaneMessage, retainPanes, retainTrajectories, useShownTrajectories } from "./pane-store";
 import {
 	hashForLayout,
@@ -228,6 +229,9 @@ export function useDashboard(): Dashboard {
 						else waiting?.reject(new Error(msg.error));
 						return;
 					}
+					case "discussion":
+						applyDiscussionMessage(msg);
+						return;
 					case "pins":
 						dispatch(msg);
 						sendStoredPins(ws);
@@ -240,6 +244,7 @@ export function useDashboard(): Dashboard {
 			};
 			ws.onclose = () => {
 				if (disposed) return;
+				discussionDisconnected();
 				dispatch({ t: "connected", connected: false });
 				timer = window.setTimeout(connect, retryMs);
 				retryMs = Math.min(retryMs * 2, 5000);

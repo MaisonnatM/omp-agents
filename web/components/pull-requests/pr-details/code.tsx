@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { PullRequest, PullRequestChanges, PullRequestDetail } from "../../../../src/shared/github";
 import { useRead } from "../../../reads";
 import { hashForPullRequestFiles } from "../../../routing";
+import { AskAboutSelection } from "../../ask-about-selection";
 import { ChangesExplorer } from "../../changes/changes-explorer";
 import { LoadNote } from "../../sheet-details";
 import { PullRequestFilesDialog } from "../pr-files-dialog";
@@ -39,13 +40,16 @@ export function Code({ pr, detail, placement, path, version }: { pr: PullRequest
 		);
 	}
 	if (list.data.files.length === 0) return <p className="m-auto text-sm text-muted-foreground">The pull request changes no file.</p>;
+	const source = `pull request ${pr.owner}/${pr.repo}#${pr.number} “${detail.title}”${path === null ? "" : `, file ${path}`}`;
 	return (
-		<ChangesExplorer
-			files={list.data.files}
-			path={path}
-			hrefFor={file => hashForPullRequestFiles(pr, file)}
-			fileUrl={file => `/api/pull-request/file?${query}&path=${encodeURIComponent(file)}`}
-			version={String(version ?? 0)}
-		/>
+		<AskAboutSelection origin={{ source, sendToSession: null }}>
+			<ChangesExplorer
+				files={list.data.files}
+				path={path}
+				hrefFor={file => hashForPullRequestFiles(pr, file)}
+				fileUrl={file => `/api/pull-request/file?${query}&path=${encodeURIComponent(file)}`}
+				version={String(version ?? 0)}
+			/>
+		</AskAboutSelection>
 	);
 }

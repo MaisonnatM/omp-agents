@@ -7,6 +7,7 @@ import type { NoticeOp } from "../shared/notices";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
+import type { Discussions } from "./discussions";
 import type { ListRegistry } from "./list-registry";
 import type { ProjectSpec } from "./project-runner";
 import type { Peer, Run } from "./request-ledger";
@@ -36,6 +37,8 @@ export interface SocketEnv {
 	sendScheduledNow(id: string): Promise<void>;
 	/** Act on notices `ids`; every socket then gets the notices as they are after. */
 	changeNotices(ids: string[], op: NoticeOp): Promise<void>;
+	/** The **Ask about this** answers under way. */
+	discussions: Discussions;
 }
 
 /** Each socket message's handler, by its `t`, so a {@link ClientMsg} variant without one does not compile. A message naming a session that is gone does nothing. */
@@ -149,6 +152,8 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	project: ({ lists }, peer, { change }) => void lists.apply("projects", change, peer),
 	"review-draft": ({ lists }, peer, { change }) => void lists.apply("review-drafts", change, peer),
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),
+	discuss: ({ discussions }, peer, { id, request }) => discussions.ask(peer, id, request),
+	"discuss-stop": ({ discussions }, peer, { id }) => discussions.stop(peer.socket, id),
 };
 
 /** `t` keys the handler that takes `msg`; spelled apart so TypeScript pairs them. */
