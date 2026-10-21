@@ -19,8 +19,8 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch 
    If this is the main checkout, create a dedicated worktree off the current parent branch.
    Use the worktree's absolute path for every edit, command, and check in this session.
    In a Graphite repo, register the branch under its parent.
-2. **Implement.** Delegate to `poteto-agent` with `isolated: true`.
-   Tell it to implement the issue in the existing worktree, but stop before opening a PR.
+2. **Implement.** Delegate to `poteto-agent` without `isolated`.
+   Tell it to implement the issue in place on the branch's checkout, but stop before opening a PR.
    Integrate its changes.
    Run smoke checks and required tests once in the parent.
    Commit, then call `ship_stage({stage:"draft_pr"})`.
@@ -31,9 +31,9 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch 
    If Graphite is configured, run `gt track <branch> -p <parent> --no-interactive -q` and `gt submit --cwd <worktree> --no-edit --no-stack -q` so the PR is registered.
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"thermonuclear", pr:<number>})`.
    A successful `gh pr create` also records this transition.
-4. **Thermonuclear.** Run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`, `isolated: true`.
+4. **Thermonuclear.** Run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`, without `isolated`, in the branch's checkout.
    Review the actual PR including tests.
-   Apply valid findings in a fresh isolated `task` agent, integrate and verify once, commit and push.
+   Apply valid findings in a fresh `task` agent working in place on the branch, integrate and verify once, commit and push.
    Repeat the review if substantial changes invalidate it.
    Once all findings are resolved, add `- [x] Thermo-nuclear code quality review` to the current PR body without overwriting other content.
    Add the checkbox only AFTER the fixes are pushed.

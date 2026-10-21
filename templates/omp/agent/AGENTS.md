@@ -5,11 +5,14 @@ If `PI_CODING_AGENT_DIR` is set, substitute that directory for `~/.omp/agent` in
 
 ## Git safety
 
-In a Git repository, create a dedicated worktree on a new branch off the current default or parent branch before making changes.
-Do all edits, checks, and commits there; reuse an existing worktree for the same task.
-Skip the worktree only for read-only investigation or an explicit user request to work in place.
-Every subagent that edits files in a Git repository uses `isolated: true`, independently of the session's own worktree; a read-only one, such as a scout, runs without it.
+When the checkout is on the default branch (`main`), create a dedicated worktree on a new branch off it before making changes.
+When the checkout is on any other local branch, work in place: edit, check, and commit on that branch alongside its existing local changes, without a worktree.
+In a worktree, do all edits, checks, and commits there; reuse an existing worktree for the same task.
+Skip the worktree also for read-only investigation or an explicit user request to work in place.
+On the default branch, every subagent that edits files in a Git repository uses `isolated: true`, independently of the session's own worktree; a read-only one, such as a scout, runs without it.
 Isolation fails when the session's cwd is not a Git repository: create a worktree for the subagent instead and name its path in the task.
+On any other local branch, editing subagents also work in place: spawn them without `isolated` in the same checkout, and run two at once only on disjoint files.
+Competing attempts at the same change, such as arena runners, still use `isolated: true`.
 Force-pushes and rewriting `main` still require explicit approval.
 
 ## Test servers
