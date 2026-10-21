@@ -41,6 +41,8 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 ## Others
 
 - `ui/button.tsx`: `loading` also sets `aria-busy`; otherwise the caller's `aria-busy` is preserved.
+- `ui/button.tsx`: T3 Code's `outline`, `ghost-muted`, `glass`, `destructive-outline`, and `warning-outline` variants, drawn on the button's surface layer so they keep Fluid's press effect, with their border as the layer's 1px ring.
+  `glass` is always a pill and uses the `surface-glass` utility from `web/globals.css`.
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`.
   Long labels wrap at 16rem.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
@@ -85,7 +87,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 
 The registry file uses shadcn's `button`, `command`, and `popover`; the dashboard keeps Fluid's, so it imports those.
 
-- The month and year pickers' button is `variant="ghost"`, in the semibold month title's size, since Fluid's button has no `outline`, and takes a `ChevronDown` as `trailingIcon`, since Fluid's button puts an icon among its children on a line of its own.
+- The month and year pickers' button is `variant="ghost"`, in the semibold month title's size, since Fluid's button had no `outline` when the calendar came in, and takes a `ChevronDown` as `trailingIcon`, since Fluid's button puts an icon among its children on a line of its own.
 - `CalendarBody`, `CalendarHeader`, `CalendarItem`, `Feature`, and `Status` are removed, along with the provider's `startDay` and the `date-fns` import.
   `web/components/calendar/calendar-page.tsx` draws the month from its own entries, so it needs no generic feature list.
 - The month arrows have `aria-label`s, **Previous month** and **Next month**.
