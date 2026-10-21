@@ -52,7 +52,7 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
-import { MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
+import { MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
@@ -60,6 +60,7 @@ import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
 import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
 import { UpdateRefused } from "./self-update";
+import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
@@ -116,6 +117,13 @@ export interface DashboardRoutesEnv {
 	update(): Promise<DashboardUpdateOutcome>;
 }
 
+/** What the settings sync routes read and run: Settings › Sync. */
+export interface SyncRoutesEnv {
+	answer(): SyncAnswer;
+	configure(settings: SyncSettings): SyncAnswer;
+	sync(choices: Record<string, SyncSide>): Promise<SyncAnswer>;
+}
+
 /** Everything the HTTP API reads, by concern. */
 export interface RouteEnv {
 	guards: Guards;
@@ -128,6 +136,7 @@ export interface RouteEnv {
 	todos: TodoRoutesEnv;
 	pullRequests: PullRequestRoutesEnv;
 	dashboard: DashboardRoutesEnv;
+	sync: SyncRoutesEnv;
 }
 
 /** What the pull request routes hand on: the merge queue, through which every merge goes. */
@@ -818,6 +827,17 @@ function dashboardRoutes({ get, write }: RouteKit, env: DashboardRoutesEnv): Rou
 	};
 }
 
+/** Settings › Sync: its settings, and a sync, which answers with its outcome whether it synced, conflicted, or failed. */
+function syncRoutes({ get, write }: RouteKit, env: SyncRoutesEnv): Routes {
+	return {
+		"/api/sync": {
+			GET: get(() => answer(async () => env.answer())),
+			PUT: write(body => checked(parseSyncSettings(body)), async settings => env.configure(settings)),
+		},
+		"/api/sync/run": { PUT: write(body => checked(parseSyncRun(body), "Expected { choices }"), choices => env.sync(choices)) },
+	};
+}
+
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
@@ -831,5 +851,6 @@ export function createRoutes(env: RouteEnv): Routes {
 		...fileRoutes(kit, env.files),
 		...todoRoutes(kit, env.todos),
 		...dashboardRoutes(kit, env.dashboard),
+		...syncRoutes(kit, env.sync),
 	};
 }

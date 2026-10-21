@@ -52,3 +52,10 @@ See [Plan quota](architecture.md#plan-quota), [Google Calendar](architecture.md#
 
 omp-agents uses `git`, `git push`, and `gh pr create --draft`, and never `gt`, even where the maintainer's other repositories use Graphite.
 The starter kit's `git-workflow.md` names this exception.
+
+## Settings sync syncs a registry of portable items through a Git remote
+
+Settings sync pushes only the items `SYNC_ITEMS` names: omp's user config, instruction files, skills, rules, agents, and commands, and the source control settings.
+Credentials, databases, sessions, and the dashboard's machine files never sync, whatever the remote holds, and neither do routines and todos, which name one machine's sessions and runs.
+A Git remote of the user's own carries them because it needs no service of ours, keeps every version, and signs in with the machine's existing git credentials.
+See [Settings sync](architecture.md#settings-sync).

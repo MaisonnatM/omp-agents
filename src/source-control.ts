@@ -77,7 +77,7 @@ async function graphiteStatus(): Promise<ProviderStatus> {
 }
 
 /** A file from before the cleanup setting reads with it on. */
-function parseSettings(value: unknown): SourceControlSettings | null {
+export function parseSourceControlSettings(value: unknown): SourceControlSettings | null {
 	if (!isObject(value) || typeof value.on !== "boolean" || !isObject(value.repos)) return null;
 	if (value.cleanUp !== undefined && typeof value.cleanUp !== "boolean") return null;
 	const repos = Object.entries(value.repos);
@@ -93,13 +93,23 @@ export class SourceControl {
 	readonly #pulls = new SerialLane();
 
 	constructor(path: string) {
-		this.#file = new JsonFile(path, { parse: parseSettings, holds: "the source control settings", onInvalid: "aside", indent: "\t" });
+		this.#file = new JsonFile(path, { parse: parseSourceControlSettings, holds: "the source control settings", onInvalid: "aside", indent: "\t" });
 		this.#settings = this.#file.load() ?? DEFAULT_SOURCE_CONTROL;
 	}
 
 	/** Whether a merge ends the sessions it leaves with nothing to do. */
 	get cleanUp(): boolean {
 		return this.#settings.cleanUp;
+	}
+
+	get settings(): SourceControlSettings {
+		return this.#settings;
+	}
+
+	/** Replaces the settings whole, as settings sync brings them from another machine, and saves. */
+	replace(settings: SourceControlSettings): void {
+		this.#settings = settings;
+		this.#file.save(settings);
 	}
 
 	/** Applies `change` and saves; whether it changed anything. */

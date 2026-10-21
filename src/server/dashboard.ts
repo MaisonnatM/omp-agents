@@ -19,18 +19,20 @@ import { loadTickets } from "../tickets";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
+import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { findMcpServers } from "../omp/mcp";
 import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
 import { SourceControl } from "../source-control";
+import { SettingsSync, sourceControlStore } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -100,6 +102,7 @@ export class Dashboard {
 	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #sourceControl = new SourceControl(sourceControlFile);
+	readonly #settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores: { "source-control": sourceControlStore(this.#sourceControl, HOME) } });
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
 	readonly #localEvents = new LocalEventsFile(localEventsFile);
@@ -535,6 +538,7 @@ export class Dashboard {
 				},
 			},
 			dashboard: this.#selfUpdate,
+			sync: this.#settingsSync,
 		});
 	}
 
