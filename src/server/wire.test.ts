@@ -3,6 +3,7 @@ import type { ClientFrame } from "../shared/protocol";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
+import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } from "../shared/discussions";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
@@ -360,6 +361,26 @@ describe("parseClientMsg", () => {
 		expect(msg(edit)).toEqual(edit);
 		expect(msg({ ...edit, entryId: "" })).toBeNull();
 		expect(msg({ ...edit, text: "  \n" })).toBeNull();
+	});
+
+	test("discuss needs a counter id and a passage, its source, and a question within their lengths", () => {
+		const request = { source: "session “Fix login”", quote: "ttl: 0", turns: [{ question: "What is ttl?", answer: "How long a token stays cached." }], question: "Why zero?" };
+		const ask = { t: "discuss" as const, id: 2, request };
+		expect(msg(ask)).toEqual(ask);
+		expect(msg({ ...ask, request: { ...request, extra: true } })).toEqual(ask);
+		expect(msg({ ...ask, id: -1 })).toBeNull();
+		expect(msg({ ...ask, id: 1.5 })).toBeNull();
+		expect(msg({ ...ask, request: { ...request, question: "  " } })).toBeNull();
+		expect(msg({ ...ask, request: { ...request, quote: "x".repeat(MAX_DISCUSSION_QUOTE + 1) } })).toBeNull();
+		expect(msg({ ...ask, request: { ...request, source: "x".repeat(MAX_DISCUSSION_SOURCE + 1) } })).toBeNull();
+		expect(msg({ ...ask, request: { ...request, turns: [{ question: "What is ttl?", answer: "" }] } })).toBeNull();
+		expect(msg({ ...ask, request: { ...request, turns: Array.from({ length: MAX_DISCUSSION_TURNS + 1 }, () => request.turns[0]) } })).toBeNull();
+		expect(msg({ ...ask, request: { ...request, turns: undefined } })).toBeNull();
+	});
+
+	test("discuss-stop names the question it stops", () => {
+		expect(msg({ t: "discuss-stop", id: 2 })).toEqual({ t: "discuss-stop", id: 2 });
+		expect(msg({ t: "discuss-stop", id: "2" })).toBeNull();
 	});
 });
 

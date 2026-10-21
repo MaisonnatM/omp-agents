@@ -251,9 +251,28 @@ export interface OAuthModule {
 	/** Every provider omp's `/login` offers; `storeCredentialsAs` names the provider its credential is filed under when that differs from `id`. */
 	getOAuthProviders(): { id: string; name: string; available: boolean; storeCredentialsAs?: string }[];
 }
+/** The fields of omp's `Model` (pi-ai src/types.ts) the dashboard reads; the rest rides through to omp. */
+export interface OmpModel {
+	provider: string;
+	id: string;
+}
+/** A credential source `ModelRegistry.resolver` mints (src/config/api-key-resolver.ts), opaque to the dashboard. */
+export interface ApiKeyResolver {
+	readonly brand: "ApiKeyResolver";
+}
 /** omp's model registry (src/config/model-registry.ts), built over a credential store. */
 export interface ModelRegistryModule {
-	ModelRegistry: new (storage: AuthStorage) => { refreshProvider(provider: string, strategy: "online"): Promise<void> };
+	ModelRegistry: new (storage: AuthStorage) => {
+		refreshProvider(provider: string, strategy: "online"): Promise<void>;
+		/** Loads the models, fetching a provider's catalog only when none is cached. */
+		refresh(): Promise<void>;
+		/** The chat models of the providers you can call. */
+		getAvailable(): OmpModel[];
+		/** `model`'s key now, `undefined` when it has none. */
+		getApiKey(model: OmpModel): Promise<string | undefined>;
+		/** `model`'s key for a call, minted again when the provider refuses it. */
+		resolver(model: OmpModel): ApiKeyResolver;
+	};
 }
 /** What `/logout` shows and removes (src/slash-commands/helpers/logout.ts). */
 export interface LogoutModule {
@@ -294,6 +313,25 @@ export interface FallbackChainsModule {
 export interface ModelResolverModule {
 	/** The listed model that omp runs for `provider/id`, following retired variant ids such as `grok-4.7-high` and dotted revision spellings. */
 	resolveProviderModelReference<M extends { provider: string; id: string }>(provider: string, modelId: string, models: readonly M[]): M | undefined;
+	/** The model of the first of `roles` whose `modelRoles` selector names one of `models`, as omp's commit and title calls pick theirs. */
+	resolveRoleSelection<M extends OmpModel>(roles: readonly string[], settings: OmpSettingsInstance, models: M[]): { role: string; model: M } | undefined;
+}
+/** One event of a pi-ai answer stream (pi-ai src/types.ts `AssistantMessageEvent`), with the fields the dashboard reads. */
+export interface AnswerEvent {
+	type: string;
+	/** The text a `text_delta` adds. */
+	delta?: string;
+	/** Why an `error` event ended the stream. */
+	reason?: "aborted" | "error";
+	error?: { errorMessage?: string };
+}
+export interface StreamModule {
+	/** One model call with no tools (pi-ai src/stream.ts), its events as the answer streams. */
+	streamSimple(
+		model: OmpModel,
+		context: { systemPrompt: string[]; messages: { role: "user"; content: string; timestamp: number }[] },
+		options: { apiKey: ApiKeyResolver; maxTokens: number; disableReasoning: boolean; signal: AbortSignal },
+	): AsyncIterable<AnswerEvent>;
 }
 /** omp's release lookup (src/cli/update-cli.ts), the one `omp update` makes. */
 export interface UpdateCliModule {
@@ -724,7 +762,12 @@ export const oauth = await load<OAuthModule>(join(dirname(packageDir), "pi-ai", 
 export const modelRegistry = await load<ModelRegistryModule>(join(srcDir, "config", "model-registry.ts"), {
 	ModelRegistry: "function",
 	"ModelRegistry.prototype.refreshProvider": "function",
+	"ModelRegistry.prototype.refresh": "function",
+	"ModelRegistry.prototype.getAvailable": "function",
+	"ModelRegistry.prototype.getApiKey": "function",
+	"ModelRegistry.prototype.resolver": "function",
 });
+export const piStream = await load<StreamModule>(join(dirname(packageDir), "pi-ai", "src", "stream.ts"), { streamSimple: "function" });
 export const logout = await load<LogoutModule>(join(srcDir, "slash-commands", "helpers", "logout.ts"), {
 	toLogoutAccounts: "function",
 	logoutCredential: "function",
@@ -739,7 +782,10 @@ export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "ses
 	expandDefaultRetryFallbackChains: "function",
 	parseRetryFallbackSelector: "function",
 });
-export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), { resolveProviderModelReference: "function" });
+export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), {
+	resolveProviderModelReference: "function",
+	resolveRoleSelection: "function",
+});
 export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, "config", "registry.ts"), { lookup: "function", all: "function" });
 export const updateCli = await load<UpdateCliModule>(join(srcDir, "cli", "update-cli.ts"), { getLatestRelease: "function" });
 export const updateSettings = await load<UpdateSettingsModule>(join(srcDir, "modes", "settings.ts"), {

@@ -19,6 +19,7 @@ import { loadTickets } from "../tickets";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
+import { answerDiscussion } from "../omp/discussion";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { findMcpServers } from "../omp/mcp";
 import { ompSandboxes } from "../omp/isolation";
@@ -71,6 +72,7 @@ import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
+import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
 import { createStarter, reattachAll, type Starter } from "./start";
 import { TodoInbox } from "./todo-inbox";
@@ -135,6 +137,7 @@ export class Dashboard {
 	#stopMergeQueue = (): void => {};
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
+	readonly #discussions = new Discussions(answerDiscussion);
 	readonly #selfUpdate: SelfUpdate;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
 	#publisher: Publisher | null = null;
@@ -474,6 +477,7 @@ export class Dashboard {
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
 			changeNotices: (ids, op) => notices.apply(ids, op),
+			discussions: this.#discussions,
 			}),
 			(t, error) => console.error(`omp-agents: ${t} failed: ${errorText(error)}`),
 		);
@@ -621,6 +625,7 @@ export class Dashboard {
 	close(ws: Socket): void {
 		this.#views.watch(ws, [], []);
 		this.#requests.close(ws);
+		this.#discussions.close(ws);
 	}
 
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */

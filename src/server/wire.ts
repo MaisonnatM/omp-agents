@@ -19,6 +19,15 @@ import {
 	slackRedirectError,
 } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
+import {
+	type DiscussionRequest,
+	type DiscussionTurn,
+	MAX_DISCUSSION_ANSWER,
+	MAX_DISCUSSION_QUESTION,
+	MAX_DISCUSSION_QUOTE,
+	MAX_DISCUSSION_SOURCE,
+	MAX_DISCUSSION_TURNS,
+} from "../shared/discussions";
 import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseThinking } from "../shared/sessions";
@@ -184,6 +193,23 @@ function parseViews(value: unknown): View[] | null {
 	return views;
 }
 
+const withinLength = (value: unknown, max: number): value is string => isNonEmpty(value) && value.length <= max;
+
+function parseDiscussionTurn(value: unknown): DiscussionTurn | null {
+	if (!isObject(value)) return null;
+	const { question, answer } = value;
+	return withinLength(question, MAX_DISCUSSION_QUESTION) && withinLength(answer, MAX_DISCUSSION_ANSWER) ? { question, answer } : null;
+}
+
+/** A question about a passage: every text nonempty and within its length, and at most {@link MAX_DISCUSSION_TURNS} earlier questions. */
+export function parseDiscussionRequest(value: unknown): Parsed<DiscussionRequest> {
+	if (!isObject(value)) return null;
+	const { source, quote, question } = value;
+	const turns = Array.isArray(value.turns) && value.turns.length <= MAX_DISCUSSION_TURNS ? parseAll(value.turns, parseDiscussionTurn) : null;
+	if (!turns || !withinLength(source, MAX_DISCUSSION_SOURCE) || !withinLength(quote, MAX_DISCUSSION_QUOTE) || !withinLength(question, MAX_DISCUSSION_QUESTION)) return null;
+	return { ok: { source, quote, turns, question } };
+}
+
 /** Each socket message's parser, by its `t`. */
 const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) => Parsed<MsgOf<T>> } = {
 	watch(value) {
@@ -295,6 +321,11 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		return change && { ok: { t: "project", change: change.ok } };
 	},
 	notice: ({ ids, op }) => (Array.isArray(ids) && ids.length > 0 && ids.every(isNonEmpty) && isNoticeOp(op) ? { ok: { t: "notice", ids, op } } : null),
+	discuss(value) {
+		const request = parseDiscussionRequest(value.request);
+		return isCounter(value.id) && request ? { ok: { t: "discuss", id: value.id, request: request.ok } } : null;
+	},
+	"discuss-stop": ({ id }) => (isCounter(id) ? { ok: { t: "discuss-stop", id } } : null),
 };
 
 const isClientMsgType = (t: unknown): t is ClientMsg["t"] => typeof t === "string" && Object.hasOwn(clientParsers, t);

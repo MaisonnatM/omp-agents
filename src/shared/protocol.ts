@@ -1,6 +1,7 @@
 /** The messages the dashboard socket carries between the server and the page. */
 import type { Routine, RoutineChange } from "../routines";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
+import type { DiscussionEvent, DiscussionRequest } from "./discussions";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
@@ -55,6 +56,8 @@ export type ServerMsg =
 	| { t: "notices"; list: Notice[] }
 	/** Every merge the server waits to make until GitHub allows it, whole, sent when a socket opens and after every change. */
 	| { t: "merges"; list: QueuedMerge[] }
+	/** One step of the answer to this socket's `discuss` with `id`, until its `end`. */
+	| { t: "discussion"; id: number; event: DiscussionEvent }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
 
@@ -116,7 +119,11 @@ export type ClientMsg =
 	/** Rename or archive a project; every socket then gets the projects as they are after. */
 	| { t: "project"; change: ProjectEdit }
 	/** Update notices `ids`, mark them seen or read, or clear them. */
-	| { t: "notice"; ids: string[]; op: NoticeOp };
+	| { t: "notice"; ids: string[]; op: NoticeOp }
+	/** Ask about selected text apart from every session, answered on this socket with `discussion` events for `id`, counted per page. */
+	| { t: "discuss"; id: number; request: DiscussionRequest }
+	/** Stop the answer to this socket's `discuss` with `id`, which then ends with no error. */
+	| { t: "discuss-stop"; id: number };
 
 /** A {@link ClientMsg} the page waits on: `ack`, counted per page, asks for a `done` once the server has handled it, and `floor` is the lowest `ack` the page still waits on. */
 export type AckedFrame = ClientMsg & { ack: number; floor: number };

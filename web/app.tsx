@@ -12,6 +12,7 @@ import {
 	DashboardStatusContext,
 	MentionListsContext,
 } from "./components/dashboard-context";
+import { DiscussionPanel } from "./components/discussion-panel";
 import { FileDialog } from "./components/file-dialog";
 import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
@@ -299,6 +300,7 @@ export function App() {
 							<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
 							{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
 							{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
+							<DiscussionPanel />
 							<CommandPalette
 								state={overlays.palette}
 								dispatch={dispatchPalette}
