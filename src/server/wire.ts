@@ -42,6 +42,7 @@ import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
 import { FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit } from "../shared/review-drafts";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
+import { isSyncSide, type SyncSide } from "../shared/settings-sync";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
@@ -465,6 +466,13 @@ export function parseSourceControlChange(body: unknown): Parsed<SourceControlCha
 	if ((body.op === "default" || body.op === "clean-up") && typeof body.on === "boolean") return { ok: { op: body.op, on: body.on } };
 	if (body.op === "repo" && typeof body.repo === "string" && body.repo.startsWith("/") && (typeof body.on === "boolean" || body.on === null)) return { ok: { op: "repo", repo: body.repo, on: body.on } };
 	return null;
+}
+
+/** The body of `PUT /api/sync/run`: the side each conflicting file keeps, by its path in the sync repository. */
+export function parseSyncRun(body: unknown): Parsed<Record<string, SyncSide>> {
+	if (!isObject(body) || !isObject(body.choices) || Array.isArray(body.choices)) return null;
+	const choices = Object.entries(body.choices);
+	return choices.length <= 10_000 && choices.every(([, side]) => isSyncSide(side)) ? { ok: Object.fromEntries(choices) as Record<string, SyncSide> } : null;
 }
 
 /** The most pull requests one queued merge takes: a stack taller than this is merged in parts. */

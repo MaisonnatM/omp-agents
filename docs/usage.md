@@ -1366,8 +1366,8 @@ An action that fails shows its error, and its control becomes available again.
 - **Settings** is the last sidebar tab by default, after **Calendar** and, once Gmail is connected, **Inbox**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists ten sections in two groups.
-  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, and **Workspaces**, which are the same whatever the workspace.
+  The sidebar lists eleven sections in two groups.
+  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, **Workspaces**, and **Sync**, which are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
@@ -1471,6 +1471,7 @@ An action that fails shows its error, and its control becomes available again.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
   The server keeps the list in `workspaces.json` beside its access token, so every browser tab and the desktop app show the same workspaces.
+- **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](#settings-sync).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
   With **All workspaces**, **Models**, **Files**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
@@ -1478,6 +1479,30 @@ An action that fails shows its error, and its control becomes available again.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.
   The page is in the URL hash, `#settings/<section>`, such as `#settings/integrations`; `#settings` opens **Analytics**.
   After each save the page shows the settings as omp loads them from disk.
+
+## Settings sync
+
+- **Sync** is a section of [Settings](#settings), at `#settings/sync`, that keeps the portable part of your setup the same on every machine through a Git remote that only you can read, such as a private GitHub repository.
+  Each machine's dashboard pushes to and fetches from the same branch.
+- **Remote** takes the remote's address and a branch, `main` by default; **Save** keeps both in `settings-sync.json` beside the access token.
+  Sync uses this machine's git credentials, its SSH keys or credential helper, and never asks for a password, so a remote that needs one fails with git's message.
+  An address with a password in it is refused.
+- **Sync** fetches the branch, compares each file with the last version this machine synced, and then sends what changed here and writes what changed on the remote.
+  A file that changed on one side only takes that side's version, and a file both sides changed the same way stays as it is.
+  For the source control settings, changes to different repositories, or to different settings, merge.
+  A second sync with nothing changed changes nothing and makes no commit.
+  Under the button, the last sync says when it ran and lists the files it received and sent, and the files it left on this machine.
+- A file changed differently here and on the remote since the last sync is a conflict: the sync changes nothing on either side and lists each such file.
+  The first sync of a machine that already has a file the remote has too, with different text, is a conflict as well.
+  **Compare** shows both versions; pick **This machine** or **Remote** for each file, then **Sync with these choices**.
+- **What syncs** has a switch for each item, all on by default.
+  The items are omp's `config.yml`, your `AGENTS.md` and `APPEND_SYSTEM.md`, and the `skills`, `rules`, `agents`, and `commands` directories in `~/.omp/agent`, and the source control settings: automatic pulls, each repository's choice, and the cleanup after a merge.
+  An item you turn off stays as it is, both here and on the remote.
+- **Never synced** lists what stays on each machine whatever the remote holds.
+  That covers omp's `agent.db` and other databases, `mcp.json`, which can hold OAuth client secrets, `secrets.yml`, key files such as `.env` or `*.pem`, session files, lock files, and the dashboard's access token, interrupted sessions, and merges.
+  Inside a synced directory, links, binary files, files over 1 MB, and files with text shaped like a token or a private key stay too, and the sync names each one it left.
+  Routines, todos, pins, workspaces, projects, and calendars do not sync, since they name this machine's sessions and runs, and a routine on two machines would run twice.
+- A path under your home directory is written as `~` on the remote: `/Users/ann/notes` in `AGENTS.md` arrives as `~/notes`, and a repository's pull choice moves to the same path under the other machine's home.
 
 ## Notifications
 

@@ -1,4 +1,3 @@
-import { Switch } from "@base-ui/react/switch";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +20,7 @@ import { age, folderName } from "../../labels";
 import { useMergeMethodChoice } from "../../merge-method";
 import { IntegrationList } from "../integrations/integration-row";
 import { OrgIcon } from "../org-icon";
-import { Section } from "./editor";
+import { Section, SettingSwitch } from "./editor";
 
 const PROVIDERS: Record<SourceControlProvider, { name: string; summary: string; signIn: string }> = {
 	github: { name: "GitHub", summary: "Reads your pull requests, changes them, and merges them through the gh CLI.", signIn: "gh auth login" },
@@ -68,20 +67,6 @@ function lastPull(repo: PullRepo): string {
 type RepoPull = "default" | "on" | "off";
 
 const MERGE_METHOD_CHOICES: Record<MergeMethodChoice, string> = { last: "Last selected", ...MERGE_METHOD_LABELS };
-
-function SettingSwitch(props: { checked: boolean; disabled: boolean; label: string; onCheckedChange: (on: boolean) => void }) {
-	return (
-		<Switch.Root
-			aria-label={props.label}
-			checked={props.checked}
-			disabled={props.disabled}
-			onCheckedChange={props.onCheckedChange}
-			className="inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-input p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 motion-reduce:transition-none"
-		>
-			<Switch.Thumb className="size-3 rounded-full bg-background shadow-xs transition-transform data-[checked]:translate-x-3 motion-reduce:transition-none" />
-		</Switch.Root>
-	);
-}
 
 /** GitHub's and Graphite's CLIs, automatic pulls by default and per repository, the cleanup after a merge, and the merge button's starting method. */
 export function SourceControlTab({ active }: { active: boolean }) {

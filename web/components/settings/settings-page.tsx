@@ -17,6 +17,7 @@ import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
 import { SourceControlTab } from "./source-control-tab";
+import { SyncTab } from "./sync-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 
@@ -133,6 +134,7 @@ export function SettingsPage({
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} />,
+		sync: <SyncTab active={section === "sync"} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.

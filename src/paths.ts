@@ -61,6 +61,10 @@ export const sourceControlFile = join(configDir, "source-control.json");
 export const mergesFile = join(configDir, "merges.json");
 /** The review drafts that Review sessions wrote for the user to post, and which session reviews which pull request, beside {@link tokenFile}. */
 export const reviewDraftsFile = join(configDir, "review-drafts.json");
+/** Settings sync's remote, branch, left-out items, and last outcome, beside {@link tokenFile}. */
+export const settingsSyncFile = join(configDir, "settings-sync.json");
+/** The bare Git repository settings sync fetches into and commits from, in the dashboard's data directory. */
+export const settingsSyncRepo = join(dataDir, "settings-sync.git");
 /** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */
 export const oldGoogleFile = join(configDir, "google.json");
 /** Names the server that runs routines and applies the todo inbox, which servers side by side share, beside {@link tokenFile}. */
