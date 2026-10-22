@@ -805,11 +805,23 @@ An action that fails shows its error, and its control becomes available again.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
   Click the row to show the pull request's details in the main area; session chips, move badges, and the `⋯` menu keep their own clicks.
   The title remains a link for keyboard and modifier-click navigation.
-  The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
+  The **+** in the open pull request strip above a PR's details brings the list back to pick another; the list itself shows the strip without it.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
   Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the browser's localStorage keeps the last one of each workspace.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
+- Opening a pull request adds a `#N` tab above its details; reopening it focuses the existing tab.
+  Drag tabs to reorder, or focus a tab's number and press Alt+Left or Alt+Right.
+  Each tab's glyph shows the state the pull request list last read gives it, or a plain icon when that list leaves it out, and becomes a close button on hover or keyboard focus.
+  Closing the active tab selects its right neighbour, then its left, or returns to the list when none remain.
+  Right-click a tab, or press Shift+F10 on its number, for **Copy link**, **Copy PR number**, **Close**, and **Close others**.
+  Wheel over the strip to scroll it horizontally; chevrons appear when tabs overflow.
+  The browser keeps the open tabs, their order, and each PR's selected detail tab across reloads, and a session sidebar's for the 20 sessions whose tabs changed last.
+  A session's **PRs** sidebar has its own strip, which starts on the session's first pull request and shows it again once its last tab closes; its **Summary** opens the session's other pull requests there without changing the page.
+  Cmd+Shift+K copies the open page PR's `#N`, Cmd+Shift+C copies its GitHub link, and Cmd+W closes its tab.
+  These keys apply only while the Pull requests page shows a PR, not in the session sidebar.
+  The desktop app gives that Cmd+W to the page rather than its native window Close command.
+  A plain browser may reserve Cmd+W and close its browser tab before the page can prevent it; use the glyph or context menu there.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any sort but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
@@ -1685,6 +1697,9 @@ Alt is Option on macOS.
 | O | Pull requests page, outside text fields | Open the pull request on GitHub |
 | . | Pull requests page, outside text fields | Open the pull request's `⋯` menu |
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
+| Cmd+Shift+K / Cmd+Shift+C | Pull requests page showing a PR | Copy its `#N` / GitHub link |
+| Cmd+W | Pull requests page showing a PR | Close its PR tab; browsers may reserve this key |
+| Alt+Left / Alt+Right | Focused open PR tab's number | Move the tab left / right |
 | / | Todo page, outside text fields | Search the todos |
 | ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
 | X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |

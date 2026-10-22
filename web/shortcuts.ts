@@ -46,6 +46,9 @@ export type ShortcutId =
 	| "pullRequestOnGitHub"
 	| "pullRequestActions"
 	| "giveToAgent"
+	| "copyPullRequestNumber"
+	| "copyPullRequestLink"
+	| "closePullRequestTab"
 	| "todoSearch"
 	| "todoNext"
 	| "todoPrevious"
@@ -233,6 +236,9 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "pullRequestOnGitHub", category: "pull-requests", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "pullRequestActions", category: "pull-requests", label: "Pull requests: open the pull request's actions menu", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
 	{ id: "giveToAgent", category: "pull-requests", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
+	{ id: "copyPullRequestNumber", category: "pull-requests", label: "Open pull request: copy #N", keys: [{ chord: { key: "k", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "copyPullRequestLink", category: "pull-requests", label: "Open pull request: copy its GitHub link", keys: [{ chord: { key: "c", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "closePullRequestTab", category: "pull-requests", label: "Open pull request: close its tab (desktop; browsers may reserve this key)", keys: [{ chord: { key: "w", mod: true }, scope: "anywhere" }] },
 	{ id: "todoSearch", category: "todo", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "todoNext", category: "todo", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "todoPrevious", category: "todo", label: "Focus the previous todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

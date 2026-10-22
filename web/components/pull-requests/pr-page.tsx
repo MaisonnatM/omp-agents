@@ -1,18 +1,20 @@
 /** `PullRequestDetailPage`: one pull request in the main area, with the quick actions that start a session on it. */
-import { ArrowLeft } from "lucide-react";
-import { type PullRequestList, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
+import { useEffect } from "react";
+import { type PullRequestList, type LinkedPullRequest, type PullRequest, pullRequestUrl, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { pageDetailTab, type PullRequestDetailTab, pullRequestTabHash, usePagePullRequestTabs } from "../../pull-request-tabs";
+import { useShortcuts } from "../../shortcuts";
+import { useClipboard } from "../../use-copy";
 import { listedPullRequest } from "../../pull-requests-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart, quickOn } from "../../quick-actions";
 import { pullRequestsStore } from "../../reads";
-import { hashForPullRequests } from "../../routing";
+import { hashForPullRequestFiles, hashForPullRequests } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
-import { Header } from "../page-header";
+import { PullRequestTabsStrip } from "./pr-tabs";
 import { QuickStartNotice } from "../quick-actions";
 import { type Placement, PullRequestDetailContent } from "./pr-details";
 import { rowId } from "./pr-row";
@@ -36,8 +38,10 @@ interface PullRequestDetailsProps {
 	placement: Placement;
 	/** A change reads `target` from GitHub again. */
 	version?: unknown;
-	/** The changed file the Code tab opens. */
-	files?: { path: string | null } | null;
+	tab: PullRequestDetailTab;
+	onTab: (tab: PullRequestDetailTab) => void;
+	/** The changed file the route opens in the Code tab. */
+	path?: string | null;
 	/** Shows another pull request of its stack or of the session in place; without it, each of its stack links to its page. */
 	onPick?: (pr: PullRequest) => void;
 	/** The session's pull requests, in the session details sidebar. */
@@ -51,7 +55,7 @@ interface PullRequestDetailsProps {
  * became of a quick start on it. The page also says why the list does not hold it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
-export function PullRequestDetails({ workspace, hosts, target, placement, version, files, onPick, session, current = null }: PullRequestDetailsProps) {
+export function PullRequestDetails({ workspace, hosts, target, placement, version, tab, onTab, path, onPick, session, current = null }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const { read } = pullRequestsStore.use(workspace);
@@ -83,7 +87,9 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 				session={session}
 				placement={placement}
 				version={version}
-				files={files}
+				tab={tab}
+				onTab={onTab}
+				path={path}
 				onPick={onPick}
 				workspace={workspace}
 				cwd={listed?.cwd ?? hosts.find(host => host.instanceId === current)?.cwd ?? null}
@@ -92,21 +98,41 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 	);
 }
 
+interface PullRequestDetailPageProps extends Pick<PullRequestDetailsProps, "workspace" | "hosts" | "target"> {
+	/** The route's Code tab and the changed file it opens; `null` for another tab. */
+	files: { path: string | null } | null;
+}
+
 /** A pull request from the Pull requests page in the main area, with the quick actions that start a session on it. */
-export function PullRequestDetailPage(props: Omit<PullRequestDetailsProps, "placement" | "version">) {
-	const back = (
-		<Tooltip content="Back to Pull requests" side="bottom">
-			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to Pull requests" render={<a href={hashForPullRequests(null)} />}>
-				<ArrowLeft />
-			</Button>
-		</Tooltip>
-	);
+export function PullRequestDetailPage({ files, ...props }: PullRequestDetailPageProps) {
+	const { tabs, dispatch } = usePagePullRequestTabs(props.target);
+	const tab = pageDetailTab(tabs.open, props.target, files !== null);
+	const choose = (next: PullRequestDetailTab): void => {
+		dispatch({ type: "detail", pr: props.target, tab: next });
+		if ((next === "code") !== (files !== null)) location.hash = next === "code" ? hashForPullRequestFiles(props.target) : hashForPullRequests(props.target);
+	};
+	const clipboard = useClipboard();
+	useShortcuts({
+		copyPullRequestNumber: () => clipboard.run(`#${props.target.number}`),
+		copyPullRequestLink: () => clipboard.run(pullRequestUrl(props.target)),
+		closePullRequestTab: () => dispatch({ type: "close", pr: props.target }),
+	});
+	useEffect(() => {
+		window.ompDesktop?.ownsClose?.(true);
+		return () => window.ompDesktop?.ownsClose?.(false);
+	}, []);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<Header title="Pull requests" meta="Your pull requests and review requests on GitHub" leading={back} />
+			<PullRequestTabsStrip
+				tabs={tabs}
+				dispatch={dispatch}
+				workspace={props.workspace}
+				hrefOf={pullRequestTabHash}
+				onAdd={() => { location.hash = hashForPullRequests(null); }}
+			/>
 			<TooltipProvider>
 				<div className="flex min-h-0 flex-1 flex-col">
-					<PullRequestDetails {...props} placement="page" />
+					<PullRequestDetails {...props} placement="page" tab={tab} onTab={choose} path={files?.path ?? null} />
 				</div>
 			</TooltipProvider>
 		</div>

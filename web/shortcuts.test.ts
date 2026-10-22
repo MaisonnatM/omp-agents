@@ -34,7 +34,7 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("t", "KeyT", { alt: true })).toEqual(["hideThinking"]);
 	expect(pressOn(true, "†", "KeyT", { alt: true })).toEqual(["hideThinking"]);
 	expect(pressOn(true, "k", "KeyK", { meta: true })).toEqual(["switcher"]);
-	expect(press("K", "KeyK", { ctrl: true, shift: true })).toEqual([]);
+	expect(press("K", "KeyK", { ctrl: true, shift: true })).toEqual(["copyPullRequestNumber"]);
 	expect(press("k", "KeyK", { ctrl: true, alt: true })).toEqual([]);
 	expect(press("b", "KeyB")).toEqual([]);
 });
@@ -46,12 +46,15 @@ test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's wind
 	expect(pressOn(true, "`", "Backquote", { ctrl: true, meta: true })).toEqual([]);
 });
 
-test("browser-reserved chords stay the browser's, apart from Cmd+N, which only the desktop window ever receives", () => {
+test("browser-reserved chords stay the browser's, apart from app new-session and PR-close bindings", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
+		expect(pressOn(mac, "w", "KeyW", mod)).toEqual(["closePullRequestTab"]);
+		expect(pressOn(mac, "K", "KeyK", { ...mod, shift: true })).toEqual(["copyPullRequestNumber"]);
+		expect(pressOn(mac, "C", "KeyC", { ...mod, shift: true })).toEqual(["copyPullRequestLink"]);
 	}
 });
 
