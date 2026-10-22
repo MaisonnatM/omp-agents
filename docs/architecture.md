@@ -1100,6 +1100,11 @@ Comment and review authors carry `isBot` from GitHub's `__typename` `Bot`, which
 An `update` change selects `merge` or `rebase` and calls `GITHUB_MERGES.update` with the node id and head read fresh from GitHub.
 `PUT /api/pull-request/viewed` takes a `PullRequestViewedEdit`, a pull request with `{ path, on }`, reads the pull request node id, calls `markFileAsViewed` or `unmarkFileAsViewed` through GraphQL, and answers `{}`, since the **Code** tab keeps its own viewed states.
 The queue uses the same update function with the merge method.
+`PUT /api/pull-request/checkout` takes a `PullRequestCheckout` from `src/shared/git.ts`, a pull request with `{ cwd, place, skill }`, checked by `parsePullRequestCheckout`, and answers 404 when `cwd` is not a directory.
+`checkOutPullRequest` in `src/pull-request-checkout.ts` refuses a `cwd` whose `origin` is another repository, reads the head branch and commit from REST, and answers a `CheckedOutPullRequest`: the branch, whether it is at that commit, and the session it started; any refusal answers 409 with why.
+Place `here` refuses uncommitted changes to tracked files and runs `gh pr checkout <number> -R <owner>/<repo>` in `cwd`.
+Place `worktree` fetches `refs/pull/<number>/head` without forcing into the head branch's name, or `pr-<number>/<name>` for a fork, and gives a branch from the same repository the upstream `origin/<name>`, unless a linked worktree already has the branch, which it reuses as it is.
+It refuses the branch while the main checkout has it, then starts a `new` session through the same start a socket `start` runs, with `branch: { kind: "existing" }`, the pinned `skill`, a prompt asking for a summary, and the pull request as its subject, so `checkoutDir` reuses or adds the worktree.
 Each open pull request detail adds one REST comparison of its base against its head commit.
 `behindBy` is the comparison's `behind_by` count, or `null` for an unavailable comparison or a finished pull request.
 A merge is no change of its own: it goes through `PUT /api/merge-queue`, whose `MergeQueue` runs GraphQL's `mergePullRequest` with `expectedHeadOid` the commit the confirmation showed, so GitHub refuses the merge once the branch moved past it.

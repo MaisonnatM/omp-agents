@@ -1,4 +1,5 @@
-/** Git checkouts and branches a new session can work on. */
+/** Git checkouts and branches a new session can work on, and pull requests checked out locally. */
+import type { PullRequest } from "./github";
 
 /** A local branch, and the worktree that has it checked out, `null` when none has. */
 export interface LocalBranch {
@@ -30,3 +31,23 @@ export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; n
  * of the repository has it, `removed`, or `kept` with `why`, the checks that kept it or the removal's error.
  */
 export type BranchRelease = { kind: "none" } | { kind: "removed"; path: string } | { kind: "kept"; path: string; why: string };
+
+/** Where **Check out** puts a pull request: a worktree of its own with a new session on it, or the checkout the page knows, as `gh pr checkout` does. */
+export type CheckoutPlace = "worktree" | "here";
+
+/** The body of `PUT /api/pull-request/checkout`: pull request `number` of `owner/repo`, checked out at `place` from `cwd`, a checkout of its repository. */
+export interface PullRequestCheckout extends PullRequest {
+	cwd: string;
+	place: CheckoutPlace;
+	/** The skill the worktree session's first message goes through, the page's pinned one; `null` for none. */
+	skill: string | null;
+}
+
+/** What `PUT /api/pull-request/checkout` did: the local branch now on the pull request, and the session started on it. */
+export interface CheckedOutPullRequest {
+	branch: string;
+	/** The branch is at the pull request's latest commit; local commits keep it where it is. */
+	onHead: boolean;
+	/** The worktree session's `instanceId`; `null` for a checkout `here`, which starts none. */
+	instanceId: string | null;
+}

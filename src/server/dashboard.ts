@@ -30,6 +30,7 @@ import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
+import { checkOutPullRequest } from "../pull-request-checkout";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
@@ -555,6 +556,7 @@ export class Dashboard {
 				},
 				previewReviewDraft: pr => this.#reviewDrafts.preview(pr),
 				postReviewDraft: (pr, submit) => this.#reviewDrafts.post(pr, submit),
+				checkOutPullRequest: checkout => checkOutPullRequest(checkout, this.#startSession),
 			},
 			dashboard: this.#selfUpdate,
 			sync: this.#settingsSync,

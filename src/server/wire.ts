@@ -30,7 +30,8 @@ import {
 } from "../shared/discussions";
 import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
-import { parseImages, parseModel, parseNewSessionRequest, parseThinking } from "../shared/sessions";
+import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
+import type { CheckoutPlace, PullRequestCheckout } from "../shared/git";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import {
@@ -524,6 +525,16 @@ export function parsePullRequestViewedEdit(body: unknown): Parsed<PullRequestVie
 	if (!isObject(body) || !isNonEmpty(body.path) || typeof body.on !== "boolean") return null;
 	const pr = parsePullRequest(body.owner, body.repo, body.number);
 	return pr && { ok: { ...pr.ok, path: body.path, on: body.on } };
+}
+
+const isCheckoutPlace = oneOf<CheckoutPlace>(["worktree", "here"]);
+
+/** The body of `PUT /api/pull-request/checkout`, with `cwd` an absolute directory. */
+export function parsePullRequestCheckout(body: unknown): Parsed<PullRequestCheckout> {
+	if (!isObject(body) || !isNonEmpty(body.cwd) || !body.cwd.startsWith("/") || !isCheckoutPlace(body.place)) return null;
+	const pr = parsePullRequest(body.owner, body.repo, body.number);
+	const skill = parseSkill(body.skill);
+	return pr && skill && { ok: { ...pr.ok, cwd: body.cwd, place: body.place, skill: skill.ok } };
 }
 
 /** The body of `PUT /api/source-control`. */

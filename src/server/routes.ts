@@ -56,9 +56,10 @@ import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
 	MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
-	parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
+	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
 } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
+import type { CheckedOutPullRequest, PullRequestCheckout } from "../shared/git";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
@@ -144,7 +145,7 @@ export interface RouteEnv {
 	sync: SyncRoutesEnv;
 }
 
-/** What the pull request routes hand on: the merge queue, through which every merge goes. */
+/** What the pull request routes hand on: the merge queue, through which every merge goes, review drafts, and checkouts, which can start a session. */
 export interface PullRequestRoutesEnv {
 	/** Apply `change` to the merge queue; answers the queued merges after it and what it merged, or rejects with why it refused. */
 	changeMergeQueue(change: MergeQueueChange): Promise<MergeQueueAnswer>;
@@ -152,6 +153,8 @@ export interface PullRequestRoutesEnv {
 	previewReviewDraft(pr: PullRequest): Promise<ReviewPreview>;
 	/** Posts the pull request's review draft once, first with the composer's `submit` applied, and answers it marked posted; rejects with why it cannot. */
 	postReviewDraft(pr: PullRequest, submit?: ReviewSubmit): Promise<ReviewDraft>;
+	/** Checks out the pull request at its place, a worktree with a new session on it or the checkout itself; rejects with why it refused. */
+	checkOutPullRequest(checkout: PullRequestCheckout): Promise<CheckedOutPullRequest>;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -731,10 +734,23 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 		err => fail(409, errorText(err)),
 	);
 
+	/** `PUT /api/pull-request/checkout`: `PullRequestCheckout`; answers a `CheckedOutPullRequest`, or 409 with why it refused. */
+	const pullRequestCheckout = write(
+		async body => {
+			const checkout = checked(parsePullRequestCheckout(body), "Expected { owner, repo, number, cwd, place } with cwd an absolute directory, place worktree or here, and an optional one-word skill");
+			if (checkout instanceof Response) return checkout;
+			const cwd = await directoryOf(checkout.cwd);
+			return cwd ? { ...checkout, cwd } : fail(404, `${checkout.cwd.trim()} is not a directory.`);
+		},
+		env.checkOutPullRequest,
+		err => fail(409, errorText(err)),
+	);
+
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/github-media": { GET: githubMedia },
 		"/api/pull-request/attachment": { PUT: pullRequestAttach },
+		"/api/pull-request/checkout": { PUT: pullRequestCheckout },
 		"/api/pull-request/viewed": { PUT: pullRequestViewed },
 		"/api/merge-queue": { PUT: mergeQueue },
 		"/api/review-draft/preview": { GET: reviewDraftPreview },

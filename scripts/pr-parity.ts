@@ -42,7 +42,7 @@ interface App {
 	pin(context: BrowserContext): Promise<unknown>;
 	panel(page: Page): Locator;
 	tab(panel: Locator, tab: Tab): Locator;
-	control(panel: Locator, control: Control): Locator | null;
+	control(panel: Locator, control: Control): Locator;
 	busy(page: Page): Locator;
 }
 
@@ -90,7 +90,7 @@ const omp = (base: string): App => ({
 		if (control === "checks") return panel.getByRole("button", { name: /^Checks:/ });
 		if (control === "menu") return panel.getByRole("button", { name: "More pull request actions" });
 		if (control === "composer") return panel.getByRole("button", { name: COMPOSER_LABEL });
-		return null;
+		return panel.getByRole("button", { name: "Check out" });
 	},
 	busy: page => page.getByText(/^(Asking GitHub for the pull request|Reading changes)…$/),
 });
@@ -177,7 +177,7 @@ async function capture(app: App, context: BrowserContext, pr: PullRequestRef, st
 		}
 		if (state.open) {
 			const control = app.control(panel, state.open);
-			if (!control || (await control.count()) === 0) return false;
+			if ((await control.count()) === 0) return false;
 			await control.click();
 			await page.locator('[role="menu"], [role="dialog"]').last().waitFor({ state: "visible", timeout: LOAD_TIMEOUT_MS });
 		}
