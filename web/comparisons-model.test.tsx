@@ -1,21 +1,41 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ComparisonSnapshot, ComparisonVariant } from "../src/shared/comparisons";
+import type { ComparisonSnapshot, ComparisonVariant, VariantLifecycle } from "../src/shared/comparisons";
 import { cleanupRemaining, EMPTY_SCREENSHOT, screenshotPreview } from "./comparisons-model";
-import { CleanupLosses, ComparisonsPage } from "./components/comparisons-page";
+import { ComparisonsPage } from "./components/comparisons-page";
+import { CleanupLosses } from "./components/comparison-dialogs";
+import { VariantCard } from "./components/comparison-variant-card";
 import { DashboardActionsContext, type DashboardActions } from "./components/dashboard-context";
 import { initialState, reduce } from "./dashboard-state";
 import { hashForComparisons, routeFromHash } from "./routing";
 
-const variant = (ordinal: number): ComparisonVariant => ({
-	id: `variant-${ordinal}`, ordinal, instanceId: `instance-${ordinal}`, sessionId: `session-${ordinal}`, sessionIds: [`session-${ordinal}`],
-	cwd: `/repo-variant-${ordinal}/web`, checkout: `/repo-variant-${ordinal}`, branch: `design-${ordinal}`,
-	model: ordinal === 5 ? { provider: "openai", id: "gpt-5" } : null, thinking: ordinal === 5 ? "high" : null,
-	start: { kind: "registered" }, firstPrompt: { kind: "admitted" }, stop: { kind: "not-requested" }, cleanup: { kind: "pending" }, screenshot: null, screenshotError: null,
+const variant = (number: number): ComparisonVariant => ({
+	id: `variant-${number}`,
+	instanceId: `instance-${number}`,
+	sessionId: `session-${number}`,
+	sessionIds: [`session-${number}`],
+	cwd: `/repo-variant-${number}/web`,
+	checkout: `/repo-variant-${number}`,
+	branch: `design-${number}`,
+	selection: { model: number === 5 ? { provider: "anthropic", id: "requested-model" } : null, thinking: number === 5 ? "low" : null },
+	model: number === 5 ? { provider: "openai", id: "gpt-5" } : null,
+	thinkingLevel: number === 5 ? "high" : null,
+	lifecycle: { kind: "running" },
+	screenshot: null,
+	screenshotError: null,
 });
 const comparison: ComparisonSnapshot = {
-	id: "comparison-1", createdAt: 1, prompt: "Compare five navigation designs", sourceCwd: "/repo/web", repository: "/repo", base: "main", baseSha: "a".repeat(40),
-	owner: { kind: "local" }, variants: Array.from({ length: 5 }, (_, index) => variant(index + 1)), winner: null, cleanup: { kind: "not-selected" }, error: null,
+	id: "comparison-1",
+	createdAt: 1,
+	prompt: "Compare five navigation designs",
+	sourceCwd: "/repo/web",
+	repository: "/repo",
+	base: "main",
+	baseSha: "a".repeat(40),
+	owner: { kind: "local" },
+	variants: Array.from({ length: 5 }, (_, index) => variant(index + 1)),
+	winner: null,
+	cleanup: { kind: "not-selected" },
 };
 const actions: DashboardActions = {
 	send() {}, request: async () => {}, open() {}, focus() {}, start() {}, dismissStart() {}, openNewSession() {}, changeTodo() {}, end() {}, openFile() {}, openNewTicket() {}, workspaceSettings: () => null,
@@ -50,7 +70,7 @@ test("comparison snapshots preserve five members and reopen independently of ord
 	expect(disconnected.comparisons?.[0]?.variants[4]?.model).toEqual({ provider: "openai", id: "gpt-5" });
 });
 
-test("the comparison renders every member and ordinary session links, including the fifth model override", () => {
+test("the comparison renders every member and saved actual model after the live host leaves", () => {
 	const html = renderToStaticMarkup(<DashboardActionsContext value={actions}><ComparisonsPage id="comparison-1" comparisons={[comparison]} hosts={[]} connected /></DashboardActionsContext>);
 	expect(html.match(/<article\b/g)?.length).toBe(5);
 	expect(html.match(/href="#session\/session-\d"/g)).toEqual([
@@ -58,12 +78,24 @@ test("the comparison renders every member and ordinary session links, including 
 	]);
 	expect(html).toContain("openai/gpt-5");
 	expect(html).toContain("design-5");
+	expect(html).toContain("high");
+	expect(html.match(/>Running</g)?.length).toBe(5);
 });
 
 test("cleanup counts preserved and blocked losers as remaining, never the winner", () => {
-	const selected: ComparisonSnapshot = { ...comparison, winner: "variant-1", variants: comparison.variants.map((row): ComparisonVariant => ({ ...row, cleanup: row.ordinal === 2 ? { kind: "removed" } : row.ordinal === 3 ? { kind: "preserved" } : row.ordinal === 4 ? { kind: "blocked", reasons: ["Locked"] } : { kind: "pending" } })) };
+	const selected: ComparisonSnapshot = {
+		...comparison,
+		winner: "variant-1",
+		variants: comparison.variants.map((row, index): ComparisonVariant => ({
+			...row,
+			lifecycle: index === 1 ? { kind: "removed" }
+				: index === 2 ? { kind: "preserved" }
+				: index === 3 ? { kind: "cleanup-blocked", reasons: ["Locked"] }
+				: { kind: "stopped" },
+		})),
+	};
 	expect(cleanupRemaining(selected)).toBe(3);
-	expect(cleanupRemaining({ ...selected, variants: selected.variants.map((row): ComparisonVariant => ({ ...row, cleanup: { kind: "removed" } })) })).toBe(0);
+	expect(cleanupRemaining({ ...selected, variants: selected.variants.map((row): ComparisonVariant => ({ ...row, lifecycle: { kind: "removed" } })) })).toBe(0);
 });
 
 test("the loss review exposes exact tracked, untracked and ignored paths and hard blockers", () => {
@@ -75,4 +107,54 @@ test("the comparison list reopens a durable group and malformed route escapes do
 	const html = renderToStaticMarkup(<ComparisonsPage id={null} comparisons={[comparison]} hosts={[]} connected={false} />);
 	expect(html).toContain('href="#comparisons/comparison-1"');
 	expect(routeFromHash("#comparisons/%zz")).toEqual({ kind: "page", page: { kind: "comparisons", id: null } });
+});
+
+test("a variant presents one lifecycle with its failure or safety detail", () => {
+	const cases: [VariantLifecycle, string, string | null][] = [
+		[{ kind: "registered" }, "Registered, waiting to send", null],
+		[{ kind: "prompt-attempted" }, "Sending first prompt", null],
+		[{ kind: "failed", error: "Provider unavailable" }, "Start failed", "Provider unavailable"],
+		[{ kind: "uncertain", reason: "Acknowledgement lost." }, "First prompt uncertain", "The first prompt will not be sent again automatically."],
+		[{ kind: "stop-blocked", reason: "Keeper still alive" }, "Stop blocked", "Keeper still alive"],
+		[{ kind: "cleanup-blocked", reasons: ["Worktree locked"] }, "Stopped, removal blocked", "Worktree locked"],
+		[{ kind: "removed" }, "Stopped, checkout removed", null],
+	];
+	for (const [lifecycle, label, detail] of cases) {
+		const html = renderToStaticMarkup(
+			<VariantCard variant={{ ...variant(5), lifecycle }} number={2} host={undefined} winner={false} canSelect={false} onSelect={() => {}} />,
+		);
+		expect(html).toContain(label);
+		if (detail) expect(html).toContain(detail);
+		expect(html).toContain("Variant 2");
+		expect(html).toContain("openai/gpt-5");
+		expect(html).toContain("Requested model");
+		expect(html).toContain("Actual model");
+		expect(html).not.toContain("First prompt </dt>");
+	}
+});
+
+test("the comparisons list links directly to its dedicated composer", () => {
+	const html = renderToStaticMarkup(<ComparisonsPage id={null} comparisons={[]} hosts={[]} connected />);
+	expect(html).toContain('href="#new-variants"');
+	expect(html).toContain("New comparison");
+	expect(html).toContain("No design comparisons yet.");
+});
+
+test("requested settings do not become actual settings when a launch fails before registration", () => {
+	const failed: ComparisonVariant = {
+		...variant(5),
+		sessionId: null,
+		sessionIds: [],
+		model: null,
+		thinkingLevel: null,
+		lifecycle: { kind: "failed", error: "Could not register" },
+	};
+	const html = renderToStaticMarkup(
+		<VariantCard variant={failed} number={1} host={undefined} winner={false} canSelect={false} onSelect={() => {}} />,
+	);
+	expect(html).toContain("anthropic/requested-model");
+	expect(html).toContain("low");
+	expect(html).toContain("Not reported");
+	expect(html).toContain("Could not register");
+	expect(html).not.toContain("openai/gpt-5");
 });

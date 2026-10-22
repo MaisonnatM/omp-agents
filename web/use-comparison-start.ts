@@ -5,14 +5,14 @@ import { errorText } from "./api";
 type Launch = { kind: "ready" } | { kind: "pending"; id: string } | { kind: "uncertain"; id: string; error: string } | { kind: "failed"; error: string };
 const STORAGE_KEY = "omp-agents.pending-comparison";
 
-export function useComparisonStart(onStart: ((id: string, spec: ComparisonSpec) => Promise<void>) | undefined) {
+export function useComparisonStart(onStart: (id: string, spec: ComparisonSpec) => Promise<void>) {
 	const [launch, setLaunch] = useState<Launch>(() => {
 		const id = sessionStorage.getItem(STORAGE_KEY);
 		return isComparisonId(id) ? { kind: "uncertain", id, error: "A previous comparison start has not been acknowledged in this browser." } : { kind: "ready" };
 	});
 	const claimed = useRef("id" in launch ? launch.id : null);
 	const start = async (spec: ComparisonSpec): Promise<void> => {
-		if (!onStart || claimed.current !== null) return;
+		if (claimed.current !== null) return;
 		const id = crypto.randomUUID();
 		claimed.current = id;
 		try {

@@ -15,7 +15,7 @@ Each part of the screen, by the name you would call it, with the component that 
 Start a UI change here, then read that file's entry under [Page](#page).
 
 - Composer, the box you type a prompt in: `InputMessage` in `web/components/ui/input-message.tsx`, with its text field, `PromptEditor`, in `web/components/prompt-editor.tsx`.
-  A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`.
+  Live sessions mount it in `web/components/conversation.tsx`, single-session drafts in `web/components/new-session.tsx`, and comparison drafts in `web/components/new-variants.tsx`.
 - Gray strip under the composer, with the directory and the context ring: `ComposerTray` in `web/components/composer.tsx`; the ring is `ContextRing` in `web/components/context-ring.tsx`.
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
@@ -49,6 +49,9 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Notification bell: `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
 - System notifications of sessions that ask or finish, and the desktop app's Dock badge: `useAttention` in `web/use-attention.ts`, shown by `desktop/attention.ts` in the desktop app; their switch is `SessionNotifications` in `web/components/settings/preferences-tab.tsx`.
 - Pages, each routed by `web/routing.ts`:
+  - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts.
+  - New design comparison: `web/components/new-variants.tsx`, with common and per-row model selection in `variant-model-rows.tsx` beside it.
+  - Design comparisons: `web/components/comparisons-page.tsx`, with each variant's lifecycle and screenshot in `comparison-variant-card.tsx`, and the keep and discard confirmations in `comparison-dialogs.tsx` beside it.
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
@@ -221,8 +224,11 @@ The server lives in `src/`:
   `src/pull-request-review.ts` holds a review draft's side of GitHub: `readReviewTarget`, the head and the lines each file's diff shows, the viewer's login, the reviews and their comments a retry compares, and `postReview`, one `POST` of the review through `ghRestPost` in `src/github.ts`.
 - `src/server/merge-queue.ts`: `MergeQueue`, every merge the dashboard makes, kept in `merges.json` and stepped only by the server that holds the owner lock, `nextStep`, which picks a merge's next step from where its pull request stands, and `stackOrder`, which orders a stack of one repository bottom first; `src/shared/merge-queue.ts` holds `QueuedMerge`, `MergeQueueChange`, `MergeQueueAnswer`, and `queuedMergeOf`, which the page shares; see [Merges, and the cleanup after one](architecture.md#merges-and-the-cleanup-after-one).
 - `src/server/review-drafts.ts`: `ReviewDrafts`, the **Review** session's `save_review_draft` host tool, bound to its pull request through `join` and the `Reviewer`s it keeps, and the preview and post of a draft, which takes a matching review already on GitHub instead of posting twice; `src/server/review-drafts-file.ts` keeps the drafts and reviewers in `review-drafts.json` beside the access token; `src/shared/review-drafts.ts` holds `ReviewDraft`, `ReviewFinding`, `ReviewDraftEdit`, `applyReviewDraft`, `reviewPayload`, which builds the review from the accepted findings and the diff's lines, and `postRefusal`, which the page shares; see [Review drafts](architecture.md#review-drafts).
-- `src/server/comparisons.ts`: `Comparisons`, the design comparisons: their records and screenshots under `comparisonsDir` from `src/paths.ts`, each one's `OwnerLock`, the start of its variants through the starter's `ReservedLaunch`, the `publish_variant_screenshot` host tool, **Keep this one**, and the review and cleanup of the losing worktrees through `Worktrees.reviewOwned` and `Worktrees.removeOwned`; see [Design comparisons](architecture.md#design-comparisons).
-  `src/shared/comparisons.ts` holds the shapes the page shares and `parseComparisonSpec`, `src/variant-image.ts` checks a published screenshot's bytes, and `allocateVariant` in `src/git.ts` adds a variant's worktree on a new branch at the comparison's commit.
+- `src/server/comparisons.ts`: `Comparisons`, the design comparison lifecycle, the canonical async session join that binds comparison membership, **Keep this one**, and the review and cleanup of losing worktrees through `Worktrees.reviewOwned` and `Worktrees.removeOwned`; see [Design comparisons](architecture.md#design-comparisons).
+  `src/server/comparison-records.ts` owns versioned manifest parsing, valid version-one conversion, durable per-instance membership claims, record load and save, and each record's `SerialLane` and `OwnerLock`.
+  `src/server/variant-screenshots.ts` owns `VariantScreenshots`, the bound `publish_variant_screenshot` host tool, copied media, and durable per-call publication receipts.
+  `src/shared/comparisons.ts` holds the single `VariantLifecycle` union, requested selection and saved actual model and effort, derived cleanup read shapes, and `parseComparisonSpec`.
+  `src/variant-image.ts` checks screenshot bytes, and `allocateVariant` in `src/git.ts` adds a variant's worktree on a new branch at the comparison's commit.
 - `src/server/merge-cleanup.ts`: `MergeCleanup`, which marks the live sessions linked to a pull request that merged while it watched, and ends each once it is idle and not held for a usage limit's continue with every pull request merged or closed, with its worktree and its merged branch, trying a failed or refused end again at the next look.
 - `src/server/isolation-sweep.ts`: `IsolationSweep`, which once a day, on the owner's minute tick, removes each of omp's isolation sandboxes whose omp exited and whose checkout is clean, unlocked, and unused; `src/omp/isolation.ts` supplies omp's directory, its owner marker and liveness check, and its teardown of a retained mount; see [Isolation sandboxes](architecture.md#isolation-sandboxes).
 - `src/source-control.ts`: Settings › Source control providers on the server: `gh`'s and `gt`'s sign-in, the automatic pull setting and the cleanup after a merge in `source-control.json`, and `pullDefaultBranch`; see [HTTP API](architecture.md#http-api).
@@ -426,12 +432,19 @@ The page lives in `web/`.
   A refused edit is undone, and the page names why.
   A pull request's details, a Linear issue's details and its fields, the settings page's omp settings, and the source control section read through it; the settings editors' saves go through its `write`.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
+  `web/components/new-session.tsx` owns only single-session starts, todo drafts, and scheduled edits; its **Variants** link opens the separate `#new-variants/<encoded cwd>` route.
+  `web/components/new-variants.tsx` owns the comparison prompt, attachments, shared base, and variant rows, reusing `ComposerEditor`, `DirectoryPicker`, `useCompletion`, and `useDraftModelSelection`.
+  `web/components/draft-skill.tsx` owns the pinned-skill state and toggle shared by the two draft composers.
+  `web/use-comparison-start.ts` saves a comparison id before sending, deduplicates repeated sends, and keeps an uncertain start across reloads without resending its first prompt.
+  `web/comparisons-model.ts` retains the previous screenshot while a replacement loads and counts losing checkouts that remain.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests, the tickets, and a session's header also show, and its `onCopy` runs once a click has copied.
   Its `releaseBranch` sends `releaseWorktree` and toasts the worktree it removed or kept, or the failure; the branch a pull request's details bring and a session header's branch call it after a copy.
   `web/use-copy.ts` copies text to the clipboard, resolving once the copy lands, and holds the copied state behind a button's check mark.
-  `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft and the **New project** form: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
+  `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of single-session and comparison drafts and the **New project** form: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
-  `web/composer-drafts.ts` keeps each composer's unsent text in localStorage under one key: `useComposerDraft` for each live session's and subagent's composer (`liveDraftKey`) and the new-session draft (`newDraftKey`, one per todo), and `putDraft` and `clearDraft`, through which `web/use-dashboard.ts` puts a fork's prompt in its composer and forgets a started session's first message; drafts unchanged for 30 days go on the next write.
+  `web/composer-drafts.ts` keeps each composer's unsent text in localStorage under one key: `liveDraftKey` for live sessions and subagents, `newDraftKey` for single-session drafts with one per todo, and `variantsDraftKey` for the comparison composer.
+  `useComposerDraft` reads and saves that text; `putDraft` and `clearDraft` seed a fork's prompt and forget an acknowledged start's draft.
+  Drafts unchanged for 30 days go on the next write.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   `web/components/command-picker.tsx` holds `CommandPicker`, the searchable grouped list behind the branch, workspace, and skill pickers, with `CommandResults`, which the model menu's search shares.
   The checkout, the default model's role, and the skills are each one `useRead`.

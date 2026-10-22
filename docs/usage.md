@@ -638,8 +638,11 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Design comparisons
 
-- **Variants** above the new-session composer turns one prompt into several sessions that try the same design at once; **Single session** turns it back.
-  It shows three variant rows at first; **Add variant** adds another and each row's × removes it, down to two.
+- **Variants** in the new-session header opens a separate **New design comparison** page at `#new-variants/<encoded directory>`.
+  **New comparison** in **Design comparisons** opens the same page in the default directory; **Single session** returns to a single-session draft.
+  The two pages keep their unsent text separately in this browser.
+  Todo drafts and scheduled starts remain single-session only.
+  The comparison composer shows three variant rows at first; **Add variant** adds another and each row's × removes it, down to two.
   There is no upper limit.
 - Every variant gets the same prompt, attachments, and skill.
   The composer's model and effort apply to every row unless a row picks its own, which shows **Use common selection** to go back.
@@ -654,9 +657,12 @@ An action that fails shows its error, and its control becomes available again.
   The server checks that the file is a PNG, JPEG, GIF, or WebP image of at most 20 MB and copies it out of the worktree, so the comparison keeps it after the worktree goes.
   A new publication replaces the variant's previous screenshot; the dashboard never takes a screenshot itself.
 - The comparison page shows every variant's card side by side, wrapping onto more rows on a narrow window.
-  A card shows the variant's latest screenshot, which a click enlarges, its requested and actual model, its branch, and where its start, first prompt, stop, and worktree stand.
+  A card shows the variant's latest screenshot, which a click enlarges, its requested and actual model and effort, its branch, and one lifecycle status.
+  The requested settings keep the original common selection and row overrides.
+  Actual settings say **Not reported** until the session reports them, then follow changes made during the session.
+  The saved actual model and effort remain visible after the session stops or the dashboard restarts.
   While a newer screenshot loads, or when it fails to load, the card keeps showing the previous one and says so.
-  **Open session** opens the variant's session; **All comparisons** lists every comparison, newest first, and **Design comparisons** in the **Sessions** tab and **Comparisons** in the new-session draft's header link there too.
+  **Open session** opens the variant's session; **All comparisons** lists every comparison, newest first, and **Design comparisons** in the **Sessions** tab and **Comparisons** in either draft's header link there too.
 - **Keep this one** asks first, then stops every other variant, its background processes included, and keeps the chosen one's session, worktree, and branch.
   Variants that had not started yet are cancelled.
   A variant whose stop cannot be confirmed shows why, and **Retry stopping siblings** tries again.

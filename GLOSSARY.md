@@ -107,6 +107,10 @@ _Avoid_: Variant group, arena, coordinator
 One session of a comparison, with its branch, its worktree, and the screenshot it last published.
 _Avoid_: Worker (see **Worker**), candidate
 
+**Variant lifecycle**:
+The single persisted state of a variant, from queued to first-prompt admission or uncertainty, then verified stop and checkout retention or removal.
+The comparison's cleanup read state is derived from these lifecycles and its current loss review.
+
 **Winner**:
 The variant **Keep this one** kept; its session, worktree, and branch stay, and the other variants stop.
 _Avoid_: Champion, merged variant

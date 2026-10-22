@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runChecked } from "./proc";
@@ -339,4 +339,91 @@ describe("worktree removal", () => {
 		const plans = await trees.previewAll([{ repository, path: landed }, { repository, path: open }], true);
 		expect(plans.map(plan => plan.blockers)).toEqual([[], [{ code: "unmerged", message: "Cannot tell whether this worktree merged: gh is down" }]]);
 	});
+});
+
+test("owned cleanup rechecks content, modes, symlinks and exact filenames instead of accepting an unchanged dirty status", async () => {
+	const changes: { name: string; change(path: string): void }[] = [
+		{ name: "dirty-tracked", change: path => writeFileSync(join(path, "tracked.txt"), "changed after review") },
+		{ name: "ignored-content", change: path => {
+			const file = join(path, "cache", "ignored.txt");
+			const stat = lstatSync(file);
+			writeFileSync(file, "after!");
+			utimesSync(file, stat.atime, stat.mtime);
+		} },
+		{ name: "untracked-content", change: path => writeFileSync(join(path, "untracked\twith\nnewline.txt"), "after!") },
+		{ name: "mode", change: path => chmodSync(join(path, "untracked\twith\nnewline.txt"), 0o755) },
+		{ name: "tracked-mode", change: path => chmodSync(join(path, "tracked.txt"), 0o755) },
+		{ name: "rename", change: path => renameSync(join(path, "untracked\twith\nnewline.txt"), join(path, "renamed.txt")) },
+		{ name: "deleted", change: path => unlinkSync(join(path, "untracked\twith\nnewline.txt")) },
+		{ name: "replaced", change: path => {
+			const file = join(path, "untracked\twith\nnewline.txt");
+			renameSync(file, join(path, "..", "old-untracked.txt"));
+			writeFileSync(file, "before");
+		} },
+		{ name: "symlink", change: path => {
+			unlinkSync(join(path, "link"));
+			symlinkSync("alternate.txt", join(path, "link"));
+		} },
+	];
+	for (const change of changes) {
+		const { parent, main } = await repo();
+		writeFileSync(join(main, ".gitignore"), "cache/\n");
+		writeFileSync(join(main, "tracked.txt"), "base");
+		chmodSync(join(main, "tracked.txt"), 0o644);
+		await git(main, "add", ".");
+		await git(main, "commit", "-qm", "files");
+		const path = await linked(parent, main, change.name);
+		await git(path, "config", "core.filemode", "false");
+		writeFileSync(join(path, "tracked.txt"), "dirty before review");
+		writeFileSync(join(path, "untracked\twith\nnewline.txt"), "before");
+		chmodSync(join(path, "untracked\twith\nnewline.txt"), 0o644);
+		writeFileSync(join(path, "alternate.txt"), "before");
+		mkdirSync(join(path, "cache"));
+		writeFileSync(join(path, "cache", "ignored.txt"), "before");
+		symlinkSync("untracked\twith\nnewline.txt", join(path, "link"));
+		const stat = lstatSync(path);
+		const review = await quiet.reviewOwned({ repository: await common(main), path, branch: change.name, identity: `${stat.dev}:${stat.ino}` });
+		expect(review.tracked).toEqual(["tracked.txt"]);
+		expect(review.untracked).toEqual(["alternate.txt", "link", "untracked\twith\nnewline.txt"]);
+		expect(review.ignored).toEqual(["cache/ignored.txt"]);
+		change.change(path);
+		const result = await quiet.removeOwned(review, "discard-owned-changes");
+		expect(result.removed).toBe(false);
+		expect(result.blockers.some(blocker => blocker.code === "drift")).toBe(true);
+		expect(existsSync(path)).toBe(true);
+	}
+});
+
+test("a special untracked file prevents owned cleanup instead of being omitted from the loss review", async () => {
+	const { parent, main } = await repo();
+	const path = await linked(parent, main, "special");
+	await runChecked(["mkfifo", join(path, "pipe")]);
+	const stat = lstatSync(path);
+	const review = await quiet.reviewOwned({ repository: await common(main), path, branch: "special", identity: `${stat.dev}:${stat.ino}` });
+	expect(review.plan.blockers.some(blocker => blocker.code === "unreadable")).toBe(true);
+	const result = await quiet.removeOwned(review, "discard-owned-changes");
+	expect(result.removed).toBe(false);
+	expect(existsSync(join(path, "pipe"))).toBe(true);
+});
+
+test("hidden index flags fail closed for canonical and owned removal", async () => {
+	for (const flag of ["--assume-unchanged", "--skip-worktree"]) {
+		const { parent, main } = await repo();
+		writeFileSync(join(main, "file.txt"), "base");
+		await git(main, "add", "file.txt");
+		await git(main, "commit", "-qm", "tracked file");
+		const path = await linked(parent, main, "hidden-index");
+		const repository = await common(main);
+		const confirmation = readable(await quiet.preview({ repository, path }));
+		await git(path, "update-index", flag, "file.txt");
+		writeFileSync(join(path, "file.txt"), "hidden changes");
+		const stat = lstatSync(path);
+		const review = await quiet.reviewOwned({ repository, path, branch: "hidden-index", identity: `${stat.dev}:${stat.ino}` });
+		expect(review.plan.blockers.some(blocker => blocker.code === "unreadable")).toBe(true);
+		expect((await quiet.removeOwned(review, "discard-owned-changes")).removed).toBe(false);
+		const plan = await quiet.preview({ repository, path });
+		expect(plan.kind).toBe("unreadable");
+		expect((await quiet.remove([confirmation]))[0]?.removed).toBe(false);
+		expect(existsSync(path)).toBe(true);
+	}
 });

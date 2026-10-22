@@ -81,7 +81,7 @@ import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
-import { createStarter, reattachAll, type Starter } from "./start";
+import { createStarter, reattachAll, type Starter, type StartEnv } from "./start";
 import { TodoInbox } from "./todo-inbox";
 import { UserTodosFile } from "./user-todos-file";
 import { UsagePoll } from "./usage-poll";
@@ -136,6 +136,9 @@ export class Dashboard {
 	readonly #todoInbox: TodoInbox;
 	readonly #worktrees: Worktrees;
 	readonly #comparisons: Comparisons;
+	readonly #sessionJoins: StartEnv["projects"] = {
+		launchFor: (request, project, instanceId) => this.#comparisons.join(request, this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)), instanceId),
+	};
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
@@ -277,9 +280,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			toolsFor: (request, instanceId) => this.#comparisons.prepare(request, instanceId),
-			registered: session => this.#comparisons.registered(session),
-			projects: { launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)) },
+			projects: this.#sessionJoins,
 		});
 		const worktrees = (this.#worktrees = new Worktrees({
 			knownCwds: () => this.knownCwds(),
@@ -585,7 +586,7 @@ export class Dashboard {
 		this.#publisher = publisher;
 		await this.#comparisons.recover();
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, { launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)) }, survived => this.#interrupted.recover(survived), this.#comparisons);
+		await reattachAll(this.#sessions, this.#sessionJoins, survived => this.#interrupted.recover(survived), instanceId => this.#comparisons.mayAttach(instanceId));
 		await this.#comparisons.attached();
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
@@ -673,7 +674,6 @@ export class Dashboard {
 
 	/** Where every live session's update goes: the views, the broadcasts, the routines, the projects, and the loops. */
 	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
-		this.#comparisons?.observe(instanceId);
 		switch (update.kind) {
 			case "roster":
 				this.#runner.observe(instanceId);
@@ -692,6 +692,8 @@ export class Dashboard {
 			case "exited": {
 				// Only a session this dashboard started reports its exit.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
+				const session = this.#sessions.get(instanceId);
+				if (session) void this.#comparisons.exited(session).catch(error => console.error(`omp-agents: comparison exit: ${errorText(error)}`));
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#projectRunner.exited(instanceId);
 				this.#reviewDrafts.exited(instanceId);
@@ -708,6 +710,7 @@ export class Dashboard {
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
 				this.#projectRunner.switched(instanceId);
+				void this.#comparisons.switched(instanceId).catch(error => console.error(`omp-agents: comparison switch: ${errorText(error)}`));
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#reviewDrafts.switched(instanceId, sessionId);
 				return;

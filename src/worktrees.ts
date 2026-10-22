@@ -128,20 +128,33 @@ export interface OwnedCheckoutReview {
 	fingerprint: string;
 }
 
-async function checkoutFingerprint(root: string): Promise<string> {
-	const hash = createHash("sha256");
-	const visit = async (dir: string): Promise<void> => {
-		for (const name of (await readdir(dir)).sort()) {
-			if (dir === root && name === ".git") continue;
-			const path = join(dir, name);
-			const stat = await lstat(path);
-			hash.update(JSON.stringify([relative(root, path), stat.mode, stat.dev, stat.ino, stat.size, stat.mtimeMs]));
-			if (stat.isSymbolicLink()) hash.update(await readlink(path));
-			else if (stat.isDirectory()) await visit(path);
-			else if (!stat.isFile()) throw new Error("A special file prevents a complete loss review.");
-		}
-	};
-	await visit(root);
+/** Git enumerates loss; only those untracked and ignored paths need an additional content read. */
+async function checkoutFingerprint(root: string, paths: string[], index: string): Promise<string> {
+	const [worktree, staged, special] = await Promise.all([
+		git(root, "-c", "core.filemode=true", "diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--binary", "--full-index", "HEAD", "--"),
+		git(root, "-c", "core.filemode=true", "diff", "--cached", "--no-ext-diff", "--no-textconv", "--no-renames", "--binary", "--full-index", "HEAD", "--"),
+		run([
+			"find", root,
+			"-name", ".git", "-prune", "-o",
+			"(", "!", "-type", "f", "!", "-type", "d", "!", "-type", "l", ")",
+			"-print0", "-quit",
+		], { timeoutMs: 10000 }),
+	]);
+	if (special.code !== 0) throw new Error(special.stderr.trim() || "Special-file inspection did not finish.");
+	if (special.stdout) throw new Error("A special file prevents a complete loss review.");
+	const hash = createHash("sha256").update(JSON.stringify([index, worktree, staged]));
+	const files: string[] = [];
+	for (const path of paths.toSorted()) {
+		const stat = await lstat(join(root, path));
+		hash.update(JSON.stringify([path, stat.mode, stat.dev, stat.ino]));
+		if (stat.isSymbolicLink()) hash.update(JSON.stringify(await readlink(join(root, path))));
+		else if (stat.isFile()) files.push(path);
+		else throw new Error("A special file prevents a complete loss review.");
+	}
+	for (let offset = 0; offset < files.length; offset += 256) {
+		const content = await git(root, "hash-object", "--no-filters", "--", ...files.slice(offset, offset + 256));
+		hash.update(content);
+	}
 	return hash.digest("hex");
 }
 
@@ -439,7 +452,11 @@ export class Worktrees {
 			let detachedCommitLoss = false;
 			const identityBlocked = blockers.some(blocker => blocker.code === "foreign" || blocker.code === "unreadable");
 			if (!entry.missing && !identityBlocked) {
-				const status = await git(entry.path, "status", "--porcelain=v1", "-z", "--untracked-files=all");
+				const [status, flags] = await Promise.all([
+					git(entry.path, "-c", "core.filemode=true", "status", "--porcelain=v1", "-z", "--untracked-files=all"),
+					git(entry.path, "ls-files", "-v", "-z"),
+				]);
+				if (flags.split("\0").some(file => /^[a-zS] /.test(file))) throw new Error("The index hides worktree changes with assume-unchanged or skip-worktree flags.");
 				if (status) blockers.push({ code: "changed", message: "Tracked modifications or untracked files must be preserved before removal." });
 				const files = await git(entry.path, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z");
 				ignored = [...new Set(files.split("\0").filter(Boolean).map(path => path.split("/")[0] ?? path))].sort();
@@ -466,40 +483,49 @@ export class Worktrees {
 		}
 	}
 
-	async remove(plans: WorktreeConfirmation[]): Promise<WorktreeRemovalResult[]> {
+	async #removal<T>(task: (snapshot: UseSnapshot) => Promise<T>): Promise<T> {
 		const removal = this.checkout(async () => {
 			await Promise.allSettled([...this.#starting]);
-			const snapshot = await this.#snapshot();
+			return task(await this.#snapshot());
+		});
+		this.#removing = removal;
+		try { return await removal; }
+		finally { if (this.#removing === removal) this.#removing = null; }
+	}
+
+	async #executeRemoval(target: WorktreeTarget, blockers: WorktreeBlocker[], discard = false): Promise<WorktreeRemovalResult> {
+		const result: WorktreeRemovalResult = { repository: target.repository, path: target.path, removed: false, blockers, error: null };
+		if (blockers.length) return result;
+		try {
+			const removed = await run(["git", "-C", target.repository, "worktree", "remove", ...(discard ? ["--force"] : []), "--", target.path], { timeoutMs: 30000 });
+			if (removed.code !== 0) throw new Error(removed.stderr.trim() || "Git refused removal.");
+			result.removed = true;
+		} catch (error) {
+			result.error = errorText(error);
+		}
+		return result;
+	}
+
+	async remove(plans: WorktreeConfirmation[]): Promise<WorktreeRemovalResult[]> {
+		return this.#removal(async snapshot => {
 			const results: WorktreeRemovalResult[] = [];
 			for (const confirmed of plans) {
 				const current = await this.preview(confirmed, snapshot);
 				const blockers = [...current.blockers];
 				if (current.kind !== "unreadable" && current.confirmation !== confirmed.confirmation) blockers.push({ code: "drift", message: "The checkout or loss plan changed. Review a new confirmation." });
-				const result: WorktreeRemovalResult = { repository: confirmed.repository, path: confirmed.path, removed: false, blockers, error: null };
-				if (!blockers.length && current.kind !== "unreadable") {
-					try {
-						const removed = await run(["git", "-C", current.repository, "worktree", "remove", "--", current.path], { timeoutMs: 30000 });
-						if (removed.code !== 0) throw new Error(removed.stderr.trim() || "Git refused removal.");
-						result.removed = true;
-					} catch (err) {
-						result.error = errorText(err);
-					}
-				}
-				results.push(result);
+				results.push(await this.#executeRemoval(confirmed, blockers));
 			}
 			return results;
 		});
-		this.#removing = removal;
-		try {
-			return await removal;
-		} finally {
-			if (this.#removing === removal) this.#removing = null;
-		}
 	}
 
 	/** The comparison supplies only a checkout identity recorded when it created that directory. */
 	async reviewOwned(owned: OwnedCheckout): Promise<OwnedCheckoutReview> {
-		const plan = await this.preview(owned);
+		return this.#reviewOwned(owned);
+	}
+
+	async #reviewOwned(owned: OwnedCheckout, snapshot?: UseSnapshot): Promise<OwnedCheckoutReview> {
+		const plan = await this.preview(owned, snapshot);
 		const result: OwnedCheckoutReview = { owned, plan, tracked: [], untracked: [], ignored: [], fingerprint: "" };
 		if (plan.kind === "unreadable") return result;
 		if (plan.kind !== "remove" || plan.branch !== owned.branch) {
@@ -513,8 +539,8 @@ export class Worktrees {
 				return result;
 			}
 			const [tracked, staged, untracked, ignored, index] = await Promise.all([
-				git(owned.path, "diff", "--name-only", "-z", "HEAD"),
-				git(owned.path, "diff", "--cached", "--name-only", "-z", "HEAD"),
+				git(owned.path, "-c", "core.filemode=true", "diff", "--name-only", "-z", "HEAD"),
+				git(owned.path, "-c", "core.filemode=true", "diff", "--cached", "--name-only", "-z", "HEAD"),
 				git(owned.path, "ls-files", "--others", "--exclude-standard", "-z"),
 				git(owned.path, "ls-files", "--others", "--ignored", "--exclude-standard", "-z"),
 				git(owned.path, "ls-files", "--stage", "-z"),
@@ -523,7 +549,7 @@ export class Worktrees {
 			result.untracked = untracked.split("\0").filter(Boolean);
 			result.ignored = ignored.split("\0").filter(Boolean);
 			if (plan.blockers.some(blocker => blocker.code !== "changed")) return result;
-			result.fingerprint = createHash("sha256").update(await checkoutFingerprint(owned.path)).update(index).digest("hex");
+			result.fingerprint = await checkoutFingerprint(owned.path, [...result.untracked, ...result.ignored], index);
 		} catch (error) {
 			plan.blockers.push({ code: "unreadable", message: `Cannot finish the owned checkout loss review: ${errorText(error)}` });
 		}
@@ -531,26 +557,14 @@ export class Worktrees {
 	}
 
 	async removeOwned(review: OwnedCheckoutReview, policy: "preserve-changes" | "discard-owned-changes"): Promise<WorktreeRemovalResult> {
-		const removal = this.checkout(async () => {
-			await Promise.allSettled([...this.#starting]);
-			const current = await this.reviewOwned(review.owned);
+		return this.#removal(async snapshot => {
+			const current = await this.#reviewOwned(review.owned, snapshot);
 			const blockers = current.plan.blockers.filter(blocker => policy !== "discard-owned-changes" || blocker.code !== "changed");
 			if (current.plan.kind === "unreadable" || review.plan.kind === "unreadable" || current.plan.confirmation !== review.plan.confirmation || current.fingerprint !== review.fingerprint) {
 				blockers.push({ code: "drift", message: "The reviewed checkout or its file contents changed. Review again." });
 			}
-			const result: WorktreeRemovalResult = { repository: review.owned.repository, path: review.owned.path, removed: false, blockers, error: null };
-			if (blockers.length) return result;
-			try {
-				const args = ["git", "-C", result.repository, "worktree", "remove", ...(policy === "discard-owned-changes" ? ["--force"] : []), "--", result.path];
-				const removed = await run(args, { timeoutMs: 30000 });
-				if (removed.code !== 0) throw new Error(removed.stderr.trim() || "Git refused removal.");
-				result.removed = true;
-			} catch (error) { result.error = errorText(error); }
-			return result;
+			return this.#executeRemoval(review.owned, blockers, policy === "discard-owned-changes");
 		});
-		this.#removing = removal;
-		try { return await removal; }
-		finally { if (this.#removing === removal) this.#removing = null; }
 	}
 
 	/**

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { fromPartial } from "@total-typescript/shoehorn";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,6 +8,8 @@ import { atomicWriteText } from "../fs";
 import { canonical, git, worktreesOf } from "../git";
 import type { LiveRow, LiveSession } from "../live-session";
 import type { RpcHostTool } from "../omp/modules";
+import { PLAIN_LAUNCH } from "../omp/rpc";
+import * as rpc from "../omp/rpc";
 import { parseComparisonSpec, type ComparisonSpec } from "../shared/comparisons";
 import type { StartRequest } from "../shared/sessions";
 import { Worktrees } from "../worktrees";
@@ -21,6 +24,7 @@ const changes = new WeakMap<Comparisons, () => Promise<void>>();
 afterEach(async () => {
 	for (const aggregate of aggregates.splice(0)) { await aggregate.stop(); aggregate.release(); }
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+	mock.restore();
 });
 const PNG = Buffer.from(await new Bun.Image(Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64")).png().bytes());
 
@@ -28,7 +32,9 @@ class Session implements LiveSession {
 	stopped = false;
 	prompts: string[] = [];
 	constructor(readonly instanceId: string, readonly cwd: string, public sessionId: string) {}
-	row(): LiveRow { throw new Error("This fixture reads the registry through its consumer-facing identities."); }
+	model: string | null = null;
+	thinkingLevel: string | null = null;
+	row(): LiveRow { return fromPartial({ model: this.model, thinkingLevel: this.thinkingLevel }); }
 	transcriptPath(): null { return null; }
 	async prompt(_agent: string | null, text: string): Promise<void> { this.prompts.push(text); }
 	async dequeue(): Promise<null> { return null; }
@@ -69,9 +75,12 @@ async function fixture(count = 5, options: { fail?: number; uncertain?: number; 
 		}
 		if (ordinal === options.fail) return { ok: false, error: "Provider refused this variant." };
 		const session = new Session(reserved.instanceId, request.cwd, `s${ordinal}`);
+		session.model = request.model ? `${request.model.provider}/${request.model.id}` : null;
+		session.thinkingLevel = request.thinking;
+		const membership = await comparisons.join(request, { rpc: PLAIN_LAUNCH, attach: () => {} }, session.instanceId);
 		sessions.add(session, null);
-		launched.push({ request, session, tools: reserved.rpc.tools });
-		await reserved.registered(session);
+		launched.push({ request, session, tools: membership.rpc.tools });
+		await membership.attach(session);
 		await reserved.beforePrompt();
 		if (ordinal === options.uncertain) throw new Error("Admission connection ended without an answer.");
 		await session.prompt(null, request.prompt);
@@ -100,7 +109,7 @@ async function fixture(count = 5, options: { fail?: number; uncertain?: number; 
 async function settled(comparisons: Comparisons): Promise<void> {
 	for (;;) {
 		const members = comparisons.list[0]?.variants;
-		if (members?.every(v => v.start.kind === "failed" || v.start.kind === "cancelled" || v.firstPrompt.kind === "admitted" || v.firstPrompt.kind === "uncertain")) return;
+		if (members?.every(v => ["failed", "cancelled", "running", "uncertain"].includes(v.lifecycle.kind))) return;
 		const next = changes.get(comparisons);
 		if (!next) throw new Error("This fixture has no durable-change subscription.");
 		await next();
@@ -119,13 +128,13 @@ describe("Design comparisons", () => {
 		await Promise.all([f.comparisons.start("five", f.spec), f.comparisons.start("five", f.spec)]);
 		await settled(f.comparisons);
 		const snapshot = f.comparisons.list[0]!;
-		expect(snapshot.variants.map(v => [v.ordinal, v.start.kind, v.firstPrompt.kind])).toEqual([[1, "registered", "admitted"], [2, "registered", "admitted"], [3, "registered", "admitted"], [4, "registered", "admitted"], [5, "registered", "admitted"]]);
+		expect(snapshot.variants.map(v => v.lifecycle.kind)).toEqual(["running", "running", "running", "running", "running"]);
 		expect(new Set(snapshot.variants.map(v => v.instanceId)).size).toBe(5);
 		expect(new Set(snapshot.variants.map(v => v.checkout)).size).toBe(5);
 		expect(new Set(snapshot.variants.map(v => v.branch)).size).toBe(5);
 		expect(f.calls()).toBe(5);
 		expect(snapshot.variants.map(v => v.cwd.slice(v.checkout.length))).toEqual(["/app", "/app", "/app", "/app", "/app"]);
-		expect(snapshot.variants.map(v => [v.model, v.thinking])).toEqual([[{ provider: "common", id: "model" }, "high"], [{ provider: "common", id: "model" }, "high"], [{ provider: "override", id: "different" }, "low"], [{ provider: "common", id: "model" }, "high"], [{ provider: "common", id: "model" }, "high"]]);
+		expect(snapshot.variants.map(v => [v.model, v.thinkingLevel])).toEqual([[{ provider: "common", id: "model" }, "high"], [{ provider: "common", id: "model" }, "high"], [{ provider: "override", id: "different" }, "low"], [{ provider: "common", id: "model" }, "high"], [{ provider: "common", id: "model" }, "high"]]);
 		expect((await git(f.main, "rev-parse", "HEAD")).trim()).not.toBe(f.base);
 		expect(await Promise.all(snapshot.variants.map(async v => (await git(v.checkout, "rev-parse", "HEAD")).trim()))).toEqual([f.base, f.base, f.base, f.base, f.base]);
 		expect(f.launched.map(row => row.tools.map(tool => [tool.name, tool.loadMode]))).toEqual(Array.from({ length: 5 }, () => [["publish_variant_screenshot", "essential"]]));
@@ -139,7 +148,7 @@ describe("Design comparisons", () => {
 		await f.comparisons.start("cancel", f.spec);
 		await held.promise;
 		for (;;) {
-			if (f.comparisons.list[0]!.variants[0]!.firstPrompt.kind === "admitted") break;
+			if (f.comparisons.list[0]!.variants[0]!.lifecycle.kind === "running") break;
 			await changes.get(f.comparisons)!();
 		}
 		const selection = f.comparisons.select("cancel", "v1");
@@ -150,7 +159,7 @@ describe("Design comparisons", () => {
 		resume.resolve();
 		await selection;
 		expect(f.calls()).toBe(1);
-		expect(f.comparisons.list[0]!.variants.map(v => [v.start.kind, v.firstPrompt.kind])).toEqual([["registered", "admitted"], ["cancelled", "not-attempted"], ["cancelled", "not-attempted"], ["cancelled", "not-attempted"], ["cancelled", "not-attempted"]]);
+		expect(f.comparisons.list[0]!.variants.map(v => v.lifecycle.kind)).toEqual(["running", "stopped", "stopped", "stopped", "stopped"]);
 	});
 
 	test("publication waits for throwing durable persistence and a failed tool call remains retryable", async () => {
@@ -162,11 +171,11 @@ describe("Design comparisons", () => {
 		await f.comparisons.start("persist", f.spec); await settled(f.comparisons);
 		const member = f.comparisons.list[0]!.variants[0]!;
 		const path = join(member.cwd, "raster.png"); writeFileSync(path, PNG);
-		const first = await f.comparisons.publish("persist", "v1", "first", path, "Persisted");
+		const first = await f.comparisons.screenshots.publish("persist", "v1", "first", path, "Persisted", member.instanceId);
 		fail = true;
-		await expect(f.comparisons.publish("persist", "v1", "retryable", path, "Not committed")).rejects.toThrow("not writable");
+		await expect(f.comparisons.screenshots.publish("persist", "v1", "retryable", path, "Not committed", member.instanceId)).rejects.toThrow("not writable");
 		expect(f.comparisons.list[0]!.variants[0]!.screenshot).toEqual(first);
-		const retried = await f.comparisons.publish("persist", "v1", "retryable", path, "Committed retry");
+		const retried = await f.comparisons.screenshots.publish("persist", "v1", "retryable", path, "Committed retry", member.instanceId);
 		expect([retried.sequence, retried.caption]).toEqual([2, "Committed retry"]);
 	});
 
@@ -174,17 +183,17 @@ describe("Design comparisons", () => {
 		const f = await fixture(5, { fail: 2, uncertain: 4 });
 		await f.comparisons.start("partial", f.spec);
 		await settled(f.comparisons);
-		expect(f.comparisons.list[0]!.variants.map(v => [v.start.kind, v.firstPrompt.kind])).toEqual([["registered", "admitted"], ["failed", "not-attempted"], ["registered", "admitted"], ["registered", "uncertain"], ["registered", "admitted"]]);
+		expect(f.comparisons.list[0]!.variants.map(v => v.lifecycle.kind)).toEqual(["running", "failed", "running", "uncertain", "running"]);
 		await f.comparisons.stop();
 		f.comparisons.release();
 		const path = join(f.dir, "partial", "comparison.json");
 		const disk = JSON.parse(readFileSync(path, "utf8"));
-		disk.snapshot.variants[0].firstPrompt = { kind: "attempted" };
+		disk.snapshot.variants[0].lifecycle = { kind: "prompt-attempted" };
 		writeFileSync(path, JSON.stringify(disk));
 		const reopened = new Comparisons({ ...f.env, sessions: new LiveSessions(() => {}) });
 		aggregates.push(reopened);
 		await reopened.recover();
-		expect(reopened.list[0]!.variants.map(v => v.firstPrompt.kind)).toEqual(["uncertain", "not-attempted", "admitted", "uncertain", "admitted"]);
+		expect(reopened.list[0]!.variants.map(v => v.lifecycle.kind)).toEqual(["uncertain", "failed", "running", "uncertain", "running"]);
 		expect(f.calls()).toBe(5);
 		await reopened.start("partial", f.spec);
 		expect(f.calls()).toBe(5);
@@ -212,7 +221,7 @@ describe("Design comparisons", () => {
 		await f.comparisons.select("screens", "v1");
 		await f.comparisons.reviewCleanup("screens");
 		await f.comparisons.cleanup("screens", reviewId(f.comparisons), "discard-owned-changes");
-		expect(f.comparisons.list[0]!.variants.map(v => v.cleanup.kind)).toEqual(["pending", "removed"]);
+		expect(f.comparisons.list[0]!.variants.map(v => v.lifecycle.kind)).toEqual(["running", "removed"]);
 		expect(existsSync(member.checkout)).toBe(false);
 		const saved = new URL(second.src, "http://localhost").searchParams.get("path")!;
 		expect(readFileSync(saved).equals(replacement)).toBe(true);
@@ -221,7 +230,7 @@ describe("Design comparisons", () => {
 		const reopened = new Comparisons(f.env); aggregates.push(reopened);
 		await reopened.recover();
 		expect(reopened.list[0]!.variants[1]!.screenshot).toEqual(second);
-		expect(await reopened.publish("screens", "v2", "call-a", source, "Retry after restart")).toEqual(first);
+		expect(await reopened.screenshots.publish("screens", "v2", "call-a", source, "Retry after restart", member.instanceId)).toEqual(first);
 		expect(reopened.list[0]!.variants[1]!.screenshot).toEqual(second);
 	});
 
@@ -234,11 +243,11 @@ describe("Design comparisons", () => {
 		const selections = await Promise.allSettled([f.comparisons.select("keep", "v1"), f.comparisons.select("keep", "v2")]);
 		expect(selections.map(result => result.status)).toEqual(["fulfilled", "rejected"]);
 		expect(f.comparisons.list[0]!.winner).toBe("v1");
-		expect(f.comparisons.list[0]!.variants.map(v => v.stop.kind)).toEqual(["not-requested", "stopped", "stopped", "stopped", "stopped"]);
+		expect(f.comparisons.list[0]!.variants.map(v => v.lifecycle.kind)).toEqual(["running", "stopped", "stopped", "stopped", "stopped"]);
 		await f.comparisons.reviewCleanup("keep");
 		expect(f.comparisons.list[0]!.variants.map(v => existsSync(v.checkout))).toEqual([true, true, true, true, true]);
 		await f.comparisons.cleanup("keep", reviewId(f.comparisons), "preserve-changes");
-		expect(f.comparisons.list[0]!.variants.map(v => v.cleanup.kind)).toEqual(["pending", "preserved", "preserved", "preserved", "preserved"]);
+		expect(f.comparisons.list[0]!.variants.map(v => v.lifecycle.kind)).toEqual(["running", "preserved", "preserved", "preserved", "preserved"]);
 		expect(f.cancelled.sort()).toEqual(["s2", "s3", "s4", "s5"]);
 	});
 
@@ -257,7 +266,7 @@ describe("Design comparisons", () => {
 		expect(read.review.rows[0]).toMatchObject({ variantId: "v2", tracked: ["app/index.html"], untracked: ["app/new.txt"], ignored: ["cache/ignored.txt"], removed: false });
 		writeFileSync(join(drift!.cwd, "index.html"), "after!");
 		await f.comparisons.cleanup("safe", read.review.id, "discard-owned-changes");
-		expect(f.comparisons.list[0]!.variants.map(v => v.cleanup.kind)).toEqual(["pending", "removed", "blocked", "blocked", "blocked"]);
+		expect(f.comparisons.list[0]!.variants.map(v => v.lifecycle.kind)).toEqual(["running", "removed", "cleanup-blocked", "cleanup-blocked", "cleanup-blocked"]);
 		expect([winner, dirty, locked, nested, drift].map(v => existsSync(v!.checkout))).toEqual([true, false, true, true, true]);
 		expect(readFileSync(join(drift!.cwd, "index.html"), "utf8")).toBe("after!");
 		const branches = (await git(f.main, "for-each-ref", "--format=%(refname:short)", "refs/heads/variants/")).trim().split("\n");
@@ -277,7 +286,7 @@ describe("Design comparisons", () => {
 		expect(loss.review.rows[0]!.tracked).toEqual(["app/index.html"]);
 		await git(member.checkout, "reset", "-q", "HEAD", "--", "app/index.html");
 		await f.comparisons.cleanup("index", loss.review.id, "discard-owned-changes");
-		expect(f.comparisons.list[0]!.variants[1]!.cleanup.kind).toBe("blocked");
+		expect(f.comparisons.list[0]!.variants[1]!.lifecycle.kind).toBe("cleanup-blocked");
 		expect(existsSync(member.checkout)).toBe(true);
 	});
 
@@ -287,19 +296,20 @@ describe("Design comparisons", () => {
 		const old = f.launched.find(row => row.session.instanceId === member.instanceId)!.session;
 		old.sessionId = "s2-switched";
 		f.sessions.allocate(old.instanceId).emit({ kind: "switched" });
-		f.comparisons.observe(old.instanceId);
+		await f.comparisons.switched(old.instanceId);
 		while (!f.comparisons.list[0]!.variants[1]!.sessionIds.includes(old.sessionId)) await changes.get(f.comparisons)!();
 		await old.end(); f.sessions.remove(old.instanceId);
-		const tools = f.comparisons.prepare({ kind: "resume", sessionId: old.sessionId }, "continued-instance");
+		const membership = await f.comparisons.join({ kind: "resume", sessionId: old.sessionId }, { rpc: PLAIN_LAUNCH, attach: () => {} }, "continued-instance");
+		const tools = membership.rpc.tools;
 		const continued = new Session("continued-instance", member.cwd, old.sessionId);
-		f.sessions.add(continued, null); await f.comparisons.registered(continued);
+		f.sessions.add(continued, null); await membership.attach(continued);
 		const path = join(member.cwd, "continued.png"); writeFileSync(path, PNG);
 		await tools[0]!.execute({ path, caption: "Published by the continuation" }, { toolCallId: "continued-publication", signal: new AbortController().signal });
 		expect(f.comparisons.list[0]!.variants[1]).toMatchObject({ instanceId: continued.instanceId, sessionIds: ["s2", "s2-switched"], screenshot: { caption: "Published by the continuation" } });
 		await f.comparisons.select("continue", "v1");
 		expect(continued.stopped).toBe(true);
 		expect(f.cancelled.sort()).toEqual(["s2", "s2-switched"]);
-		expect(() => f.comparisons.prepare({ kind: "resume", sessionId: old.sessionId }, "forbidden")).toThrow();
+		await expect(f.comparisons.join({ kind: "resume", sessionId: old.sessionId }, { rpc: PLAIN_LAUNCH, attach: () => {} }, "forbidden")).rejects.toThrow();
 	});
 
 	test("discard re-verifies that a stopped loser has not resumed since its loss review", async () => {
@@ -310,7 +320,7 @@ describe("Design comparisons", () => {
 		const resumed = new Session(member.instanceId, member.cwd, member.sessionId!);
 		f.sessions.add(resumed, null);
 		await f.comparisons.cleanup("resumed", review, "discard-owned-changes");
-		expect(f.comparisons.list[0]!.variants[1]).toMatchObject({ stop: { kind: "blocked" }, cleanup: { kind: "blocked" } });
+		expect(f.comparisons.list[0]!.variants[1]).toMatchObject({ lifecycle: { kind: "stop-blocked" } });
 		expect(existsSync(member.checkout)).toBe(true);
 		expect(resumed.stopped).toBe(false);
 	});
@@ -320,7 +330,7 @@ describe("Design comparisons", () => {
 		const other = new Comparisons({ ...f.env, port: 49372, sessions: new LiveSessions(() => {}) }); aggregates.push(other);
 		await other.recover();
 		expect(other.list[0]!.owner).toEqual({ kind: "other", port: 49371 });
-		expect(other.mayAttach(f.comparisons.list[0]!.variants[0]!.instanceId)).toBe(false);
+		expect(await other.mayAttach(f.comparisons.list[0]!.variants[0]!.instanceId)).toBe(false);
 		await expect(other.select("owner", "v1")).rejects.toThrow("49371");
 		await f.comparisons.select("owner", "v1"); await f.comparisons.reviewCleanup("owner");
 		const oldReview = reviewId(f.comparisons);
@@ -348,7 +358,110 @@ describe("Design comparisons", () => {
 		await mkdir(loser.checkout); writeFileSync(join(loser.checkout, "unrelated.txt"), "must survive");
 		await f.comparisons.cleanup("identity", review, "discard-owned-changes");
 		expect(readFileSync(join(loser.checkout, "unrelated.txt"), "utf8")).toBe("must survive");
-		expect(f.comparisons.list[0]!.variants[1]!.cleanup.kind).toBe("blocked");
+		expect(f.comparisons.list[0]!.variants[1]!.lifecycle.kind).toBe("cleanup-blocked");
+	});
+
+	test("actual settings survive a switch, natural exit, explicit stop, and restart without changing the requested selection", async () => {
+		const f = await fixture(2);
+		await f.comparisons.start("settings", f.spec);
+		await settled(f.comparisons);
+		const [first, second] = f.launched;
+		first!.session.model = "resolved/default-model";
+		first!.session.thinkingLevel = "xhigh";
+		await f.comparisons.switched(first!.session.instanceId);
+		first!.session.model = "switched/final-model";
+		first!.session.thinkingLevel = "medium";
+		await first!.session.end();
+		await f.comparisons.exited(first!.session);
+		f.sessions.remove(first!.session.instanceId);
+		second!.session.model = "other/final-model";
+		second!.session.thinkingLevel = "low";
+		second!.session.end = async () => {
+			second!.session.stopped = true;
+			second!.session.model = null;
+			second!.session.thinkingLevel = null;
+		};
+		await f.comparisons.select("settings", "v1");
+		await f.comparisons.stop();
+		f.comparisons.release();
+		const reopened = new Comparisons({ ...f.env, sessions: new LiveSessions(() => {}) });
+		aggregates.push(reopened);
+		await reopened.recover();
+		expect(reopened.list[0]!.variants.map(v => ({ model: v.model, thinkingLevel: v.thinkingLevel, selection: v.selection, lifecycle: v.lifecycle }))).toEqual([
+			{ model: { provider: "switched", id: "final-model" }, thinkingLevel: "medium", selection: { model: { provider: "common", id: "model" }, thinking: "high" }, lifecycle: { kind: "stopped" } },
+			{ model: { provider: "other", id: "final-model" }, thinkingLevel: "low", selection: { model: { provider: "common", id: "model" }, thinking: "high" }, lifecycle: { kind: "stopped" } },
+		]);
+	});
+
+	test("a failed launch retains requested settings without inventing an actual provider outcome", async () => {
+		const f = await fixture(2, { fail: 2 });
+		await f.comparisons.start("failed-settings", f.spec);
+		await settled(f.comparisons);
+		expect(f.comparisons.list[0]!.variants[1]).toMatchObject({
+			selection: { model: { provider: "common", id: "model" }, thinking: "high" },
+			model: null, thinkingLevel: null, lifecycle: { kind: "failed" },
+		});
+	});
+
+	test("a corrupt comparison retains its durable ownership claims without vetoing an unrelated keeper", async () => {
+		const f = await fixture(2);
+		await f.comparisons.start("corrupt", f.spec);
+		await settled(f.comparisons);
+		const member = f.comparisons.list[0]!.variants[0]!;
+		await f.comparisons.stop();
+		f.comparisons.release();
+		const path = join(f.dir, "corrupt", "comparison.json");
+		writeFileSync(path, "{");
+		const reopened = new Comparisons({ ...f.env, sessions: new LiveSessions(() => {}) });
+		aggregates.push(reopened);
+		await reopened.recover();
+		spyOn(rpc, "keptSessionCwd").mockImplementation(async instance => instance === "ordinary" ? f.main : member.cwd);
+		expect(await reopened.mayAttach("ordinary")).toBe(true);
+		expect(await reopened.mayAttach(member.instanceId)).toBe(false);
+		expect(await reopened.mayAttach("legacy-unclaimed-instance")).toBe(false);
+		expect(readFileSync(path, "utf8")).toBe("{");
+	});
+
+	test("reattachment uses durable instance membership even when the server died before registration persisted", async () => {
+		const f = await fixture(2);
+		await f.comparisons.start("registration", f.spec);
+		await settled(f.comparisons);
+		const member = f.comparisons.list[0]!.variants[0]!;
+		await f.comparisons.stop();
+		f.comparisons.release();
+		const path = join(f.dir, "registration", "comparison.json");
+		const disk = JSON.parse(readFileSync(path, "utf8"));
+		disk.snapshot.variants[0].lifecycle = { kind: "starting" };
+		disk.snapshot.variants[0].sessionId = null;
+		disk.snapshot.variants[0].sessionIds = [];
+		writeFileSync(path, JSON.stringify(disk));
+		const sessions = new LiveSessions(() => {});
+		const reopened = new Comparisons({ ...f.env, sessions });
+		aggregates.push(reopened);
+		await reopened.recover();
+		const session = new Session(member.instanceId, member.cwd, "surviving-session");
+		const membership = await reopened.join({ kind: "resume", sessionId: session.sessionId }, { rpc: PLAIN_LAUNCH, attach: () => {} }, member.instanceId);
+		sessions.add(session, null);
+		await membership.attach(session);
+		expect(membership.rpc.tools.map(tool => tool.name)).toEqual(["publish_variant_screenshot"]);
+		expect(reopened.list[0]!.variants[0]).toMatchObject({ sessionId: "surviving-session", sessionIds: ["surviving-session"], lifecycle: { kind: "registered" } });
+		expect(f.calls()).toBe(2);
+	});
+
+	test("a known surviving losing keeper rejoins so recovery can finish its stop, while a new continuation stays forbidden", async () => {
+		const f = await fixture(2);
+		await f.comparisons.start("stop-recovery", f.spec);
+		await settled(f.comparisons);
+		await f.comparisons.select("stop-recovery", "v1");
+		const member = f.comparisons.list[0]!.variants[1]!;
+		const survivor = new Session(member.instanceId, member.cwd, member.sessionId!);
+		const membership = await f.comparisons.join({ kind: "resume", sessionId: survivor.sessionId }, { rpc: PLAIN_LAUNCH, attach: () => {} }, survivor.instanceId);
+		f.sessions.add(survivor, null);
+		await membership.attach(survivor);
+		await f.comparisons.attached();
+		expect(survivor.stopped).toBe(true);
+		expect(f.comparisons.list[0]!.variants[1]!.lifecycle).toEqual({ kind: "stopped" });
+		await expect(f.comparisons.join({ kind: "resume", sessionId: survivor.sessionId }, { rpc: PLAIN_LAUNCH, attach: () => {} }, "unowned-new-instance")).rejects.toThrow("cannot be continued");
 	});
 });
 

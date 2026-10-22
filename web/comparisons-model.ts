@@ -18,5 +18,5 @@ export function screenshotPreview(state: ScreenshotPreview, event: ScreenshotEve
 }
 
 export function cleanupRemaining(comparison: ComparisonSnapshot): number {
-	return comparison.variants.filter(variant => variant.id !== comparison.winner && variant.cleanup.kind !== "removed").length;
+	return comparison.variants.filter(variant => variant.id !== comparison.winner && variant.lifecycle.kind !== "removed").length;
 }

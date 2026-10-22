@@ -823,22 +823,37 @@ Each server's runner follows only the sessions that server started.
 
 - A comparison is a record, not a session: it starts exactly one ordinary dashboard session per variant through the same starter as **New session**, and no coordinator.
   The page sends `comparison-start` with an id it made and saved before sending, so a resent or replayed request finds the comparison it already started instead of starting another; the same id with a different prompt is refused.
+  The browser mounts a dedicated comparison composer at `#new-variants/<encoded cwd>`; single-session, todo, and scheduled composers never send this command.
 - Acceptance resolves the base to one commit, plans every variant's branch, worktree, and instance id, and writes the whole plan before anything starts.
   Each variant then gets its worktree through `allocateVariant` in `src/git.ts`, `git worktree add -b` at that commit, which refuses an existing branch or path, inside `Worktrees.start` and `Worktrees.checkout`, so no removal runs at the same time.
   The comparison records each worktree it created with its directory's device and inode; that record, not a branch name or a path, is what later lets it remove the worktree.
-- The starter takes a `ReservedLaunch` for a variant: the planned instance id, the screenshot tool, and three steps it awaits in order, the session's registration, the first prompt about to go, and omp admitting it.
-  Each step is written to the record before the next, so a server that stops between them leaves a variant whose first prompt shows as uncertain, and nothing sends it again.
+- `VariantLifecycle` in `src/shared/comparisons.ts` is the sole persisted lifecycle for a variant, from queued through registration, first-prompt admission or uncertainty, and verified stop and checkout retention or removal.
+  The starter takes a `ReservedLaunch` for the planned instance id and the first-prompt steps; the canonical async join binds comparison membership and the screenshot tool.
+  Each transition is written before the next action, so a server that stops between them leaves a variant whose first prompt shows as uncertain, and nothing sends it again.
   A variant still queued or starting when the server stopped shows as failed; a keeper that survived is reattached, never launched again.
+  Session registration, model switches, and termination persist the actual model and thinking level, so the page does not depend on a live roster row to show them.
+  Requested selection is derived for each snapshot from the immutable comparison specification, separately from actual model and thinking level, which stay unknown until reported.
 - `publish_variant_screenshot` is an essential host tool bound to one variant's instance, given at launch and again on reattach and resume.
+  `VariantScreenshots` in `src/server/variant-screenshots.ts` owns publication.
   `rasterExtension` in `src/variant-image.ts` decodes the whole file with `Bun.Image`, whatever its name says, and the bytes are copied to `comparisons/<id>/media/` under the data directory, outside the access token's directory that `GET /api/media` refuses.
   Each publication takes the next number for its variant, and the record keeps a receipt per instance and tool call id, so a host tool call that omp repeats answers the publication it already made instead of a new one.
 - **Keep this one** is `comparison-select`: it writes the winner first, cancels variants not started yet, waits for the starts under way, then ends each other variant's session and waits until its keeper exits.
-  `comparison-review-cleanup` only reads: after every stop is confirmed, `Worktrees.reviewOwned` lists each owned losing worktree's tracked, staged, untracked, and ignored files, runs the checks **Delete** runs, and fingerprints the files' paths, sizes, modification times, and inodes with Git's index.
+  `comparison-review-cleanup` only reads: after every stop is confirmed, `Worktrees.reviewOwned` lists each owned losing worktree's tracked, staged, untracked, and ignored files and runs the same removal checks as **Delete**.
+  The review fingerprints Git's index and binary diffs, plus content hashes, modes, inodes, and symlink targets of untracked and ignored files.
+  Changed bytes invalidate the review even when file size and modification time stay the same.
+  Removal checks reject assume-unchanged and skip-worktree index flags, force executable-mode detection, and inspect special files outside `.git`, refusing FIFOs and sockets that Git can omit.
+  This safety review still traverses the filesystem and reads ignored file contents.
   `comparison-cleanup` takes that review's id and a policy: `preserve-changes` removes nothing, and `discard-owned-changes` runs `Worktrees.removeOwned`, which reviews again, refuses on any blocker other than uncommitted changes or a changed fingerprint, and then runs `git worktree remove --force`.
+  Cleanup read state is computed from the winner, each variant's lifecycle, and the current in-memory loss review, not stored as another lifecycle in the manifest.
   Reviews live only in memory, so a restart asks for a new one, and an interrupted cleanup never resumes.
   **End session** on a variant stays the ordinary end, with its dirty worktree kept.
-- Each comparison has its own `OwnerLock` at `comparisons/<id>/owner.lock`, apart from `server.lock`, so a smoke server never takes over another server's comparisons, nor their keepers at startup; `reattachAll` asks `Comparisons.mayAttach` before attaching a variant.
-  Each change to a record is written with `atomicWriteText` and awaited before the change takes effect, and each screenshot to a new file that must not exist yet, both mode `0600` in `0700` directories; a record that does not read is listed as unreadable and never replaced.
+- `ComparisonRecords` in `src/server/comparison-records.ts` owns manifest parsing and persistence, per-record serialization, and the `OwnerLock` at `comparisons/<id>/owner.lock`, apart from `server.lock`.
+  Each planned or resumed instance also has a durable `comparisons/<id>/members/<instanceId>` claim, so an unreadable manifest cannot release its keeper to another server.
+  `reattachAll` asks `Comparisons.mayAttach` before attaching a variant; unrelated keepers remain attachable.
+  Version-two manifests store domain state, worktree ownership, instance membership, and screenshot receipts, without derived owner, requested selection, or cleanup read state.
+  Valid version-one records are converted at the persistence boundary; their requested-only settings do not become actual model data.
+  Invalid records are listed as unavailable and never replaced or restarted.
+  Each record change uses `atomicWriteText` and is awaited before it takes effect, and each screenshot is written to a new file that must not exist yet, both mode `0600` in `0700` directories.
 - Every socket hears the comparisons as a whole-list `comparisons` message from `ListRegistry`, a list the page reads but never edits through it, after each change and when it opens.
 
 ## Pins

@@ -3,7 +3,7 @@
  * process runs under a keeper (`src/keeper.ts`), so it outlives the server, and the next server attaches to it.
  */
 import { errorText, isObject } from "../json";
-import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "../keeper-link";
+import { attachKeeper, type KeeperLink, keeperLaunchCwd, listKeepers, startKeeper } from "../keeper-link";
 import type { KeeperMeta } from "../keeper-wire";
 import { keepersDir } from "../paths";
 import type { Frame } from "./collab";
@@ -195,9 +195,12 @@ export function startRpc(instanceId: string, cwd: string, onFrame: (frame: Recor
  * Attaches to session `instanceId`, which a previous server started and whose omp still runs. `onFrame` first gets the
  * questions omp still waits on. omp keeps the tools the last server served it until the caller replaces them.
  */
-export function attachRpc(instanceId: string, onFrame: (frame: Record<string, unknown>) => void, directory = keepersDir): Promise<RpcChild> {
-	return drive(() => attachKeeper(directory, instanceId), onFrame, PLAIN_LAUNCH);
+export function attachRpc(instanceId: string, onFrame: (frame: Record<string, unknown>) => void): Promise<RpcChild> {
+	return drive(() => attachKeeper(keepersDir, instanceId), onFrame, PLAIN_LAUNCH);
 }
 
 /** The instance ids of the sessions a previous server started whose keeper may still run. */
-export const keptSessions = (directory = keepersDir): string[] => listKeepers(directory);
+export const keptSessions = (): string[] => listKeepers(keepersDir);
+
+/** Launch provenance without taking a keeper's connection from its owner. */
+export const keptSessionCwd = (instanceId: string): Promise<string | null> => keeperLaunchCwd(keepersDir, instanceId);

@@ -2,11 +2,11 @@ import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import { clearDraft, newDraftKey } from "../composer-drafts";
+import { clearDraft, newDraftKey, variantsDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
 import type { Layout, Page, TodoListView } from "../routing";
-import { hashForComparisons, hashForNewSession } from "../routing";
+import { hashForComparisons, hashForNewSession, hashForNewVariants } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import type { WorkspaceScope } from "../use-workspace-scope";
@@ -17,6 +17,7 @@ import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { PullRequestDetailPage } from "./pull-requests/pr-page";
 import { NewSession } from "./new-session";
+import { NewVariants } from "./new-variants";
 import { PaneGrid } from "./pane-grid";
 import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
@@ -147,13 +148,26 @@ export const PageSwitch = memo(function PageSwitch({
 					}}
 					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
-					onStartVariants={page.todoId === null ? async (id, spec) => {
-						await request({ t: "comparison-start", id, spec });
-						clearDraft(newDraftKey(null));
-						location.hash = hashForComparisons(id);
-					} : undefined}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
+				/>
+			);
+		}
+		case "new-variants": {
+			const cwd = page.cwd ?? defaultWorkspace;
+			return (
+				<NewVariants
+					cwd={cwd}
+					workspaces={workspaces}
+					connected={connected}
+					completions={newSessionCompletions}
+					onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
+					onPickCwd={next => { location.hash = hashForNewVariants(next); }}
+					onStart={async (id, spec) => {
+						await request({ t: "comparison-start", id, spec });
+						clearDraft(variantsDraftKey);
+						location.hash = hashForComparisons(id);
+					}}
 				/>
 			);
 		}

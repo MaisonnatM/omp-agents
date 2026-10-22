@@ -83,7 +83,7 @@ type Opening =
 	/** A new omp in `cwd` with `launch`, which a failed opening stops, so no process outlives a failed start. */
 	| { kind: "spawn"; cwd: string; launch: RpcLaunch }
 	/** The omp a previous server started, which a failed opening leaves running, turn and all, for the next server. */
-	| { kind: "attach"; directory?: string };
+	| { kind: "attach" };
 
 async function reach(instanceId: string, opening: Opening, onFrame: (frame: Record<string, unknown>) => void): Promise<{ child: RpcChild; abandon: () => Promise<void> }> {
 	switch (opening.kind) {
@@ -92,7 +92,7 @@ async function reach(instanceId: string, opening: Opening, onFrame: (frame: Reco
 			return { child, abandon: () => child.client.stop() };
 		}
 		case "attach": {
-			const child = await attachRpc(instanceId, onFrame, opening.directory);
+			const child = await attachRpc(instanceId, onFrame);
 			return { child, abandon: async () => child.detach() };
 		}
 		default: {
@@ -261,11 +261,11 @@ export class DashboardSession implements LiveSession {
 	 * Attach to session `instanceId`, whose omp a previous server started and left running, as it stands now: in the
 	 * middle of a turn, with its questions and its subagents. `toolsFor` names the tools this server serves the session.
 	 */
-	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"], emit: (update: DashboardUpdate) => void, directory?: string): Promise<DashboardSession> {
+	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"] | Promise<RpcLaunch["tools"]>, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		let protectedReplay = false;
-		const session = await DashboardSession.#open(instanceId, emit, { kind: "attach", directory }, async child => {
+		const session = await DashboardSession.#open(instanceId, emit, { kind: "attach" }, async child => {
 			const { sessionId, sessionFile } = await child.client.getState();
-			const tools = toolsFor(sessionId);
+			const tools = await toolsFor(sessionId);
 			if (tools.length > 0) await child.client.setCustomTools(tools);
 			// omp runs already, so its session file decides only how this server shows it, never whether it runs.
 			if (!sessionFile || !(await stat(sessionFile).catch(() => null))) return child.meta.cwd;

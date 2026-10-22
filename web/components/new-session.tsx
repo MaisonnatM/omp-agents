@@ -1,26 +1,19 @@
-import { Sparkles } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
-import type { ComparisonSpec } from "../../src/shared/comparisons";
 import type { NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
-import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName } from "../labels";
-import { hashForComparisons } from "../routing";
-import { useComparisonStart } from "../use-comparison-start";
+import { hashForComparisons, hashForNewVariants } from "../routing";
 import type { Completions } from "../pane-store";
-import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
 import { useShortcuts } from "../shortcuts";
 import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
-import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerEditor, ComposerNote, ComposerTray, EmptyConversation, OVER_TRAY } from "./composer";
 import { BranchPicker, targetOf } from "./git";
@@ -30,7 +23,7 @@ import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
 import { DirectoryPicker } from "./workspace-picker";
-import { VariantModelRows, type VariantDraft } from "./variant-model-rows";
+import { SkillToggle, useDraftSkill } from "./draft-skill";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -50,7 +43,6 @@ interface NewSessionProps {
 	 * `thinking` when it names a level; through `skill` when it names one.
 	 */
 	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId">) => void;
-	onStartVariants?: (id: string, spec: ComparisonSpec) => Promise<void>;
 	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
 	onSchedule: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
@@ -84,32 +76,14 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onStartVariants, onSchedule, todo, scheduled, draftKey }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
-	const comparisonStart = useComparisonStart(onStartVariants);
-	const [mode, setMode] = useState<"session" | "variants">("session");
-	const [variants, setVariants] = useState<VariantDraft[]>(() => Array.from({ length: 3 }, () => ({ id: crypto.randomUUID(), model: null, thinking: null })));
-	const [base, setBase] = useState("HEAD");
-	const [pinnedSkill] = usePinnedSkill();
-	// A scheduled start keeps the skill it was saved with; with its skill turned off, the toggle offers the pinned one.
-	const draftSkill = initial?.skill ?? pinnedSkill;
-	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
-	const skills = useSkills(cwd);
-	// The server decides whether the skill applies; the toggle only shows what it will decide.
-	const listedSkills = skills.error === null ? skills.data?.skills : [];
-	const skillState: SkillState =
-		listedSkills && !listedSkills.some(skill => skill.name === draftSkill)
-			? "missing"
-			: skipSkill
-				? "off"
-				: draft.trimStart().startsWith("/")
-					? "bypassed"
-					: "on";
+	const skill = useDraftSkill(cwd, draft, initial ?? undefined);
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
@@ -119,7 +93,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		pickedChoice?.kind === "new" && checkout?.branches.some(branch => branch.name === pickedChoice.name)
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
-	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false) || comparisonStart.launch.kind === "pending";
+	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const onComposerKey = useShortcuts({
 		model: () => {
@@ -149,7 +123,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		}
 	};
 	const directCommand = blockedShortcut(draft, "new");
-	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill });
+	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skill.skill });
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
 		await onSchedule(opOf(prompt), when);
@@ -171,7 +145,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					</Button>
 				</Header>
 			) : (
-				<Header title="New session" status={starting ? mode === "variants" ? "Starting variants…" : "Starting omp…" : undefined}>
+				<Header title="New session" status={starting ? "Starting omp…" : undefined}>
+					{!todo && <a href={hashForNewVariants(cwd)} className="text-xs underline underline-offset-4">Variants</a>}
 					<a href={hashForComparisons()} className="text-xs underline underline-offset-4">Comparisons</a>
 				</Header>
 			)}
@@ -180,42 +155,20 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{scheduled ? `Not sent: ${error}` : error}
 				</p>
 			)}
-			{!scheduled && onStartVariants && (comparisonStart.launch.kind === "uncertain" || comparisonStart.launch.kind === "failed") && (
-				<div role="alert" className="space-y-2 px-6 py-3 text-xs">
-					<p>{comparisonStart.launch.error}</p>
-					{comparisonStart.launch.kind === "uncertain" && <p>The start may have taken effect. <a className="underline" href={hashForComparisons(comparisonStart.launch.id)}>Check this comparison</a> before starting another.</p>}
-					<Button variant="ghost" size="compact" onClick={comparisonStart.reset}>Start a separate comparison</Button>
-				</div>
-			)}
 			{scheduled ? (
 				<EmptyConversation title={`Scheduled in ${name}`}>
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			) : (
-				<EmptyConversation title={mode === "variants" ? `Compare ${variants.length} designs in ${folderName(cwd) ?? cwd}` : `Start omp in ${name}`}>
-					{mode === "variants" ? "One prompt starts independent sessions from the same captured Git commit. Compare their published screenshots, then keep a design." : target.creates
+				<EmptyConversation title={`Start omp in ${name}`}>
+					{target.creates
 						? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
 						: "It starts when you send the first message, so leaving this draft leaves nothing running."}
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			)}
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-3">
-				{!scheduled && onStartVariants && (
-					<div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Session mode">
-						<Button variant={mode === "session" ? "secondary" : "ghost"} size="compact" aria-pressed={mode === "session"} disabled={starting} onClick={() => setMode("session")}>Single session</Button>
-						<Button variant={mode === "variants" ? "secondary" : "ghost"} size="compact" aria-pressed={mode === "variants"} disabled={starting} onClick={() => setMode("variants")}>Variants</Button>
-					</div>
-				)}
-				{mode === "variants" && (
-					<>
-						<label className="mb-4 flex flex-wrap items-center gap-2 text-xs">Shared base
-							<input value={base} onChange={event => setBase(event.target.value)} disabled={starting || comparisonStart.launch.kind === "uncertain"} list="variant-bases" className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-base sm:text-sm" />
-						</label>
-						<datalist id="variant-bases"><option value="HEAD" />{checkout?.branches.map(branch => <option key={branch.name} value={branch.name} />)}</datalist>
-						<VariantModelRows rows={variants} common={models} disabled={starting || comparisonStart.launch.kind === "uncertain"} onChange={setVariants} />
-					</>
-				)}
 				{completion.popup}
 				<ComposerEditor value={editorRef}>
 					<InputMessage
@@ -226,31 +179,27 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							if (directCommand) return;
 							completion.close();
 							if (scheduled) save.run(text.trim());
-							else void attachments.read(text, async (prompt, images) => mode === "variants" ? comparisonStart.start({
-								cwd, prompt, images, base: base.trim() || "HEAD", model: models.model, thinking: models.thinking,
-								skill: skipSkill ? null : draftSkill,
-								variants: variants.map(({ model, thinking }) => ({ model, thinking })),
-							}) : onStart({ ...opOf(prompt), images }));
+							else void attachments.read(text, (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
-						placeholder={mode === "variants" ? "Describe the designs to compare…" : "Message this session…"}
+						placeholder="Message this session…"
 						files={attachments.files}
 						onFilesChange={attachments.onFilesChange}
 						accept={ATTACH_ACCEPT}
 						leftSlot={
 							<>
 								<ModelPicker {...models.picker} disabled={starting || !connected} />
-								{draftSkill !== null && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+								{skill.name !== null && <SkillToggle name={skill.name} state={skill.state} onToggle={skill.toggle} disabled={starting} />}
 							</>
 						}
 						rightSlot={({ openFilePicker }) => (
 							<>
-								{mode === "session" && <ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />}
+								<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
 								{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
 							</>
 						)}
-						disabled={starting || !connected || (mode === "variants" && comparisonStart.launch.kind === "uncertain")}
+						disabled={starting || !connected}
 						className={OVER_TRAY}
-						sendLabel={scheduled ? "Save" : mode === "variants" ? `Start ${variants.length} variants` : starting ? "Starting session" : "Start session"}
+						sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
 						sending={starting || save.pending}
 						editorProps={{ ...completion.editorProps, onKeyDown, autoFocus: true }}
 					/>
@@ -266,7 +215,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 									onOpenChange={setDirectoriesOpen}
 									onPick={onPickCwd}
 								/>
-								{mode === "session" && checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 							</>
 						}
 					/>
@@ -275,43 +224,5 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				{attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>
-	);
-}
-
-/** Whether the pinned skill applies: `missing` when the directory has no such skill, `bypassed` when the message opens with its own command. */
-type SkillState = "on" | "off" | "missing" | "bypassed";
-
-function skillTitle(name: string, state: SkillState): string {
-	switch (state) {
-		case "on":
-			return `The first message goes through /skill:${name}. Click to start without it.`;
-		case "off":
-			return `Click to send the first message through /skill:${name}.`;
-		case "missing":
-			return `No skill named ${name} in this directory, so the session starts without it.`;
-		case "bypassed":
-			return `A message that starts with / runs its own command, so it skips /skill:${name}.`;
-		default: {
-			const unhandled: never = state;
-			return unhandled;
-		}
-	}
-}
-
-function SkillToggle({ name, state, onToggle, disabled }: { name: string; state: SkillState; onToggle: () => void; disabled: boolean }) {
-	return (
-		<Tooltip content={skillTitle(name, state)}>
-			<Button
-				variant="ghost"
-				size="compact"
-				leadingIcon={Sparkles}
-				aria-pressed={state === "on"}
-				aria-label={`Skill ${name}`}
-				onClick={onToggle}
-				disabled={disabled || state === "missing" || state === "bypassed"}
-			>
-				<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
-			</Button>
-		</Tooltip>
 	);
 }

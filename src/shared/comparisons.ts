@@ -18,26 +18,38 @@ export interface ComparisonSpec {
 	skill: string | null;
 	variants: VariantSpec[];
 }
-export type FirstPrompt = { kind: "not-attempted" } | { kind: "attempted" } | { kind: "admitted" } | { kind: "uncertain"; reason: string };
-export type VariantStart = { kind: "queued" } | { kind: "starting" } | { kind: "registered" } | { kind: "failed"; error: string } | { kind: "cancelled" };
-export type VariantStop = { kind: "not-requested" } | { kind: "stopping" } | { kind: "stopped" } | { kind: "blocked"; reason: string };
-export type VariantCleanup = { kind: "pending" } | { kind: "preserved" } | { kind: "removed" } | { kind: "blocked"; reasons: string[] };
+export type VariantLifecycle =
+	| { kind: "queued" }
+	| { kind: "starting" }
+	| { kind: "registered" }
+	| { kind: "prompt-attempted" }
+	| { kind: "running" }
+	| { kind: "failed"; error: string }
+	| { kind: "cancelled" }
+	| { kind: "uncertain"; reason: string }
+	| { kind: "stopping" }
+	| { kind: "stop-blocked"; reason: string }
+	| { kind: "stopped" }
+	| { kind: "preserved" }
+	| { kind: "removed" }
+	| { kind: "cleanup-blocked"; reasons: string[] };
+
+export function isVariantStopped(lifecycle: VariantLifecycle): boolean {
+	return lifecycle.kind === "stopped" || lifecycle.kind === "preserved" || lifecycle.kind === "removed" || lifecycle.kind === "cleanup-blocked";
+}
 export interface VariantScreenshot { sequence: number; src: string; caption: string; publishedAt: number }
 export interface ComparisonVariant {
 	id: VariantId;
-	ordinal: number;
 	instanceId: string;
 	sessionId: string | null;
 	sessionIds: string[];
 	cwd: string;
 	checkout: string;
 	branch: string;
+	selection: VariantSpec;
 	model: ModelOption | null;
-	thinking: string | null;
-	start: VariantStart;
-	firstPrompt: FirstPrompt;
-	stop: VariantStop;
-	cleanup: VariantCleanup;
+	thinkingLevel: string | null;
+	lifecycle: VariantLifecycle;
 	screenshot: VariantScreenshot | null;
 	screenshotError: string | null;
 }
@@ -66,7 +78,6 @@ export interface ComparisonSnapshot {
 	variants: ComparisonVariant[];
 	winner: VariantId | null;
 	cleanup: CleanupRead;
-	error: string | null;
 }
 export const isComparisonId = (value: unknown): value is string => typeof value === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(value);
 export function parseComparisonSpec(value: unknown): Parsed<ComparisonSpec> {
