@@ -7,7 +7,8 @@ import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } fro
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES } from "../shared/github";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseReviewDraftEdit, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import type { ReviewDraftEdit } from "../shared/review-drafts";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -423,8 +424,29 @@ describe("parsePullRequestQuery", () => {
 	});
 });
 
+describe("parsePullRequestFilesQuery", () => {
+	test("accepts all changes or a full commit OID, and refuses malformed commit scopes", () => {
+		const query = (suffix: string) => parsePullRequestFilesQuery(new URLSearchParams(`owner=acme&repo=app&number=7${suffix}`));
+		expect(query("")?.ok).toEqual({ owner: "acme", repo: "app", number: 7 });
+		expect(query(`&commit=${"a".repeat(40)}`)?.ok).toEqual({ owner: "acme", repo: "app", number: 7, commit: "a".repeat(40) });
+		expect(query(`&commit=${"b".repeat(64)}`)?.ok).toEqual({ owner: "acme", repo: "app", number: 7, commit: "b".repeat(64) });
+		for (const commit of ["", "HEAD", "../main", "abc123", "g".repeat(40), "a".repeat(65)]) expect(query(`&commit=${commit}`)).toBeNull();
+	});
+});
+
 describe("parsePullRequestEdit", () => {
 	const pr = { owner: "anthropics", repo: "omp-agents", number: 12 };
+
+	test("takes no viewed change, which has its own route", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "viewed", path: "src/a.ts", on: true } })).toBeNull();
+	});
+
+	test("parsePullRequestViewedEdit takes a nonempty path and a boolean direction", () => {
+		expect(parsePullRequestViewedEdit({ ...pr, path: "src/a file.ts", on: true })?.ok).toEqual({ ...pr, path: "src/a file.ts", on: true });
+		expect(parsePullRequestViewedEdit({ ...pr, path: "src/a.ts", on: false })?.ok).toEqual({ ...pr, path: "src/a.ts", on: false });
+		for (const edit of [{ path: "", on: true }, { path: " ", on: false }, { path: 1, on: true }, { path: "a.ts" }, { path: "a.ts", on: 1 }]) expect(parsePullRequestViewedEdit({ ...pr, ...edit })).toBeNull();
+		expect(parsePullRequestViewedEdit({ owner: "a/b", repo: "r", number: 1, path: "a.ts", on: true })).toBeNull();
+	});
 
 	test("takes one label, reviewer, or state change to a pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "good first issue", on: true } })?.ok).toEqual({ ...pr, change: { field: "label", name: "good first issue", on: true } });
@@ -475,21 +497,53 @@ describe("parsePullRequestEdit", () => {
 
 describe("parseReviewDraftEdit", () => {
 	const pr = { owner: "acme", repo: "app", number: 7 };
+	const head = "a".repeat(40);
+
+	test("takes a line or range to add on either side, its path trimmed, and an edit of a numbered finding", () => {
+		const change: ReviewDraftEdit = { op: "add-finding", pr, head, finding: { path: " src/a.ts ", line: 8, startLine: 5, side: "LEFT", body: "Deleted range." } };
+		const expected: ReviewDraftEdit = { op: "add-finding", pr, head, finding: { path: "src/a.ts", line: 8, startLine: 5, side: "LEFT", body: "Deleted range." } };
+		expect(parseReviewDraftEdit(change)?.ok).toEqual(expected);
+		expect(msg({ t: "review-draft", change })).toEqual({ t: "review-draft", change: expected });
+		const line = { path: "src/a.ts", line: 8, startLine: null, side: "RIGHT", body: "One line." } as const;
+		expect(parseReviewDraftEdit({ op: "add-finding", pr, head, finding: line })?.ok).toEqual({ op: "add-finding", pr, head, finding: line });
+		expect(parseReviewDraftEdit({ op: "add-finding", pr, head: "b".repeat(64), finding: line })?.ok).toEqual({ op: "add-finding", pr, head: "b".repeat(64), finding: line });
+		expect(parseReviewDraftEdit({ op: "finding", pr, id: "f12", path: "a.ts", startLine: 2, line: 4, side: "RIGHT", body: "Edited." })?.ok).toEqual({
+			op: "finding", pr, id: "f12", path: "a.ts", startLine: 2, line: 4, side: "RIGHT", body: "Edited.",
+		});
+	});
+
+	test("rejects malformed additions, invalid ranges and sides, and a finding on no line", () => {
+		const finding = { path: "src/a.ts", line: 8, startLine: null, side: "RIGHT", body: "One line." };
+		const change = { op: "add-finding", pr, head, finding };
+		expect(parseReviewDraftEdit({ ...change, head: "abc1234" })).toBeNull();
+		expect(parseReviewDraftEdit({ ...change, head: "z".repeat(40) })).toBeNull();
+		expect(parseReviewDraftEdit({ ...change, finding: null })).toBeNull();
+		for (const over of [
+			{ line: null }, { line: 0 }, { line: 1.5 },
+			{ startLine: 0 }, { startLine: 9 }, { startLine: 1.5 }, { startLine: undefined }, { side: "BASE" }, { side: undefined },
+			{ path: " " }, { body: " " }, { body: "x".repeat(65_537) },
+		]) {
+			expect(parseReviewDraftEdit({ ...change, finding: { ...finding, ...over } })).toBeNull();
+		}
+		expect(parseReviewDraftEdit({ op: "finding", pr, id: "f1", ...finding, startLine: 9 })).toBeNull();
+		expect(parseReviewDraftEdit({ op: "finding", pr, id: "f1", ...finding, line: null, startLine: 1 })).toBeNull();
+		expect(parseReviewDraftEdit({ op: "finding", pr, id: "code-1", ...finding })).toBeNull();
+	});
 
 	test("takes a verdict, a summary, one finding's place and text, findings' states, and a discard", () => {
 		expect(parseReviewDraftEdit({ pr, op: "verdict", verdict: "request-changes" })?.ok).toEqual({ pr, op: "verdict", verdict: "request-changes" });
 		expect(parseReviewDraftEdit({ pr, op: "summary", summary: "" })?.ok).toEqual({ pr, op: "summary", summary: "" });
-		expect(parseReviewDraftEdit({ pr, op: "finding", id: "f2", path: " src/a.ts ", line: null, body: "Nit." })?.ok).toEqual({ pr, op: "finding", id: "f2", path: "src/a.ts", line: null, body: "Nit." });
+		expect(parseReviewDraftEdit({ pr, op: "finding", id: "f2", path: " src/a.ts ", line: null, startLine: null, side: "RIGHT", body: "Nit." })?.ok).toEqual({ pr, op: "finding", id: "f2", path: "src/a.ts", line: null, startLine: null, side: "RIGHT", body: "Nit." });
 		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: ["f1", "f3"], state: "dismissed" })?.ok).toEqual({ pr, op: "finding-state", ids: ["f1", "f3"], state: "dismissed" });
 		expect(parseReviewDraftEdit({ pr, op: "discard", extra: 1 })?.ok).toEqual({ pr, op: "discard" });
 	});
 
-	test("rejects an unknown verdict or state, a finding on line 0, a blank body, an id it did not number, and no pull request", () => {
+	test("rejects an unknown verdict or state, a finding on line 0, a blank body, a malformed id, and no pull request", () => {
 		expect(parseReviewDraftEdit({ pr, op: "verdict", verdict: "lgtm" })).toBeNull();
 		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: ["f1"], state: "done" })).toBeNull();
 		expect(parseReviewDraftEdit({ pr, op: "finding", id: "f1", path: "a.ts", line: 0, body: "x" })).toBeNull();
 		expect(parseReviewDraftEdit({ pr, op: "finding", id: "f1", path: "a.ts", line: 3, body: " " })).toBeNull();
-		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: ["x1"], state: "accepted" })).toBeNull();
+		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: ["bad id"], state: "accepted" })).toBeNull();
 		expect(parseReviewDraftEdit({ pr, op: "finding-state", ids: [], state: "accepted" })).toBeNull();
 		expect(parseReviewDraftEdit({ op: "discard" })).toBeNull();
 	});

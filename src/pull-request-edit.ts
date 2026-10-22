@@ -8,7 +8,7 @@ import { runChecked } from "./proc";
 import { loadPullRequestDetail } from "./pull-requests";
 import { GITHUB_MERGES } from "./pull-request-merge";
 import { isObject, str } from "./json";
-import { type Person, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
+import { type Person, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, type PullRequestViewedEdit, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
 import { MEDIA_FILE_TYPES, mediaExtension } from "./shared/transcript";
 
 const OPTIONS_TTL_MS = 5 * 60_000;
@@ -108,6 +108,14 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 			break;
 	}
 	return loadPullRequestDetail(pr, true);
+}
+
+/** Marks one file viewed by the viewer, or not; the page keeps its own viewed states, so nothing is read back. */
+export async function markPullRequestFileViewed({ path, on, ...pr }: PullRequestViewedEdit): Promise<void> {
+	const node = await nodeOf(pr);
+	await ghMutation(`mutation($id: ID!, $path: String!) {
+		${on ? "markFileAsViewed" : "unmarkFileAsViewed"}(input: { pullRequestId: $id, path: $path }) { clientMutationId }
+	}`, { id: node.id, path });
 }
 
 /**

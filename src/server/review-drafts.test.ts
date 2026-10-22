@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles } from "../fs";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import type { SubmittedComment, SubmittedReview } from "../pull-request-review";
-import type { ReviewDraft, ReviewPayload } from "../shared/review-drafts";
+import { diffLinesOf, type ReviewDraft, type ReviewPayload } from "../shared/review-drafts";
 import { newSessionRequest } from "../shared/sessions";
 import type { ProjectJoin } from "./project-runner";
 import { ReviewDrafts, type ReviewGitHub } from "./review-drafts";
@@ -27,7 +27,7 @@ function fakeGitHub(head = HEAD) {
 	const comments = new Map<number, SubmittedComment[]>();
 	const posts: ReviewPayload[] = [];
 	const github: ReviewGitHub = {
-		target: async () => ({ head, lines: new Map([["src/a.ts", new Set([1, 2, 3])]]) }),
+		target: async () => ({ head, lines: diffLinesOf([{ path: "src/a.ts", patch: PATCH }]) }),
 		reviews: async () => reviews,
 		reviewComments: async (_pr, id) => comments.get(id) ?? [],
 		viewer: async () => "me",
@@ -88,8 +88,8 @@ describe("the save_review_draft tool", () => {
 			verdict: "comment",
 			summary: "Close.",
 			findings: [
-				{ id: "f1", path: "src/a.ts", line: 2, body: "Off by one.", state: "pending" },
-				{ id: "f2", path: "src/b.ts", line: null, body: "Missing test.", state: "pending" },
+				{ id: "f1", path: "src/a.ts", line: 2, startLine: null, side: "RIGHT", body: "Off by one.", state: "pending", source: "review" },
+				{ id: "f2", path: "src/b.ts", line: null, startLine: null, side: "RIGHT", body: "Missing test.", state: "pending", source: "review" },
 			],
 			savedAt: 5_000,
 			posted: null,
@@ -111,7 +111,52 @@ describe("the save_review_draft tool", () => {
 	});
 });
 
+describe("local findings", () => {
+	test("creates and appends through the dashboard edit store, saved at the server's time, and persists ranges without GitHub", () => {
+		const unavailable = async (): Promise<never> => { throw new Error("A local draft must not call GitHub."); };
+		const { drafts, path } = setup({ target: unavailable, reviews: unavailable, reviewComments: unavailable, viewer: unavailable, post: unavailable });
+		expect(drafts.edit({ op: "add-finding", pr, head: HEAD, finding: { path: "src/a.ts", line: 2, startLine: 1, side: "LEFT", body: "Range." } })).toBe(true);
+		expect(drafts.edit({ op: "add-finding", pr, head: HEAD, finding: { path: "src/a.ts", line: 3, startLine: null, side: "RIGHT", body: "Line." } })).toBe(true);
+		expect(drafts.list[0]?.findings).toEqual([
+			{ id: "f1", path: "src/a.ts", line: 2, startLine: 1, side: "LEFT", body: "Range.", state: "pending", source: "code" },
+			{ id: "f2", path: "src/a.ts", line: 3, startLine: null, side: "RIGHT", body: "Line.", state: "pending", source: "code" },
+		]);
+		expect(drafts.list[0]?.savedAt).toBe(5_000);
+		flushJsonFiles();
+		expect(new ReviewDraftsFile(path).value.drafts).toEqual(drafts.list);
+	});
+
+	test("loads a finding saved before ranges as the session's, on one line on the head side", () => {
+		const { path } = setup();
+		const old = { id: "f1", path: "a.ts", line: 3, body: "Old.", state: "pending" };
+		writeFileSync(path, JSON.stringify({ drafts: [{ pr, head: HEAD, verdict: "comment", summary: "", findings: [old], savedAt: 1, posted: null }], reviewers: [] }));
+		expect(new ReviewDraftsFile(path).value.drafts[0]?.findings).toEqual([{ id: "f1", path: "a.ts", line: 3, startLine: null, side: "RIGHT", body: "Old.", state: "pending", source: "review" }]);
+	});
+});
+
 describe("posting", () => {
+	test("previews and submits a manually added range on the selected side in one review", async () => {
+		const fake = fakeGitHub();
+		fake.github.target = async () => ({
+			head: HEAD,
+			lines: diffLinesOf([{ path: "src/a.ts", patch: ["@@ -10,2 +20,2 @@", "-old one", "-old two", "+new one", "+new two"].join("\n") }]),
+		});
+		const { drafts } = setup(fake.github);
+		drafts.edit({ op: "add-finding", pr, head: HEAD, finding: { path: "src/a.ts", startLine: 10, line: 11, side: "LEFT", body: "Removed range." } });
+		drafts.edit({ op: "add-finding", pr, head: HEAD, finding: { path: "src/a.ts", startLine: 20, line: 21, side: "RIGHT", body: "Added range." } });
+		drafts.edit({ op: "finding-state", pr, ids: ["f1", "f2"], state: "accepted" });
+		const expected: ReviewPayload = {
+			commit_id: HEAD, event: "COMMENT", body: "",
+			comments: [
+				{ path: "src/a.ts", start_line: 10, line: 11, start_side: "LEFT", side: "LEFT", body: "Removed range." },
+				{ path: "src/a.ts", start_line: 20, line: 21, start_side: "RIGHT", side: "RIGHT", body: "Added range." },
+			],
+		};
+		expect(await drafts.preview(pr)).toEqual({ head: HEAD, refusal: null, payload: expected });
+		await drafts.post(pr);
+		expect(fake.posts).toEqual([expected]);
+	});
+
 	const accept = (drafts: ReviewDrafts) => drafts.edit({ op: "finding-state", pr, ids: ["f1", "f2"], state: "accepted" });
 
 	test("posts one review on the draft's head, comments on diff lines, and marks the draft posted", async () => {

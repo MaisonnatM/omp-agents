@@ -551,6 +551,15 @@ describe("parseDetailAnswer", () => {
 		expect(commits.map(({ sha }) => sha)).toEqual(["mine", "unpushed"]);
 	});
 
+	test("keeps a full commit id for the diff scope separately from its abbreviated label", () => {
+		const oid = "a".repeat(40);
+		const detail = parseDetailAnswer(answer({ history: { nodes: [{ commit: {
+			oid, abbreviatedOid: "aaaaaaa", messageHeadline: "Change", committedDate: "2026-09-30T09:00:00Z",
+			author: { user: me }, associatedPullRequests: { nodes: [{ number: pr.number }] },
+		} }] } }), pr);
+		expect(detail.commits[0]).toMatchObject({ oid, sha: "aaaaaaa" });
+	});
+
 	test("a repository without that pull request is an error, not an empty one", () => {
 		expect(() => parseDetailAnswer({ data: { repository: { pullRequest: null } } }, pr)).toThrow("GitHub has no pull request acme/webapp#7");
 	});

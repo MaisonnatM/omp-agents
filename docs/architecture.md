@@ -970,10 +970,14 @@ Then it deletes the local branch it worked on when that is the head branch of a 
 ## Review drafts
 
 A **Review** quick action's session writes its review into a draft the dashboard keeps, and the user posts it from the pull request's **Review draft** tab; see [Pull requests](usage.md#pull-requests) for what the user sees.
-`src/shared/review-drafts.ts` holds the shapes and the rules both sides apply: `ReviewDraft`, one per pull request, with the `head` commit the session reviewed, a `verdict`, a `summary`, `findings`, `savedAt`, and `posted`, the review it became; `ReviewFinding`, `{ id, path, line, body, state }`, its `line` `null` for a finding on a whole file and its `state` `pending`, `accepted`, or `dismissed`; and `Reviewer`, which pull request a session reviews.
+`src/shared/review-drafts.ts` holds the shapes and the rules both sides apply: `ReviewDraft`, one per pull request, with the `head` commit the session reviewed, a `verdict`, a `summary`, `findings`, `savedAt`, and `posted`, the review it became; `ReviewFinding`, `{ id, path, line, startLine, side, body, state, source }`, its `line` `null` for a finding on a whole file and its `state` `pending`, `accepted`, or `dismissed`, and its `source` `review` for the session's tool or `code` for the Code tab; and `Reviewer`, which pull request a session reviews.
 `applyReviewDraft` reduces a `ReviewDraftChange` over `ReviewDraftState`, `{ drafts, reviewers }`: the page's `ReviewDraftEdit`s, which change a draft not yet posted, and the server's `save`, `posted`, `bind`, and `relink`.
-A `save` replaces the pull request's draft whole and drops drafts posted more than 14 days before it; `posted` marks a draft only while its head is the one posted and it is not posted yet; `bind` keeps the latest 200 reviewers.
+A `save` replaces the pull request's draft, keeping only its `code` findings when the draft is unposted on the same head, renumbered after the saved ones, and drops drafts posted more than 14 days before it; `posted` marks a draft only while its head is the one posted and it is not posted yet; `bind` keeps the latest 200 reviewers.
 `ReviewDraftsFile` in `src/server/review-drafts-file.ts` keeps that state in `review-drafts.json` beside the access token, `shared` so every server on this machine reads the others' writes, and every socket hears the drafts as a `review-drafts` message, also sent when a socket opens; the page edits them with a `review-draft` message, which `parseReviewDraftEdit` in `src/server/wire.ts` checks.
+The Code tab's `add-finding` edit creates a local comment draft or appends a pending finding to an unposted draft on the same head, without calling GitHub; the reducer numbers it after the draft's highest `fN` id, so the page never picks an id.
+One on a posted draft or a draft of another head throws, like a `take` of a scheduled send, so the page's request fails with why and it toasts that instead of a saved comment.
+Every finding has a `side`, `LEFT` or `RIGHT`, and a `startLine`, the first line of a range or `null`; `ReviewDraftsFile` reads a finding saved before ranges as `RIGHT` and `null`, and one saved before sources as `review`.
+Posting preserves a range only when every line belongs to the diff on that side; other findings join the summary.
 
 `ReviewDrafts` in `src/server/review-drafts.ts` owns the tool and the post.
 A start asks for the tool with `NewSessionRequest.reviewDraft`, which `parseNewSessionRequest` takes only with a pull request subject and which `startTarget` in `web/quick-actions.ts` sets only for **Review**; **Thermonuclear review** never gets it.
@@ -1118,8 +1122,10 @@ It waits for the transcript reads asked for so far, then reads nothing itself; t
 `GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub or Graphite PR link.
 It reads only the title through `gh api graphql`, using the same validated pull request query as the details routes, and keeps each answer for 30 seconds, sharing in-flight reads.
 The page's existing `useRead` drops answers for a previous link and aborts the read when the link unmounts; explicit Markdown labels do not request a title.
-`GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers the list on a pull request's **Code** tab, `PullRequestChanges` in `src/shared/github.ts`: its title and branches from `gh api repos/<o>/<r>/pulls/<n>`, and its files from `gh api --paginate --slurp repos/<o>/<r>/pulls/<n>/files`, which lists up to GitHub's 3000 where GraphQL's `files` stops at 100.
-It reads GitHub again on each call and keeps the answer, with each file's `patch` and blob id, for the file reads for 30 seconds.
+`GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers `PullRequestChanges`: title and branches from REST, the files from the paginated REST files endpoint, and each file's `viewerViewedState` from paginated GraphQL.
+Files are ordered by source dependencies, tests in source order, and generated files last.
+The optional `commit=<full oid>` scopes both `/files` and `/file` to a commit belonging to that pull request, with a separate cache entry and the blobs from that commit.
+Each list call reads GitHub again and keeps patches and blob ids for following file reads for 30 seconds.
 `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>` answers one file of that list in full, `ChangedFileText`, and 404 for a path the list does not hold.
 GitHub's patch keeps three unchanged lines around each change, so `patchRows` in `src/shared/changes.ts` fills the lines before, between, and after its hunks from the file's text at the head, which one `gh api graphql` call reads by the blob id the list names.
 Both file readers answer through `fileText(path, rows, note)` in `src/shared/changes.ts`, so a file's rows and the note on why it has none take one shape.
@@ -1130,6 +1136,7 @@ A removed file's patch holds every line, so it reads no blob; a file GitHub send
 `PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
 A `title` change carries a nonblank title of at most 256 characters and patches `repos/<owner>/<repo>/pulls/<number>`.
 An `update` change selects `merge` or `rebase` and calls `GITHUB_MERGES.update` with the node id and head read fresh from GitHub.
+`PUT /api/pull-request/viewed` takes a `PullRequestViewedEdit`, a pull request with `{ path, on }`, reads the pull request node id, calls `markFileAsViewed` or `unmarkFileAsViewed` through GraphQL, and answers `{}`, since the **Code** tab keeps its own viewed states.
 The queue uses the same update function with the merge method.
 Each open pull request detail adds one REST comparison of its base against its head commit.
 `behindBy` is the comparison's `behind_by` count, or `null` for an unavailable comparison or a finished pull request.

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
-import { changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, lastAtOrAbove, treeOrder } from "./changes-model";
+import { changeBlocks, changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, lastAtOrAbove, treeOrder, withMember } from "./changes-model";
 
 const same = (count: number, from = 1): DiffRow[] => Array.from({ length: count }, (_, at) => ({ sign: " ", old: from + at, new: from + at, text: "" }));
 const added: DiffRow = { sign: "+", old: null, new: 0, text: "" };
@@ -38,6 +38,29 @@ describe("foldDiff", () => {
 
 	test("a file with no change shows whole", () => {
 		expect(shown(foldDiff(same(20), new Set()))).toEqual(Array.from({ length: 20 }, (_, index) => index));
+	});
+});
+
+describe("changeBlocks", () => {
+	test("keeps each unchanged row alone and groups a change's removed and added rows, starting at its first row", () => {
+		expect(changeBlocks([...same(1), removed, removed, added, ...same(1), added, removed])).toEqual([
+			{ kind: "same", start: 0 },
+			{ kind: "change", start: 1, removed: [1, 2], added: [3] },
+			{ kind: "same", start: 4 },
+			{ kind: "change", start: 5, removed: [6], added: [5] },
+		]);
+		expect(changeBlocks([])).toEqual([]);
+	});
+});
+
+describe("withMember", () => {
+	test("adds or drops the path, and gives the same set back when nothing changes", () => {
+		const set: ReadonlySet<string> = new Set(["a.ts"]);
+		expect([...withMember(set, "b.ts", true)]).toEqual(["a.ts", "b.ts"]);
+		expect([...withMember(set, "a.ts", false)]).toEqual([]);
+		expect(withMember(set, "a.ts", true)).toBe(set);
+		expect(withMember(set, "b.ts", false)).toBe(set);
+		expect([...set]).toEqual(["a.ts"]);
 	});
 });
 

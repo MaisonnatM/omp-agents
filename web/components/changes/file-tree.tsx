@@ -1,10 +1,19 @@
-/** `FileTree`: the changes explorer's folder tree of changed files, each with its status letter. */
+/** `FileTree`: the changes explorer's folder tree of changed files, each with its status letter, and the line that tells its keys. */
 import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
 import { foldersAbove, type TreeDir } from "../../changes-model";
+import { shortcutLabels } from "../../shortcuts";
 import { cn } from "@/lib/utils";
 import { LineCounts } from "../line-counts";
+
+export function FileStepHint() {
+	return (
+		<p className="px-4 pt-3 pb-1 text-xs text-muted-foreground">
+			<kbd>{shortcutLabels("nextChangedFile")[0]}</kbd> and <kbd>{shortcutLabels("previousChangedFile")[0]}</kbd> step through the files
+		</p>
+	);
+}
 
 const STATUS = {
 	added: { letter: "A", tone: "text-emerald-600 dark:text-emerald-400", label: "Added" },

@@ -124,6 +124,34 @@ export function foldDiff(rows: readonly DiffRow[], opened: ReadonlySet<number>):
 	return items;
 }
 
+/** A run of the diff by row index: an unchanged row, or the rows one change removed and added; `start` is its first row. */
+export type ChangeBlock = { kind: "same"; start: number } | { kind: "change"; start: number; removed: number[]; added: number[] };
+
+/** The diff's rows as blocks, in order, each row in exactly one. */
+export function changeBlocks(rows: readonly DiffRow[]): ChangeBlock[] {
+	const blocks: ChangeBlock[] = [];
+	let index = 0;
+	while (index < rows.length) {
+		if (rows[index]!.sign === " ") {
+			blocks.push({ kind: "same", start: index++ });
+			continue;
+		}
+		const block: ChangeBlock = { kind: "change", start: index, removed: [], added: [] };
+		for (; index < rows.length && rows[index]!.sign !== " "; index++) (rows[index]!.sign === "-" ? block.removed : block.added).push(index);
+		blocks.push(block);
+	}
+	return blocks;
+}
+
+/** `set` with `path` in it or out of it as `member` says; `set` itself when it already is. */
+export function withMember(set: ReadonlySet<string>, path: string, member: boolean): ReadonlySet<string> {
+	if (set.has(path) === member) return set;
+	const next = new Set(set);
+	if (member) next.add(path);
+	else next.delete(path);
+	return next;
+}
+
 /**
  * A line of the file as it is now, with its gutter mark: `added` in a run of added rows, `modified` in one that follows
  * removed rows. `removed` holds the removed rows just before its run, which a click anywhere on the run's gutter shows
