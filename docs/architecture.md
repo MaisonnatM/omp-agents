@@ -1103,7 +1103,8 @@ The queue uses the same update function with the merge method.
 `PUT /api/pull-request/checkout` takes a `PullRequestCheckout` from `src/shared/github.ts`, a pull request with `{ cwd, place, skill }`, checked by `parsePullRequestCheckout`, and answers 404 when `cwd` is not a directory.
 `checkOutPullRequest` in `src/pull-request-checkout.ts` refuses a `cwd` whose `origin` is another repository, reads the head branch and commit from REST, and answers a `CheckedOutPullRequest`: its `place`, the branch, whether it is at that commit, and at `worktree` the `instanceId` of the session it started; any refusal answers 409 with why.
 Place `here` refuses uncommitted changes to tracked files and runs `gh pr checkout <number> -R <owner>/<repo>` in `cwd`.
-Place `worktree` fetches `refs/pull/<number>/head` without forcing into the head branch's name, or `pr-<number>/<name>` for a fork, and gives a branch from the same repository the upstream `origin/<name>`, unless a linked worktree already has the branch, which it reuses as it is.
+Place `worktree` fetches `refs/pull/<number>/head` without tags or forcing into the head branch's name, or `pr-<number>/<name>` for a fork; a non-fast-forward rejection is explained as a local branch with commits of its own.
+It gives a branch from the same repository the upstream `origin/<name>`, unless a linked worktree already has the branch, which it reuses as it is.
 It refuses the branch while the main checkout has it, then starts a `new` session through the same start a socket `start` runs, with `branch: { kind: "existing" }`, the pinned `skill`, a prompt asking for a summary, and the pull request as its subject, so `checkoutDir` reuses or adds the worktree.
 Each open pull request detail adds one REST comparison of its base against its head commit.
 `behindBy` is the comparison's `behind_by` count, or `null` for an unavailable comparison or a finished pull request.

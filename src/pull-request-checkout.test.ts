@@ -131,6 +131,28 @@ describe("in a separate worktree", () => {
 		expect(starts).toEqual([]);
 	});
 
+	test("refuses a local branch with commits of its own, leaving it where it is, and starts nothing", async () => {
+		const { main, starts, checkOut } = await setup();
+		await git(main, "fetch", "-q", "origin", "refs/pull/7/head:feature");
+		await git(main, "switch", "-q", "feature");
+		await git(main, "commit", "-q", "--allow-empty", "-m", "mine");
+		const mine = await git(main, "rev-parse", "HEAD");
+		await git(main, "switch", "-q", "main");
+		await expect(checkOut("worktree")).rejects.toThrow("Local branch `feature` has commits pull request #7 does not. Move them off it or delete it before checking the pull request out in its own worktree.");
+		expect(await git(main, "rev-parse", "feature")).toBe(mine);
+		expect(existsSync(worktreeDir(main, "feature"))).toBe(false);
+		expect(starts).toEqual([]);
+	});
+
+	test("fast-forwards a local branch behind the head, without fetching tags", async () => {
+		const { main, head, checkOut } = await setup();
+		await git(main, "branch", "-q", "feature", "main");
+		await git(main, "push", "-q", "origin", `${head}:refs/tags/v1`);
+		expect(await checkOut("worktree")).toEqual({ place: "worktree", branch: "feature", onHead: true, instanceId: "i1" });
+		expect(await git(main, "rev-parse", "feature")).toBe(head);
+		expect(await git(main, "tag", "--list")).toBe("");
+	});
+
 	test("puts a fork's head on pr-<number>/<branch>, with no upstream", async () => {
 		const { main, head, checkOut } = await setup("someone/app");
 		expect(await checkOut("worktree")).toEqual({ place: "worktree", branch: "pr-7/feature", onHead: true, instanceId: "i1" });

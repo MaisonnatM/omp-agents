@@ -47,7 +47,7 @@ async function checkOutHere(request: PullRequestCheckout, head: PullRequestHead)
 
 /**
  * A new session on the pull request's branch, in the linked worktree that has it checked out, else in a new one the
- * start adds. A branch not checked out anywhere first takes the pull request's head with a fetch that only fast-forwards.
+ * start adds. A branch not checked out anywhere first takes the pull request's head only when it can fast-forward.
  * A fork's branch is `pr-<number>/<name>`, since its name could be one the repository uses.
  */
 async function checkOutInWorktree(request: PullRequestCheckout, head: PullRequestHead, start: StartSession): Promise<CheckedOutPullRequest> {
@@ -56,7 +56,12 @@ async function checkOutInWorktree(request: PullRequestCheckout, head: PullReques
 	const holder = (await worktreesOf(cwd)).find(worktree => worktree.prunable === null && worktree.branch === branch);
 	if (holder?.main) throw new Error("This PR branch is already checked out in the main repo. Use In this repository, or switch the main repo off that branch before creating a worktree session.");
 	if (!holder) {
-		await runChecked(["git", "-C", cwd, "fetch", "--quiet", "origin", `refs/pull/${request.number}/head:refs/heads/${branch}`], { timeoutMs: FETCH_TIMEOUT_MS });
+		try {
+			await runChecked(["git", "-C", cwd, "fetch", "--no-tags", "origin", `refs/pull/${request.number}/head:refs/heads/${branch}`], { timeoutMs: FETCH_TIMEOUT_MS });
+		} catch (error) {
+			if (error instanceof Error && error.message.includes("(non-fast-forward)")) throw new Error(`Local branch \`${branch}\` has commits pull request #${request.number} does not. Move them off it or delete it before checking the pull request out in its own worktree.`);
+			throw error;
+		}
 		const tracked = await run(["git", "-C", cwd, "config", "--get", `branch.${branch}.merge`]);
 		if (!head.fork && tracked.code !== 0) {
 			await git(cwd, "config", `branch.${branch}.remote`, "origin");
