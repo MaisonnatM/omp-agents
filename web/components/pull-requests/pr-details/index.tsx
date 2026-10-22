@@ -1,6 +1,6 @@
 /** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, Code, and Review draft tabs. */
 import { ClipboardPen, FileDiff, FileText, History, MessageSquare } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
@@ -15,6 +15,7 @@ import { useEditableRead } from "../../../editable-read";
 import { useRead, writePullRequest } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
 import { useDashboardStatus } from "../../dashboard-context";
+import { DetailsScrollerContext } from "../../details-sidebar-frame";
 import { ERROR_TEXT } from "../../form-dialog";
 import { usePullRequestOptions } from "../pr-fields";
 import { LoadNote } from "../../sheet-details";
@@ -25,7 +26,7 @@ import { Comments } from "./comments";
 import { DetailHeader } from "./header";
 import { ReviewDraftPanel } from "./review-draft";
 import { Summary } from "./summary";
-
+import { useCondensedHeader } from "./use-condensed-header";
 
 export interface DetailContentProps {
 	pr: PullRequest;
@@ -110,37 +111,12 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const comments = detail ? commentCount(detail) : 0;
 	const timeline = detail ? detail.conversation.length + openThreads(detail).length : 0;
 	const pendingFindings = draft && !draft.posted ? draft.findings.filter(finding => finding.state === "pending").length : 0;
-	const rootRef = useRef<HTMLDivElement>(null);
+	const [root, setRoot] = useState<HTMLDivElement | null>(null);
 	const foldRef = useRef<HTMLDivElement>(null);
-	const [condensedByTab, setCondensedByTab] = useState<Partial<Record<DetailTab, boolean>>>({});
-	const condensed = condensedByTab[tab] ?? false;
-	const compensation = useRef<{ scroller: HTMLElement; top: number } | null>(null);
-	useLayoutEffect(() => {
-		if (!compensation.current) return;
-		const { scroller, top } = compensation.current;
-		compensation.current = null;
-		scroller.scrollTop = Math.max(0, top);
-	}, [condensed]);
-	useEffect(() => {
-		const root = rootRef.current;
-		if (!root) return;
-		const onScroll = (event: Event) => {
-			const scroller = event.target;
-			if (!(scroller instanceof HTMLElement)) return;
-			if (!scroller.contains(root) && !root.contains(scroller)) return;
-			const fold = foldRef.current?.scrollHeight ?? 0;
-			if (condensed && scroller.scrollTop < 4 && fold > 0) setCondensedByTab(previous => ({ ...previous, [tab]: false }));
-			else if (!condensed && fold > 0 && scroller.scrollTop > fold + 32) {
-				const compact = root.querySelector<HTMLElement>("[data-pr-condensed]")?.scrollHeight ?? 0;
-				compensation.current = { scroller, top: scroller.scrollTop - (fold - compact) };
-				setCondensedByTab(previous => ({ ...previous, [tab]: true }));
-			}
-		};
-		document.addEventListener("scroll", onScroll, true);
-		return () => document.removeEventListener("scroll", onScroll, true);
-	}, [tab, condensed]);
+	const sidebarScroller = useContext(DetailsScrollerContext);
+	const condensed = useCondensedHeader(page ? root : sidebarScroller, root, foldRef, tab);
 	return (
-		<div ref={rootRef} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
+		<div ref={setRoot} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
 			<div className={cn("sticky top-0 z-10 shrink-0 bg-background", !page && "-mx-4 pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
 				<div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">

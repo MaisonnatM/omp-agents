@@ -800,7 +800,7 @@ An action that fails shows its error, and its control becomes available again.
   The `⋯` menu starts with the quick actions, including fixes for CI, conflicts, and review comments.
   Next come the merge methods, **Ready for review** or **Convert to draft**, links to GitHub and Graphite, **Copy link**, and **Copy PR number**.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
-  The header condenses after scrolling beyond its expanded body and expands again at the top.
+  The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
   In a narrow panel, action labels hide but their tooltips and accessible names remain.
 - Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, **Code**, and **Review draft** while a review draft of the pull request is kept, with the count of its findings still pending.
   Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
