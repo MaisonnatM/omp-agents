@@ -18,7 +18,6 @@ import type { SendPullRequest } from "../pr-fields";
 import { composerLabel, reviewPlaceholder, reviewVerdicts } from "./composer.logic";
 
 type Mode = "comment" | "review";
-type Submitting = "comment" | "close" | "reopen" | "review" | null;
 
 const VERDICTS: Record<ReviewVerdict, { label: string; icon: ReactNode }> = {
 	comment: { label: "Comment", icon: <MessageSquare aria-hidden className="size-3" /> },
@@ -56,7 +55,7 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 			setVerdict(openDraft.verdict);
 		}
 	}
-	const [submitting, setSubmitting] = useState<Submitting>(null);
+	const [busy, setBusy] = useState(false);
 	const [failure, setFailure] = useState<string | null>(null);
 	const commentRef = useRef<HTMLTextAreaElement>(null);
 	const reviewRef = useRef<HTMLTextAreaElement>(null);
@@ -66,9 +65,9 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 	const mode: Mode = reviewable ? requestedMode : "comment";
 	const picked = verdicts.includes(verdict) ? verdict : "comment";
 
-	const run = async (what: Exclude<Submitting, null>, act: () => Promise<void>): Promise<void> => {
-		if (submitting) return;
-		setSubmitting(what);
+	const run = async (act: () => Promise<void>): Promise<void> => {
+		if (busy) return;
+		setBusy(true);
 		setFailure(null);
 		try {
 			await act();
@@ -76,18 +75,18 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 		} catch (err) {
 			setFailure(errorText(err));
 		} finally {
-			setSubmitting(null);
+			setBusy(false);
 		}
 	};
 	const comment = (then: "close" | "reopen" | null): Promise<void> =>
-		run(then ?? "comment", async () => {
+		run(async () => {
 			if (body.trim() === "") return;
 			await send({ field: "comment", body });
 			setBody("");
 			if (then) await send({ field: "state", state: then === "close" ? "closed" : "open" });
 		});
 	const review = (): Promise<void> =>
-		run("review", async () => {
+		run(async () => {
 			if (openDraft) {
 				await putJson<ReviewDraft>("/api/review-draft/post", { owner: detail.owner, repo: detail.repo, number: detail.number, submit: { verdict: picked, summary } });
 				onDraftPosted();
@@ -145,7 +144,7 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 								variant="ghost"
 								aria-label="Discard pending line comments"
 								title="Discard pending line comments"
-								disabled={submitting !== null}
+								disabled={busy}
 								onClick={() => sendSocket({ t: "review-draft", change: { op: "finding-state", pr: openDraft.pr, ids: openDraft.findings.filter(finding => finding.state === "pending").map(finding => finding.id), state: "dismissed" } })}
 							>
 								<Trash2 aria-hidden />
@@ -158,11 +157,11 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 				</div>
 				{reviewable && (
 					<div hidden={mode !== "review"}>
-						<ReviewForm textareaRef={reviewRef} summary={summary} onSummary={setSummary} verdict={picked} verdicts={verdicts} onVerdict={setVerdict} lineComments={lineComments} pending={submitting === "review"} onSubmit={() => void review()} />
+						<ReviewForm textareaRef={reviewRef} summary={summary} onSummary={setSummary} verdict={picked} verdicts={verdicts} onVerdict={setVerdict} lineComments={lineComments} busy={busy} onSubmit={() => void review()} />
 					</div>
 				)}
 				<div hidden={mode !== "comment"}>
-					<CommentForm scope={prKey(detail)} state={detail.state} textareaRef={commentRef} body={body} onBody={setBody} submitting={submitting} onSubmit={then => void comment(then)} />
+					<CommentForm scope={prKey(detail)} state={detail.state} textareaRef={commentRef} body={body} onBody={setBody} busy={busy} onSubmit={then => void comment(then)} />
 				</div>
 				{failure && (
 					<p role="alert" className={`${ERROR_TEXT} mt-2`}>
@@ -189,13 +188,17 @@ interface CommentFormProps {
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
 	body: string;
 	onBody: (body: string) => void;
-	submitting: Submitting;
+	busy: boolean;
 	onSubmit: (then: "close" | "reopen" | null) => void;
 }
 
-function CommentForm({ scope, state, textareaRef, body, onBody, submitting, onSubmit }: CommentFormProps) {
+function CommentForm({ scope, state, textareaRef, body, onBody, busy, onSubmit }: CommentFormProps) {
 	const confirm = useInlineConfirm(scope);
-	const busy = submitting !== null;
+	const [pressed, setPressed] = useState<"close" | "reopen" | null>(null);
+	const submit = (then: "close" | "reopen" | null): void => {
+		setPressed(then);
+		onSubmit(then);
+	};
 	const ready = body.trim() !== "" && body.length <= MAX_COMMENT_BODY && !busy;
 	const followUp = state === "open" || state === "draft" ? "close" : state === "closed" ? "reopen" : null;
 	return (
@@ -208,27 +211,27 @@ function CommentForm({ scope, state, textareaRef, body, onBody, submitting, onSu
 				placeholder="Leave a comment"
 				aria-label="Comment on this pull request"
 				onChange={event => onBody(event.target.value)}
-				onKeyDown={event => submitKey(event, () => ready && onSubmit(null))}
+				onKeyDown={event => submitKey(event, () => ready && submit(null))}
 				className={TEXTAREA}
 			/>
 			<div className="flex flex-wrap justify-end gap-2">
 				{followUp === "close" && (
-					<Button size="xs" variant="destructive-outline" leadingIcon={GitPullRequestClosed} disabled={!ready} {...confirm.props("close", () => onSubmit("close"))}>
+					<Button size="xs" variant="destructive-outline" leadingIcon={GitPullRequestClosed} loading={busy && pressed === "close"} disabled={!ready} {...confirm.props("close", () => submit("close"))}>
 						<span className="inline-grid">
 							<span aria-hidden className="invisible col-start-1 row-start-1">
 								Close with comment
 							</span>
-							<span className="col-start-1 row-start-1">{submitting === "close" ? "Closing…" : confirm.isArmed("close") ? "Confirm close?" : "Close with comment"}</span>
+							<span className="col-start-1 row-start-1">{confirm.isArmed("close") ? "Confirm close?" : "Close with comment"}</span>
 						</span>
 					</Button>
 				)}
 				{followUp === "reopen" && (
-					<Button size="xs" variant="outline" leadingIcon={GitPullRequest} disabled={!ready} onClick={() => onSubmit("reopen")}>
-						{submitting === "reopen" ? "Reopening…" : "Reopen with comment"}
+					<Button size="xs" variant="outline" leadingIcon={GitPullRequest} loading={busy && pressed === "reopen"} disabled={!ready} onClick={() => submit("reopen")}>
+						Reopen with comment
 					</Button>
 				)}
-				<Button size="xs" variant="outline" leadingIcon={Send} disabled={!ready} onClick={() => onSubmit(null)}>
-					{submitting === "comment" ? "Posting…" : "Comment"}
+				<Button size="xs" variant="outline" leadingIcon={Send} loading={busy && pressed === null} disabled={!ready} onClick={() => submit(null)}>
+					Comment
 				</Button>
 			</div>
 		</div>
@@ -243,12 +246,12 @@ interface ReviewFormProps {
 	verdicts: ReviewVerdict[];
 	onVerdict: (verdict: ReviewVerdict) => void;
 	lineComments: number;
-	pending: boolean;
+	busy: boolean;
 	onSubmit: () => void;
 }
 
-function ReviewForm({ textareaRef, summary, onSummary, verdict, verdicts, onVerdict, lineComments, pending, onSubmit }: ReviewFormProps) {
-	const ready = !pending && summary.length <= MAX_COMMENT_BODY && canSubmitReview(verdict, summary, lineComments);
+function ReviewForm({ textareaRef, summary, onSummary, verdict, verdicts, onVerdict, lineComments, busy, onSubmit }: ReviewFormProps) {
+	const ready = !busy && summary.length <= MAX_COMMENT_BODY && canSubmitReview(verdict, summary, lineComments);
 	return (
 		<>
 			<textarea
@@ -263,7 +266,7 @@ function ReviewForm({ textareaRef, summary, onSummary, verdict, verdicts, onVerd
 			/>
 			<div className="mt-2 flex justify-end gap-2">
 				{verdicts.length > 1 && (
-					<Select value={verdict} disabled={pending} onValueChange={value => value && onVerdict(value as ReviewVerdict)}>
+					<Select value={verdict} disabled={busy} onValueChange={value => value && onVerdict(value as ReviewVerdict)}>
 						<SelectTrigger aria-label="Review verdict" className="mr-auto h-6 min-w-0 text-xs">
 							<span className="flex items-center gap-1.5">
 								{VERDICTS[verdict].icon}
@@ -282,8 +285,8 @@ function ReviewForm({ textareaRef, summary, onSummary, verdict, verdicts, onVerd
 						</SelectContent>
 					</Select>
 				)}
-				<Button size="xs" disabled={!ready} onClick={onSubmit}>
-					{pending ? "Submitting…" : "Submit review"}
+				<Button size="xs" loading={busy} disabled={!ready} onClick={onSubmit}>
+					Submit review
 				</Button>
 			</div>
 		</>
