@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { hashForSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { StartOp } from "./starts";
+import type { UserTodo } from "../src/user-todos-shared";
 import {
 	adjacentSession,
 	closePane,
@@ -17,6 +18,7 @@ import {
 	hashForTickets,
 	hashForOpenTodo,
 	hashForTodo,
+	hashForTodoId,
 	hashForView,
 	type Layout,
 	layoutAfterResumeAll,
@@ -28,6 +30,8 @@ import {
 	swapView,
 	viewForSession,
 } from "./routing";
+
+const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, children: [], links: [], addedBy: null, ...fields });
 
 describe("layout hash", () => {
 	const live = (instanceId: string, agentId: string | null = null) => ({ kind: "live", instanceId, agentId }) as const;
@@ -147,6 +151,11 @@ describe("layout hash", () => {
 		}
 		expect(hashForOpenTodo("t 1", null)).toBe("#todo?open=t%201");
 		expect(hashForOpenTodo("t1", "work")).toBe("#todo/work?open=t1");
+		const list = { categories: [], todos: [todo({ id: "t1" }), todo({ id: "t2", categoryId: "work", children: [todo({ id: "t3" })] })], archive: [todo({ id: "a1", children: [todo({ id: "a2" })] })] };
+		expect(hashForTodoId(list, "t3")).toBe("#todo/work?open=t3");
+		expect(hashForTodoId(list, "t1")).toBe("#todo?open=t1");
+		expect(hashForTodoId(list, "a2")).toBe("#todo/archive?open=a2");
+		expect(hashForTodoId(list, "gone")).toBeNull();
 		expect(routeFromHash("#todo?open=t%201")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" }, open: "t 1" } });
 		expect(routeFromHash("#todo/today?open=t1")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "today" }, open: "t1" } });
 		for (const hash of ["#todo", "#todo/0b9e", "#todo?open=t1"]) expect(routeFromHash(hash).kind).toBe("page");

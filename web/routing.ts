@@ -4,6 +4,7 @@ import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
+import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
 
@@ -280,6 +281,13 @@ export const hashForInbox = (target: InboxRoute["target"]): string => hashForPag
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
 export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);
+/** Todo `id` opened in the list that holds it now: its category's, or **Archive** once put away; `null` for a todo deleted for good. */
+export function hashForTodoId({ todos, archive }: UserTodoList, id: string): string | null {
+	const holds = (todo: UserTodo): boolean => todo.id === id || todo.children.some(child => child.id === id);
+	const open = todos.find(holds);
+	if (open) return hashForOpenTodo(id, open.categoryId);
+	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
+}
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
 export const hashForProjects = (target: ProjectsTarget): string => hashForPage({ kind: "projects", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
