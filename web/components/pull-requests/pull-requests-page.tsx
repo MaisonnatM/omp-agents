@@ -1,4 +1,6 @@
 /** The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it is. */
+import { pullRequestTabHash, usePagePullRequestTabs } from "../../pull-request-tabs";
+import { PullRequestTabsStrip } from "./pr-tabs";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
@@ -101,24 +103,28 @@ export function PullRequestsPage({ workspace, hosts, past, section }: PullReques
 	const board = usePullRequestsBoard({ workspace, hosts, past, route: { target: null }, entersList: true });
 	useReveal(section, board.folds, { token: section, block: "start", focus: true });
 	const unmatched = board.poll.read?.data.unmatched ?? [];
+	const { tabs, dispatch } = usePagePullRequestTabs(null);
 	return (
-		<ListPage
-			title="Pull requests"
-			meta="Pull requests by whose move it is"
-			noun="pull requests"
-			loading="Asking GitHub for pull requests…"
-			poll={board.poll}
-			onRefresh={board.refresh}
-			actions={
-				<>
-					<UnmatchedTip unmatched={unmatched} />
-					<SortMenu order={board.order} onSort={board.onSort} onReset={board.onReset} />
-				</>
-			}
-			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-			className="max-w-7xl space-y-8"
-		>
-			{() => (board.repos.length === 0 ? note("No session ran in a GitHub repository.") : board.repos.map(view => <RepoTable key={view.key} view={view} />))}
-		</ListPage>
+		<div className="flex h-full min-h-0 flex-1 flex-col">
+			{tabs.open.length > 0 && <PullRequestTabsStrip tabs={tabs} dispatch={dispatch} workspace={workspace} hrefOf={pullRequestTabHash} />}
+			<ListPage
+				title="Pull requests"
+				meta="Pull requests by whose move it is"
+				noun="pull requests"
+				loading="Asking GitHub for pull requests…"
+				poll={board.poll}
+				onRefresh={board.refresh}
+				actions={
+					<>
+						<UnmatchedTip unmatched={unmatched} />
+						<SortMenu order={board.order} onSort={board.onSort} onReset={board.onReset} />
+					</>
+				}
+				notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
+				className="max-w-7xl space-y-8"
+			>
+				{() => (board.repos.length === 0 ? note("No session ran in a GitHub repository.") : board.repos.map(view => <RepoTable key={view.key} view={view} />))}
+			</ListPage>
+		</div>
 	);
 }
