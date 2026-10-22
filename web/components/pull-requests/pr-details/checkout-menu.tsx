@@ -1,7 +1,6 @@
 import { ChevronDown, FolderGit2, GitBranch, type LucideIcon } from "lucide-react";
 import { useState } from "react";
-import type { CheckedOutPullRequest, CheckoutPlace, PullRequestCheckout } from "../../../../src/shared/git";
-import type { PullRequest } from "../../../../src/shared/github";
+import type { CheckedOutPullRequest, CheckoutPlace, PullRequest, PullRequestCheckout } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -53,7 +52,7 @@ export function CheckoutMenu({ pr, cwd, onOpen }: { pr: PullRequest; cwd: string
 			})
 			.catch(() => null);
 		setPending(false);
-		if (done?.instanceId) onOpen({ kind: "live", instanceId: done.instanceId, agentId: null }, "replace");
+		if (done?.place === "worktree") onOpen({ kind: "live", instanceId: done.instanceId, agentId: null }, "replace");
 	};
 	return (
 		<DropdownMenu>

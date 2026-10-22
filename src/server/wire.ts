@@ -31,7 +31,6 @@ import {
 import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
-import type { CheckoutPlace, PullRequestCheckout } from "../shared/git";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import {
@@ -44,7 +43,9 @@ import {
 	PULL_REQUEST_IMAGE_TYPES,
 	parsePullRequest,
 	type PullRequest,
+	type CheckoutPlace,
 	type PullRequestAttachment,
+	type PullRequestCheckout,
 	type PullRequestChange,
 	type PullRequestEdit,
 	type PullRequestViewedEdit,

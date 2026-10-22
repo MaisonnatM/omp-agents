@@ -6,8 +6,7 @@ import { git, worktreesOf } from "./git";
 import { ghRest, repoOf } from "./github";
 import { isObject, str } from "./json";
 import { run, runChecked } from "./proc";
-import type { CheckedOutPullRequest, PullRequestCheckout } from "./shared/git";
-import { type PullRequest, pullRequestUrl } from "./shared/github";
+import { type CheckedOutPullRequest, type PullRequest, type PullRequestCheckout, pullRequestUrl } from "./shared/github";
 import { newSessionRequest, type NewSessionRequest, type StartResult } from "./shared/sessions";
 
 const FETCH_TIMEOUT_MS = 120_000;
@@ -43,7 +42,7 @@ async function checkOutHere(request: PullRequestCheckout, head: PullRequestHead)
 	if ((await git(cwd, "status", "--porcelain", "--untracked-files=no")).trim()) throw new Error(`This repository has uncommitted changes. Commit or stash them before checking out pull request #${request.number} here, or check it out in its own folder.`);
 	await runChecked(["gh", "pr", "checkout", String(request.number), "-R", `${request.owner}/${request.repo}`], { cwd, timeoutMs: FETCH_TIMEOUT_MS });
 	const [branch, oid] = await Promise.all([git(cwd, "symbolic-ref", "--quiet", "--short", "HEAD"), git(cwd, "rev-parse", "HEAD")]);
-	return { branch: branch.trim(), onHead: oid.trim() === head.oid, instanceId: null };
+	return { place: "here", branch: branch.trim(), onHead: oid.trim() === head.oid };
 }
 
 /**
@@ -69,7 +68,7 @@ async function checkOutInWorktree(request: PullRequestCheckout, head: PullReques
 	const prompt = `Pull request ${pullRequestUrl(request)} ("${head.title}") is checked out in this worktree, on branch \`${branch}\`. Read its description and diff (\`gh pr view ${request.number} -R ${request.owner}/${request.repo}\`, \`gh pr diff ${request.number} -R ${request.owner}/${request.repo}\`), sum up what it changes in a few lines, then wait for what I ask next.`;
 	const started = await start(newSessionRequest(cwd, prompt, { branch: { kind: "existing", name: branch }, skill: request.skill, subject: { kind: "pull-request", pr: { owner: request.owner, repo: request.repo, number: request.number } } }));
 	if (!started.ok) throw new Error(started.error);
-	return { branch, onHead: oid === head.oid, instanceId: started.instanceId };
+	return { place: "worktree", branch, onHead: oid === head.oid, instanceId: started.instanceId };
 }
 
 /** Checks out `request`'s pull request at its place; refuses a `cwd` whose `origin` is another repository. */

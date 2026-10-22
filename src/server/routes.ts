@@ -34,7 +34,7 @@ import { ClientConfigError } from "../mcp-clients";
 import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
-import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, prKey, type Repo } from "../shared/github";
+import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, type PullRequestCheckout, prKey, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
 import type { ProjectNotesAnswer } from "../shared/projects";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
@@ -59,7 +59,6 @@ import {
 	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
 } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
-import type { CheckedOutPullRequest, PullRequestCheckout } from "../shared/git";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";

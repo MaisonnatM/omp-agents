@@ -6,7 +6,8 @@ import { checkoutDir } from "./git";
 import * as github from "./github";
 import * as proc from "./proc";
 import { checkOutPullRequest } from "./pull-request-checkout";
-import { type CheckoutPlace, worktreeDir } from "./shared/git";
+import { worktreeDir } from "./shared/git";
+import type { CheckoutPlace } from "./shared/github";
 import type { NewSessionRequest, StartResult } from "./shared/sessions";
 
 const realRunChecked = proc.runChecked;
@@ -69,7 +70,7 @@ describe("in this repository", () => {
 	test("runs gh pr checkout in the checkout and answers the branch it switched to, at the pull request's head", async () => {
 		const { main, head, prCheckouts, starts, checkOut } = await setup();
 		writeFileSync(join(main, "notes.txt"), "untracked\n");
-		expect(await checkOut("here")).toEqual({ branch: "feature", onHead: true, instanceId: null });
+		expect(await checkOut("here")).toEqual({ place: "here", branch: "feature", onHead: true });
 		expect(prCheckouts).toEqual([{ argv: ["gh", "pr", "checkout", "7", "-R", "acme/app"], cwd: main }]);
 		expect(await git(main, "rev-parse", "HEAD")).toBe(head);
 		expect(starts).toEqual([]);
@@ -87,7 +88,7 @@ describe("in this repository", () => {
 describe("in a separate worktree", () => {
 	test("fetches the head into a branch that tracks origin's, and starts a session on it in a new worktree", async () => {
 		const { main, head, starts, checkOut } = await setup();
-		expect(await checkOut("worktree")).toEqual({ branch: "feature", onHead: true, instanceId: "i1" });
+		expect(await checkOut("worktree")).toEqual({ place: "worktree", branch: "feature", onHead: true, instanceId: "i1" });
 		expect(await git(worktreeDir(main, "feature"), "rev-parse", "HEAD")).toBe(head);
 		expect(await git(main, "rev-parse", "--abbrev-ref", "feature@{upstream}")).toBe("origin/feature");
 		expect(await git(main, "branch", "--show-current")).toBe("main");
@@ -115,7 +116,7 @@ describe("in a separate worktree", () => {
 		await git(main, "worktree", "add", "-q", review, "feature");
 		await git(review, "commit", "-q", "--allow-empty", "-m", "mine");
 		const mine = await git(review, "rev-parse", "HEAD");
-		expect(await checkOut("worktree")).toEqual({ branch: "feature", onHead: false, instanceId: "i1" });
+		expect(await checkOut("worktree")).toEqual({ place: "worktree", branch: "feature", onHead: false, instanceId: "i1" });
 		expect(await git(review, "rev-parse", "HEAD")).toBe(mine);
 		expect(mine).not.toBe(head);
 		expect(existsSync(worktreeDir(main, "feature"))).toBe(false);
@@ -132,7 +133,7 @@ describe("in a separate worktree", () => {
 
 	test("puts a fork's head on pr-<number>/<branch>, with no upstream", async () => {
 		const { main, head, checkOut } = await setup("someone/app");
-		expect(await checkOut("worktree")).toEqual({ branch: "pr-7/feature", onHead: true, instanceId: "i1" });
+		expect(await checkOut("worktree")).toEqual({ place: "worktree", branch: "pr-7/feature", onHead: true, instanceId: "i1" });
 		expect(await git(worktreeDir(main, "pr-7/feature"), "rev-parse", "HEAD")).toBe(head);
 		expect((await proc.run(["git", "-C", main, "config", "--get", "branch.pr-7/feature.merge"])).code).toBe(1);
 	});
