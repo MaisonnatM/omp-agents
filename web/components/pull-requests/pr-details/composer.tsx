@@ -31,17 +31,17 @@ const TEXTAREA = cn(FIELD, "resize-none disabled:opacity-60");
 
 interface ComposerProps {
 	detail: PullRequestDetail;
-	/** The pull request's Review draft, whose pending findings post with the review. */
-	draft: ReviewDraft | undefined;
+	/** The pull request's unposted Review draft, whose pending findings post with the review. */
+	openDraft: ReviewDraft | undefined;
 	send: SendPullRequest;
 	/** A review of the draft posted, which the details read again to show. */
 	onDraftPosted: () => void;
 }
 
-export function PullRequestComposer({ detail, draft, send, onDraftPosted }: ComposerProps) {
+export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: ComposerProps) {
 	const { send: sendSocket } = useDashboardActions();
-	const openDraft = draft && !draft.posted ? draft : undefined;
-	const pending = openDraft?.findings.filter(finding => finding.state === "pending").length ?? 0;
+	const pendingIds = openDraft?.findings.filter(finding => finding.state === "pending").map(finding => finding.id) ?? [];
+	const pending = pendingIds.length;
 	const lineComments = openDraft?.findings.filter(finding => finding.state !== "dismissed").length ?? 0;
 	const verdicts = reviewVerdicts(detail);
 	const [open, setOpen] = useState(false);
@@ -82,10 +82,14 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 	};
 	const comment = (then: "close" | "reopen" | null): Promise<void> =>
 		run(async () => {
-			if (body.trim() === "") return;
 			await send({ field: "comment", body });
 			setBody("");
-			if (then) await send({ field: "state", state: then === "close" ? "closed" : "open" });
+			if (!then) return;
+			try {
+				await send({ field: "state", state: then === "close" ? "closed" : "open" });
+			} catch (err) {
+				throw new Error(`the comment posted, but ${then === "close" ? "closing" : "reopening"} failed: ${errorText(err)}`);
+			}
 		});
 	const review = (): Promise<void> =>
 		run(async () => {
@@ -147,7 +151,7 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 								aria-label="Discard pending line comments"
 								title="Discard pending line comments"
 								disabled={busy}
-								onClick={() => sendSocket({ t: "review-draft", change: { op: "finding-state", pr: openDraft.pr, ids: openDraft.findings.filter(finding => finding.state === "pending").map(finding => finding.id), state: "dismissed" } })}
+								onClick={() => sendSocket({ t: "review-draft", change: { op: "finding-state", pr: openDraft.pr, ids: pendingIds, state: "dismissed" } })}
 							>
 								<Trash2 aria-hidden />
 							</Button>
@@ -157,14 +161,11 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 						</Button>
 					</div>
 				</div>
-				{reviewable && (
-					<div hidden={mode !== "review"}>
-						<ReviewForm textareaRef={reviewRef} summary={summary} onSummary={setSummary} verdict={picked} verdicts={verdicts} onVerdict={setVerdict} lineComments={lineComments} busy={busy} onSubmit={() => void review()} />
-					</div>
-				)}
-				<div hidden={mode !== "comment"}>
+				{mode === "review" ? (
+					<ReviewForm textareaRef={reviewRef} summary={summary} onSummary={setSummary} verdict={picked} verdicts={verdicts} onVerdict={setVerdict} lineComments={lineComments} busy={busy} onSubmit={() => void review()} />
+				) : (
 					<CommentForm scope={prKey(detail)} state={detail.state} textareaRef={commentRef} body={body} onBody={setBody} busy={busy} onSubmit={then => void comment(then)} />
-				</div>
+				)}
 				{failure && (
 					<p role="alert" className={`${ERROR_TEXT} mt-2`}>
 						GitHub did not take it: {failure}

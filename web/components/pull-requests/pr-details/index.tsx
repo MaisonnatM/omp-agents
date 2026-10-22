@@ -106,7 +106,8 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const page = placement === "page";
 	const options = usePullRequestOptions(pr);
 	const comments = detail ? commentCount(detail) : 0;
-	const pendingFindings = draft && !draft.posted ? draft.findings.filter(finding => finding.state === "pending").length : 0;
+	const openDraft = draft && !draft.posted ? draft : undefined;
+	const pendingFindings = openDraft?.findings.filter(finding => finding.state === "pending").length ?? 0;
 	const [root, setRoot] = useState<HTMLDivElement | null>(null);
 	const foldRef = useRef<HTMLDivElement>(null);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
@@ -171,7 +172,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 			</SegmentedTabPanel>
 			{detail && (
 				<div className="absolute right-4 bottom-3 z-20">
-					<PullRequestComposer key={prKey(pr)} detail={detail} draft={draft} send={send} onDraftPosted={reload} />
+					<PullRequestComposer key={prKey(pr)} detail={detail} openDraft={openDraft} send={send} onDraftPosted={reload} />
 				</div>
 			)}
 		</SegmentedTabs>
