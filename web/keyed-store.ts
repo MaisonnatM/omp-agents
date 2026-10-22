@@ -4,7 +4,8 @@ import { useCallback, useRef, useSyncExternalStore } from "react";
 export function keyedStore<T>(empty: T) {
 	const entries = new Map<string, T>();
 	const listeners = new Map<string, Set<() => void>>();
-	const get = (key: string): T => entries.get(key) ?? empty;
+	// `has`, not `??`: a stored `null` differs from an `undefined` empty, as when a stored value is reset to its default.
+	const get = (key: string): T => (entries.has(key) ? (entries.get(key) as T) : empty);
 	const set = (key: string, value: T): void => {
 		if (value === empty) entries.delete(key);
 		else entries.set(key, value);

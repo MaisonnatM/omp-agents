@@ -1,6 +1,6 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a header of counted tabs, and each tab's panel. */
 import type { LucideIcon } from "lucide-react";
-import { createContext, type ReactNode, useState } from "react";
+import { type ComponentPropsWithoutRef, createContext, forwardRef, type ReactNode, useState } from "react";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
@@ -49,16 +49,23 @@ function tabLabel(name: string, count: number): { label: string; badge: number |
 	return count > 0 ? { label: name, badge: count, "aria-label": `${name} (${count})` } : { label: name, badge: undefined, "aria-label": undefined };
 }
 
-/** The sidebar tab panel's own vertical scroller, for content that reacts to its scroll. */
+/** A details pane's own vertical scroller, for content that reacts to its scroll. */
 export const DetailsScrollerContext = createContext<HTMLElement | null>(null);
 
-function ScrollingPanel({ value, viewportClassName, children }: { value: string; viewportClassName: string; children: ReactNode }) {
+/** A details pane's vertical scroller, which hands itself to its content through {@link DetailsScrollerContext}: a sidebar tab's panel, or the details the Pull requests board docks. */
+export const DetailsScroller = forwardRef<HTMLDivElement, Omit<ComponentPropsWithoutRef<typeof SidebarContent>, "viewportRef">>(function DetailsScroller({ children, ...props }, ref) {
 	const [scroller, setScroller] = useState<HTMLElement | null>(null);
 	return (
+		<SidebarContent ref={ref} {...props} viewportRef={setScroller}>
+			<DetailsScrollerContext.Provider value={scroller}>{children}</DetailsScrollerContext.Provider>
+		</SidebarContent>
+	);
+});
+
+function ScrollingPanel({ value, viewportClassName, children }: { value: string; viewportClassName: string; children: ReactNode }) {
+	return (
 		<TabPanel value={value} asChild>
-			<SidebarContent viewportClassName={viewportClassName} viewportRef={setScroller}>
-				<DetailsScrollerContext.Provider value={scroller}>{children}</DetailsScrollerContext.Provider>
-			</SidebarContent>
+			<DetailsScroller viewportClassName={viewportClassName}>{children}</DetailsScroller>
 		</TabPanel>
 	);
 }

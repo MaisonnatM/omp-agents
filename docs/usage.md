@@ -760,6 +760,7 @@ An action that fails shows its error, and its control becomes available again.
   The tabs never spill past the sidebar.
   **Pull requests** opens the Pull requests page, a table of your pull requests like Graphite's inbox, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
   Once you open a pull request or a session from the Pull requests page, the sidebar lists the pull requests instead, beside the details or the session panes.
+  In the board view, the sidebar lists the board's columns instead, each with its count; click one to unfold the column and scroll to it, while a pull request's details stay docked beside the board.
   The tab stays on **Pull requests** while you open sessions from it, until you choose **Sessions**.
   The **Your move** count stands out in bold.
   The **Pull requests** tab counts the pull requests that wait on your move, for the workspace that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
@@ -835,6 +836,21 @@ An action that fails shows its error, and its control becomes available again.
   Drag a repository's name on the page or in its sidebar index to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
+- **List** and **Board** at the top of the Pull requests page switch its view, and the browser's localStorage keeps the choice.
+  The board shows a column per section, in the sections' order, each holding the pull requests of every repository as cards: the move's badge, state, and age, the title, the repository and number with the reason, then the sessions, stack, conversations, checks, reviewers, and lines added and removed.
+  The repository shows on a card only when the board spans more than one.
+  **Recently merged** starts folded; click a column's title to fold it to a narrow strip with its count, and click the strip to unfold it.
+  An empty column is a strip too, and every strip still takes a drop.
+  Drag a card onto another column to run the step that moves it there.
+  The card follows the pointer, and the column under it shows a dashed slot named after the step, or turns red and says why no step applies.
+  **Agent on it** starts the quick action of the card's move, such as **Fix CI** with an agent.
+  **Recently merged** opens the card's merge confirmation, for a pull request that is **Merge**, or **CI running** and ready but for its checks; the merge happens only once you confirm it.
+  **Drafts** converts your open pull request to a draft, and **Your move**, **Approved**, or **Waiting on others** marks your draft ready for review.
+  Every other column fills from GitHub, so a drop there is refused, as is one on a merged pull request or on someone else's draft state.
+  A refused drop, Escape, or a release outside the columns springs the card back.
+  Space on a focused card's title picks it up, ← and → choose its column, Space or Enter drops it, and Escape or Tab puts it back; a screen reader hears each step.
+  Click a card to show the pull request's details docked at the right of the board, with ↓ and ↑ stepping through the cards column by column.
+  **Open as a page** in the docked details switches to the list view with the details on their own page, and the close button hides them.
 - A pull request's header starts with its repository and a state-colored `#number` link to GitHub.
   Its primary action and `⋯` menu sit at the right.
   Below them are the title, author, last update, copyable `gh pr checkout <number>` command, branches, file count, and lines added and removed.
@@ -1738,6 +1754,7 @@ Alt is Option on macOS.
 | O | Pull requests page, outside text fields | Open the pull request on GitHub |
 | . | Pull requests page, outside text fields | Open the pull request's `⋯` menu |
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
+| Space | Pull requests board, a card's title focused | Pick up the card; ← and → choose a column, Space or Enter drops it, and Escape puts it back |
 | Cmd+Shift+K / Cmd+Shift+C | Pull requests page showing a PR | Copy its `#N` / GitHub link |
 | Cmd+W | Pull requests page showing a PR | Close its PR tab; browsers may reserve this key |
 | Alt+Left / Alt+Right | Focused open PR tab's number | Move the tab left / right |
