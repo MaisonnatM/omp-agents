@@ -46,10 +46,10 @@ Suggestions:
 
 When your work is done and the next step is opening, pushing, or proposing a pull request, run a code-quality review first. No exceptions for small changes.
 
-1. Collect `git diff <base>...HEAD` plus the working-tree `git diff` (base defaults to `main`) and the full contents of every changed file.
-2. Spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`. Do not run the rubric yourself or override its model.
-3. Apply every finding that keeps behavior the same and stays inside the change's scope. Skip a finding only with a one-line reason.
-4. Re-run the checks and smoke run that proved the change, then open or update the PR.
-5. Only then say the PR is ready. The report names what the review changed and any finding you skipped and why.
+1. Read `~/.omp/agent/docs/review-workflow.md` and start a dashboard-bound Review triage capture.
+2. The read-only `thermonuclear-reviewer` returns structured findings on the actual diff, working tree, and changed files.
+3. Assess each finding, save the cards, and wait for the user's decisions. Never apply every finding automatically.
+4. Apply accepted in the dashboard starts one application session for accepted fixes and reply-only handling.
+5. Wait for its evidence before a separately authorized publishing step. Capture and application never commit, push, post, resolve, edit PR descriptions, or create PRs.
 
 The review subagent itself never triggers this rule.

@@ -4,6 +4,7 @@
  */
 import { type PullRequestSummary, pullRequestUrl } from "./shared/github";
 import { REVIEW_DRAFT_TOOL } from "./shared/review-drafts";
+import { TRIAGE_TOOLS } from "./shared/review-triage";
 
 export type PullRequestActionId = "fix-ci-and-conflicts" | "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 
@@ -58,14 +59,14 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}). In a git worktree on the PR's branch, rebase it onto the latest base (restack with \`gt\` when the repository uses Graphite), resolve every conflict keeping the intent of both sides, run the project's checks, and push the branch with \`--force-with-lease\` (or \`gt submit\`).`,
 	},
 	"address-comments": {
-		label: "Address comments",
-		description: "Start a session that works through the review comments",
+		label: "Triage comments",
+		description: "Assess incoming review comments before you choose what to apply",
 		applies: pr => ownOpen(pr) && (pr.unresolved.count > 0 || pr.review === "changes-requested"),
 		prompt: pr => {
 			const threads = pr.unresolved.count > 0 ? `${pr.unresolved.exact ? "" : "at least "}${pr.unresolved.count} unresolved review ${pr.unresolved.count === 1 ? "thread" : "threads"}` : null;
 			const requested = pr.review === "changes-requested" ? "a reviewer requested changes" : null;
 			const has = [threads, requested].filter(clause => clause !== null).join(" and ");
-			return `${pullRequestContext(pr)} It has ${has}. Read the threads and reviews, fix what is right in a git worktree on the PR's branch, commit and push, then reply to each thread with what you changed or why you did not change it, and resolve the threads you fixed.`;
+			return `${pullRequestContext(pr)} It has ${has}. Use ${TRIAGE_TOOLS.capture} first to read every host-captured review thread, its comments, and every nonempty review body. Assess each source as fix, push-back, or already-done with rationale and code evidence. Read maxence-voice and draft a reply or copyable review note at the host-bound destination. Save the complete structured report with ${TRIAGE_TOOLS.report}, then wait for the user's Review triage card decisions. Do not edit code, commit, push, reply on GitHub, resolve threads, change descriptions, or create a PR.`;
 		},
 	},
 	review: {
@@ -80,9 +81,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		description: "Start a session that runs a thermo-nuclear code quality review",
 		applies: pr => pr.state !== "merged",
 		prompt: pr =>
-			pr.role === "author"
-				? `${pullRequestContext(pr)} ${thermonuclear(pr)} Apply the valid findings in a git worktree on the PR's branch, run the project's checks, then commit and push to the PR's branch. Only once the fixes are pushed, add the line \`- [x] Thermo-nuclear code quality review\` to the PR's description (\`gh pr edit ${pr.number} -R ${pr.owner}/${pr.repo} --body-file\` from its current body, never a blind overwrite), unless it is already there. Report each finding and what you did with it.`
-				: `${pullRequestContext(pr)} ${pr.author.login} asked you to review it. ${thermonuclear(pr)} Report its findings here with file and line references. Do not change the PR's branch or post anything on GitHub.`,
+			`${pullRequestContext(pr)} Use ${TRIAGE_TOOLS.capture} first to bind the reviewed code and source census. ${thermonuclear(pr)} Ask the reviewer for explicit structured findings, not Markdown to parse. Assess every finding as fix, push-back, or already-done with rationale and concrete evidence. Read maxence-voice and draft a reply or finding note. Save the complete report with ${TRIAGE_TOOLS.report}, then wait for the user's Review triage card decisions. Do not apply findings, commit, push, post on GitHub, resolve threads, change descriptions, or create a PR.`,
 	},
 };
 

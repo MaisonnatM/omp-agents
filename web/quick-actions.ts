@@ -24,14 +24,14 @@ export type QuickSubject =
 	| { kind: "todo"; id: string; text: string; action: WorkActionId };
 
 /** What the server links the session that `subject` starts to: a pull request or issue as its subject, or a todo; a Review start saves a review draft of its pull request. */
-export function startTarget(subject: QuickSubject): Pick<NewSessionRequest, "subject" | "todoId" | "reviewDraft"> {
+export function startTarget(subject: QuickSubject): Pick<NewSessionRequest, "subject" | "todoId" | "reviewDraft" | "reviewTriage"> {
 	switch (subject.kind) {
 		case "pull-request":
-			return { subject: { kind: "pull-request", pr: subject.pr }, todoId: null, reviewDraft: subject.action === "review" };
+			return { subject: { kind: "pull-request", pr: subject.pr }, todoId: null, reviewDraft: subject.action === "review", reviewTriage: subject.action === "address-comments" || subject.action === "thermonuclear-review" ? { kind: "capture", mode: subject.action === "address-comments" ? "comments" : "thermo", originSessionId: null, existingReport: false } : null };
 		case "ticket":
-			return { subject: { kind: "ticket", id: subject.id }, todoId: null, reviewDraft: false };
+			return { subject: { kind: "ticket", id: subject.id }, todoId: null, reviewDraft: false, reviewTriage: null };
 		case "todo":
-			return { subject: null, todoId: subject.id, reviewDraft: false };
+			return { subject: null, todoId: subject.id, reviewDraft: false, reviewTriage: null };
 		default: {
 			const unhandled: never = subject;
 			return unhandled;

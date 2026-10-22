@@ -59,6 +59,7 @@ import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
 import { FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding } from "../shared/review-drafts";
+import { parseTriageEdit } from "../shared/review-triage";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
@@ -399,6 +400,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	"review-draft"(value) {
 		const change = parseReviewDraftEdit(value.change);
 		return change && { ok: { t: "review-draft", change: change.ok } };
+	},
+	"review-triage"(value) {
+		const change = parseTriageEdit(value.change);
+		return change && { ok: { t: "review-triage", change: change.ok } };
 	},
 	notice: ({ ids, op }) => (Array.isArray(ids) && ids.length > 0 && ids.every(isNonEmpty) && isNoticeOp(op) ? { ok: { t: "notice", ids, op } } : null),
 	discuss(value) {

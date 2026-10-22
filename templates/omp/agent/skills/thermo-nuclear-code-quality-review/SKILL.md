@@ -10,6 +10,27 @@ Use this skill for an unusually strict review focused on implementation quality,
 
 Above all, this skill should push the reviewer to be **ambitious** about code structure. Do not merely identify local cleanup opportunities. Actively search for "code judo" moves: restructurings that preserve behavior while making the implementation dramatically simpler, smaller, more direct, and more elegant.
 
+## Approval workflow
+
+The `thermonuclear-reviewer` subagent is read-only.
+It applies the rubric below and returns structured findings to its caller, never starts another review session.
+Every finding has `number`, `path`, `line` (or `null`), `feedback` (the original words), and `evidence`; the report has `summary` and `findings`.
+Keep numbering stable within the report.
+
+The author session first calls the host's `read_review_triage`.
+For a new review, delegate the rubric to `thermonuclear-reviewer`, then assess its structured findings as `fix`, `push-back`, or `already-done`.
+For an existing report, read the original session file supplied by the host and keep its finding numbers and words; do not run a replacement review.
+Use `maxence-voice` for draft replies, then call `save_review_triage` with the complete structured report.
+Wait for decisions in the dashboard's Review triage cards.
+Only Apply accepted starts the application session.
+Do not apply findings, commit, push, post, resolve threads, change a PR description, or create a PR as part of capture.
+
+If `read_review_triage` is absent in a Terminal session, call `start_review_triage` with `existingReport: false` for a new review, or `true` to triage this session's existing findings.
+The extension starts a dashboard-bound session using the current session's host identity.
+Stop here and direct the user to its Review triage cards.
+If the bridge is unavailable or fails, report the failure; do not fall back to automatic application.
+
+
 ## Core Prompt
 
 Start from this baseline:

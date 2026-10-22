@@ -221,6 +221,7 @@ export function useDashboard(): Dashboard {
 					case "notices":
 					case "merges":
 					case "review-drafts":
+					case "review-triages":
 						dispatch(msg);
 						return;
 					case "done": {

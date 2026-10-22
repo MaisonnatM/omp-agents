@@ -71,6 +71,10 @@ _Avoid_: Alert, notification (reserved for session notifications)
 The review a **Review** session saved of one pull request, with its verdict, summary, and findings, which waits in the dashboard for the user to accept, edit, and post.
 _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 
+**Review triage**:
+Incoming feedback on your work, a pull request's nonempty review bodies and review threads or a thermonuclear review's numbered findings, each assessed onto a card that the user accepts or dismisses before one session applies the accepted ones; only the **Owner** changes it or starts its sessions.
+_Avoid_: Review draft (the outbound review you post), address comments
+
 ## Unattended work
 
 **Routine**:

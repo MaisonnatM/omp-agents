@@ -9,6 +9,7 @@ import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
 import type { Project, ProjectEdit } from "./projects";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
+import type { ReviewTriageEdit, ReviewTriagesAnswer } from "./review-triage";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
@@ -61,6 +62,7 @@ export type ServerMsg =
 	/** Every review draft, posted ones too, whole, sent when a socket opens and after every change. */
 	| { t: "review-drafts"; list: ReviewDraft[] }
 	| { t: "comparisons"; comparisons: ComparisonSnapshot[] }
+	| ({ t: "review-triages" } & ReviewTriagesAnswer)
 	/** One step of the answer to this socket's `discuss` with `id`, until its `end`. */
 	| { t: "discussion"; id: number; event: DiscussionEvent }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
@@ -129,6 +131,7 @@ export type ClientMsg =
 	| { t: "project"; change: ProjectEdit }
 	/** Change a review draft's verdict, summary, or findings, or discard it; every socket then gets the drafts as they are after. */
 	| { t: "review-draft"; change: ReviewDraftEdit }
+	| { t: "review-triage"; change: ReviewTriageEdit }
 	/** Update notices `ids`, mark them seen or read, or clear them. */
 	| { t: "notice"; ids: string[]; op: NoticeOp }
 	/** Ask about selected text apart from every session, answered on this socket with `discussion` events for `id`, counted per page. */

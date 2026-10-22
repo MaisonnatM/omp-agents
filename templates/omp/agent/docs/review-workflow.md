@@ -2,16 +2,32 @@
 
 ## Thermonuclear review
 
-When the user invokes `thermo-nuclear-code-quality-review`, asks for a thermonuclear review, or requests a deep code quality audit, spawn `task` with `agent: "thermonuclear-reviewer"`; it is read-only, so it runs without `isolated` in the session's checkout.
-Its `model: "@plan"` frontmatter follows `modelRoles.plan` and that role's fallback chain on any provider.
-Pass the review scope and user arguments, then relay the findings verbatim.
-Run the skill through this agent, not in the session model.
+Thermonuclear review first produces incoming **Review triage** cards, not automatic fixes.
+In a host-bound session, call `read_review_triage` before inspecting the review target.
+For a new review, delegate the rubric to `thermonuclear-reviewer` without `isolated`.
+Its `model: "@plan"` frontmatter follows `modelRoles.plan` and its fallback chain on any provider.
+Request structured `summary` and `findings`, with each finding's number, path, line, original feedback, and evidence.
+For an existing report, read the originating session file supplied by the host instead of running another review.
+Preserve each finding's positive unique original number in `save_review_triage`'s `number` field and its unchanged wording in `feedback`.
+Assess each item as `fix`, `push-back`, or `already-done`, draft replies with `maxence-voice`, and call `save_review_triage`.
 
-When the review targets a PR, add `- [x] Thermo-nuclear code quality review` only after the review's fixes are committed and pushed.
-A review that was only run, not applied, does not earn the checkbox.
-Read the current PR description and update it with `gh pr edit <N> --body-file <file>` without overwriting other content.
-If the checkbox already exists, leave it unchanged.
-Append it under an existing checklist; otherwise add a `## Checks` section before any `<!-- CURSOR_SUMMARY -->` Bugbot block, or at the end when there is no such block.
+In a Terminal session without `read_review_triage`, call `start_review_triage` with `existingReport: false` for a new review, or `true` for this session's existing findings.
+The dashboard resolves the originating session and starts the bound capture.
+Wait for the user's Accept or Dismiss decisions, then Apply accepted in the cards.
+Only accepted fixes become code tasks; accepted pushback and already-done items produce reply drafts only.
+The application session preserves unrelated staged, unstaged, and untracked work and records changed files, evidence, or a visible blocked reason.
+Replies stay editable and Copy only.
+Neither capture nor application authorizes commits, pushes, posts, thread resolution, PR-description edits, or PR creation.
+
+Any later publishing or `/ship` continuation is a separate user-authorized action, not a consequence of review capture or Apply accepted.
+PR capture may create a detached worktree at the actual reviewed head.
+End session retains a checkout still needed by the latest complete triage; otherwise its normal cleanup removes clean, safe worktrees and keeps dirty changes.
+Explicit removal in Settings → Worktrees invalidates that triage's checkout.
+Before a later authorized commit and push, select or create the appropriate branch if the checkout is detached.
+On that continuation, inspect the application's recorded results first: each fixed item's changed files and evidence, and each blocked item's reason.
+Then commit and push the accepted changes, and only after the push add `- [x] Thermo-nuclear code quality review` to the PR body.
+Put it under the body's existing checklist, else under a `## Checks` heading, and always above any `<!-- CURSOR_SUMMARY -->` block.
+Neither capture nor Apply accepted adds the checkbox.
 
 ## PR description layout
 

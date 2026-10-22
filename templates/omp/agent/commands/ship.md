@@ -31,13 +31,13 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch 
    If Graphite is configured, run `gt track <branch> -p <parent> --no-interactive -q` and `gt submit --cwd <checkout> --no-edit --no-stack -q` so the PR is registered.
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"thermonuclear", pr:<number>})`.
    A successful `gh pr create` also records this transition.
-4. **Thermonuclear.** Run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
-   Review the actual PR including tests.
-   Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once, commit and push.
-   Repeat the review if substantial changes invalidate it.
-   Once all findings are resolved, add `- [x] Thermo-nuclear code quality review` to the current PR body without overwriting other content.
-   Add the checkbox only AFTER the fixes are pushed.
-   Call `ship_stage({stage:"ready_gate"})`.
+4. **Thermonuclear.** Follow `~/.omp/agent/docs/review-workflow.md` to start a dashboard-bound Review triage capture.
+   The read-only `thermonuclear-reviewer` reviews the actual PR and tests and returns structured findings.
+   The author saves proposed handling and waits for the user's decisions on the cards.
+   Only Apply accepted starts code changes, and only accepted fixes become code tasks.
+   Accepted pushback and already-done findings produce reply drafts only.
+   Stop at this approval boundary; do not automatically commit, push, post, resolve, or update the PR body from capture or application.
+   On a separate user-authorized `/ship` continuation, inspect the recorded application evidence, commit and push the accepted changes, then add the review checkbox as `review-workflow.md` places it.
 5. **Put live for review.** Show the issue, PR URL, checks, findings and dispositions before promotion.
    Run `gh pr ready <number>` only after the review checkbox is in the body.
    The extension asks the user for approval and blocks the command if they decline or no UI is available.

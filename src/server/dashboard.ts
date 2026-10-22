@@ -27,7 +27,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, reviewDraftsFile, reviewTriagesFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { comparisonsDir } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
@@ -69,6 +69,8 @@ import { ProjectWatch } from "./project-watch";
 import { ProjectsFile } from "./projects-file";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
+import { ReviewTriages, TRIAGE_IO } from "./review-triages";
+import { ReviewTriagesFile } from "./review-triages-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
@@ -114,6 +116,7 @@ export class Dashboard {
 		now: Date.now,
 		onChange: () => this.#broadcasts.pushList("review-drafts"),
 	});
+	readonly #reviewTriages: ReviewTriages;
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores: { "source-control": sourceControlStore(this.#sourceControl, HOME) } });
 	readonly #calendars = new CalendarsFile(calendarsFile);
@@ -137,7 +140,7 @@ export class Dashboard {
 	readonly #worktrees: Worktrees;
 	readonly #comparisons: Comparisons;
 	readonly #sessionJoins: StartEnv["projects"] = {
-		launchFor: (request, project, instanceId) => this.#comparisons.join(request, this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)), instanceId),
+		launchFor: (request, project, instanceId) => this.#comparisons.join(request, this.#reviewTriages.join(request, this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project))), instanceId),
 	};
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -189,6 +192,36 @@ export class Dashboard {
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
 		this.#pathFor = pathFor;
+		const triages = (this.#reviewTriages = new ReviewTriages({
+			...TRIAGE_IO,
+			file: new ReviewTriagesFile(reviewTriagesFile),
+			acquire: () => ownerLock.acquire(),
+			owner: () => (ownerLock.held ? null : `http://127.0.0.1:${ownerLock.holder()?.port ?? port}`),
+			start: request => this.#startSession(request),
+			resume: async sessionId => {
+				if (sessions.bySessionId(sessionId)) return;
+				const result = await this.#startSession({ kind: "resume", sessionId });
+				if (!result.ok) throw new Error(result.error);
+			},
+			origin: sessionId => {
+				const live = sessions.bySessionId(sessionId);
+				const saved = files.savedOf(sessionId);
+				const file = live?.transcriptPath(null, files.pathOf) ?? files.pathOf(sessionId);
+				const cwd = files.factsOf(sessionId).worktree ?? live?.cwd ?? saved?.cwd;
+				return file && cwd ? { file, cwd } : null;
+			},
+			conflict: async (cwd, exceptSessionId) => {
+				const target = await worktreeAt(cwd);
+				if (!target) return "The reviewed checkout is unavailable.";
+				for (const host of sessions.rows(files.factsOf)) {
+					if (host.sessionId === exceptSessionId || host.status === "idle" && !host.agents.some(agent => agent.status === "running")) continue;
+					const active = await worktreeAt(host.cwd);
+					if (active?.top === target.top) return `Session ${host.sessionId} may still edit this checkout. Wait for it to finish before applying.`;
+				}
+				return null;
+			},
+			onChange: () => this.#broadcasts.pushList("review-triages"),
+		}));
 		const views = (this.#views = new Views(
 			pathFor,
 			(topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg)),
@@ -254,6 +287,7 @@ export class Dashboard {
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
 			comparisons: { msg: () => ({ t: "comparisons", comparisons: this.#comparisons.list }) },
+			"review-triages": { msg: () => ({ t: "review-triages", ...triages.answer }), apply: edit => triages.edit(edit) },
 		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -300,7 +334,7 @@ export class Dashboard {
 			cancelContinue: id => this.#autoContinue.cancel(id),
 			changed: () => broadcasts.pushList("comparisons"),
 		});
-		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "replay" || request.kind === "new" && request.branch !== null);
+		const startWith: Starter = (request, project) => worktrees.start(async () => starter(await triages.prepare(request), project), request.kind === "replay" || request.kind === "new" && (request.branch !== null || request.reviewTriage?.kind === "capture" && request.subject?.kind === "pull-request"));
 		const startSession = (this.#startSession = request => startWith(request, null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
 		const reach = async (sessionId: string): Promise<LiveSession> => {
@@ -462,6 +496,7 @@ export class Dashboard {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
 				this.#publishScheduled();
+				broadcasts.pushList("review-triages");
 				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -569,6 +604,7 @@ export class Dashboard {
 			},
 			dashboard: this.#selfUpdate,
 			sync: this.#settingsSync,
+			reviewTriages: this.#reviewTriages,
 		});
 	}
 
@@ -697,6 +733,7 @@ export class Dashboard {
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#projectRunner.exited(instanceId);
 				this.#reviewDrafts.exited(instanceId);
+				this.#reviewTriages.exited(instanceId);
 				this.#sessions.remove(instanceId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
@@ -713,6 +750,7 @@ export class Dashboard {
 				void this.#comparisons.switched(instanceId).catch(error => console.error(`omp-agents: comparison switch: ${errorText(error)}`));
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#reviewDrafts.switched(instanceId, sessionId);
+				if (sessionId) this.#reviewTriages.switched(instanceId, sessionId);
 				return;
 			}
 			case "turn-started": {
@@ -749,7 +787,11 @@ export class Dashboard {
 	 */
 	async #endLive(session: LiveSession): Promise<void> {
 		const { sessionId } = session;
-		await endSession({ sessionId, workDir: this.#files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() }, dir => this.#worktrees.removeCheckout(dir));
+		await endSession({ sessionId, workDir: this.#files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() }, async dir => {
+			const why = await this.#reviewTriages.keepCheckout(dir);
+			if (why) throw new Error(why);
+			return this.#worktrees.removeCheckout(dir);
+		});
 		this.#autoContinue.cancel(sessionId);
 	}
 

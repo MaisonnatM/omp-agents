@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles } from "../fs";
@@ -11,6 +11,7 @@ import { PinsFile } from "./pins-file";
 import { ProjectsFile } from "./projects-file";
 import { RequestLedger } from "./request-ledger";
 import { ReviewDraftsFile } from "./review-drafts-file";
+import { ReviewTriagesFile } from "./review-triages-file";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { createClientHandler, type SocketEnv } from "./socket";
@@ -43,6 +44,8 @@ function setup(initial: PastSession[]) {
 	const pins = new PinsFile(join(dir, "pins.json"));
 	const projects = new ProjectsFile(join(dir, "projects.json"));
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
+	const triagesPath = join(dir, "review-triages.json");
+	const reviewTriages = new ReviewTriagesFile(triagesPath);
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
@@ -60,6 +63,7 @@ function setup(initial: PastSession[]) {
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 		projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
 		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change.op === "add-finding" ? { ...change, at: 0 } : change) },
+		"review-triages": { msg: () => ({ t: "review-triages", list: reviewTriages.value.triages, owner: null }), apply: () => false },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 		comparisons: { msg: () => ({ t: "comparisons", comparisons: [] }) },
@@ -90,12 +94,34 @@ function setup(initial: PastSession[]) {
 		reviewDrafts,
 		published,
 		sent,
+		triagesPath,
 		pastPublished,
 		rosterPublished,
 		setSessions: (next: PastSession[]) => void (sessions = next),
 		setRoster: (next: { hosts: RosterHost[]; error: string | null }) => void (roster = next),
 	};
 }
+
+test("corrupt triage storage does not interrupt socket opening, whole lists, or minute-tick publication", () => {
+	const diagnostic = spyOn(console, "error").mockImplementation(() => {});
+	try {
+		const { broadcasts, ws, sent, lists, published, triagesPath } = setup([past("a", "one")]);
+		writeFileSync(triagesPath, "{broken");
+		broadcasts.open(ws);
+		expect(sent.find(msg => msg.t === "review-triages")).toEqual({ t: "review-triages", list: [], owner: null });
+		expect(sent.at(-1)).toEqual({ t: "comparisons", comparisons: [] });
+		expect([...lists.messages()].find(msg => msg.t === "review-triages")).toEqual({ t: "review-triages", list: [], owner: null });
+		broadcasts.pushList("review-triages");
+		expect(published.filter(msg => msg.t === "review-triages")).toEqual([{ t: "review-triages", list: [], owner: null }]);
+		expect(diagnostic.mock.calls).toHaveLength(1);
+		expect(readFileSync(triagesPath, "utf8")).toBe("{broken");
+		writeFileSync(triagesPath, '{"triages":[],"bindings":[]}');
+		expect(lists.message("review-triages")).toEqual({ t: "review-triages", list: [], owner: null });
+		writeFileSync(triagesPath, "{broken");
+		broadcasts.pushList("review-triages");
+		expect(diagnostic.mock.calls).toHaveLength(2);
+	} finally { diagnostic.mockRestore(); }
+});
 
 describe("past list broadcasts", () => {
 	test("a socket that opens gets the whole list, and the listeners then hear only the sessions that changed, joined, or left", () => {
@@ -186,6 +212,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
 		expect(lists.apply("projects", { op: "rename", id: "missing", name: "new" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
+		expect(lists.apply("review-triages", { id: "missing", revision: 0, itemId: "f1", op: "decision", decision: "accepted" }, peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "comparisons"));
 		expect(published).toEqual([]);
 	});

@@ -5,6 +5,7 @@ import type { BranchChoice } from "./git";
 import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
 import type { ReplayFacts } from "./replay";
+import type { TriageIntent } from "./review-triage";
 import { TICKET_ID } from "./tickets";
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
@@ -302,6 +303,7 @@ export type StartRequest =
 			todoId: string | null;
 			/** The session reviews `subject`, a pull request, as a review draft it saves through the dashboard's `save_review_draft` tool rather than posting on GitHub. */
 			reviewDraft: boolean;
+			reviewTriage: TriageIntent | null;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "replay"; view: View; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
@@ -321,6 +323,7 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	subject: null,
 	todoId: null,
 	reviewDraft: false,
+	reviewTriage: null,
 	...options,
 });
 
@@ -394,8 +397,15 @@ export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest
 	if (todoId !== null && !isTodoId(todoId)) return null;
 	// Only a pull request has a review draft.
 	if (typeof reviewDraft !== "boolean" || (reviewDraft && subject.ok?.kind !== "pull-request")) return null;
+	const intent = value.reviewTriage;
+	let reviewTriage: TriageIntent | null = null;
+	if (intent !== undefined && intent !== null) {
+		if (!isObject(intent) || intent.kind !== "capture" || (intent.mode !== "comments" && intent.mode !== "thermo") || intent.originSessionId !== null || intent.existingReport !== false) return null;
+		if (intent.mode === "comments" && subject.ok?.kind !== "pull-request") return null;
+		reviewTriage = { kind: "capture", mode: intent.mode, originSessionId: null, existingReport: false };
+	}
 	return prompt.trim() || images.ok.length > 0
-		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, reviewDraft }) }
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, reviewDraft, reviewTriage }) }
 		: null;
 }
 

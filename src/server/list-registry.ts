@@ -4,6 +4,7 @@ import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
 import type { ServerMsg } from "../shared/protocol";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
+import type { ReviewTriageEdit } from "../shared/review-triage";
 import type { ScheduledChange } from "../shared/scheduled";
 import type { WorkspaceChange } from "../shared/workspaces";
 import type { UserTodoChange } from "../user-todos-shared";
@@ -17,6 +18,7 @@ interface ListChanges {
 	pins: PinChange;
 	projects: ProjectEdit;
 	"review-drafts": ReviewDraftEdit;
+	"review-triages": ReviewTriageEdit;
 }
 
 /** The lists only the server changes, through actions of their own: the bell's notices, the queued merges, and the design comparisons. */

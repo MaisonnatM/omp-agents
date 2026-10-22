@@ -28,6 +28,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Session notifications](#session-notifications)
 - [Merges, and the cleanup after one](#merges-and-the-cleanup-after-one)
 - [Review drafts](#review-drafts)
+- [Review triage](#review-triage)
 - [Updating the dashboard](#updating-the-dashboard)
 - [Settings sync](#settings-sync)
 - [HTTP API](#http-api)
@@ -992,6 +993,60 @@ It numbers the findings `f1` on, all `pending`, trims a leading `./` from each p
 `post` posts through one `gh api` call (`ghRestPost` in `src/github.ts`) and saves `posted`.
 Before it posts, it lists the pull request's reviews and takes one of the viewer's on the same commit, in the state the verdict makes, with the same body and the same comments by path and words, as the review already posted, so a retry after a lost answer marks the draft instead of posting twice; an empty reply review, which GitHub makes for each thread reply, never matches.
 Two posts of one draft at once share one promise.
+
+## Review triage
+
+Review triage is the inbound counterpart of a review draft: a session assesses feedback on the user's own work into cards, the user decides on each, and one session applies the accepted ones; see [Pull requests](usage.md#pull-requests) for what the user sees.
+It shares no state or code path with review drafts, and **Review** still saves a draft through `save_review_draft`.
+`src/shared/review-triage.ts` holds the shapes and the pure transitions both sides apply.
+A `ReviewTriage` has its `target`, a pull request or the local session whose findings it holds, the `cwd` it reviewed, its `mode`, `comments` or `thermo`, its `snapshot`, its `sources`, its `items`, the canonical `capture` the session saved, and at most one `batch`.
+The `snapshot` holds the reviewed `TriageCode`, the checkout's head, digests of its staged and unstaged diffs, and the content digest of each path that differs from the head, tracked in `dirty` and untracked in `untracked`, and the `sourceVersion`, a digest of every nonempty review body, review thread, and comment, edits included.
+A thermonuclear triage of an existing report also keeps its `origin`: the originating session's file, and the size and digest of the prefix the capture read, which later turns only append to.
+Each `TriageItem` holds its `source`, the session's `assessment` with a verdict of `fix`, `push-back`, or `already-done`, the user's `decision`, `pending`, `accepted`, or `dismissed`, the user's `reply`, `null` until edited, and its `replyRevision`.
+`editReviewTriage` takes a `ReviewTriageEdit` only at the triage's current `revision`, and refuses decisions once a batch exists, while replies stay editable.
+`reserveTriage` freezes the accepted items, each with its reply, reply revision, and `ReplyDestination`, a thread reply, review note, or thermonuclear finding note, into a `TriageBatch`, and refuses when the snapshot taken now differs from the reviewed one.
+`completeTriage` takes exactly one `TriageResult` per selected item, at its bound destination: `fixed` with changed files and evidence, or `blocked` with a reason, for an accepted fix, and `reply-only` for the others; a completed batch's results never change, and an identical retry is a no-op.
+`replyOf` displays a completed application's reply unless the user edited the item after its frozen reply revision; earlier wording remains batch input.
+`latestReviewTriage` selects the latest completed capture, falling back to the latest pending one only when none is complete; the panel and both tab counts share it.
+
+`ReviewTriagesFile` in `src/server/review-triages-file.ts` keeps `{ triages, bindings }` in `review-triages.json` beside the access token, read fresh on every access so every server sees the others' writes, and written synchronously through `atomicWriteTextSync` before anything is published or launched, so a failed write surfaces as the caller's error.
+Read-only list access keeps the last valid state, or an empty list before the first valid read, and logs each distinct read failure without changing the file.
+Strict reads still fail for mutations and tool authorization, including an application already checked before corruption.
+Until repair, automatic End session cleanup retains checkouts because their triage references are unknown.
+Repair takes effect on the next read.
+`ReviewTriages` in `src/server/review-triages.ts` owns every change: only the server that holds or takes `server.lock`, the **Owner**, writes the file or starts a triage's sessions.
+Every other server shows the triages read-only, with the owner's address in the `review-triages` message, and its edits, routes, and tools refuse with that address.
+Nothing locks the file against other writers, so a hand edit or another tool can still race the owner.
+
+A triage starts with `NewSessionRequest.reviewTriage`, a `TriageIntent`.
+`startTarget` in `web/quick-actions.ts` sets a `capture` intent for **Triage comments**, mode `comments`, and **Thermonuclear review**, mode `thermo`; `parseNewSessionRequest` rejects client-supplied origins, existing-report requests, and application intents.
+Only the server's `startFromSession` binds a capture to an originating session or an existing report.
+`prepare` runs before the starter, on the checkout chain of `Worktrees.start`: a pull request capture runs in the workspace when its head is the pull request's, else in a new detached worktree of that head beside the main checkout, `<main>-review-triage-<id>`; an `apply` start runs in the triage's `cwd`.
+Before automatic **End session** cleanup, `keepCheckout` uses `needsTriageCheckout` to retain checkouts referenced by the latest complete report of each target and mode whose items still await a completed application.
+It compares canonical worktree roots through `worktreeAt`, including session subdirectories and symlinked paths, and returns the reason the existing session-end callback logs.
+Superseded reports, empty reports, and completed applications do not retain a checkout; ordinary cleanup still preserves dirty work.
+Explicit **Settings → Worktrees** removal remains a user choice that invalidates the report's checkout, and later commit or push from a detached checkout needs an appropriate branch.
+`join` wraps the project runner's `launchFor` outside `ReviewDrafts.join`, as the starter and `reattachAll` call it, and gives a triage start or the resume of a bound session its strict host tools.
+Its `attach` runs the inner `attach` first, then, on the owner only, saves the `TriageBinding`, and for an application marks the batch `running` with the session's ids; a `switched` update moves the binding and the application to the session's new id, and `exited` forgets the instance.
+A capture session gets `read_review_triage`, which reads the code and every nonempty review body, review thread, and comment once and saves the triage with no items, and `save_review_triage`, which saves the whole report once.
+In `comments` mode the report tool takes `{ sourceId, assessment }` per item and requires every captured thread and nonempty review body exactly once.
+The host supplies each canonical source rather than accepting model-authored feedback or locations.
+Thread sources retain their path, line, resolution, and complete comment census.
+Review sources preserve their author, state, body, URL, and edit timestamp without fake numbers or locations, and bind results to `review-note` destinations rather than claiming that review bodies accept thread replies.
+In `thermo` mode the report tool takes `{ number, path, line, feedback, assessment }` per finding with a positive unique original integer `number`; its id is `f${number}`, independent of array order, under the origin session's id.
+Neither mode accepts the other mode's fields or nullable padding.
+The save refuses when the code, the feedback, or the origin report changed since the read; another session running in the checkout does not block a capture.
+An application session gets `read_review_application`, which on its first call checks for another session working in the checkout and checks freshness again before it returns the selection split into `codeTasks` and `replyOnly`, and `save_review_application`, which refuses fixed results once HEAD moved, and a fixed result naming a file whose content is the same as in the reviewed snapshot.
+`changedPaths` compares the reviewed `TriageCode` with a new read: a path counts when its digest in `dirty` or `untracked` differs, a path absent from both holding the head's content, so a file the user had already changed before the review substantiates a fix only if the application changed it again.
+`readTriageGitHub` in `src/review-triage-input.ts` pages through every review and review thread and every comment of each thread through GraphQL, excludes empty review bodies, and refuses duplicate identities, repeated cursors, a head that moved between pages, and counts that disagree with what it read.
+
+`apply` coalesces concurrent calls per triage on one promise.
+It refuses while another running session's checkout is the reviewed one, a newer complete report replaced the triage of its target and mode, or the origin report, code, pull request head, or feedback changed; otherwise it reserves the batch, written through, and starts one session.
+A launch that fails, or a reserved batch found on a later call, which means the server stopped between the reservation and the binding, becomes `interrupted` with the reason and never starts again; a `running` batch resumes its session instead, and a `completed` one is answered as it is.
+This gives at most one launch per batch, not exactly once across an arbitrary crash: the user checks the running sessions and captures a new triage.
+`PUT /api/review-triage/apply` takes exactly `{ id, revision }`, `PUT /api/review-triage/session` `{ sessionId }` to triage that session's existing findings, and `PUT /api/review-triage/start` `{ sessionId }` to run a new thermonuclear review of its checkout; each refusal is a 409 with its reason.
+The page edits a triage with a `review-triage` message, which `parseTriageEdit` checks in `src/server/wire.ts`, through the list registry, which answers a no-op with the current triages; a refused edit settles its `ack` with the error, so the card shows why.
+The starter kit's `start_review_triage` tool, in `templates/omp/agent/extensions/review-triage.ts`, reads `server.lock` and the token and calls the session or start route of the owner, so a Terminal session can hand its findings to the dashboard.
 
 ## Updating the dashboard
 

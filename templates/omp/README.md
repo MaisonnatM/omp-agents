@@ -66,6 +66,8 @@ Files, in `agent/`:
   `bun ~/.omp/agent/extensions/request-log.ts <session.jsonl>` rebuilds every recorded request and checks its hash, and a request number after the path prints that request's body.
   The record is the body this extension receives, after the extensions that load before it; Anthropic can still withhold a disabled field afterwards, Codex over WebSocket sends only the new input after the first request, and compaction, summary, and title requests are not recorded.
   The blobs hold what the provider received, including your `AGENTS.md` files, environment details, and any secret that reached the conversation, so keep `~/.omp/agent/blobs/` as private as the session files.
+- `extensions/review-triage.ts`: the `start_review_triage` tool, with which an agent in a Terminal session hands its thermonuclear findings, or a new thermonuclear review of its checkout, to the omp-agents dashboard as Review triage cards.
+  It asks the dashboard that holds `server.lock`, with the dashboard's token, and changes nothing itself.
 - `extensions/worktree-guard.ts`: blocks every `edit` or `write` in a repository's main checkout while it is on its default branch (`origin/HEAD`, else `main` or `master`), and tells the agent to work in a linked worktree.
   On any other branch the main checkout is edited in place, as `AGENTS.md` asks, and the clones omp makes for `isolated: true` subagents pass too.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add/check changes.
