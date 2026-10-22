@@ -92,7 +92,7 @@ export async function ghMutation(mutation: string, vars: Record<string, string |
 export function parsePerson(value: unknown): Person | null {
 	if (!isObject(value)) return null;
 	const login = str(value.login) ?? str(value.slug);
-	return login === undefined ? null : { login, avatarUrl: str(value.avatarUrl) ?? null };
+	return login === undefined ? null : { login, avatarUrl: str(value.avatarUrl) ?? null, ...(value.__typename === "Bot" ? { isBot: true } : {}) };
 }
 
 /** The avatar field every query asks for a person. */

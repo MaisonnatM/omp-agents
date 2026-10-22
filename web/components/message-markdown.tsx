@@ -1,13 +1,14 @@
 import type { Element, ElementContent } from "hast";
-import { type ComponentProps, memo } from "react";
-import ReactMarkdown, { type Components, defaultUrlTransform } from "react-markdown";
+import { type ComponentProps, memo, useState } from "react";
+import ReactMarkdown, { type Components, defaultUrlTransform, type Options, type UrlTransform } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
+import { cn } from "@/lib/utils";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
 import { highlightLines } from "../code-highlight";
-import type { PullRequestDetail } from "../../src/shared/github";
+import { githubMediaPath, type PullRequestDetail } from "../../src/shared/github";
 import { linkedFile, remarkFilePaths } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
@@ -17,20 +18,15 @@ import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { isChipKind, PromptChip } from "./prompt-chip";
 
-/** Where text written on GitHub may load images from. The page's CSP allows the same hosts. */
-const GITHUB_IMAGE_PREFIXES = [
-	"https://avatars.githubusercontent.com/",
-	"https://github.com/user-attachments/",
-	"https://private-user-images.githubusercontent.com/",
-	"https://user-images.githubusercontent.com/",
-];
+/** Where text written on GitHub may load images from directly; its uploads load through `githubMediaPath`. The page's CSP allows the same host. */
+const GITHUB_AVATARS = "https://avatars.githubusercontent.com/";
 
 const INLINE_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,/i;
 
 const inlineImage = (src: string): boolean => INLINE_IMAGE.test(src);
 /** A file of a Linear issue, which this server fetches from Linear: the issue's markdown names it so. */
 const ticketMedia = (src: string): boolean => src.startsWith(`${TICKET_MEDIA_PATH}?`);
-const githubImage = (src: string): boolean => inlineImage(src) || ticketMedia(src) || GITHUB_IMAGE_PREFIXES.some(prefix => src.startsWith(prefix));
+const githubImage = (src: string): boolean => inlineImage(src) || ticketMedia(src) || src.startsWith(GITHUB_AVATARS);
 
 /**
  * An image that loads only from where `allowed` says. Any other would be fetched the moment the text renders, so a
@@ -38,7 +34,7 @@ const githubImage = (src: string): boolean => inlineImage(src) || ticketMedia(sr
  * `local`, as in agent text, a path to an image or video on this computer shows it through `GET /api/media`.
  */
 const imageFrom =
-	(allowed: (src: string) => boolean, local = false): Components["img"] =>
+	(allowed: (src: string) => boolean, local = false) =>
 	({ node: _node, ...props }: ComponentProps<"img"> & { node?: unknown }) => {
 		const { src, alt } = props;
 		if (typeof src !== "string" || src === "") return <>{alt}</>;
@@ -51,6 +47,27 @@ const imageFrom =
 			</a>
 		);
 	};
+
+/** An image uploaded to GitHub, which its hosts serve only to a signed-in user; one that fails to load shows as a link to it. */
+function GitHubUpload({ url, path, alt, ...props }: ComponentProps<"img"> & { url: string; path: string }) {
+	const [failed, setFailed] = useState(false);
+	return failed ? (
+		<a href={url} target="_blank" rel="noopener noreferrer">
+			{alt || url}
+		</a>
+	) : (
+		<img {...props} src={path} alt={alt ?? ""} loading="lazy" onError={() => setFailed(true)} className={cn("max-w-full rounded-lg", props.className)} />
+	);
+}
+
+const GitHubImage = imageFrom(githubImage);
+
+/** Text written on GitHub: its uploads load through this server, any other image as `githubImage` allows. */
+const githubImg: Components["img"] = ({ node: _node, ...props }) => {
+	const { src } = props;
+	const path = typeof src === "string" ? githubMediaPath(src) : null;
+	return path && typeof src === "string" ? <GitHubUpload {...props} url={src} path={path} /> : <GitHubImage {...props} />;
+};
 
 /** The `figure` that `remarkFilePaths` ends agent text with: the images and videos it names. Markdown makes no other figure. */
 const mediaFigure: Components["figure"] = ({ node }) => {
@@ -113,10 +130,13 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 
 const link: Components["a"] = ({ node: _node, ...props }) => <ExternalLink {...props} />;
 
-/** A video that plays only a Linear issue's file; any other source shows as a link to it. */
-const video: Components["video"] = ({ node: _node, src }) => {
+/** A video, from its `src` or its first `<source>`, that plays only a Linear issue's file or one uploaded to GitHub; any other shows as a link to it. */
+const video: Components["video"] = ({ node, src: own }) => {
+	const source = node?.children.find((child): child is Element => child.type === "element" && child.tagName === "source");
+	const src = own ?? source?.properties.src;
 	if (typeof src !== "string" || src === "") return null;
-	if (!ticketMedia(src)) {
+	const playable = ticketMedia(src) ? src : githubMediaPath(src);
+	if (!playable) {
 		return (
 			<a href={src} target="_blank" rel="noopener noreferrer">
 				{src}
@@ -124,7 +144,7 @@ const video: Components["video"] = ({ node: _node, src }) => {
 		);
 	}
 	return (
-		<video controls preload="metadata" src={src} className="max-h-[70vh] w-full rounded-md bg-black">
+		<video controls preload="metadata" src={playable} className="max-h-[70vh] w-full rounded-md bg-black">
 			<a href={src} target="_blank" rel="noopener noreferrer">
 				Download the video
 			</a>
@@ -189,19 +209,14 @@ const codeBlock: Components["pre"] = ({ node }) => {
 
 const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage, true), figure: mediaFigure, pre: codeBlock };
 const PROMPT_COMPONENTS: Components = { ...AGENT_COMPONENTS, span: promptChip };
-const GITHUB_COMPONENTS: Components = { a: link, img: imageFrom(githubImage), video, pre: codeBlock };
+const GITHUB_COMPONENTS: Components = { a: link, img: githubImg, video, pre: codeBlock };
 
-/** GitHub's schema, plus the `<video>` a Linear issue's recording becomes. */
+/** GitHub's schema, plus the `<video>` a Linear issue's recording or a GitHub upload becomes, with its `<source>`. */
 const SANITIZE_SCHEMA = {
 	...defaultSchema,
-	tagNames: [...(defaultSchema.tagNames ?? []), "video"],
-	attributes: { ...defaultSchema.attributes, video: ["src"] },
+	tagNames: [...(defaultSchema.tagNames ?? []), "video", "source"],
+	attributes: { ...defaultSchema.attributes, video: ["src"], source: ["src"] },
 };
-
-const GITHUB_PLUGINS = [rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA]] satisfies ComponentProps<typeof ReactMarkdown>["rehypePlugins"];
-const REMARK_PLUGINS = [remarkGfm];
-const AGENT_REMARK_PLUGINS = [remarkGfm, remarkFilePaths];
-const PROMPT_REMARK_PLUGINS = [remarkGfm, remarkPromptChips, remarkFilePaths];
 
 /** react-markdown drops `data:` URLs; the images the page allows inline are the exception. */
 const urlTransform = (url: string, key: string): string => (key === "src" && inlineImage(url) ? url : defaultUrlTransform(url));
@@ -219,26 +234,40 @@ const agentUrlTransform = (url: string, key: string): string => {
 	}
 };
 
+/** The plugins, components, and URL filter that one kind of text renders with. */
+export interface MarkdownPreset {
+	remark: NonNullable<Options["remarkPlugins"]>;
+	rehype: NonNullable<Options["rehypePlugins"]>;
+	components: Components;
+	urlTransform: UrlTransform;
+}
+
 /**
- * Markdown text is untrusted. react-markdown escapes raw HTML and filters unsafe link schemes. Images load only inline
- * (`data:`), or, for `github`, from GitHub's own hosts and from this server's route for a Linear issue's files, which
- * also plays its videos. `github`: text written on GitHub or Linear, whose raw HTML renders as GitHub renders it,
- * through rehype-sanitize's schema, which follows GitHub's; HTML comments drop out, as GitHub hides them. In agent
- * text, the path of a file opens it in the file dialog, a relative one against `FileBaseContext`; an image or video on
- * this computer shows in place when the text writes it as an image, and under the text when it only names it. `prompt`: a
- * user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips.
+ * Agent text: the path of a file opens it in the file dialog, a relative one against `FileBaseContext`; an image or
+ * video on this computer shows in place when the text writes it as an image, and under the text when it only names it.
+ */
+export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform };
+
+/** A user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips. */
+export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
+
+/**
+ * Text written on GitHub or Linear, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which
+ * follows GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts and from this
+ * server's route for a Linear issue's files, which also plays its videos.
+ */
+export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rehype: [rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA]], components: GITHUB_COMPONENTS, urlTransform };
+
+/**
+ * Markdown text is untrusted. react-markdown escapes raw HTML and filters unsafe link schemes, and images load only
+ * inline (`data:`) or from where the preset allows.
  *
  * Parsing and highlighting a long reply is the page's costliest render, so the same text never renders twice.
  */
-export const MessageMarkdown = memo(function MessageMarkdown({ text, github = false, prompt = false }: { text: string; github?: boolean; prompt?: boolean }) {
+export const MessageMarkdown = memo(function MessageMarkdown({ text, preset = AGENT_PRESET }: { text: string; preset?: MarkdownPreset }) {
 	return (
 		<div className="message-markdown max-w-full whitespace-normal break-words">
-			<ReactMarkdown
-				remarkPlugins={github ? REMARK_PLUGINS : prompt ? PROMPT_REMARK_PLUGINS : AGENT_REMARK_PLUGINS}
-				rehypePlugins={github ? GITHUB_PLUGINS : undefined}
-				components={github ? GITHUB_COMPONENTS : prompt ? PROMPT_COMPONENTS : AGENT_COMPONENTS}
-				urlTransform={github ? urlTransform : agentUrlTransform}
-			>
+			<ReactMarkdown remarkPlugins={preset.remark} rehypePlugins={preset.rehype} components={preset.components} urlTransform={preset.urlTransform}>
 				{text}
 			</ReactMarkdown>
 		</div>

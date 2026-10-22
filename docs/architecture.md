@@ -1145,11 +1145,13 @@ Each list call reads GitHub again and keeps patches and blob ids for following f
 GitHub's patch keeps three unchanged lines around each change, so `patchRows` in `src/shared/changes.ts` fills the lines before, between, and after its hunks from the file's text at the head, which one `gh api graphql` call reads by the blob id the list names.
 Both file readers answer through `fileText(path, rows, note)` in `src/shared/changes.ts`, so a file's rows and the note on why it has none take one shape.
 A removed file's patch holds every line, so it reads no blob; a file GitHub sends no patch for, a binary file, and one over `MAX_CHANGED_FILE_BYTES` answer a note.
-`GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>` answers the pull requests of a details' **Stack**, `StackedPullRequest[]` top first, from one `gh api graphql --paginate --slurp` read of the repository's open pull requests, forks left out, which it keeps for 30 seconds.
+`GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>` answers the pull requests of the header's **N/M** stack menu, `StackedPullRequest[]` top first, from one `gh api graphql --paginate --slurp` read of the repository's open pull requests, forks left out, which it keeps for 30 seconds.
 `stackOf` in `src/pull-request-stack.ts` follows the base branches down from the pull request and the pull requests based on its branch up, so the stack holds those that the Pull requests page does not list.
 `GET /api/pull-request/options?owner=<o>&repo=<r>` answers `PullRequestOptions` for the pickers of a pull request's **Summary**: the repository's labels and the people its issues can be assigned to, whom a review can be asked of, each from `gh api --paginate --slurp` and sorted by name, kept five minutes per repository.
 `PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
 A `title` change carries a nonblank title of at most 256 characters and patches `repos/<owner>/<repo>/pulls/<number>`.
+A `body` change patches the same REST resource with the description as a literal `-f body=…` field, preserving whitespace and allowing an empty description, up to `MAX_PULL_REQUEST_BODY` (65536 characters).
+Comment and review authors carry `isBot` from GitHub's `__typename` `Bot`, which the **Bot comments** filter reads along with a `[bot]` login suffix, since some GitHub Apps comment under a login without one.
 An `update` change selects `merge` or `rebase` and calls `GITHUB_MERGES.update` with the node id and head read fresh from GitHub.
 `PUT /api/pull-request/viewed` takes a `PullRequestViewedEdit`, a pull request with `{ path, on }`, reads the pull request node id, calls `markFileAsViewed` or `unmarkFileAsViewed` through GraphQL, and answers `{}`, since the **Code** tab keeps its own viewed states.
 The queue uses the same update function with the merge method.
@@ -1173,6 +1175,14 @@ Every mutation goes through `ghMutation` in `src/github.ts`, which throws GitHub
 One change goes per call, so two changes made at once each keep the other.
 The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
 Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.
+
+`GET /api/github-media?url=<HTTPS URL>` reads GitHub images and videos through `src/github-media.ts`.
+The allowlist is `github.com/user-attachments/`, `private-user-images.githubusercontent.com`, `user-images.githubusercontent.com`, and `camo.githubusercontent.com`; credentials, alternate ports, and every other host or scheme are rejected.
+`githubMediaUrl` in `src/shared/github.ts` holds it, and the page loads every such image or video written on GitHub through this route, so the page's CSP allows only GitHub's avatars directly.
+It reads `gh auth token --hostname github.com` only for a `github.com` hop, at most once a minute, checks each of at most five redirects before fetching it, and never sends that token to a CDN.
+Only image and video content types pass, up to 20 MiB streamed under one 15-second deadline, with a five-minute private cache bounded to 32 entries and 40 MiB.
+Upstream cookies and headers do not pass through; responses have `nosniff` and a sandbox CSP.
+A `github.com` upload may redirect once into GitHub's signed upload bucket, `github-production-user-asset-6210df.s3.amazonaws.com`, which gets no token and which no other hop or request may reach.
 
 `PUT /api/merge-queue` takes a `MergeQueueChange` from `src/shared/merge-queue.ts`, checked by `parseMergeQueueChange` in `src/server/wire.ts`: `{ op: "add", method, prs }`, one to `MAX_QUEUED_STACK` (20) pull requests in any order, each with the head commit the confirmation showed or `null`, or `{ op: "cancel", id }`.
 It answers a `MergeQueueAnswer`, the queued merges after it, which every socket also hears as a `merges` message, and the pull requests it merged on the way, which `writeMergeQueue` in `web/reads.ts` marks merged in the list at once; a refusal, such as a branch that moved or a pull request already queued, is a 409 with the reason.
@@ -1276,7 +1286,7 @@ When the kept address is within 30 seconds of expiring, missing after a restart,
 Only paths that a read of the issue named are fetched, so the route reaches nothing but Linear's own uploads, and a path that one issue names is not served under another's identifier.
 It serves each file with `Content-Security-Policy: sandbox` and `nosniff`, and anything other than an image, a video, or audio as an attachment, since a file that someone uploaded to Linear is served from the dashboard's origin.
 The page's CSP stays `'self'` for media.
-`message-markdown.tsx` lets Linear's text load images and play `<video>` only from that route.
+`message-markdown.tsx` lets Linear's text load images and play `<video>` only from that route and `GET /api/github-media`.
 
 `GET /api/ticket/options?team=<team id>` answers `TicketOptions` for the issue detail's field pickers: the team's workflow states (`list_issue_statuses`) as `{ status, statusType }` in the order Linear lists them, the workspace's active members (`list_users`), the team's and the workspace's live labels (`list_issue_labels`), and the names of the team's projects (`list_projects`, 50 a page), each paged to its end.
 The issue detail's status picker orders the states with the same `statusOrder` as the tickets page's groups.
@@ -1605,6 +1615,6 @@ In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text, 
 It then ends the text with a `figure` naming the images and videos those links name, each once, but for those an image already shows; `MediaStrip` draws it as thumbnails, each dropping out when its file does not load.
 A `file://` address whose escapes do not decode renders as a link with no address, and text from GitHub keeps no `file://` path, since it renders through the default filter.
 A relative path resolves against `FileBaseContext`: the pane's session worktree, from `SessionFacts.worktree`, else its directory, or the directory of the file the dialog shows.
-Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` with only a `src`.
-It keeps images only from GitHub's image hosts and the route for a Linear issue's files, and plays a video only from that route.
+Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` and its `<source>`, each with only a `src`.
+It shows GitHub's avatars and images from the route for a Linear issue's files, and shows images and plays videos uploaded to GitHub through `GET /api/github-media`; a video from anywhere else, and any other image, renders as a link.
 `web/index.html` sets the page's `Content-Security-Policy`.

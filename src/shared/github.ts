@@ -1,6 +1,6 @@
 /** GitHub repositories and pull requests: keys, links, the pull request list, one pull request in full, and its changed files. */
 
-import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, type Parsed, type Shape } from "../json";
+import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, optional, type Parsed, type Shape } from "../json";
 import type { ChangedEntry } from "./changes";
 import type { MergeMethod } from "./source-control";
 
@@ -44,6 +44,36 @@ export interface PullRequestImage {
 /** The body of `PUT /api/pull-request/attachment`: images that `gh pr edit --attach` appends to a pull request's description. */
 export interface PullRequestAttachment extends PullRequest {
 	files: PullRequestImage[];
+}
+
+/** The hosts, besides `github.com/user-attachments/`, that serve the images and videos written on GitHub. */
+const MEDIA_HOSTS: Record<string, true> = {
+	"private-user-images.githubusercontent.com": true,
+	"user-images.githubusercontent.com": true,
+	"camo.githubusercontent.com": true,
+};
+
+/**
+ * `raw` as a URL of an image or video written on GitHub, which `GET /api/github-media` fetches with the user's GitHub
+ * sign-in, without its fragment; `null` for any other URL, or one with credentials or a port. A `//` URL is HTTPS.
+ */
+export function githubMediaUrl(raw: string): URL | null {
+	let url: URL;
+	try {
+		url = new URL(raw.startsWith("//") ? `https:${raw}` : raw);
+	} catch {
+		return null;
+	}
+	if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
+	if (MEDIA_HOSTS[url.hostname] !== true && !(url.hostname === "github.com" && url.pathname.startsWith("/user-attachments/"))) return null;
+	url.hash = "";
+	return url;
+}
+
+/** `GET /api/github-media` of `raw`, or `null` when {@link githubMediaUrl} refuses it. */
+export function githubMediaPath(raw: string): string | null {
+	const url = githubMediaUrl(raw);
+	return url && `/api/github-media?${new URLSearchParams({ url: url.href })}`;
 }
 
 /** A GitHub repository's key in maps and lookups: `owner/repo`, lowercased, since GitHub matches names in any case. */
@@ -94,6 +124,7 @@ export type CheckState = "passing" | "failing" | "pending" | "none";
 export interface Person {
 	login: string;
 	avatarUrl: string | null;
+	isBot?: boolean;
 }
 
 /** Where one reviewer stands: their latest review, or `requested` while a review from them is pending. */
@@ -138,7 +169,8 @@ export interface PullRequestList {
 	unmatched: string[];
 }
 
-const isPerson = fields<Person>({ login: isString, avatarUrl: nullable(isString) });
+const PERSON_FIELDS: Shape<Person> = { login: isString, avatarUrl: nullable(isString), isBot: optional(isBoolean) };
+const isPerson = fields<Person>(PERSON_FIELDS);
 
 const isSummary = fields<PullRequestSummary>({
 	owner: isString,
@@ -146,7 +178,7 @@ const isSummary = fields<PullRequestSummary>({
 	number: isNumber,
 	title: isString,
 	author: isPerson,
-	reviewers: arrayOf(fields<Reviewer>({ login: isString, avatarUrl: nullable(isString), state: oneOf(["approved", "changes-requested", "commented", "requested"]) })),
+	reviewers: arrayOf(fields<Reviewer>({ ...PERSON_FIELDS, state: oneOf(["approved", "changes-requested", "commented", "requested"]) })),
 	role: oneOf(["author", "reviewer"]),
 	state: oneOf(["open", "draft", "merged"]),
 	review: oneOf(["approved", "changes-requested", "review-required", "none"]),
@@ -348,9 +380,13 @@ export type UpdateMethod = (typeof UPDATE_METHODS)[number];
 /** The longest title GitHub takes for a pull request. */
 export const MAX_PULL_REQUEST_TITLE = 256;
 
+/** The longest description GitHub takes for a pull request. */
+export const MAX_PULL_REQUEST_BODY = 65_536;
+
 /** One change the details make to a pull request. */
 export type PullRequestChange =
 	| { field: "title"; title: string }
+	| { field: "body"; body: string }
 	| { field: "label"; name: string; on: boolean }
 	| { field: "reviewer"; login: string; on: boolean }
 	| { field: "state"; state: SettableState }

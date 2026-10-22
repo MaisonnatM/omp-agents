@@ -63,6 +63,12 @@ export const nullable =
 	(value): value is T | null =>
 		value === null || guard(value);
 
+/** A field JSON may leave out. */
+export const optional =
+	<T>(guard: Guard<T>): Guard<T | undefined> =>
+	(value): value is T | undefined =>
+		value === undefined || guard(value);
+
 export const arrayOf =
 	<T>(guard: Guard<T>): Guard<T[]> =>
 	(value): value is T[] =>

@@ -1,4 +1,4 @@
-/** A pull request's labels, review requests, state, review threads, comments, and description images, changed from the dashboard through `gh`, and the choices its pickers offer. */
+/** A pull request's title, description, labels, review requests, state, review threads, comments, and description images, changed from the dashboard through `gh`, and the choices its pickers offer. */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
@@ -80,6 +80,9 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 	switch (change.field) {
 		case "title":
 			await ghRestWrite("PATCH", `${base}/pulls/${pr.number}`, [["title", change.title]]);
+			break;
+		case "body":
+			await ghRestWrite("PATCH", `${base}/pulls/${pr.number}`, [["body", change.body]]);
 			break;
 		case "update": {
 			const status = await GITHUB_MERGES.status(pr);

@@ -1,6 +1,6 @@
-/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, Code, Review draft, and Review triage tabs. */
-import { ClipboardList, ClipboardPen, FileDiff, FileText, History, MessageSquare } from "lucide-react";
-import { useContext, useEffect, useRef, useState } from "react";
+/** `PullRequestDetailContent`: a pull request's header and Summary, Timeline, Code, Review draft, and Review triage tabs. */
+import { ClipboardList, ClipboardPen, FileDiff, FileText, History } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import { latestReviewTriage } from "../../../../src/shared/review-triage";
@@ -17,17 +17,16 @@ import { useEditableRead } from "../../../editable-read";
 import { useRead, writePullRequest } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
 import { useDashboardStatus } from "../../dashboard-context";
-import { DetailsScrollerContext } from "../../details-sidebar-frame";
 import { ERROR_TEXT } from "../../form-dialog";
 import { usePullRequestOptions } from "../pr-fields";
 import { LoadNote } from "../../sheet-details";
 import { Timeline } from "../pr-timeline";
 import { ChecksSummary } from "./checks";
 import { Code } from "./code";
-import { Comments } from "./comments";
 import { DetailHeader } from "./header";
 import { ReviewDraftPanel } from "./review-draft";
 import { ReviewTriagePanel } from "../../review-triage";
+import { DetailsScrollerContext } from "./section";
 import { Summary } from "./summary";
 import { useCondensedHeader } from "./use-condensed-header";
 
@@ -72,7 +71,7 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
 
 /**
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
- * of the other actions; then Summary, Comments, Timeline, and Code tabs, and a Review draft tab while a Review session's
+ * of the other actions; then Summary, Timeline, and Code tabs, and a Review draft tab while a Review session's
  * draft of it is kept, with the checks at a glance on the tab bar.
  */
 export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, tab: picked, onTab, path = null, onPick, workspace, cwd }: DetailContentProps) {
@@ -109,17 +108,16 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const pendingFindings = draft && !draft.posted ? draft.findings.filter(finding => finding.state === "pending").length : 0;
 	const [root, setRoot] = useState<HTMLDivElement | null>(null);
 	const foldRef = useRef<HTMLDivElement>(null);
-	const sidebarScroller = useContext(DetailsScrollerContext);
-	const condensed = useCondensedHeader(page ? root : sidebarScroller, root, foldRef, tab);
+	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+	const condensed = useCondensedHeader(scroller, root, foldRef, tab);
 	return (
-		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
-			<div className={cn("sticky top-0 z-10 shrink-0 bg-background", !page && "-mx-4 pt-2")}>
-				<DetailHeader pr={pr} detail={detail} stack={stack} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
+		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr flex min-h-0 flex-1 flex-col", page && "h-full")}>
+			<div className={cn("shrink-0 bg-background", !page && "pt-2")}>
+				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
 					<SegmentedTabsList aria-label="Pull request details">
 						{([
 							{ value: "summary", label: "Summary", Icon: FileText, name: "Summary" },
-							{ value: "comments", label: "Comments", Icon: MessageSquare, name: `Comments, ${comments} comments` },
 							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${comments} comments` },
 							{ value: "code", label: "Code", Icon: FileDiff, name: "Code" },
 							...(draft ? [{ value: "review", label: "Review draft", Icon: ClipboardPen, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}` }] : []),
@@ -138,33 +136,35 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 			</div>
 			<SegmentedTabPanel value={tab} asChild>
 				{tab === "triage" ? (
-					<div className={cn("min-w-0 py-4", page && "px-6")}><ReviewTriagePanel triages={triages} headOid={detail?.headOid} /></div>
+					<div className={cn("min-h-0 min-w-0 flex-1 overflow-y-auto py-4", page ? "px-6" : "px-4")}>
+						<ReviewTriagePanel triages={triages} headOid={detail?.headOid} />
+					</div>
 				) : !detail ? (
-					<div className={cn("py-4", page && "px-6")}>
+					<div className={cn("py-4", page ? "px-6" : "px-4")}>
 						<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
 					</div>
 				) : tab === "code" ? (
-					<div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !page && "-mx-4 h-[65vh] flex-none pt-3")}>
+					<div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !page && "pt-3")}>
 						<Code key={prKey(pr)} pr={pr} detail={detail} placement={placement} path={path} version={version} />
 					</div>
 				) : (
-					<div className={cn("shrink-0", page && "px-6")}>
-						<div className="space-y-6 py-4">
-							{saveError && (
-								<p role="alert" className={ERROR_TEXT}>
-									GitHub did not take the change: {saveError}
-								</p>
-							)}
-							{tab === "summary" ? (
-								<Summary pr={pr} detail={detail} options={options} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
-							) : tab === "comments" ? (
-								<Comments detail={detail} save={save} send={send} />
-							) : tab === "timeline" ? (
-								<Timeline detail={detail} placement={placement} />
-							) : (
-								draft && <ReviewDraftPanel draft={draft} headOid={detail.headOid} />
-							)}
-						</div>
+					<div ref={setScroller} className="min-h-0 flex-1 overflow-y-auto">
+						<DetailsScrollerContext.Provider value={scroller}>
+							<div className={cn(tab !== "summary" && "space-y-6 px-4 py-4")}>
+								{saveError && (
+									<p role="alert" className={cn(ERROR_TEXT, tab === "summary" && "px-4 pt-3")}>
+										GitHub did not take the change: {saveError}
+									</p>
+								)}
+								{tab === "summary" ? (
+									<Summary detail={detail} options={options} save={save} send={send} />
+								) : tab === "timeline" ? (
+									<Timeline detail={detail} placement={placement} />
+								) : (
+									draft && <ReviewDraftPanel draft={draft} headOid={detail.headOid} />
+								)}
+							</div>
+						</DetailsScrollerContext.Provider>
 					</div>
 				)}
 			</SegmentedTabPanel>

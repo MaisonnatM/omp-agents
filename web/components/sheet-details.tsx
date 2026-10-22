@@ -5,7 +5,7 @@ import type { PullRequestComment } from "../../src/shared/github";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { age } from "../labels";
-import { MessageMarkdown } from "./message-markdown";
+import { GITHUB_PRESET, MessageMarkdown } from "./message-markdown";
 
 /** What details show before they arrive: the loading line, or the error once the read failed. */
 export function LoadNote({ loading, error }: { loading: string; error: string | null }) {
@@ -40,7 +40,7 @@ export function OutLink({ href, children }: { href: string; children: ReactNode 
 export function Markdown({ text, className }: { text: string; className?: string }) {
 	return (
 		<div className={cn("text-sm [&_img]:max-w-full", className)}>
-			<MessageMarkdown text={text} github />
+			<MessageMarkdown text={text} preset={GITHUB_PRESET} />
 		</div>
 	);
 }

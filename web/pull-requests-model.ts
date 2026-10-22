@@ -417,10 +417,10 @@ export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): num
 /** The review threads not yet resolved, in GitHub's order. */
 export const openThreads = ({ threads }: Pick<PullRequestDetail, "threads">): PullRequestThread[] => threads.filter(thread => !thread.resolved);
 
-/** The comments and reviews of the conversation that have words, which **Comments** lists. */
+/** The comments and reviews of the conversation that have words. */
 export const spokenConversation = ({ conversation }: Pick<PullRequestDetail, "conversation">): PullRequestDetail["conversation"] => conversation.filter(event => event.body.trim() !== "");
 
-/** The pull request's comments, which **Comments**, **Timeline**, and its header count: every review thread's, resolved or not and beyond the first 20 loaded, and the conversation's with words. */
+/** The pull request's comments, which the **Timeline** tab and its header count: every review thread's, resolved or not and beyond the first 20 loaded, and the conversation's with words. */
 export const commentCount = (detail: Pick<PullRequestDetail, "threads" | "conversation">): number =>
 	detail.threads.reduce((sum, thread) => sum + thread.commentCount, 0) + spokenConversation(detail).length;
 

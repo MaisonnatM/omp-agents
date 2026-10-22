@@ -16,6 +16,19 @@ test("a title edit patches GitHub and returns the refreshed title", async () => 
 	expect({ title: detail.title, behindBy: detail.behindBy }).toEqual({ title: "A better title", behindBy: 2 });
 });
 
+test.each([
+	{ body: "## Summary\n\nA description with @octocat and 7.", field: "body=## Summary\n\nA description with @octocat and 7.", refreshed: "## Summary\n\nA description with @octocat and 7." },
+	{ body: "", field: "body=", refreshed: "" },
+])("a description edit patches its exact body and returns the refreshed description: %j", async ({ body, field, refreshed }) => {
+	const write = spyOn(proc, "runChecked").mockResolvedValue("");
+	spyOn(proc, "runJson").mockImplementation(async argv => argv.includes("graphql") ? {
+		data: { repository: { pullRequest: { number: 7, title: "Feature", body, state: "OPEN", headRefName: "feature", headRefOid: "abc", baseRefName: "main", createdAt: "2026-10-01T00:00:00Z" } } },
+	} : { behind_by: 0 });
+	const detail = await savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "body", body } });
+	expect(write.mock.calls[0]?.[0]).toEqual(["gh", "api", "-X", "PATCH", "repos/acme/app/pulls/7", "-f", field]);
+	expect(detail.body).toBe(refreshed);
+});
+
 test("a branch update rebases the head read from GitHub, not a stale page", async () => {
 	const calls = spyOn(proc, "runJson").mockImplementation(async argv => {
 		if (argv.some(arg => arg.includes("updatePullRequestBranch"))) return { data: { updatePullRequestBranch: { clientMutationId: null } } };

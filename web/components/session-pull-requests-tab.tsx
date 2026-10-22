@@ -22,18 +22,16 @@ interface PullRequestsTabProps {
 
 /**
  * The session's pull requests in the right sidebar: one's details as the Pull requests page shows them, the first until another
- * is picked from its stack or from the session's other pull requests, which its Summary lists.
+ * is picked from its stack or from the session's other pull requests in the header's stack menu.
  */
 export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version, current, scope }: PullRequestsTabProps) {
 	const { tabs, dispatch } = useSessionPullRequestTabs(scope, pullRequests[0]);
 	const shown = tabs.open.find(pr => prKey(pr) === tabs.active);
 	if (!shown) return <DetailsEmpty icon={GitPullRequest} title="No pull request yet" description="Pull requests this session opens or works on show here." />;
 	return (
-		<div className="pb-4">
+		<div className="flex min-h-0 flex-1 flex-col">
 			<PullRequestTabsStrip tabs={tabs} dispatch={dispatch} workspace={workspace} />
-			<div className="space-y-3 px-4">
-				<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} tab={shown.detailTab} onTab={tab => dispatch({ type: "detail", pr: shown, tab })} onPick={pr => dispatch({ type: "open", pr })} session={pullRequests} current={current} />
-			</div>
+			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} tab={shown.detailTab} onTab={tab => dispatch({ type: "detail", pr: shown, tab })} onPick={pr => dispatch({ type: "open", pr })} session={pullRequests} current={current} />
 		</div>
 	);
 }

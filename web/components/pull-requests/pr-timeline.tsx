@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { age } from "../../labels";
 import { approvalCount, timelineRows, type TimelineRow, type Verdict } from "../../pull-request-timeline";
 import { commentCount } from "../../pull-requests-model";
-import { Markdown } from "../sheet-details";
+import { PullRequestMarkdown } from "./pr-markdown";
 import { Avatar } from "./avatars";
 import type { Placement } from "./pr-details";
 import { REVIEW_STYLE, ThreadPlace } from "./pr-details/message";
@@ -46,7 +46,7 @@ function HostLink({ url }: { url: string | null }) {
 	return url ? <a href={url} target="_blank" rel="noreferrer" aria-label="Open activity on GitHub" className={cn("flex size-6 shrink-0 items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground", FOCUS_CLASS)}><ExternalLink aria-hidden className="size-3" /></a> : null;
 }
 
-function ConversationCard({ comment, action = "commented" }: { comment: PullRequestComment; action?: string }) {
+function ConversationCard({ detail, comment, action = "commented" }: { detail: PullRequestDetail; comment: PullRequestComment; action?: string }) {
 	return (
 		<article className="py-2">
 			<div className="flex min-w-0 flex-wrap items-start gap-2 px-2">
@@ -60,12 +60,12 @@ function ConversationCard({ comment, action = "commented" }: { comment: PullRequ
 				<Reactions comment={comment} />
 				<HostLink url={comment.url} />
 			</div>
-			{comment.body.trim() && <div className="mt-3 px-2 pb-2"><Markdown text={comment.body} /></div>}
+			{comment.body.trim() && <div className="mt-3 px-2 pb-2"><PullRequestMarkdown text={comment.body} repo={detail} /></div>}
 		</article>
 	);
 }
 
-function ConversationGroup({ events }: { events: [PullRequestEvent, ...PullRequestEvent[]] }) {
+function ConversationGroup({ detail, events }: { detail: PullRequestDetail; events: [PullRequestEvent, ...PullRequestEvent[]] }) {
 	const [open, setOpen] = useState(false);
 	const id = useId();
 	const authors = new Set(events.map(event => event.author.login));
@@ -81,7 +81,7 @@ function ConversationGroup({ events }: { events: [PullRequestEvent, ...PullReque
 				<ChevronDown aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground", open && "rotate-180")} />
 			</button>
 			<div id={id} hidden={!open} className="mt-1 space-y-1">
-				{open && events.map((event, index) => <ConversationCard key={event.url ?? index} comment={event} action={event.review ? "reviewed" : "commented"} />)}
+				{open && events.map((event, index) => <ConversationCard key={event.url ?? index} detail={detail} comment={event} action={event.review ? "reviewed" : "commented"} />)}
 			</div>
 		</li>
 	);
@@ -110,14 +110,14 @@ function Thread({ detail, thread, root, replies }: { detail: PullRequestDetail; 
 			</div>
 			<div id={id} hidden={!expanded}>
 				{expanded && <>
-					<ConversationCard comment={root} />
+					<ConversationCard detail={detail} comment={root} />
 					{replies.length > 0 && <div className="ml-2 border-l border-border/60 pl-3">
 						<button type="button" aria-expanded={repliesOpen} aria-controls={repliesId} onClick={() => setRepliesOpen(value => !value)} className={cn("flex min-h-6 items-center gap-2 py-1 text-xs text-muted-foreground hover:text-foreground", FOCUS_CLASS)}>
 							{repliesOpen ? "Hide replies" : `${replies.length} more ${replies.length === 1 ? "reply" : "replies"}`}
 							<ChevronDown aria-hidden className={cn("size-3", repliesOpen && "rotate-180")} />
 						</button>
 						<div id={repliesId} hidden={!repliesOpen} className="space-y-1">
-							{repliesOpen && replies.map((reply, index) => <ConversationCard key={reply.url ?? index} comment={reply} action="replied" />)}
+							{repliesOpen && replies.map((reply, index) => <ConversationCard key={reply.url ?? index} detail={detail} comment={reply} action="replied" />)}
 						</div>
 					</div>}
 					{more > 0 && <div className="flex flex-wrap items-baseline gap-2 px-2 py-1 text-xs text-muted-foreground">
@@ -145,7 +145,7 @@ function CommitRow({ detail, commit }: { detail: PullRequestDetail; commit: Pull
 	);
 }
 
-function ReviewVerdict({ event, verdict, stale }: { event: PullRequestEvent; verdict: Verdict; stale: boolean }) {
+function ReviewVerdict({ detail, event, verdict, stale }: { detail: PullRequestDetail; event: PullRequestEvent; verdict: Verdict; stale: boolean }) {
 	const { label, tone } = REVIEW_STYLE[verdict];
 	return (
 		<li className={ROW_CLASS}>
@@ -161,7 +161,7 @@ function ReviewVerdict({ event, verdict, stale }: { event: PullRequestEvent; ver
 				<Reactions comment={event} />
 				<HostLink url={event.url} />
 			</div>
-			{event.body.trim() && <div className="mt-3"><Markdown text={event.body} /></div>}
+			{event.body.trim() && <div className="mt-3"><PullRequestMarkdown text={event.body} repo={detail} /></div>}
 		</li>
 	);
 }
@@ -181,10 +181,10 @@ function LifecycleRow({ state, author, at }: { state: "opened" | "merged" | "clo
 
 function EntryView({ detail, row }: { detail: PullRequestDetail; row: TimelineRow }) {
 	switch (row.kind) {
-		case "comments": return <ConversationGroup events={row.events} />;
+		case "comments": return <ConversationGroup detail={detail} events={row.events} />;
 		case "thread": return <Thread detail={detail} thread={row.thread} root={row.root} replies={row.replies} />;
 		case "commit": return <CommitRow detail={detail} commit={row.commit} />;
-		case "review": return <ReviewVerdict event={row.event} verdict={row.verdict} stale={row.stale} />;
+		case "review": return <ReviewVerdict detail={detail} event={row.event} verdict={row.verdict} stale={row.stale} />;
 		case "new": return <NewDivider />;
 		case "lifecycle": return <LifecycleRow state={row.state} author={row.author} at={row.at} />;
 	}
