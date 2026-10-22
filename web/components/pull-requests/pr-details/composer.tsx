@@ -43,7 +43,6 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 	const pending = openDraft?.findings.filter(finding => finding.state === "pending").length ?? 0;
 	const lineComments = openDraft?.findings.filter(finding => finding.state !== "dismissed").length ?? 0;
 	const verdicts = reviewVerdicts(detail);
-	const canComment = detail.canComment;
 	const [open, setOpen] = useState(false);
 	const [requestedMode, setRequestedMode] = useState<Mode>("comment");
 	const [body, setBody] = useState("");
@@ -61,10 +60,11 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 	const [failure, setFailure] = useState<string | null>(null);
 	const commentRef = useRef<HTMLTextAreaElement>(null);
 	const reviewRef = useRef<HTMLTextAreaElement>(null);
-	if (!canComment && verdicts.length === 0) return null;
+	if (!detail.canComment) return null;
+	const reviewable = verdicts.length > 0;
 	const reviewStarted = pending > 0 || summary.trim() !== "";
-	const mode: Mode = canComment ? (verdicts.length === 0 ? "comment" : requestedMode) : "review";
-	const picked = verdicts.includes(verdict) ? verdict : (verdicts[0] ?? "comment");
+	const mode: Mode = reviewable ? requestedMode : "comment";
+	const picked = verdicts.includes(verdict) ? verdict : "comment";
 
 	const run = async (what: Exclude<Submitting, null>, act: () => Promise<void>): Promise<void> => {
 		if (submitting) return;
@@ -110,7 +110,7 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 		>
 			<div className="relative">
 				<PopoverTrigger asChild>
-					<Button size="icon" variant="glass" aria-label={composerLabel({ pending, reviewStarted, canComment })}>
+					<Button size="icon" variant="glass" aria-label={composerLabel({ pending, reviewStarted })}>
 						<MessageSquare aria-hidden className="size-4" />
 					</Button>
 				</PopoverTrigger>
@@ -128,7 +128,7 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 				}}
 			>
 				<div className="mb-3 flex items-center justify-between gap-2">
-					{canComment && verdicts.length > 0 ? (
+					{reviewable ? (
 						<SegmentedTabs value={mode} onValueChange={value => setRequestedMode(value === "review" ? "review" : "comment")}>
 							<SegmentedTabsList aria-label="Composer mode">
 								<SegmentedTab value="comment">Comment</SegmentedTab>
@@ -136,7 +136,7 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 							</SegmentedTabsList>
 						</SegmentedTabs>
 					) : (
-						<PopoverTitle className="text-sm">{mode === "review" ? "Review pull request" : "Comment on pull request"}</PopoverTitle>
+						<PopoverTitle className="text-sm">Comment on pull request</PopoverTitle>
 					)}
 					<div className="flex items-center gap-1">
 						{mode === "review" && openDraft && pending > 0 && (
@@ -156,16 +156,14 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 						</Button>
 					</div>
 				</div>
-				{verdicts.length > 0 && (
+				{reviewable && (
 					<div hidden={mode !== "review"}>
 						<ReviewForm textareaRef={reviewRef} summary={summary} onSummary={setSummary} verdict={picked} verdicts={verdicts} onVerdict={setVerdict} lineComments={lineComments} pending={submitting === "review"} onSubmit={() => void review()} />
 					</div>
 				)}
-				{canComment && (
-					<div hidden={mode !== "comment"}>
-						<CommentForm scope={prKey(detail)} state={detail.state} textareaRef={commentRef} body={body} onBody={setBody} submitting={submitting} onSubmit={then => void comment(then)} />
-					</div>
-				)}
+				<div hidden={mode !== "comment"}>
+					<CommentForm scope={prKey(detail)} state={detail.state} textareaRef={commentRef} body={body} onBody={setBody} submitting={submitting} onSubmit={then => void comment(then)} />
+				</div>
 				{failure && (
 					<p role="alert" className={`${ERROR_TEXT} mt-2`}>
 						GitHub did not take it: {failure}
