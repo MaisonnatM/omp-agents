@@ -4,7 +4,6 @@ import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
-import type { ReviewTriagesAnswer } from "../src/shared/review-triage";
 import { applyPins, type PinChange } from "../src/shared/pins";
 import type { Project } from "../src/shared/projects";
 import type { ScheduledSend } from "../src/shared/scheduled";
@@ -61,13 +60,12 @@ export interface DashboardState {
 	merges: QueuedMerge[];
 	/** The review drafts the server keeps, posted ones too, empty until the server first sends them. */
 	reviewDrafts: ReviewDraft[];
-	reviewTriages: ReviewTriagesAnswer;
 	/** The live sessions this page asked the server to end, by instance id, until it answers. */
 	ending: ReadonlySet<string>;
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" | "merges" | "review-drafts" | "review-triages" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -189,8 +187,6 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, merges: action.list };
 		case "review-drafts":
 			return { ...state, reviewDrafts: action.list };
-		case "review-triages":
-			return { ...state, reviewTriages: { list: action.list, owner: action.owner } };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		case "pin": {
@@ -229,7 +225,6 @@ export function initialState(route: Route): DashboardState {
 		notices: [],
 		merges: [],
 		reviewDrafts: [],
-		reviewTriages: { list: [], owner: null },
 		ending: new Set(),
 	};
 }

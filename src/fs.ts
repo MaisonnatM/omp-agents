@@ -29,7 +29,7 @@ export async function atomicWriteText(path: string, text: string, mode?: number)
 }
 
 /** {@link atomicWriteText} for a caller that has no way to wait: the file is replaced when this returns. */
-export function atomicWriteTextSync(path: string, text: string, mode?: number): void {
+function atomicWriteTextSync(path: string, text: string, mode?: number): void {
 	const temp = stagingFor(path);
 	try {
 		writeFileSync(temp, text, { flag: "wx", mode });

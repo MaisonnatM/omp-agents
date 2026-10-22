@@ -151,7 +151,7 @@ An action that fails shows its error, and its control becomes available again.
 
 - The right sidebar shows what the focused pane's agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Files**, **Media**, **PRs**, **Review triage**, and **Tickets**, which shows only for a session with a Linear issue.
+- Tabs split it: **Files**, **Media**, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone; with **Tickets** among them, they show their icons alone until you widen the sidebar past 30rem, and hovering one names it.
   The sidebar remembers the tab you chose, for every view.
@@ -191,10 +191,6 @@ An action that fails shows its error, and its control becomes available again.
   The header and the tab bar stay at the top of the sidebar, and only the tab's content scrolls below them, as on the page.
   The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
-- **Review triage** turns the findings of a session, such as a thermonuclear review run in a Terminal session, into decision cards, with the count of cards still waiting for a decision.
-  **Triage existing findings** starts a session that reads this session's file and keeps each finding's original number and wording, without reviewing again; **Run thermonuclear review** starts one that reviews this session's checkout anew.
-  Both put their cards on this tab, which work as the [pull request's **Review triage** tab](#pull-requests) does, from **Accept** to **Apply accepted**, in this session's checkout as it is, uncommitted work included.
-  An agent in a Terminal session starts the same through the starter kit's `start_review_triage` tool, which asks the dashboard that owns Review triage.
 - **Tickets** shows the Linear issues the session and its subagents worked on, as its header lists them, the session's own first.
   The first one shows until you click another identifier above it, or the issue's **Sub-issue of** link or one of its **Sub-issues**, which show it in place.
   The issue shows as on the tickets page, stacked in one column: its title, its status, priority, assignee, due date, labels, and project, which you can edit there, then its **Sub-issues**, its branch, its links, who opened it, **Open in Linear**, its description, and its comments.
@@ -616,7 +612,6 @@ An action that fails shows its error, and its control becomes available again.
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
   The dashboard then removes the linked git worktree the session works in, the one whose branch its header names, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
   A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.
-  A checkout needed by the latest finished Review triage also stays until its application completes or a newer finished report replaces it.
   The header shows **Ending…** until the process stops and the worktree check finishes.
   Each pane that showed the session, or one of its subagents, moves to the next running session the sidebar lists, else the previous one, skipping sessions already open in a pane.
   With none left, the pane closes and the dashboard shows its empty state.
@@ -835,7 +830,7 @@ An action that fails shows its error, and its control becomes available again.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
   The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
   In a narrow panel, action labels hide but their tooltips and accessible names remain.
-- Under the header, a compact segmented control splits the details into **Summary**, **Timeline**, **Code**, **Review draft** while a review draft is kept, and **Review triage** once a **Triage comments** or **Thermonuclear review** session has started on it.
+- Under the header, a compact segmented control splits the details into **Summary**, **Timeline**, **Code**, and **Review draft** while a review draft is kept.
   Tabs have no count badges; their accessible names still include timeline and pending-finding counts.
   Left and Right arrow keys select adjacent tabs, and Home and End select the first and last.
   Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
@@ -911,27 +906,6 @@ An action that fails shows its error, and its control becomes available again.
   Once posted, the tab says when, links to the review on GitHub, and takes no more changes; posting again, even after a lost answer, never posts a second review, since the server first looks for the review it would post among yours on that commit.
   **Discard draft** deletes the draft, posted or not.
   The server keeps the drafts in `review-drafts.json` beside its access token, and drops a posted draft two weeks after it posted, the next time a session saves a draft.
-- **Review triage** holds incoming feedback for you to decide on before anything changes: the pull request's nonempty review bodies and review threads, or the findings of a thermonuclear review.
-  It names the commit and checkout the session reviewed, and a menu picks another report of the same pull request.
-  The tab and its count use the latest finished report, even while a newer capture is still assessing; the menu also offers that pending capture.
-  With no finished report, the tab shows the latest capture's progress.
-  Each card shows the file and line, the session's proposal, **Fix**, **Push back**, or **Already done**, the original review, thread, or finding folded under **Original**, the session's rationale and evidence, and a draft reply.
-  A review body keeps its author, review state, and GitHub link; its draft is a copyable review note, not a thread reply.
-  A thermonuclear card shows **Finding N** with the original finding number and unchanged wording, even when findings arrive out of order.
-  A card is **Pending** until you **Accept** or **Dismiss** it, which **Unaccept** and **Restore** undo.
-  Accepting a card accepts its proposed handling, not necessarily the complaint: an accepted **Fix** becomes a code change, and an accepted **Push back** or **Already done** only drafts a reply.
-  **Edit reply** rewords the draft, and **Copy reply** copies it for you to post yourself; the dashboard posts no reply and resolves no thread.
-  **Apply accepted** starts one session for every accepted card, in the reviewed checkout, and freezes that selection: the decisions then take no change, while replies still do.
-  Wording edited before **Apply accepted** enters the application as input; the application's final reply then appears on the card.
-  Wording edited during or after that application takes precedence without changing its recorded evidence.
-  It refuses when a newer report has finished, the pull request's head or feedback changed, the checkout's staged, unstaged, or untracked work changed since the review, or another running session works in that checkout, and says why.
-  A second click, or one after a reload, never starts a second session: while the session runs, the button reads **Resume application** and resumes it, and a launch that failed says so and does not start again by itself.
-  The application session leaves unrelated work in the checkout alone, commits and pushes nothing, and records per card **Fixed** with the files it changed and its evidence, **Blocked** with why, or **Reply only**.
-  When another dashboard on this machine owns Review triage, this one shows the cards read-only and links to the owner's.
-  The server keeps the triages in `review-triages.json` beside its access token.
-  If that file is invalid or unreadable, the dashboard keeps showing its last valid cards, or no cards before its first valid read.
-  Triage changes and tools refuse until the file is repaired, and automatic **End session** cleanup keeps checkouts whose triage references it cannot read.
-  The server logs the reason without changing the file.
 - Each opening reads the pull request again; the server keeps its answer for 30 seconds.
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.
@@ -947,18 +921,12 @@ An action that fails shows its error, and its control becomes available again.
   The page stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
   The session also shows in the sessions sidebar.
-  Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Triage comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
+  Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
   **Fix CI and conflicts** rebases the branch and resolves its conflicts first, then fixes the checks that still fail on the rebased branch, in one session.
   **Review** reviews the pull request's head commit and saves what it finds as the pull request's review draft, through the dashboard's `save_review_draft` tool, which only that session gets, and resumes of it too; it posts nothing on GitHub, and the draft waits on the **Review draft** tab for you to post it.
   A new draft of the same pull request replaces the one before it, findings and edits included, except the comments you added from **Code** on the same head, which stay after the new findings.
-  **Triage comments** reads every nonempty review body and every review thread of the pull request, resolved ones too, and assesses each onto a card of the pull request's **Review triage** tab, with a draft reply; it changes no code and posts nothing.
-  **Thermonuclear review** runs the `thermonuclear-reviewer` agent on the pull request and puts its findings, each assessed, on the same tab; it applies nothing until you **Apply accepted**.
-  Both run in a checkout of the pull request's head: the workspace itself when it is there, else a new detached worktree beside the repository's main checkout, named `<main>-review-triage-<id>`.
-  **End session** retains a checkout still needed by the latest finished triage until its application completes or a newer finished report supersedes it.
-  Otherwise, **End session** removes the worktree only when its usual safety checks allow it, and keeps dirty changes.
-  Explicit removal in **Settings → Worktrees** can remove a retained checkout and makes its triage unusable.
-  A later, separately authorized commit and push from a detached checkout needs the appropriate branch first.
-  A merged pull request has none.
+  **Thermonuclear review** runs the `thermonuclear-reviewer` agent on the pull request's diff.
+  On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   The button waits while the session starts.
   When the start fails, a note at the top of the Pull requests page, and in the details of that pull request, gives the reason until you dismiss it.
 

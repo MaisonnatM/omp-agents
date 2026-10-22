@@ -151,7 +151,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
 	project: ({ lists }, peer, { change }) => void lists.apply("projects", change, peer),
 	"review-draft": ({ lists }, peer, { change }) => void lists.apply("review-drafts", change, peer),
-	"review-triage": ({ lists }, peer, { change }) => void lists.apply("review-triages", change, peer),
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),
 	discuss: ({ discussions }, peer, { id, request }) => discussions.ask(peer, id, request),
 	"discuss-stop": ({ discussions }, peer, { id }) => discussions.stop(peer.socket, id),
