@@ -1099,6 +1099,10 @@ A `reply` change, `{ thread, body }`, runs `addPullRequestReviewThreadReply` on 
 A `comment` change, `{ body }`, posts to REST's `repos/<o>/<r>/issues/<n>/comments`, the pull request's number naming it, with the body as a `-f` field, which `gh` sends as written, never as a number, a file, or a placeholder.
 A reply's or comment's body is not blank and at most 65536 characters, GitHub's limit.
 The pull request's answer lists every review thread among the first 100, resolved ones too, each with its node id and whether the viewer may reply, resolve, and unresolve it, from `viewerCanReply`, `viewerCanResolve`, and `viewerCanUnresolve`, so the button a resolve or unresolve shows at once stays right.
+The same detail GraphQL request reads `mergedAt`, `closedAt`, comment and review `reactionGroups`, each thread's `isOutdated`, its total comment count, and its root comment's review state for dismissal.
+Each thread still loads its first 20 comments, with the total count letting the Timeline link to replies beyond that limit on GitHub.
+Reaction groups carry their content, user count, and viewer participation for read-only display; lifecycle times remain separate from `updatedAt`.
+The Timeline adds no activity request and does not invent draft, ready, reopen, force-push, or base-change history from the pull request's current state.
 Its `unresolved` counts the open threads among those it lists, with `exact` false when GitHub has more than it listed, so the details' counts agree with their threads.
 GitHub's GraphQL has no `viewerCanComment` on a pull request, so its `canComment` is true unless the repository is archived, or the conversation is locked and the viewer's `viewerPermission` is below `WRITE`, as GitHub lets only people who can write comment on a locked conversation.
 Every mutation goes through `ghMutation` in `src/github.ts`, which throws GitHub's errors even when its answer carries `data`, since a refused mutation answers its field as `null` beside them.

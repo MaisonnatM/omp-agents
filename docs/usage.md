@@ -830,12 +830,16 @@ An action that fails shows its error, and its control becomes available again.
   A thread you can reply to has a reply box under it: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and the box keeps your words and says why when GitHub refuses them.
   Under the threads, **Conversation** lists the comments and reviews with words on the pull request, oldest first, then a box to comment that works as the reply box does, shown when GitHub lets you comment.
   Replies and comments go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
-- **Timeline** lists what happened on the pull request as a chat does, newest first, with a line for each day that stays on top while you scroll its entries.
-  Each entry shows its author's avatar, name, and time: a push lists its commits, one author's commits within an hour as one entry, with each commit's short hash and lines added and removed; a review shows its verdict and words; a comment shows its words.
+- **Timeline** puts the pull request's activity on a vertical rail, newest first, with avatars for conversations and commits and icons for opened, merged, and closed events.
+  Consecutive comments and commented reviews fold into conversation groups showing their comment and author counts.
+  Reviews show their verdict and words, with verdicts from before the latest commits muted.
+  Each commit shows its short hash, time, and lines added and removed; clicking it opens that commit on GitHub.
   The pull request's own commits show, not those of its trunk that its branch took in; a commit counts as its own unless GitHub links it only to other pull requests.
-  An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came; resolved threads show only on **Comments**.
+  Review threads include resolved ones, with resolved and dismissed threads folded initially and outdated threads marked.
+  The file and line link to the **Code** tab, and **more replies** reveals the loaded replies in place.
+  When a thread has more than the 20 comments loaded, **View on GitHub** opens the rest there.
   A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
-  Above the list, the counts of comments and commits, and **Newest first**, which flips the order.
+  Above the rail are the comment count the tab shows, the commit count, and the count of reviewers whose latest verdict approves the newest commit, and **Newest first**, which flips the order without reversing replies within a thread.
 - **Code** shows the pull request's files as the [session changes](#session-changes) dialog shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and every file's diff in one scroll, or the open file in **File**, with ↓ and ↑ to step through them.
   A renamed file shows **R**, and a copied one **A**.
   It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.

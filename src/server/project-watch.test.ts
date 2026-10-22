@@ -72,7 +72,7 @@ describe("ProjectWatch", () => {
 		state.detail = detail({
 			checks: "failing",
 			checkRuns: [{ name: "lint", state: "failing", url: null }, { name: "test", state: "passing", url: null }],
-			conversation: [{ author: { login: "ana", avatarUrl: null }, body: "Rename Y too.", at: 5, url: null, review: "changes-requested" }],
+			conversation: [{ author: { login: "ana", avatarUrl: null }, body: "Rename Y too.", at: 5, url: null, reactions: [], review: "changes-requested" }],
 		});
 		await look();
 		state.detail = detail({ state: "merged", checks: "passing", conversation: state.detail.conversation });

@@ -1,196 +1,198 @@
-import { ArrowDownUp, GitCommitHorizontal, MessageSquare } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useState } from "react";
-import { type Person, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestThread, prKey } from "../../../src/shared/github";
+import { ArrowDownUp, ChevronDown, CircleCheck, ExternalLink, FileCode2, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestClosed, MessageSquare, ThumbsUp } from "lucide-react";
+import { type ReactNode, useEffect, useId, useState } from "react";
+import { type Person, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestThread, prKey, type ReactionContent } from "../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
-import { hashForPullRequestFiles } from "../../routing";
-import { openThreads } from "../../pull-requests-model";
+import { approvalCount, timelineRows, type TimelineRow, type Verdict } from "../../pull-request-timeline";
+import { commentCount } from "../../pull-requests-model";
 import { Markdown } from "../sheet-details";
 import { Avatar } from "./avatars";
+import type { Placement } from "./pr-details";
+import { REVIEW_STYLE, ThreadPlace } from "./pr-details/message";
 
-type Entry =
-	| { kind: "commits"; at: number; author: Person; commits: PullRequestCommit[] }
-	| { kind: "event"; at: number; author: Person; event: PullRequestEvent }
-	| { kind: "thread"; at: number; author: Person; thread: PullRequestThread };
+const ROW_CLASS = "relative mb-5 pl-12 [contain-intrinsic-block-size:48px] [content-visibility:auto]";
+const FOCUS_CLASS = "rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-/** A run of one author's commits within an hour reads as one message, as Slack groups a sender's messages. */
-const COMMIT_RUN_MS = 60 * 60_000;
-
-function entriesOf(detail: PullRequestDetail): Entry[] {
-	const entries: Entry[] = [];
-	for (const commit of detail.commits) {
-		const last = entries.at(-1);
-		if (last?.kind === "commits" && last.author.login === commit.author.login && commit.at - last.at < COMMIT_RUN_MS) {
-			last.commits.push(commit);
-			last.at = commit.at;
-		} else entries.push({ kind: "commits", at: commit.at, author: commit.author, commits: [commit] });
-	}
-	for (const event of detail.conversation) entries.push({ kind: "event", at: event.at, author: event.author, event });
-	for (const thread of openThreads(detail)) {
-		const first = thread.comments[0];
-		if (first) entries.push({ kind: "thread", at: first.at, author: first.author, thread });
-	}
-	return entries.toSorted((a, b) => a.at - b.at);
+function RelativeTime({ at }: { at: number }) {
+	return <time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()}>{age(at)} ago</time>;
 }
 
-const DAY = new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric" });
-const TIME = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" });
-
-function dayLabel(at: number): string {
-	const start = new Date();
-	start.setHours(0, 0, 0, 0);
-	const day = new Date(at);
-	day.setHours(0, 0, 0, 0);
-	const days = Math.round((start.getTime() - day.getTime()) / 86_400_000);
-	return days === 0 ? "Today" : days === 1 ? "Yesterday" : DAY.format(at);
-}
-
-const REVIEW_PILL: Record<NonNullable<PullRequestEvent["review"]>, [string, string]> = {
-	approved: ["Approved", "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"],
-	"changes-requested": ["Requested changes", "bg-red-500/10 text-red-700 dark:text-red-400"],
-	commented: ["Reviewed", "bg-muted text-muted-foreground"],
-	dismissed: ["Review dismissed", "bg-muted text-muted-foreground"],
-};
-
-/** One message of a Slack-like list: the author's picture, name, and time over `children`. */
-export function Message({ author, at, children }: { author: Person; at: number; children: ReactNode }) {
+function Marker({ author, children, muted = false, top = false }: { author?: Person | null; children?: ReactNode; muted?: boolean; top?: boolean }) {
 	return (
-		<li className="flex gap-3 px-2 py-2 hover:bg-muted/40">
-			<Avatar person={author} label={author.login} className="size-9 rounded-md ring-0 [&_img]:rounded-md" />
-			<div className="min-w-0 flex-1 space-y-1">
-				<p className="flex items-baseline gap-2">
-					<span className="text-sm font-semibold">{author.login}</span>
-					<Tooltip content={new Date(at).toLocaleString()}>
-						<span className="text-xs text-muted-foreground">{TIME.format(at)}</span>
-					</Tooltip>
-				</p>
-				{children}
+		<span aria-hidden className={cn("absolute left-0 z-1 flex size-8 -translate-y-1/2 items-center justify-center bg-background", top ? "top-6" : "top-1/2")}>
+			{author ? <Avatar person={author} label={author.login} className={cn("size-7 bg-muted text-3xs ring-0", muted && "opacity-45 grayscale")} /> : <span className="flex size-7 items-center justify-center text-muted-foreground">{children}</span>}
+		</span>
+	);
+}
+
+const REACTION_EMOJI: Record<ReactionContent, string> = { THUMBS_UP: "👍", THUMBS_DOWN: "👎", LAUGH: "😄", HOORAY: "🎉", CONFUSED: "😕", HEART: "❤️", ROCKET: "🚀", EYES: "👀" };
+
+function Reactions({ comment }: { comment: PullRequestComment }) {
+	return (
+		<div className="ml-auto flex min-w-0 flex-wrap justify-end gap-1">
+			{comment.reactions.map(reaction => (
+				<span key={reaction.content} title={`${reaction.content.toLowerCase().replaceAll("_", " ")}${reaction.viewerHasReacted ? " · You reacted" : ""}`} className={cn("inline-flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-xs", reaction.viewerHasReacted ? "border-primary/60 bg-primary/10 text-foreground" : "border-border/70 bg-muted/40 text-muted-foreground")}>
+					<span>{REACTION_EMOJI[reaction.content]}</span>
+					<span className="tabular-nums">{reaction.count}</span>
+				</span>
+			))}
+		</div>
+	);
+}
+
+function HostLink({ url }: { url: string | null }) {
+	return url ? <a href={url} target="_blank" rel="noreferrer" aria-label="Open activity on GitHub" className={cn("flex size-6 shrink-0 items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground", FOCUS_CLASS)}><ExternalLink aria-hidden className="size-3" /></a> : null;
+}
+
+function ConversationCard({ comment, action = "commented" }: { comment: PullRequestComment; action?: string }) {
+	return (
+		<article className="py-2">
+			<div className="flex min-w-0 flex-wrap items-start gap-2 px-2">
+				<div className="min-w-0 flex-1">
+					<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+						<span className="font-semibold text-foreground">{comment.author.login}</span>
+						<span className="text-muted-foreground">{action}</span>
+					</p>
+					<div className="mt-1 text-2xs text-muted-foreground"><RelativeTime at={comment.at} /></div>
+				</div>
+				<Reactions comment={comment} />
+				<HostLink url={comment.url} />
+			</div>
+			{comment.body.trim() && <div className="mt-3 px-2 pb-2"><Markdown text={comment.body} /></div>}
+		</article>
+	);
+}
+
+function ConversationGroup({ events }: { events: [PullRequestEvent, ...PullRequestEvent[]] }) {
+	const [open, setOpen] = useState(false);
+	const id = useId();
+	const authors = new Set(events.map(event => event.author.login));
+	const [first] = events;
+	return (
+		<li className={ROW_CLASS}>
+			<Marker author={first.author} muted={!open} top />
+			<button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)} className={cn("flex w-full min-w-0 items-center gap-3 py-2 text-left hover:opacity-100", FOCUS_CLASS, open ? "text-foreground" : "text-muted-foreground opacity-55")}>
+				<span className="min-w-0 flex-1">
+					<span className="block text-xs font-semibold">{events.length} {events.length === 1 ? "comment" : "comments"}</span>
+					<span className="block truncate text-3xs text-muted-foreground">{authors.size} {authors.size === 1 ? "author" : "authors"} · <RelativeTime at={first.at} /></span>
+				</span>
+				<ChevronDown aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground", open && "rotate-180")} />
+			</button>
+			<div id={id} hidden={!open} className="mt-1 space-y-1">
+				{open && events.map((event, index) => <ConversationCard key={event.url ?? index} comment={event} action={event.review ? "reviewed" : "commented"} />)}
 			</div>
 		</li>
 	);
 }
 
-function CommitLines({ commits }: { commits: PullRequestCommit[] }) {
+function Thread({ detail, thread, root, replies }: { detail: PullRequestDetail; thread: PullRequestThread; root: PullRequestComment; replies: PullRequestComment[] }) {
+	const [expanded, setExpanded] = useState(!thread.resolved && !thread.dismissed);
+	const [repliesOpen, setRepliesOpen] = useState(false);
+	const id = useId();
+	const repliesId = useId();
+	const more = Math.max(0, thread.commentCount - 1 - replies.length);
+	const replyCount = replies.length + more;
 	return (
-		<ul className="space-y-0.5">
-			{commits.map(commit => (
-				<li key={commit.sha} className="flex min-w-0 items-center gap-2 text-sm">
-					<GitCommitHorizontal aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-					<span className="min-w-0 flex-1 truncate">{commit.headline}</span>
-					<span className="shrink-0 font-mono text-xs text-muted-foreground">{commit.sha}</span>
-					<span className="w-24 shrink-0 text-right font-mono text-xs tabular-nums">
-						<span className="text-emerald-600 dark:text-emerald-400">+{commit.additions}</span> <span className="text-red-600 dark:text-red-400">−{commit.deletions}</span>
-					</span>
-				</li>
-			))}
-		</ul>
-	);
-}
-
-/** A comment's or a review's words, after the review's verdict as a pill. */
-export function EventBody({ event }: { event: PullRequestEvent }) {
-	const pill = event.review && REVIEW_PILL[event.review];
-	return (
-		<>
-			{pill && <span className={cn("inline-block rounded px-1.5 py-0.5 text-xs font-medium", pill[1])}>{pill[0]}</span>}
-			{event.body.trim() && <Markdown text={event.body} />}
-		</>
-	);
-}
-
-/** Where a review thread sits, `path:line`, linked to that file in the Code tab. */
-export function ThreadPlace({ detail, thread }: { detail: PullRequestDetail; thread: PullRequestThread }) {
-	return (
-		<a href={hashForPullRequestFiles(detail, thread.path)} className="min-w-0 font-mono break-all hover:text-foreground hover:underline">
-			{thread.path}
-			{thread.line !== null && `:${thread.line}`}
-		</a>
-	);
-}
-
-/** A review thread as a Slack thread: its first comment, then a bar with who replied, how many, and when; the replies unfold under it. */
-function Thread({ detail, thread }: { detail: PullRequestDetail; thread: PullRequestThread }) {
-	const [open, setOpen] = useState(false);
-	const [first, ...replies] = thread.comments;
-	const last = replies.at(-1);
-	const people = [...new Map(replies.map(reply => [reply.author.login, reply.author])).values()];
-	return (
-		<>
-			<p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-				<span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-700 dark:text-amber-400">Unresolved</span>
-				on
-				<ThreadPlace detail={detail} thread={thread} />
-			</p>
-			{first && <Markdown text={first.body} />}
-			{replies.length > 0 && (
-				<button
-					type="button"
-					onClick={() => setOpen(value => !value)}
-					className="-ml-1 flex items-center gap-2 rounded-md border border-transparent px-1 py-0.5 text-xs hover:border-border hover:bg-background"
-				>
-					<span className="flex -space-x-1">
-						{people.map(person => (
-							<Avatar key={person.login} person={person} label={person.login} className="size-5 rounded-md [&_img]:rounded-md" />
-						))}
-					</span>
-					<span className="font-semibold text-sky-700 dark:text-sky-400">{open ? "Hide replies" : `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}</span>
-					{last && <span className="text-muted-foreground">Last reply {age(last.at)} ago</span>}
+		<li className={ROW_CLASS}>
+			<Marker author={root.author} muted={!expanded} top />
+			<div className="flex min-w-0 flex-wrap items-center gap-2 px-2 py-2 text-2xs text-muted-foreground">
+				<FileCode2 aria-hidden className="size-3 shrink-0" />
+				<span className="min-w-0 flex-1 truncate"><ThreadPlace detail={detail} thread={thread} /></span>
+				{thread.resolved && <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground"><CircleCheck aria-hidden className="size-3" />Resolved</span>}
+				{thread.dismissed && <span className="font-medium">Review dismissed</span>}
+				{thread.outdated && <span className="font-medium">Outdated</span>}
+				<button type="button" aria-label={`${expanded ? "Collapse" : "Expand"} thread on ${thread.path}`} aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded(value => !value)} className={cn("ml-auto flex min-h-6 items-center gap-1 hover:text-foreground", FOCUS_CLASS)}>
+					{!expanded && <span className="text-3xs">· {root.author.login}{replyCount > 0 && ` · ${replyCount} ${replyCount === 1 ? "reply" : "replies"}`}</span>}
+					<ChevronDown aria-hidden className={cn("size-3.5 shrink-0", expanded && "rotate-180")} />
 				</button>
-			)}
-			{open && (
-				<ul className="mt-1 space-y-1 border-l-2 border-border pl-3">
-					{replies.map((reply, index) => (
-						<Message key={index} author={reply.author} at={reply.at}>
-							<Markdown text={reply.body} />
-						</Message>
-					))}
-				</ul>
-			)}
-		</>
-	);
-}
-
-function EntryView({ detail, entry }: { detail: PullRequestDetail; entry: Entry }) {
-	switch (entry.kind) {
-		case "commits":
-			return (
-				<Message author={entry.author} at={entry.at}>
-					<p className="text-xs text-muted-foreground">
-						pushed {entry.commits.length} {entry.commits.length === 1 ? "commit" : "commits"}
-					</p>
-					<CommitLines commits={entry.commits} />
-				</Message>
-			);
-		case "event":
-			return (
-				<Message author={entry.author} at={entry.at}>
-					<EventBody event={entry.event} />
-				</Message>
-			);
-		case "thread":
-			return (
-				<Message author={entry.author} at={entry.at}>
-					<Thread detail={detail} thread={entry.thread} />
-				</Message>
-			);
-	}
-}
-
-function DayDivider({ label }: { label: string }) {
-	return (
-		<li aria-hidden className="sticky top-0 z-10 flex items-center py-2">
-			<span className="h-px flex-1 bg-border" />
-			<span className="rounded-full border border-border bg-background px-3 py-0.5 text-xs font-medium shadow-xs">{label}</span>
-			<span className="h-px flex-1 bg-border" />
+			</div>
+			<div id={id} hidden={!expanded}>
+				{expanded && <>
+					<ConversationCard comment={root} />
+					{replies.length > 0 && <div className="ml-2 border-l border-border/60 pl-3">
+						<button type="button" aria-expanded={repliesOpen} aria-controls={repliesId} onClick={() => setRepliesOpen(value => !value)} className={cn("flex min-h-6 items-center gap-2 py-1 text-xs text-muted-foreground hover:text-foreground", FOCUS_CLASS)}>
+							{repliesOpen ? "Hide replies" : `${replies.length} more ${replies.length === 1 ? "reply" : "replies"}`}
+							<ChevronDown aria-hidden className={cn("size-3", repliesOpen && "rotate-180")} />
+						</button>
+						<div id={repliesId} hidden={!repliesOpen} className="space-y-1">
+							{repliesOpen && replies.map((reply, index) => <ConversationCard key={reply.url ?? index} comment={reply} action="replied" />)}
+						</div>
+					</div>}
+					{more > 0 && <div className="flex flex-wrap items-baseline gap-2 px-2 py-1 text-xs text-muted-foreground">
+						<span>{more} more {more === 1 ? "reply" : "replies"}</span>
+						{root.url && <a href={root.url} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">View on GitHub</a>}
+					</div>}
+				</>}
+			</div>
 		</li>
 	);
 }
 
+function CommitRow({ detail, commit }: { detail: PullRequestDetail; commit: PullRequestCommit }) {
+	return (
+		<li className={ROW_CLASS}>
+			<Marker author={commit.author}><GitCommitHorizontal aria-hidden className="size-3.5" /></Marker>
+			<a href={`https://github.com/${detail.owner}/${detail.repo}/commit/${commit.sha}`} target="_blank" rel="noreferrer" aria-label={`View commit ${commit.sha}`} className={cn("group flex min-w-0 items-center gap-2.5 py-1.5", FOCUS_CLASS)}>
+				<div className="min-w-0 flex-1">
+					<div title={commit.headline} className="truncate text-xs font-semibold text-foreground group-hover:text-primary">{commit.headline || "Untitled commit"}</div>
+					<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-muted-foreground"><code>{commit.sha.slice(0, 7)}</code><RelativeTime at={commit.at} /></div>
+				</div>
+				<span className="ml-auto shrink-0 font-mono text-3xs"><span className="text-diff-addition-foreground">+{commit.additions}</span>{" "}<span className="text-diff-deletion">−{commit.deletions}</span></span>
+			</a>
+		</li>
+	);
+}
+
+function ReviewVerdict({ event, verdict, stale }: { event: PullRequestEvent; verdict: Verdict; stale: boolean }) {
+	const { label, tone } = REVIEW_STYLE[verdict];
+	return (
+		<li className={ROW_CLASS}>
+			<Marker author={event.author} top />
+			<div className="flex min-w-0 flex-wrap items-start gap-2 py-1.5">
+				<div className="min-w-0 flex-1">
+					<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+						<span className="font-semibold text-foreground">{event.author.login}</span>
+						<Tooltip content="Before the latest commits" disabled={!stale}><span className={cn("font-medium lowercase", stale ? "text-muted-foreground opacity-70" : tone)}>{label}{stale && <span className="sr-only">, before the latest commits</span>}</span></Tooltip>
+					</p>
+					<div className="mt-0.5 text-2xs text-muted-foreground"><RelativeTime at={event.at} /></div>
+				</div>
+				<Reactions comment={event} />
+				<HostLink url={event.url} />
+			</div>
+			{event.body.trim() && <div className="mt-3"><Markdown text={event.body} /></div>}
+		</li>
+	);
+}
+
+function LifecycleRow({ state, author, at }: { state: "opened" | "merged" | "closed"; author: Person | null; at: number }) {
+	const Icon = state === "opened" ? GitPullRequest : state === "merged" ? GitMerge : GitPullRequestClosed;
+	return (
+		<li className={ROW_CLASS}>
+			<Marker><Icon aria-hidden className="size-3.5" /></Marker>
+			<div className="py-1.5 text-xs">
+				<p className="flex flex-wrap items-center gap-1.5">{author && <span className="font-semibold">{author.login}</span>}<span className="font-semibold">Pull request {state}</span></p>
+				<div className="mt-0.5 text-2xs text-muted-foreground"><RelativeTime at={at} /></div>
+			</div>
+		</li>
+	);
+}
+
+function EntryView({ detail, row }: { detail: PullRequestDetail; row: TimelineRow }) {
+	switch (row.kind) {
+		case "comments": return <ConversationGroup events={row.events} />;
+		case "thread": return <Thread detail={detail} thread={row.thread} root={row.root} replies={row.replies} />;
+		case "commit": return <CommitRow detail={detail} commit={row.commit} />;
+		case "review": return <ReviewVerdict event={row.event} verdict={row.verdict} stale={row.stale} />;
+		case "new": return <NewDivider />;
+		case "lifecycle": return <LifecycleRow state={row.state} author={row.author} at={row.at} />;
+	}
+}
+
 function NewDivider() {
 	return (
-		<li className="flex items-center gap-2 py-1" aria-label="New since your last visit">
+		<li className="relative mb-5 flex items-center gap-2 pl-12 py-1" aria-label="New since your last visit">
 			<span className="h-px flex-1 bg-red-500/70" />
 			<span className="text-xs font-semibold text-red-600 dark:text-red-400">New</span>
 		</li>
@@ -228,52 +230,24 @@ function useLastSeen(key: string): number | null {
 	return seen;
 }
 
-/** Commits, comments, reviews, and review threads in one Slack-like list: grouped by day, with a line under what is new since the last visit. */
-export function Timeline({ detail }: { detail: PullRequestDetail }) {
+export function Timeline({ detail, placement }: { detail: PullRequestDetail; placement: Placement }) {
 	const [newestFirst, setNewestFirst] = useState(true);
 	const seen = useLastSeen(prKey(detail));
-	const sorted = entriesOf(detail);
-	const entries = newestFirst ? sorted.toReversed() : sorted;
-	const comments = detail.conversation.length + openThreads(detail).reduce((sum, thread) => sum + thread.comments.length, 0);
-	let day: string | null = null;
-	let newShown = false;
+	const rows = timelineRows(detail, newestFirst, seen);
+	const comments = commentCount(detail);
+	const approvals = approvalCount(detail);
 	return (
-		<div className="space-y-2">
-			<div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-				<span className="flex items-center gap-1">
-					<MessageSquare aria-hidden className="size-3.5" />
-					{comments}
-				</span>
-				<span className="flex items-center gap-1">
-					<GitCommitHorizontal aria-hidden className="size-3.5" />
-					{detail.commits.length}
-				</span>
-				<Button variant="ghost" size="compact" leadingIcon={ArrowDownUp} onClick={() => setNewestFirst(value => !value)}>
-					{newestFirst ? "Newest first" : "Oldest first"}
-				</Button>
+		<div data-pr-timeline className={cn("py-1", placement === "page" && "-mx-2")}>
+			<div className="mx-auto mb-5 flex max-w-3xl flex-wrap items-center justify-end gap-3 text-2xs text-muted-foreground">
+				<span aria-label={`${comments} comments`} className="flex items-center gap-1"><MessageSquare aria-hidden className="size-3" />{comments}</span>
+				<span aria-label={`${detail.commits.length} commits`} className="flex items-center gap-1"><GitCommitHorizontal aria-hidden className="size-3" />{detail.commits.length}</span>
+				<span aria-label={`${approvals} approvals`} className="flex items-center gap-1"><ThumbsUp aria-hidden className="size-3" />{approvals}</span>
+				<Button variant="ghost-muted" size="xs" leadingIcon={ArrowDownUp} onClick={() => setNewestFirst(value => !value)}>{newestFirst ? "Newest first" : "Oldest first"}</Button>
 			</div>
-			{entries.length === 0 ? (
-				<p className="text-sm text-muted-foreground">Nothing happened on it yet.</p>
-			) : (
-				<ul>
-					{entries.map((entry, index) => {
-						const label = dayLabel(entry.at);
-						const isNew = seen !== null && entry.at > seen;
-						// Newest first: the line sits under the last new entry. Oldest first: above the first one.
-						const lineBefore = !newShown && seen !== null && (newestFirst ? !isNew && index > 0 && entries[index - 1]!.at > seen : isNew);
-						if (lineBefore) newShown = true;
-						const divider = label !== day;
-						day = label;
-						return (
-							<Fragment key={index}>
-								{lineBefore && <NewDivider />}
-								{divider && <DayDivider label={label} />}
-								<EntryView detail={detail} entry={entry} />
-							</Fragment>
-						);
-					})}
-				</ul>
-			)}
+			<ul className="relative mx-auto max-w-3xl">
+				<li aria-hidden className="pointer-events-none absolute bottom-5 left-[15px] top-1 w-px bg-border/45" />
+				{rows.map(row => <EntryView key={row.key} detail={detail} row={row} />)}
+			</ul>
 		</div>
 	);
 }

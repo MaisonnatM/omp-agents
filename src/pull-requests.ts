@@ -6,7 +6,7 @@ import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
-import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, pullRequestName, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
+import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
 import { MERGE_METHODS, type MergeMethod } from "./shared/source-control";
 
 export { parseRemote, repoOf } from "./github";
@@ -167,14 +167,16 @@ async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
 
 const loaded = createCache<PullRequestSummary[]>();
 
-const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
+const REACTION_FIELDS = `reactionGroups { content viewerHasReacted users { totalCount } }`;
+
+const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url ${REACTION_FIELDS}`;
 
 /** The repository permissions that may still comment once a pull request's conversation is locked. */
 const LOCKED_COMMENTERS: Record<string, true> = { ADMIN: true, MAINTAIN: true, WRITE: true };
 
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed isArchived viewerPermission pullRequest(number: $number) {
-		number title body isDraft state reviewDecision mergeable mergeStateStatus headRefName headRefOid baseRefName createdAt updatedAt additions deletions changedFiles locked
+		number title body isDraft state reviewDecision mergeable mergeStateStatus headRefName headRefOid baseRefName createdAt updatedAt mergedAt closedAt additions deletions changedFiles locked
 		labels(first: 20) { nodes { name color } }
 		history: commits(last: 100) { nodes { commit {
 			abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
@@ -187,9 +189,9 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 		} } } } } }
 		files(first: 100) { nodes { path additions deletions changeType } }
 		comments(last: 50) { nodes { ${COMMENT_FIELDS} } }
-		reviews(last: 50) { nodes { state submittedAt author { login ${AVATAR} } body url } }
+		reviews(last: 50) { nodes { state submittedAt author { login ${AVATAR} } body url ${REACTION_FIELDS} } }
 		reviewThreads(first: ${THREADS}) { totalCount nodes {
-			id isResolved viewerCanReply viewerCanResolve viewerCanUnresolve path line comments(first: 20) { nodes { ${COMMENT_FIELDS} } }
+			id isResolved isOutdated viewerCanReply viewerCanResolve viewerCanUnresolve path line comments(first: 20) { totalCount nodes { ${COMMENT_FIELDS} pullRequestReview { state } } }
 		} }
 	} }
 }`;
@@ -209,11 +211,22 @@ function parseCheck(node: unknown): PullRequestCheck | null {
 	return context === undefined ? null : { name: context, state: STATUS[str(node.state) ?? ""] ?? "pending", url: str(node.targetUrl) ?? null };
 }
 
+function lifecycleTime(value: unknown): number | null {
+	const at = Date.parse(str(value) ?? "");
+	return Number.isNaN(at) ? null : at;
+}
+
 function parseComment(node: unknown, at: unknown): PullRequestComment | null {
 	if (!isObject(node)) return null;
 	const posted = Date.parse(str(at) ?? "");
 	if (Number.isNaN(posted)) return null;
-	return { author: authorOf(node.author), body: str(node.body) ?? "", at: posted, url: str(node.url) ?? null };
+	const reactions = (Array.isArray(node.reactionGroups) ? node.reactionGroups : []).flatMap((group): PullRequestReaction[] => {
+		if (!isObject(group)) return [];
+		const content = REACTION_CONTENTS.find(known => known === group.content);
+		const count = totalOf(group.users);
+		return content && count > 0 ? [{ content, count, viewerHasReacted: group.viewerHasReacted === true }] : [];
+	});
+	return { author: authorOf(node.author), body: str(node.body) ?? "", at: posted, url: str(node.url) ?? null, reactions };
 }
 
 /** The pull request in `gh api graphql`'s answer to `DETAIL_QUERY`; throws when GitHub has no such PR. */
@@ -251,9 +264,25 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	});
 	const threads = nodesOf(node.reviewThreads).flatMap((thread): PullRequestThread[] => {
 		if (!isObject(thread) || typeof thread.id !== "string" || typeof thread.isResolved !== "boolean" || typeof thread.path !== "string") return [];
-		const threadComments = nodesOf(thread.comments).flatMap(comment => parseComment(comment, isObject(comment) ? comment.createdAt : null) ?? []);
+		const rawComments = nodesOf(thread.comments);
+		const parsed = rawComments
+			.flatMap(raw => {
+				const comment = parseComment(raw, isObject(raw) ? raw.createdAt : null);
+				return comment && isObject(raw) ? [{ comment, dismissed: isObject(raw.pullRequestReview) && raw.pullRequestReview.state === "DISMISSED" }] : [];
+			})
+			.toSorted((a, b) => a.comment.at - b.comment.at);
 		const can = { reply: thread.viewerCanReply === true, resolve: thread.viewerCanResolve === true, unresolve: thread.viewerCanUnresolve === true };
-		return [{ id: thread.id, path: thread.path, line: typeof thread.line === "number" ? thread.line : null, resolved: thread.isResolved, can, comments: threadComments }];
+		return [{
+			id: thread.id,
+			path: thread.path,
+			line: typeof thread.line === "number" ? thread.line : null,
+			resolved: thread.isResolved,
+			outdated: thread.isOutdated === true,
+			dismissed: parsed[0]?.dismissed === true,
+			can,
+			commentCount: Math.max(totalOf(thread.comments), rawComments.length),
+			comments: parsed.map(entry => entry.comment),
+		}];
 	});
 	// A branch that took in its trunk lists the trunk's commits too; each belongs to another, merged pull request.
 	const commitList = nodesOf(node.history).flatMap((entry): PullRequestCommit[] => {
@@ -281,6 +310,8 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		conversation: [...comments, ...reviews].toSorted((a, b) => a.at - b.at),
 		createdAt,
 		updatedAt: Date.parse(str(node.updatedAt) ?? "") || createdAt,
+		mergedAt: lifecycleTime(node.mergedAt),
+		closedAt: lifecycleTime(node.closedAt),
 		labels,
 		commits: commitList,
 		headOid: str(node.headRefOid) ?? "",

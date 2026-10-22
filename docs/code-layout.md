@@ -39,6 +39,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   The Reviewers picker lives in **Summary**, not the header.
   `web/components/segmented-tabs.tsx` provides its T3-styled 24px tabs with Radix keyboard navigation and tab-panel semantics.
   `checks.tsx` draws the checks status line and grouped popover, over the pure summary and grouping in `web/pull-request-checks.ts`.
+  **Timeline** in `web/components/pull-requests/pr-timeline.tsx` draws T3's activity rail, conversation and reply disclosures, review verdicts, lifecycle markers, and commit links, over pure grouping and ordering in `web/pull-request-timeline.ts`.
   A pull request row's **Review draft** tag is `ReviewDraftTag` in `web/components/pull-requests/pr-row.tsx`.
   The same details show in two places, so reproduce a layout bug in the one the user means: the Pull requests page's `pr-page.tsx`, and the right sidebar's **PRs** tab, a much narrower column.
 - Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
@@ -368,7 +369,7 @@ The page lives in `web/`.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the Pull requests page and the tickets page show.
   `web/pull-requests-model.ts` holds the pull requests' moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it, over `moveOf` in `src/shared/moves.ts`.
   It also holds which sections start folded, sorts rows by move, and keeps each stack's rows together by the chain of base branches.
-  `openThreads` lists unresolved threads for **Comments** and **Timeline**, `commentCount` counts comments for its tab, and `withThreadResolved` keeps a thread's state and unresolved count together.
+  `openThreads` lists unresolved threads for **Comments**, `commentCount` counts the comments that the **Comments** and **Timeline** tabs and the Timeline's header show, and `withThreadResolved` keeps a thread's state and unresolved count together.
   `PullRequestOrder` there is the order you chose, the repositories, the sections, the sort, and the manual order of pull requests, which `placedManual` updates after a drop; a stack moves as one `unit`.
   `withPullRequestState` gives the list after GitHub took a state change from a row or a merge, until the list is read again: a closed pull request leaves it, and every other repository and row stays the same object.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
@@ -555,7 +556,10 @@ The page lives in `web/`.
   `pr-fields.tsx` holds the **Summary**'s reviewers and labels pickers and the save and send callbacks.
   `pr-files-dialog.tsx` opens the sidebar's file list in the explorer.
   `pr-details/comments.tsx` is the **Comments** tab: the review threads, unresolved first and resolved folded, each with Resolve or Unresolve and a reply box, then the conversation and a box to comment, both boxes sending with Cmd+Enter through `isSubmitChord` from `web/components/form-dialog.tsx`.
-  `pr-timeline.tsx` is the **Timeline**: commits, comments, reviews, and unresolved threads in one list by day, with the **New** line from the last visit it keeps in localStorage; it exports the message row, a comment's or review's body, and a thread's `path:line` link, which **Comments** draws too.
+  `pr-timeline.tsx` is the **Timeline**: comments, commits, reviews, every nonempty thread, and known lifecycle events on T3's rail, with local reply disclosures, read-only reactions, a sort toggle, and the **New** line from the last visit it keeps in localStorage.
+  `web/pull-request-timeline.ts` interleaves activity before grouping adjacent comments, with one row per commit; the unread boundary splits groups in either sort order.
+  Its review rows say whether the verdict came before the newest commit, and `approvalCount` counts the reviewers whose latest verdict approves the newest commit, as T3 does.
+  `pr-details/message.tsx` holds what **Comments** and the **Timeline** both draw: the message row, a comment's or review's words, each review state's label and colors, and a thread's `path:line` link.
   `pr-row.tsx` draws the sidebar row and the table row, each with `ReviewDraftTag` while a review draft waits to post, and exports the DOM lookups of a row and its link that the board's keys use.
   `pr-details/review-draft.tsx` is the **Review draft** tab, `ReviewDraftPanel`: the verdict, the summary, each finding with **Accept**, **Dismiss**, and **Edit**, which send `review-draft` socket messages, the **Preview** from `GET /api/review-draft/preview`, and **Post review**, a confirmation that posts through `PUT /api/review-draft/post`.
   `pr-menu.tsx` holds `PullRequestMenu`, the shared row and header `⋯` menu with quick actions, merge method radios, state changes, host links, clipboard actions, and inline-confirmed close or reopen.

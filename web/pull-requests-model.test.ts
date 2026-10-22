@@ -338,6 +338,8 @@ describe("pull request details", () => {
 		conversation: [],
 		createdAt: 0,
 		updatedAt: 0,
+		mergedAt: null,
+		closedAt: null,
 		labels: [],
 		commits: [],
 		headOid: "",
@@ -362,18 +364,18 @@ describe("pull request details", () => {
 		expect(actionFacts(ready, null)).toBe(ready);
 	});
 
-	const thread = (id: string, resolved: boolean): PullRequestThread => ({ id, path: "a.ts", line: 1, resolved, can: { reply: true, resolve: true, unresolve: true }, comments: [] });
+	const thread = (id: string, resolved: boolean): PullRequestThread => ({ id, path: "a.ts", line: 1, resolved, outdated: false, dismissed: false, can: { reply: true, resolve: true, unresolve: true }, commentCount: 0, comments: [] });
 
 	test("open threads are the unresolved ones, in GitHub's order", () => {
 		const threads = [thread("PRRT_a", false), thread("PRRT_b", true), thread("PRRT_c", false)];
 		expect(openThreads(detail({ threads })).map(({ id }) => id)).toEqual(["PRRT_a", "PRRT_c"]);
 	});
 
-	test("the comment count counts every comment of every thread, resolved ones too, and the conversation's comments and reviews with words", () => {
-		const said: PullRequestComment = { author: { login: "ann", avatarUrl: null }, at: 0, body: "Looks off", url: "" };
-		const threads = [{ ...thread("PRRT_a", false), comments: [said, said] }, { ...thread("PRRT_b", true), comments: [said] }];
+	test("the comment count counts every comment of every thread, resolved ones too and replies beyond those loaded, and the conversation's comments and reviews with words", () => {
+		const said: PullRequestComment = { author: { login: "ann", avatarUrl: null }, at: 0, body: "Looks off", url: "", reactions: [] };
+		const threads = [{ ...thread("PRRT_a", false), commentCount: 23, comments: [said, said] }, { ...thread("PRRT_b", true), commentCount: 1, comments: [said] }];
 		const conversation = [{ ...said, review: null }, { ...said, body: "  ", review: "approved" as const }, { ...said, review: "changes-requested" as const }];
-		expect(commentCount(detail({ threads, conversation }))).toBe(5);
+		expect(commentCount(detail({ threads, conversation }))).toBe(26);
 	});
 
 	test("resolving or unresolving a thread moves the unresolved count with it, and keeps whether GitHub listed every thread", () => {
