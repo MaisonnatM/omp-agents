@@ -166,3 +166,11 @@ test("refuses a checkout whose origin is another repository", async () => {
 	spyOn(github, "repoOf").mockResolvedValue({ owner: "acme", repo: "other" });
 	await expect(checkOut("here")).rejects.toThrow("The selected workspace is not this pull request's repository.");
 });
+
+test("refuses incomplete REST data before a checkout or session starts", async () => {
+	const { checkOut, prCheckouts, starts } = await setup();
+	spyOn(proc, "runJson").mockResolvedValue({ title: "Add the change", head: { ref: "feature", sha: "abc" } });
+	await expect(checkOut("here")).rejects.toThrow("GitHub answered incomplete pull request data for acme/app#7.");
+	expect(prCheckouts).toEqual([]);
+	expect(starts).toEqual([]);
+});

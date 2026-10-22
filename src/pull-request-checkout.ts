@@ -29,11 +29,12 @@ async function headOf(pr: PullRequest): Promise<PullRequestHead> {
 	const head = isObject(answer) && isObject(answer.head) ? answer.head : null;
 	const base = isObject(answer) && isObject(answer.base) ? answer.base : null;
 	const title = isObject(answer) ? str(answer.title) : undefined;
-	const ref = str(head?.ref);
-	const oid = str(head?.sha);
-	if (title === undefined || !ref || !oid || !base) throw new Error(`GitHub answered no head branch for ${pr.owner}/${pr.repo}#${pr.number}.`);
+	if (title === undefined || !head || !base) throw new Error(`GitHub answered incomplete pull request data for ${pr.owner}/${pr.repo}#${pr.number}.`);
+	const ref = str(head.ref);
+	const oid = str(head.sha);
+	if (!ref || !oid) throw new Error(`GitHub answered no head branch for ${pr.owner}/${pr.repo}#${pr.number}.`);
 	const fullName = (side: Record<string, unknown>) => (isObject(side.repo) ? str(side.repo.full_name) : undefined);
-	return { title, ref, oid, fork: fullName(head!) !== fullName(base) };
+	return { title, ref, oid, fork: fullName(head) !== fullName(base) };
 }
 
 /** `gh pr checkout` in `cwd`, refused while tracked files there have uncommitted changes. */
@@ -78,8 +79,7 @@ async function checkOutInWorktree(request: PullRequestCheckout, head: PullReques
 
 /** Checks out `request`'s pull request at its place; refuses a `cwd` whose `origin` is another repository. */
 export async function checkOutPullRequest(request: PullRequestCheckout, start: StartSession): Promise<CheckedOutPullRequest> {
-	const repo = await repoOf(request.cwd);
+	const [repo, head] = await Promise.all([repoOf(request.cwd), headOf(request)]);
 	if (!repo || repo.owner.toLowerCase() !== request.owner.toLowerCase() || repo.repo.toLowerCase() !== request.repo.toLowerCase()) throw new Error("The selected workspace is not this pull request's repository.");
-	const head = await headOf(request);
 	return request.place === "here" ? checkOutHere(request, head) : checkOutInWorktree(request, head, start);
 }
