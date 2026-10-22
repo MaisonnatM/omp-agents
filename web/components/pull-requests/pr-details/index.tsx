@@ -1,9 +1,8 @@
-/** `PullRequestDetailContent`: a pull request's header and Summary, Timeline, Code, Review draft, and Review triage tabs. */
-import { ClipboardList, ClipboardPen, FileDiff, FileText, History } from "lucide-react";
+/** `PullRequestDetailContent`: a pull request's header and Summary, Timeline, Code, and Review draft tabs. */
+import { ClipboardPen, FileDiff, FileText, History } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
-import { latestReviewTriage } from "../../../../src/shared/review-triage";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -25,7 +24,6 @@ import { ChecksSummary } from "./checks";
 import { Code } from "./code";
 import { DetailHeader } from "./header";
 import { ReviewDraftPanel } from "./review-draft";
-import { ReviewTriagePanel } from "../../review-triage";
 import { DetailsScrollerContext } from "./section";
 import { Summary } from "./summary";
 import { useCondensedHeader } from "./use-condensed-header";
@@ -91,11 +89,8 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	const draft = reviewDraftOf(useDashboardStatus().reviewDrafts, pr);
-	const triages = useDashboardStatus().reviewTriages.list.filter(triage => triage.target.kind === "pull-request" && samePullRequest(triage.target.pr, pr));
-	const latestTriage = latestReviewTriage(triages);
-	const undecided = latestTriage && !latestTriage.batch ? latestTriage.items.filter(item => item.decision === "pending").length : 0;
 	// A discarded draft takes its tab with it.
-	const tab = (picked === "review" && !draft) || (picked === "triage" && !latestTriage) ? "summary" : picked;
+	const tab = picked === "review" && !draft ? "summary" : picked;
 	useEffect(() => {
 		// The sidebar's details must leave the cursor in the pane's composer.
 		if (placement === "page") headingRef.current?.focus({ preventScroll: true });
@@ -121,7 +116,6 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${comments} comments` },
 							{ value: "code", label: "Code", Icon: FileDiff, name: "Code" },
 							...(draft ? [{ value: "review", label: "Review draft", Icon: ClipboardPen, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}` }] : []),
-							...(latestTriage ? [{ value: "triage", label: "Review triage", Icon: ClipboardList, name: `Review triage, ${undecided} undecided` }] : []),
 						]).map(({ value, label, Icon, name }) => (
 							<Tooltip key={value} content={name} side="bottom">
 								<SegmentedTab value={value} className={TAB_CLASS} aria-label={name}>
@@ -135,11 +129,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 				</nav>
 			</div>
 			<SegmentedTabPanel value={tab} asChild>
-				{tab === "triage" ? (
-					<div className={cn("min-h-0 min-w-0 flex-1 overflow-y-auto py-4", page ? "px-6" : "px-4")}>
-						<ReviewTriagePanel triages={triages} headOid={detail?.headOid} />
-					</div>
-				) : !detail ? (
+				{!detail ? (
 					<div className={cn("py-4", page ? "px-6" : "px-4")}>
 						<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
 					</div>

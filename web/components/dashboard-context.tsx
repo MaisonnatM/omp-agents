@@ -2,7 +2,6 @@
 import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
-import type { ReviewTriagesAnswer } from "../../src/shared/review-triage";
 import type { MentionLists } from "../mentions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
@@ -60,7 +59,6 @@ export interface DashboardStatus {
 	merges: readonly QueuedMerge[];
 	/** The review drafts the server keeps, which a pull request's row and its details show. */
 	reviewDrafts: readonly ReviewDraft[];
-	reviewTriages: ReviewTriagesAnswer;
 }
 
 export const DashboardStatusContext = createContext<DashboardStatus | null>(null);

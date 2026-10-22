@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
 import { readGithubMedia } from "../github-media";
-import { errorText, isNonEmpty, isObject, type Parsed } from "../json";
+import { errorText, isObject, type Parsed } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import type { FileUsage } from "../foreign/usage";
@@ -66,8 +66,6 @@ import { documentText, UnreadableDocument } from "../omp/documents";
 import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
-import { parseTriageApply } from "../shared/review-triage";
-import type { ReviewTriages } from "./review-triages";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
@@ -144,7 +142,6 @@ export interface RouteEnv {
 	pullRequests: PullRequestRoutesEnv;
 	dashboard: DashboardRoutesEnv;
 	sync: SyncRoutesEnv;
-	reviewTriages: Pick<ReviewTriages, "apply" | "startFromSession">;
 }
 
 /** What the pull request routes hand on: the merge queue, through which every merge goes. */
@@ -898,21 +895,6 @@ function syncRoutes({ get, write }: RouteKit, env: SyncRoutesEnv): Routes {
 	};
 }
 
-function reviewTriageRoutes({ write }: RouteKit, env: RouteEnv["reviewTriages"]): Routes {
-	const refuse = (error: unknown): Response => fail(409, errorText(error));
-	const sessionOf = (body: unknown): string | Response => (isObject(body) && isNonEmpty(body.sessionId) && Object.keys(body).length === 1 ? body.sessionId : fail(400, "Expected { sessionId }"));
-	const capture = (existingReport: boolean) => async (sessionId: string) => {
-		const result = await env.startFromSession(sessionId, existingReport);
-		if (!result.ok) throw new Error(result.error);
-		return result;
-	};
-	return {
-		"/api/review-triage/apply": { PUT: write(body => checked(parseTriageApply(body), "Expected only { id, revision }"), request => env.apply(request), refuse) },
-		"/api/review-triage/session": { PUT: write(sessionOf, capture(true), refuse) },
-		"/api/review-triage/start": { PUT: write(sessionOf, capture(false), refuse) },
-	};
-}
-
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
@@ -927,6 +909,5 @@ export function createRoutes(env: RouteEnv): Routes {
 		...todoRoutes(kit, env.todos),
 		...dashboardRoutes(kit, env.dashboard),
 		...syncRoutes(kit, env.sync),
-		...reviewTriageRoutes(kit, env.reviewTriages),
 	};
 }

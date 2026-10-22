@@ -312,21 +312,6 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 6, kind: "resume", sessionId: "s1" })).toEqual({ t: "start", reqId: 6, kind: "resume", sessionId: "s1" });
 	});
 
-	test("client triage starts accept new captures and reject server-bound report or application intents", () => {
-		const start = { t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "Triage", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } } };
-		for (const mode of ["comments", "thermo"]) {
-			const reviewTriage = { kind: "capture", mode, originSessionId: null, existingReport: false };
-			expect(msg({ ...start, reviewTriage })).toMatchObject({ t: "start", reqId: 4, reviewTriage });
-			for (const existingReport of [true, undefined, null, "false"]) expect(msg({ ...start, reviewTriage: { ...reviewTriage, existingReport } })).toBeNull();
-			for (const originSessionId of ["s0", "", undefined, 7]) expect(msg({ ...start, reviewTriage: { ...reviewTriage, originSessionId } })).toBeNull();
-		}
-		expect(msg({ ...start, reviewTriage: { kind: "apply", id: "t1", batchId: "b1" } })).toBeNull();
-		expect(msg({ ...start, subject: null, reviewTriage: { kind: "capture", mode: "comments", originSessionId: null, existingReport: false } })).toBeNull();
-		expect(msg({ ...start, subject: null, reviewTriage: { kind: "capture", mode: "thermo", originSessionId: null, existingReport: false } })).toMatchObject({
-			subject: null, reviewTriage: { kind: "capture", mode: "thermo", originSessionId: null, existingReport: false },
-		});
-	});
-
 	test("start rejects a missing request id, an unknown kind, and blank fields", () => {
 		expect(msg({ t: "start", kind: "resume", sessionId: "s1" })).toBeNull();
 		expect(msg({ t: "start", reqId: "6", kind: "resume", sessionId: "s1" })).toBeNull();
