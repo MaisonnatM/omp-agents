@@ -2,6 +2,7 @@
 import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
+import type { UserTodoList } from "../../src/user-todos-shared";
 import type { MentionLists } from "../mentions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
@@ -80,3 +81,6 @@ export function useMentionLists(): MentionLists {
 	if (!value) throw new Error("useMentionLists must be used within the App's MentionListsContext.Provider");
 	return value;
 }
+
+/** The Todo page's list as the server last sent it, `null` until it arrives, for a prompt's todo chips to find where each todo is now. */
+export const UserTodosContext = createContext<UserTodoList | null>(null);

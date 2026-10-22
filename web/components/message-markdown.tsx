@@ -1,6 +1,6 @@
 import type { Element, ElementContent } from "hast";
-import { type ComponentProps, memo, useState } from "react";
-import ReactMarkdown, { type Components, defaultUrlTransform, type Options, type UrlTransform } from "react-markdown";
+import { type ComponentProps, memo, useContext, useState } from "react";
+import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
@@ -8,15 +8,19 @@ import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
 import { highlightLines } from "../code-highlight";
-import { githubMediaPath, type PullRequestDetail } from "../../src/shared/github";
+import { githubMediaPath, pullRequestOfUrl, type PullRequestDetail } from "../../src/shared/github";
+import { hashForSession } from "../../src/shared/sessions";
+import type { UserTodoList } from "../../src/user-todos-shared";
 import { linkedFile, remarkFilePaths } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
+import { hashForPullRequests, hashForTickets, hashForTodoId } from "../routing";
+import { UserTodosContext } from "./dashboard-context";
 import { FileLink } from "./file-link";
 import { LocalMedia, MediaStrip } from "./local-media";
 import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
-import { isChipKind, PromptChip } from "./prompt-chip";
+import { type ChipProps, isChipKind, PromptChip } from "./prompt-chip";
 
 /** Where text written on GitHub may load images from directly; its uploads load through `githubMediaPath`. The page's CSP allows the same host. */
 const GITHUB_AVATARS = "https://avatars.githubusercontent.com/";
@@ -162,19 +166,49 @@ const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) =
 	);
 };
 
-/** A reference in a sent prompt, which `remarkPromptChips` marks; a ticket or pull request still opens. Any other `span` stays one. */
-const promptChip: Components["span"] = ({ node, ...props }) => {
+/** Where a chip opens in the dashboard; `null` for a skill, command, file, or folder, which have no page of their own, and for a todo not found. */
+function chipHref({ kind, label, target }: ChipProps, todos: UserTodoList | null): string | null {
+	switch (kind) {
+		case "todo":
+			return todos && hashForTodoId(todos, target);
+		case "session":
+			return hashForSession(target);
+		case "ticket":
+			return hashForTickets(label.slice(0, label.indexOf(" ")));
+		case "pull-request": {
+			const pr = pullRequestOfUrl(target);
+			return pr ? hashForPullRequests(pr) : null;
+		}
+		case "skill":
+		case "command":
+		case "file":
+		case "directory":
+			return null;
+		default: {
+			const unhandled: never = kind;
+			return unhandled;
+		}
+	}
+}
+
+/**
+ * A reference in a sent prompt, which `remarkPromptChips` marks; a todo, session, ticket, or pull request opens in the
+ * dashboard. Any other `span` stays one.
+ */
+function PromptChipSpan({ node, ...props }: ComponentProps<"span"> & ExtraProps) {
+	const todos = useContext(UserTodosContext);
 	const { dataChip: kind, dataLabel: label, dataTarget: target } = node?.properties ?? {};
 	if (!isChipKind(kind) || typeof label !== "string" || typeof target !== "string") return <span {...props} />;
-	const chip = <PromptChip kind={kind} label={label} target={target} />;
-	return kind === "ticket" || kind === "pull-request" ? (
-		<a href={target} target="_blank" rel="noopener noreferrer" className="no-underline">
-			{chip}
-		</a>
+	const chip = { kind, label, target };
+	const href = chipHref(chip, todos);
+	return href === null ? (
+		<PromptChip {...chip} />
 	) : (
-		chip
+		<a href={href} className="no-underline">
+			<PromptChip {...chip} />
+		</a>
 	);
-};
+}
 
 const textOf = (node: Element | ElementContent): string =>
 	node.type === "text" ? node.value : node.type === "element" ? node.children.map(textOf).join("") : "";
@@ -208,7 +242,7 @@ const codeBlock: Components["pre"] = ({ node }) => {
 };
 
 const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage, true), figure: mediaFigure, pre: codeBlock };
-const PROMPT_COMPONENTS: Components = { ...AGENT_COMPONENTS, span: promptChip };
+const PROMPT_COMPONENTS: Components = { ...AGENT_COMPONENTS, span: PromptChipSpan };
 const GITHUB_COMPONENTS: Components = { a: link, img: githubImg, video, pre: codeBlock };
 
 /** GitHub's schema, plus the `<video>` a Linear issue's recording or a GitHub upload becomes, with its `<source>`. */
