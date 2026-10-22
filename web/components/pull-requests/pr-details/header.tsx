@@ -21,6 +21,7 @@ import { PullRequestMenu } from "../pr-menu";
 import { useMergeController } from "../use-merge-controller";
 import type { Placement } from ".";
 import type { DetailContentProps } from ".";
+import { CheckoutMenu } from "./checkout-menu";
 import { StackPopover } from "./stack";
 import { SessionChip } from "../../session-chip";
 
@@ -189,6 +190,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 						<StateIcon aria-hidden className="size-3.5" />{control.kind === "merged" ? "Merged" : "Closed"}
 					</span>
 				)}
+				<CheckoutMenu pr={pr} cwd={cwd} onOpen={onOpen} />
 				{control.kind === "resolve-conflicts" && (
 					<Tooltip content="Resolve conflicts">
 						<span className="inline-flex">

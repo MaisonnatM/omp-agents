@@ -36,7 +36,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   The **Media** tab's viewer and the transcript's share `ImageViewer` from `web/components/media-viewer.tsx`: the image large with its caption, `N of M`, the buttons and Left and Right keys to the images before and after it, open in a new tab, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
   The floating comment and review composer at its bottom right is `PullRequestComposer` in `pr-details/composer.tsx`.
-  `header.tsx` draws T3's crumbs, inline-confirmed primary action, title editor, base freshness warning, copyable command and branch, stack menu, and linked-sessions count.
+  `header.tsx` draws T3's crumbs, **Check out** menu, inline-confirmed primary action, title editor, base freshness warning, copyable command and branch, stack menu, and linked-sessions count; the **Check out** menu is `CheckoutMenu` in `checkout-menu.tsx`.
   The Reviewers and Labels pickers and collapsible Description, Checks, and Comments sections live in **Summary**.
   `web/components/segmented-tabs.tsx` provides its T3-styled 24px tabs with Radix keyboard navigation and tab-panel semantics.
   `checks.tsx` draws the checks status line and grouped popover, over the pure summary and grouping in `web/pull-request-checks.ts`.
@@ -229,6 +229,7 @@ The server lives in `src/`:
   `src/pull-request-stack.ts` reads the stack for `GET /api/pull-request/stack`.
   `src/pull-request-edit.ts` saves titles, descriptions, labels, review requests, states, branch updates, and conversation changes for `PUT /api/pull-request`, and viewed files for `PUT /api/pull-request/viewed`.
   It also lists picker choices for `GET /api/pull-request/options` and appends images with `attachToPullRequest`.
+  `src/pull-request-checkout.ts` checks out a pull request for `PUT /api/pull-request/checkout`: with `gh pr checkout` in a checkout, or on its head branch in a worktree with a new session that the route's starter opens there.
   `src/pull-request-merge.ts` holds `GITHUB_MERGES`, the merge and its steps, including merge or rebase branch updates, and the status reads.
   `src/pull-requests.ts` adds `behindBy` with one REST base-to-head comparison per detail read.
   `src/pull-request-review.ts` holds a review draft's side of GitHub: `readReviewTarget`, the head and the lines each file's diff shows, the viewer's login, the reviews and their comments a retry compares, and `postReview`, one `POST` of the review through `ghRestPost` in `src/github.ts`.
@@ -567,7 +568,8 @@ The page lives in `web/`.
   `PullRequestDetails` hands it the list entry and how to start a quick action, and `PullRequestDetailContent` derives the menu's quick actions from `actionFacts`.
   `PullRequestDetailContent` reads the pull request and its stack, and lays out the header, the tab bar, and the **Summary**, **Timeline**, and **Code** tabs, and the **Review draft** tab while the dashboard's status holds a draft of the pull request; its host holds the shown tab, and on the page `PullRequestDetailPage` takes **Code** from the route's `files` alone, so choosing it changes the address and the board's keys leave ↓ and ↑ to the explorer.
   It sends a resolve or unresolve through `useEditableRead`'s `edit`, shown at once, and a reply, comment, or description through its `write`, so the editor keeps its words until GitHub takes them; GitHub's refusal of a change shows once, above the **Summary** or **Timeline** tab.
-  `pr-details/header.tsx` owns the crumbs, primary control, title editor, author and branch rows, base freshness popover, stack menu, and linked-session list.
+  `pr-details/header.tsx` owns the crumbs, **Check out** menu, primary control, title editor, author and branch rows, base freshness popover, stack menu, and linked-session list.
+  `pr-details/checkout-menu.tsx` holds `CheckoutMenu`, which sends `PUT /api/pull-request/checkout` with the toasts of its progress and opens the session a worktree checkout started.
   `pr-details/use-condensed-header.ts` keeps each tab's condensed header state and its scroll thresholds, listening only to the details' own vertical scroller below the header, the same in the page and the sidebar.
   `summary.tsx` holds Reviewers, Labels, the description editor, Checks, and Comments; `section.tsx` provides its sticky collapsible headings, which read the details' scroller from its `DetailsScrollerContext` and keep a pinned heading in place as it collapses, through `sectionCollapseAnchorScrollTop` in `section.logic.ts`.
   `stack.tsx` holds `StackPopover`, which the header's **N/M** menu and a session header's pull request button both open: the stack on `StackRail`, on `web/components/rail.tsx`, its `MergeStack`, which queues the stack's merge through `MergePopover`, and the session's other pull requests.

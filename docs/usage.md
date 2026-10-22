@@ -804,7 +804,7 @@ An action that fails shows its error, and its control becomes available again.
   Click a card to show the pull request's details docked at the right of the board, with ↓ and ↑ stepping through the cards column by column.
   **Open as a page** in the docked details switches to the list view with the details on their own page, and the close button hides them.
 - A pull request's header starts with its repository and a state-colored `#number` link to GitHub.
-  Its primary action and `⋯` menu sit at the right.
+  Its **Check out** menu, primary action, and `⋯` menu sit at the right.
   Below them are the title, author, last update, copyable `gh pr checkout <number>` command, branches, file count, and lines added and removed.
   Hover the title for **Edit title**, or focus its pencil with the keyboard.
   Enter saves the title and Escape cancels the edit.
@@ -813,6 +813,12 @@ An action that fails shows its error, and its control becomes available again.
   When GitHub reports that the branch is behind its base, the base turns orange and gains a warning icon.
   Hover or activate the warning for the commit count and **Update branch** or **Update with rebase**.
   Tab reaches both update actions; Escape closes the popover and returns focus to the warning.
+  **Check out** offers **In a separate worktree** and **In this repository**, for the checkout of the pull request's repository that the details know from a session or the selected host.
+  With no such checkout, both items are off and say why.
+  **In a separate worktree** fetches the head into a local branch of the same name, or `pr-<number>/<branch>` for a fork's head, adds a worktree for it beside the repository, and opens a new session there that sums up the pull request.
+  A linked worktree that already has the branch is reused as it is, and one in the main checkout is refused.
+  **In this repository** runs `gh pr checkout <number>` in that checkout, and refuses while tracked files have uncommitted changes.
+  A toast follows the checkout, and warns when the branch is not at the pull request's latest commit, as a reused branch with local commits is not.
   The primary control shows **Merged** or **Closed** for a finished pull request, **Resolve conflicts** for conflicts, and **Ready for review** for a draft.
   Otherwise it offers the selected merge method, such as **Squash and merge**, or that method **when ready** while GitHub holds the merge.
   The first click arms **Confirm merge?**, and a second click within three seconds sends the merge to the server.

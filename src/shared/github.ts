@@ -413,6 +413,24 @@ export interface PullRequestViewedEdit extends PullRequest {
 	on: boolean;
 }
 
+/** Where **Check out** puts a pull request: a worktree of its own with a new session on it, or the checkout the page knows, as `gh pr checkout` does. */
+export type CheckoutPlace = "worktree" | "here";
+
+/** The body of `PUT /api/pull-request/checkout`: pull request `number` of `owner/repo`, checked out at `place` from `cwd`, a checkout of its repository. */
+export interface PullRequestCheckout extends PullRequest {
+	cwd: string;
+	place: CheckoutPlace;
+	/** The skill the worktree session's first message goes through, the page's pinned one; `null` for none. */
+	skill: string | null;
+}
+
+/** What `PUT /api/pull-request/checkout` did: the local branch now on the pull request, and at `worktree` the session started on it. */
+export type CheckedOutPullRequest = {
+	branch: string;
+	/** The branch is at the pull request's latest commit; local commits keep it where it is. */
+	onHead: boolean;
+} & ({ place: "here" } | { place: "worktree"; instanceId: string });
+
 /** What the details' Labels and Reviewers pickers offer for a repository. */
 export interface PullRequestOptions {
 	labels: PullRequestLabel[];

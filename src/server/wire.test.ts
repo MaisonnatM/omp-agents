@@ -8,7 +8,7 @@ import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -446,6 +446,12 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestViewedEdit({ ...pr, path: "src/a.ts", on: false })?.ok).toEqual({ ...pr, path: "src/a.ts", on: false });
 		for (const edit of [{ path: "", on: true }, { path: " ", on: false }, { path: 1, on: true }, { path: "a.ts" }, { path: "a.ts", on: 1 }]) expect(parsePullRequestViewedEdit({ ...pr, ...edit })).toBeNull();
 		expect(parsePullRequestViewedEdit({ owner: "a/b", repo: "r", number: 1, path: "a.ts", on: true })).toBeNull();
+	});
+
+	test("parsePullRequestCheckout takes an absolute cwd, a place, and an optional one-word skill", () => {
+		expect(parsePullRequestCheckout({ ...pr, cwd: "/work/app", place: "here" })?.ok).toEqual({ ...pr, cwd: "/work/app", place: "here", skill: null });
+		expect(parsePullRequestCheckout({ ...pr, cwd: "/work/app", place: "worktree", skill: "review" })?.ok).toEqual({ ...pr, cwd: "/work/app", place: "worktree", skill: "review" });
+		for (const body of [{ cwd: "work/app", place: "here" }, { cwd: " ", place: "here" }, { cwd: "/work/app", place: "local" }, { cwd: "/work/app", place: "here", skill: "two words" }]) expect(parsePullRequestCheckout({ ...pr, ...body })).toBeNull();
 	});
 
 	test("takes one label, reviewer, or state change to a pull request", () => {
