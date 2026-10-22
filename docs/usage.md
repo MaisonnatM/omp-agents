@@ -803,9 +803,16 @@ An action that fails shows its error, and its control becomes available again.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
   The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
   In a narrow panel, action labels hide but their tooltips and accessible names remain.
-- Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, **Code**, and **Review draft** while a review draft of the pull request is kept, with the count of its findings still pending.
+- Under the header, a compact segmented control splits the details into **Summary**, **Comments**, **Timeline**, **Code**, and **Review draft** while a review draft is kept.
+  Tabs have no count badges; their accessible names still include comment and pending-finding counts.
+  Left and Right arrow keys select adjacent tabs, and Home and End select the first and last.
   Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
-  The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
+  The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, `15 of 25 passing`, `All checks passed`, or `No checks reported`.
+  Only successful checks count as passing, not skipped ones.
+  Click the status icon to open the checks popover: checks needing attention come first, then running checks, then completed checks.
+  **Show all** reveals completed checks when other checks are failing or running, and **Show less** hides them again.
+  Each row names its status and links to the check run through **Details** when GitHub provides a link.
+  In a narrow panel the checks label hides, but the status icon's accessible name keeps the summary.
 - **Summary** lists the pull request's reviewers, labels, and sessions.
   **Reviewers** shows overlapping avatars marked by review outcome, or **None**.
   Click the row for the people who can review on the repository, with the author left out.

@@ -4,8 +4,8 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
-import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
-import { SizeProvider } from "@/lib/size-context";
+import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { commentCount, openThreads } from "../../../pull-requests-model";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
@@ -59,10 +59,6 @@ export type Placement = "page" | "sidebar";
 
 type DetailTab = "summary" | "comments" | "timeline" | "code" | "review";
 
-/**
- * The labels and their counts outgrow the sidebar's default width, with or without the checks beside them, so
- * below 30rem the tabs show their icons alone, which the tooltip and screen readers still name.
- */
 const TAB_CLASS = "@min-[30rem]/pr:[&>svg]:hidden @max-[30rem]/pr:px-1.5";
 const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
 
@@ -116,63 +112,59 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const sidebarScroller = useContext(DetailsScrollerContext);
 	const condensed = useCondensedHeader(page ? root : sidebarScroller, root, foldRef, tab);
 	return (
-		<div ref={setRoot} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
+		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => choose(value as DetailTab)} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
 			<div className={cn("sticky top-0 z-10 shrink-0 bg-background", !page && "-mx-4 pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
-				<div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-					<SizeProvider size="compact">
-						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
-							<TabsList aria-label="Show">
-								<TabItem value="summary" label="Summary" icon={FileText} tooltip="Summary" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
-								<TabItem value="comments" label="Comments" icon={MessageSquare} tooltip="Comments" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={comments || undefined} aria-label={`Comments, ${comments} comments`} />
-								<TabItem value="timeline" label="Timeline" icon={History} tooltip="Timeline" className={TAB_CLASS} labelClassName={LABEL_CLASS} badge={timeline || undefined} aria-label={`Timeline, ${timeline} comments`} />
-								<TabItem value="code" label="Code" icon={FileDiff} tooltip="Code" className={TAB_CLASS} labelClassName={LABEL_CLASS} />
-								{draft && (
-									<TabItem
-										value="review"
-										label="Review draft"
-										icon={ClipboardPen}
-										tooltip={draft.posted ? "Review draft, posted" : "Review draft, waiting for you to post it"}
-										className={TAB_CLASS}
-										labelClassName={LABEL_CLASS}
-										badge={pendingFindings || undefined}
-										aria-label={`Review draft, ${pendingFindings} pending findings`}
-									/>
-								)}
-							</TabsList>
-						</Tabs>
-					</SizeProvider>
-					<span className="ml-auto">{detail && <ChecksSummary checks={detail.checkRuns} />}</span>
-				</div>
+				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
+					<SegmentedTabsList aria-label="Pull request details">
+						{([
+							{ value: "summary", label: "Summary", Icon: FileText, name: "Summary" },
+							{ value: "comments", label: "Comments", Icon: MessageSquare, name: `Comments, ${comments} comments` },
+							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${timeline} comments and review threads` },
+							{ value: "code", label: "Code", Icon: FileDiff, name: "Code" },
+							...(draft ? [{ value: "review", label: "Review draft", Icon: ClipboardPen, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}` }] : []),
+						]).map(({ value, label, Icon, name }) => (
+							<Tooltip key={value} content={name} side="bottom">
+								<SegmentedTab value={value} className={TAB_CLASS} aria-label={name}>
+									<Icon aria-hidden className="size-3.5" />
+									<span className={LABEL_CLASS}>{label}</span>
+								</SegmentedTab>
+							</Tooltip>
+						))}
+					</SegmentedTabsList>
+					{detail && <ChecksSummary checks={detail.checkRuns} />}
+				</nav>
 			</div>
-			{!detail ? (
-				<div className={cn("py-4", page && "px-6")}>
-					<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
-				</div>
-			) : tab === "code" ? (
-				<div className={cn("flex min-h-0 flex-1 flex-col", !page && "pt-3")}>
-					<Code pr={pr} detail={detail} placement={placement} path={files?.path ?? null} version={version} />
-				</div>
-			) : (
-				<div className={cn("shrink-0", page && "px-6")}>
-					<div className="space-y-6 py-4">
-						{saveError && (
-							<p role="alert" className={ERROR_TEXT}>
-								GitHub did not take the change: {saveError}
-							</p>
-						)}
-						{tab === "summary" ? (
-							<Summary pr={pr} detail={detail} options={options} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
-						) : tab === "comments" ? (
-							<Comments detail={detail} save={save} send={send} />
-						) : tab === "timeline" ? (
-							<Timeline detail={detail} />
-						) : (
-							draft && <ReviewDraftPanel draft={draft} headOid={detail.headOid} />
-						)}
+			<SegmentedTabPanel value={tab} asChild>
+				{!detail ? (
+					<div className={cn("py-4", page && "px-6")}>
+						<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
 					</div>
-				</div>
-			)}
-		</div>
+				) : tab === "code" ? (
+					<div className={cn("flex min-h-0 flex-1 flex-col", !page && "pt-3")}>
+						<Code pr={pr} detail={detail} placement={placement} path={files?.path ?? null} version={version} />
+					</div>
+				) : (
+					<div className={cn("shrink-0", page && "px-6")}>
+						<div className="space-y-6 py-4">
+							{saveError && (
+								<p role="alert" className={ERROR_TEXT}>
+									GitHub did not take the change: {saveError}
+								</p>
+							)}
+							{tab === "summary" ? (
+								<Summary pr={pr} detail={detail} options={options} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} />
+							) : tab === "comments" ? (
+								<Comments detail={detail} save={save} send={send} />
+							) : tab === "timeline" ? (
+								<Timeline detail={detail} />
+							) : (
+								draft && <ReviewDraftPanel draft={draft} headOid={detail.headOid} />
+							)}
+						</div>
+					</div>
+				)}
+			</SegmentedTabPanel>
+		</SegmentedTabs>
 	);
 }
