@@ -184,6 +184,16 @@ describe("posting", () => {
 		expect(changes()).toBeGreaterThan(0);
 	});
 
+	test("a refused submit leaves the draft as it was", async () => {
+		const fake = fakeGitHub();
+		const { drafts } = setup(fake.github);
+		await saveTool(drafts)(review);
+		await expect(drafts.post(pr, { verdict: "request-changes", summary: "" })).rejects.toThrow("Requesting changes needs a summary.");
+		expect(fake.posts).toEqual([]);
+		const kept = drafts.list[0];
+		expect([kept?.verdict, kept?.summary, kept?.findings.map(finding => finding.state)]).toEqual(["comment", "Close.", ["pending", "pending"]]);
+	});
+
 	test("a double click posts once", async () => {
 		const fake = fakeGitHub();
 		const { drafts } = setup(fake.github);

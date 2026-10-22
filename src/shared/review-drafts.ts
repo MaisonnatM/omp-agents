@@ -90,6 +90,7 @@ export type ReviewDraftChange =
 	| (Extract<ReviewDraftEdit, { op: "add-finding" }> & { at: number })
 	| { op: "save"; draft: ReviewDraft }
 	| { op: "posted"; pr: PullRequest; head: string; review: PostedReview }
+	| { op: "submit"; pr: PullRequest; submit: ReviewSubmit }
 	| { op: "bind"; reviewer: Reviewer }
 	| { op: "relink"; from: string; to: string };
 
@@ -151,6 +152,8 @@ export function applyReviewDraft(state: ReviewDraftState, change: ReviewDraftCha
 			if (change.from === change.to || !state.reviewers.some(reviewer => reviewer.sessionId === change.from)) return state;
 			return { ...state, reviewers: state.reviewers.map(reviewer => (reviewer.sessionId === change.from ? { ...reviewer, sessionId: change.to } : reviewer)) };
 		}
+		case "submit":
+			return mapDraft(state, change.pr, draft => (draft.posted === null ? submittedDraft(draft, change.submit) : draft));
 		default:
 			return mapDraft(state, change.pr, draft => (draft.posted === null ? editDraft(draft, change) : draft));
 	}
@@ -159,6 +162,12 @@ export function applyReviewDraft(state: ReviewDraftState, change: ReviewDraftCha
 /** The id after the highest of `findings`, numbered `f1`, `f2`, and on as the review tool numbers them. */
 function nextFindingId(findings: readonly ReviewFinding[]): string {
 	return `f${Math.max(0, ...findings.map(finding => Number(/^f(\d+)$/.exec(finding.id)?.[1] ?? 0))) + 1}`;
+}
+
+/** `draft` as the composer's Submit review posts it: with `submit`'s verdict and summary, and every pending finding accepted. */
+export function submittedDraft(draft: ReviewDraft, { verdict, summary }: ReviewSubmit): ReviewDraft {
+	const next = editDraft(editDraft(draft, { op: "verdict", pr: draft.pr, verdict }), { op: "summary", pr: draft.pr, summary });
+	return mapFindings(next, finding => (finding.state === "pending" ? { ...finding, state: "accepted" } : finding));
 }
 
 function editDraft(draft: ReviewDraft, edit: Exclude<ReviewDraftEdit, { op: "discard" | "add-finding" }>): ReviewDraft {

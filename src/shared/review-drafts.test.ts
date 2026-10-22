@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { applyReviewDraft, canSubmitReview, decodeReviewDraft, diffLinesOf, NO_REVIEW_DRAFTS, postRefusal, type ReviewDraft, type ReviewDraftState, type ReviewFinding, reviewPayload } from "./review-drafts";
+import { applyReviewDraft, canSubmitReview, decodeReviewDraft, diffLinesOf, NO_REVIEW_DRAFTS, postRefusal, type ReviewDraft, type ReviewDraftState, type ReviewFinding, reviewPayload, submittedDraft } from "./review-drafts";
 
 const HEAD = "a".repeat(40);
 const pr = { owner: "acme", repo: "app", number: 7 };
@@ -185,6 +185,20 @@ describe("reviewPayload", () => {
 	test("with no summary the folded findings are the whole body", () => {
 		const payload = reviewPayload(draft({ verdict: "approve", summary: "", findings: [finding("f1", "x.ts", 1, "Nit.", "accepted")] }), new Map());
 		expect(payload).toEqual({ commit_id: HEAD, event: "APPROVE", body: "- `x.ts:1`: Nit.", comments: [] });
+	});
+});
+
+describe("submittedDraft", () => {
+	test("sets the verdict and summary and accepts the pending findings, leaving the dismissed ones", () => {
+		const before = draft({ findings: [finding("f1", "x.ts", 1, "Nit.", "pending"), finding("f2", "y.ts", 2, "No.", "dismissed")] });
+		const after = submittedDraft(before, { verdict: "approve", summary: "Ship it." });
+		expect([after.verdict, after.summary, after.findings.map(item => item.state)]).toEqual(["approve", "Ship it.", ["accepted", "dismissed"]]);
+		expect(before.findings.map(item => item.state)).toEqual(["pending", "dismissed"]);
+	});
+
+	test("answers the draft itself when the submit changes nothing", () => {
+		const same = draft({ verdict: "comment", summary: "Hi.", findings: [finding("f1", "x.ts", 1, "Nit.", "accepted")] });
+		expect(submittedDraft(same, { verdict: "comment", summary: "Hi." })).toBe(same);
 	});
 });
 
