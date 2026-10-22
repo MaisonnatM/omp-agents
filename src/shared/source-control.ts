@@ -6,7 +6,7 @@ export type MergeMethod = (typeof MERGE_METHODS)[number];
 
 export const MERGE_METHOD_LABELS: Record<MergeMethod, string> = { merge: "Merge", squash: "Squash and merge", rebase: "Rebase and merge" };
 
-/** The method a pull request's merge button starts with: one of GitHub's, or the one last picked in this browser. */
+/** The method a pull request's merge button starts with: one of GitHub's, or the one the last merge confirmed in this browser used. */
 export type MergeMethodChoice = MergeMethod | "last";
 
 /**

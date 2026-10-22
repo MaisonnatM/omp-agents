@@ -18,6 +18,7 @@ import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
 import { BranchName, releaseBranch } from "./git";
 import { StackRail } from "./pull-requests/pr-details/stack";
 import { MergePopover, QueuedMergeNote, useMergeTarget } from "./pull-requests/merge-popover";
+import { useCancelMerge } from "./pull-requests/use-merge-controller";
 import { useDashboardStatus } from "./dashboard-context";
 import { OrgIcon } from "./org-icon";
 import { useCopy } from "../use-copy";
@@ -125,10 +126,11 @@ function MergeStack({ stack }: { stack: StackedPullRequest[] }) {
 	const bottom = stack[stack.length - 1]!;
 	const target = useMergeTarget(bottom, open);
 	const queued = stack.map(pr => queuedMergeOf(merges, pr)).find(merge => merge !== undefined);
+	const cancel = useCancelMerge(queued);
 	return (
 		<div className="border-t border-border px-3 py-2">
 			{queued ? (
-				<QueuedMergeNote merge={queued} />
+				<QueuedMergeNote merge={queued} cancel={cancel} />
 			) : (
 				<MergePopover pr={bottom} stack={stack} target={target.data} error={target.error} open={open} onOpenChange={setOpen} align="end">
 					{({ pending }) => (

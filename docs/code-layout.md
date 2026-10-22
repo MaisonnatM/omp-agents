@@ -379,7 +379,7 @@ The page lives in `web/`.
   The open section is in the hash, `#settings/<section>`, and the **This workspace** sections follow the sidebar's workspace; `settings-page.tsx` keeps inactive panels mounted to preserve unsaved drafts, and shows the workspace picker on the **This workspace** sections only.
   `preferences-tab.tsx` holds the dashboard's browser-local choices, and `routing-tab.tsx` the Models section: roles, model chains, provider order, and retries.
   `workspaces-tab.tsx` lists the workspaces with **Hide**, the hidden ones with **Show**, and adds a directory by path through `PUT /api/workspaces`; the list it shows comes back as the `workspaces` socket message.
-  `source-control-tab.tsx` shows the `gh` and `gt` rows, the automatic pull switch, each repository's override with its last pull, and the default merge method, which `web/merge-method.ts` keeps in localStorage with the method last picked on a merge button.
+  `source-control-tab.tsx` shows the `gh` and `gt` rows, the automatic pull switch, each repository's override with its last pull, and the default merge method, which `web/merge-method.ts` keeps in localStorage with the method of the last confirmed merge.
   `sync-tab.tsx` saves the remote and branch, runs a sync, shows the last outcome and, on a conflict, each file's two versions with **This machine** and **Remote**, and switches each synced item through `PUT /api/sync`.
   `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each and which merged, and removes them one by one or, through **Remove merged**, every merged one nothing blocks, previewing and removing in batches of `MAX_WORKTREE_BATCH`.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
@@ -559,8 +559,8 @@ The page lives in `web/`.
   `web/use-inline-confirm.ts` arms one action for three seconds and disarms on Escape, blur, or an outside pointer press.
   `web/components/copyable-code.tsx` copies a command or branch and briefly swaps its label to **Copied**.
   `merge-popover.tsx` keeps the popover confirmation for rows, the bell, and a session's stack.
-  Both it and the header enqueue through `writeMergeQueue` in `web/reads.ts`.
-  Its `queuedMergeText` words the status and `QueuedMergeNote` offers Cancel or Dismiss.
+  It and the header's inline confirmation share `use-merge-controller.ts`: `useMergeController` owns the method, the queued merge lookup, the head-pinned request through `writeMergeQueue` in `web/reads.ts`, cancellation, and pending state, and remembers the method only when a merge is confirmed.
+  Its `queuedMergeText` words the status and `QueuedMergeNote` offers Cancel or Dismiss through `useCancelMerge`.
   `web/use-drag-order.ts` drags the pull request list's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
   The tickets and Pull requests pages use `web/components/list-page.tsx` for their frame, header, and load and refresh states, their issue details use its `DetailPage`, the Inbox page its `PolledPageFrame` and `PolledContent`, and the Todo, Routines, and Calendar pages its `PageFrame`.
   `PolledPageFrame` renders ordinary children while reads load; only `PolledContent` supplies a data render callback, after an answer exists.

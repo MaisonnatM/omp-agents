@@ -799,6 +799,7 @@ An action that fails shows its error, and its control becomes available again.
   The server keeps merges in `merges.json` beside its access token and resumes them after a restart.
   The `⋯` menu starts with the quick actions, including fixes for CI, conflicts, and review comments.
   Next come the merge methods, **Ready for review** or **Convert to draft**, links to GitHub and Graphite, **Copy link**, and **Copy PR number**.
+  A method picked there applies to this pull request's merge button; **Last selected** in Settings remembers it only once you confirm a merge with it.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
   The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
   In a narrow panel, action labels hide but their tooltips and accessible names remain.
@@ -1478,7 +1479,7 @@ An action that fails shows its error, and its control becomes available again.
   A session still working when its pull request merges, or waiting to continue after a usage limit, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
   A project's workers follow their project's **Workers' pull requests** instead, and a coordinator never ends.
-  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses whatever you chose most recently in this browser, and a method the repository does not allow falls back to the first one it does.
+  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in this browser, and a method the repository does not allow falls back to the first one it does.
 - **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.

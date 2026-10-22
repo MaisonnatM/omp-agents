@@ -155,7 +155,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 					End finished sessions and remove their worktrees and branches
 				</label>
 			</Section>
-			<Section title="Default merge method" meta="Pull requests start with this method. Last selected reuses whatever you chose most recently on this device.">
+			<Section title="Default merge method" meta="Pull requests start with this method. Last selected reuses the method of your last merge on this device.">
 				<Select<MergeMethodChoice> items={MERGE_METHOD_CHOICES} value={choice} onValueChange={next => next && setChoice(next)}>
 					<SelectTrigger aria-label="Default merge method">
 						<SelectValue />

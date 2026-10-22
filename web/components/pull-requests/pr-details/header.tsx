@@ -1,26 +1,23 @@
 import { ArrowLeft, ExternalLink, FileDiff, GitMerge, GitPullRequest, Pencil, TriangleAlert } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, prKey, MAX_PULL_REQUEST_TITLE, type StackedPullRequest, type UpdateMethod } from "../../../../src/shared/github";
-import { queuedMergeOf } from "../../../../src/shared/merge-queue";
 import { primaryControl } from "../../../../src/shared/moves";
-import { MERGE_METHOD_LABELS, type MergeMethod, startingMethod } from "../../../../src/shared/source-control";
+import { MERGE_METHOD_LABELS } from "../../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { age } from "../../../labels";
-import { useLastMergeMethod, useMergeMethodChoice } from "../../../merge-method";
-import { writeMergeQueue } from "../../../reads";
 import { useAction } from "../../../use-action";
 import { useInlineConfirm } from "../../../use-inline-confirm";
 import { CopyableCode } from "../../copyable-code";
-import { useDashboardStatus } from "../../dashboard-context";
 import { BranchLabel, releaseBranch } from "../../git";
 import type { QuickActionsProps } from "../../quick-actions";
 import { Avatar, STATE_ICON } from "../avatars";
 import { queuedMergeText } from "../merge-popover";
 import { type SavePullRequest, type SendPullRequest } from "../pr-fields";
 import { PullRequestMenu } from "../pr-menu";
+import { useMergeController } from "../use-merge-controller";
 import type { Placement } from ".";
 
 const ACTION_LABEL = "@max-[30rem]/pr-header:hidden";
@@ -113,25 +110,9 @@ interface DetailHeaderProps {
 }
 
 export function DetailHeader({ pr, detail, stack, quick, onSave, send, onMergeQueued, placement, headingRef, cwd, condensed, foldRef }: DetailHeaderProps) {
-	const { merges, pullRequestsScope } = useDashboardStatus();
-	const [choice] = useMergeMethodChoice();
-	const [last, setLast] = useLastMergeMethod();
-	const [picked, setPicked] = useState<MergeMethod | null>(null);
-	const allowed = detail?.mergeMethods ?? [];
-	const method = picked && allowed.includes(picked) ? picked : startingMethod(choice, last, allowed);
-	const queued = queuedMergeOf(merges, pr);
+	const { allowed, method, pick, queued, merging, pending, merge, cancel } = useMergeController({ pr, target: detail, onQueued: onMergeQueued, onCancelled: onMergeQueued });
 	const control = detail ? primaryControl(detail, method, queued?.method ?? null) : { kind: "none" as const };
 	const confirm = useInlineConfirm(`${prKey(pr)}:${detail?.headOid}:${method}`);
-	const queue = useAction(async () => {
-		if (!detail || !method) return;
-		setLast(method);
-		await writeMergeQueue(pullRequestsScope, { op: "add", method, prs: [{ ...pr, head: detail.headOid }] });
-		onMergeQueued();
-	}, "Could not merge");
-	const cancel = useAction(async () => {
-		if (queued) await writeMergeQueue(pullRequestsScope, { op: "cancel", id: queued.id });
-		onMergeQueued();
-	}, "Could not cancel the merge");
 	const state = detail?.state ?? "open";
 	const [StateIcon, tone] = STATE_ICON[state];
 	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn("inline-flex h-6 shrink-0 items-center gap-1 rounded-md border px-[7px] text-xs font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><GitMerge aria-hidden className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
@@ -192,13 +173,13 @@ export function DetailHeader({ pr, detail, stack, quick, onSave, send, onMergeQu
 				{(control.kind === "merge" || control.kind === "enable-auto-merge") && (
 					<Tooltip content={mergeLabel} forceOpen={confirm.isArmed("merge") ? false : undefined} contentClassName="pointer-events-none">
 						<Button size="xs" variant="primary" className={ACTION_BUTTON} leadingIcon={GitMerge} aria-label={mergeLabel}
-							loading={queue.pending} disabled={!!queued} {...confirm.props("merge", queue.run)}>
-							<span className={ACTION_LABEL}>{queue.pending ? "Merging..." : mergeLabel}</span>
+							loading={merging} disabled={!!queued} {...confirm.props("merge", merge)}>
+							<span className={ACTION_LABEL}>{merging ? "Merging..." : mergeLabel}</span>
 						</Button>
 					</Tooltip>
 				)}
 				<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={quick} onState={to => onSave({ field: "state", state: to }, { state: to })}
-					merge={{ allowed, method, onPick: method => { setPicked(method); setLast(method); }, queued, onCancel: cancel.run }} pending={queue.pending || cancel.pending} label="More pull request actions" />
+					merge={{ allowed, method, onPick: pick, queued, onCancel: cancel.run }} pending={pending} label="More pull request actions" />
 			</div>
 			<div className={cn("col-span-2 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
 				<div data-pr-condensed className={cn("min-h-0 overflow-hidden transition-[opacity,transform] duration-150 motion-reduce:transition-none", condensed ? "translate-y-0 opacity-100 delay-50" : "translate-y-1 opacity-0 duration-100")} inert={!condensed}>

@@ -1,4 +1,4 @@
-/** The merge method a pull request's merge button starts with, and the one last picked, both kept in this browser. */
+/** The merge method a pull request's merge button starts with, and the one the last confirmed merge used, both kept in this browser. */
 import { MERGE_METHODS, type MergeMethod, type MergeMethodChoice } from "../src/shared/source-control";
 import { useStoredState } from "./stored-state";
 
@@ -10,5 +10,5 @@ const asMethod = (raw: string | null): MergeMethod | null => MERGE_METHODS.find(
 /** Settings' **Default merge method**: `last` until you pick another. */
 export const useMergeMethodChoice = (): [MergeMethodChoice, (choice: MergeMethodChoice) => void] => useStoredState<MergeMethodChoice>(CHOICE_KEY, raw => asMethod(raw) ?? "last");
 
-/** The method last picked on a merge button, `null` before the first pick. */
+/** The method the last confirmed merge used, `null` before the first merge. */
 export const useLastMergeMethod = (): [MergeMethod | null, (method: MergeMethod | null) => void] => useStoredState<MergeMethod | null>(LAST_KEY, asMethod, method => method ?? "");
