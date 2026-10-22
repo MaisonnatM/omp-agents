@@ -1,4 +1,4 @@
-/** A pull request's title, description, labels, review requests, state, review threads, comments, and description images, changed from the dashboard through `gh`, and the choices its pickers offer. */
+/** A pull request's title, description, labels, review requests, state, review threads, comments, reviews, and description images, changed from the dashboard through `gh`, and the choices its pickers offer. */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
@@ -9,6 +9,7 @@ import { loadPullRequestDetail } from "./pull-requests";
 import { GITHUB_MERGES } from "./pull-request-merge";
 import { isObject, str } from "./json";
 import { type Person, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, type PullRequestViewedEdit, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
+import { REVIEW_EVENTS } from "./shared/review-drafts";
 import { MEDIA_FILE_TYPES, mediaExtension } from "./shared/transcript";
 
 const OPTIONS_TTL_MS = 5 * 60_000;
@@ -108,6 +109,9 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 			break;
 		case "comment":
 			await ghRestWrite("POST", `${base}/issues/${pr.number}/comments`, [["body", change.body]]);
+			break;
+		case "review":
+			await ghRestWrite("POST", `${base}/pulls/${pr.number}/reviews`, change.body.trim() ? [["event", REVIEW_EVENTS[change.verdict]], ["body", change.body]] : [["event", REVIEW_EVENTS[change.verdict]]]);
 			break;
 	}
 	return loadPullRequestDetail(pr, true);

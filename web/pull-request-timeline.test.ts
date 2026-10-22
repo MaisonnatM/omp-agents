@@ -38,6 +38,7 @@ const detail = (fields: Partial<PullRequestDetail> = {}): PullRequestDetail => (
 	mergeState: "clean",
 	behindBy: null,
 	canComment: false,
+	byViewer: false,
 	...fields,
 });
 

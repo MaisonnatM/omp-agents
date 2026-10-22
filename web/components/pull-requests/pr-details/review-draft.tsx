@@ -11,6 +11,7 @@ import { findingLocation, type FindingState, REVIEW_VERDICTS, type ReviewDraft, 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { VERDICT_LABELS } from "./composer.logic";
 import { putJson } from "../../../api";
 import { useRead } from "../../../reads";
 import { useAction } from "../../../use-action";
@@ -19,7 +20,6 @@ import { useDashboardActions } from "../../dashboard-context";
 import { ERROR_TEXT } from "../../form-dialog";
 import { DetailSection, LoadNote, Markdown } from "../../sheet-details";
 
-const VERDICT_LABELS: Record<ReviewVerdict, string> = { approve: "Approve", "request-changes": "Request changes", comment: "Comment" };
 const EVENT_LABELS: Record<ReviewEvent, string> = { APPROVE: "Approve", REQUEST_CHANGES: "Request changes", COMMENT: "Comment" };
 
 const STATE_LOOK: Record<FindingState, [string, string]> = {
@@ -28,7 +28,7 @@ const STATE_LOOK: Record<FindingState, [string, string]> = {
 	dismissed: ["Dismissed", "bg-muted text-muted-foreground line-through"],
 };
 
-const FIELD = "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+export const FIELD = "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const TEXTAREA = cn(FIELD, "max-h-80 min-h-14 resize-none [field-sizing:content]");
 
 const short = (sha: string): string => sha.slice(0, 7);

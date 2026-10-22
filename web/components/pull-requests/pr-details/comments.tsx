@@ -1,4 +1,4 @@
-/** Summary's **Comments**: the pull request's conversations, filtered, ordered, and paged, each thread with its replies, resolve toggle, and reply composer, then the new-comment composer. */
+/** Summary's **Comments**: the pull request's conversations, filtered, ordered, and paged, each thread with its replies, resolve toggle, and reply composer. */
 import { ArrowDownUp, Check, ListFilter, RotateCcw } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { MAX_COMMENT_BODY, type PullRequestComment, type PullRequestDetail, type PullRequestEvent, type PullRequestThread } from "../../../../src/shared/github";
@@ -237,7 +237,6 @@ export function Comments({ detail, save, send }: CommentsProps) {
 						)}
 					</>
 				)}
-				{detail.canComment && <Composer label="Comment" placeholder="Leave a comment…" onSend={body => send({ field: "comment", body })} />}
 			</div>
 		</SummarySection>
 	);

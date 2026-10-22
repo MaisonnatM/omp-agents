@@ -176,7 +176,7 @@ const LOCKED_COMMENTERS: Record<string, true> = { ADMIN: true, MAINTAIN: true, W
 
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed isArchived viewerPermission pullRequest(number: $number) {
-		number title body isDraft state reviewDecision mergeable mergeStateStatus headRefName headRefOid baseRefName createdAt updatedAt mergedAt closedAt additions deletions changedFiles locked
+		number title body isDraft state reviewDecision mergeable mergeStateStatus headRefName headRefOid baseRefName createdAt updatedAt mergedAt closedAt additions deletions changedFiles locked viewerDidAuthor
 		labels(first: 20) { nodes { name color } }
 		history: commits(last: 100) { nodes { commit {
 			oid abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
@@ -319,6 +319,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		mergeState: mergeStateOf(node.mergeStateStatus),
 		behindBy: null,
 		canComment: repository.isArchived !== true && (node.locked !== true || LOCKED_COMMENTERS[str(repository.viewerPermission) ?? ""] === true),
+		byViewer: node.viewerDidAuthor === true,
 	};
 }
 

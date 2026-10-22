@@ -90,11 +90,18 @@ export type ReviewDraftChange =
 	| (Extract<ReviewDraftEdit, { op: "add-finding" }> & { at: number })
 	| { op: "save"; draft: ReviewDraft }
 	| { op: "posted"; pr: PullRequest; head: string; review: PostedReview }
+	| { op: "submit"; pr: PullRequest; submit: ReviewSubmit }
 	| { op: "bind"; reviewer: Reviewer }
 	| { op: "relink"; from: string; to: string };
 
 /** The sessions the file remembers as reviewers, newest last: one resumed after that many later reviews loses the tool. */
 const KEPT_REVIEWERS = 200;
+
+/** What the composer's Submit review sets on the draft before it posts it. */
+export interface ReviewSubmit {
+	verdict: ReviewVerdict;
+	summary: string;
+}
 
 /** The draft for `pr`, if any. */
 export const reviewDraftOf = (drafts: readonly ReviewDraft[], pr: PullRequest): ReviewDraft | undefined => drafts.find(draft => samePullRequest(draft.pr, pr));
@@ -145,6 +152,8 @@ export function applyReviewDraft(state: ReviewDraftState, change: ReviewDraftCha
 			if (change.from === change.to || !state.reviewers.some(reviewer => reviewer.sessionId === change.from)) return state;
 			return { ...state, reviewers: state.reviewers.map(reviewer => (reviewer.sessionId === change.from ? { ...reviewer, sessionId: change.to } : reviewer)) };
 		}
+		case "submit":
+			return mapDraft(state, change.pr, draft => (draft.posted === null ? submittedDraft(draft, change.submit) : draft));
 		default:
 			return mapDraft(state, change.pr, draft => (draft.posted === null ? editDraft(draft, change) : draft));
 	}
@@ -153,6 +162,12 @@ export function applyReviewDraft(state: ReviewDraftState, change: ReviewDraftCha
 /** The id after the highest of `findings`, numbered `f1`, `f2`, and on as the review tool numbers them. */
 function nextFindingId(findings: readonly ReviewFinding[]): string {
 	return `f${Math.max(0, ...findings.map(finding => Number(/^f(\d+)$/.exec(finding.id)?.[1] ?? 0))) + 1}`;
+}
+
+/** `draft` as the composer's Submit review posts it: with `submit`'s verdict and summary, and every pending finding accepted. */
+export function submittedDraft(draft: ReviewDraft, { verdict, summary }: ReviewSubmit): ReviewDraft {
+	const next = editDraft(editDraft(draft, { op: "verdict", pr: draft.pr, verdict }), { op: "summary", pr: draft.pr, summary });
+	return mapFindings(next, finding => (finding.state === "pending" ? { ...finding, state: "accepted" } : finding));
 }
 
 function editDraft(draft: ReviewDraft, edit: Exclude<ReviewDraftEdit, { op: "discard" | "add-finding" }>): ReviewDraft {
@@ -202,7 +217,14 @@ export function diffLinesOf(files: readonly { path: string; patch: string | null
 
 export type ReviewEvent = "APPROVE" | "REQUEST_CHANGES" | "COMMENT";
 
-const EVENTS: Record<ReviewVerdict, ReviewEvent> = { approve: "APPROVE", "request-changes": "REQUEST_CHANGES", comment: "COMMENT" };
+export const REVIEW_EVENTS: Record<ReviewVerdict, ReviewEvent> = { approve: "APPROVE", "request-changes": "REQUEST_CHANGES", comment: "COMMENT" };
+
+/** Whether a review that says `verdict` can post with `summary` and `lineComments` line comments: an approval always can, a request for changes needs a summary, and a comment needs something to say. */
+export function canSubmitReview(verdict: ReviewVerdict, summary: string, lineComments: number): boolean {
+	if (verdict === "approve") return true;
+	if (verdict === "request-changes") return summary.trim() !== "";
+	return summary.trim() !== "" || lineComments > 0;
+}
 
 /** A comment on a line or range on one side of the diff. */
 export interface ReviewComment {
@@ -244,7 +266,7 @@ export function reviewPayload(draft: ReviewDraft, lines: DiffLines): ReviewPaylo
 	}));
 	const folded = accepted.filter(finding => !onDiff(finding)).map(foldedItem);
 	const body = [draft.summary.trim(), folded.join("\n")].filter(part => part !== "").join("\n\n");
-	return { commit_id: draft.head, event: EVENTS[draft.verdict], body, comments };
+	return { commit_id: draft.head, event: REVIEW_EVENTS[draft.verdict], body, comments };
 }
 
 /** Where a finding sits, as the draft and its preview name it: the path, then the line or range, marked when on the base side. */
@@ -264,10 +286,8 @@ function foldedItem(finding: ReviewFinding): string {
 export function postRefusal(draft: ReviewDraft, head: string): string | null {
 	if (draft.posted) return "This draft is posted already.";
 	if (draft.head !== head) return `The pull request moved from ${draft.head.slice(0, 7)} to ${head.slice(0, 7)} since this review; run Review again on the new head.`;
-	const summary = draft.summary.trim();
-	if (draft.verdict === "request-changes" && summary === "") return "Requesting changes needs a summary.";
-	if (summary === "" && !draft.findings.some(finding => finding.state === "accepted")) return "Accept a finding or write a summary first.";
-	return null;
+	if (canSubmitReview(draft.verdict, draft.summary, draft.findings.filter(finding => finding.state === "accepted").length)) return null;
+	return draft.verdict === "request-changes" ? "Requesting changes needs a summary." : "Accept a finding or write a summary first.";
 }
 
 /** What `GET /api/review-draft/preview` answers: what posting sends now, or why it cannot post. */

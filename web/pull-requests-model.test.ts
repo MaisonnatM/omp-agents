@@ -428,6 +428,7 @@ describe("pull request details", () => {
 		mergeState: "clean",
 		behindBy: null,
 		canComment: false,
+		byViewer: false,
 		...fields,
 	});
 	test("the details' facts, not the list's older ones, decide the move and quick actions", () => {

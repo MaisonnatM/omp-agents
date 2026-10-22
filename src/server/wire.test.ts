@@ -8,7 +8,7 @@ import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -494,6 +494,23 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "org/team", on: true } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "bug" } })).toBeNull();
 		expect(parsePullRequestEdit({ owner: "a", repo: "b", change: { field: "state", state: "open" } })).toBeNull();
+	});
+
+	test("takes a review that can submit: an approval without a summary, a change request or comment only with one", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "review", verdict: "approve", body: "" } })?.ok).toEqual({ ...pr, change: { field: "review", verdict: "approve", body: "" } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "review", verdict: "request-changes", body: "Fix it." } })?.ok).toEqual({ ...pr, change: { field: "review", verdict: "request-changes", body: "Fix it." } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "review", verdict: "comment", body: " " } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "review", verdict: "request-changes", body: "" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "review", verdict: "dismiss", body: "Hm." } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "review", verdict: "approve", body: "a".repeat(65_537) } })).toBeNull();
+	});
+
+	test("parseReviewDraftPost takes a pull request, and the composer's verdict and summary when given", () => {
+		expect(parseReviewDraftPost(pr)?.ok).toEqual({ pr });
+		expect(parseReviewDraftPost({ ...pr, submit: { verdict: "approve", summary: "" } })?.ok).toEqual({ pr, submit: { verdict: "approve", summary: "" } });
+		expect(parseReviewDraftPost({ ...pr, submit: { verdict: "merge", summary: "" } })).toBeNull();
+		expect(parseReviewDraftPost({ ...pr, submit: { verdict: "comment" } })).toBeNull();
+		expect(parseReviewDraftPost({ owner: "a/b", repo: "r", number: 1 })).toBeNull();
 	});
 
 	test("takes a review thread to resolve or unresolve by its new or older node id, a reply to a thread, and a comment on the pull request", () => {

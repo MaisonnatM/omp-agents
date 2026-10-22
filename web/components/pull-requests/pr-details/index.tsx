@@ -28,6 +28,7 @@ import { ReviewDraftPanel } from "./review-draft";
 import { ReviewTriagePanel } from "../../review-triage";
 import { DetailsScrollerContext } from "./section";
 import { Summary } from "./summary";
+import { PullRequestComposer } from "./composer";
 import { useCondensedHeader } from "./use-condensed-header";
 
 export interface DetailContentProps {
@@ -105,13 +106,14 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const page = placement === "page";
 	const options = usePullRequestOptions(pr);
 	const comments = detail ? commentCount(detail) : 0;
-	const pendingFindings = draft && !draft.posted ? draft.findings.filter(finding => finding.state === "pending").length : 0;
+	const openDraft = draft && !draft.posted ? draft : undefined;
+	const pendingFindings = openDraft?.findings.filter(finding => finding.state === "pending").length ?? 0;
 	const [root, setRoot] = useState<HTMLDivElement | null>(null);
 	const foldRef = useRef<HTMLDivElement>(null);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	const condensed = useCondensedHeader(scroller, root, foldRef, tab);
 	return (
-		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr flex min-h-0 flex-1 flex-col", page && "h-full")}>
+		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr relative flex min-h-0 flex-1 flex-col", page && "h-full")}>
 			<div className={cn("shrink-0 bg-background", !page && "pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
@@ -168,6 +170,11 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 					</div>
 				)}
 			</SegmentedTabPanel>
+			{detail && (
+				<div className="absolute right-4 bottom-3 z-20">
+					<PullRequestComposer key={prKey(pr)} detail={detail} openDraft={openDraft} send={send} onDraftPosted={reload} />
+				</div>
+			)}
 		</SegmentedTabs>
 	);
 }

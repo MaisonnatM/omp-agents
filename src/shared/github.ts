@@ -3,6 +3,7 @@
 import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, optional, type Parsed, type Shape } from "../json";
 import type { ChangedEntry } from "./changes";
 import type { MergeMethod } from "./source-control";
+import type { ReviewVerdict } from "./review-drafts";
 
 /** A GitHub repository. */
 export interface Repo {
@@ -367,6 +368,8 @@ export interface PullRequestDetail extends PullRequest {
 	behindBy: number | null;
 	/** Whether you may comment on it: its repository is not archived, and its conversation is not locked or you can write to the repository. */
 	canComment: boolean;
+	/** Whether you opened it: GitHub lets its author review it only with a comment. */
+	byViewer: boolean;
 }
 
 /** The states the details can set; a merge goes through the merge queue. */
@@ -393,7 +396,8 @@ export type PullRequestChange =
 	| { field: "update"; method: UpdateMethod }
 	| { field: "thread"; id: string; resolved: boolean }
 	| { field: "reply"; thread: string; body: string }
-	| { field: "comment"; body: string };
+	| { field: "comment"; body: string }
+	| { field: "review"; verdict: ReviewVerdict; body: string };
 
 /** The longest reply or comment the details send, GitHub's own limit on a comment's body. */
 export const MAX_COMMENT_BODY = 65_536;

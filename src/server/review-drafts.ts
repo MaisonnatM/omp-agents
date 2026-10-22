@@ -16,7 +16,9 @@ import {
 	type ReviewFinding,
 	type ReviewPayload,
 	type ReviewPreview,
+	type ReviewSubmit,
 	reviewPayload,
+	submittedDraft,
 	type ReviewVerdict,
 } from "../shared/review-drafts";
 import type { StartRequest } from "../shared/sessions";
@@ -108,23 +110,26 @@ export class ReviewDrafts {
 	/**
 	 * Posts the draft for `pr` as one review on the head it was written against, and marks it posted. A review of the
 	 * signed-in user already on that commit with the same event, body, and comments is taken as this one, so a retry after
-	 * a post whose answer was lost posts nothing.
+	 * a post whose answer was lost posts nothing. The composer's `submit` sets the verdict and summary and accepts every
+	 * pending finding, written only once the post is not refused.
 	 */
-	post(pr: PullRequest): Promise<ReviewDraft> {
+	post(pr: PullRequest, submit?: ReviewSubmit): Promise<ReviewDraft> {
 		const key = prKey(pr);
 		const running = this.#posting.get(key);
 		if (running) return running;
-		const posting = this.#post(pr).finally(() => this.#posting.delete(key));
+		const posting = this.#post(pr, submit).finally(() => this.#posting.delete(key));
 		this.#posting.set(key, posting);
 		return posting;
 	}
 
-	async #post(pr: PullRequest): Promise<ReviewDraft> {
+	async #post(pr: PullRequest, submit: ReviewSubmit | undefined): Promise<ReviewDraft> {
 		const { github, file, now } = this.#deps;
-		const draft = this.#draft(pr);
+		const candidate = submit ? submittedDraft(this.#draft(pr), submit) : this.#draft(pr);
 		const { head, lines } = await github.target(pr);
-		const refusal = postRefusal(draft, head);
+		const refusal = postRefusal(candidate, head);
 		if (refusal) throw new Error(refusal);
+		if (submit && file.apply({ op: "submit", pr, submit })) this.#deps.onChange();
+		const draft = this.#draft(pr);
 		const payload = reviewPayload(draft, lines);
 		const review = (await this.#posted(pr, payload)) ?? (await github.post(pr, payload));
 		if (file.apply({ op: "posted", pr, head: draft.head, review: { id: review.id, url: review.url, at: now() } })) this.#deps.onChange();

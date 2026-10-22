@@ -17,6 +17,18 @@ test("a title edit patches GitHub and returns the refreshed title", async () => 
 });
 
 test.each([
+	{ verdict: "approve" as const, body: "", argv: ["-f", "event=APPROVE"] },
+	{ verdict: "request-changes" as const, body: "Fix the race.", argv: ["-f", "event=REQUEST_CHANGES", "-f", "body=Fix the race."] },
+])("a review posts its event and any summary to GitHub's reviews: %j", async ({ verdict, body, argv }) => {
+	const write = spyOn(proc, "runChecked").mockResolvedValue("");
+	spyOn(proc, "runJson").mockImplementation(async argv => argv.includes("graphql") ? {
+		data: { repository: { pullRequest: { number: 7, title: "T", state: "OPEN", headRefName: "feature", headRefOid: "abc", baseRefName: "main", createdAt: "2026-10-01T00:00:00Z" } } },
+	} : { behind_by: 0 });
+	await savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "review", verdict, body } });
+	expect(write.mock.calls[0]?.[0]).toEqual(["gh", "api", "-X", "POST", "repos/acme/app/pulls/7/reviews", ...argv]);
+});
+
+test.each([
 	{ body: "## Summary\n\nA description with @octocat and 7.", field: "body=## Summary\n\nA description with @octocat and 7.", refreshed: "## Summary\n\nA description with @octocat and 7." },
 	{ body: "", field: "body=", refreshed: "" },
 ])("a description edit patches its exact body and returns the refreshed description: %j", async ({ body, field, refreshed }) => {

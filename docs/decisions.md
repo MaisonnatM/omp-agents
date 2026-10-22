@@ -112,3 +112,12 @@ The stack menu also holds the session's other pull requests, the closest T3 navi
 PR Markdown opts into alerts, repository autolinks, code chips, attachments, and authenticated media; session transcripts retain the shared renderer's defaults.
 The media proxy fails closed on every redirect outside the four named GitHub hosts, except GitHub's own signed upload bucket after a `github.com` hop, which is where GitHub sends a token's request for an upload; T3 follows any HTTPS redirect there, and this keeps the one bucket.
 See [Pull requests](usage.md#pull-requests) and [HTTP API](architecture.md#http-api).
+
+## The pull request composer submits the Review draft as its line comments
+
+T3's composer submits a review with its pending line comments; here those are the Review draft's pending findings, so the badge and **Review (N)** count them.
+Submitting sends the verdict and summary with the post, and the server accepts the pending findings and posts in one step, so no socket edit can race the post.
+Without an open draft the composer posts a plain review through a `review` change.
+**Request changes** keeps the Review draft's rule that it needs a summary, and an approval needs nothing, as GitHub allows.
+The forms' text lives in the composer rather than in a force-mounted popover, so closing it keeps a draft without patching the shared popover.
+See [Pull requests](usage.md#pull-requests) and [HTTP API](architecture.md#http-api).
