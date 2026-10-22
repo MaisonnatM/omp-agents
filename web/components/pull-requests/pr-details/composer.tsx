@@ -175,11 +175,9 @@ export function PullRequestComposer({ detail, draft, send, onDraftPosted }: Comp
 
 /** Cmd+Enter or Ctrl+Enter, but not while an input method composes text. */
 function submitKey(event: KeyboardEvent<HTMLTextAreaElement>, submit: () => void): void {
-	if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-	if (!isSubmitChord(event) || event.shiftKey || event.altKey) return;
+	if (event.nativeEvent.isComposing || !isSubmitChord(event)) return;
 	event.preventDefault();
-	event.stopPropagation();
-	if (!event.repeat) submit();
+	submit();
 }
 
 interface CommentFormProps {
