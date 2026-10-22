@@ -21,8 +21,8 @@ interface ListChanges {
 	"review-triages": ReviewTriageEdit;
 }
 
-/** The lists only the server changes, through actions of their own: the bell's notices, the queued merges, and the design comparisons. */
-type ReadOnlyKind = "notices" | "merges" | "comparisons";
+/** The lists only the server changes, through actions of their own: the bell's notices, and the queued merges. */
+type ReadOnlyKind = "notices" | "merges";
 export type ListKind = keyof ListChanges | ReadOnlyKind;
 export type ListMessage<T extends ListKind = ListKind> = Extract<ServerMsg, { t: T }>;
 type EditableEntries = {

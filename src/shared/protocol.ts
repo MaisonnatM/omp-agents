@@ -1,7 +1,6 @@
 /** The messages the dashboard socket carries between the server and the page. */
 import type { Routine, RoutineChange } from "../routines";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
-import type { CleanupPolicy, ComparisonSnapshot, ComparisonSpec } from "./comparisons";
 import type { DiscussionEvent, DiscussionRequest } from "./discussions";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
@@ -61,7 +60,6 @@ export type ServerMsg =
 	| { t: "merges"; list: QueuedMerge[] }
 	/** Every review draft, posted ones too, whole, sent when a socket opens and after every change. */
 	| { t: "review-drafts"; list: ReviewDraft[] }
-	| { t: "comparisons"; comparisons: ComparisonSnapshot[] }
 	| ({ t: "review-triages" } & ReviewTriagesAnswer)
 	/** One step of the answer to this socket's `discuss` with `id`, until its `end`. */
 	| { t: "discussion"; id: number; event: DiscussionEvent }
@@ -97,10 +95,6 @@ export type ClientMsg =
 	| { t: "read"; instanceId: string }
 	/** Start a dashboard session. `reqId` counts per page and comes back with the answer. */
 	| ({ t: "start"; reqId: number } & StartRequest)
-	| { t: "comparison-start"; id: string; spec: ComparisonSpec }
-	| { t: "comparison-select"; id: string; winner: string }
-	| { t: "comparison-review-cleanup"; id: string }
-	| { t: "comparison-cleanup"; id: string; reviewId: string; policy: CleanupPolicy }
 	/** Create a project and start its coordinator in `cwd` on `prompt`, at `model` and `thinking` as `start` takes them, answered with `started` for `reqId` as a `start` is. An empty `name` reads as New project. */
 	| { t: "project-create"; reqId: number; name: string; cwd: string; prompt: string; model: ModelOption | null; thinking: string | null }
 	/** Resume each of these past sessions, as `start` with `resume` does. `reqId` counts per page and comes back with the answer. */

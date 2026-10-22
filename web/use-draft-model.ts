@@ -18,8 +18,6 @@ export interface DraftModelSelection {
 	thinking: string | null;
 	/** The levels the picker offers: `null` until the model's capabilities are known, none when the model list failed. */
 	levels: string[] | null;
-	/** The levels the picker offers for model `selector`, as {@link levels} does for the draft's own model. */
-	levelsOf: (selector: string | null) => string[] | null;
 	pickThinking: (level: string | null) => void;
 	/** Opens or closes the model menu; opening reads the model list again. */
 	openModels: (open: ModelMenuOpen | null) => void;
@@ -47,8 +45,7 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 	const [opens, setOpens] = useState(0);
 	const list = useRead<ConnectedModels>(`/api/models/connected?cwd=${encodeURIComponent(cwd)}`, opens);
 	const known = list.data?.models.find(entry => selectorOf(entry) === selector)?.thinkingLevels ?? null;
-	const levelsOf = (of: string | null): string[] | null => (list.error === null ? (list.data?.models.find(entry => selectorOf(entry) === of)?.thinkingLevels ?? null) : []);
-	const levels = levelsOf(selector);
+	const levels = list.error === null ? known : [];
 	const thinking = picked !== null && picked.model === selector && known?.includes(picked.level) ? picked.level : null;
 	const pickThinking = (level: string | null): void => {
 		setPendingDefaultEffort(null);
@@ -67,7 +64,6 @@ export function useDraftModelSelection(cwd: string, initial: { model: ModelOptio
 		model,
 		thinking,
 		levels,
-		levelsOf,
 		pickThinking,
 		openModels,
 		picker: {

@@ -78,8 +78,8 @@ export class ReviewDrafts {
 		if (!pr) return join;
 		return {
 			rpc: { ...join.rpc, tools: [...join.rpc.tools, this.#tool(pr)] },
-			attach: async session => {
-				await join.attach(session);
+			attach: session => {
+				join.attach(session);
 				this.#live.set(session.instanceId, session.sessionId);
 				this.#deps.file.apply({ op: "bind", reviewer: { sessionId: session.sessionId, pr } });
 			},

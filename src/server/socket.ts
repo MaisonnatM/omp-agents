@@ -7,7 +7,6 @@ import type { NoticeOp } from "../shared/notices";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
-import type { Comparisons } from "./comparisons";
 import type { Discussions } from "./discussions";
 import type { ListRegistry } from "./list-registry";
 import type { ProjectSpec } from "./project-runner";
@@ -22,7 +21,6 @@ export interface SocketEnv {
 	/** Create a project in `spec.cwd` and start its coordinator on `spec.prompt`, ready once the coordinator is. */
 	createProject(spec: ProjectSpec): Promise<StartResult>;
 	lists: ListRegistry;
-	comparisons: Comparisons;
 	/** End live session `instanceId` as **End session** does, then remove the git worktree it worked in. */
 	end(instanceId: string): Promise<void>;
 	/** Move interrupted session `sessionId` to the past sessions. */
@@ -107,10 +105,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	async start({ start }, peer, msg) {
 		peer.send({ t: "started", reqId: msg.reqId, result: await start(msg) });
 	},
-	"comparison-start": ({ comparisons }, _peer, { id, spec }) => comparisons.start(id, spec),
-	"comparison-select": ({ comparisons }, _peer, { id, winner }) => comparisons.select(id, winner),
-	"comparison-review-cleanup": ({ comparisons }, _peer, { id }) => comparisons.reviewCleanup(id),
-	"comparison-cleanup": ({ comparisons }, _peer, { id, reviewId, policy }) => comparisons.cleanup(id, reviewId, policy),
 	async "project-create"({ createProject }, peer, { reqId, name, cwd, prompt, model, thinking }) {
 		peer.send({ t: "started", reqId, result: await createProject({ name, cwd, prompt, model, thinking }) });
 	},

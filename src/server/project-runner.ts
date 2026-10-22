@@ -35,7 +35,7 @@ export type ProjectLaunch =
 /** How a start joins its project: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
 export interface ProjectJoin {
 	rpc: RpcLaunch;
-	attach(session: { instanceId: string; sessionId: string; cwd: string }): void | Promise<void>;
+	attach(session: { instanceId: string; sessionId: string; cwd: string }): void;
 }
 
 const NO_PROJECT: ProjectJoin = { rpc: PLAIN_LAUNCH, attach() {} };

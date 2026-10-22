@@ -28,7 +28,6 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, reviewDraftsFile, reviewTriagesFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNotesDir, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
-import { comparisonsDir } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { replayComparison, replayDetail } from "../replay";
@@ -48,7 +47,6 @@ import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
-import { Comparisons } from "./comparisons";
 import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
 import { InterruptedSessions } from "./interrupted";
@@ -138,9 +136,8 @@ export class Dashboard {
 	readonly #lists: ListRegistry;
 	readonly #todoInbox: TodoInbox;
 	readonly #worktrees: Worktrees;
-	readonly #comparisons: Comparisons;
 	readonly #sessionJoins: StartEnv["projects"] = {
-		launchFor: (request, project, instanceId) => this.#comparisons.join(request, this.#reviewTriages.join(request, this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project))), instanceId),
+		launchFor: (request, project) => this.#reviewTriages.join(request, this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project))),
 	};
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -286,7 +283,6 @@ export class Dashboard {
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
-			comparisons: { msg: () => ({ t: "comparisons", comparisons: this.#comparisons.list }) },
 			"review-triages": { msg: () => ({ t: "review-triages", ...triages.answer }), apply: edit => triages.edit(edit) },
 		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
@@ -329,11 +325,6 @@ export class Dashboard {
 			},
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
-		this.#comparisons = new Comparisons({
-			dir: comparisonsDir, port, sessions, worktrees, start: starter,
-			cancelContinue: id => this.#autoContinue.cancel(id),
-			changed: () => broadcasts.pushList("comparisons"),
-		});
 		const startWith: Starter = (request, project) => worktrees.start(async () => starter(await triages.prepare(request), project), request.kind === "replay" || request.kind === "new" && (request.branch !== null || request.reviewTriage?.kind === "capture" && request.subject?.kind === "pull-request"));
 		const startSession = (this.#startSession = request => startWith(request, null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
@@ -479,7 +470,6 @@ export class Dashboard {
 		});
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
-				await this.#comparisons.refresh();
 				if (broadcasts.listening()) await this.#listRegistry();
 				else this.#registryFresh = false;
 			},
@@ -523,7 +513,6 @@ export class Dashboard {
 			start: startSession,
 			createProject: spec => projectRunner.create(spec),
 			lists,
-			comparisons: this.#comparisons,
 			end: async instanceId => {
 				const session = sessions.get(instanceId);
 				if (session) await this.#endLive(session);
@@ -620,10 +609,8 @@ export class Dashboard {
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
-		await this.#comparisons.recover();
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, this.#sessionJoins, survived => this.#interrupted.recover(survived), instanceId => this.#comparisons.mayAttach(instanceId));
-		await this.#comparisons.attached();
+		await reattachAll(this.#sessions, this.#sessionJoins, survived => this.#interrupted.recover(survived));
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		seedUserNotes(userNotesDir);
@@ -656,7 +643,6 @@ export class Dashboard {
 	async stop(): Promise<void> {
 		this.#loops.stop();
 		this.#stopMergeQueue();
-		await this.#comparisons.stop();
 		this.#projectRunner.stop();
 		this.#todoInbox.stop();
 		this.#endInbox.stop();
@@ -672,7 +658,6 @@ export class Dashboard {
 	exited(): void {
 		flushJsonFiles();
 		this.#ownerLock.release();
-		this.#comparisons.release();
 	}
 
 	/** A dashboard socket opened. */
@@ -728,8 +713,6 @@ export class Dashboard {
 			case "exited": {
 				// Only a session this dashboard started reports its exit.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				const session = this.#sessions.get(instanceId);
-				if (session) void this.#comparisons.exited(session).catch(error => console.error(`omp-agents: comparison exit: ${errorText(error)}`));
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#projectRunner.exited(instanceId);
 				this.#reviewDrafts.exited(instanceId);
@@ -747,7 +730,6 @@ export class Dashboard {
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
 				this.#projectRunner.switched(instanceId);
-				void this.#comparisons.switched(instanceId).catch(error => console.error(`omp-agents: comparison switch: ${errorText(error)}`));
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#reviewDrafts.switched(instanceId, sessionId);
 				if (sessionId) this.#reviewTriages.switched(instanceId, sessionId);

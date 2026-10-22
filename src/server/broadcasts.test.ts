@@ -66,7 +66,6 @@ function setup(initial: PastSession[]) {
 		"review-triages": { msg: () => ({ t: "review-triages", list: reviewTriages.value.triages, owner: null }), apply: () => false },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
-		comparisons: { msg: () => ({ t: "comparisons", comparisons: [] }) },
 	}, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
@@ -109,7 +108,7 @@ test("corrupt triage storage does not interrupt socket opening, whole lists, or 
 		writeFileSync(triagesPath, "{broken");
 		broadcasts.open(ws);
 		expect(sent.find(msg => msg.t === "review-triages")).toEqual({ t: "review-triages", list: [], owner: null });
-		expect(sent.at(-1)).toEqual({ t: "comparisons", comparisons: [] });
+		expect(sent.at(-1)).toEqual({ t: "merges", list: [] });
 		expect([...lists.messages()].find(msg => msg.t === "review-triages")).toEqual({ t: "review-triages", list: [], owner: null });
 		broadcasts.pushList("review-triages");
 		expect(published.filter(msg => msg.t === "review-triages")).toEqual([{ t: "review-triages", list: [], owner: null }]);
@@ -213,7 +212,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("projects", { op: "rename", id: "missing", name: "new" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
 		expect(lists.apply("review-triages", { id: "missing", revision: 0, itemId: "f1", op: "decision", decision: "accepted" }, peer)).toBe(false);
-		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "comparisons"));
+		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
 		expect(published).toEqual([]);
 	});
 

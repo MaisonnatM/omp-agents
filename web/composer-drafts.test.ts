@@ -15,7 +15,7 @@ let now = 0;
 Date.now = () => now;
 // React DOM reads these globals as it loads, so it is imported after they are set.
 const { createRoot } = await import("react-dom/client");
-const { clearDraft, liveDraftKey, newDraftKey, variantsDraftKey, putDraft, useComposerDraft } = await import("./composer-drafts.ts");
+const { clearDraft, liveDraftKey, newDraftKey, putDraft, useComposerDraft } = await import("./composer-drafts.ts");
 
 const DAY = 24 * 60 * 60 * 1000;
 const STORAGE_KEY = "omp-agents.composer-drafts";
@@ -43,15 +43,6 @@ await open(live("b"));
 await type("for b");
 results.separate = { a: await open(live("a")), subagent: await open(live("a", "agent-1")), b: await open(live("b")), stored: stored() };
 
-
-memory.clear();
-await open(newDraftKey(null));
-await type("one session");
-await open(variantsDraftKey);
-await type("several designs");
-results.startDrafts = { single: await open(newDraftKey(null)), variants: await open(variantsDraftKey) };
-clearDraft(variantsDraftKey);
-results.acceptedComparison = { single: await open(newDraftKey(null)), variants: await open(variantsDraftKey) };
 memory.clear();
 results.seeded = [await open(newDraftKey("t1"), "Fix the build")];
 await type("Fix the build first");
@@ -96,8 +87,6 @@ test("each composer keeps its own draft, forgets one equal to its seed or empty,
 			b: "for b",
 			stored: { "live/a": { text: "for a", at: 0 }, "live/a/agent-1": { text: "for its subagent", at: 0 }, "live/b": { text: "for b", at: 0 } },
 		},
-		startDrafts: { single: "one session", variants: "several designs" },
-		acceptedComparison: { single: "one session", variants: "" },
 		seeded: ["Fix the build", { "new/todo/t1": { text: "Fix the build first", at: 0 } }, {}, {}, "Fix the build"],
 		put: "the prompt it branched at",
 		cleared: "",

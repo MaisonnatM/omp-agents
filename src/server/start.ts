@@ -23,11 +23,6 @@ interface Started {
 
 type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
 
-interface Allocation {
-	instanceId: string;
-	emit(update: DashboardUpdate): void;
-}
-
 export interface StartEnv {
 	sessions: LiveSessions;
 	/** The file a view reads, or `null` while it is not known. */
@@ -39,18 +34,12 @@ export interface StartEnv {
 	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
 	linkTodo(todoId: string, sessionId: string): void;
 	/** How a start joins a project: the one `project` names, else the one a resumed session belongs to, else none. */
-	projects: { launchFor(request: StartRequest, project: ProjectLaunch | null, instanceId: string): Promise<ProjectJoin> };
+	projects: { launchFor(request: StartRequest, project: ProjectLaunch | null): ProjectJoin };
 	mayDiscardReplay(cwd: string): Promise<string | null>;
 }
 
-export interface ReservedLaunch {
-	instanceId: string;
-	beforePrompt(): Promise<void>;
-	admitted(): Promise<void>;
-}
-
 /** Starts `request`; `project` is the project runner's reason for it, which a page's start never has. */
-export type Starter = (request: StartRequest, project: ProjectLaunch | null, reserved?: ReservedLaunch) => Promise<StartResult>;
+export type Starter = (request: StartRequest, project: ProjectLaunch | null) => Promise<StartResult>;
 
 /** Runs `start` requests; one ready session per success, none on failure. */
 export function createStarter(env: StartEnv): Starter {
@@ -58,8 +47,8 @@ export function createStarter(env: StartEnv): Starter {
 	/** Past sessions being resumed, so a second click starts no second omp on the same file. */
 	const resuming = new Set<string>();
 
-	async function launch(failure: string, spawn: Spawn, allocation: Allocation): Promise<{ started: Started } | { error: string }> {
-		const { instanceId, emit } = allocation;
+	async function launch(failure: string, spawn: Spawn): Promise<{ started: Started } | { error: string }> {
+		const { instanceId, emit } = sessions.allocate();
 		try {
 			return { started: await spawn(instanceId, emit) };
 		} catch (err) {
@@ -68,7 +57,7 @@ export function createStarter(env: StartEnv): Starter {
 	}
 
 	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its project's extensions and host tools. */
-	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch, allocation: Allocation): Promise<{ started: Started } | { error: string }> {
+	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<{ started: Started } | { error: string }> {
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
@@ -94,13 +83,13 @@ export function createStarter(env: StartEnv): Starter {
 					session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
 					prompt: null,
 					first: { text, images },
-				}), allocation);
+				}));
 			}
 			case "fork": {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
-				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, PLAIN_LAUNCH, emit), allocation);
+				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, PLAIN_LAUNCH, emit));
 			}
 			case "replay": {
 				const source = env.pathFor(request.view);
@@ -114,7 +103,7 @@ export function createStarter(env: StartEnv): Starter {
 						await prepared.discard().catch(cleanup => { throw new Error(`${errorText(error)}; ${errorText(cleanup)}`); });
 						throw error;
 					}
-				}, allocation);
+				});
 			}
 			case "resume": {
 				const { sessionId } = request;
@@ -124,7 +113,7 @@ export function createStarter(env: StartEnv): Starter {
 				if (formatOf(path).source !== "omp") return { error: "Cannot resume: this session is read-only. Only omp sessions resume here." };
 				resuming.add(sessionId);
 				try {
-					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }), allocation);
+					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }));
 				} finally {
 					resuming.delete(sessionId);
 				}
@@ -132,10 +121,9 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	return async (request, project, reserved) => {
-		const allocation = sessions.allocate(reserved?.instanceId);
-		const join = await env.projects.launchFor(request, project, allocation.instanceId);
-		const outcome = await spawnFor(request, join.rpc, allocation);
+	return async (request, project) => {
+		const join = env.projects.launchFor(request, project);
+		const outcome = await spawnFor(request, join.rpc);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
@@ -145,15 +133,9 @@ export function createStarter(env: StartEnv): Starter {
 		}
 		// The todo and the project link first, so the session's first turn already knows the todo it works on and its role.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
-		await join.attach(session);
+		join.attach(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
-		if (reserved) {
-			if (first) {
-				await reserved.beforePrompt();
-				await session.prompt(null, first.text, first.images, "steer");
-				await reserved.admitted();
-			}
-		} else if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);
+		if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
 	};
@@ -163,7 +145,7 @@ export function createStarter(env: StartEnv): Starter {
 interface Attached {
 	session: DashboardSession;
 	/** Passes on what the session reported while it attached, then lets each report through as it comes. */
-	publish(): Promise<void>;
+	publish(): void;
 }
 
 /** Attaches to session `instanceId`; `null` when it cannot, which leaves its omp running for the next server. */
@@ -172,16 +154,10 @@ async function attach(sessions: LiveSessions, projects: StartEnv["projects"], in
 	const held: DashboardUpdate[] = [];
 	let report = (update: DashboardUpdate): void => void held.push(update);
 	try {
-		let membership: ProjectJoin | undefined;
-		const session = await DashboardSession.reattach(instanceId, async sessionId => {
-			membership = await projects.launchFor({ kind: "resume", sessionId }, null, instanceId);
-			return membership.rpc.tools;
-		}, update => report(update));
+		const session = await DashboardSession.reattach(instanceId, sessionId => projects.launchFor({ kind: "resume", sessionId }, null).rpc.tools, update => report(update));
 		return {
 			session,
-			publish: async () => {
-				if (!membership) throw new Error("The kept session has no launch membership.");
-				await membership.attach(session);
+			publish: () => {
 				report = emit;
 				for (const update of held.splice(0)) emit(update);
 			},
@@ -198,14 +174,14 @@ async function attach(sessions: LiveSessions, projects: StartEnv["projects"], in
  * it reported, so no report reaches the server before it knows which sessions survived. One it reaches but cannot
  * attach to runs on unlisted, and the next server tries again.
  */
-export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"], recover: (survived: ReadonlySet<string>) => void, mayAttach: (instanceId: string) => Promise<boolean> = async () => true): Promise<void> {
-	const allowed = await Promise.all(keptSessions().map(async id => await mayAttach(id) ? id : null));
-	const attached = (await Promise.all(allowed.flatMap(id => id === null ? [] : [attach(sessions, projects, id)]))).filter(
+export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"], recover: (survived: ReadonlySet<string>) => void): Promise<void> {
+	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, projects, instanceId)))).filter(
 		(kept): kept is Attached => kept !== null && !kept.session.finished(),
 	);
 	recover(new Set(attached.map(({ session }) => session.sessionId)));
 	for (const { session, publish } of attached) {
 		sessions.add(session, null);
-		await publish();
+		projects.launchFor({ kind: "resume", sessionId: session.sessionId }, null).attach(session);
+		publish();
 	}
 }

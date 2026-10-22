@@ -123,8 +123,6 @@ export type Page =
 	| { kind: "calendar" }
 	| ({ kind: "inbox" } & InboxRoute)
 	| ({ kind: "new" } & NewSessionRoute)
-	| { kind: "new-variants"; cwd: string | null }
-	| { kind: "comparisons"; id: string | null }
 	| ({ kind: "scheduled" } & ScheduledRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
@@ -159,7 +157,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   `#settings` and an unknown section open Analytics; a segment after the section is ignored.
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
- * - `#new-variants/<cwd>` opens the separate comparison composer, with an optional encoded directory and no todo or schedule.
  * - `#scheduled/<id>` opens scheduled send `id`, a new session's start, as an editable draft.
  * - `#pull-requests` shows the sidebar's Pull requests tab, which lists the pull requests of the sidebar's workspace, beside the panes,
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
@@ -183,9 +180,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "settings", section: isSettingsSection(section) ? section : "analytics" };
 	},
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
-	"new-variants": rest => ({ kind: "new-variants", cwd: decodeCwd(rest) }),
 	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
-	comparisons: rest => ({ kind: "comparisons", id: rest ? decodeSegment(rest) : null }),
 	"pull-requests": rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
 		if (!match) return { kind: "pull-requests", target: null };
@@ -221,7 +216,6 @@ function restOfPage(page: Page): string | null {
 		case "settings":
 			return page.section;
 		case "new":
-		case "new-variants":
 			return encodeCwd(page.cwd);
 		case "pull-requests": {
 			if (page.target === null) return null;
@@ -238,7 +232,6 @@ function restOfPage(page: Page): string | null {
 		case "inbox":
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
-		case "comparisons":
 			return page.id === null ? null : encodeURIComponent(page.id);
 		case "projects":
 			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
@@ -266,8 +259,6 @@ function queryOfPage(page: Page): string | null {
 		case "calendar":
 		case "inbox":
 		case "scheduled":
-		case "comparisons":
-		case "new-variants":
 			return null;
 		default: {
 			const never: never = page;
@@ -294,9 +285,7 @@ export const hashForProjects = (target: ProjectsTarget): string => hashForPage({
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
-export const hashForNewVariants = (cwd: string | null): string => hashForPage({ kind: "new-variants", cwd });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
-export const hashForComparisons = (id: string | null = null): string => hashForPage({ kind: "comparisons", id });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

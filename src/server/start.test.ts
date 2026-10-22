@@ -21,13 +21,18 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 	const claudeFile = join(claudeCodeRoot(), "-work", "c1.jsonl");
 	const codexFile = join(codexHome(), "sessions", "2026", "10", "01", "rollout-x1.jsonl");
 	const start = createStarter({
-		sessions: new LiveSessions(() => {}),
+		sessions: fromPartial<LiveSessions>({
+			sessionIds: () => new Set<string>(),
+			allocate: () => {
+				throw new Error("no omp should start");
+			},
+		}),
 		pathFor: () => codexFile,
 		savedFile: () => claudeFile,
 		onStarted: () => {},
 		linkTodo: () => {},
 		mayDiscardReplay: async () => null,
-		projects: { launchFor: async () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }) },
+		projects: { launchFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }) },
 	});
 	expect(await start({ kind: "resume", sessionId: "c1" }, null)).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 	expect(await start({ kind: "fork", view: { kind: "past", sessionId: "x1" }, entryId: "e1" }, null)).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
@@ -37,9 +42,8 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 test("the server learns which sessions survived before it lists or hears any, and lists none that exited as it attached", async () => {
 	spyOn(rpc, "keptSessions").mockReturnValue(["i-kept", "i-gone", "i-broken"]);
 	spyOn(console, "error").mockImplementation(() => {});
-	spyOn(DashboardSession, "reattach").mockImplementation(async (instanceId, toolsFor, emit) => {
+	spyOn(DashboardSession, "reattach").mockImplementation(async (instanceId, _toolsFor, emit) => {
 		if (instanceId === "i-broken") throw new Error("omp did not answer");
-		await toolsFor(`s-${instanceId}`);
 		// A question omp still waits on reaches the session while it attaches.
 		emit({ kind: "roster" });
 		const fields = { instanceId: { value: instanceId }, sessionId: { value: `s-${instanceId}` }, finished: { value: () => instanceId === "i-gone" } };
@@ -47,7 +51,7 @@ test("the server learns which sessions survived before it lists or hears any, an
 	});
 	const heard: string[] = [];
 	const sessions: LiveSessions = new LiveSessions((instanceId, update) => heard.push(`${update.kind} ${instanceId}, listed: ${sessions.get(instanceId) !== undefined}`));
-	const projects = { launchFor: async (): Promise<ProjectJoin> => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`project ${session.instanceId}`); } }) };
+	const projects = { launchFor: (): ProjectJoin => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`project ${session.instanceId}`); } }) };
 	await reattachAll(sessions, projects, survived => heard.push(`recover ${[...survived].join(" ")}`));
 	expect(heard).toEqual(["recover s-i-kept", "project i-kept", "roster i-kept, listed: true"]);
 	expect([sessions.get("i-gone"), sessions.get("i-broken")]).toEqual([undefined, undefined]);
@@ -95,7 +99,7 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 		const interrupted = new InterruptedSessions(saved);
 
 		const began = Date.now();
-		const reattached = reattachAll(new LiveSessions(() => {}), { launchFor: async () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }) }, survived => interrupted.recover(survived));
+		const reattached = reattachAll(new LiveSessions(() => {}), { launchFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }) }, survived => interrupted.recover(survived));
 		const notReattached = refuseUntil(reattached, "Still attaching.");
 		expect(notReattached()?.status).toBe(503);
 		await reattached;

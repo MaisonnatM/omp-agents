@@ -261,11 +261,11 @@ export class DashboardSession implements LiveSession {
 	 * Attach to session `instanceId`, whose omp a previous server started and left running, as it stands now: in the
 	 * middle of a turn, with its questions and its subagents. `toolsFor` names the tools this server serves the session.
 	 */
-	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"] | Promise<RpcLaunch["tools"]>, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"], emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		let protectedReplay = false;
 		const session = await DashboardSession.#open(instanceId, emit, { kind: "attach" }, async child => {
 			const { sessionId, sessionFile } = await child.client.getState();
-			const tools = await toolsFor(sessionId);
+			const tools = toolsFor(sessionId);
 			if (tools.length > 0) await child.client.setCustomTools(tools);
 			// omp runs already, so its session file decides only how this server shows it, never whether it runs.
 			if (!sessionFile || !(await stat(sessionFile).catch(() => null))) return child.meta.cwd;

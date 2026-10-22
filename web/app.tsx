@@ -241,7 +241,6 @@ export function App() {
 														userTodos={state.userTodos}
 														routines={state.routines}
 														projects={state.projects}
-														comparisons={state.comparisons}
 														workspaceList={state.workspaceList}
 														pins={state.pins}
 														newSessionCompletions={state.newSessionCompletions}

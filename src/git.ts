@@ -183,11 +183,3 @@ export async function checkoutDir(cwd: string, choice: BranchChoice): Promise<st
 	);
 	return dir;
 }
-
-/** Allocates a comparison's fresh branch at its captured commit, never reusing a checkout. */
-export async function allocateVariant(cwd: string, branch: string, baseSha: string, path: string): Promise<void> {
-	if (!COMMIT_ID.test(baseSha)) throw new Error("A variant requires a captured commit.");
-	await runChecked(["git", "-C", cwd, "check-ref-format", "--branch", branch]);
-	if (existsSync(path)) throw new Error(`${path} already exists.`);
-	await runChecked(["git", "-C", cwd, "worktree", "add", "-b", branch, "--", path, baseSha]);
-}

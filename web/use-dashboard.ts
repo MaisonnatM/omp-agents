@@ -217,7 +217,6 @@ export function useDashboard(): Dashboard {
 					case "scheduled":
 					case "workspaces":
 					case "projects":
-					case "comparisons":
 					case "notices":
 					case "merges":
 					case "review-drafts":

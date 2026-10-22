@@ -7,7 +7,6 @@
  */
 import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
-import { isComparisonId, parseComparisonSpec } from "../shared/comparisons";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
@@ -339,13 +338,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const request = parseStartRequest(value);
 		return isCounter(reqId) && request ? { ok: { t: "start", reqId, ...request.ok } } : null;
 	},
-	"comparison-start"({ id, spec }) {
-		const parsed = parseComparisonSpec(spec);
-		return isComparisonId(id) && parsed ? { ok: { t: "comparison-start", id, spec: parsed.ok } } : null;
-	},
-	"comparison-select": ({ id, winner }) => isComparisonId(id) && isNonEmpty(winner) ? { ok: { t: "comparison-select", id, winner } } : null,
-	"comparison-review-cleanup": ({ id }) => isComparisonId(id) ? { ok: { t: "comparison-review-cleanup", id } } : null,
-	"comparison-cleanup": ({ id, reviewId, policy }) => isComparisonId(id) && isNonEmpty(reviewId) && (policy === "preserve-changes" || policy === "discard-owned-changes") ? { ok: { t: "comparison-cleanup", id, reviewId, policy } } : null,
 	"project-create"(value) {
 		const { reqId, name, cwd, prompt } = value;
 		// `null` starts the coordinator on omp's default model.

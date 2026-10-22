@@ -118,7 +118,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		const cwd = request.kind === "new" ? request.cwd : "/work/app";
 		const session: FakeSession = { instanceId, sessionId, cwd, status: "idle", held: false, requests: [], answers: [], prompts: [], attempts: 0, refuses: false, firstPromptSaw: null, alive: true };
 		sessions.set(instanceId, session);
-		await join.attach(session);
+		join.attach(session);
 		if (request.kind === "new") {
 			session.firstPromptSaw = parseProjects(JSON.parse(readFileSync(path, "utf8")));
 			session.status = "working";

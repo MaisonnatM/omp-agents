@@ -9,7 +9,6 @@ import { isObject } from "./json";
 import { HELLO, type KeeperMeta, pidFileOf, STOP } from "./keeper-wire";
 import type { RpcProcess } from "./omp/modules";
 import { stopTree } from "./process-census";
-import { run } from "./proc";
 import { keeperScript } from "./server/resources";
 
 /** One connection to a keeper. */
@@ -252,23 +251,4 @@ export function listKeepers(dir: string): string[] {
 		if (id !== name && !ids.includes(id)) rmSync(join(dir, name), { force: true });
 	}
 	return ids;
-}
-
-/** Reads the keeper's immutable launch metadata from its process, without connecting to it. */
-export async function keeperLaunchCwd(dir: string, instanceId: string): Promise<string | null> {
-	try {
-		const socket = socketOf(dir, instanceId);
-		const pid = Number(readFileSync(pidFileOf(socket), "utf8").trim());
-		if (!Number.isSafeInteger(pid) || pid <= 1) return null;
-		const result = await run(["ps", "-ww", "-p", String(pid), "-o", "command="]);
-		if (result.code !== 0) return null;
-		const prefix = `${keeperScript} ${socket} `;
-		const start = result.stdout.indexOf(prefix);
-		if (start < 0) return null;
-		const metadata = /^(\{"startedAt":[0-9]+,"cwd":"(?:[^"\\]|\\.)*"\}) /.exec(result.stdout.slice(start + prefix.length));
-		if (!metadata) return null;
-		return parseMeta(JSON.parse(metadata[1]!))?.cwd ?? null;
-	} catch {
-		return null;
-	}
 }
