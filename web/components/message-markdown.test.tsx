@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DashboardActionsContext, type DashboardActions } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
-import { MessageMarkdown } from "./message-markdown";
+import { AGENT_PRESET, GITHUB_PRESET, MessageMarkdown, PROMPT_PRESET } from "./message-markdown";
 
 test("messages render GFM and refuse executable markup", () => {
 	const html = renderToStaticMarkup(
@@ -26,12 +26,12 @@ test("service links keep their titles and icons without displaying bare URLs", (
 	];
 	for (const github of [false, true]) {
 		for (const [url, label] of destinations) {
-			const bare = renderToStaticMarkup(<MessageMarkdown github={github} text={url!} />);
+			const bare = renderToStaticMarkup(<MessageMarkdown preset={github ? GITHUB_PRESET : AGENT_PRESET} text={url!} />);
 			expect(bare).toContain(`href="${url}"`);
 			expect(bare.replace(/<[^>]*>/g, "")).toBe(label!);
 			expect(bare).toContain('aria-hidden="true"');
 			expect(bare).not.toContain(`>${url}<`);
-			const titled = renderToStaticMarkup(<MessageMarkdown github={github} text={`[Fix **login**](${url})`} />);
+			const titled = renderToStaticMarkup(<MessageMarkdown preset={github ? GITHUB_PRESET : AGENT_PRESET} text={`[Fix **login**](${url})`} />);
 			expect(titled.replace(/<[^>]*>/g, "")).toBe("Fix login");
 			expect(titled).toContain('aria-hidden="true"');
 		}
@@ -77,7 +77,7 @@ test("a fence titles its code block with its language, colors it line by line, a
 test("GitHub text renders the HTML GitHub allows, hides comments, and still refuses executable markup", () => {
 	const html = renderToStaticMarkup(
 		<MessageMarkdown
-			github
+			preset={GITHUB_PRESET}
 			text={'<!-- CURSOR_SUMMARY -->\n<details><summary>More</summary>\n\nHidden **bold**\n\n</details>\n\n<img src="x" onerror="alert(1)"> <script>alert(1)</script>\n\n```ts\nconst answer = 42\n```'}
 		/>,
 	);
@@ -98,12 +98,12 @@ test("agent text links remote images rather than fetching them, but can show inl
 	expect(html).toContain('<img src="data:image/png;base64,aGVsbG8="');
 });
 
-test("GitHub text shows only GitHub-hosted images and links other image URLs", () => {
+test("GitHub text shows avatars, loads uploads through this server, and links other image URLs", () => {
 	const html = renderToStaticMarkup(
-		<MessageMarkdown github text={'![avatar](https://avatars.githubusercontent.com/u/1?v=4) <img src="https://github.com/user-attachments/assets/123" alt="attachment"> ![other](https://attacker.example/leak)'} />,
+		<MessageMarkdown preset={GITHUB_PRESET} text={'![avatar](https://avatars.githubusercontent.com/u/1?v=4) <img src="https://github.com/user-attachments/assets/123" alt="attachment"> ![other](https://attacker.example/leak)'} />,
 	);
 	expect(html).toContain('<img src="https://avatars.githubusercontent.com/u/1?v=4"');
-	expect(html).toContain('<img src="https://github.com/user-attachments/assets/123"');
+	expect(html).toContain('<img src="/api/github-media?url=https%3A%2F%2Fgithub.com%2Fuser-attachments%2Fassets%2F123" alt="attachment"');
 	expect(html).not.toContain('<img src="https://attacker.example');
 	expect(html).toContain('<a href="https://attacker.example/leak"');
 });
@@ -154,14 +154,14 @@ test("a file link whose escapes do not decode drops its address instead of throw
 	expect(broken.count).toBe(1);
 	expect(broken.html).toContain(">x</a>");
 	expect(broken.html).not.toContain("%E0");
-	const github = renderToStaticMarkup(<MessageMarkdown github text="[passwd](file:///etc/passwd)" />);
+	const github = renderToStaticMarkup(<MessageMarkdown preset={GITHUB_PRESET} text="[passwd](file:///etc/passwd)" />);
 	expect(github).not.toContain("/etc/passwd");
 });
 
 test("a sent prompt draws its references as chips, a ticket still opens, and code stays code", () => {
 	const html = renderToStaticMarkup(
 		<MessageMarkdown
-			prompt
+			preset={PROMPT_PRESET}
 			text={"/skill:ship check @web/app.tsx for [ENG-1 Fix it](https://linear.app/a/issue/ENG-1/fix), not `@web/x.ts`, then **todo \"Tidy\" (id t1)**"}
 		/>,
 	);

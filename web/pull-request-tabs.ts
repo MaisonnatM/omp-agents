@@ -3,7 +3,7 @@ import { parsePullRequest, prKey, type PullRequest } from "../src/shared/github"
 import { hashForPullRequestFiles, hashForPullRequests } from "./routing";
 import { useStoredState } from "./stored-state";
 
-const DETAIL_TABS = ["summary", "comments", "timeline", "code", "review", "triage"] as const;
+const DETAIL_TABS = ["summary", "timeline", "code", "review", "triage"] as const;
 export type PullRequestDetailTab = (typeof DETAIL_TABS)[number];
 export interface PullRequestTab extends PullRequest {
 	detailTab: PullRequestDetailTab;

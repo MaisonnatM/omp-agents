@@ -16,7 +16,6 @@ import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { DROP_LINE } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
-import { DetailsScroller } from "../details-sidebar-frame";
 import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
@@ -135,11 +134,9 @@ function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: strin
 						</Button>
 					</Tooltip>
 				</div>
-				<DetailsScroller viewportClassName="pt-2">
-					<div className="px-4 pb-6">
-						<PullRequestDetails workspace={workspace} hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" />
-					</div>
-				</DetailsScroller>
+				<div className="flex min-h-0 flex-1 flex-col">
+					<PullRequestDetails workspace={workspace} hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" />
+				</div>
 			</TooltipProvider>
 		</aside>
 	);

@@ -1,6 +1,6 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a header of counted tabs, and each tab's panel. */
 import type { LucideIcon } from "lucide-react";
-import { type ComponentPropsWithoutRef, createContext, forwardRef, type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
@@ -29,6 +29,8 @@ export interface DetailsTab<T extends string> {
 	count: number;
 	/** With anything to list, the panel pins its own header to the top edge instead of padding below the sidebar's; empty, it pads as every tab does. */
 	pinned?: boolean;
+	/** The content scrolls itself inside the panel's full height, as a pull request's details do below their header and tabs. */
+	scrollsItself?: boolean;
 	content: ReactNode;
 }
 
@@ -49,26 +51,6 @@ function tabLabel(name: string, count: number): { label: string; badge: number |
 	return count > 0 ? { label: name, badge: count, "aria-label": `${name} (${count})` } : { label: name, badge: undefined, "aria-label": undefined };
 }
 
-/** A details pane's own vertical scroller, for content that reacts to its scroll. */
-export const DetailsScrollerContext = createContext<HTMLElement | null>(null);
-
-/** A details pane's vertical scroller, which hands itself to its content through {@link DetailsScrollerContext}: a sidebar tab's panel, or the details the Pull requests board docks. */
-export const DetailsScroller = forwardRef<HTMLDivElement, Omit<ComponentPropsWithoutRef<typeof SidebarContent>, "viewportRef">>(function DetailsScroller({ children, ...props }, ref) {
-	const [scroller, setScroller] = useState<HTMLElement | null>(null);
-	return (
-		<SidebarContent ref={ref} {...props} viewportRef={setScroller}>
-			<DetailsScrollerContext.Provider value={scroller}>{children}</DetailsScrollerContext.Provider>
-		</SidebarContent>
-	);
-});
-
-function ScrollingPanel({ value, viewportClassName, children }: { value: string; viewportClassName: string; children: ReactNode }) {
-	return (
-		<TabPanel value={value} asChild>
-			<DetailsScroller viewportClassName={viewportClassName}>{children}</DetailsScroller>
-		</TabPanel>
-	);
-}
 
 /** A tab with nothing to show yet, the same in every tab whether its panel is pinned or padded. */
 export function DetailsEmpty({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
@@ -110,11 +92,17 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 						</TabsList>
 					</SizeProvider>
 				</SidebarHeader>
-				{tabs.map(each => (
-					<ScrollingPanel key={each.value} value={each.value} viewportClassName={each.pinned && each.count > 0 ? PINNED_VIEWPORT : PANEL_VIEWPORT}>
-						{each.content}
-					</ScrollingPanel>
-				))}
+				{tabs.map(each =>
+					each.scrollsItself ? (
+						<TabPanel key={each.value} value={each.value} className="flex min-h-0 flex-1 flex-col">
+							{each.content}
+						</TabPanel>
+					) : (
+						<TabPanel key={each.value} value={each.value} asChild>
+							<SidebarContent viewportClassName={each.pinned && each.count > 0 ? PINNED_VIEWPORT : PANEL_VIEWPORT}>{each.content}</SidebarContent>
+						</TabPanel>
+					),
+				)}
 			</Tabs>
 		</FileBaseContext.Provider>
 	);

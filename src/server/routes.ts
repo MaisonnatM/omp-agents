@@ -6,6 +6,7 @@
 import { join } from "node:path";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
+import { readGithubMedia } from "../github-media";
 import { errorText, isNonEmpty, isObject, type Parsed } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
@@ -656,12 +657,15 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 	/** `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>`: the open pull requests stacked with that one, top first, for its details' Stack. */
 	const pullRequestStack = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestStack(pr)));
 
+	/** Images and videos hosted by GitHub; the proxy restricts hosts and keeps the GitHub token off redirected hosts. */
+	const githubMedia = get(params => readGithubMedia(params.get("url")));
+
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
 		body =>
 			checked(
 				parsePullRequestEdit(body),
-				"Expected { owner, repo, number, change } with a title, branch update, label, reviewer, state, review thread, reply, or comment",
+				"Expected { owner, repo, number, change } with a title, description, branch update, label, reviewer, state, review thread, reply, or comment",
 			),
 		savePullRequest,
 	);
@@ -732,6 +736,7 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
+		"/api/github-media": { GET: githubMedia },
 		"/api/pull-request/attachment": { PUT: pullRequestAttach },
 		"/api/pull-request/viewed": { PUT: pullRequestViewed },
 		"/api/merge-queue": { PUT: mergeQueue },

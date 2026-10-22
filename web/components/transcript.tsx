@@ -70,7 +70,7 @@ import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoin
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { ImageViewer } from "./media-viewer";
-import { MessageMarkdown } from "./message-markdown";
+import { MessageMarkdown, PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TranscriptMinimap } from "./transcript-minimap";
 
@@ -504,7 +504,7 @@ const MessageRow = memo(function MessageRow({
 				data-pending={pending || undefined}
 			>
 				{editor ?? (item.kind === "user" && (item.text || item.skill) ? (
-					<MessageMarkdown text={copyText(item)} prompt />
+					<MessageMarkdown text={copyText(item)} preset={PROMPT_PRESET} />
 				) : item.text ? (
 					<MessageMarkdown text={item.text} />
 				) : null)}

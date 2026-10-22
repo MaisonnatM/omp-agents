@@ -169,7 +169,7 @@ const loaded = createCache<PullRequestSummary[]>();
 
 const REACTION_FIELDS = `reactionGroups { content viewerHasReacted users { totalCount } }`;
 
-const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url ${REACTION_FIELDS}`;
+const COMMENT_FIELDS = `author { __typename login ${AVATAR} } body createdAt url ${REACTION_FIELDS}`;
 
 /** The repository permissions that may still comment once a pull request's conversation is locked. */
 const LOCKED_COMMENTERS: Record<string, true> = { ADMIN: true, MAINTAIN: true, WRITE: true };
@@ -189,7 +189,7 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 		} } } } } }
 		files(first: 100) { nodes { path additions deletions changeType } }
 		comments(last: 50) { nodes { ${COMMENT_FIELDS} } }
-		reviews(last: 50) { nodes { state submittedAt author { login ${AVATAR} } body url ${REACTION_FIELDS} } }
+		reviews(last: 50) { nodes { state submittedAt author { __typename login ${AVATAR} } body url ${REACTION_FIELDS} } }
 		reviewThreads(first: ${THREADS}) { totalCount nodes {
 			id isResolved isOutdated viewerCanReply viewerCanResolve viewerCanUnresolve path line comments(first: 20) { totalCount nodes { ${COMMENT_FIELDS} pullRequestReview { state } } }
 		} }

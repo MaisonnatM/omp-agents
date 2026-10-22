@@ -478,6 +478,15 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "a".repeat(257) } })).toBeNull();
 	});
 
+	test("takes an empty or untrimmed description within GitHub's limit and rejects oversized or non-string descriptions", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "" } })?.ok).toEqual({ ...pr, change: { field: "body", body: "" } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "  ## Summary\n\nWords.\n" } })?.ok).toEqual({ ...pr, change: { field: "body", body: "  ## Summary\n\nWords.\n" } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "a".repeat(65_536) } })?.ok.change.field).toBe("body");
+		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "a".repeat(65_537) } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: null } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: 7 } })).toBeNull();
+	});
+
 	test("rejects the merged state, a merge, which goes through the merge queue, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "merged" } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "merge", method: "squash", head: "a".repeat(40) } })).toBeNull();

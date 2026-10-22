@@ -186,10 +186,9 @@ An action that fails shows its error, and its control becomes available again.
   **Attach to Linear issue** lists the session's issues, and attaches each image to the one you pick, as the new-issue dialog attaches files; the images Linear refused stay selected.
   Either button is disabled, with a tooltip saying why, when the session has no pull request or no issue; **Clear** empties the selection.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
-  The first one shows until you pick another: click another pull request of its **Stack**, or of **Other pull requests of the session** under it, to show it in place.
-  **Other pull requests of the session** lists the session's pull requests that the stack does not show, each with whether the session submitted or worked on it.
-  The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Comments**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
-  The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
+  The first one shows until you pick another from the header's **N/M** stack menu, the same popover as the session header's pull request button, or from its **Also on this session** list, which says whether the session submitted or worked on each pull request.
+  The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
+  The header and the tab bar stay at the top of the sidebar, and only the tab's content scrolls below them, as on the page.
   The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - **Review triage** turns the findings of a session, such as a thermonuclear review run in a Terminal session, into decision cards, with the count of cards still waiting for a decision.
@@ -836,8 +835,8 @@ An action that fails shows its error, and its control becomes available again.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
   The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
   In a narrow panel, action labels hide but their tooltips and accessible names remain.
-- Under the header, a compact segmented control splits the details into **Summary**, **Comments**, **Timeline**, **Code**, **Review draft** while a review draft is kept, and **Review triage** once a **Triage comments** or **Thermonuclear review** session has started on it.
-  Tabs have no count badges; their accessible names still include comment and pending-finding counts.
+- Under the header, a compact segmented control splits the details into **Summary**, **Timeline**, **Code**, **Review draft** while a review draft is kept, and **Review triage** once a **Triage comments** or **Thermonuclear review** session has started on it.
+  Tabs have no count badges; their accessible names still include timeline and pending-finding counts.
   Left and Right arrow keys select adjacent tabs, and Home and End select the first and last.
   Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, `15 of 25 passing`, `All checks passed`, or `No checks reported`.
@@ -846,22 +845,30 @@ An action that fails shows its error, and its control becomes available again.
   **Show all** reveals completed checks when other checks are failing or running, and **Show less** hides them again.
   Each row names its status and links to the check run through **Details** when GitHub provides a link.
   In a narrow panel the checks label hides, but the status icon's accessible name keeps the summary.
-- **Summary** lists the pull request's reviewers, labels, and sessions.
-  **Reviewers** shows overlapping avatars marked by review outcome, or **None**.
+- **Summary** starts with the pull request's reviewers and labels.
+  **Reviewers** shows overlapping avatars, each with the dot the pull request list marks a review's outcome with, or **None**.
   Click the row for the people who can review on the repository, with the author left out.
   Picking a person requests a review, again when they reviewed already, and picking someone already requested withdraws the request.
   **Labels** shows the labels in their GitHub colors; click them for the repository's labels, and pick one to add or remove it.
   The lists of reviewers and labels come from GitHub on the first click of either picker, and the server keeps them for 5 minutes.
   A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why above the tab.
-  **Sessions** shows the running sessions on the pull request.
-  When another open pull request of its repository stacks with it by base branch, whoever opened it, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, as Graphite does, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
+  The header's linked-sessions count opens a small list of the running sessions on the pull request, each opening through the usual session action.
+  When another open pull request stacks with it by base branch, the header's **N/M** menu shows the stack top first on a rail and marks the current layer.
+  The menu is the session header's stack popover, with **Merge stack**, the session's other pull requests, and the GitHub and Graphite links.
   The server reads the repository's open pull requests for it and keeps them for 30 seconds.
-  Then comes the description in full.
-- **Comments** lists the pull request's review threads, unresolved ones first, each under the file and line it is on, which link to the file on the **Code** tab, with every comment in it.
-  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; the details undo a refused change and say why above the tab.
-  Resolved threads fold behind a line with their count, such as **2 resolved**.
-  A thread you can reply to has a reply box under it: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and the box keeps your words and says why when GitHub refuses them.
-  Under the threads, **Conversation** lists the comments and reviews with words on the pull request, oldest first, then a box to comment that works as the reply box does, shown when GitHub lets you comment.
+  **Description**, **Checks**, and **Comments** are collapsible sections with sticky headings.
+  **Checks** starts collapsed and says **No checks reported.** when empty; otherwise it lists them as the tab bar's checks popover does, failing and running ones first, with each check's **Details** link.
+  The pencil on **Description** opens a textarea with **Save** and **Cancel**; Escape cancels, and a failed save keeps the draft.
+  Descriptions and comments render GitHub alerts, issue-number and full-commit autolinks, inline-code chips, attachment cards, and authenticated GitHub images and videos.
+  Session transcripts keep their existing Markdown rendering.
+- **Comments** inside **Summary** mixes review threads, comments, and review verdicts in cards, newest first, showing ten conversations at a time.
+  **Filter comments** toggles **Bot comments** and **Resolved or dismissed**, both hidden by default and remembered in this browser.
+  Images in the description and comments load through the app from GitHub's hosts; an image from any other host, or one that fails to load, shows as a link.
+  **Newest first** flips to **Oldest first** within the recent conversations shown; **Show older conversations** adds ten more.
+  Resolved threads and dismissed reviews start folded.
+  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; a refused change is undone.
+  A thread you can reply to has a reply box: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and a refusal keeps the draft.
+  The comment box works the same way and shows only when GitHub lets you comment.
   Replies and comments go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
 - **Timeline** puts the pull request's activity on a vertical rail, newest first, with avatars for conversations and commits and icons for opened, merged, and closed events.
   Consecutive comments and commented reviews fold into conversation groups showing their comment and author counts.

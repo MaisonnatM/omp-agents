@@ -35,7 +35,8 @@ function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) 
 	);
 }
 
-function Checks({ summary }: { summary: ChecksPresentation }) {
+/** The checks that need attention and those running, then the completed ones, folded behind **Show all** while any of the first two remain. */
+export function Checks({ summary }: { summary: ChecksPresentation }) {
 	const [showAll, setShowAll] = useState(false);
 	const { attention, running, completed } = summary;
 	const canCollapse = attention.length + running.length > 0 && completed.length > 0;

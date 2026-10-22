@@ -1,4 +1,3 @@
-import { Tag } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestLabel, type PullRequestOptions, type Reviewer } from "../../../src/shared/github";
 import { type ReadState, useRead } from "../../reads";
@@ -77,16 +76,7 @@ export function LabelsField({ detail, options, save, children }: OptionsFieldPro
 			field="Labels"
 			current={names.join(", ") || "none"}
 			className={ROW_FIELD}
-			trigger={
-				detail.labels.length > 0 ? (
-					children
-				) : (
-					<>
-						<Tag aria-hidden className="size-4 text-muted-foreground" />
-						<span className="text-muted-foreground">Add a label</span>
-					</>
-				)
-			}
+			trigger={children}
 			choices={options.data?.labels.map(label => ({ value: label.name, label: label.name, icon: <LabelDot label={label} /> })) ?? null}
 			error={options.error}
 			selected={names}

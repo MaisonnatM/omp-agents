@@ -1,33 +1,39 @@
-import { Bot, type LucideIcon, Tag, Users } from "lucide-react";
-import type { ReactNode } from "react";
-import type { LinkedPullRequest, PullRequest, PullRequestDetail, StackedPullRequest } from "../../../../src/shared/github";
-import type { RosterHost } from "../../../../src/shared/sessions";
-import { LiveSessionChips } from "../../session-chip";
-import { DetailSection, Markdown } from "../../sheet-details";
-import { LabelDot, LabelsField, ReviewersField, type PullRequestOptionsRead, type SavePullRequest } from "../pr-fields";
-import type { DetailContentProps } from ".";
-import { OtherPullRequests, StackSection } from "./stack";
+/** The Summary tab: reviewers and labels, the description and its editor, the checks, and the comments. */
+import { type LucideIcon, Pencil, Tag, Users } from "lucide-react";
+import { type CSSProperties, type ReactNode, useState } from "react";
+import { MAX_PULL_REQUEST_BODY, type PullRequestDetail } from "../../../../src/shared/github";
+import { Button } from "@/components/ui/button";
+import { useAction } from "../../../use-action";
+import { LabelsField, ReviewersField, type PullRequestOptionsRead, type SavePullRequest, type SendPullRequest } from "../pr-fields";
 import { Reviewers } from "../avatars";
+import { PullRequestMarkdown } from "../pr-markdown";
+import { presentChecks } from "../../../pull-request-checks";
+import { Checks } from "./checks";
+import { Comments } from "./comments";
+import { SummarySection } from "./section";
 
-function Property({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
+function MetaRow({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
 	return (
-		<>
-			<dt className="flex min-h-7 items-center gap-1.5 text-muted-foreground sm:min-h-6">
+		<div className="grid min-h-7 min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 text-xs sm:min-h-6">
+			<span className="flex items-center gap-1.5 text-muted-foreground">
 				<Icon aria-hidden className="size-3.5" />
 				{label}
-			</dt>
-			<dd className="flex min-h-7 min-w-0 items-center sm:min-h-6">{children}</dd>
-		</>
+			</span>
+			<div className="min-w-0 text-foreground">{children}</div>
+		</div>
 	);
 }
 
 function LabelChips({ labels }: { labels: PullRequestDetail["labels"] }) {
 	if (labels.length === 0) return <span className="text-muted-foreground">None</span>;
 	return (
-		<span className="flex flex-wrap gap-1.5">
+		<span className="flex flex-wrap gap-1">
 			{labels.map(label => (
-				<span key={label.name} className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs">
-					<LabelDot label={label} />
+				<span
+					key={label.name}
+					style={{ "--label": `#${label.color}` } as CSSProperties}
+					className="max-w-48 min-w-0 truncate rounded-md border border-[color-mix(in_srgb,var(--label)_32%,transparent)] bg-[color-mix(in_srgb,var(--label)_12%,transparent)] px-2 py-0.5 text-xs"
+				>
 					{label.name}
 				</span>
 			))}
@@ -35,42 +41,98 @@ function LabelChips({ labels }: { labels: PullRequestDetail["labels"] }) {
 	);
 }
 
-interface SummaryProps {
-	pr: PullRequest;
-	detail: PullRequestDetail;
-	options: PullRequestOptionsRead;
-	stack: StackedPullRequest[];
-	/** The session's pull requests outside the stack. */
-	others: LinkedPullRequest[];
-	sessions: RosterHost[];
-	onOpen: DetailContentProps["onOpen"];
-	onPick: DetailContentProps["onPick"];
-	save: SavePullRequest;
+function Description({ detail, send }: { detail: PullRequestDetail; send: SendPullRequest }) {
+	const [editing, setEditing] = useState(false);
+	const [body, setBody] = useState(detail.body);
+	const save = useAction(async () => {
+		if (body !== detail.body) await send({ field: "body", body });
+		setEditing(false);
+	}, "Could not save the description");
+	const edit = (): void => {
+		setBody(detail.body);
+		setEditing(true);
+	};
+	return (
+		// Keyed on editing, so a collapsed section opens again for its editor.
+		<SummarySection
+			key={String(editing)}
+			title="Description"
+			actions={
+				!editing && (
+					<Button size="icon-xs" variant="ghost-muted" aria-label="Edit description" onClick={edit}>
+						<Pencil aria-hidden className="size-3" />
+					</Button>
+				)
+			}
+		>
+			{editing ? (
+				<form
+					className="space-y-2"
+					onSubmit={event => {
+						event.preventDefault();
+						save.run();
+					}}
+					onKeyDown={event => {
+						if (event.key !== "Escape" || save.pending) return;
+						event.preventDefault();
+						event.stopPropagation();
+						setEditing(false);
+					}}
+				>
+					<textarea
+						autoFocus
+						aria-label="Pull request description"
+						placeholder="Describe this pull request"
+						value={body}
+						maxLength={MAX_PULL_REQUEST_BODY}
+						disabled={save.pending}
+						rows={10}
+						onChange={event => setBody(event.target.value)}
+						className="block max-h-[60vh] min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+					<div className="flex justify-end gap-1">
+						<Button type="button" variant="ghost" size="xs" disabled={save.pending} onClick={() => setEditing(false)}>
+							Cancel
+						</Button>
+						<Button type="submit" variant="outline" size="xs" loading={save.pending}>
+							{save.pending ? "Saving..." : "Save"}
+						</Button>
+					</div>
+				</form>
+			) : (
+				<PullRequestMarkdown text={detail.body.trim() ? detail.body : "_No description provided._"} repo={detail} />
+			)}
+		</SummarySection>
+	);
 }
 
-export function Summary({ pr, detail, options, stack, others, sessions, onOpen, onPick, save }: SummaryProps) {
+interface SummaryProps {
+	detail: PullRequestDetail;
+	options: PullRequestOptionsRead;
+	save: SavePullRequest;
+	send: SendPullRequest;
+}
+
+export function Summary({ detail, options, save, send }: SummaryProps) {
 	return (
-		<div className="space-y-6">
-			<dl className="grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 text-xs">
-				<Property icon={Users} label="Reviewers">
+		<div>
+			<section className="space-y-2 px-4 pt-2.5 pb-1" aria-label="Pull request metadata">
+				<MetaRow icon={Users} label="Reviewers">
 					<ReviewersField detail={detail} options={options} save={save}>
 						{detail.reviewers.length ? <Reviewers reviewers={detail.reviewers} /> : <span className="text-muted-foreground">None</span>}
 					</ReviewersField>
-				</Property>
-				<Property icon={Tag} label="Labels">
+				</MetaRow>
+				<MetaRow icon={Tag} label="Labels">
 					<LabelsField detail={detail} options={options} save={save}>
 						<LabelChips labels={detail.labels} />
 					</LabelsField>
-				</Property>
-				{sessions.length > 0 && (
-					<Property icon={Bot} label="Sessions">
-						<LiveSessionChips hosts={sessions} onOpen={onOpen} />
-					</Property>
-				)}
-			</dl>
-			{stack.length > 0 && <StackSection stack={stack} current={pr} onPick={onPick} />}
-			{others.length > 0 && onPick && <OtherPullRequests others={others} onPick={onPick} />}
-			<DetailSection title="Description">{detail.body.trim() ? <Markdown text={detail.body} /> : <p className="text-sm text-muted-foreground">No description.</p>}</DetailSection>
+				</MetaRow>
+			</section>
+			<Description detail={detail} send={send} />
+			<SummarySection title="Checks" defaultOpen={false}>
+				{detail.checkRuns.length === 0 ? <p className="text-xs text-muted-foreground">No checks reported.</p> : <Checks summary={presentChecks(detail.checkRuns)} />}
+			</SummarySection>
+			<Comments detail={detail} save={save} send={send} />
 		</div>
 	);
 }

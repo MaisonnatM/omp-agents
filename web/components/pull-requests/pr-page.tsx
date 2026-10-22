@@ -67,7 +67,7 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 	return (
 		<>
 			{(missing || started) && (
-				<div className={cn("space-y-2", placement === "page" && "px-6 pt-4")}>
+				<div className={cn("space-y-2", placement === "page" ? "px-6 pt-4" : "px-4 pt-3")}>
 					{missing && (
 						<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
 							{whyMissing(target, read.data, workspace === null)}

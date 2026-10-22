@@ -1,13 +1,14 @@
-import { ArrowLeft, ExternalLink, FileDiff, GitMerge, GitPullRequest, Pencil, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileDiff, GitMerge, GitPullRequest, Layers, MessageSquare, Pencil, TriangleAlert } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
-import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, prKey, MAX_PULL_REQUEST_TITLE, type StackedPullRequest, type UpdateMethod } from "../../../../src/shared/github";
+import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, prKey, MAX_PULL_REQUEST_TITLE, samePullRequest, type StackedPullRequest, type UpdateMethod } from "../../../../src/shared/github";
+import type { RosterHost } from "../../../../src/shared/sessions";
 import { primaryControl } from "../../../../src/shared/moves";
 import { MERGE_METHOD_LABELS } from "../../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { age } from "../../../labels";
+import { age, hostLabel, modeOf } from "../../../labels";
 import { useAction } from "../../../use-action";
 import { useInlineConfirm } from "../../../use-inline-confirm";
 import { CopyableCode } from "../../copyable-code";
@@ -19,6 +20,21 @@ import { type SavePullRequest, type SendPullRequest } from "../pr-fields";
 import { PullRequestMenu } from "../pr-menu";
 import { useMergeController } from "../use-merge-controller";
 import type { Placement } from ".";
+import type { DetailContentProps } from ".";
+import { StackPopover } from "./stack";
+import { SessionChip } from "../../session-chip";
+
+function LinkedSessions({ sessions, onOpen }: { sessions: RosterHost[]; onOpen: DetailContentProps["onOpen"] }) {
+	const [open, setOpen] = useState(false);
+	if (sessions.length === 0) return null;
+	return <Popover open={open} onOpenChange={setOpen}>
+		<PopoverTrigger asChild><Button size="xs" variant="ghost-muted" leadingIcon={MessageSquare} aria-label={`Linked from ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`}>{sessions.length}</Button></PopoverTrigger>
+		<PopoverContent align="start" className="max-h-(--radix-popover-content-available-height) w-64 space-y-2 overflow-y-auto p-3">
+			<p className="text-xs font-medium text-muted-foreground">Linked sessions</p>
+			<div className="flex flex-col items-start gap-2 text-xs">{sessions.map(host => <SessionChip key={host.instanceId} label={hostLabel(host)} status={host.status} title="Open the session" filled={false} onClick={event => { setOpen(false); onOpen({ kind: "live", instanceId: host.instanceId, agentId: null }, modeOf(event)); }} />)}</div>
+		</PopoverContent>
+	</Popover>;
+}
 
 const ACTION_LABEL = "@max-[30rem]/pr-header:hidden";
 const ACTION_BUTTON = "shrink-0 font-medium @max-[30rem]/pr-header:gap-0 @max-[30rem]/pr-header:px-1.5";
@@ -98,6 +114,10 @@ interface DetailHeaderProps {
 	pr: PullRequest;
 	detail: PullRequestDetail | null;
 	stack: StackedPullRequest[];
+	others: LinkedPullRequest[];
+	sessions: RosterHost[];
+	onOpen: DetailContentProps["onOpen"];
+	onPick: DetailContentProps["onPick"];
 	quick: QuickActionsProps;
 	onSave: SavePullRequest;
 	send: SendPullRequest;
@@ -109,7 +129,7 @@ interface DetailHeaderProps {
 	foldRef: RefObject<HTMLDivElement | null>;
 }
 
-export function DetailHeader({ pr, detail, stack, quick, onSave, send, onMergeQueued, placement, headingRef, cwd, condensed, foldRef }: DetailHeaderProps) {
+export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPick, quick, onSave, send, onMergeQueued, placement, headingRef, cwd, condensed, foldRef }: DetailHeaderProps) {
 	const { allowed, method, pick, queued, merging, pending, merge, cancel } = useMergeController({ pr, target: detail, onQueued: onMergeQueued, onCancelled: onMergeQueued });
 	const control = detail ? primaryControl(detail, method, queued?.method ?? null) : { kind: "none" as const };
 	const confirm = useInlineConfirm(`${prKey(pr)}:${detail?.headOid}:${method}`);
@@ -137,6 +157,7 @@ export function DetailHeader({ pr, detail, stack, quick, onSave, send, onMergeQu
 			</span>
 		</span>
 	);
+	const layer = stack.length - stack.findIndex(member => samePullRequest(member, pr));
 	return (
 		<header className="@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 pt-2">
 			<div className="grid h-7 min-w-0 items-center overflow-hidden pl-4">
@@ -147,6 +168,21 @@ export function DetailHeader({ pr, detail, stack, quick, onSave, send, onMergeQu
 				</div>
 			</div>
 			<div className="mr-4 flex h-7 shrink-0 items-center justify-end gap-1">
+				{(stack.length > 0 || others.length > 0) && (
+					<StackPopover
+						stack={stack}
+						others={others}
+						current={pr}
+						onPick={onPick}
+						align="end"
+						trigger={() => (
+							<Button variant="ghost-muted" size="xs" leadingIcon={Layers} aria-label={stack.length ? `Stack, layer ${layer} of ${stack.length}` : "Other pull requests of the session"}>
+								{stack.length ? `${layer}/${stack.length}` : `+${others.length}`}
+							</Button>
+						)}
+					/>
+				)}
+				<LinkedSessions sessions={sessions} onOpen={onOpen} />
 				{queued && state !== "merged" && state !== "closed" && badge}
 				{(control.kind === "merged" || control.kind === "closed") && (
 					<span className={cn("inline-flex h-6 items-center gap-1 rounded-md border border-border px-[7px] text-xs", tone)}>

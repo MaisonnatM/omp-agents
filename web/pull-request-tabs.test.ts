@@ -84,8 +84,8 @@ test("the shown tab's neighbour after it closes is the right one, then the left,
 });
 
 test("the page stores its tabs' order and detail tabs without an active tab", () => {
-	const { open } = change(opened(), { type: "detail", pr: third, tab: "comments" });
-	expect(JSON.parse(JSON.stringify(open))).toEqual([{ ...first, detailTab: "summary" }, { ...second, detailTab: "summary" }, { ...third, detailTab: "comments" }]);
+	const { open } = change(opened(), { type: "detail", pr: third, tab: "timeline" });
+	expect(JSON.parse(JSON.stringify(open))).toEqual([{ ...first, detailTab: "summary" }, { ...second, detailTab: "summary" }, { ...third, detailTab: "timeline" }]);
 	expect(decodePageTabs(JSON.stringify(open))).toEqual(open);
 	expect(decodePageTabs(JSON.stringify({ open, active: "acme/app#1" }))).toEqual([]);
 	expect(decodePageTabs("broken")).toEqual([]);

@@ -1,19 +1,22 @@
-/** A pull request's Comments tab: its review threads, open ones first, to reply to and resolve, then its conversation and a box to comment. */
-import { Check, RotateCcw } from "lucide-react";
-import { useId, useState } from "react";
-import { MAX_COMMENT_BODY, type PullRequestDetail, type PullRequestThread } from "../../../../src/shared/github";
+/** Summary's **Comments**: the pull request's conversations, filtered, ordered, and paged, each thread with its replies, resolve toggle, and reply composer, then the new-comment composer. */
+import { ArrowDownUp, Check, ListFilter, RotateCcw } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import { MAX_COMMENT_BODY, type PullRequestComment, type PullRequestDetail, type PullRequestEvent, type PullRequestThread } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuSwitchItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { errorText } from "../../../api";
-import { openThreads, spokenConversation, withThreadResolved } from "../../../pull-requests-model";
+import { withThreadResolved } from "../../../pull-requests-model";
+import { conversationItems, decodeCommentFilter, filterConversations, pageConversations } from "../../../pull-request-comments";
+import { useStoredState } from "../../../stored-state";
 import { chordLabel } from "../../../shortcuts";
-import { FoldButton } from "../../fold";
 import { ERROR_TEXT, isSubmitChord, type Submit } from "../../form-dialog";
-import { DetailSection, Markdown } from "../../sheet-details";
-import { EventBody, Message, ThreadPlace } from "./message";
+import { REVIEW_STYLE, ThreadPlace } from "./message";
+import { PullRequestMarkdown } from "../pr-markdown";
+import { Avatar } from "../avatars";
 import type { SavePullRequest, SendPullRequest } from "../pr-fields";
+import { SummarySection } from "./section";
 
-/** A text box that sends its draft with its button or Cmd+Enter, and keeps the draft, with the reason, when GitHub refuses it. */
 function Composer({ label, placeholder, onSend }: { label: string; placeholder: string; onSend: (body: string) => Promise<void> }) {
 	const [draft, setDraft] = useState("");
 	const [submit, setSubmit] = useState<Submit>({ kind: "writing" });
@@ -70,32 +73,79 @@ interface ThreadProps {
 	send: SendPullRequest;
 }
 
-/** A review thread: where it sits, Resolve or Unresolve, every comment, and a reply box. */
+function CommentCard({ comment, detail, review, children }: { comment: PullRequestComment; detail: PullRequestDetail; review?: PullRequestEvent["review"]; children?: ReactNode }) {
+	return (
+		<article className="group rounded-lg border border-border/60 bg-background">
+			<div className="flex flex-wrap items-center gap-2 rounded-t-lg bg-muted/25 px-3 py-2.5 text-xs text-muted-foreground">
+				<Avatar person={comment.author} label={comment.author.login} className="size-4" />
+				<span className="font-medium text-foreground">{comment.author.login}</span>
+				{review && <span className={REVIEW_STYLE[review].tone}>{REVIEW_STYLE[review].label}</span>}
+				<time dateTime={new Date(comment.at).toISOString()} className="ml-auto">
+					{new Date(comment.at).toLocaleDateString()}
+				</time>
+			</div>
+			{comment.body.trim() && <PullRequestMarkdown text={comment.body} repo={detail} className="px-3 py-3" />}
+			{children}
+		</article>
+	);
+}
+
+/** A folded conversation: who started it and why it is folded, opening it on a click. */
+function FoldedBar({ author, reason, open, onToggle }: { author: string; reason: string; open: boolean; onToggle: () => void }) {
+	return (
+		<button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-left text-xs text-muted-foreground">
+			{author}
+			<span className="ml-auto">{reason}</span>
+		</button>
+	);
+}
+
 function ThreadCard({ detail, thread, save, send }: ThreadProps) {
+	const folded = thread.resolved || thread.dismissed;
+	const [open, setOpen] = useState(!folded);
+	const [root, ...replies] = thread.comments;
+	if (!root) return null;
 	const toggle = (): void => save({ field: "thread", id: thread.id, resolved: !thread.resolved }, withThreadResolved(detail, thread.id, !thread.resolved));
 	return (
-		<li className="rounded-md border border-border">
-			<div className="flex min-h-9 items-center gap-2 border-b border-border px-2 py-1 text-xs text-muted-foreground">
-				<ThreadPlace detail={detail} thread={thread} />
-				{(thread.resolved ? thread.can.unresolve : thread.can.resolve) && (
-					<Button variant="ghost" size="compact" className="ml-auto shrink-0" leadingIcon={thread.resolved ? RotateCcw : Check} onClick={toggle}>
-						{thread.resolved ? "Unresolve" : "Resolve"}
-					</Button>
-				)}
-			</div>
-			<ul>
-				{thread.comments.map((comment, index) => (
-					<Message key={index} author={comment.author} at={comment.at}>
-						<Markdown text={comment.body} />
-					</Message>
-				))}
-			</ul>
-			{thread.can.reply && (
-				<div className="px-2 pb-2">
-					<Composer label="Reply" placeholder="Reply…" onSend={body => send({ field: "reply", thread: thread.id, body })} />
-				</div>
+		<div className="space-y-2">
+			{folded && <FoldedBar author={root.author.login} reason={thread.resolved ? "Resolved" : "Dismissed"} open={open} onToggle={() => setOpen(!open)} />}
+			{(!folded || open) && (
+				<>
+					<CommentCard comment={root} detail={detail}>
+						<div className="flex items-center gap-2 px-3 pb-2 text-xs text-muted-foreground">
+							<ThreadPlace detail={detail} thread={thread} />
+							{(thread.resolved ? thread.can.unresolve : thread.can.resolve) && (
+								<Button variant="ghost" size="xs" className="ml-auto shrink-0" leadingIcon={thread.resolved ? RotateCcw : Check} onClick={toggle}>
+									{thread.resolved ? "Unresolve" : "Resolve"}
+								</Button>
+							)}
+						</div>
+					</CommentCard>
+					{replies.length > 0 && (
+						<div className="ml-4 space-y-2 border-l-2 border-border/60 pl-3">
+							{replies.map((comment, index) => (
+								<CommentCard key={comment.url ?? index} comment={comment} detail={detail} />
+							))}
+						</div>
+					)}
+					{thread.can.reply && (
+						<div className="ml-4 pl-3">
+							<Composer label="Reply" placeholder="Reply…" onSend={body => send({ field: "reply", thread: thread.id, body })} />
+						</div>
+					)}
+				</>
 			)}
-		</li>
+		</div>
+	);
+}
+
+function DismissedCard({ event, detail }: { event: PullRequestEvent; detail: PullRequestDetail }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div className="space-y-2">
+			<FoldedBar author={event.author.login} reason="Review dismissed" open={open} onToggle={() => setOpen(!open)} />
+			{open && <CommentCard comment={event} detail={detail} review="dismissed" />}
+		</div>
 	);
 }
 
@@ -106,49 +156,89 @@ interface CommentsProps {
 }
 
 export function Comments({ detail, save, send }: CommentsProps) {
-	const [resolvedOpen, setResolvedOpen] = useState(false);
-	const resolvedId = useId();
-	const open = openThreads(detail);
-	const resolved = detail.threads.filter(thread => thread.resolved);
-	const conversation = spokenConversation(detail);
-	const card = (thread: PullRequestThread) => <ThreadCard key={thread.id} detail={detail} thread={thread} save={save} send={send} />;
-	return (
-		<div className="space-y-6">
-			<DetailSection
-				title={
-					<>
-						Review threads <span className="tabular-nums">{open.length}</span>
-					</>
-				}
+	const [filter, setFilter] = useStoredState("omp-agents.pr-comment-filter", decodeCommentFilter, JSON.stringify);
+	const [order, setOrder] = useState<"newest" | "oldest">("newest");
+	const [shown, setShown] = useState(10);
+	const items = conversationItems(detail);
+	const filtered = filterConversations(items, filter);
+	const { visible, hidden } = pageConversations(filtered, shown, order);
+	const count = items.reduce((sum, item) => sum + item.comments.length, 0);
+	const hiddenComments = count - filtered.reduce((sum, item) => sum + item.comments.length, 0);
+	const showRecent = (): void => setShown(10);
+	const actions = (
+		<div className="flex shrink-0 items-center gap-1">
+			<DropdownMenu>
+				<DropdownMenuTrigger render={<Button size="xs" variant="ghost-muted" aria-label="Filter comments" leadingIcon={ListFilter} />}>
+					{hiddenComments ? `${hiddenComments} hidden` : "Filter"}
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<MenuSwitchItem
+						checked={filter.bots}
+						closeOnClick={false}
+						onCheckedChange={bots => {
+							setFilter(value => ({ ...value, bots }));
+							showRecent();
+						}}
+					>
+						Bot comments
+					</MenuSwitchItem>
+					<MenuSwitchItem
+						checked={filter.resolved}
+						closeOnClick={false}
+						onCheckedChange={resolved => {
+							setFilter(value => ({ ...value, resolved }));
+							showRecent();
+						}}
+					>
+						Resolved or dismissed
+					</MenuSwitchItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<Button
+				size="xs"
+				variant="ghost-muted"
+				leadingIcon={ArrowDownUp}
+				aria-label={order === "newest" ? "Show oldest comments first" : "Show newest comments first"}
+				onClick={() => setOrder(order === "newest" ? "oldest" : "newest")}
 			>
-				{open.length === 0 ? <p className="text-sm text-muted-foreground">No open review threads.</p> : <ul className="space-y-3">{open.map(card)}</ul>}
-				{resolved.length > 0 && (
-					<div className="space-y-2">
-						<FoldButton open={resolvedOpen} onToggle={() => setResolvedOpen(value => !value)} controls={resolvedId} className="text-xs text-muted-foreground">
-							{resolved.length} resolved
-						</FoldButton>
-						{resolvedOpen && (
-							<ul id={resolvedId} className="space-y-3">
-								{resolved.map(card)}
-							</ul>
-						)}
-					</div>
-				)}
-			</DetailSection>
-			<DetailSection title="Conversation">
-				{conversation.length === 0 ? (
-					<p className="text-sm text-muted-foreground">No comments yet.</p>
+				<span className="@max-[30rem]/pr:sr-only">{order === "newest" ? "Newest first" : "Oldest first"}</span>
+			</Button>
+		</div>
+	);
+	const older = hidden > 0 && (
+		<Button size="xs" variant="outline" className="w-full" onClick={() => setShown(shown + 10)}>
+			Show {Math.min(hidden, 10)} older conversations ({hidden} hidden)
+		</Button>
+	);
+	return (
+		<SummarySection title={`Comments (${count})`} actions={actions}>
+			<div className="space-y-3">
+				{items.length === 0 ? (
+					<p className="py-2 text-xs text-muted-foreground">No comments yet.</p>
+				) : filtered.length === 0 ? (
+					<p className="py-2 text-xs text-muted-foreground">All {hiddenComments} comments are hidden by the filter.</p>
 				) : (
-					<ul>
-						{conversation.map((event, index) => (
-							<Message key={index} author={event.author} at={event.at}>
-								<EventBody event={event} />
-							</Message>
-						))}
-					</ul>
+					<>
+						{order === "oldest" && older}
+						{visible.map(item =>
+							item.kind === "thread" ? (
+								<ThreadCard key={item.id} thread={item.thread} detail={detail} save={save} send={send} />
+							) : item.event.review === "dismissed" ? (
+								<DismissedCard key={item.id} event={item.event} detail={detail} />
+							) : (
+								<CommentCard key={item.id} comment={item.event} detail={detail} review={item.event.review} />
+							),
+						)}
+						{order === "newest" && older}
+						{shown > 10 && (
+							<Button size="xs" variant="ghost" className="w-full" onClick={showRecent}>
+								Show only 10 recent conversations
+							</Button>
+						)}
+					</>
 				)}
 				{detail.canComment && <Composer label="Comment" placeholder="Leave a comment…" onSend={body => send({ field: "comment", body })} />}
-			</DetailSection>
-		</div>
+			</div>
+		</SummarySection>
 	);
 }

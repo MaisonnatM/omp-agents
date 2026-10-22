@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { dataOf, ghMutation, ghRestWrite } from "./github";
+import { dataOf, ghMutation, ghRestWrite, parsePerson } from "./github";
 import * as proc from "./proc";
 
 afterEach(() => {
 	mock.restore();
+});
+
+test("bot identity comes from GitHub rather than a hardcoded login list", () => {
+	expect(parsePerson({ __typename: "Bot", login: "cursor", avatarUrl: "https://avatars.example/cursor" })).toEqual({ login: "cursor", avatarUrl: "https://avatars.example/cursor", isBot: true });
+	expect(parsePerson({ __typename: "User", login: "cursor", avatarUrl: null })).toEqual({ login: "cursor", avatarUrl: null });
 });
 
 describe("ghMutation", () => {

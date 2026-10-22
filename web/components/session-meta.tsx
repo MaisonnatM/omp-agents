@@ -1,26 +1,19 @@
 /** The subagent header's crumb styles, and a session header's controls: its branch, its Linear issues, and its pull requests. */
-import { Check, ChevronDown, Copy, GitMerge, GitPullRequest, Layers } from "lucide-react";
-import { Fragment, type MouseEvent, useEffect, useState } from "react";
-import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest } from "../../src/shared/github";
-import { queuedMergeOf } from "../../src/shared/merge-queue";
+import { Check, ChevronDown, Copy, GitPullRequest, Layers } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { type LinkedPullRequest, prKey, type StackedPullRequest } from "../../src/shared/github";
 import type { SessionFacts } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
-import { LINK_VERB } from "../labels";
-import { graphiteUrl, sessionStack } from "../pull-requests-model";
+import { sessionStack } from "../pull-requests-model";
 import { PAGE_ICON } from "../page-icons";
 import { ticketsStore, useRead } from "../reads";
-import { hashForPullRequests, hashForTickets } from "../routing";
+import { hashForTickets } from "../routing";
 import { linearUrlOf } from "../tickets-model";
 import { BrandMark, LINEAR_LOGO } from "./integrations/brand-logos";
 import { BranchName, releaseBranch } from "./git";
-import { StackRail } from "./pull-requests/pr-details/stack";
-import { MergePopover, QueuedMergeNote, useMergeTarget } from "./pull-requests/merge-popover";
-import { useCancelMerge } from "./pull-requests/use-merge-controller";
-import { useDashboardStatus } from "./dashboard-context";
-import { OrgIcon } from "./org-icon";
+import { StackPopover } from "./pull-requests/pr-details/stack";
 import { useCopy } from "../use-copy";
 
 export const PARENT_CRUMB = "font-normal text-muted-foreground";
@@ -59,7 +52,6 @@ export function SessionIdCopy({ id }: { id: string }) {
  * or on Graphite. When two or more of them stack, the button says so and the popover shows the stack on its rail, the session's other PRs below it.
  */
 function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
-	const [open, setOpen] = useState(false);
 	const [first] = pullRequests;
 	const query = first && pullRequests.length > 1 ? new URLSearchParams({ owner: first.owner, repo: first.repo, number: String(first.number) }) : null;
 	// Read again when the session links another PR, which may join the stack.
@@ -67,14 +59,12 @@ function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[]
 	if (!first) return null;
 	const stacked = sessionStack(pullRequests, stackRead.data ?? []);
 	const others = stacked?.others ?? pullRequests;
-	const top = stacked?.stack[0];
-	// A link in the popover leaves the page or opens a tab; either way the popover is done.
-	const closeOnLink = (event: MouseEvent): void => {
-		if (event.target instanceof Element && event.target.closest("a")) setOpen(false);
-	};
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
+		<StackPopover
+			stack={stacked?.stack ?? []}
+			others={others}
+			align="end"
+			trigger={open => (
 				<Button variant="secondary" size="compact" leadingIcon={stacked ? Layers : GitPullRequest} trailingIcon={ChevronDown} active={open}>
 					{stacked ? (
 						<>
@@ -87,79 +77,8 @@ function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[]
 						</>
 					)}
 				</Button>
-			</PopoverTrigger>
-			<PopoverContent align="end" className="w-[28rem] p-0" onClick={closeOnLink}>
-				{stacked && <StackRail stack={stacked.stack} trailing={pr => <ExternalLinks pr={pr} />} />}
-				{stacked && <MergeStack stack={stacked.stack} />}
-				{others.length > 0 && (
-					<div className={stacked ? "border-t border-border py-1" : "py-1"}>
-						{stacked && <p className="px-3 pt-1 pb-0.5 text-xs text-muted-foreground">Also on this session</p>}
-						<ul>
-							{others.map(pr => (
-								<li key={prKey(pr)} className="flex items-center gap-2 py-1.5 pr-3 pl-3 text-sm">
-									<GitPullRequest aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-									<a href={hashForPullRequests(pr)} className="min-w-0 flex-1 truncate tabular-nums underline-offset-2 hover:underline">
-										{pr.repo} #{pr.number}
-									</a>
-									<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[pr.link]}</span>
-									<ExternalLinks pr={pr} />
-								</li>
-							))}
-						</ul>
-					</div>
-				)}
-				{top && (
-					<a href={graphiteUrl(top)} target="_blank" rel="noreferrer" className="flex items-center gap-2 border-t border-border px-3 py-2 text-sm hover:bg-muted">
-						<OrgIcon org="graphite" className="size-4" />
-						Open stack on Graphite
-					</a>
-				)}
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-/** **Merge stack**: queues the stack's merge, bottom first, after the merge confirmation; once queued, where it stands, with **Cancel**. */
-function MergeStack({ stack }: { stack: StackedPullRequest[] }) {
-	const { merges } = useDashboardStatus();
-	const [open, setOpen] = useState(false);
-	const bottom = stack[stack.length - 1]!;
-	const target = useMergeTarget(bottom, open);
-	const queued = stack.map(pr => queuedMergeOf(merges, pr)).find(merge => merge !== undefined);
-	const cancel = useCancelMerge(queued);
-	return (
-		<div className="border-t border-border px-3 py-2">
-			{queued ? (
-				<QueuedMergeNote merge={queued} cancel={cancel} />
-			) : (
-				<MergePopover pr={bottom} stack={stack} target={target.data} error={target.error} open={open} onOpenChange={setOpen} align="end">
-					{({ pending }) => (
-						<Button variant="secondary" size="compact" leadingIcon={GitMerge} active={open} loading={pending}>
-							Merge stack
-						</Button>
-					)}
-				</MergePopover>
 			)}
-		</div>
-	);
-}
-
-/** A pull request's GitHub and Graphite pages, as icon links at the end of its row. */
-function ExternalLinks({ pr }: { pr: PullRequest }) {
-	const link = "rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground";
-	return (
-		<span className="flex shrink-0 items-center">
-			<Tooltip content={`#${pr.number} on GitHub`}>
-				<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" aria-label={`#${pr.number} on GitHub`} className={link}>
-					<OrgIcon org="github" className="size-3.5" />
-				</a>
-			</Tooltip>
-			<Tooltip content={`#${pr.number} on Graphite`}>
-				<a href={graphiteUrl(pr)} target="_blank" rel="noreferrer" aria-label={`#${pr.number} on Graphite`} className={link}>
-					<OrgIcon org="graphite" className="size-3.5" />
-				</a>
-			</Tooltip>
-		</span>
+		/>
 	);
 }
 

@@ -37,6 +37,7 @@ import {
 	GITHUB_NAME,
 	MAX_COMMENT_BODY,
 	MAX_PULL_REQUEST_ATTACHMENTS,
+	MAX_PULL_REQUEST_BODY,
 	MAX_PULL_REQUEST_IMAGE_BYTES,
 	MAX_PULL_REQUEST_TITLE,
 	PULL_REQUEST_IMAGE_TYPES,
@@ -492,6 +493,7 @@ const isCommentBody = (value: unknown): value is string => isNonEmpty(value) && 
 function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (!isObject(change)) return null;
 	if (change.field === "title" && isNonEmpty(change.title) && change.title.length <= MAX_PULL_REQUEST_TITLE) return { ok: { field: "title", title: change.title } };
+	if (change.field === "body" && typeof change.body === "string" && change.body.length <= MAX_PULL_REQUEST_BODY) return { ok: { field: "body", body: change.body } };
 	if (change.field === "update" && isUpdateMethod(change.method)) return { ok: { field: "update", method: change.method } };
 	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { ok: { field: "label", name: change.name, on: change.on } };
 	if (change.field === "reviewer" && typeof change.login === "string" && GITHUB_NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
