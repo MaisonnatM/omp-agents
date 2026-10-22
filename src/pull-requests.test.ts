@@ -532,6 +532,10 @@ describe("parseDetailAnswer", () => {
 		]).toEqual([true, false, false, true, false]);
 	});
 
+	test("knows whether you opened it", () => {
+		expect([parseDetailAnswer(answer({ viewerDidAuthor: true }), pr).byViewer, parseDetailAnswer(answer({}), pr).byViewer]).toEqual([true, false]);
+	});
+
 	test("reports conflicts only on an open or draft PR that GitHub finds CONFLICTING", () => {
 		const conflicts = (fields: Record<string, unknown>) => parseDetailAnswer(answer(fields), pr).conflicts;
 		expect([

@@ -1170,6 +1170,8 @@ Reaction groups carry their content, user count, and viewer participation for re
 The Timeline adds no activity request and does not invent draft, ready, reopen, force-push, or base-change history from the pull request's current state.
 Its `unresolved` counts the open threads among those it lists, with `exact` false when GitHub has more than it listed, so the details' counts agree with their threads.
 GitHub's GraphQL has no `viewerCanComment` on a pull request, so its `canComment` is true unless the repository is archived, or the conversation is locked and the viewer's `viewerPermission` is below `WRITE`, as GitHub lets only people who can write comment on a locked conversation.
+Its `byViewer` is `viewerDidAuthor`, since GitHub refuses an approval or a change request from the pull request's author.
+A `review` change posts `{ event, body }` to `pulls/<n>/reviews`, leaving out a blank body; `canSubmitReview` in `src/shared/review-drafts.ts` decides whether one may post, for the composer and the server alike.
 Every mutation goes through `ghMutation` in `src/github.ts`, which throws GitHub's errors even when its answer carries `data`, since a refused mutation answers its field as `null` beside them.
 `PUT /api/pull-request` answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
 One change goes per call, so two changes made at once each keep the other.
@@ -1189,7 +1191,7 @@ It answers a `MergeQueueAnswer`, the queued merges after it, which every socket 
 The details' answer carries GitHub's `mergeStateStatus` as `mergeState`, which `mergesNow` in `src/shared/github.ts` reads to word the confirmation as a merge now or once it is ready.
 
 `GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>` answers a `ReviewPreview` from `src/shared/review-drafts.ts`: the `payload` posting would send, the pull request's `head` now, and the `refusal`, or `null`; see [Review drafts](#review-drafts).
-`PUT /api/review-draft/post` takes `{ owner, repo, number }`, posts that pull request's draft as one review, and answers the draft marked posted, which every socket also hears; a refusal, or GitHub's own, is a 409 with the reason.
+`PUT /api/review-draft/post` takes `{ owner, repo, number }`, and optionally the composer's `submit: { verdict, summary }`, which the server writes into the draft, accepting its pending findings, before it posts; it posts that pull request's draft as one review, and answers the draft marked posted, which every socket also hears; a refusal, or GitHub's own, is a 409 with the reason.
 
 `GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
 `gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.

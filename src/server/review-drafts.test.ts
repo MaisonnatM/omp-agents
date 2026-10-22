@@ -173,6 +173,17 @@ describe("posting", () => {
 		expect(fake.posts.length).toBe(1);
 	});
 
+	test("the composer's submit sets the verdict and summary and posts the pending findings, leaving the dismissed ones out", async () => {
+		const fake = fakeGitHub();
+		const { drafts, changes } = setup(fake.github);
+		await saveTool(drafts)(review);
+		drafts.edit({ op: "finding-state", pr, ids: ["f2"], state: "dismissed" });
+		const posted = await drafts.post(pr, { verdict: "approve", summary: "Ship it." });
+		expect(fake.posts).toEqual([{ commit_id: HEAD, event: "APPROVE", body: "Ship it.", comments: [{ path: "src/a.ts", line: 2, side: "RIGHT", body: "Off by one." }] }]);
+		expect([posted.verdict, posted.summary, posted.findings.map(finding => finding.state)]).toEqual(["approve", "Ship it.", ["accepted", "dismissed"]]);
+		expect(changes()).toBeGreaterThan(0);
+	});
+
 	test("a double click posts once", async () => {
 		const fake = fakeGitHub();
 		const { drafts } = setup(fake.github);

@@ -16,6 +16,7 @@ import {
 	type ReviewFinding,
 	type ReviewPayload,
 	type ReviewPreview,
+	type ReviewSubmit,
 	reviewPayload,
 	type ReviewVerdict,
 } from "../shared/review-drafts";
@@ -108,19 +109,21 @@ export class ReviewDrafts {
 	/**
 	 * Posts the draft for `pr` as one review on the head it was written against, and marks it posted. A review of the
 	 * signed-in user already on that commit with the same event, body, and comments is taken as this one, so a retry after
-	 * a post whose answer was lost posts nothing.
+	 * a post whose answer was lost posts nothing. The composer's `submit` first sets the verdict and summary and accepts
+	 * every pending finding.
 	 */
-	post(pr: PullRequest): Promise<ReviewDraft> {
+	post(pr: PullRequest, submit?: ReviewSubmit): Promise<ReviewDraft> {
 		const key = prKey(pr);
 		const running = this.#posting.get(key);
 		if (running) return running;
-		const posting = this.#post(pr).finally(() => this.#posting.delete(key));
+		const posting = this.#post(pr, submit).finally(() => this.#posting.delete(key));
 		this.#posting.set(key, posting);
 		return posting;
 	}
 
-	async #post(pr: PullRequest): Promise<ReviewDraft> {
+	async #post(pr: PullRequest, submit: ReviewSubmit | undefined): Promise<ReviewDraft> {
 		const { github, file, now } = this.#deps;
+		if (submit && !this.#draft(pr).posted) this.#submit(pr, submit);
 		const draft = this.#draft(pr);
 		const { head, lines } = await github.target(pr);
 		const refusal = postRefusal(draft, head);
@@ -129,6 +132,17 @@ export class ReviewDrafts {
 		const review = (await this.#posted(pr, payload)) ?? (await github.post(pr, payload));
 		if (file.apply({ op: "posted", pr, head: draft.head, review: { id: review.id, url: review.url, at: now() } })) this.#deps.onChange();
 		return this.#draft(pr);
+	}
+
+	#submit(pr: PullRequest, { verdict, summary }: ReviewSubmit): void {
+		const { file } = this.#deps;
+		const pending = this.#draft(pr).findings.filter(finding => finding.state === "pending").map(finding => finding.id);
+		const changed = [
+			file.apply({ op: "verdict", pr, verdict }),
+			file.apply({ op: "summary", pr, summary }),
+			pending.length > 0 && file.apply({ op: "finding-state", pr, ids: pending, state: "accepted" }),
+		];
+		if (changed.some(Boolean)) this.#deps.onChange();
 	}
 
 	/** The review of the signed-in user on the payload's commit that says what `payload` says, if one is there. */

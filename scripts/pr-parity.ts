@@ -28,7 +28,7 @@ const MASKS = {
 type Side = "omp" | "t3";
 type Theme = "light" | "dark";
 type Tab = "summary" | "timeline" | "code";
-type Control = "checks" | "menu" | "checkout";
+type Control = "checks" | "menu" | "checkout" | "composer";
 
 interface PullRequestRef {
 	owner: string;
@@ -60,12 +60,14 @@ const STATES: State[] = [
 	{ name: "checks", tab: "summary", open: "checks" },
 	{ name: "menu", tab: "summary", open: "menu" },
 	{ name: "checkout", tab: "summary", open: "checkout" },
+	{ name: "composer", tab: "summary", open: "composer" },
 	{ name: "scrolled", tab: "summary", scroll: true },
 ];
 
 const STATE_PULL_REQUEST_STATES = STATES.filter(state => state.name === "summary");
 
 const TAB_LABEL: Record<Tab, string> = { summary: "Summary", timeline: "Timeline", code: "Code" };
+const COMPOSER_LABEL = /^(Comment on|Review) pull request/;
 
 const omp = (base: string): App => ({
 	side: "omp",
@@ -87,6 +89,7 @@ const omp = (base: string): App => ({
 	control: (panel, control) => {
 		if (control === "checks") return panel.getByRole("button", { name: /^Checks:/ });
 		if (control === "menu") return panel.getByRole("button", { name: "More pull request actions" });
+		if (control === "composer") return panel.getByRole("button", { name: COMPOSER_LABEL });
 		return null;
 	},
 	busy: page => page.getByText(/^(Asking GitHub for the pull request|Reading changes)…$/),
@@ -107,6 +110,7 @@ const t3 = (base: string): App => ({
 	control: (panel, control) => {
 		if (control === "checks") return panel.getByRole("button", { name: /^(Open )?checks:/i });
 		if (control === "menu") return panel.getByRole("button", { name: "More pull request actions" });
+		if (control === "composer") return panel.getByRole("button", { name: COMPOSER_LABEL });
 		return panel.getByRole("button", { name: "Check out" });
 	},
 	busy: page => page.locator('[class*="animate-skeleton"], [data-slot="skeleton"]'),

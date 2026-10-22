@@ -74,7 +74,7 @@ Start a smoke server first; the harness starts nothing.
 bun scripts/pr-parity.ts --omp "http://127.0.0.1:<port>/?token=<token>" [--t3 <url>] [--pr owner/repo#N] [--draft N] [--merged N] [--closed N] [--theme light|dark|both] [--page <hash>]... [--run <name>]
 ```
 
-It opens `#pull-requests/<owner>/<repo>/<number>` in headless Chromium at 1440×900 with the panel pinned to 720 pixels, in light and dark, and captures Summary, Timeline, Code, the checks popover, the `⋯` menu, the Check out menu, and the Summary scrolled down; `--draft`, `--merged`, and `--closed` add the Summary of other pull requests of the same repository.
+It opens `#pull-requests/<owner>/<repo>/<number>` in headless Chromium at 1440×900 with the panel pinned to 720 pixels, in light and dark, and captures Summary, Timeline, Code, the checks popover, the `⋯` menu, the Check out menu, the open comment and review composer, and the Summary scrolled down; `--draft`, `--merged`, and `--closed` add the Summary of other pull requests of the same repository.
 `--pr` defaults to `yampa-ai/yampa#6833`.
 States run sequentially because the browser-local PR tabs share their selected detail tab between pages in one context.
 A state whose control the app lacks is reported `absent`.

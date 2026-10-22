@@ -35,7 +35,7 @@ import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTa
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, prKey, type Repo } from "../shared/github";
-import type { ReviewDraft, ReviewPreview } from "../shared/review-drafts";
+import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
 import type { ProjectNotesAnswer } from "../shared/projects";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
@@ -43,7 +43,7 @@ import type { WorkspaceChange } from "../shared/workspaces";
 import type { ReplayComparison, ReplayDetail } from "../shared/replay";
 import { MEDIA_FILE_TYPES } from "../shared/transcript";
 import type { View } from "../shared/sessions";
-import { parseView } from "./wire";
+import { parseReviewDraftPost, parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
 import { findMediaFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
@@ -153,8 +153,8 @@ export interface PullRequestRoutesEnv {
 	changeMergeQueue(change: MergeQueueChange): Promise<MergeQueueAnswer>;
 	/** What posting the pull request's review draft sends now, and why it cannot post, if it cannot; rejects when there is no draft. */
 	previewReviewDraft(pr: PullRequest): Promise<ReviewPreview>;
-	/** Posts the pull request's review draft once and answers it marked posted; rejects with why it cannot. */
-	postReviewDraft(pr: PullRequest): Promise<ReviewDraft>;
+	/** Posts the pull request's review draft once, first with the composer's `submit` applied, and answers it marked posted; rejects with why it cannot. */
+	postReviewDraft(pr: PullRequest, submit?: ReviewSubmit): Promise<ReviewDraft>;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -727,10 +727,10 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 	/** `GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>`: the `ReviewPreview` of that pull request's review draft, against its head now. */
 	const reviewDraftPreview = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => env.previewReviewDraft(pr)));
 
-	/** `PUT /api/review-draft/post`: `{ owner, repo, number }`, whose review draft posts as one review; answers the draft marked posted. */
+	/** `PUT /api/review-draft/post`: `{ owner, repo, number, submit? }`, whose review draft posts as one review; answers the draft marked posted. */
 	const reviewDraftPost = write(
-		body => checked(isObject(body) ? parsePullRequest(body.owner, body.repo, body.number) : null, "Expected { owner, repo, number }"),
-		env.postReviewDraft,
+		body => checked(parseReviewDraftPost(body), "Expected { owner, repo, number, submit?: { verdict, summary } }"),
+		({ pr, submit }) => env.postReviewDraft(pr, submit),
 		err => fail(409, errorText(err)),
 	);
 

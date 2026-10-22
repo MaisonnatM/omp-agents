@@ -589,7 +589,7 @@ export class Dashboard {
 					return { merges: [...this.#mergeQueue.list], merged };
 				},
 				previewReviewDraft: pr => this.#reviewDrafts.preview(pr),
-				postReviewDraft: pr => this.#reviewDrafts.post(pr),
+				postReviewDraft: (pr, submit) => this.#reviewDrafts.post(pr, submit),
 			},
 			dashboard: this.#selfUpdate,
 			sync: this.#settingsSync,

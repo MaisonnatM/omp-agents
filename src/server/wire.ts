@@ -58,7 +58,7 @@ import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
-import { FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding } from "../shared/review-drafts";
+import { canSubmitReview, FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding, type ReviewSubmit } from "../shared/review-drafts";
 import { parseTriageEdit } from "../shared/review-triage";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
@@ -501,6 +501,7 @@ function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (change.field === "thread" && isNodeId(change.id) && typeof change.resolved === "boolean") return { ok: { field: "thread", id: change.id, resolved: change.resolved } };
 	if (change.field === "reply" && isNodeId(change.thread) && isCommentBody(change.body)) return { ok: { field: "reply", thread: change.thread, body: change.body } };
 	if (change.field === "comment" && isCommentBody(change.body)) return { ok: { field: "comment", body: change.body } };
+	if (change.field === "review" && oneOf(REVIEW_VERDICTS)(change.verdict) && typeof change.body === "string" && change.body.length <= MAX_COMMENT_BODY && canSubmitReview(change.verdict, change.body, 0)) return { ok: { field: "review", verdict: change.verdict, body: change.body } };
 	return null;
 }
 
@@ -510,6 +511,17 @@ export function parsePullRequestEdit(body: unknown): Parsed<PullRequestEdit> {
 	const pr = parsePullRequest(body.owner, body.repo, body.number);
 	const change = parsePullRequestChange(body.change);
 	return pr && change && { ok: { ...pr.ok, change: change.ok } };
+}
+
+/** The body of `PUT /api/review-draft/post`: a pull request, and the composer's verdict and summary when it posts. */
+export function parseReviewDraftPost(body: unknown): Parsed<{ pr: PullRequest; submit?: ReviewSubmit }> {
+	if (!isObject(body)) return null;
+	const pr = parsePullRequest(body.owner, body.repo, body.number);
+	if (!pr) return null;
+	if (body.submit === undefined) return { ok: { pr: pr.ok } };
+	const submit = body.submit;
+	if (!isObject(submit) || !oneOf(REVIEW_VERDICTS)(submit.verdict) || typeof submit.summary !== "string" || submit.summary.length > MAX_COMMENT_BODY) return null;
+	return { ok: { pr: pr.ok, submit: { verdict: submit.verdict, summary: submit.summary } } };
 }
 
 /** The body of `PUT /api/pull-request/viewed`. */

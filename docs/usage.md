@@ -868,8 +868,13 @@ An action that fails shows its error, and its control becomes available again.
   Resolved threads and dismissed reviews start folded.
   **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; a refused change is undone.
   A thread you can reply to has a reply box: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and a refusal keeps the draft.
-  The comment box works the same way and shows only when GitHub lets you comment.
-  Replies and comments go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
+  Replies go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
+- The round button at the bottom right of the details opens the composer, shown only when GitHub lets you comment.
+  Its badge counts the Review draft's pending findings.
+  **Comment** posts a comment; **Close with comment** asks **Confirm close?** and then posts the comment and closes the pull request, and a closed one offers **Reopen with comment**.
+  **Review (N)**, offered on an open or draft pull request, picks **Comment**, **Approve**, or **Request changes**, the last two not on your own pull request, and a summary; **Submit review** accepts every pending finding of an open Review draft and posts it, or posts the review alone.
+  An approval needs no summary, a change request needs one, and a comment needs one or a pending finding.
+  The trash button dismisses the pending findings, and closing the composer keeps what you typed.
 - **Timeline** puts the pull request's activity on a vertical rail, newest first, with avatars for conversations and commits and icons for opened, merged, and closed events.
   Consecutive comments and commented reviews fold into conversation groups showing their comment and author counts.
   Reviews show their verdict and words, with verdicts from before the latest commits muted.
@@ -902,7 +907,7 @@ An action that fails shows its error, and its control becomes available again.
   **Preview** shows exactly what posting sends: the verdict, the body, and each line comment.
   An accepted finding on a line the diff shows becomes a comment on that line; one on another line, or on no line, joins the body as a list item after the summary, since GitHub takes comments only on lines its diff shows.
   **Post review** reads the pull request again and asks you to confirm, naming the verdict, the count of line comments, and the commit; **Post review** there sends one review on the commit the session reviewed.
-  It refuses when the pull request moved on, when nothing is accepted and the summary is empty, and when **Request changes** has no summary.
+  It refuses when the pull request moved on, when nothing is accepted and the summary is empty unless it approves, and when **Request changes** has no summary.
   Once posted, the tab says when, links to the review on GitHub, and takes no more changes; posting again, even after a lost answer, never posts a second review, since the server first looks for the review it would post among yours on that commit.
   **Discard draft** deletes the draft, posted or not.
   The server keeps the drafts in `review-drafts.json` beside its access token, and drops a posted draft two weeks after it posted, the next time a session saves a draft.
