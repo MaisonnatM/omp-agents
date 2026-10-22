@@ -45,6 +45,7 @@ export type ShortcutId =
 	| "previousPullRequest"
 	| "pullRequestOnGitHub"
 	| "pullRequestActions"
+	| "liftPullRequest"
 	| "giveToAgent"
 	| "todoSearch"
 	| "todoNext"
@@ -232,6 +233,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "pullRequestOnGitHub", category: "pull-requests", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "pullRequestActions", category: "pull-requests", label: "Pull requests: open the pull request's actions menu", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
+	{
+		id: "liftPullRequest",
+		category: "pull-requests",
+		label: "Pull requests board: pick up the focused card, then ← and → choose a column, Space or Enter drops it there, and Esc puts it back",
+		keys: [{ chord: { key: " " }, scope: "outside-fields" }],
+	},
 	{ id: "giveToAgent", category: "pull-requests", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "todoSearch", category: "todo", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "todoNext", category: "todo", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
@@ -331,6 +338,7 @@ const KEY_LABEL: Record<string, string> = {
 	Enter: IS_MAC ? "↩" : "Enter",
 	Backspace: IS_MAC ? "⌫" : "Backspace",
 	Tab: IS_MAC ? "⇥" : "Tab",
+	" ": "Space",
 };
 
 /** `⇧⌘X` on macOS, `Ctrl+Shift+X` elsewhere. */

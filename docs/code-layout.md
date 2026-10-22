@@ -54,7 +54,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Notification bell: `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
 - System notifications of sessions that ask or finish, and the desktop app's Dock badge: `useAttention` in `web/use-attention.ts`, shown by `desktop/attention.ts` in the desktop app; their switch is `SessionNotifications` in `web/components/settings/preferences-tab.tsx`.
 - Pages, each routed by `web/routing.ts`:
-  - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, and one pull request in `pr-page.tsx` beside it.
+  - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`.
@@ -369,6 +369,7 @@ The page lives in `web/`.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the Pull requests page and the tickets page show.
   `web/pull-requests-model.ts` holds the pull requests' moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it, over `moveOf` in `src/shared/moves.ts`.
   It also holds which sections start folded, sorts rows by move, and keeps each stack's rows together by the chain of base branches.
+  `boardColumns` lays the board's columns out, one per section over every readable repository, and `boardDrop` decides what dropping a card on another column does: the quick action, the merge confirmation, the draft state change, or a refusal with why.
   `openThreads` lists unresolved threads for **Comments**, `commentCount` counts the comments that the **Comments** and **Timeline** tabs and the Timeline's header show, and `withThreadResolved` keeps a thread's state and unresolved count together.
   `PullRequestOrder` there is the order you chose, the repositories, the sections, the sort, and the manual order of pull requests, which `placedManual` updates after a drop; a stack moves as one `unit`.
   `withPullRequestState` gives the list after GitHub took a state change from a row or a merge, until the list is read again: a closed pull request leaves it, and every other repository and row stays the same object.
@@ -542,7 +543,9 @@ The page lives in `web/`.
   `web/components/pull-requests/pull-requests-board.tsx` holds `usePullRequestsBoard`, the logic that the sidebar list and the page share: its sections, folds, order, drag, keys, and rows, with the sort menu and the keys line.
   It lays the board out only when the pull request list, its order, or its folds change, and fills in each row's drag, sessions, pending start, and open menu in a second pass; the sessions come from one pass over the roster, `sessionsByPullRequest` in `pr-row.tsx`, and the board keeps a pull request's list the same array while its chips hold, so a memoized row draws again only when what it shows changes.
   Its `onChange`, the same function for every row, sends a row's state change or merge through `writePullRequest`.
-  Only one board mounts at a time, since its rows carry document ids and its keys are global, so `pull-requests-page.tsx` shows the table while the sidebar shows `PullRequestsIndex`, its sections as links, and `pull-requests-nav.tsx` lists the pull requests in the sidebar otherwise.
+  Only one board mounts at a time, since its rows carry document ids and its keys are global, so `pull-requests-page.tsx` shows the table or the board while the sidebar shows `PullRequestsIndex`, its sections as links, and `pull-requests-nav.tsx` lists the pull requests in the sidebar otherwise.
+  In the board view, `usePullRequestsView` keeps the page mounted while a pull request shows, docking `PullRequestDetails` beside the board, and the hook's `columns` carry each card's props, with ↓ and ↑ stepping column by column and the board's own folds.
+  `pull-requests-kanban.tsx` draws the columns, drags a card by pointer with a card in hand that tilts with its speed, shows each column's slot or refusal, picks a card up with Space for ← and →, and runs a drop's step through the card's props.
   `pr-page.tsx` shows one pull request's details in the main content, in a frame of its own that lets the **Code** tab fill the height under the header.
   Its `PullRequestDetails` shows the same details, with the same quick actions, on the page and in the session details sidebar; its `placement` decides whether it says why the Pull requests page does not list the pull request, and `PullRequestDetailContent` in `pr-details/index.tsx` takes it too, for the heading's level and size, whether it takes focus, whether the header and tab bar stick to the top of the sidebar's scroll, and whether **Code** shows the explorer or a list of files.
   `PullRequestDetails` hands it the list entry and how to start a quick action, and `PullRequestDetailContent` derives the menu's quick actions from `actionFacts`.
@@ -560,7 +563,7 @@ The page lives in `web/`.
   `web/pull-request-timeline.ts` interleaves activity before grouping adjacent comments, with one row per commit; the unread boundary splits groups in either sort order.
   Its review rows say whether the verdict came before the newest commit, and `approvalCount` counts the reviewers whose latest verdict approves the newest commit, as T3 does.
   `pr-details/message.tsx` holds what **Comments** and the **Timeline** both draw: the message row, a comment's or review's words, each review state's label and colors, and a thread's `path:line` link.
-  `pr-row.tsx` draws the sidebar row and the table row, each with `ReviewDraftTag` while a review draft waits to post, and exports the DOM lookups of a row and its link that the board's keys use.
+  `pr-row.tsx` draws the sidebar row, the table row, and the board's card, each with `ReviewDraftTag` while a review draft waits to post, and exports the DOM lookups of a row and its link that the board's keys use; a card's **Merge** badge takes its confirmation's open state from the board, so a drop on **Recently merged** opens it.
   `pr-details/review-draft.tsx` is the **Review draft** tab, `ReviewDraftPanel`: the verdict, the summary, each finding with **Accept**, **Dismiss**, and **Edit**, which send `review-draft` socket messages, the **Preview** from `GET /api/review-draft/preview`, and **Post review**, a confirmation that posts through `PUT /api/review-draft/post`.
   `pr-menu.tsx` holds `PullRequestMenu`, the shared row and header `⋯` menu with quick actions, merge method radios, state changes, host links, clipboard actions, and inline-confirmed close or reopen.
   `web/use-inline-confirm.ts` arms one action for three seconds and disarms on Escape, blur, or an outside pointer press.
@@ -576,7 +579,7 @@ The page lives in `web/`.
   The pull request's and the issue's details use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `LoadNote` is the loading or error line that the pull request's details, the issue's, the conversation's, and the list page share.
   `web/components/fold.tsx` holds the fold button that the Pull requests and tickets pages share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
-  The Pull requests page binds ↓, ↑, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/pull-requests-model.ts` lists in order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
+  The Pull requests page binds ↓, ↑, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/pull-requests-model.ts` lists in order, or the board's open columns, so a folded section's rows drop out, binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute, and on the board binds Space to pick up the focused card.
 - `web/assets.d.ts`: the module type of the PDF.js worker's URL, which the page imports as an asset.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry, and `web/components/kibo-ui` from Kibo UI's; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
   The sidebar's parts are split over `sidebar.tsx`, `sidebar-core.tsx`, `sidebar-group.tsx`, `sidebar-slot.tsx`, `sidebar-menu.tsx`, `sidebar-menu-scope.tsx`, and `sidebar-menu-row.ts`, and the composer's over `input-message.tsx`, `file-preview-tile.tsx`, `web/hooks/use-region-height.ts`, and `web/hooks/use-is-touch.ts`.

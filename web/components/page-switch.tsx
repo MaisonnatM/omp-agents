@@ -14,6 +14,7 @@ import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
 import { InboxPage } from "./inbox/inbox-page";
 import { DisconnectedPage } from "./integrations/disconnected-page";
+import { usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { PullRequestDetailPage } from "./pull-requests/pr-page";
 import { NewSession } from "./new-session";
@@ -121,6 +122,7 @@ export const PageSwitch = memo(function PageSwitch({
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
+	const [pullRequestsView] = usePullRequestsView();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
 		case "new": {
@@ -164,8 +166,9 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		case "pull-requests":
-			return page.target === null ? (
-				<PullRequestsPage workspace={workspace} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
+			// The board docks a pull request's details beside it; the list gives them the page.
+			return page.target === null || pullRequestsView === "board" ? (
+				<PullRequestsPage workspace={workspace} hosts={visible.hosts} past={visible.past} section={sectionTarget} route={page} />
 			) : (
 				<PullRequestDetailPage workspace={workspace} hosts={visible.hosts} target={page.target} files={page.files} />
 			);

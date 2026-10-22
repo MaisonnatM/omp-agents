@@ -1,7 +1,7 @@
-/** Pull request links, what each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
-import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
+/** Pull request links, what each pull request waits on next, the list's sections and stacks, the board's columns and what a drop on one does, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
+import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
-import { type AgentOn, hasOpenThreads, type MoveId, moveOf } from "../src/shared/moves";
+import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
@@ -292,6 +292,78 @@ export function shownPullRequests({ repos }: PullRequestList, isFolded: (key: st
 		if ("error" in repo || isFolded(key)) return [];
 		return pullRequestSections(repo.pullRequests, order, agentOn).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
 	});
+}
+
+/** A pull request on the board, with its repository's key and the workspace a session on it starts in. */
+export interface BoardCard {
+	row: SectionRow;
+	repo: string;
+	cwd: string;
+}
+
+/** One of the board's columns: a section, with every readable repository's pull requests in it, repository by repository. */
+export interface BoardColumn {
+	title: MoveGroup;
+	cards: BoardCard[];
+}
+
+/** The board: one column per section in page order, empty ones too, since a pull request can be dropped on them. */
+export function boardColumns({ repos }: PullRequestList, order: PullRequestOrder, agentOn: AgentOn): BoardColumn[] {
+	const cards = new Map<MoveGroup, BoardCard[]>(sectionTitles(order).map(title => [title, []]));
+	for (const repo of orderedRepos(repos, order)) {
+		const cwd = repo.cwds[0];
+		if ("error" in repo || cwd === undefined) continue;
+		const key = repoKey(repo);
+		for (const { title, rows } of pullRequestSections(repo.pullRequests, order, agentOn)) cards.get(title)!.push(...rows.map(row => ({ row, repo: key, cwd })));
+	}
+	return [...cards].map(([title, held]) => ({ title, cards: held }));
+}
+
+/** Whether the board folds the column `title` until you unfold it: only **Recently merged**, which holds a week of merges. */
+export const boardFoldedByDefault = (title: string): boolean => title === "Recently merged";
+
+/**
+ * What dropping a pull request on another column does. A column follows where the pull request stands on GitHub, so a
+ * drop runs the step that moves it there, or is refused with why.
+ */
+export type BoardDrop =
+	| { kind: "agent"; action: PullRequestActionId; label: string }
+	| { kind: "merge"; label: string }
+	| { kind: "state"; state: Extract<SettableState, "open" | "draft">; label: string }
+	| { kind: "refused"; why: string };
+
+/** The columns a draft lands in once it is ready for review, whichever its move then picks. */
+const READY_COLUMNS: MoveGroup[] = ["Your move", "Approved", "Waiting on others"];
+
+/**
+ * What dropping `row` from the column `from` on the column `to` does; `null` when it stays in its column. **Agent on it**
+ * starts the quick action of its move, **Recently merged** merges it when its row offers the merge, **Drafts** converts
+ * your open pull request to a draft, and an open column marks your draft ready for review.
+ */
+export function boardDrop({ pr, move }: SectionRow, from: MoveGroup, to: MoveGroup): BoardDrop | null {
+	if (from === to) return null;
+	const why = reason(pr, move);
+	if (pr.state === "merged") return { kind: "refused", why: "It is merged already" };
+	if (to === "Agent on it") {
+		const action = moveAction(pr, move);
+		return action ? { kind: "agent", action, label: `${PULL_REQUEST_ACTIONS[action].label} with an agent` } : { kind: "refused", why: `No agent step applies: ${why}` };
+	}
+	if (to === "Recently merged") {
+		if (move === "merge") return { kind: "merge", label: "Merge" };
+		if (move === "checks-running" && readyOnceChecksPass(pr)) return { kind: "merge", label: "Merge once checks pass" };
+		return { kind: "refused", why: `Not ready to merge: ${why}` };
+	}
+	const change: BoardDrop | null =
+		to === "Drafts"
+			? pr.state === "open"
+				? { kind: "state", state: "draft", label: "Convert to draft" }
+				: { kind: "refused", why: "It is a draft already" }
+			: pr.state === "draft" && READY_COLUMNS.includes(to)
+				? { kind: "state", state: "open", label: "Ready for review" }
+				: null;
+	if (change === null) return { kind: "refused", why: `${to} fills from GitHub; no step moves it there` };
+	if (change.kind === "state" && pr.role !== "author") return { kind: "refused", why: "Only its author changes whether it is a draft" };
+	return change;
 }
 
 /** The pull request as `list` holds it, with the workspace a session on it starts in; `null` when `list` leaves it out. */

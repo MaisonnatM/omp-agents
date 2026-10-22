@@ -1,4 +1,4 @@
-/** A pull request's row in the lists, with its move badge, review draft tag, checks icon, review state, diff size, and `⋯` menu. */
+/** A pull request's row in the lists, or its card on the board, with its move badge, review draft tag, checks icon, review state, diff size, and `⋯` menu. */
 import { CircleCheck, CircleX, ClipboardPen, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
 import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
@@ -100,12 +100,21 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): Action<[ListChange]> =>
 	useAction((change: ListChange) => onChange(pr, change), "GitHub refused the change");
 
+/** A merge confirmation's open state, which a board drop on **Recently merged** opens from outside the badge. */
+interface MergeOpen {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}
+
 /**
  * A **Merge** badge, or a **Checks running** one on a pull request that is ready but for them: a button that merges after the
  * same confirmation as the details, reading what the merge needs while it is open; once queued, **Queued** or **Stopped**.
+ * The badge holds whether its confirmation is open unless `control` does.
  */
-function MergeBadge({ pr, move }: { pr: PullRequestSummary; move: "merge" | "checks-running" }) {
-	const [open, setOpen] = useState(false);
+function MergeBadge({ pr, move, control }: { pr: PullRequestSummary; move: "merge" | "checks-running"; control?: MergeOpen }) {
+	const [own, setOwn] = useState(false);
+	const open = control?.open ?? own;
+	const setOpen = control?.onOpenChange ?? setOwn;
 	const target = useMergeTarget(pr, open);
 	const label = move === "merge" ? `Merge ${pullRequestName(pr)} on GitHub` : `Checks running: merge ${pullRequestName(pr)} once they pass`;
 	return (
@@ -137,8 +146,8 @@ function MergeBadge({ pr, move }: { pr: PullRequestSummary; move: "merge" | "che
  * A row's move badge: for **Merge**, and **Checks running** on a pull request ready but for them, a button that merges;
  * else a button that starts the quick action handing the move to an agent, when one applies; else the plain badge.
  */
-function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
-	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} />;
+function RowMoveBadge({ pr, move, pending, cwd, onQuickAction, merge }: { pr: PullRequestSummary; move: MoveId; merge?: MergeOpen } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} control={merge} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -352,12 +361,20 @@ const sameStack = (a: StackPlace | null, b: StackPlace | null): boolean =>
 export const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
 	a.length === b.length && a.every((link, at) => link.sessionId === b[at]!.sessionId && link.label === b[at]!.label && link.link === b[at]!.link && link.status === b[at]!.status && sameView(link.view, b[at]!.view));
 
+/** How each prop of a component is compared, which decides whether it draws again. */
+type PropEqual<Props> = { [K in keyof Props]: (a: Props[K], b: Props[K]) => boolean };
+
+const sameProps =
+	<Props,>(equal: PropEqual<Props>) =>
+	(a: Props, b: Props): boolean =>
+		(Object.keys(equal) as (keyof Props)[]).every(key => equal[key](a[key], b[key]));
+
 /**
  * How each prop of a row is compared. The board keeps each prop the same object while what it shows holds, `sessions`
  * included, except two it rebuilds: the row's data, whenever the roster or the sort changes, compared by what it holds,
  * and the drag item, whose handlers stay the same, compared by them and where a drop would land.
  */
-const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => boolean } = {
+const PROP_EQUAL: PropEqual<RowProps> = {
 	row: (a, b) => a === b || (a.pr === b.pr && a.move === b.move && a.unit === b.unit && sameStack(a.stack, b.stack)),
 	sessions: Object.is,
 	targeted: Object.is,
@@ -372,8 +389,7 @@ const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => b
 	moveId: Object.is,
 };
 
-const sameRowProps = (a: RowProps, b: RowProps): boolean =>
-	(Object.keys(PROP_EQUAL) as (keyof RowProps)[]).every(key => (PROP_EQUAL[key] as (x: unknown, y: unknown) => boolean)(a[key], b[key]));
+const sameRowProps = sameProps(PROP_EQUAL);
 
 function RowMenu({ pr, change, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[ListChange]> }) {
 	return (
@@ -532,3 +548,77 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 		</li>
 	);
 }, sameRowProps);
+
+/** A card on the Pull requests board: a row's props without the list's drag and move keys, and what the board adds. */
+export interface CardProps extends Omit<RowProps, "drag" | "moveId"> {
+	/** `owner/repo`, when the board holds several repositories; `null` when it holds one. */
+	repo: string | null;
+	/** Whether its merge confirmation is open, which a drop on **Recently merged** opens. */
+	mergeOpen: boolean;
+	/** The same function for every card, like `onQuickAction`. */
+	onMergeOpenChange: (pr: PullRequest, open: boolean) => void;
+	/** What a drag does to it: `lifted` leaves this faded copy behind the card in the pointer's hand, `picked` marks the card the keys carry, and `moving` waits on GitHub after a drop. */
+	held: "lifted" | "picked" | "moving" | null;
+}
+
+const { drag: _drag, moveId: _moveId, ...ROW_EQUAL } = PROP_EQUAL;
+
+const sameCardProps = sameProps<CardProps>({ ...ROW_EQUAL, repo: Object.is, mergeOpen: Object.is, onMergeOpenChange: Object.is, held: Object.is });
+
+/** The DOM attribute that names a card by {@link prKey}, which the board's drag reads under the pointer. */
+export const CARD_KEY = "data-card";
+
+/**
+ * A pull request on the Pull requests board: its move badge, tags, and age, its title, its repository, number, and why it
+ * waits, then its sessions, stack, checks, review, and size, with its `⋯` menu on hover. A click shows its details
+ * beside the board.
+ */
+export const PullRequestCard = memo(function PullRequestCard({ row: { pr, move, stack }, repo, sessions, targeted, onOpen, onChange, mergeOpen, onMergeOpenChange, held, ...actions }: CardProps) {
+	const change = useRowChange(pr, onChange);
+	return (
+		<li
+			id={rowId(pr)}
+			{...{ [CARD_KEY]: prKey(pr) }}
+			aria-busy={held === "moving" || undefined}
+			onClick={event => openFromRow(event, pr)}
+			className={cn(
+				"group/card relative cursor-grab touch-pan-y select-none space-y-1.5 rounded-lg border border-border bg-background p-2.5 shadow-xs/5 transition-[border-color,opacity] hover:border-foreground/20",
+				targeted && "border-ring ring-1 ring-ring",
+				held === "lifted" && "border-dashed opacity-35 shadow-none",
+				held === "picked" && "ring-2 ring-ring",
+				held === "moving" && "motion-safe:animate-pulse",
+			)}
+		>
+			<div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+				<RowMoveBadge pr={pr} move={move} merge={{ open: mergeOpen, onOpenChange: open => onMergeOpenChange(pr, open) }} {...actions} />
+				<StateTag pr={pr} move={move} />
+				<ReviewDraftTag pr={pr} />
+				<Age at={pr.updatedAt} compact exact className="ml-auto shrink-0 tabular-nums" />
+			</div>
+			<TitleLink pr={pr} targeted={targeted} className="line-clamp-2 block pr-6 leading-5" />
+			<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
+				<span className="min-w-0 shrink truncate tabular-nums">{repo ? `${repo}#${pr.number}` : `#${pr.number}`}</span>
+				<span aria-hidden>·</span>
+				<span className="min-w-0 flex-1 truncate">{reason(pr, move)}</span>
+			</p>
+			<div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+				<SessionChips sessions={sessions} onOpen={onOpen} compact />
+				<StackInfo stack={stack} base={pr.stackedOn} />
+				<ConversationCount pr={pr} />
+				<ChecksIcon checks={pr.checks} className="[&_svg]:size-3.5" />
+				<span className="ml-auto flex min-w-0 items-center gap-2">
+					<ReviewState pr={pr} max={2} />
+					<DiffSize pr={pr} />
+				</span>
+			</div>
+			<span
+				className={cn(
+					"absolute top-8 right-1.5 rounded-md bg-background transition-opacity group-focus-within/card:opacity-100 group-hover/card:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
+					actions.pending === null && !change.pending && "opacity-0",
+				)}
+			>
+				<RowMenu pr={pr} change={change} {...actions} />
+			</span>
+		</li>
+	);
+}, sameCardProps);

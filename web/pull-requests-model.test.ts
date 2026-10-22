@@ -4,10 +4,14 @@ import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves"
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
 import {
+	boardColumns,
+	boardDrop,
+	boardFoldedByDefault,
 	commentCount,
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
+	type MoveGroup,
 	type PullRequestOrder,
 	pullRequestSections,
 	listedPullRequests,
@@ -253,6 +257,73 @@ test("the shown pull requests follow page order and leave out folded repositorie
 	};
 	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
 	expect(shownPullRequests(list, key => folded.has(key), DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
+});
+
+describe("pull request board", () => {
+	const repo = (name: string, pullRequests: PullRequestSummary[], cwds = [`/code/${name}`]): RepoPullRequests => ({ owner: "acme", repo: name, cwds, pullRequests });
+
+	test("each column holds its section of every readable repository, repository by repository in page order, and empty columns stay", () => {
+		const list = {
+			repos: [
+				repo("webapp", [pr(1), pr(2, { state: "draft" })]),
+				{ owner: "acme", repo: "down", cwds: ["/code/down"], error: "rate limited" },
+				repo("api", [pr(3), pr(4, { role: "reviewer", author: teammate })]),
+				repo("nowhere", [pr(5)], []),
+			],
+			unmatched: [],
+		};
+		const order: PullRequestOrder = { ...DEFAULT_ORDER, repos: ["acme/api", "acme/webapp"] };
+		const columns = boardColumns(list, order, noAgent).map(({ title, cards }) => [title, cards.map(({ row, repo, cwd }) => `${repo}#${row.pr.number} ${cwd}`)]);
+		expect(columns).toEqual([
+			["Your move", ["acme/api#4 /code/api"]],
+			["Agent on it", []],
+			["Approved", []],
+			["Waiting on others", ["acme/api#3 /code/api", "acme/webapp#1 /code/webapp"]],
+			["Drafts", ["acme/webapp#2 /code/webapp"]],
+			["Recently merged", []],
+		]);
+	});
+
+	test("only Recently merged starts folded", () => {
+		expect(sectionTitles(DEFAULT_ORDER).filter(boardFoldedByDefault)).toEqual(["Recently merged"]);
+	});
+
+	describe("a drop", () => {
+		const drop = (summary: PullRequestSummary, to: MoveGroup, agent: AgentOn = noAgent) => {
+			const [section] = pullRequestSections([summary], DEFAULT_ORDER, agent);
+			return boardDrop(section!.rows[0]!, section!.title, to);
+		};
+
+		test("on its own column does nothing", () => {
+			expect(drop(pr(1), "Waiting on others")).toBeNull();
+		});
+
+		test("on Agent on it starts the quick action of the pull request's move, and is refused when no action takes the move", () => {
+			expect(drop(pr(1, { checks: "failing" }), "Agent on it")).toEqual({ kind: "agent", action: "fix-ci", label: "Fix CI with an agent" });
+			expect(drop(pr(2, { role: "reviewer", author: teammate }), "Agent on it")).toEqual({ kind: "agent", action: "review", label: "Review with an agent" });
+			expect(drop(pr(3), "Agent on it")).toEqual({ kind: "refused", why: "No agent step applies: waiting for review" });
+		});
+
+		test("on Recently merged merges a pull request ready to merge, or once its running checks pass, and is refused with what stands in the way otherwise", () => {
+			expect(drop(pr(1, { review: "approved" }), "Recently merged")).toEqual({ kind: "merge", label: "Merge" });
+			expect(drop(pr(2, { review: "approved", checks: "pending" }), "Recently merged")).toEqual({ kind: "merge", label: "Merge once checks pass" });
+			expect(drop(pr(3, { review: "approved", conflicts: true }), "Recently merged")).toEqual({ kind: "refused", why: `Not ready to merge: ${reason(pr(3, { review: "approved", conflicts: true }), "rebase")}` });
+			expect(drop(pr(4, { review: "approved" }), "Recently merged", () => "working")).toMatchObject({ kind: "refused" });
+		});
+
+		test("on Drafts converts your open pull request to a draft, and on an open column marks your draft ready for review", () => {
+			expect(drop(pr(1), "Drafts")).toEqual({ kind: "state", state: "draft", label: "Convert to draft" });
+			for (const to of ["Your move", "Approved", "Waiting on others"] as const) expect(drop(pr(2, { state: "draft" }), to)).toEqual({ kind: "state", state: "open", label: "Ready for review" });
+		});
+
+		test("is refused for a pull request you do not author, a merged one, and a column only GitHub fills, which outranks authorship", () => {
+			expect(drop(pr(1, { role: "reviewer", author: teammate }), "Drafts")).toEqual({ kind: "refused", why: "Only its author changes whether it is a draft" });
+			expect(drop(pr(5, { role: "reviewer", author: teammate }), "Approved")).toEqual({ kind: "refused", why: "Approved fills from GitHub; no step moves it there" });
+			expect(drop(pr(2, { state: "merged" }), "Your move")).toEqual({ kind: "refused", why: "It is merged already" });
+			expect(drop(pr(3), "Approved")).toEqual({ kind: "refused", why: "Approved fills from GitHub; no step moves it there" });
+			expect(drop(pr(4, { state: "draft" }), "Drafts")).toBeNull();
+		});
+	});
 });
 
 describe("pull request order", () => {

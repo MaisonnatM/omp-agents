@@ -8,6 +8,7 @@ import type { PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView }
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
+import { usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { NoticesBell } from "./notices";
 import { Roster } from "./roster";
@@ -70,13 +71,15 @@ export const AppSidebar = memo(function AppSidebar({
 	dispatchPalette,
 	setShortcutsOpen,
 }: AppSidebarProps) {
+	const [pullRequestsView] = usePullRequestsView();
 	const pullRequestsTab = useMemo(() => {
 		// Until the sessions are listed, the saved workspace reads as all workspaces, which would ask GitHub about every repository.
 		if (!listed) return <p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>;
-		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab shows its sections then.
-		if (page?.kind === "pull-requests" && !page.target) return <PullRequestsIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
+		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab shows its sections then;
+		// the board stays on screen with a pull request's details docked beside it.
+		if (page?.kind === "pull-requests" && (!page.target || pullRequestsView === "board")) return <PullRequestsIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
 		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
-	}, [listed, page, workspace, visible, sectionTarget, onSectionTarget]);
+	}, [listed, page, pullRequestsView, workspace, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const calendarTab = useMemo(
 		() => (page?.kind === "calendar" ? page : page?.kind === "routines" ? ({ kind: "routines", target: routinesTarget } as const) : null),
