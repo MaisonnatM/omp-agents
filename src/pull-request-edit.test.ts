@@ -2,9 +2,31 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import * as proc from "./proc";
-import { attachToPullRequest, stateSteps } from "./pull-request-edit";
+import { attachToPullRequest, savePullRequest, stateSteps } from "./pull-request-edit";
 
 afterEach(() => mock.restore());
+
+test("a title edit patches GitHub and returns the refreshed title", async () => {
+	const write = spyOn(proc, "runChecked").mockResolvedValue("");
+	spyOn(proc, "runJson").mockImplementation(async argv => argv.includes("graphql") ? {
+		data: { repository: { pullRequest: { number: 7, title: "A better title", state: "OPEN", headRefName: "feature", headRefOid: "abc", baseRefName: "main", createdAt: "2026-10-01T00:00:00Z" } } },
+	} : { behind_by: 2 });
+	const detail = await savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "title", title: "A better title" } });
+	expect(write.mock.calls[0]?.[0]).toEqual(["gh", "api", "-X", "PATCH", "repos/acme/app/pulls/7", "-f", "title=A better title"]);
+	expect({ title: detail.title, behindBy: detail.behindBy }).toEqual({ title: "A better title", behindBy: 2 });
+});
+
+test("a branch update rebases the head read from GitHub, not a stale page", async () => {
+	const calls = spyOn(proc, "runJson").mockImplementation(async argv => {
+		if (argv.some(arg => arg.includes("updatePullRequestBranch"))) return { data: { updatePullRequestBranch: { clientMutationId: null } } };
+		if (!argv.includes("graphql")) return { behind_by: 0 };
+		return { data: { repository: { pullRequest: { id: "PR_7", number: 7, title: "Feature", state: "OPEN", headRefName: "feature", headRefOid: "latest-head", baseRefName: "main", createdAt: "2026-10-01T00:00:00Z" } } } };
+	});
+	const detail = await savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "update", method: "rebase" } });
+	const mutation = calls.mock.calls.find(([argv]) => argv.some(arg => arg.includes("updatePullRequestBranch")))?.[0];
+	expect(mutation?.slice(-6)).toEqual(["-f", "id=PR_7", "-f", "head=latest-head", "-f", "method=REBASE"]);
+	expect({ title: detail.title, behindBy: detail.behindBy }).toEqual({ title: "Feature", behindBy: 0 });
+});
 
 describe("stateSteps", () => {
 	const open = { open: true, draft: false };

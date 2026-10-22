@@ -3,7 +3,7 @@
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
-import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
+import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
 import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, pullRequestName, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
@@ -286,6 +286,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		headOid: str(node.headRefOid) ?? "",
 		mergeMethods: MERGE_METHODS.filter(method => repository[MERGE_ALLOWED[method]] === true),
 		mergeState: mergeStateOf(node.mergeStateStatus),
+		behindBy: null,
 		canComment: repository.isArchived !== true && (node.locked !== true || LOCKED_COMMENTERS[str(repository.viewerPermission) ?? ""] === true),
 	};
 }
@@ -294,7 +295,20 @@ const details = createCache<PullRequestDetail>();
 
 /** One pull request in full, live from `gh`; `fresh` skips the kept answer, as after a change. */
 export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<PullRequestDetail> {
-	return details.get(prKey(pr), async () => parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr), fresh);
+	return details.get(prKey(pr), async () => {
+		const detail = parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr);
+		if (detail.state === "open" || detail.state === "draft") detail.behindBy = await readBehindBy(pr, detail.base, detail.headOid);
+		return detail;
+	}, fresh);
+}
+
+export async function readBehindBy(pr: PullRequest, base: string, head: string): Promise<number | null> {
+	try {
+		const comparison = await ghRest(`repos/${pr.owner}/${pr.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=1`);
+		return isObject(comparison) ? num(comparison.behind_by) ?? null : null;
+	} catch {
+		return null;
+	}
 }
 
 const titles = createCache<Pick<PullRequestDetail, "title">>();

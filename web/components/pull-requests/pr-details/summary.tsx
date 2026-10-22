@@ -1,22 +1,22 @@
-/** A pull request's Summary tab: labels, linked sessions, stack, and description. */
-import { Bot, type LucideIcon, Tag } from "lucide-react";
+import { Bot, type LucideIcon, Tag, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import type { LinkedPullRequest, PullRequest, PullRequestDetail, StackedPullRequest } from "../../../../src/shared/github";
 import type { RosterHost } from "../../../../src/shared/sessions";
 import { LiveSessionChips } from "../../session-chip";
 import { DetailSection, Markdown } from "../../sheet-details";
-import { LabelDot, LabelsField, type PullRequestOptionsRead, type SavePullRequest } from "../pr-fields";
+import { LabelDot, LabelsField, ReviewersField, type PullRequestOptionsRead, type SavePullRequest } from "../pr-fields";
 import type { DetailContentProps } from ".";
 import { OtherPullRequests, StackSection } from "./stack";
+import { Reviewers } from "../avatars";
 
 function Property({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
 	return (
 		<>
-			<dt className="flex items-center gap-2 pt-1 text-muted-foreground @sm/pr:py-1">
-				<Icon aria-hidden className="size-4" />
+			<dt className="flex min-h-7 items-center gap-1.5 text-muted-foreground sm:min-h-6">
+				<Icon aria-hidden className="size-3.5" />
 				{label}
 			</dt>
-			<dd className="min-w-0 pt-1 pb-2 @sm/pr:py-1">{children}</dd>
+			<dd className="flex min-h-7 min-w-0 items-center sm:min-h-6">{children}</dd>
 		</>
 	);
 }
@@ -51,7 +51,12 @@ interface SummaryProps {
 export function Summary({ pr, detail, options, stack, others, sessions, onOpen, onPick, save }: SummaryProps) {
 	return (
 		<div className="space-y-6">
-			<dl className="grid grid-cols-1 items-start gap-x-4 text-sm @sm/pr:grid-cols-[8rem_minmax(0,1fr)] @sm/pr:gap-y-1">
+			<dl className="grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 text-xs">
+				<Property icon={Users} label="Reviewers">
+					<ReviewersField detail={detail} options={options} save={save}>
+						{detail.reviewers.length ? <Reviewers reviewers={detail.reviewers} /> : <span className="text-muted-foreground">None</span>}
+					</ReviewersField>
+				</Property>
 				<Property icon={Tag} label="Labels">
 					<LabelsField detail={detail} options={options} save={save}>
 						<LabelChips labels={detail.labels} />

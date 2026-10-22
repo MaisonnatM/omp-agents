@@ -20,7 +20,6 @@ const IMAGE_TIMEOUT_MS = 5_000;
 const GUTTER = 16;
 const MASK_COLOR = "#ff00ff";
 
-/** What changes between two runs with no change to the code: avatars and relative times. Masked on every capture. */
 const MASKS = {
 	selectors: ['img[src*="avatars.githubusercontent.com"]', "time"],
 	text: /^(([A-Za-z]+ ){0,2}(\d+\s?[a-z]+ ago|just now)|Today|Yesterday)$/,
@@ -37,20 +36,16 @@ interface PullRequestRef {
 	number: number;
 }
 
-/** One app's pull request panel: where a pull request opens, the panel, its tabs and controls, and what shows while it loads. */
 interface App {
 	side: Side;
 	url(pr: PullRequestRef): string;
-	/** Pins the panel to `PANEL_WIDTH` before the page loads. */
 	pin(context: BrowserContext): Promise<unknown>;
 	panel(page: Page): Locator;
 	tab(panel: Locator, tab: Tab): Locator;
-	/** `null` when the app has no such control. */
 	control(panel: Locator, control: Control): Locator | null;
 	busy(page: Page): Locator;
 }
 
-/** A captured state: the tab it shows, then the control it opens or the scroll it makes. */
 interface State {
 	name: string;
 	tab: Tab;
@@ -68,7 +63,6 @@ const STATES: State[] = [
 	{ name: "scrolled", tab: "summary", scroll: true },
 ];
 
-/** A draft, merged, or closed pull request shows its header's state on the Summary tab alone. */
 const STATE_PULL_REQUEST_STATES = STATES.filter(state => state.name === "summary");
 
 const TAB_LABEL: Record<Tab, string> = { summary: "Summary", timeline: "Timeline", code: "Code" };
@@ -92,7 +86,7 @@ const omp = (base: string): App => ({
 	tab: (panel, tab) => panel.getByRole("tab", { name: new RegExp(`^${TAB_LABEL[tab]}`) }),
 	control: (panel, control) => {
 		if (control === "checks") return panel.getByRole("button", { name: /^Checks:/ });
-		if (control === "menu") return panel.getByRole("button", { name: "More actions" });
+		if (control === "menu") return panel.getByRole("button", { name: "More pull request actions" });
 		return null;
 	},
 	busy: page => page.getByText(/^(Asking GitHub for the pull request|Reading changes)…$/),
@@ -126,7 +120,6 @@ function parsePullRequest(text: string): PullRequestRef {
 
 const masks = (page: Page): Locator[] => [...MASKS.selectors.map(selector => page.locator(selector)), page.getByText(MASKS.text)];
 
-/** From now on, `page`'s fetches; the returned wait ends once none is pending and none started or ended for `SETTLE_MS`. */
 function networkQuiet(page: Page): () => Promise<void> {
 	const pending = new Set<Request>();
 	let changed = Date.now();
@@ -160,7 +153,6 @@ async function settle(app: App, page: Page, panel: Locator, quiet: () => Promise
 	}, IMAGE_TIMEOUT_MS);
 }
 
-/** Scrolls the panel's tallest scroller down far enough for a header that condenses on scroll to condense. */
 const scrollPanel = (panel: Locator): Promise<void> =>
 	panel.evaluate(element => {
 		const scrollers = [element, ...element.querySelectorAll("*")].filter(node => node.scrollHeight > node.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(node).overflowY));
@@ -168,7 +160,6 @@ const scrollPanel = (panel: Locator): Promise<void> =>
 		if (scroller) scroller.scrollTop = Math.min(400, scroller.scrollHeight - scroller.clientHeight);
 	});
 
-/** Captures `state` of `pr` to `file`; `false` when the app has no control for it. */
 async function capture(app: App, context: BrowserContext, pr: PullRequestRef, state: State, file: string): Promise<boolean> {
 	const page = await context.newPage();
 	const quiet = networkQuiet(page);
@@ -197,7 +188,6 @@ async function capture(app: App, context: BrowserContext, pr: PullRequestRef, st
 	}
 }
 
-/** Captures the whole window at `hash`, for pages other than the pull request panel. */
 async function capturePage(base: string, context: BrowserContext, hash: string, file: string): Promise<void> {
 	const page = await context.newPage();
 	const quiet = networkQuiet(page);
@@ -212,7 +202,6 @@ async function capturePage(base: string, context: BrowserContext, hash: string, 
 	}
 }
 
-/** Writes omp and T3 side by side and their pixel diff, each padded to the larger size; returns the share of pixels that differ. */
 async function compare(ompFile: string, t3File: string, sideBySide: string, diffFile: string): Promise<number> {
 	const [left, right] = await Promise.all([ompFile, t3File].map(async file => PNG.sync.read(Buffer.from(await Bun.file(file).arrayBuffer()))));
 	const width = Math.max(left.width, right.width);

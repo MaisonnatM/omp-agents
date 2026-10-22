@@ -1,230 +1,207 @@
-import { ArrowLeft, Check, CircleDashed, CircleDot, CircleX, Copy, ExternalLink, FileDiff, GitMerge, Layers, type LucideIcon, MessageSquare, Users } from "lucide-react";
-import { type ReactNode, type RefObject, useState } from "react";
-import { type PullRequestOptionsRead, ReviewersField, type SavePullRequest, StateField } from "../pr-fields";
-import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, type Reviewer, type ReviewerState, type StackedPullRequest } from "../../../../src/shared/github";
-import { readyOnceChecksPass } from "../../../../src/shared/moves";
+import { ArrowLeft, ExternalLink, FileDiff, GitMerge, GitPullRequest, Pencil, TriangleAlert } from "lucide-react";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, prKey, MAX_PULL_REQUEST_TITLE, type StackedPullRequest, type UpdateMethod } from "../../../../src/shared/github";
+import { primaryControl } from "../../../../src/shared/moves";
 import { MERGE_METHOD_LABELS } from "../../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { age, modeOf } from "../../../labels";
-import type { QuickActionId } from "../../../quick-actions";
-import { useCopy } from "../../../use-copy";
-import { BranchLabel, BranchName, releaseBranch } from "../../git";
-import { QuickActionButton, type QuickActionsProps } from "../../quick-actions";
-import { Avatar, IconTip, STATE_ICON } from "../avatars";
-import { MergePopover } from "../merge-popover";
+import { age } from "../../../labels";
+import { useAction } from "../../../use-action";
+import { useInlineConfirm } from "../../../use-inline-confirm";
+import { CopyableCode } from "../../copyable-code";
+import { BranchLabel, releaseBranch } from "../../git";
+import type { QuickActionsProps } from "../../quick-actions";
+import { Avatar, STATE_ICON } from "../avatars";
+import { queuedMergeText } from "../merge-popover";
+import { type SavePullRequest, type SendPullRequest } from "../pr-fields";
 import { PullRequestMenu } from "../pr-menu";
-import { MoveBadge } from "../pr-row";
-import type { DetailContentProps, NextMove, Placement } from ".";
-import { type PlacedItem, TONE_COLOR, viewOf } from "./status-view";
+import { useMergeController } from "../use-merge-controller";
+import type { Placement } from ".";
 
-const REVIEWER_ICON: Record<ReviewerState, [LucideIcon, string, string]> = {
-	approved: [Check, "text-emerald-600 dark:text-emerald-400", "Approved"],
-	"changes-requested": [CircleX, "text-red-600 dark:text-red-400", "Requested changes"],
-	commented: [MessageSquare, "text-muted-foreground", "Commented"],
-	requested: [CircleDashed, "text-amber-600 dark:text-amber-400", "Review requested"],
-};
+const ACTION_LABEL = "@max-[30rem]/pr-header:hidden";
+const ACTION_BUTTON = "shrink-0 font-medium @max-[30rem]/pr-header:gap-0 @max-[30rem]/pr-header:px-1.5";
 
-/** A header row: its label beside its value at every width, so the sticky header stays short in the sidebar. */
-function Field({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
+function TitleEditor({ detail, headingRef, placement, send }: { detail: PullRequestDetail; headingRef: RefObject<HTMLHeadingElement | null>; placement: Placement; send: SendPullRequest }) {
+	const [editing, setEditing] = useState(false);
+	const [title, setTitle] = useState(detail.title);
+	const save = useAction(async () => {
+		const value = title.trim();
+		if (!value) return;
+		if (value !== detail.title) await send({ field: "title", title: value });
+		setEditing(false);
+	}, "Could not save the title");
+	const Heading = placement === "page" ? "h1" : "h3";
+	if (editing) return (
+		<form className="flex min-h-7 min-w-0 items-center gap-1 sm:min-h-6" onSubmit={event => { event.preventDefault(); save.run(); }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (!save.pending) setEditing(false); } }}>
+			<input autoFocus aria-label="Pull request title" value={title} maxLength={MAX_PULL_REQUEST_TITLE} required disabled={save.pending} onChange={event => setTitle(event.target.value)} className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+			<Button type="button" size="xs" variant="ghost" disabled={save.pending} onClick={() => setEditing(false)}>Cancel</Button>
+			<Button type="submit" size="xs" variant="outline" loading={save.pending}>{save.pending ? "Saving..." : "Save"}</Button>
+		</form>
+	);
 	return (
-		<>
-			<dt className="flex items-center gap-2 py-1 text-muted-foreground">
-				<Icon aria-hidden className="size-4" />
-				{label}
-			</dt>
-			<dd className="min-w-0 py-1">{children}</dd>
-		</>
+		<div className="group flex min-h-7 min-w-0 items-center gap-1 sm:min-h-6">
+			<Heading ref={headingRef} tabIndex={-1} title={detail.title} className="min-w-0 flex-1 truncate text-base font-semibold leading-snug outline-none">{detail.title}</Heading>
+			<span className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+				<Button size="icon-xs" variant="ghost-muted" aria-label="Edit title" onClick={() => { setTitle(detail.title); setEditing(true); }}><Pencil aria-hidden className="size-3" /></Button>
+			</span>
+		</div>
 	);
 }
 
-function StatusInline({ placed, quick }: { placed: PlacedItem[]; quick: QuickActionsProps }) {
-	return (
-		<ul className="space-y-1.5">
-			{placed.map(({ item, fix }) => {
-				const { tone, icon: Icon, text } = viewOf(item);
-				return (
-					<li key={item.kind} className="flex items-start gap-2">
-						<Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", TONE_COLOR[tone])} />
-						<span className="flex min-w-0 flex-wrap items-center gap-2">
-							<span className="min-w-0">{text(item)}</span>
-							{fix && <QuickActionButton action={fix} pending={quick.pending} onRun={quick.onRun} />}
-						</span>
-					</li>
-				);
-			})}
-		</ul>
-	);
-}
-
-function ReviewerInline({ reviewers }: { reviewers: Reviewer[] }) {
-	return (
-		<span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-			{reviewers.map(reviewer => (
-				<span key={reviewer.login} className="flex items-center gap-1.5">
-					<Avatar person={reviewer} label={reviewer.login} />
-					{reviewer.login}
-					<IconTip icon={REVIEWER_ICON[reviewer.state]} />
-				</span>
-			))}
-		</span>
-	);
-}
-
-/** The merge button, whose confirmation waits for the details while GitHub has not answered yet, or says why it did not; once queued, it says so. */
-function MergeButton({ pr, detail, readError, onQueued }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; onQueued: () => void }) {
+function BaseBranch({ detail, stacked, send }: { detail: PullRequestDetail; stacked: boolean; send: SendPullRequest }) {
+	const update = useAction(async (method: UpdateMethod) => { await send({ field: "update", method }); }, "Could not update the branch");
 	const [open, setOpen] = useState(false);
+	const hovered = useRef(false);
+	const trigger = useRef<HTMLButtonElement>(null);
+	const content = useRef<HTMLDivElement>(null);
+	const closeTimer = useRef<number | undefined>(undefined);
+	const keepOpen = () => {
+		window.clearTimeout(closeTimer.current);
+	};
+	const closeAfterHover = () => {
+		keepOpen();
+		closeTimer.current = window.setTimeout(() => {
+			if (trigger.current === document.activeElement || content.current?.contains(document.activeElement)) return;
+			setOpen(false);
+		}, 120);
+	};
+	useEffect(() => keepOpen, []);
+	const behind = (detail.state === "open" || detail.state === "draft") && !detail.conflicts && detail.behindBy !== null && detail.behindBy > 0;
+	if (!behind) return <span className={cn("inline-flex min-w-0 max-w-[40%]", stacked && "text-warning-foreground")} title={stacked ? `Stacked on ${detail.base}` : detail.base}><BranchLabel name={detail.base} /></span>;
 	return (
-		<MergePopover pr={pr} target={detail} error={readError} onQueued={onQueued} open={open} onOpenChange={setOpen}>
-			{({ method, queued, pending }) => (
-				<Button variant={queued?.state.kind === "failed" ? "secondary" : "primary"} size="compact" leadingIcon={GitMerge} active={open} loading={pending}>
-					{queued ? (queued.state.kind === "failed" ? "Merge stopped" : "Merging when ready") : method ? MERGE_METHOD_LABELS[method] : "Merge"}
-				</Button>
-			)}
-		</MergePopover>
-	);
-}
-
-/** The Next move's one button, as the header's primary action. */
-function NextMoveButton({ pr, detail, readError, next, quick, onOpen, onMergeQueued }: { pr: PullRequest; detail: PullRequestDetail | null; readError: string | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onMergeQueued: () => void }) {
-	const { move, reason, action, session } = next;
-	let button: ReactNode = null;
-	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
-	else if (move === "merge" || (move === "checks-running" && detail && readyOnceChecksPass(detail))) button = <MergeButton pr={pr} detail={detail} readError={readError} onQueued={onMergeQueued} />;
-	else if (session)
-		button = (
-			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
-				Open the session
-			</Button>
-		);
-	return (
-		<span className="flex items-center gap-2">
-			<Tooltip content={reason}>
-				<span>
-					<MoveBadge move={move} />
-				</span>
-			</Tooltip>
-			{button}
-		</span>
-	);
-}
-
-function CheckoutCommand({ pr }: { pr: PullRequest }) {
-	const { copied, copy } = useCopy();
-	const command = `gh pr checkout ${pr.number}`;
-	return (
-		<Tooltip content={copied ? "Copied" : "Copy the command"}>
-			<button type="button" onClick={() => copy(command)} className="group flex shrink-0 items-center gap-1.5 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
-				{copied ? <Check aria-hidden className="size-3" /> : <Copy aria-hidden className="size-3 opacity-0 group-hover:opacity-100" />}
-				{command}
-			</button>
-		</Tooltip>
+		<Popover open={open} onOpenChange={value => { keepOpen(); hovered.current = false; setOpen(value); }}>
+			<PopoverTrigger asChild>
+				<button ref={trigger} type="button" aria-label={`${detail.base}, behind by ${detail.behindBy} ${detail.behindBy === 1 ? "commit" : "commits"}`}
+					onPointerEnter={event => { keepOpen(); if (event.pointerType === "mouse" && !open) { hovered.current = true; setOpen(true); } }}
+					onPointerLeave={closeAfterHover}
+					onClick={event => { if (hovered.current) { event.preventDefault(); hovered.current = false; content.current?.querySelector("button")?.focus(); } }}
+					className="inline-flex min-w-0 max-w-[40%] shrink-0 cursor-help items-center gap-1 rounded-sm text-warning-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+					<BranchLabel name={detail.base} /><TriangleAlert aria-hidden className="size-3.5 shrink-0" />
+				</button>
+			</PopoverTrigger>
+			<PopoverContent ref={content} align="start" aria-label="Update base branch" className="w-80 max-w-80 space-y-3 p-3 text-xs font-sans"
+				onPointerEnter={keepOpen} onPointerLeave={closeAfterHover}
+				onOpenAutoFocus={event => { if (hovered.current) event.preventDefault(); }}
+				onCloseAutoFocus={event => { if (hovered.current) event.preventDefault(); }}
+				onEscapeKeyDown={() => { hovered.current = false; }}>
+				<p>This branch is out-of-date with <code>{detail.base}</code> by {detail.behindBy} {detail.behindBy === 1 ? "commit" : "commits"}.</p>
+				<p className="text-muted-foreground">Changes can be cleanly merged.</p>
+				<div className="flex flex-wrap gap-2"><Button size="xs" variant="outline" disabled={update.pending} onClick={() => update.run("merge")}>Update branch</Button><Button size="xs" variant="outline" disabled={update.pending} onClick={() => update.run("rebase")}>Update with rebase</Button></div>
+			</PopoverContent>
+		</Popover>
 	);
 }
 
 interface DetailHeaderProps {
 	pr: PullRequest;
-	/** What GitHub says of it; `null` until it answers. */
 	detail: PullRequestDetail | null;
-	/** Why GitHub did not answer, if it did not. */
-	readError: string | null;
 	stack: StackedPullRequest[];
-	next: NextMove | null;
-	/** The quick actions for the `⋯` menu. */
-	actions: QuickActionId[];
 	quick: QuickActionsProps;
-	/** The Status's items, each with the quick action that fixes it. */
-	placed: PlacedItem[];
-	options: PullRequestOptionsRead;
-	onOpen: DetailContentProps["onOpen"];
 	onSave: SavePullRequest;
-	/** The server took a merge of it, at once or to wait: the details read it again. */
+	send: SendPullRequest;
 	onMergeQueued: () => void;
 	placement: Placement;
-	/** The heading, which takes focus on the page. */
 	headingRef: RefObject<HTMLHeadingElement | null>;
-	/** A checkout of its repository, where copying the branch removes the linked worktree that has it checked out, as a row's copy does. */
 	cwd: string | null;
+	condensed: boolean;
+	foldRef: RefObject<HTMLDivElement | null>;
 }
 
-/** The header: the pull request's name, author, branches, size, status, and reviewers, with the Next move's button and the `⋯` menu. */
-export function DetailHeader({ pr, detail, readError, stack, next, actions, quick, placed, options, onOpen, onSave, onMergeQueued, placement, headingRef, cwd }: DetailHeaderProps) {
-	const page = placement === "page";
-	const Heading = page ? "h1" : "h3";
-	const stackedBase = detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
-	// The state picker says it is a draft already.
-	const blockers = placed.filter(({ item, fix }) => item.kind !== "draft" || fix);
+export function DetailHeader({ pr, detail, stack, quick, onSave, send, onMergeQueued, placement, headingRef, cwd, condensed, foldRef }: DetailHeaderProps) {
+	const { allowed, method, pick, queued, merging, pending, merge, cancel } = useMergeController({ pr, target: detail, onQueued: onMergeQueued, onCancelled: onMergeQueued });
+	const control = detail ? primaryControl(detail, method, queued?.method ?? null) : { kind: "none" as const };
+	const confirm = useInlineConfirm(`${prKey(pr)}:${detail?.headOid}:${method}`);
+	const state = detail?.state ?? "open";
+	const [StateIcon, tone] = STATE_ICON[state];
+	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn("inline-flex h-6 shrink-0 items-center gap-1 rounded-md border px-[7px] text-xs font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><GitMerge aria-hidden className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
+	const mergeLabel = confirm.isArmed("merge") ? "Confirm merge?" : control.kind === "enable-auto-merge" ? `${method ? MERGE_METHOD_LABELS[method] : "Merge"} when ready` : method ? MERGE_METHOD_LABELS[method] : "Merge";
+	const stacked = !!detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
+	const branches = detail && (
+		<span className={cn("flex min-w-0 flex-1 items-center gap-1.5 font-mono text-muted-foreground/70", condensed ? "text-2xs" : "text-xs")}>
+			<BaseBranch detail={detail} stacked={stacked} send={send} />
+			<ArrowLeft aria-label="receives changes from" className={cn("shrink-0 opacity-60", condensed ? "size-3" : "size-3.5")} />
+			<CopyableCode key={detail.head} value={detail.head} label="Copy pull request branch" onCopy={cwd === null ? undefined : () => releaseBranch(cwd, detail.head)} />
+		</span>
+	);
+	const stats = detail && (
+		<span className="ml-auto inline-flex shrink-0 items-center justify-end gap-2">
+			<span aria-label={`${detail.changedFiles} changed files`} className="inline-flex min-w-16 items-center justify-end gap-1.5 tabular-nums">
+				<FileDiff aria-hidden className={condensed ? "size-3" : "size-3.5"} />
+				{detail.changedFiles} <span className="@max-[30rem]/pr-header:hidden">{detail.changedFiles === 1 ? "file" : "files"}</span>
+			</span>
+			<span className={cn("shrink-0 font-mono", condensed ? "text-2xs" : "text-xs")}>
+				<span className="text-emerald-700 dark:text-emerald-400">+{detail.additions.toLocaleString()}</span>{" "}
+				<span className="text-destructive-foreground">−{detail.deletions.toLocaleString()}</span>
+			</span>
+		</span>
+	);
 	return (
-		<header className={cn("space-y-2 border-b border-border pb-4", page ? "px-6 pt-5" : "pt-1")}>
-			<div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-				<p className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">
-					{detail && <IconTip icon={STATE_ICON[detail.state]} />}
-					<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate hover:text-foreground">
-						{pr.owner}/{pr.repo} <span className="text-emerald-700 dark:text-emerald-400">#{pr.number}</span>
-						<ExternalLink aria-hidden className="size-3" />
-					</a>
-				</p>
-				<span className="ml-auto flex shrink-0 items-center gap-1.5">
-					{next && <NextMoveButton pr={pr} detail={detail} readError={readError} next={next} quick={quick} onOpen={onOpen} onMergeQueued={onMergeQueued} />}
-					<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={{ ...quick, actions }} onState={to => onSave({ field: "state", state: to }, { state: to })} label="More actions" />
-				</span>
+		<header className="@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 border-b border-border/60 pt-2">
+			<div className="grid h-7 min-w-0 items-center overflow-hidden pl-4">
+				<div className="col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+					{!condensed && <a href={`https://github.com/${pr.owner}/${pr.repo}`} target="_blank" rel="noreferrer" className="min-w-0 truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{pr.owner}/{pr.repo}</a>}
+					<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className={cn("inline-flex shrink-0 items-center gap-0.5 font-medium underline-offset-2 hover:underline", tone)}>#{pr.number}<ExternalLink aria-hidden className="size-2.5" /></a>
+					{condensed && <span className="truncate font-medium text-foreground">{detail?.title}</span>}
+				</div>
 			</div>
-			<Heading ref={headingRef} tabIndex={-1} className={cn(page ? "text-xl" : "text-base", "leading-snug font-semibold outline-none")}>
-				{detail?.title ?? pullRequestName(pr)}
-			</Heading>
-			{detail && (
-				<>
-					<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-						<span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-							<Avatar person={detail.author} label={`Opened by ${detail.author.login}`} />
-							<span className="truncate text-foreground">{detail.author.login}</span>
-							<span aria-hidden>·</span>
-							<Tooltip content={`Opened ${new Date(detail.createdAt).toLocaleString()}`}>
-								<span>updated {age(detail.updatedAt)} ago</span>
-							</Tooltip>
+			<div className="mr-4 flex h-7 shrink-0 items-center justify-end gap-1">
+				{queued && state !== "merged" && state !== "closed" && badge}
+				{(control.kind === "merged" || control.kind === "closed") && (
+					<span className={cn("inline-flex h-6 items-center gap-1 rounded-md border border-border px-[7px] text-xs", tone)}>
+						<StateIcon aria-hidden className="size-3.5" />{control.kind === "merged" ? "Merged" : "Closed"}
+					</span>
+				)}
+				{control.kind === "resolve-conflicts" && (
+					<Tooltip content="Resolve conflicts">
+						<span className="inline-flex">
+							<Button size="xs" variant="destructive-outline" className={ACTION_BUTTON} leadingIcon={TriangleAlert} aria-label="Resolve conflicts"
+								disabled={quick.pending !== null || !quick.actions.includes("resolve-conflicts")} onClick={() => quick.onRun("resolve-conflicts")}>
+								<span className={ACTION_LABEL}>Resolve conflicts</span>
+							</Button>
 						</span>
-						<span className="ml-auto whitespace-nowrap">
-							<CheckoutCommand pr={pr} />
-						</span>
+					</Tooltip>
+				)}
+				{control.kind === "ready-for-review" && (
+					<Tooltip content="Ready for review">
+						<Button size="xs" variant="primary" className={ACTION_BUTTON} leadingIcon={GitPullRequest} aria-label="Ready for review" onClick={() => onSave({ field: "state", state: "open" }, { state: "open" })}>
+							<span className={ACTION_LABEL}>Ready for review</span>
+						</Button>
+					</Tooltip>
+				)}
+				{(control.kind === "merge" || control.kind === "enable-auto-merge") && (
+					<Tooltip content={mergeLabel} forceOpen={confirm.isArmed("merge") ? false : undefined} contentClassName="pointer-events-none">
+						<Button size="xs" variant="primary" className={ACTION_BUTTON} leadingIcon={GitMerge} aria-label={mergeLabel}
+							loading={merging} disabled={!!queued} {...confirm.props("merge", merge)}>
+							<span className={ACTION_LABEL}>{merging ? "Merging..." : mergeLabel}</span>
+						</Button>
+					</Tooltip>
+				)}
+				<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={quick} onState={to => onSave({ field: "state", state: to }, { state: to })}
+					merge={{ allowed, method, onPick: pick, queued, onCancel: cancel.run }} pending={pending} label="More pull request actions" />
+			</div>
+			<div className={cn("col-span-2 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+				<div data-pr-condensed className={cn("min-h-0 overflow-hidden transition-[opacity,transform] duration-150 motion-reduce:transition-none", condensed ? "translate-y-0 opacity-100 delay-50" : "translate-y-1 opacity-0 duration-100")} inert={!condensed}>
+					{detail && <div className="flex min-w-0 items-center gap-2 px-4 pb-2 pt-1 text-2xs text-muted-foreground">
+						<Avatar person={detail.author} label={detail.author.login} />
+						<span className="shrink-0 @max-[30rem]/pr-header:hidden">updated {age(detail.updatedAt)} ago</span>
+						<span aria-hidden className="h-3 w-px shrink-0 bg-border/70" />
+						{branches}{stats}
+					</div>}
+				</div>
+			</div>
+			<div className={cn("col-span-2 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
+				<div ref={foldRef} className={cn("min-h-0 overflow-hidden transition-[opacity,transform] duration-150 motion-reduce:transition-none", condensed ? "-translate-y-1 opacity-0 duration-100" : "translate-y-0 opacity-100 delay-50")} inert={condensed}>
+					<div className="mt-1 min-w-0 px-4 pb-4">
+						{detail ? <TitleEditor detail={detail} headingRef={headingRef} placement={placement} send={send} /> : <h1 ref={headingRef} tabIndex={-1} className="text-base font-semibold">{pullRequestName(pr)}</h1>}
+						{detail && <>
+							<div className="mt-2 flex min-h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground"><span className="flex min-w-0 items-center gap-1.5"><Avatar person={detail.author} label={`Opened by ${detail.author.login}`} /><span className="truncate text-foreground">{detail.author.login}</span></span><span aria-hidden className="text-muted-foreground/50">·</span><Tooltip content={`Updated ${new Date(detail.updatedAt).toLocaleString()}`}><span className="shrink-0">updated {age(detail.updatedAt)} ago</span></Tooltip><CopyableCode value={`gh pr checkout ${pr.number}`} label="Copy checkout command" className="ml-auto font-mono" /></div>
+							<div className="mt-4 flex min-h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground">{branches}{stats}</div>
+						</>}
 					</div>
-					<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-						<span className="flex min-w-0 max-w-full items-center gap-1.5">
-							{stackedBase ? (
-								<span className="flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-400">
-									<Layers aria-hidden className="size-3.5 shrink-0" />
-									<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
-								</span>
-							) : (
-								<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
-							)}
-							<ArrowLeft aria-label="from" className="size-3 shrink-0" />
-							<BranchName name={detail.head} onCopy={cwd === null ? undefined : () => releaseBranch(cwd, detail.head)} className="font-mono" />
-						</span>
-						<span className="ml-auto flex items-center gap-2 tabular-nums">
-							<FileDiff aria-hidden className="size-3.5" />
-							{detail.changedFiles} {detail.changedFiles === 1 ? "file" : "files"}
-							<span className="font-mono">
-								<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions.toLocaleString()}</span>{" "}
-								<span className="text-red-600 dark:text-red-400">−{detail.deletions.toLocaleString()}</span>
-							</span>
-						</span>
-					</div>
-					<dl className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 text-sm">
-						<Field icon={CircleDot} label="Status">
-							<div className="space-y-1.5">
-								<StateField detail={detail} save={onSave} />
-								{blockers.length > 0 && <StatusInline placed={blockers} quick={quick} />}
-							</div>
-						</Field>
-						<Field icon={Users} label="Reviewers">
-							<ReviewersField detail={detail} options={options} save={onSave}>
-								<ReviewerInline reviewers={detail.reviewers} />
-							</ReviewersField>
-						</Field>
-					</dl>
-				</>
-			)}
+				</div>
+			</div>
 		</header>
 	);
 }

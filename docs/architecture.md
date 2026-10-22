@@ -1087,6 +1087,11 @@ A removed file's patch holds every line, so it reads no blob; a file GitHub send
 `stackOf` in `src/pull-request-stack.ts` follows the base branches down from the pull request and the pull requests based on its branch up, so the stack holds those that the Pull requests page does not list.
 `GET /api/pull-request/options?owner=<o>&repo=<r>` answers `PullRequestOptions` for the pickers of a pull request's **Summary**: the repository's labels and the people its issues can be assigned to, whom a review can be asked of, each from `gh api --paginate --slurp` and sorted by name, kept five minutes per repository.
 `PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
+A `title` change carries a nonblank title of at most 256 characters and patches `repos/<owner>/<repo>/pulls/<number>`.
+An `update` change selects `merge` or `rebase` and calls `GITHUB_MERGES.update` with the node id and head read fresh from GitHub.
+The queue uses the same update function with the merge method.
+Each open pull request detail adds one REST comparison of its base against its head commit.
+`behindBy` is the comparison's `behind_by` count, or `null` for an unavailable comparison or a finished pull request.
 A merge is no change of its own: it goes through `PUT /api/merge-queue`, whose `MergeQueue` runs GraphQL's `mergePullRequest` with `expectedHeadOid` the commit the confirmation showed, so GitHub refuses the merge once the branch moved past it.
 The pull request's answer carries that commit as `headOid` and the methods its repository allows as `mergeMethods`.
 A `thread` change, `{ id, resolved }`, runs GraphQL's `resolveReviewThread` or `unresolveReviewThread` on the review thread with that node id, which `parsePullRequestEdit` takes only as letters, digits, `_`, `-`, and the `=` an older base64 id ends with, at most 100.

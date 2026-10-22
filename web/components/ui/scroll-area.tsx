@@ -15,6 +15,7 @@ import {
   useState,
   type ComponentPropsWithoutRef,
   type ComponentRef,
+  type Ref,
 } from "react";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,8 @@ type Orientation = "vertical" | "horizontal" | "both";
 interface ScrollAreaProps
   extends ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> {
   viewportClassName?: string;
+  /** The element that scrolls, which the forwarded ref (the root) is not. */
+  viewportRef?: Ref<HTMLDivElement>;
   /** Which axes get scrollbars. Defaults to `"vertical"`. */
   orientation?: Orientation;
 }
@@ -59,6 +62,7 @@ const ScrollArea = forwardRef<
       // below, not Radix's hover machinery (see type="always" note).
       scrollHideDelay: _scrollHideDelay,
       viewportClassName,
+      viewportRef,
       orientation = "vertical",
       ...props
     },
@@ -95,6 +99,7 @@ const ScrollArea = forwardRef<
             {...props}
           >
             <div
+              ref={viewportRef}
               data-slot="scroll-area-viewport"
               className={cn(
                 "size-full rounded-[inherit]",
@@ -124,6 +129,7 @@ const ScrollArea = forwardRef<
               {...props}
             >
               <ScrollAreaPrimitive.Viewport
+                ref={viewportRef}
                 data-slot="scroll-area-viewport"
                 onScroll={handleScroll}
                 className={cn("size-full rounded-[inherit]", viewportClassName)}

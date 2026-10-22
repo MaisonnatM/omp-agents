@@ -302,6 +302,8 @@ export interface PullRequestDetail extends PullRequest {
 	mergeMethods: MergeMethod[];
 	/** Whether GitHub would merge it now, and if not, what holds it: a branch behind its base, a pending check or review, conflicts. */
 	mergeState: MergeState;
+	/** How many commits its base has that its branch lacks; `null` once it merged or closed, or when GitHub could not compare them, as after its branch was deleted. */
+	behindBy: number | null;
 	/** Whether you may comment on it: its repository is not archived, and its conversation is not locked or you can write to the repository. */
 	canComment: boolean;
 }
@@ -310,11 +312,20 @@ export interface PullRequestDetail extends PullRequest {
 export const SETTABLE_STATES = ["open", "draft", "closed"] as const;
 export type SettableState = (typeof SETTABLE_STATES)[number];
 
+/** How the details bring a branch up to date with its base: merge the base into it, or rebase it onto the base. */
+export const UPDATE_METHODS = ["merge", "rebase"] as const;
+export type UpdateMethod = (typeof UPDATE_METHODS)[number];
+
+/** The longest title GitHub takes for a pull request. */
+export const MAX_PULL_REQUEST_TITLE = 256;
+
 /** One change the details make to a pull request. */
 export type PullRequestChange =
+	| { field: "title"; title: string }
 	| { field: "label"; name: string; on: boolean }
 	| { field: "reviewer"; login: string; on: boolean }
 	| { field: "state"; state: SettableState }
+	| { field: "update"; method: UpdateMethod }
 	| { field: "thread"; id: string; resolved: boolean }
 	| { field: "reply"; thread: string; body: string }
 	| { field: "comment"; body: string };

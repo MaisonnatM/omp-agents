@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type HTMLAttributes } from "react";
+import { forwardRef, type HTMLAttributes, type Ref } from "react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { SidebarSide } from "@/components/ui/sidebar-core";
@@ -44,15 +44,16 @@ Sidebar.displayName = "Sidebar";
 
 interface SidebarContentProps extends HTMLAttributes<HTMLDivElement> {
   viewportClassName?: string;
+  viewportRef?: Ref<HTMLDivElement>;
 }
 
 const SidebarContent = forwardRef<HTMLDivElement, SidebarContentProps>(
-  ({ className, viewportClassName, children, ...props }, ref) => (
+  ({ className, viewportClassName, viewportRef, children, ...props }, ref) => (
     // The scroll primitive wraps children in an inline-styled sizer that
     // sizes to content — rows would stop shrinking near the min width
     // instead of truncating, so the viewport's direct child is forced back
     // to a plain shrinkable block.
-    <ScrollArea className={cn("scroll-divider min-h-0 w-full flex-1", className)} viewportClassName={cn("scroll-fade scroll-fade-once-scrolled [&>div]:!block [&>div]:!min-w-0", viewportClassName)}>
+    <ScrollArea className={cn("scroll-divider min-h-0 w-full flex-1", className)} viewportRef={viewportRef} viewportClassName={cn("scroll-fade scroll-fade-once-scrolled [&>div]:!block [&>div]:!min-w-0", viewportClassName)}>
       <div ref={ref} data-sidebar="content" className="flex w-full min-w-0 flex-col" {...props}>
         {children}
       </div>

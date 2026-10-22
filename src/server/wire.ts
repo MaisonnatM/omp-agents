@@ -38,6 +38,7 @@ import {
 	MAX_COMMENT_BODY,
 	MAX_PULL_REQUEST_ATTACHMENTS,
 	MAX_PULL_REQUEST_IMAGE_BYTES,
+	MAX_PULL_REQUEST_TITLE,
 	PULL_REQUEST_IMAGE_TYPES,
 	parsePullRequest,
 	type PullRequest,
@@ -47,6 +48,7 @@ import {
 	type PullRequestImage,
 	type Repo,
 	SETTABLE_STATES,
+	UPDATE_METHODS,
 } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
@@ -449,6 +451,7 @@ export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullReque
 
 const isSettableState = oneOf(SETTABLE_STATES);
 const isMergeMethod = oneOf(MERGE_METHODS);
+const isUpdateMethod = oneOf(UPDATE_METHODS);
 const COMMIT = /^[0-9a-f]{40,64}$/;
 /** A GitHub node id: a review thread's `PRRT_…` id, or an older id's base64 with its `=` padding. */
 const NODE_ID = /^[A-Za-z0-9_=-]{1,100}$/;
@@ -457,6 +460,8 @@ const isCommentBody = (value: unknown): value is string => isNonEmpty(value) && 
 
 function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (!isObject(change)) return null;
+	if (change.field === "title" && isNonEmpty(change.title) && change.title.length <= MAX_PULL_REQUEST_TITLE) return { ok: { field: "title", title: change.title } };
+	if (change.field === "update" && isUpdateMethod(change.method)) return { ok: { field: "update", method: change.method } };
 	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { ok: { field: "label", name: change.name, on: change.on } };
 	if (change.field === "reviewer" && typeof change.login === "string" && GITHUB_NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
 	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };

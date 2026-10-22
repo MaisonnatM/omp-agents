@@ -1,22 +1,16 @@
-/**
- * The confirmation before a pull request merges on GitHub, which the details' merge button, a row's **Merge** badge, the
- * bell's **Merge**, and a session's stack open. Every merge goes to the server's merge queue, which merges at once when
- * GitHub allows it and otherwise once it is ready.
- */
 import { GitMerge, Layers } from "lucide-react";
-import { type ReactElement, useState } from "react";
+import type { ReactElement } from "react";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { mergesNow, type PullRequest, type PullRequestDetail, pullRequestName, type StackedPullRequest } from "../../../src/shared/github";
-import { type QueuedMerge, queuedMergeOf } from "../../../src/shared/merge-queue";
-import { MERGE_METHOD_LABELS, type MergeMethod, startingMethod } from "../../../src/shared/source-control";
+import type { QueuedMerge } from "../../../src/shared/merge-queue";
+import { MERGE_METHOD_LABELS, type MergeMethod } from "../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useLastMergeMethod, useMergeMethodChoice } from "../../merge-method";
-import { useRead, writeMergeQueue } from "../../reads";
-import { useAction } from "../../use-action";
-import { useDashboardStatus } from "../dashboard-context";
+import { useRead } from "../../reads";
+import type { Action } from "../../use-action";
+import { useMergeController } from "./use-merge-controller";
 
 /** What a merge of `pr` needs, read from GitHub only while its confirmation is `open`, for a place that holds no details of it. */
 export const useMergeTarget = (pr: PullRequest, open: boolean) =>
@@ -51,9 +45,7 @@ export function queuedMergeText(merge: QueuedMerge): string {
 }
 
 /** A queued merge's line and its **Cancel**, or **Dismiss** once it stopped. */
-export function QueuedMergeNote({ merge }: { merge: QueuedMerge }) {
-	const { pullRequestsScope } = useDashboardStatus();
-	const cancel = useAction(async () => void (await writeMergeQueue(pullRequestsScope, { op: "cancel", id: merge.id })), "Could not cancel the merge");
+export function QueuedMergeNote({ merge, cancel }: { merge: QueuedMerge; cancel: Action<[]> }) {
 	return (
 		<div className="flex items-start gap-2 text-[13px]">
 			<p role={merge.state.kind === "failed" ? "alert" : "status"} className={merge.state.kind === "failed" ? "flex-1 text-red-600 dark:text-red-400" : "flex-1 text-muted-foreground"}>
@@ -88,7 +80,7 @@ export interface MergePopoverProps {
 	onOpenChange: (open: boolean) => void;
 	/** The trigger's tooltip, if any. */
 	tooltip?: string;
-	/** Which edge of the trigger the confirmation lines up with: the header's button sits at the right, a row's badge at the left. */
+	/** Which edge of the trigger the confirmation lines up with. */
 	align?: "start" | "end";
 	children: (trigger: MergeTrigger) => ReactElement;
 }
@@ -99,27 +91,14 @@ export interface MergePopoverProps {
  * confirmation says where it stands and cancels it.
  */
 export function MergePopover({ pr, stack, target, error = null, onQueued, open, onOpenChange, tooltip, align = "end", children }: MergePopoverProps) {
-	const { merges, pullRequestsScope } = useDashboardStatus();
-	const [choice] = useMergeMethodChoice();
-	const [last, setLast] = useLastMergeMethod();
-	const [picked, setPicked] = useState<MergeMethod | null>(null);
-	const queue = useAction(async (method: MergeMethod, head: string) => {
-		const bottomFirst = stack ? stack.toReversed() : [pr];
-		await writeMergeQueue(pullRequestsScope, { op: "add", method, prs: bottomFirst.map(({ owner, repo, number }, index) => ({ owner, repo, number, head: index === 0 ? head : null })) });
-		onQueued?.();
-	}, "Could not merge");
-	const queued = queuedMergeOf(merges, pr) ?? stack?.map(stacked => queuedMergeOf(merges, stacked)).find(Boolean);
-	const allowed = target?.mergeMethods ?? [];
-	const method = picked && allowed.includes(picked) ? picked : startingMethod(choice, last, allowed);
+	const { allowed, method, pick, queued, merging, merge, cancel } = useMergeController({ pr, stack, target, onQueued });
 	// Only the wording follows whether GitHub merges it now; the queue decides what the merge does.
 	const later = stack !== undefined || (target !== null && !mergesNow(target));
-	const merge = (): void => {
-		if (!target || !method) return;
-		setLast(method);
+	const confirm = (): void => {
 		onOpenChange(false);
-		queue.run(method, target.headOid);
+		merge();
 	};
-	const trigger = <PopoverTrigger asChild>{children({ method, queued, pending: queue.pending })}</PopoverTrigger>;
+	const trigger = <PopoverTrigger asChild>{children({ method, queued, pending: merging })}</PopoverTrigger>;
 	const question = (): ReactElement => {
 		if (target === null)
 			return (
@@ -156,13 +135,13 @@ export function MergePopover({ pr, stack, target, error = null, onQueued, open, 
 			)}
 			<PopoverContent align={align} className="w-72 space-y-3 p-3">
 				{queued ? (
-					<QueuedMergeNote merge={queued} />
+					<QueuedMergeNote merge={queued} cancel={cancel} />
 				) : (
 					<>
 						{question()}
 						{target && allowed.length === 0 && <p className="text-[13px] text-muted-foreground">The repository allows no merge method.</p>}
 						{allowed.length > 1 && method && (
-							<RadioGroup aria-label="Merge method" value={method} onValueChange={value => setPicked(allowed.find(candidate => candidate === value) ?? null)} className="space-y-1">
+							<RadioGroup aria-label="Merge method" value={method} onValueChange={value => { const candidate = allowed.find(each => each === value); if (candidate) pick(candidate); }} className="space-y-1">
 								{allowed.map(candidate => (
 									<label key={candidate} className="flex cursor-pointer items-center gap-2 text-[13px]">
 										<Radio.Root value={candidate} className="flex size-3.5 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--border)] outline-none focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary">
@@ -177,7 +156,7 @@ export function MergePopover({ pr, stack, target, error = null, onQueued, open, 
 							<Button variant="ghost" size="compact" onClick={() => onOpenChange(false)}>
 								Cancel
 							</Button>
-							<Button variant="primary" size="compact" leadingIcon={stack ? Layers : GitMerge} disabled={method === null} loading={queue.pending} onClick={merge}>
+							<Button variant="primary" size="compact" leadingIcon={stack ? Layers : GitMerge} disabled={method === null} loading={merging} onClick={confirm}>
 								{method ? MERGE_METHOD_LABELS[method] : "Merge"}
 								{later && " when ready"}
 							</Button>

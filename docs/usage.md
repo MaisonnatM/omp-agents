@@ -756,7 +756,7 @@ An action that fails shows its error, and its control becomes available again.
   It holds the quick actions that apply, then **Convert to draft** on an open pull request or **Mark ready for review** on a draft, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change.
   A state change or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
-  Click a **Merge** badge to merge the pull request after the same confirmation as the details' merge button, which reads the pull request from GitHub while it is open; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
+  Click a **Merge** badge for a popover that reads the pull request from GitHub and confirms the merge; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
@@ -776,32 +776,40 @@ An action that fails shows its error, and its control becomes available again.
   Drag a repository's name on the page or in its sidebar index to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- The details of a pull request open with a header: the repository and number, a link to it on GitHub, then the title, its author, when it last changed, and `gh pr checkout <number>`, which a click copies.
-  Its next line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
-  Clicking the branch it brings copies its name and removes the linked worktree that has it checked out, as a session header's branch does.
-  The header ends with **Status** and **Reviewers**, each label beside its value at every width.
-  **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
-  A pull request otherwise ready to merge whose branch is behind its base, under a rule that wants it up to date, says **Behind** its base in place of **Ready to merge**, and still offers its merge, which updates the branch first.
-  Click the state to make the pull request **Open**, **Draft**, or **Closed**; a merged one keeps its state.
-  **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
-  Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
-  On the right of the first line, the **Next move** shows as its badge, with its reason on hover, and one button that makes it.
-  The badge, its button, the `⋯` menu, and the Status's buttons all follow what the details read from GitHub, so a pull request you just made a draft, whose checks failed, or that merged since the list last refreshed shows the move the Status agrees with, and a closed one offers none.
-  The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
-  **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
-  In a session's details sidebar, that session is the one you are in, so its **Open the session** button and its chip under **Sessions** do not show.
-  The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; while the details are still being read, its confirmation says so and waits.
-  A pull request GitHub would not merge yet, because its branch is behind its base, its checks still run, or a review or rule holds it, still merges in one click: the confirmation says why it waits and its button reads **Squash and merge when ready**, or the method you picked.
-  The dashboard's server then carries the merge out, even with the page closed: it updates a branch that is behind, waits for the checks, and merges once GitHub allows it, or arms GitHub's auto-merge where the repository allows it.
-  While it waits, the button reads **Merging when ready**, a row's badge **Queued**, and the confirmation says what it waits on, with **Cancel**; a merge that stops, when the checks fail, the branch conflicts or moves, or GitHub refuses, reads **Merge stopped** and **Stopped**, with the reason and **Dismiss**.
-  **CI running** on your own pull request that is ready but for its checks offers the same button.
-  The server keeps the queued merges in `merges.json` beside its access token, so a restart picks them up where they were; with dashboards on two ports, the one that runs routines carries out every merge, so a merge clicked on the other starts within 15 seconds.
-  The `⋯` menu beside it holds the other quick actions, then the state changes: **Convert to draft** and **Close pull request** on an open pull request, **Mark ready for review** and **Close pull request** on a draft, and **Reopen pull request** on a closed one.
-  It ends with **Open on GitHub** and **Open on Graphite**, each with its logo.
+- A pull request's header starts with its repository and a state-colored `#number` link to GitHub.
+  Its primary action and `⋯` menu sit at the right.
+  Below them are the title, author, last update, copyable `gh pr checkout <number>` command, branches, file count, and lines added and removed.
+  Hover the title for **Edit title**, or focus its pencil with the keyboard.
+  Enter saves the title and Escape cancels the edit.
+  Clicking the head branch copies its name and removes the linked worktree that has it checked out, as a session header's branch does.
+  A stacked base is amber.
+  When GitHub reports that the branch is behind its base, the base turns orange and gains a warning icon.
+  Hover or activate the warning for the commit count and **Update branch** or **Update with rebase**.
+  Tab reaches both update actions; Escape closes the popover and returns focus to the warning.
+  The primary control shows **Merged** or **Closed** for a finished pull request, **Resolve conflicts** for conflicts, and **Ready for review** for a draft.
+  Otherwise it offers the selected merge method, such as **Squash and merge**, or that method **when ready** while GitHub holds the merge.
+  The first click arms **Confirm merge?**, and a second click within three seconds sends the merge to the server.
+  Escape, blur, or a click outside disarms it.
+  The merge is pinned to the head commit the header showed.
+  The server updates a stale branch, waits for checks and reviews, and merges once GitHub allows it, even with the page closed.
+  The armed merge shows **Auto-merge** with its method, or **Merge stopped** after a failure.
+  Its tooltip says what it waits on or why it stopped.
+  The `⋯` menu offers **Cancel merge when ready** or **Dismiss stopped merge**.
+  Rows keep their popover confirmation and **Queued** or **Stopped** badge.
+  The server keeps merges in `merges.json` beside its access token and resumes them after a restart.
+  The `⋯` menu starts with the quick actions, including fixes for CI, conflicts, and review comments.
+  Next come the merge methods, **Ready for review** or **Convert to draft**, links to GitHub and Graphite, **Copy link**, and **Copy PR number**.
+  A method picked there applies to this pull request's merge button; **Last selected** in Settings remembers it only once you confirm a merge with it.
+  **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
+  The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
+  In a narrow panel, action labels hide but their tooltips and accessible names remain.
 - Under the header, tabs split the details: **Summary**, **Comments**, with the count of the comments it lists, **Timeline**, with the count of its comments, reviews, and unresolved review threads, **Code**, and **Review draft** while a review draft of the pull request is kept, with the count of its findings still pending.
   Where the details are narrower than 480 px, as in the sidebar at its default width, each tab shows its icon alone and names itself in a tooltip.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
-- **Summary** lists the pull request's labels and the sessions on it.
+- **Summary** lists the pull request's reviewers, labels, and sessions.
+  **Reviewers** shows overlapping avatars marked by review outcome, or **None**.
+  Click the row for the people who can review on the repository, with the author left out.
+  Picking a person requests a review, again when they reviewed already, and picking someone already requested withdraws the request.
   **Labels** shows the labels in their GitHub colors; click them for the repository's labels, and pick one to add or remove it.
   The lists of reviewers and labels come from GitHub on the first click of either picker, and the server keeps them for 5 minutes.
   A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why above the tab.
@@ -810,7 +818,7 @@ An action that fails shows its error, and its control becomes available again.
   The server reads the repository's open pull requests for it and keeps them for 30 seconds.
   Then comes the description in full.
 - **Comments** lists the pull request's review threads, unresolved ones first, each under the file and line it is on, which link to the file on the **Code** tab, with every comment in it.
-  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; the change shows at once in the header's unresolved review threads, and the details undo it and say why when GitHub refuses it.
+  **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; the details undo a refused change and say why above the tab.
   Resolved threads fold behind a line with their count, such as **2 resolved**.
   A thread you can reply to has a reply box under it: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and the box keeps your words and says why when GitHub refuses them.
   Under the threads, **Conversation** lists the comments and reviews with words on the pull request, oldest first, then a box to comment that works as the reply box does, shown when GitHub lets you comment.
@@ -1471,7 +1479,7 @@ An action that fails shows its error, and its control becomes available again.
   A session still working when its pull request merges, or waiting to continue after a usage limit, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
   A project's workers follow their project's **Workers' pull requests** instead, and a coordinator never ends.
-  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses whatever you chose most recently in this browser, and a method the repository does not allow falls back to the first one it does.
+  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in this browser, and a method the repository does not allow falls back to the first one it does.
 - **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.

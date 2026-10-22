@@ -1,6 +1,7 @@
 /** What a pull request waits on next, which the Pull requests page ranks its rows by and the bell notifies of when the move is yours. */
-import type { PullRequestSummary, PullRequest, PullRequestDetail } from "./github";
+import { mergesNow, type PullRequestSummary, type PullRequest, type PullRequestDetail } from "./github";
 import { type HostStatus, type RosterHost, worksOn } from "./sessions";
+import type { MergeMethod } from "./source-control";
 
 export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "in-review" | "checks-running" | "draft" | "merged";
 
@@ -59,4 +60,28 @@ export function moveOf(pr: PullRequestSummary, agent: AgentState | null): MoveId
 	if (readyToMerge(pr)) return "merge";
 	if (pr.checks === "pending") return "checks-running";
 	return "in-review";
+}
+
+export type PrimaryControl =
+	| { kind: "merged" }
+	| { kind: "closed" }
+	| { kind: "none" }
+	| { kind: "resolve-conflicts" }
+	| { kind: "ready-for-review" }
+	| { kind: "auto-merge-armed"; method: MergeMethod }
+	| { kind: "enable-auto-merge"; method: MergeMethod }
+	| { kind: "merge"; method: MergeMethod };
+
+export function primaryControl(
+	detail: Pick<PullRequestDetail, "state" | "conflicts" | "checks" | "mergeState">,
+	method: MergeMethod | null,
+	armed: MergeMethod | null,
+): PrimaryControl {
+	if (detail.state === "merged") return { kind: "merged" };
+	if (detail.state === "closed") return { kind: "closed" };
+	if (detail.conflicts) return { kind: "resolve-conflicts" };
+	if (detail.state === "draft") return { kind: "ready-for-review" };
+	if (armed) return { kind: "auto-merge-armed", method: armed };
+	if (!method) return { kind: "none" };
+	return { kind: mergesNow(detail) ? "merge" : "enable-auto-merge", method };
 }
