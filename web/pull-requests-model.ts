@@ -41,14 +41,19 @@ export const MOVES: Record<MoveId, Move> = {
 
 const MOVE_IDS = Object.keys(MOVES) as MoveId[];
 
-/** The list's sections in page order, and whether each starts folded: those that hold nothing for you or an agent to do now. Drafts stay open, since they are your work in progress. */
-const GROUPS: Record<MoveGroup, { folded: boolean }> = {
-	"Your move": { folded: false },
-	"Agent on it": { folded: false },
-	Approved: { folded: false },
-	"Waiting on others": { folded: true },
-	Drafts: { folded: false },
-	"Recently merged": { folded: true },
+/**
+ * The list's sections in page order, whether each starts folded in the list, and whether it starts folded on the board.
+ * The list folds those that hold nothing for you or an agent to do now; Drafts stay open, since they are your work in
+ * progress. The board folds only **Recently merged**, a week of merges, since a column of what waits on others is where
+ * a drop starts.
+ */
+const GROUPS: Record<MoveGroup, { folded: boolean; boardFolded: boolean }> = {
+	"Your move": { folded: false, boardFolded: false },
+	"Agent on it": { folded: false, boardFolded: false },
+	Approved: { folded: false, boardFolded: false },
+	"Waiting on others": { folded: true, boardFolded: false },
+	Drafts: { folded: false, boardFolded: false },
+	"Recently merged": { folded: true, boardFolded: true },
 };
 
 const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
@@ -319,8 +324,12 @@ export function boardColumns({ repos }: PullRequestList, order: PullRequestOrder
 	return [...cards].map(([title, held]) => ({ title, cards: held }));
 }
 
-/** Whether the board folds the column `title` until you unfold it: only **Recently merged**, which holds a week of merges. */
-export const boardFoldedByDefault = (title: string): boolean => title === "Recently merged";
+/** Whether the board folds the column `title` until you unfold it. */
+export const boardFoldedByDefault = (title: string): boolean => GROUP_TITLES.some(each => GROUPS[each].boardFolded && title === each);
+
+/** The pull requests the board shows, in its order: column by column, leaving out those that `isFolded` folds. */
+export const shownBoardPullRequests = (columns: readonly BoardColumn[], isFolded: (title: string) => boolean): PullRequestSummary[] =>
+	columns.flatMap(({ title, cards }) => (isFolded(title) ? [] : cards.map(({ row }) => row.pr)));
 
 /**
  * What dropping a pull request on another column does. A column follows where the pull request stands on GitHub, so a
@@ -335,6 +344,8 @@ export type BoardDrop =
 /** The columns a draft lands in once it is ready for review, whichever its move then picks. */
 const READY_COLUMNS: MoveGroup[] = ["Your move", "Approved", "Waiting on others"];
 
+const refused = (why: string): BoardDrop => ({ kind: "refused", why });
+
 /**
  * What dropping `row` from the column `from` on the column `to` does; `null` when it stays in its column. **Agent on it**
  * starts the quick action of its move, **Recently merged** merges it when its row offers the merge, **Drafts** converts
@@ -342,28 +353,26 @@ const READY_COLUMNS: MoveGroup[] = ["Your move", "Approved", "Waiting on others"
  */
 export function boardDrop({ pr, move }: SectionRow, from: MoveGroup, to: MoveGroup): BoardDrop | null {
 	if (from === to) return null;
-	const why = reason(pr, move);
-	if (pr.state === "merged") return { kind: "refused", why: "It is merged already" };
+	if (pr.state === "merged") return refused("It is merged already");
 	if (to === "Agent on it") {
 		const action = moveAction(pr, move);
-		return action ? { kind: "agent", action, label: `${PULL_REQUEST_ACTIONS[action].label} with an agent` } : { kind: "refused", why: `No agent step applies: ${why}` };
+		return action ? { kind: "agent", action, label: `${PULL_REQUEST_ACTIONS[action].label} with an agent` } : refused(`No agent step applies: ${reason(pr, move)}`);
 	}
 	if (to === "Recently merged") {
 		if (move === "merge") return { kind: "merge", label: "Merge" };
 		if (move === "checks-running" && readyOnceChecksPass(pr)) return { kind: "merge", label: "Merge once checks pass" };
-		return { kind: "refused", why: `Not ready to merge: ${why}` };
+		return refused(`Not ready to merge: ${reason(pr, move)}`);
 	}
-	const change: BoardDrop | null =
-		to === "Drafts"
-			? pr.state === "open"
-				? { kind: "state", state: "draft", label: "Convert to draft" }
-				: { kind: "refused", why: "It is a draft already" }
-			: pr.state === "draft" && READY_COLUMNS.includes(to)
-				? { kind: "state", state: "open", label: "Ready for review" }
-				: null;
-	if (change === null) return { kind: "refused", why: `${to} fills from GitHub; no step moves it there` };
-	if (change.kind === "state" && pr.role !== "author") return { kind: "refused", why: "Only its author changes whether it is a draft" };
-	return change;
+	if (to === "Drafts") {
+		if (pr.state !== "open") return refused("It is a draft already");
+		if (pr.role !== "author") return refused("Only its author changes whether it is a draft");
+		return { kind: "state", state: "draft", label: "Convert to draft" };
+	}
+	if (pr.state === "draft" && READY_COLUMNS.includes(to)) {
+		if (pr.role !== "author") return refused("Only its author changes whether it is a draft");
+		return { kind: "state", state: "open", label: "Ready for review" };
+	}
+	return refused(`${to} fills from GitHub; no step moves it there`);
 }
 
 /** The pull request as `list` holds it, with the workspace a session on it starts in; `null` when `list` leaves it out. */

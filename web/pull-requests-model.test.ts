@@ -23,6 +23,7 @@ import {
 	placedManual,
 	reason,
 	sectionTitles,
+	shownBoardPullRequests,
 	shownPullRequests,
 	sessionStack,
 	stepTarget,
@@ -286,6 +287,13 @@ describe("pull request board", () => {
 
 	test("only Recently merged starts folded", () => {
 		expect(sectionTitles(DEFAULT_ORDER).filter(boardFoldedByDefault)).toEqual(["Recently merged"]);
+	});
+
+	test("the shown pull requests follow the columns in order and leave out folded columns", () => {
+		const list = { repos: [repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate }), pr(3, { state: "draft" }), pr(4, { state: "merged" })]), repo("api", [pr(5)])], unmatched: [] };
+		const columns = boardColumns(list, DEFAULT_ORDER, noAgent);
+		const folded = new Set(["Drafts", "Recently merged"]);
+		expect(shownBoardPullRequests(columns, title => folded.has(title)).map(({ number }) => number)).toEqual([2, 1, 5]);
 	});
 
 	describe("a drop", () => {

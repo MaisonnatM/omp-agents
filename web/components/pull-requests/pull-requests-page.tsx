@@ -3,8 +3,7 @@
  * is; or on a board, a column per section, with the details of the pull request it shows docked beside it.
  */
 import { Maximize2, X } from "lucide-react";
-import { useState } from "react";
-import type { PullRequest } from "../../../src/shared/github";
+import { type PullRequest, repoKey } from "../../../src/shared/github";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
@@ -14,15 +13,29 @@ import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { DROP_LINE } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
-import { DetailsScrollerContext } from "../details-sidebar-frame";
+import { DetailsScroller } from "../details-sidebar-frame";
 import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
-import { pullRequestSectionTarget, type PullRequestsView, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestsBoard, usePullRequestsView, workspacesLabel } from "./pull-requests-board";
+import {
+	type PullRequests,
+	type PullRequestsView,
+	pullRequestSectionTarget,
+	pullRequestsPageShows,
+	RepoReadError,
+	type RepoView,
+	type SectionView,
+	SortMenu,
+	UnmatchedTip,
+	usePullRequests,
+	usePullRequestsBoard,
+	usePullRequestsView,
+	workspacesLabel,
+} from "./pull-requests-board";
 import { PullRequestsKanban } from "./pull-requests-kanban";
 import { SectionCount } from "./pull-requests-nav";
-import { PullRequestDetails } from "./pr-page";
+import { PullRequestDetailPage, PullRequestDetails } from "./pr-page";
 import { PullRequestTableRow } from "./pr-row";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
@@ -81,9 +94,7 @@ function RepoTable({ view }: { view: RepoView }) {
 			{open && (
 				<div id={bodyId} className="space-y-3">
 					{"error" in repo ? (
-						<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-							Cannot read {name} from GitHub: {repo.error}
-						</p>
+						<RepoReadError name={name} error={repo.error} className="text-sm" />
 					) : sections.length === 0 ? (
 						note("No open pull requests of yours and no reviews waiting on you.")
 					) : (
@@ -95,20 +106,15 @@ function RepoTable({ view }: { view: RepoView }) {
 	);
 }
 
-interface PullRequestsPageProps {
-	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
-	workspace: string | null;
-	hosts: RosterHost[];
-	past: PastSession[];
-	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
-	section: SectionTarget | null;
-	/** The pull request whose details the board docks beside it; the list view shows them on a page of their own instead. */
-	route: PullRequestsRoute;
+/** The list view's tables, one per repository, whose sidebar link `section` unfolds, scrolls to, and focuses a section. */
+function RepoTables({ pulls, section }: { pulls: PullRequests; section: SectionTarget | null }) {
+	const { folds, repos } = usePullRequestsBoard(pulls, true);
+	useReveal(section, folds, { token: section, block: "start", focus: true });
+	return repos.map(each => <RepoTable key={each.key} view={each} />);
 }
 
 /** The details of the pull request `route` names, docked beside the board, with buttons that show them as a page or close them. */
 function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: string | null; hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
-	const [scroller, setScroller] = useState<HTMLElement | null>(null);
 	return (
 		<aside aria-label="Pull request details" className="flex w-[30rem] max-w-[45%] shrink-0 flex-col border-l border-border">
 			<TooltipProvider>
@@ -124,27 +130,48 @@ function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: strin
 						</Button>
 					</Tooltip>
 				</div>
-				<div ref={setScroller} className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-6">
-					<DetailsScrollerContext.Provider value={scroller}>
+				<DetailsScroller viewportClassName="pt-2">
+					<div className="px-4 pb-6">
 						<PullRequestDetails workspace={workspace} hosts={hosts} target={route.target} files={route.files} placement="sidebar" />
-					</DetailsScrollerContext.Provider>
-				</div>
+					</div>
+				</DetailsScroller>
 			</TooltipProvider>
 		</aside>
 	);
+}
+
+interface PullRequestsPageProps {
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
+	hosts: RosterHost[];
+	past: PastSession[];
+	/** The section or column a sidebar link last chose, to unfold, scroll to, and focus. */
+	section: SectionTarget | null;
+	/** The pull request whose details the page shows: docked beside the board, or on a page of their own in the list view. */
+	route: PullRequestsRoute;
+}
+
+/**
+ * The Pull requests page: in the list view, a pull request's details on a page of their own while `route` names one;
+ * else the pull requests as a table or a board.
+ */
+export function PullRequestsPage(props: PullRequestsPageProps) {
+	const [view, setView] = usePullRequestsView();
+	const { workspace, hosts, route } = props;
+	// Checking the target first narrows the route to one with its files.
+	if (route.target && pullRequestsPageShows(view, route) === "details") return <PullRequestDetailPage workspace={workspace} hosts={hosts} target={route.target} files={route.files} />;
+	return <PullRequestsOverview {...props} view={view} onView={setView} />;
 }
 
 /**
  * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of every workspace,
  * read from GitHub. It keeps the sidebar list's order, folds, and keys; the browser keeps which view it shows.
  */
-export function PullRequestsPage({ workspace, hosts, past, section, route }: PullRequestsPageProps) {
+function PullRequestsOverview({ workspace, hosts, past, section, route, view, onView }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void }) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const [view, setView] = usePullRequestsView();
-	const board = usePullRequestsBoard({ workspace, hosts, past, route, entersList: true, view });
-	useReveal(view === "list" ? section : null, board.folds, { token: section, block: "start", focus: true });
-	const unmatched = board.poll.read?.data.unmatched ?? [];
+	const pulls = usePullRequests({ workspace, hosts, past, route });
+	const unmatched = pulls.poll.read?.data.unmatched ?? [];
 	const docked = view === "board" && route.target !== null ? route : null;
 	return (
 		<div className="flex h-full min-h-0 flex-1">
@@ -154,42 +181,36 @@ export function PullRequestsPage({ workspace, hosts, past, section, route }: Pul
 					meta="Pull requests by whose move it is"
 					noun="pull requests"
 					loading="Asking GitHub for pull requests…"
-					poll={board.poll}
-					onRefresh={board.refresh}
+					poll={pulls.poll}
+					onRefresh={pulls.refresh}
 					actions={
 						<>
 							<UnmatchedTip unmatched={unmatched} />
-							<SegmentedTabs value={view} onValueChange={next => setView(next as PullRequestsView)} activationMode="manual">
+							<SegmentedTabs value={view} onValueChange={next => onView(next as PullRequestsView)} activationMode="manual">
 								<SegmentedTabsList aria-label="View">
 									<SegmentedTab value="list">List</SegmentedTab>
 									<SegmentedTab value="board">Board</SegmentedTab>
 								</SegmentedTabsList>
 							</SegmentedTabs>
-							<SortMenu order={board.order} onSort={board.onSort} onReset={board.onReset} />
+							<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
 						</>
 					}
 					notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 					className={view === "board" ? "max-w-none space-y-4" : "max-w-7xl space-y-8"}
 				>
 					{() => {
-						if (board.repos.length === 0) return note("No session ran in a GitHub repository.");
-						if (view === "list") return board.repos.map(each => <RepoTable key={each.key} view={each} />);
+						if (pulls.repos.length === 0) return note("No session ran in a GitHub repository.");
+						if (view === "list") return <RepoTables pulls={pulls} section={section} />;
 						return (
 							<>
-								{board.repos.map(({ key, name, repo }) =>
-									"error" in repo ? (
-										<p key={key} role="alert" className="text-sm text-red-600 dark:text-red-400">
-											Cannot read {name} from GitHub: {repo.error}
-										</p>
-									) : null,
-								)}
-								<PullRequestsKanban columns={board.columns} />
+								{pulls.repos.map(repo => ("error" in repo ? <RepoReadError key={repoKey(repo)} name={`${repo.owner}/${repo.repo}`} error={repo.error} className="text-sm" /> : null))}
+								<PullRequestsKanban pulls={pulls} section={section} />
 							</>
 						);
 					}}
 				</ListPage>
 			</div>
-			{docked && <DockedDetails workspace={workspace} hosts={hosts} route={docked} onExpand={() => setView("list")} />}
+			{docked && <DockedDetails workspace={workspace} hosts={hosts} route={docked} onExpand={() => onView("list")} />}
 		</div>
 	);
 }

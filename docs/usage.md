@@ -713,7 +713,7 @@ An action that fails shows its error, and its control becomes available again.
   The tabs never spill past the sidebar.
   **Pull requests** opens the Pull requests page, a table of your pull requests like Graphite's inbox, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
   Once you open a pull request or a session from the Pull requests page, the sidebar lists the pull requests instead, beside the details or the session panes.
-  In the board view, a pull request's details dock beside the board instead, so the sidebar keeps its sections.
+  In the board view, the sidebar lists the board's columns instead, each with its count; click one to unfold the column and scroll to it, while a pull request's details stay docked beside the board.
   The tab stays on **Pull requests** while you open sessions from it, until you choose **Sessions**.
   The **Your move** count stands out in bold.
   The **Pull requests** tab counts the pull requests that wait on your move, for the workspace that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.

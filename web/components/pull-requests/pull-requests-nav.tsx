@@ -9,7 +9,7 @@ import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@/components/ui/si
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { pullRequestSections, orderedRepos } from "../../pull-requests-model";
+import { boardColumns, pullRequestSections, orderedRepos } from "../../pull-requests-model";
 import { readTime } from "../../labels";
 import { pullRequestsStore } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
@@ -19,7 +19,20 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton } from "../fold";
 import { QuickStartNotice } from "../quick-actions";
 import { SectionLink } from "../section-link";
-import { pullRequestSectionTarget, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestsBoard, usePullRequestsOrder, withRepoMoved, workspacesLabel } from "./pull-requests-board";
+import {
+	pullRequestSectionTarget,
+	RepoReadError,
+	type RepoView,
+	type SectionView,
+	SortMenu,
+	UnmatchedTip,
+	usePullRequests,
+	usePullRequestsBoard,
+	usePullRequestsOrder,
+	withRepoMoved,
+	workspacesLabel,
+} from "./pull-requests-board";
+import { boardColumnTarget } from "./pull-requests-kanban";
 import { PullRequestRow } from "./pr-row";
 
 const note = (text: string) => <p className="px-3 py-1 text-xs text-muted-foreground">{text}</p>;
@@ -67,11 +80,7 @@ function RepoBlock({ view }: { view: RepoView }) {
 	const workspaces = workspacesLabel(repo);
 	let body: ReactNode;
 	if ("error" in repo) {
-		body = (
-			<p role="alert" className="px-3 py-1 text-xs text-red-600 dark:text-red-400">
-				Cannot read {name} from GitHub: {repo.error}
-			</p>
-		);
+		body = <RepoReadError name={name} error={repo.error} className="px-3 py-1 text-xs" />;
 	} else if (sections.length === 0) body = note("No open pull requests of yours and no reviews waiting on you.");
 	else body = sections.map(section => <SectionBlock key={section.section.title} view={section} />);
 	return (
@@ -113,16 +122,17 @@ interface PullRequestsNavProps {
 export function PullRequestsNav({ workspace, hosts, past, route }: PullRequestsNavProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = usePullRequestsBoard({ workspace, hosts, past, route, entersList: false, view: "list" });
-	const { read, error, refreshing } = board.poll;
+	const pulls = usePullRequests({ workspace, hosts, past, route });
+	const board = usePullRequestsBoard(pulls, false);
+	const { read, error, refreshing } = pulls.poll;
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center gap-1 pr-2 pl-3 text-xs text-muted-foreground">
 				<span className="min-w-0 flex-1 truncate">{read ? `Updated ${readTime(read.at)}` : "Asking GitHub for pull requests…"}</span>
 				{read && <UnmatchedTip unmatched={read.data.unmatched} />}
-				<SortMenu order={board.order} onSort={board.onSort} onReset={board.onReset} />
+				<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
 				<Tooltip content="Refresh pull requests">
-					<Button variant="ghost" size="icon-compact" aria-label="Refresh pull requests" loading={refreshing} onClick={board.refresh}>
+					<Button variant="ghost" size="icon-compact" aria-label="Refresh pull requests" loading={refreshing} onClick={pulls.refresh}>
 						<RefreshCw />
 					</Button>
 				</Tooltip>
@@ -153,7 +163,7 @@ interface PullRequestsIndexProps {
 	onTarget: (target: SectionTarget) => void;
 }
 
-/** The sidebar beside the Pull requests page: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
+/** The sidebar beside the Pull requests page's list: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
 export function PullRequestsIndex({ workspace, hosts, target, onTarget }: PullRequestsIndexProps) {
 	const { read, error } = pullRequestsStore.use(workspace);
 	const [order, setOrder] = usePullRequestsOrder();
@@ -193,3 +203,28 @@ export function PullRequestsIndex({ workspace, hosts, target, onTarget }: PullRe
 	});
 }
 
+/** The sidebar beside the Pull requests page's board: each column with its pull request count, each a link that unfolds and scrolls to it, keeping the docked details open. */
+export function PullRequestsBoardIndex({ workspace, hosts, target, onTarget }: PullRequestsIndexProps) {
+	const { read, error } = pullRequestsStore.use(workspace);
+	const [order] = usePullRequestsOrder();
+	if (!read) return note(error ? `Cannot load pull requests: ${error}` : "Asking GitHub for pull requests…");
+	return (
+		<SidebarGroup>
+			<SidebarGroupLabel>Columns</SidebarGroupLabel>
+			<SidebarMenu aria-label="Board columns">
+				{boardColumns(read.data, order, agentOn(hosts)).map(({ title, cards: { length } }) => (
+					<SectionLink
+						key={title}
+						href={hashForPullRequests(null)}
+						section={boardColumnTarget(title)}
+						chosen={target}
+						title={title}
+						label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}
+						count={length}
+						onChoose={onTarget}
+					/>
+				))}
+			</SidebarMenu>
+		</SidebarGroup>
+	);
+}

@@ -1,4 +1,4 @@
-/** What the lists of pull requests share, the sidebar's and the page's list and board: their state, their keys, and the views they render. */
+/** What the views of the pull requests share, the sidebar's list and the page's list and board: their state, their keys, and the list's repositories, sections, and rows. */
 import { ArrowDownUp, Unplug } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
@@ -8,9 +8,8 @@ import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
-	boardColumns,
-	boardFoldedByDefault,
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
@@ -47,14 +46,12 @@ import { type DragItem, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
 import { stepRows } from "../list-page";
-import { type CardProps, type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
+import { type RowBase, type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
 
 // Both keys keep their names from before the page was called Pull requests, so the browser's saved folds and order survive.
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
 const FOLDS_KEY = "omp-agents.inbox-collapsed";
 const ORDER_KEY = "omp-agents.inbox-order";
-/** The board's columns flipped from their default fold, by section title. */
-const BOARD_FOLDS_KEY = "omp-agents.pull-requests-board-folds";
 const VIEW_KEY = "omp-agents.pull-requests-view";
 
 const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
@@ -70,8 +67,14 @@ export type PullRequestsView = "list" | "board";
 
 const decodeView = (raw: string | null): PullRequestsView => (raw === "board" ? "board" : "list");
 
-/** The Pull requests page's view, which the browser keeps and the main area and the sidebar both follow. */
+/** The Pull requests page's view, which the browser keeps and the page and the sidebar both follow. */
 export const usePullRequestsView = () => useStoredState(VIEW_KEY, decodeView);
+
+/**
+ * What the Pull requests page shows for `route` in `view`: the list or the board, or, in the list view, the details of
+ * the pull request `route` names, on a page of their own; the board docks them beside it instead.
+ */
+export const pullRequestsPageShows = (view: PullRequestsView, route: PullRequestsRoute): PullRequestsView | "details" => (view === "list" && route.target !== null ? "details" : view);
 
 /** `order` with the repository `key` put on the `where` side of `beside`; the repositories a list does not show, `shown` being those it does, keep their place behind them. */
 export const withRepoMoved = (order: PullRequestOrder, shown: string[], key: string, beside: string, where: Where): PullRequestOrder => ({
@@ -94,13 +97,16 @@ function placeOf(list: PullRequestList, pr: PullRequest, agent: AgentOn): { repo
 }
 
 /**
- * ↓ and ↑ move between the rows `shown` lists, or, while the main area shows a pull request's details, show the next or
- * previous one; on its changes page they step through its files instead. With no row focused they enter the list only
- * when `entersList`, so the sidebar's list leaves them to scroll the panes. O opens the pull request on GitHub, `.` opens
- * a row's `⋯` menu, and E runs `giveToAgent` on the focused row's pull request, or the one the main area shows. A
- * key that has nothing to act on keeps its usual meaning.
+ * Binds the keys of a view of `pulls`, over `shown`, the pull requests it shows in order. Mount it once per screen,
+ * since its keys are global. ↓ and ↑ move between those rows or cards, or, while the main area shows a pull request's
+ * details, show the next or previous one; on its changes page they step through its files instead. With nothing
+ * focused they enter the view only when `entersList`, so the sidebar's list leaves them to scroll the panes. O opens
+ * the pull request on GitHub, `.` opens a row's `⋯` menu, and E starts the quick action that makes the move of the
+ * focused row's pull request, or the one the main area shows, the one its row's menu would. A key that has nothing to
+ * act on keeps its usual meaning.
  */
-function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, entersList: boolean, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: PullRequestSummary) => void): void {
+export function usePullRequestKeys({ list, agent, route, onActionsOpenChange }: PullRequests, shown: PullRequestSummary[], entersList: boolean): void {
+	const { start } = useDashboardActions();
 	const { target } = route;
 	const current = (): number =>
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
@@ -115,6 +121,13 @@ function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, en
 		}
 		return stepRows(shown, pr => rowElement(pr), by, entersList);
 	};
+	const giveToAgent = (pr: PullRequest): boolean => {
+		const listed = list && listedPullRequest(list, pr);
+		const action = listed && moveAction(listed.pr, moveOf(listed.pr, agent(listed.pr)));
+		if (!listed || !action) return false;
+		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
+		return true;
+	};
 	useShortcuts({
 		nextPullRequest: () => step(1),
 		previousPullRequest: () => step(-1),
@@ -126,7 +139,7 @@ function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, en
 		pullRequestActions: () => {
 			const pr = target ? undefined : shown[current()];
 			if (!pr) return false;
-			openActions(pr);
+			onActionsOpenChange(pr, true);
 		},
 		giveToAgent: () => {
 			const pr = target ?? shown[current()];
@@ -191,6 +204,15 @@ export function workspacesLabel({ repo, cwds }: RepoPullRequests): string | null
 	return folder && folder.toLowerCase() !== repo.toLowerCase() ? folder : null;
 }
 
+/** Why GitHub could not read the repository `name`, which takes the place of its pull requests. */
+export function RepoReadError({ name, error, className }: { name: string; error: string; className?: string }) {
+	return (
+		<p role="alert" className={cn("text-red-600 dark:text-red-400", className)}>
+			Cannot read {name} from GitHub: {error}
+		</p>
+	);
+}
+
 /** The workspaces the pull request list leaves out, having no GitHub `origin`, as an icon that lists them on hover; nothing when it leaves none out. */
 export function UnmatchedTip({ unmatched }: { unmatched: string[] }) {
 	if (unmatched.length === 0) return null;
@@ -238,39 +260,39 @@ export interface RepoView extends Placed {
 	sections: SectionView[];
 }
 
-/** A column of the board: a section, folded to a strip or open on its cards. */
-export interface ColumnView {
-	title: MoveGroup;
-	/** The id of its list, which its fold button controls. */
-	listId: string;
-	open: boolean;
-	toggle: () => void;
-	cards: Omit<CardProps, "held">[];
-}
 
-export interface PullRequestsBoard {
+/** The pull requests of a workspace, read from GitHub, and what every view of them shares. */
+export interface PullRequests {
 	poll: PolledEntry<PullRequestList>;
 	refresh: () => void;
+	/** The list GitHub last returned, or `null` until it answers. */
+	list: PullRequestList | null;
+	/** What the main area shows: its pull request's row stays highlighted while its details or changes show. */
+	route: PullRequestsRoute;
+	agent: AgentOn;
 	order: PullRequestOrder;
+	setOrder: (order: PullRequestOrder) => void;
 	onSort: (sort: PullRequestSort) => void;
 	onReset: () => void;
-	folds: Folds;
-	repos: RepoView[];
-	/** The board's columns in page order; empty in the list view. */
-	columns: ColumnView[];
+	/** The repositories in the list's order, and the sections of each, at the same index. */
+	repos: RepoPullRequests[];
+	sectionsOf: PullRequestSection[][];
+	/** Every pull request's key in the order the list shows them now; placing one by hand starts the manual sort from it. */
+	shownOrder: string[];
+	/** What a list row or a board card of `row` takes, from functions every row shares, so a row's props change only with what it shows. */
+	rowBase: (row: SectionRow, cwd: string) => RowBase;
+	onQuickAction: RowBase["onQuickAction"];
+	onActionsOpenChange: RowBase["onActionsOpenChange"];
+	onChange: RowBase["onChange"];
 }
 
-interface BoardProps {
+interface PullRequestsProps {
 	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
 	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
 	route: PullRequestsRoute;
-	/** Whether ↓ and ↑ with no row focused enter the list: the page's do, the sidebar's leave them to scroll the panes. */
-	entersList: boolean;
-	/** Which view the rows show in, which decides the order ↓ and ↑ step through them. */
-	view: PullRequestsView;
 }
 
 /** What makes an item's drag: the arguments of `useDragOrder`'s function, which change with every drag and so are called in a pass of their own. */
@@ -280,10 +302,9 @@ interface Dropped {
 	onDrop: (dragged: string, where: Where) => void;
 }
 
-/** A row's place on the board, which changes only with the pull request list, its order, and its folds. */
+/** A row's place in the list, which changes only with the pull request list, its order, and its folds. */
 interface RowLayout {
 	row: SectionRow;
-	key: string;
 	cwd: string;
 	moveId: string;
 	dropped: Dropped;
@@ -315,68 +336,86 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 	}, [hosts, past]);
 }
 
-/**
- * The pull requests of `workspace` as a list of repositories, sections, and rows, or as a board of columns, with the keys
- * that move through it. Dragging or Alt+Shift+↑ and ↓ reorder the list's repositories, sections, and the pull requests
- * in a section; the browser keeps the order. Mount it once per screen, since its keys act on the rows it lists.
- */
-export function usePullRequestsBoard({ workspace, hosts, past, route, entersList, view }: BoardProps): PullRequestsBoard {
-	const { target } = route;
-	const targetKey = target ? prKey(target) : null;
+/** The pull requests of `workspace`, with the state and the functions that their list and their board share. */
+export function usePullRequests({ workspace, hosts, past, route }: PullRequestsProps): PullRequests {
+	const targetKey = route.target ? prKey(route.target) : null;
 	const { open, start } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const poll = pullRequestsStore.use(workspace);
-	const { read } = poll;
-	const list = read?.data ?? null;
-	const folds = usePullRequestsFolds();
+	const list = poll.read?.data ?? null;
 	const [order, setOrder] = usePullRequestsOrder();
-	const drag = useDragOrder();
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
-	const place = useMemo(() => (view === "list" && list && target ? placeOf(list, target, agent) : null), [view, list, targetKey, agent]);
-	const reveal = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
-	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
-	/** Starts the quick action that makes `pr`'s move, the one its row's menu would; `false` when no action makes it. */
-	const giveToAgent = (pr: PullRequest): boolean => {
-		const listed = list && listedPullRequest(list, pr);
-		const action = listed && moveAction(listed.pr, moveOf(listed.pr, agent(listed.pr)));
-		if (!listed || !action) return false;
-		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
-		return true;
-	};
+	const sessions = useSessionsByPullRequest(hosts, past);
 	/** The row, by {@link rowId}, whose `⋯` menu is open. */
 	const [actionsOpen, setActionsOpen] = useState<string | null>(null);
-	const openActions = (pr: PullRequestSummary): void => setActionsOpen(rowId(pr));
-	/** The card, by {@link rowId}, whose merge confirmation is open. */
-	const [mergeOpen, setMergeOpen] = useState<string | null>(null);
-	// The functions every row shares, so a row's props change only with what the row shows.
 	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
 	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
-	const onMergeOpenChange = useCallback((pr: PullRequest, next: boolean) => setMergeOpen(next ? rowId(pr) : null), []);
 	const onChange = useCallback(
 		async (pr: PullRequestSummary, change: ListChange) => {
 			await writePullRequest(workspace, pr, change);
 		},
 		[workspace],
 	);
-	const boardFolds = useFolds(BOARD_FOLDS_KEY, boardFoldedByDefault);
-	const columns = useMemo(() => (view === "board" && list ? boardColumns(list, order, agent) : []), [view, list, order, agent]);
-	const column = target ? columns.find(({ cards }) => cards.some(({ row }) => samePullRequest(row.pr, target))) : undefined;
-	const boardReveal = target && column ? { id: rowId(target), folds: [column.title] } : null;
-	useReveal(boardReveal, boardFolds, { token: boardReveal?.id, block: "nearest", focus: false });
-	const shown = useMemo(() => {
-		if (!list) return [];
-		if (view === "list") return shownPullRequests(list, folds.isFolded, order, agent);
-		return columns.flatMap(({ title, cards }) => (boardFolds.isFolded(title) ? [] : cards.map(({ row }) => row.pr)));
-	}, [view, list, folds.isFolded, boardFolds.isFolded, columns, order, agent]);
-	useTriageKeys(shown, route, entersList, giveToAgent, openActions);
-
+	const rowBase = useCallback(
+		(row: SectionRow, cwd: string): RowBase => {
+			const key = prKey(row.pr);
+			return {
+				row,
+				sessions: sessions.get(key) ?? NO_SESSIONS,
+				targeted: key === targetKey,
+				onOpen: open,
+				pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
+				cwd,
+				onQuickAction,
+				actionsOpen: actionsOpen === rowId(row.pr),
+				onActionsOpenChange,
+				onChange,
+			};
+		},
+		[sessions, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange, onChange],
+	);
 	const repos = useMemo(() => (list ? orderedRepos(list.repos, order) : []), [list, order]);
 	const sectionsOf = useMemo(() => repos.map(repo => ("error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agent))), [repos, order, agent]);
-	// The page shows its pull requests in this order now; placing one by hand starts the manual sort from it.
 	const shownOrder = useMemo(
 		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOf.flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
 		[order, sectionsOf],
 	);
+	return {
+		poll,
+		refresh: () => void pullRequestsStore.refresh(workspace, { fresh: true }),
+		list,
+		route,
+		agent,
+		order,
+		setOrder,
+		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder : order.manual }),
+		onReset: () => setOrder(DEFAULT_ORDER),
+		repos,
+		sectionsOf,
+		shownOrder,
+		rowBase,
+		onQuickAction,
+		onActionsOpenChange,
+		onChange,
+	};
+}
+
+/**
+ * The list of `pulls`: its repositories, sections, and rows, with their folds and the keys that move through them.
+ * Dragging or Alt+Shift+↑ and ↓ reorder its repositories, sections, and the pull requests in a section; the browser
+ * keeps the order. Mount it once per screen, since its keys act on the rows it lists.
+ */
+export function usePullRequestsBoard(pulls: PullRequests, entersList: boolean): { folds: Folds; repos: RepoView[] } {
+	const { list, route: { target }, agent, order, setOrder, repos, sectionsOf, shownOrder, rowBase } = pulls;
+	const targetKey = target ? prKey(target) : null;
+	const folds = usePullRequestsFolds();
+	const drag = useDragOrder();
+	const place = useMemo(() => (list && target ? placeOf(list, target, agent) : null), [list, targetKey, agent]);
+	const reveal = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
+	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
+	const shown = useMemo(() => (list ? shownPullRequests(list, folds.isFolded, order, agent) : []), [list, folds.isFolded, order, agent]);
+	usePullRequestKeys(pulls, shown, entersList);
+
 	const layout = useMemo(() => {
 		const moves = new Map<string, Move>();
 		const repoKeys = repos.map(repoKey);
@@ -433,7 +472,6 @@ export function usePullRequestsBoard({ workspace, hosts, past, route, entersList
 							});
 							return {
 								row,
-								key: rowKey,
 								cwd: repo.cwds[0]!,
 								moveId: rowMoveId,
 								dropped: { scope: `pull-requests:${foldKey}`, key: row.unit, onDrop: (dragged, where) => placeUnit(dragged, row.unit, where) },
@@ -449,7 +487,6 @@ export function usePullRequestsBoard({ workspace, hosts, past, route, entersList
 	}, [repos, sectionsOf, shownOrder, order, setOrder, folds]);
 	useMoveKeys(layout.moves);
 
-	const sessions = useSessionsByPullRequest(hosts, past);
 	// What changes with a drag, the roster, the target, a pending start, or an open menu: a cheap pass over the layout.
 	const views = useMemo(() => {
 		const place = ({ scope, key, onDrop }: Dropped): DragItem => drag(scope, key, onDrop);
@@ -459,64 +496,14 @@ export function usePullRequestsBoard({ workspace, hosts, past, route, entersList
 			sections: sections.map(({ dropped, rows, ...section }): SectionView => ({
 				...section,
 				drag: place(dropped),
-				rows: rows.map(({ row, key, cwd, moveId, dropped, above, below }): RowProps => {
+				rows: rows.map(({ row, cwd, moveId, dropped, above, below }): RowProps => {
 					const item = place(dropped);
 					const edge = item.dropAt === "before" ? above : below;
-					return {
-						row,
-						sessions: sessions.get(key) ?? NO_SESSIONS,
-						targeted: key === targetKey,
-						onOpen: open,
-						pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
-						cwd,
-						onQuickAction,
-						actionsOpen: actionsOpen === rowId(row.pr),
-						onActionsOpenChange,
-						onChange,
-						drag: { ...item, dropAt: edge === row.unit ? null : item.dropAt },
-						moveId,
-					};
+					return { ...rowBase(row, cwd), drag: { ...item, dropAt: edge === row.unit ? null : item.dropAt }, moveId };
 				}),
 			})),
 		}));
-	}, [layout, drag, sessions, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange, onChange]);
+	}, [layout, drag, rowBase]);
 
-	const columnViews = useMemo(() => {
-		const several = new Set(columns.flatMap(({ cards }) => cards.map(({ repo }) => repo))).size > 1;
-		return columns.map(({ title, cards }): ColumnView => ({
-			title,
-			listId: sectionId("pull-requests-board", title),
-			open: !boardFolds.isFolded(title),
-			toggle: () => boardFolds.toggle(title),
-			cards: cards.map(({ row, repo, cwd }) => {
-				const key = prKey(row.pr);
-				return {
-					row,
-					repo: several ? repo : null,
-					sessions: sessions.get(key) ?? NO_SESSIONS,
-					targeted: key === targetKey,
-					onOpen: open,
-					pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
-					cwd,
-					onQuickAction,
-					actionsOpen: actionsOpen === rowId(row.pr),
-					onActionsOpenChange,
-					onChange,
-					mergeOpen: mergeOpen === rowId(row.pr),
-					onMergeOpenChange,
-				};
-			}),
-		}));
-	}, [columns, boardFolds, sessions, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange, onChange, mergeOpen, onMergeOpenChange]);
-
-	return {
-		poll,
-		refresh: () => void pullRequestsStore.refresh(workspace, { fresh: true }),
-		order,
-		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder : order.manual }),
-		onReset: () => setOrder(DEFAULT_ORDER),
-		folds,
-		repos: views,
-		columns: columnViews,
-	};
+	return { folds, repos: views };
 }

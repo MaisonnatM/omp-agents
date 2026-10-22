@@ -100,7 +100,7 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): Action<[ListChange]> =>
 	useAction((change: ListChange) => onChange(pr, change), "GitHub refused the change");
 
-/** A merge confirmation's open state, which a board drop on **Recently merged** opens from outside the badge. */
+/** A merge confirmation's open state. */
 interface MergeOpen {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -109,16 +109,12 @@ interface MergeOpen {
 /**
  * A **Merge** badge, or a **Checks running** one on a pull request that is ready but for them: a button that merges after the
  * same confirmation as the details, reading what the merge needs while it is open; once queued, **Queued** or **Stopped**.
- * The badge holds whether its confirmation is open unless `control` does.
  */
-function MergeBadge({ pr, move, control }: { pr: PullRequestSummary; move: "merge" | "checks-running"; control?: MergeOpen }) {
-	const [own, setOwn] = useState(false);
-	const open = control?.open ?? own;
-	const setOpen = control?.onOpenChange ?? setOwn;
+function MergeBadge({ pr, move, open, onOpenChange }: { pr: PullRequestSummary; move: "merge" | "checks-running" } & MergeOpen) {
 	const target = useMergeTarget(pr, open);
 	const label = move === "merge" ? `Merge ${pullRequestName(pr)} on GitHub` : `Checks running: merge ${pullRequestName(pr)} once they pass`;
 	return (
-		<MergePopover pr={pr} target={target.data} error={target.error} open={open} onOpenChange={setOpen} tooltip={label} align="start">
+		<MergePopover pr={pr} target={target.data} error={target.error} open={open} onOpenChange={onOpenChange} tooltip={label} align="start">
 			{({ queued, pending }) => (
 				<button
 					type="button"
@@ -142,12 +138,18 @@ function MergeBadge({ pr, move, control }: { pr: PullRequestSummary; move: "merg
 	);
 }
 
+/** A list row's {@link MergeBadge}, which holds whether its confirmation is open; the board's card holds its own, since a drop opens it. */
+function RowMergeBadge(props: { pr: PullRequestSummary; move: "merge" | "checks-running" }) {
+	const [open, setOpen] = useState(false);
+	return <MergeBadge {...props} open={open} onOpenChange={setOpen} />;
+}
+
 /**
  * A row's move badge: for **Merge**, and **Checks running** on a pull request ready but for them, a button that merges;
  * else a button that starts the quick action handing the move to an agent, when one applies; else the plain badge.
  */
 function RowMoveBadge({ pr, move, pending, cwd, onQuickAction, merge }: { pr: PullRequestSummary; move: MoveId; merge?: MergeOpen } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
-	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} control={merge} />;
+	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return merge ? <MergeBadge pr={pr} move={move} {...merge} /> : <RowMergeBadge pr={pr} move={move} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -331,7 +333,8 @@ export const rowId = (pr: PullRequest): string => `pull-request-${repoKey(pr)}/$
 export const rowElement = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
 export const rowLink = (pr: PullRequest): HTMLAnchorElement | null => rowElement(pr)?.querySelector("a") ?? null;
 
-export interface RowProps {
+/** What a pull request's row and its card on the board both take. */
+export interface RowBase {
 	row: SectionRow;
 	sessions: SessionLink[];
 	/** The pull request whose details the main area shows. */
@@ -349,6 +352,9 @@ export interface RowProps {
 	onActionsOpenChange: (pr: PullRequest, open: boolean) => void;
 	/** Makes `change` on GitHub and shows it in the list; the same function for every row, like `onQuickAction`. */
 	onChange: (pr: PullRequestSummary, change: ListChange) => Promise<void>;
+}
+
+export interface RowProps extends RowBase {
 	drag: DragItem;
 	/** What the move shortcuts name the row by. */
 	moveId: string;
@@ -370,11 +376,11 @@ const sameProps =
 		(Object.keys(equal) as (keyof Props)[]).every(key => equal[key](a[key], b[key]));
 
 /**
- * How each prop of a row is compared. The board keeps each prop the same object while what it shows holds, `sessions`
- * included, except two it rebuilds: the row's data, whenever the roster or the sort changes, compared by what it holds,
- * and the drag item, whose handlers stay the same, compared by them and where a drop would land.
+ * How each prop of a row or card is compared. The board keeps each prop the same object while what it shows holds,
+ * `sessions` included, except the row's data, which it rebuilds whenever the roster or the sort changes, compared by
+ * what it holds.
  */
-const PROP_EQUAL: PropEqual<RowProps> = {
+const ROW_EQUAL: PropEqual<RowBase> = {
 	row: (a, b) => a === b || (a.pr === b.pr && a.move === b.move && a.unit === b.unit && sameStack(a.stack, b.stack)),
 	sessions: Object.is,
 	targeted: Object.is,
@@ -385,11 +391,14 @@ const PROP_EQUAL: PropEqual<RowProps> = {
 	actionsOpen: Object.is,
 	onActionsOpenChange: Object.is,
 	onChange: Object.is,
-	drag: (a, b) => a.handle === b.handle && a.target === b.target && a.dropAt === b.dropAt && a.dragging === b.dragging,
-	moveId: Object.is,
 };
 
-const sameRowProps = sameProps(PROP_EQUAL);
+/** A list row adds its drag item, which the board rebuilds too, compared by its handlers, which stay the same, and where a drop would land. */
+const sameRowProps = sameProps<RowProps>({
+	...ROW_EQUAL,
+	drag: (a, b) => a.handle === b.handle && a.target === b.target && a.dropAt === b.dropAt && a.dragging === b.dragging,
+	moveId: Object.is,
+});
 
 function RowMenu({ pr, change, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[ListChange]> }) {
 	return (
@@ -549,8 +558,8 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 	);
 }, sameRowProps);
 
-/** A card on the Pull requests board: a row's props without the list's drag and move keys, and what the board adds. */
-export interface CardProps extends Omit<RowProps, "drag" | "moveId"> {
+/** A card on the Pull requests board: what a row takes, and what the board adds. */
+export interface CardProps extends RowBase {
 	/** `owner/repo`, when the board holds several repositories; `null` when it holds one. */
 	repo: string | null;
 	/** Whether its merge confirmation is open, which a drop on **Recently merged** opens. */
@@ -560,8 +569,6 @@ export interface CardProps extends Omit<RowProps, "drag" | "moveId"> {
 	/** What a drag does to it: `lifted` leaves this faded copy behind the card in the pointer's hand, `picked` marks the card the keys carry, and `moving` waits on GitHub after a drop. */
 	held: "lifted" | "picked" | "moving" | null;
 }
-
-const { drag: _drag, moveId: _moveId, ...ROW_EQUAL } = PROP_EQUAL;
 
 const sameCardProps = sameProps<CardProps>({ ...ROW_EQUAL, repo: Object.is, mergeOpen: Object.is, onMergeOpenChange: Object.is, held: Object.is });
 
