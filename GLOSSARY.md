@@ -97,6 +97,24 @@ _Avoid_: Subagent
 The one server that holds `server.lock` and runs the unattended work.
 _Avoid_: Leader, primary
 
+## Design comparisons
+
+**Comparison**:
+One prompt started as several dashboard sessions, each on its own fresh branch and worktree from the same commit, whose screenshots the dashboard shows side by side.
+_Avoid_: Variant group, arena, coordinator
+
+**Variant**:
+One session of a comparison, with its branch, its worktree, and the screenshot it last published.
+_Avoid_: Worker (see **Worker**), candidate
+
+**Variant lifecycle**:
+The single persisted state of a variant, from queued to first-prompt admission or uncertainty, then verified stop and checkout retention or removal.
+The comparison's cleanup read state is derived from these lifecycles and its current loss review.
+
+**Winner**:
+The variant **Keep this one** kept; its session, worktree, and branch stay, and the other variants stop.
+_Avoid_: Champion, merged variant
+
 ## Distribution
 
 **Starter kit**:

@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
-import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "./keeper-link";
+import { attachKeeper, type KeeperLink, keeperLaunchCwd, listKeepers, startKeeper } from "./keeper-link";
 import { STOP } from "./keeper-wire";
 import { rpc, rpcFrameFile, type RpcHostTool, utils } from "./omp/modules";
 import type { RpcClient } from "./omp/rpc";
@@ -140,6 +140,7 @@ describe("session keeper", () => {
 		const dir = scratch();
 		const first = await start(dir);
 		const { client } = await drive(first);
+		expect(await keeperLaunchCwd(dir, "s1")).toBe(META.cwd);
 		first.process.stdin.write(`${JSON.stringify({ type: "ask", id: "x" })}\n`);
 		await eventually(async () => (await heard(client)).negotiations === 1);
 		first.detach();

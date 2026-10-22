@@ -1,23 +1,19 @@
-import { Sparkles } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
-import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName } from "../labels";
+import { hashForComparisons, hashForNewVariants } from "../routing";
 import type { Completions } from "../pane-store";
-import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
 import { useShortcuts } from "../shortcuts";
 import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
-import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerEditor, ComposerNote, ComposerTray, EmptyConversation, OVER_TRAY } from "./composer";
 import { BranchPicker, targetOf } from "./git";
@@ -27,6 +23,7 @@ import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
 import { DirectoryPicker } from "./workspace-picker";
+import { SkillToggle, useDraftSkill } from "./draft-skill";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -86,21 +83,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
-	const [pinnedSkill] = usePinnedSkill();
-	// A scheduled start keeps the skill it was saved with; with its skill turned off, the toggle offers the pinned one.
-	const draftSkill = initial?.skill ?? pinnedSkill;
-	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
-	const skills = useSkills(cwd);
-	// The server decides whether the skill applies; the toggle only shows what it will decide.
-	const listedSkills = skills.error === null ? skills.data?.skills : [];
-	const skillState: SkillState =
-		listedSkills && !listedSkills.some(skill => skill.name === draftSkill)
-			? "missing"
-			: skipSkill
-				? "off"
-				: draft.trimStart().startsWith("/")
-					? "bypassed"
-					: "on";
+	const skill = useDraftSkill(cwd, draft, initial ?? undefined);
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
@@ -140,7 +123,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		}
 	};
 	const directCommand = blockedShortcut(draft, "new");
-	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill });
+	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skill.skill });
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
 		await onSchedule(opOf(prompt), when);
@@ -151,7 +134,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
 	return (
-		<div className="flex h-full min-h-0 flex-1 flex-col">
+		<div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto">
 			{scheduled ? (
 				<Header title="Scheduled session" meta={scheduled.when}>
 					<Button variant="ghost" size="compact" disabled={starting || !connected || !draft.trim() || directCommand !== null} onClick={() => onStart({ ...opOf(draft.trim()), images: [] })}>
@@ -162,7 +145,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					</Button>
 				</Header>
 			) : (
-				<Header title="New session" status={starting ? "Starting omp…" : undefined} />
+				<Header title="New session" status={starting ? "Starting omp…" : undefined}>
+					{!todo && <a href={hashForNewVariants(cwd)} className="text-xs underline underline-offset-4">Variants</a>}
+					<a href={hashForComparisons()} className="text-xs underline underline-offset-4">Comparisons</a>
+				</Header>
 			)}
 			{error !== null && (
 				<p role="alert" className="border-b border-border px-6 py-2 text-xs text-red-600 dark:text-red-400">
@@ -193,7 +179,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							if (directCommand) return;
 							completion.close();
 							if (scheduled) save.run(text.trim());
-							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
+							else void attachments.read(text, (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
 						placeholder="Message this session…"
 						files={attachments.files}
@@ -202,7 +188,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						leftSlot={
 							<>
 								<ModelPicker {...models.picker} disabled={starting || !connected} />
-								{draftSkill !== null && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+								{skill.name !== null && <SkillToggle name={skill.name} state={skill.state} onToggle={skill.toggle} disabled={starting} />}
 							</>
 						}
 						rightSlot={({ openFilePicker }) => (
@@ -238,43 +224,5 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				{attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>
-	);
-}
-
-/** Whether the pinned skill applies: `missing` when the directory has no such skill, `bypassed` when the message opens with its own command. */
-type SkillState = "on" | "off" | "missing" | "bypassed";
-
-function skillTitle(name: string, state: SkillState): string {
-	switch (state) {
-		case "on":
-			return `The first message goes through /skill:${name}. Click to start without it.`;
-		case "off":
-			return `Click to send the first message through /skill:${name}.`;
-		case "missing":
-			return `No skill named ${name} in this directory, so the session starts without it.`;
-		case "bypassed":
-			return `A message that starts with / runs its own command, so it skips /skill:${name}.`;
-		default: {
-			const unhandled: never = state;
-			return unhandled;
-		}
-	}
-}
-
-function SkillToggle({ name, state, onToggle, disabled }: { name: string; state: SkillState; onToggle: () => void; disabled: boolean }) {
-	return (
-		<Tooltip content={skillTitle(name, state)}>
-			<Button
-				variant="ghost"
-				size="compact"
-				leadingIcon={Sparkles}
-				aria-pressed={state === "on"}
-				aria-label={`Skill ${name}`}
-				onClick={onToggle}
-				disabled={disabled || state === "missing" || state === "bypassed"}
-			>
-				<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
-			</Button>
-		</Tooltip>
 	);
 }

@@ -64,13 +64,13 @@ function saveTool(drafts: ReviewDrafts) {
 const review = { commit: HEAD, verdict: "comment", summary: "Close.", findings: [{ path: "./src/a.ts", line: 2, body: "Off by one." }, { path: "src/b.ts", line: null, body: "Missing test." }] };
 
 describe("the save_review_draft tool", () => {
-	test("only a Review start of a pull request, or the resume of its session, gets it", () => {
+	test("only a Review start of a pull request, or the resume of its session, gets it", async () => {
 		const { drafts } = setup();
 		const plain = drafts.join(newSessionRequest("/tmp/app", "Hi", { subject: { kind: "pull-request", pr } }), plainJoin);
 		expect(plain).toBe(plainJoin);
 		const join = drafts.join(reviewStart, plainJoin);
 		expect(join.rpc.tools.map(tool => tool.name)).toEqual(["save_review_draft"]);
-		join.attach({ instanceId: "i1", sessionId: "s1", cwd: "/tmp/app" });
+		await join.attach({ instanceId: "i1", sessionId: "s1", cwd: "/tmp/app" });
 		expect(drafts.join({ kind: "resume", sessionId: "s1" }, plainJoin).rpc.tools.map(tool => tool.name)).toEqual(["save_review_draft"]);
 		drafts.switched("i1", "s2");
 		expect(drafts.join({ kind: "resume", sessionId: "s1" }, plainJoin)).toBe(plainJoin);

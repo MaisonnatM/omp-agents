@@ -3,7 +3,7 @@
  * process runs under a keeper (`src/keeper.ts`), so it outlives the server, and the next server attaches to it.
  */
 import { errorText, isObject } from "../json";
-import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "../keeper-link";
+import { attachKeeper, type KeeperLink, keeperLaunchCwd, listKeepers, startKeeper } from "../keeper-link";
 import type { KeeperMeta } from "../keeper-wire";
 import { keepersDir } from "../paths";
 import type { Frame } from "./collab";
@@ -201,3 +201,6 @@ export function attachRpc(instanceId: string, onFrame: (frame: Record<string, un
 
 /** The instance ids of the sessions a previous server started whose keeper may still run. */
 export const keptSessions = (): string[] => listKeepers(keepersDir);
+
+/** Launch provenance without taking a keeper's connection from its owner. */
+export const keptSessionCwd = (instanceId: string): Promise<string | null> => keeperLaunchCwd(keepersDir, instanceId);
