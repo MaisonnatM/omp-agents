@@ -8,6 +8,7 @@ import { MAX_COMMENT_BODY, type PullRequestDetail, prKey } from "../../../../src
 import { canSubmitReview, type ReviewDraft, type ReviewVerdict } from "../../../../src/shared/review-drafts";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { errorText, putJson } from "../../../api";
 import { useInlineConfirm } from "../../../use-inline-confirm";
@@ -15,17 +16,18 @@ import { useDashboardActions } from "../../dashboard-context";
 import { ERROR_TEXT, isSubmitChord } from "../../form-dialog";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import type { SendPullRequest } from "../pr-fields";
-import { composerLabel, reviewPlaceholder, reviewVerdicts } from "./composer.logic";
+import { composerLabel, reviewPlaceholder, reviewVerdicts, VERDICT_LABELS } from "./composer.logic";
+import { FIELD } from "./review-draft";
 
 type Mode = "comment" | "review";
 
-const VERDICTS: Record<ReviewVerdict, { label: string; icon: ReactNode }> = {
-	comment: { label: "Comment", icon: <MessageSquare aria-hidden className="size-3" /> },
-	approve: { label: "Approve", icon: <Check aria-hidden className="size-3" /> },
-	"request-changes": { label: "Request changes", icon: <CircleX aria-hidden className="size-3" /> },
+const VERDICT_ICONS: Record<ReviewVerdict, ReactNode> = {
+	comment: <MessageSquare aria-hidden className="size-3" />,
+	approve: <Check aria-hidden className="size-3" />,
+	"request-changes": <CircleX aria-hidden className="size-3" />,
 };
 
-const TEXTAREA = "block w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
+const TEXTAREA = cn(FIELD, "resize-none disabled:opacity-60");
 
 interface ComposerProps {
 	detail: PullRequestDetail;
@@ -267,16 +269,16 @@ function ReviewForm({ textareaRef, summary, onSummary, verdict, verdicts, onVerd
 					<Select value={verdict} disabled={busy} onValueChange={value => value && onVerdict(value as ReviewVerdict)}>
 						<SelectTrigger aria-label="Review verdict" className="mr-auto h-6 min-w-0 text-xs">
 							<span className="flex items-center gap-1.5">
-								{VERDICTS[verdict].icon}
-								{VERDICTS[verdict].label}
+								{VERDICT_ICONS[verdict]}
+								{VERDICT_LABELS[verdict]}
 							</span>
 						</SelectTrigger>
 						<SelectContent side="top" alignItemWithTrigger={false}>
 							{verdicts.map(value => (
 								<SelectItem key={value} value={value} className="text-xs">
 									<span className="flex items-center gap-1.5">
-										{VERDICTS[value].icon}
-										{VERDICTS[value].label}
+										{VERDICT_ICONS[value]}
+										{VERDICT_LABELS[value]}
 									</span>
 								</SelectItem>
 							))}

@@ -1,6 +1,8 @@
 import type { PullRequestDetail } from "../../../../src/shared/github";
 import { canSubmitReview, type ReviewVerdict } from "../../../../src/shared/review-drafts";
 
+export const VERDICT_LABELS: Record<ReviewVerdict, string> = { approve: "Approve", "request-changes": "Request changes", comment: "Comment" };
+
 /** The verdicts you may review with: none once it merged or closed, and only a comment on your own. */
 export function reviewVerdicts(detail: Pick<PullRequestDetail, "state" | "byViewer">): ReviewVerdict[] {
 	if (detail.state !== "open" && detail.state !== "draft") return [];
