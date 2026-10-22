@@ -2,11 +2,11 @@ import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import { newDraftKey } from "../composer-drafts";
+import { clearDraft, newDraftKey, variantsDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
 import type { Layout, Page, TodoListView } from "../routing";
-import { hashForNewSession } from "../routing";
+import { hashForComparisons, hashForNewSession, hashForNewVariants } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import type { WorkspaceScope } from "../use-workspace-scope";
@@ -16,6 +16,7 @@ import { InboxPage } from "./inbox/inbox-page";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
+import { NewVariants } from "./new-variants";
 import { PaneGrid } from "./pane-grid";
 import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
@@ -24,6 +25,7 @@ import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
+import { ComparisonsPage } from "./comparisons-page";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -57,7 +59,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "models" | "userTodos" | "routines" | "projects" | "comparisons" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -97,6 +99,7 @@ export const PageSwitch = memo(function PageSwitch({
 	userTodos,
 	routines,
 	projects,
+	comparisons,
 	workspaceList,
 	pins,
 	newSessionCompletions,
@@ -118,7 +121,7 @@ export const PageSwitch = memo(function PageSwitch({
 	show,
 	toggleSidebar,
 }: PageSwitchProps) {
-	const { send, start, dismissStart, changeTodo } = useDashboardActions();
+	const { send, request, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
@@ -149,6 +152,26 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		}
+		case "new-variants": {
+			const cwd = page.cwd ?? defaultWorkspace;
+			return (
+				<NewVariants
+					cwd={cwd}
+					workspaces={workspaces}
+					connected={connected}
+					completions={newSessionCompletions}
+					onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
+					onPickCwd={next => { location.hash = hashForNewVariants(next); }}
+					onStart={async (id, spec) => {
+						await request({ t: "comparison-start", id, spec });
+						clearDraft(variantsDraftKey);
+						location.hash = hashForComparisons(id);
+					}}
+				/>
+			);
+		}
+		case "comparisons":
+			return <ComparisonsPage id={page.id} comparisons={comparisons} connected={connected} hosts={hosts} />;
 		case "scheduled":
 			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
 		case "settings":

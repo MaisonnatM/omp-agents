@@ -22,6 +22,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Isolation sandboxes](#isolation-sandboxes)
 - [Scheduled sends](#scheduled-sends)
 - [Projects](#projects)
+- [Design comparisons](#design-comparisons)
 - [Pins](#pins)
 - [Notifications](#notifications)
   - [Session notifications](#session-notifications)
@@ -491,7 +492,8 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
   An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the MCP sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
 - The page runs with context isolation and the sandbox on, and gets no Node or Electron API.
-  Its preload, `desktop/preload.ts`, hands it only `window.ompDesktop`, the `DesktopBridge` of `src/shared/desktop-bridge.ts`, whose `badge` and `alert` send one IPC message each; see [Session notifications](#session-notifications).
+  Its preload, `desktop/preload.ts`, hands it only `window.ompDesktop`, the `DesktopBridge` of `src/shared/desktop-bridge.ts`, whose `badge`, `alert`, and `ownsClose` send one IPC message each; see [Session notifications](#session-notifications).
+  The main process takes each one only from the window's own dashboard frame.
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
 - The packaged app, launched by Finder or at login, gets no shell environment, so `desktop/shell-env.ts` runs the login shell (`$SHELL -ilc`) once at startup and merges its environment into `process.env` before the server starts; omp, `gh`, and `git` are then found as in a terminal.
@@ -816,6 +818,45 @@ The runner's `noticeFacts` feeds the `projects` notice source (`PROJECT_KINDS`) 
 On a takeover, the server reads `projects.json` again, since the previous owner kept saving it; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
 Each server's runner follows only the sessions that server started.
 
+## Design comparisons
+
+`Comparisons` in `src/server/comparisons.ts` owns every comparison and is the only writer of its record; see [Design comparisons](usage.md#design-comparisons) for the interface.
+
+- A comparison is a record, not a session: it starts exactly one ordinary dashboard session per variant through the same starter as **New session**, and no coordinator.
+  The page sends `comparison-start` with an id it made and saved before sending, so a resent or replayed request finds the comparison it already started instead of starting another; the same id with a different prompt is refused.
+  The browser mounts a dedicated comparison composer at `#new-variants/<encoded cwd>`; single-session, todo, and scheduled composers never send this command.
+- Acceptance resolves the base to one commit, plans every variant's branch, worktree, and instance id, and writes the whole plan before anything starts.
+  Each variant then gets its worktree through `allocateVariant` in `src/git.ts`, `git worktree add -b` at that commit, which refuses an existing branch or path, inside `Worktrees.start` and `Worktrees.checkout`, so no removal runs at the same time.
+  The comparison records each worktree it created with its directory's device and inode; that record, not a branch name or a path, is what later lets it remove the worktree.
+- `VariantLifecycle` in `src/shared/comparisons.ts` is the sole persisted lifecycle for a variant, from queued through registration, first-prompt admission or uncertainty, and verified stop and checkout retention or removal.
+  The starter takes a `ReservedLaunch` for the planned instance id and the first-prompt steps; the canonical async join binds comparison membership and the screenshot tool.
+  Each transition is written before the next action, so a server that stops between them leaves a variant whose first prompt shows as uncertain, and nothing sends it again.
+  A variant still queued or starting when the server stopped shows as failed; a keeper that survived is reattached, never launched again.
+  Session registration, model switches, and termination persist the actual model and thinking level, so the page does not depend on a live roster row to show them.
+  Requested selection is derived for each snapshot from the immutable comparison specification, separately from actual model and thinking level, which stay unknown until reported.
+- `publish_variant_screenshot` is an essential host tool bound to one variant's instance, given at launch and again on reattach and resume.
+  `VariantScreenshots` in `src/server/variant-screenshots.ts` owns publication.
+  `rasterExtension` in `src/variant-image.ts` decodes the whole file with `Bun.Image`, whatever its name says, and the bytes are copied to `comparisons/<id>/media/` under the data directory, outside the access token's directory that `GET /api/media` refuses.
+  Each publication takes the next number for its variant, and the record keeps a receipt per instance and tool call id, so a host tool call that omp repeats answers the publication it already made instead of a new one.
+- **Keep this one** is `comparison-select`: it writes the winner first, cancels variants not started yet, waits for the starts under way, then ends each other variant's session and waits until its keeper exits.
+  `comparison-review-cleanup` only reads: after every stop is confirmed, `Worktrees.reviewOwned` lists each owned losing worktree's tracked, staged, untracked, and ignored files and runs the same removal checks as **Delete**.
+  The review fingerprints Git's index and binary diffs, plus content hashes, modes, inodes, and symlink targets of untracked and ignored files.
+  Changed bytes invalidate the review even when file size and modification time stay the same.
+  Removal checks reject assume-unchanged and skip-worktree index flags, force executable-mode detection, and inspect special files outside `.git`, refusing FIFOs and sockets that Git can omit.
+  This safety review still traverses the filesystem and reads ignored file contents.
+  `comparison-cleanup` takes that review's id and a policy: `preserve-changes` removes nothing, and `discard-owned-changes` runs `Worktrees.removeOwned`, which reviews again, refuses on any blocker other than uncommitted changes or a changed fingerprint, and then runs `git worktree remove --force`.
+  Cleanup read state is computed from the winner, each variant's lifecycle, and the current in-memory loss review, not stored as another lifecycle in the manifest.
+  Reviews live only in memory, so a restart asks for a new one, and an interrupted cleanup never resumes.
+  **End session** on a variant stays the ordinary end, with its dirty worktree kept.
+- `ComparisonRecords` in `src/server/comparison-records.ts` owns manifest parsing and persistence, per-record serialization, and the `OwnerLock` at `comparisons/<id>/owner.lock`, apart from `server.lock`.
+  Each planned or resumed instance also has a durable `comparisons/<id>/members/<instanceId>` claim, so an unreadable manifest cannot release its keeper to another server.
+  `reattachAll` asks `Comparisons.mayAttach` before attaching a variant; unrelated keepers remain attachable.
+  Version-two manifests store domain state, worktree ownership, instance membership, and screenshot receipts, without derived owner, requested selection, or cleanup read state.
+  Valid version-one records are converted at the persistence boundary; their requested-only settings do not become actual model data.
+  Invalid records are listed as unavailable and never replaced or restarted.
+  Each record change uses `atomicWriteText` and is awaited before it takes effect, and each screenshot is written to a new file that must not exist yet, both mode `0600` in `0700` directories.
+- Every socket hears the comparisons as a whole-list `comparisons` message from `ListRegistry`, a list the page reads but never edits through it, after each change and when it opens.
+
 ## Pins
 
 The sidebar's pins are a list of session ids that the server keeps, so the routine runner can pin with no page open and every window agrees.
@@ -929,10 +970,14 @@ Then it deletes the local branch it worked on when that is the head branch of a 
 ## Review drafts
 
 A **Review** quick action's session writes its review into a draft the dashboard keeps, and the user posts it from the pull request's **Review draft** tab; see [Pull requests](usage.md#pull-requests) for what the user sees.
-`src/shared/review-drafts.ts` holds the shapes and the rules both sides apply: `ReviewDraft`, one per pull request, with the `head` commit the session reviewed, a `verdict`, a `summary`, `findings`, `savedAt`, and `posted`, the review it became; `ReviewFinding`, `{ id, path, line, body, state }`, its `line` `null` for a finding on a whole file and its `state` `pending`, `accepted`, or `dismissed`; and `Reviewer`, which pull request a session reviews.
+`src/shared/review-drafts.ts` holds the shapes and the rules both sides apply: `ReviewDraft`, one per pull request, with the `head` commit the session reviewed, a `verdict`, a `summary`, `findings`, `savedAt`, and `posted`, the review it became; `ReviewFinding`, `{ id, path, line, startLine, side, body, state, source }`, its `line` `null` for a finding on a whole file and its `state` `pending`, `accepted`, or `dismissed`, and its `source` `review` for the session's tool or `code` for the Code tab; and `Reviewer`, which pull request a session reviews.
 `applyReviewDraft` reduces a `ReviewDraftChange` over `ReviewDraftState`, `{ drafts, reviewers }`: the page's `ReviewDraftEdit`s, which change a draft not yet posted, and the server's `save`, `posted`, `bind`, and `relink`.
-A `save` replaces the pull request's draft whole and drops drafts posted more than 14 days before it; `posted` marks a draft only while its head is the one posted and it is not posted yet; `bind` keeps the latest 200 reviewers.
+A `save` replaces the pull request's draft, keeping only its `code` findings when the draft is unposted on the same head, renumbered after the saved ones, and drops drafts posted more than 14 days before it; `posted` marks a draft only while its head is the one posted and it is not posted yet; `bind` keeps the latest 200 reviewers.
 `ReviewDraftsFile` in `src/server/review-drafts-file.ts` keeps that state in `review-drafts.json` beside the access token, `shared` so every server on this machine reads the others' writes, and every socket hears the drafts as a `review-drafts` message, also sent when a socket opens; the page edits them with a `review-draft` message, which `parseReviewDraftEdit` in `src/server/wire.ts` checks.
+The Code tab's `add-finding` edit creates a local comment draft or appends a pending finding to an unposted draft on the same head, without calling GitHub; the reducer numbers it after the draft's highest `fN` id, so the page never picks an id.
+One on a posted draft or a draft of another head throws, like a `take` of a scheduled send, so the page's request fails with why and it toasts that instead of a saved comment.
+Every finding has a `side`, `LEFT` or `RIGHT`, and a `startLine`, the first line of a range or `null`; `ReviewDraftsFile` reads a finding saved before ranges as `RIGHT` and `null`, and one saved before sources as `review`.
+Posting preserves a range only when every line belongs to the diff on that side; other findings join the summary.
 
 `ReviewDrafts` in `src/server/review-drafts.ts` owns the tool and the post.
 A start asks for the tool with `NewSessionRequest.reviewDraft`, which `parseNewSessionRequest` takes only with a pull request subject and which `startTarget` in `web/quick-actions.ts` sets only for **Review**; **Thermonuclear review** never gets it.
@@ -1077,8 +1122,10 @@ It waits for the transcript reads asked for so far, then reads nothing itself; t
 `GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub or Graphite PR link.
 It reads only the title through `gh api graphql`, using the same validated pull request query as the details routes, and keeps each answer for 30 seconds, sharing in-flight reads.
 The page's existing `useRead` drops answers for a previous link and aborts the read when the link unmounts; explicit Markdown labels do not request a title.
-`GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers the list on a pull request's **Code** tab, `PullRequestChanges` in `src/shared/github.ts`: its title and branches from `gh api repos/<o>/<r>/pulls/<n>`, and its files from `gh api --paginate --slurp repos/<o>/<r>/pulls/<n>/files`, which lists up to GitHub's 3000 where GraphQL's `files` stops at 100.
-It reads GitHub again on each call and keeps the answer, with each file's `patch` and blob id, for the file reads for 30 seconds.
+`GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers `PullRequestChanges`: title and branches from REST, the files from the paginated REST files endpoint, and each file's `viewerViewedState` from paginated GraphQL.
+Files are ordered by source dependencies, tests in source order, and generated files last.
+The optional `commit=<full oid>` scopes both `/files` and `/file` to a commit belonging to that pull request, with a separate cache entry and the blobs from that commit.
+Each list call reads GitHub again and keeps patches and blob ids for following file reads for 30 seconds.
 `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>` answers one file of that list in full, `ChangedFileText`, and 404 for a path the list does not hold.
 GitHub's patch keeps three unchanged lines around each change, so `patchRows` in `src/shared/changes.ts` fills the lines before, between, and after its hunks from the file's text at the head, which one `gh api graphql` call reads by the blob id the list names.
 Both file readers answer through `fileText(path, rows, note)` in `src/shared/changes.ts`, so a file's rows and the note on why it has none take one shape.
@@ -1089,6 +1136,7 @@ A removed file's patch holds every line, so it reads no blob; a file GitHub send
 `PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
 A `title` change carries a nonblank title of at most 256 characters and patches `repos/<owner>/<repo>/pulls/<number>`.
 An `update` change selects `merge` or `rebase` and calls `GITHUB_MERGES.update` with the node id and head read fresh from GitHub.
+`PUT /api/pull-request/viewed` takes a `PullRequestViewedEdit`, a pull request with `{ path, on }`, reads the pull request node id, calls `markFileAsViewed` or `unmarkFileAsViewed` through GraphQL, and answers `{}`, since the **Code** tab keeps its own viewed states.
 The queue uses the same update function with the merge method.
 Each open pull request detail adds one REST comparison of its base against its head commit.
 `behindBy` is the comparison's `behind_by` count, or `null` for an unavailable comparison or a finished pull request.
@@ -1510,6 +1558,12 @@ Skipped checks stay in the completed group but never count as passed.
 The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
+
+Open pull request tabs use `web/pull-request-tabs.ts` and the same `useStoredState` localStorage mechanism as the sidebar layout.
+The main Pull requests page shares one ordered strip between windows and stores no active tab, since its route says which PR shows.
+Each session's or project's PRs sidebar keeps its own tabs and active tab, and keeps navigation local to that sidebar; one key holds them by the session's ID, which stays the same from its live view to its past one, or by the project's ID, for the 20 sidebars whose tabs changed last.
+Only the main PR detail registers the copy-number, copy-link, and close-tab shortcuts.
+While `PullRequestDetailPage` is mounted it tells the desktop shell through `window.ompDesktop.ownsClose`, and the Electron window's `before-input-event` then bypasses native menu shortcuts for Cmd+W, so the page can prevent the native Close action without the shell knowing the dashboard's routes.
 
 Every fixed list of choices uses shadcn's Base UI `select`, vendored as `web/components/ui/select.tsx` with the menu's popup and row look, in place of the browser's `<select>`.
 `FormDialog` is Base UI's `Dialog`, so a `Select` in its form opens and takes focus there; Esc in one of the form's Radix pickers closes only the picker.

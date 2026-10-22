@@ -202,13 +202,19 @@ export interface PullRequestFile {
 	change: "added" | "deleted" | "modified" | "renamed" | "copied" | "changed";
 }
 
+export type PullRequestViewedState = "VIEWED" | "UNVIEWED" | "DISMISSED";
+
+export interface PullRequestChangedEntry extends ChangedEntry {
+	viewed?: PullRequestViewedState;
+}
+
 /** Every file a pull request changes, as its changes page lists them, beyond the first 100 that its details list. */
 export interface PullRequestChanges {
 	title: string;
 	/** The branch it merges, and the one it merges into. */
 	head: string;
 	base: string;
-	files: ChangedEntry[];
+	files: PullRequestChangedEntry[];
 }
 
 /** GitHub's `ReactionContent` values. */
@@ -258,6 +264,8 @@ export interface PullRequestThread {
 
 /** A commit on the pull request's branch. */
 export interface PullRequestCommit {
+	/** Full Git object id for opening this commit's diff. */
+	oid: string;
 	sha: string;
 	headline: string;
 	author: Person;
@@ -357,6 +365,12 @@ export const MAX_COMMENT_BODY = 65_536;
 /** The body of `PUT /api/pull-request`. */
 export interface PullRequestEdit extends PullRequest {
 	change: PullRequestChange;
+}
+
+/** The body of `PUT /api/pull-request/viewed`: one file of the pull request marked viewed by the viewer, or not. */
+export interface PullRequestViewedEdit extends PullRequest {
+	path: string;
+	on: boolean;
 }
 
 /** What the details' Labels and Reviewers pickers offer for a repository. */

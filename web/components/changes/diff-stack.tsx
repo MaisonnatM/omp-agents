@@ -4,12 +4,13 @@
  * of files costs one placeholder each until you reach it.
  */
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { memo, type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { memo, type Ref, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
-import { CLICK_TO_LOAD_LINES, changedLines, estimatedRows, lastAtOrAbove } from "../../changes-model";
+import { CLICK_TO_LOAD_LINES, changedLines, estimatedRows, lastAtOrAbove, withMember } from "../../changes-model";
 import { cn } from "@/lib/utils";
 import { LineCounts } from "../line-counts";
 import { DiffView, ROW_HEIGHT } from "./code-view";
+import { useDiffReview } from "./diff-review";
 import { StatusLetter, statusLabel } from "./file-tree";
 
 /** How far beyond the view a file starts to read, so it is drawn by the time it scrolls in. */
@@ -57,6 +58,15 @@ export interface DiffStackHandle {
 	scrollTo: (path: string) => void;
 }
 
+type Collapse = (path: string, value: boolean) => void;
+
+/** The files whose diffs are folded to their headers, and the one function that folds or opens each. */
+export function useCollapsedFiles(): { collapsed: ReadonlySet<string>; setCollapsed: (collapsed: ReadonlySet<string>) => void; onCollapse: Collapse } {
+	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+	const onCollapse = useCallback<Collapse>((path, value) => setCollapsed(previous => withMember(previous, path, value)), []);
+	return { collapsed, setCollapsed, onCollapse };
+}
+
 interface DiffStackProps {
 	ref: Ref<DiffStackHandle>;
 	/** The files in the explorer's order. */
@@ -68,9 +78,12 @@ interface DiffStackProps {
 	initial: string | null;
 	/** The file at the top of the view, as you scroll. */
 	onCurrent: (path: string) => void;
+	collapsed: ReadonlySet<string>;
+	/** Folds or opens a file; the same function on every render, so a file's section draws again only when its own fold changes. */
+	onCollapse: Collapse;
 }
 
-export function DiffStack({ ref, files, fileUrl, version, initial, onCurrent }: DiffStackProps) {
+export function DiffStack({ ref, files, fileUrl, version, initial, onCurrent, collapsed, onCollapse }: DiffStackProps) {
 	const [root, setRoot] = useState<HTMLDivElement | null>(null);
 	const near = useNearObserver(root);
 	const latest = useRef({ files, onCurrent });
@@ -104,7 +117,10 @@ export function DiffStack({ ref, files, fileUrl, version, initial, onCurrent }: 
 	}, [root]);
 	return (
 		<div ref={setRoot} className="relative min-h-0 min-w-0 flex-1 overflow-y-auto">
-			{near && files.map(file => <FileSection key={file.path} file={file} url={fileUrl(file.path)} version={version} watchNear={near} />)}
+			{near &&
+				files.map(file => (
+					<FileSection key={file.path} file={file} url={fileUrl(file.path)} version={version} watchNear={near} folded={collapsed.has(file.path)} onCollapse={onCollapse} />
+				))}
 		</div>
 	);
 }
@@ -114,13 +130,15 @@ interface FileSectionProps {
 	url: string;
 	version: string | number;
 	watchNear: WatchNear;
+	folded: boolean;
+	onCollapse: Collapse;
 }
 
 /** One file: its header, sticky while its diff scrolls under it, and the diff once it neared the view. */
-const FileSection = memo(function FileSection({ file, url, version, watchNear }: FileSectionProps) {
+const FileSection = memo(function FileSection({ file, url, version, watchNear, folded, onCollapse }: FileSectionProps) {
+	const { FileHeader } = useDiffReview();
 	const ref = useRef<HTMLElement>(null);
 	const [reached, setReached] = useState(false);
-	const [folded, setFolded] = useState(false);
 	const lines = changedLines(file);
 	const [asked, setAsked] = useState(lines <= CLICK_TO_LOAD_LINES);
 	useEffect(() => {
@@ -136,7 +154,7 @@ const FileSection = memo(function FileSection({ file, url, version, watchNear }:
 					type="button"
 					aria-expanded={!folded}
 					aria-label={folded ? `Show ${file.path}` : `Hide ${file.path}`}
-					onClick={() => setFolded(value => !value)}
+					onClick={() => onCollapse(file.path, !folded)}
 					className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
 				>
 					<Chevron aria-hidden className="size-3.5" />
@@ -146,6 +164,7 @@ const FileSection = memo(function FileSection({ file, url, version, watchNear }:
 					{file.path}
 				</p>
 				<LineCounts added={file.added} removed={file.removed} />
+				{FileHeader && <FileHeader file={file} />}
 			</div>
 			{folded ? null : !asked ? (
 				<p className="px-4 py-6 text-center text-sm text-muted-foreground">
@@ -156,7 +175,7 @@ const FileSection = memo(function FileSection({ file, url, version, watchNear }:
 				</p>
 			) : reached ? (
 				<div className="[content-visibility:auto]" style={{ containIntrinsicSize: `auto ${height}px` }}>
-					<DiffView url={url} version={version} />
+					<DiffView path={file.path} url={url} version={version} />
 				</div>
 			) : (
 				<div aria-hidden style={{ height }} />

@@ -21,7 +21,7 @@ import {
 } from "../src/shared/calendar";
 import { decodeInboxAnswer, type InboxAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
-import { decodePullRequestList, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestEdit, type PullRequestList, type RepoPullRequests } from "../src/shared/github";
+import { decodePullRequestList, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestEdit, type PullRequestList, type PullRequestViewedEdit, type RepoPullRequests } from "../src/shared/github";
 import type { MergeQueueAnswer, MergeQueueChange } from "../src/shared/merge-queue";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
@@ -93,6 +93,11 @@ export async function writePullRequest(workspace: string | null, pr: PullRequest
 	if (change.field === "state") pullRequestsStore.update(list => withPullRequestState(list, pr, change.state, Date.now()), workspace);
 	void pullRequestsStore.refresh(workspace, { fresh: true });
 	return detail;
+}
+
+/** Marks one of `pr`'s files viewed by the viewer on GitHub, or not; no list shows it, so none is read again. */
+export async function writeViewedFile(pr: PullRequest, path: string, on: boolean): Promise<void> {
+	await putJson("/api/pull-request/viewed", { owner: pr.owner, repo: pr.repo, number: pr.number, path, on } satisfies PullRequestViewedEdit);
 }
 
 /**

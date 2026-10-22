@@ -43,7 +43,7 @@ const detail = (fields: Partial<PullRequestDetail> = {}): PullRequestDetail => (
 
 const comment = (body: string, at: number): PullRequestComment => ({ author: ann, body, at, url: `https://github.com/acme/webapp/pull/7#${body}`, reactions: [] });
 const event = (body: string, at: number, review: PullRequestEvent["review"] = null): PullRequestEvent => ({ ...comment(body, at), review });
-const commit = (sha: string, at: number): PullRequestCommit => ({ sha, at, author: ann, headline: `Commit ${sha}`, additions: 1, deletions: 0 });
+const commit = (sha: string, at: number): PullRequestCommit => ({ oid: sha.padEnd(40, "0"), sha, at, author: ann, headline: `Commit ${sha}`, additions: 1, deletions: 0 });
 const thread = (id: string, comments: PullRequestComment[], resolved = false): PullRequestThread => ({
 	id,
 	path: "src/app.ts",

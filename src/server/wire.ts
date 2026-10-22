@@ -7,6 +7,7 @@
  */
 import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
+import { isComparisonId, parseComparisonSpec } from "../shared/comparisons";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
@@ -45,6 +46,7 @@ import {
 	type PullRequestAttachment,
 	type PullRequestChange,
 	type PullRequestEdit,
+	type PullRequestViewedEdit,
 	type PullRequestImage,
 	type Repo,
 	SETTABLE_STATES,
@@ -56,7 +58,7 @@ import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
-import { FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit } from "../shared/review-drafts";
+import { FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding } from "../shared/review-drafts";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
@@ -149,8 +151,22 @@ function parsePinChange(value: unknown): Parsed<PinChange> {
 	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { ok: { op, sessionIds } } : null;
 }
 
-/** A finding id as `save_review_draft` numbers them. */
+/** A finding id as the draft numbers them. */
 const FINDING_ID = /^f\d{1,4}$/;
+
+/** A full commit id: 40 hex digits in SHA-1 repositories, 64 in SHA-256 ones. */
+const COMMIT = /^[0-9a-f]{40,64}$/;
+
+/** A finding's file, its line or range on one side of the diff, and its text, as the page sends them to add or edit a finding. */
+function parseFindingPlace(input: unknown): Pick<ReviewFinding, "path" | "line" | "startLine" | "side" | "body"> | null {
+	if (!isObject(input)) return null;
+	const { path, line, startLine, side, body } = input;
+	if (!isNonEmpty(path) || !isCommentBody(body)) return null;
+	if (!(line === null || (isSafeInteger(line) && line >= 1))) return null;
+	if (!(startLine === null || (isSafeInteger(startLine) && startLine >= 1 && line !== null && startLine <= line))) return null;
+	if (side !== "LEFT" && side !== "RIGHT") return null;
+	return { path: path.trim(), line, startLine, side, body };
+}
 
 /** A change to the draft of a pull request: its verdict, its summary, one finding's place and text, findings' states, or its discard. */
 export function parseReviewDraftEdit(value: unknown): Parsed<ReviewDraftEdit> {
@@ -163,10 +179,14 @@ export function parseReviewDraftEdit(value: unknown): Parsed<ReviewDraftEdit> {
 			return oneOf(REVIEW_VERDICTS)(value.verdict) ? { ok: { op: "verdict", pr, verdict: value.verdict } } : null;
 		case "summary":
 			return typeof value.summary === "string" && value.summary.length <= MAX_COMMENT_BODY ? { ok: { op: "summary", pr, summary: value.summary } } : null;
+		case "add-finding": {
+			const place = parseFindingPlace(value.finding);
+			if (!place || place.line === null || typeof value.head !== "string" || !COMMIT.test(value.head)) return null;
+			return { ok: { op: "add-finding", pr, head: value.head, finding: { ...place, line: place.line } } };
+		}
 		case "finding": {
-			const { id, path, line, body } = value;
-			if (typeof id !== "string" || !FINDING_ID.test(id) || !isNonEmpty(path) || !isCommentBody(body)) return null;
-			return line === null || (isSafeInteger(line) && line >= 1) ? { ok: { op: "finding", pr, id, path: path.trim(), line, body } } : null;
+			const place = parseFindingPlace(value);
+			return place && typeof value.id === "string" && FINDING_ID.test(value.id) ? { ok: { op: "finding", pr, id: value.id, ...place } } : null;
 		}
 		case "finding-state": {
 			const { ids, state } = value;
@@ -318,6 +338,13 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const request = parseStartRequest(value);
 		return isCounter(reqId) && request ? { ok: { t: "start", reqId, ...request.ok } } : null;
 	},
+	"comparison-start"({ id, spec }) {
+		const parsed = parseComparisonSpec(spec);
+		return isComparisonId(id) && parsed ? { ok: { t: "comparison-start", id, spec: parsed.ok } } : null;
+	},
+	"comparison-select": ({ id, winner }) => isComparisonId(id) && isNonEmpty(winner) ? { ok: { t: "comparison-select", id, winner } } : null,
+	"comparison-review-cleanup": ({ id }) => isComparisonId(id) ? { ok: { t: "comparison-review-cleanup", id } } : null,
+	"comparison-cleanup": ({ id, reviewId, policy }) => isComparisonId(id) && isNonEmpty(reviewId) && (policy === "preserve-changes" || policy === "discard-owned-changes") ? { ok: { t: "comparison-cleanup", id, reviewId, policy } } : null,
 	"project-create"(value) {
 		const { reqId, name, cwd, prompt } = value;
 		// `null` starts the coordinator on omp's default model.
@@ -444,7 +471,7 @@ export function parseTerminalQuery(params: URLSearchParams): Parsed<{ id: string
 	return isNonEmpty(cwd) && isTerminalSide(cols) && isTerminalSide(rows) ? { ok: { cwd, cols, rows } } : null;
 }
 
-/** `?owner=<o>&repo=<r>&number=<n>` of `GET /api/pull-request` and its `/files` and `/file`. */
+/** `?owner=<o>&repo=<r>&number=<n>` of a pull request read. */
 export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullRequest> {
 	return parsePullRequest(params.get("owner"), params.get("repo"), Number(params.get("number")));
 }
@@ -452,7 +479,14 @@ export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullReque
 const isSettableState = oneOf(SETTABLE_STATES);
 const isMergeMethod = oneOf(MERGE_METHODS);
 const isUpdateMethod = oneOf(UPDATE_METHODS);
-const COMMIT = /^[0-9a-f]{40,64}$/;
+
+export function parsePullRequestFilesQuery(params: URLSearchParams): Parsed<PullRequest & { commit?: string }> {
+	const pr = parsePullRequestQuery(params);
+	const commit = params.get("commit");
+	if (!pr || (commit !== null && !COMMIT.test(commit))) return null;
+	return commit === null ? pr : { ok: { ...pr.ok, commit } };
+}
+
 /** A GitHub node id: a review thread's `PRRT_…` id, or an older id's base64 with its `=` padding. */
 const NODE_ID = /^[A-Za-z0-9_=-]{1,100}$/;
 const isNodeId = (value: unknown): value is string => typeof value === "string" && NODE_ID.test(value);
@@ -477,6 +511,13 @@ export function parsePullRequestEdit(body: unknown): Parsed<PullRequestEdit> {
 	const pr = parsePullRequest(body.owner, body.repo, body.number);
 	const change = parsePullRequestChange(body.change);
 	return pr && change && { ok: { ...pr.ok, change: change.ok } };
+}
+
+/** The body of `PUT /api/pull-request/viewed`. */
+export function parsePullRequestViewedEdit(body: unknown): Parsed<PullRequestViewedEdit> {
+	if (!isObject(body) || !isNonEmpty(body.path) || typeof body.on !== "boolean") return null;
+	const pr = parsePullRequest(body.owner, body.repo, body.number);
+	return pr && { ok: { ...pr.ok, path: body.path, on: body.on } };
 }
 
 /** The body of `PUT /api/source-control`. */

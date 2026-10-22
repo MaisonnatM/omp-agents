@@ -4,6 +4,9 @@
  */
 import { Maximize2, X } from "lucide-react";
 import { type PullRequest, repoKey } from "../../../src/shared/github";
+import { type PullRequestDetailTab, pullRequestTabHash, usePagePullRequestTabs } from "../../pull-request-tabs";
+import { useState } from "react";
+import { PullRequestTabsStrip } from "./pr-tabs";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
@@ -115,6 +118,8 @@ function RepoTables({ pulls, section }: { pulls: PullRequests; section: SectionT
 
 /** The details of the pull request `route` names, docked beside the board, with buttons that show them as a page or close them. */
 function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: string | null; hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
+	// The docked details keep their own tab, starting on Code when the route opens a file.
+	const [tab, setTab] = useState<PullRequestDetailTab>(route.files ? "code" : "summary");
 	return (
 		<aside aria-label="Pull request details" className="flex w-[30rem] max-w-[45%] shrink-0 flex-col border-l border-border">
 			<TooltipProvider>
@@ -132,7 +137,7 @@ function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: strin
 				</div>
 				<DetailsScroller viewportClassName="pt-2">
 					<div className="px-4 pb-6">
-						<PullRequestDetails workspace={workspace} hosts={hosts} target={route.target} files={route.files} placement="sidebar" />
+						<PullRequestDetails workspace={workspace} hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" />
 					</div>
 				</DetailsScroller>
 			</TooltipProvider>
@@ -173,8 +178,11 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 	const pulls = usePullRequests({ workspace, hosts, past, route });
 	const unmatched = pulls.poll.read?.data.unmatched ?? [];
 	const docked = view === "board" && route.target !== null ? route : null;
+	const { tabs, dispatch } = usePagePullRequestTabs(null);
 	return (
-		<div className="flex h-full min-h-0 flex-1">
+		<div className="flex h-full min-h-0 flex-1 flex-col">
+			{tabs.open.length > 0 && <PullRequestTabsStrip tabs={tabs} dispatch={dispatch} workspace={workspace} hrefOf={pullRequestTabHash} />}
+			<div className="flex min-h-0 flex-1">
 			<div className="flex min-w-0 flex-1 flex-col">
 				<ListPage
 					title="Pull requests"
@@ -211,6 +219,7 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 				</ListPage>
 			</div>
 			{docked && <DockedDetails workspace={workspace} hosts={hosts} route={docked} onExpand={() => onView("list")} />}
+			</div>
 		</div>
 	);
 }

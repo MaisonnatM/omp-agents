@@ -1,16 +1,17 @@
 /** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, Code, and Review draft tabs. */
 import { ClipboardPen, FileDiff, FileText, History, MessageSquare } from "lucide-react";
 import { useContext, useEffect, useRef, useState } from "react";
-import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
+import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { PullRequestDetailTab } from "../../../pull-request-tabs";
 import { commentCount } from "../../../pull-requests-model";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { actionFacts } from "../../../../src/shared/moves";
-import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../../../routing";
+import type { OpenMode } from "../../../routing";
 import { useEditableRead } from "../../../editable-read";
 import { useRead, writePullRequest } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
@@ -45,8 +46,11 @@ export interface DetailContentProps {
 	placement: Placement;
 	/** A change reads the pull request from GitHub again. */
 	version?: unknown;
-	/** The changed file the route opens in the Code tab; `null` shows the Summary. */
-	files?: { path: string | null } | null;
+	/** The tab it shows; its host keeps it, and on the page the route decides whether it is Code. */
+	tab: PullRequestDetailTab;
+	onTab: (tab: PullRequestDetailTab) => void;
+	/** The changed file the route opens in the Code tab. */
+	path?: string | null;
 	/** Shows another pull request of its stack or of the session in place; without it, each of its stack links to its page. */
 	onPick?: (pr: PullRequest) => void;
 	/** The workspace whose pull request list a change here shows in at once. */
@@ -57,8 +61,10 @@ export interface DetailContentProps {
 
 export type Placement = "page" | "sidebar";
 
-type DetailTab = "summary" | "comments" | "timeline" | "code" | "review";
-
+/**
+ * The labels and their counts outgrow the sidebar's default width, with or without the checks beside them, so
+ * below 30rem the tabs show their icons alone, which the tooltip and screen readers still name.
+ */
 const TAB_CLASS = "@min-[30rem]/pr:[&>svg]:hidden @max-[30rem]/pr:px-1.5";
 const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
 
@@ -67,7 +73,7 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
  * of the other actions; then Summary, Comments, Timeline, and Code tabs, and a Review draft tab while a Review session's
  * draft of it is kept, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, files = null, onPick, workspace, cwd }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, tab: picked, onTab, path = null, onPick, workspace, cwd }: DetailContentProps) {
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
 	// The list's state of it joins `version`, so a change made from its row, or one the list reads from GitHub, reads the details again.
 	const { data: detail, error, saveError, edit, write, reload } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, `${String(version)}:${listed?.state ?? "unlisted"}`);
@@ -83,23 +89,13 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 		await write(() => put(change));
 	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
-	const [picked, setPicked] = useState<DetailTab>(files ? "code" : "summary");
 	const draft = reviewDraftOf(useDashboardStatus().reviewDrafts, pr);
 	// A discarded draft takes its tab with it.
 	const tab = picked === "review" && !draft ? "summary" : picked;
 	useEffect(() => {
-		if (files) setPicked("code");
-	}, [files]);
-	useEffect(() => {
 		// The sidebar's details must leave the cursor in the pane's composer.
 		if (placement === "page") headingRef.current?.focus({ preventScroll: true });
 	}, [placement]);
-	const choose = (value: DetailTab): void => {
-		setPicked(value);
-		if (placement !== "page") return;
-		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
-		else if (value !== "code" && files) location.hash = hashForPullRequests(pr);
-	};
 	const facts = listed && actionFacts(listed, detail);
 	const quick: QuickActionsProps = { actions: facts ? pullRequestActions(facts) : [], pending, onRun: (action: PullRequestActionId) => facts && onRun(facts, action) };
 	const page = placement === "page";
@@ -111,7 +107,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const sidebarScroller = useContext(DetailsScrollerContext);
 	const condensed = useCondensedHeader(page ? root : sidebarScroller, root, foldRef, tab);
 	return (
-		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => choose(value as DetailTab)} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
+		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr flex min-h-0 flex-col", page && "h-full overflow-y-auto")}>
 			<div className={cn("sticky top-0 z-10 shrink-0 bg-background", !page && "-mx-4 pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
@@ -140,8 +136,8 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 						<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
 					</div>
 				) : tab === "code" ? (
-					<div className={cn("flex min-h-0 flex-1 flex-col", !page && "pt-3")}>
-						<Code pr={pr} detail={detail} placement={placement} path={files?.path ?? null} version={version} />
+					<div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !page && "-mx-4 h-[65vh] flex-none pt-3")}>
+						<Code key={prKey(pr)} pr={pr} detail={detail} placement={placement} path={path} version={version} />
 					</div>
 				) : (
 					<div className={cn("shrink-0", page && "px-6")}>

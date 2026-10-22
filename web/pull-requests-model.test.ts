@@ -3,6 +3,7 @@ import type { LinkedPullRequest, PullRequestSummary, PullRequestComment, PullReq
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
+import type { ReviewDraft } from "../src/shared/review-drafts";
 import {
 	boardColumns,
 	boardDrop,
@@ -10,6 +11,7 @@ import {
 	commentCount,
 	DEFAULT_ORDER,
 	decodeOrder,
+	lineCommentsBlocked,
 	foldedByDefault,
 	type MoveGroup,
 	type PullRequestOrder,
@@ -517,5 +519,24 @@ describe("pull request list after a change", () => {
 		const closed = withPullRequestState(list, other, "closed", 99);
 		expect(closed.repos).toEqual([list.repos[0], repo("api", []), failed]);
 		expect(closed.repos[0]).toBe(list.repos[0]);
+	});
+});
+
+describe("lineCommentsBlocked", () => {
+	const draft = (head: string, posted: ReviewDraft["posted"] = null): ReviewDraft => ({
+		pr: { owner: "o", repo: "r", number: 1 },
+		head,
+		verdict: "comment",
+		summary: "",
+		findings: [],
+		savedAt: 1,
+		posted,
+	});
+	test("names the one reason the Code tab takes no line comments", () => {
+		expect(lineCommentsBlocked(null, undefined, "abc")).toBeNull();
+		expect(lineCommentsBlocked(null, draft("abc"), "abc")).toBeNull();
+		expect(lineCommentsBlocked("c1", draft("old"), "abc")).toBe("Line comments are written from All commits.");
+		expect(lineCommentsBlocked(null, draft("old"), "abc")).toBe("The Review draft is posted or belongs to an older head. Discard it before adding comments.");
+		expect(lineCommentsBlocked(null, draft("abc", { id: 7, url: "u", at: 2 }), "abc")).toBe("The Review draft is posted or belongs to an older head. Discard it before adding comments.");
 	});
 });

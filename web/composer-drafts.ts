@@ -47,6 +47,9 @@ export const liveDraftKey = (view: LiveView): string => (view.agentId === null ?
 /** The draft of the new-session page: one for the plain draft, one for each todo it starts from. */
 export const newDraftKey = (todoId: string | null): string => (todoId === null ? "new" : `new/todo/${todoId}`);
 
+/** The dedicated design-comparison composer keeps its text separately from single sessions. */
+export const variantsDraftKey = "new-variants";
+
 /** Puts `text` in the composer of `key` for its next mount; `""` forgets it. */
 export const putDraft = (key: string, text: string): void => writeDraft(key, text === "" ? null : text);
 

@@ -10,6 +10,7 @@ import {
 	hashForLayout,
 	hashForPage,
 	hashForNewSession,
+	hashForNewVariants,
 	hashForPullRequestFiles,
 	hashForProjects,
 	hashForRoutines,
@@ -93,6 +94,13 @@ describe("layout hash", () => {
 		expect(routeFromHash("#new")).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: null } });
 		expect(routeFromHash("#newer").kind).toBe("panes");
 		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
+	});
+
+	test("the variants composer has its own route and directory, without todo or scheduled starts", () => {
+		expect(hashForNewVariants("~/code/my app")).toBe("#new-variants/~%2Fcode%2Fmy%20app");
+		expect(routeFromHash("#new-variants/~%2Fcode%2Fmy%20app")).toEqual({ kind: "page", page: { kind: "new-variants", cwd: "~/code/my app" } });
+		expect(routeFromHash(hashForNewVariants(null))).toEqual({ kind: "page", page: { kind: "new-variants", cwd: null } });
+		expect(routeFromHash("#new-variants/%zz?todo=t1")).toEqual({ kind: "page", page: { kind: "new-variants", cwd: null } });
 	});
 
 	test("a draft for a todo names it after the directory, or alone", () => {

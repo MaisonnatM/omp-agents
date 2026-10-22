@@ -281,6 +281,7 @@ export function Roster({
 				</p>
 			)}
 			<TabPanel value="sessions" forceMount className={tab === "sessions" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
+				<a href="#comparisons" className="mx-3 mt-3 rounded-md px-2 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">Design comparisons</a>
 				<SessionList
 					lists={lists}
 					query={query}

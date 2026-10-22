@@ -286,14 +286,12 @@ async function main(): Promise<void> {
 				const context = await browser.newContext({ viewport: VIEWPORT, colorScheme: theme, reducedMotion: "reduce" });
 				await app.pin(context);
 				for (const { pr, states } of targets) {
-					await Promise.all(
-						states.map(async state => {
-							const name = `${pr.number}-${state.name}`;
-							const sides = captured.get(name) ?? { omp: null, t3: null };
-							sides[app.side] = await capture(app, context, pr, state, join(dir, `${name}.${app.side}.png`));
-							captured.set(name, sides);
-						}),
-					);
+					for (const state of states) {
+						const name = `${pr.number}-${state.name}`;
+						const sides = captured.get(name) ?? { omp: null, t3: null };
+						sides[app.side] = await capture(app, context, pr, state, join(dir, `${name}.${app.side}.png`));
+						captured.set(name, sides);
+					}
 				}
 				if (app.side === "omp") for (const hash of pages) await capturePage(values.omp, context, hash, join(dir, `page-${hash.replace(/[^\w-]+/g, "-")}.omp.png`));
 				await context.close();

@@ -16,6 +16,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
   - [Continue after a usage limit](#continue-after-a-usage-limit)
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
+- [Design comparisons](#design-comparisons)
 - [Replay from here](#replay-from-here)
 - [Pull requests](#pull-requests)
 - [Linear tickets](#linear-tickets)
@@ -635,6 +636,47 @@ An action that fails shows its error, and its control becomes available again.
   omp moves the session to a new file, as `/branch` does, so the conversation before the edit stays under the past sessions.
   Only a plain text message that omp has saved can be edited: not a skill prompt, one with images or files, or a message in a terminal session.
 
+## Design comparisons
+
+- **Variants** in the new-session header opens a separate **New design comparison** page at `#new-variants/<encoded directory>`.
+  **New comparison** in **Design comparisons** opens the same page in the default directory; **Single session** returns to a single-session draft.
+  The two pages keep their unsent text separately in this browser.
+  Todo drafts and scheduled starts remain single-session only.
+  The comparison composer shows three variant rows at first; **Add variant** adds another and each row's × removes it, down to two.
+  There is no upper limit.
+- Every variant gets the same prompt, attachments, and skill.
+  The composer's model and effort apply to every row unless a row picks its own, which shows **Use common selection** to go back.
+- **Shared base**, `HEAD` at first, names the commit every variant starts from.
+  The server resolves it once when you send, so every variant starts from the same commit even if the branch moves while they start.
+- Sending starts the comparison and opens its page, `#comparisons/<id>`.
+  Each variant runs as an ordinary dashboard session, on a fresh branch `variants/<id>/<n>-<suffix>` in its own worktree, in the same subdirectory of the repository as the draft's directory.
+  A start that fails on one variant shows on its card; the others keep running, and none is started again in its place.
+  A failed variant's worktree stays, and only a variant that started can be kept, so when none started, remove their worktrees in **Settings › Worktrees**.
+  If the page loses its connection before the server answers, it shows **Check this comparison** instead of starting another, since the first send may have started it.
+- Each variant has a `publish_variant_screenshot` tool and is asked to capture a real screenshot of its design and publish it.
+  The server checks that the file is a PNG, JPEG, GIF, or WebP image of at most 20 MB and copies it out of the worktree, so the comparison keeps it after the worktree goes.
+  A new publication replaces the variant's previous screenshot; the dashboard never takes a screenshot itself.
+- The comparison page shows every variant's card side by side, wrapping onto more rows on a narrow window.
+  A card shows the variant's latest screenshot, which a click enlarges, its requested and actual model and effort, its branch, and one lifecycle status.
+  The requested settings keep the original common selection and row overrides.
+  Actual settings say **Not reported** until the session reports them, then follow changes made during the session.
+  The saved actual model and effort remain visible after the session stops or the dashboard restarts.
+  While a newer screenshot loads, or when it fails to load, the card keeps showing the previous one and says so.
+  **Open session** opens the variant's session; **All comparisons** lists every comparison, newest first, and **Design comparisons** in the **Sessions** tab and **Comparisons** in either draft's header link there too.
+- **Keep this one** asks first, then stops every other variant, its background processes included, and keeps the chosen one's session, worktree, and branch.
+  Variants that had not started yet are cancelled.
+  A variant whose stop cannot be confirmed shows why, and **Retry stopping siblings** tries again.
+- Once the others stopped, **Losing worktrees** lists each one's path with its tracked changes, untracked files, and ignored files, and anything else that blocks its removal.
+  **Keep worktrees** leaves them all in place.
+  **Discard worktrees…** asks again, listing the same files, then removes them with their changes.
+  Discarding lifts only the uncommitted-changes check: a locked worktree, one a live session or a nested repository uses, a directory the comparison did not create, or files that changed since the list was read still keep it, and the card says why.
+  Every branch stays, the winner's included, so a discarded variant's commits can still be checked out.
+- The server keeps each comparison under the data directory, in `omp-agents/comparisons/<id>/`, so it survives a restart.
+  A variant that was mid-start when the server stopped shows as failed rather than starting again, and one whose first prompt may not have reached omp says so instead of sending it twice.
+  The loss list does not survive a restart; review it again before discarding.
+- A comparison belongs to the server that started it.
+  Another server's dashboard shows its saved results with **Open owning dashboard**, a link to that server, and offers none of its actions.
+
 ## Replay from here
 
 - In a main session's **Trajectory**, each prompt row has **Replay from here**, separate from the button that expands its steps. Past sessions and a running source both support it. Subagents and the row before the first prompt do not.
@@ -764,11 +806,23 @@ An action that fails shows its error, and its control becomes available again.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
   Click the row to show the pull request's details in the main area; session chips, move badges, and the `⋯` menu keep their own clicks.
   The title remains a link for keyboard and modifier-click navigation.
-  The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
+  The **+** in the open pull request strip above a PR's details brings the list back to pick another; the list itself shows the strip without it.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
   Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the browser's localStorage keeps the last one of each workspace.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
+- Opening a pull request adds a `#N` tab above its details; reopening it focuses the existing tab.
+  Drag tabs to reorder, or focus a tab's number and press Alt+Left or Alt+Right.
+  Each tab's glyph shows the state the pull request list last read gives it, or a plain icon when that list leaves it out, and becomes a close button on hover or keyboard focus.
+  Closing the active tab selects its right neighbour, then its left, or returns to the list when none remain.
+  Right-click a tab, or press Shift+F10 on its number, for **Copy link**, **Copy PR number**, **Close**, and **Close others**.
+  Wheel over the strip to scroll it horizontally; chevrons appear when tabs overflow.
+  The browser keeps the open tabs, their order, and each PR's selected detail tab across reloads, and a session sidebar's for the 20 sessions whose tabs changed last.
+  A session's **PRs** sidebar has its own strip, which starts on the session's first pull request and shows it again once its last tab closes; its **Summary** opens the session's other pull requests there without changing the page.
+  Cmd+Shift+K copies the open page PR's `#N`, Cmd+Shift+C copies its GitHub link, and Cmd+W closes its tab.
+  These keys apply only while the Pull requests page shows a PR, not in the session sidebar.
+  The desktop app gives that Cmd+W to the page rather than its native window Close command.
+  A plain browser may reserve Cmd+W and close its browser tab before the page can prevent it; use the glyph or context menu there.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any sort but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
@@ -856,12 +910,22 @@ An action that fails shows its error, and its control becomes available again.
   When a thread has more than the 20 comments loaded, **View on GitHub** opens the rest there.
   A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
   Above the rail are the comment count the tab shows, the commit count, and the count of reviewers whose latest verdict approves the newest commit, and **Newest first**, which flips the order without reversing replies within a thread.
-- **Code** shows the pull request's files as the [session changes](#session-changes) dialog shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and every file's diff in one scroll, or the open file in **File**, with ↓ and ↑ to step through them.
-  A renamed file shows **R**, and a copied one **A**.
-  It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
-  Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
-  In the session details sidebar's **PRs** tab, **Code** lists the files instead; a click on one opens the explorer in a dialog at that file, where the others open in place.
-- **Review draft** holds what a **Review** session wrote about the pull request, for you to post as your review.
+- **Code** shows every changed file with omp's diff renderer and a T3-style toolbar, on the page and in the sidebar.
+  **All commits** selects the whole pull request or one commit.
+  The toolbar counts **N of M viewed** and offers **Hide whitespace changes**, **Stacked diff view**, **Split diff view**, **Wrap lines**, **Collapse all files**, **Expand all files**, and the file tree toggle.
+  View preferences persist in this browser; narrow panels put layout, wrapping, and whitespace under **Diff options**.
+  Files read in source dependency order, then tests in their sources' order, then generated files.
+  The tree stays alphabetical, and ↓ and ↑ follow the diff's reading order.
+  Each file's **Viewed** checkbox reads and writes your GitHub viewed state; marking it collapses its diff.
+  **Changed** means GitHub reports a push since the file was viewed.
+  A failed write restores the previous checkbox and says why.
+  Renames show **R**, and binary or very large files say why no diff is available.
+  In **All commits**, click a line number, optionally Shift-click another on the same side for a range, then **Add comment**.
+  **Add to review draft** saves a pending finding locally, without posting to GitHub; Cmd+Enter or Ctrl+Enter saves, and Escape cancels the editor.
+  Open **Review draft** to accept, edit, dismiss, or post the finding.
+  A posted draft or one for an older head must be discarded before adding another comment.
+  A selected commit that leaves the pull request falls back to **All commits**.
+- **Review draft** holds findings from a **Review** session and comments added from **Code**, for you to post as your review.
   It says which commit the session reviewed; when the pull request moved on since, a warning names both commits, and the draft cannot post until a new **Review** session saves a draft of the new head.
   **Verdict** picks **Comment**, **Approve**, or **Request changes**, and **Summary** holds the review's words, kept once the field loses focus.
   **Findings** lists one card per issue the session found, under the file and line it is on, each **Pending** until you **Accept** or **Dismiss** it, which **Unaccept** and **Restore** undo; **Accept N pending** accepts every pending one, and **Edit** changes a finding's file, line, and words.
@@ -890,7 +954,7 @@ An action that fails shows its error, and its control becomes available again.
   Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
   **Fix CI and conflicts** rebases the branch and resolves its conflicts first, then fixes the checks that still fail on the rebased branch, in one session.
   **Review** reviews the pull request's head commit and saves what it finds as the pull request's review draft, through the dashboard's `save_review_draft` tool, which only that session gets, and resumes of it too; it posts nothing on GitHub, and the draft waits on the **Review draft** tab for you to post it.
-  A new draft of the same pull request replaces the one before it, findings and edits included.
+  A new draft of the same pull request replaces the one before it, findings and edits included, except the comments you added from **Code** on the same head, which stay after the new findings.
   **Thermonuclear review** runs the `thermonuclear-reviewer` agent on the pull request's diff.
   On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   A merged pull request has none.
@@ -1660,6 +1724,9 @@ Alt is Option on macOS.
 | . | Pull requests page, outside text fields | Open the pull request's `⋯` menu |
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
 | Space | Pull requests board, a card's title focused | Pick up the card; ← and → choose a column, Space or Enter drops it, and Escape puts it back |
+| Cmd+Shift+K / Cmd+Shift+C | Pull requests page showing a PR | Copy its `#N` / GitHub link |
+| Cmd+W | Pull requests page showing a PR | Close its PR tab; browsers may reserve this key |
+| Alt+Left / Alt+Right | Focused open PR tab's number | Move the tab left / right |
 | / | Todo page, outside text fields | Search the todos |
 | ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
 | X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |
