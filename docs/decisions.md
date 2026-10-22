@@ -96,3 +96,11 @@ A small pointer reorder needs no drag dependency; Alt+Left and Alt+Right on the 
 The strip adds no panel controls of T3's: the sessions sidebar keeps its own rail toggle, and thread-details, panel maximize, and panel visibility have no equivalent surface on the PR page.
 The terminal remains in the existing status bar, as T3 also omits its terminal control on the PR list page.
 See [Pull requests](usage.md#pull-requests).
+
+## Code review keeps omp's renderer and local drafts
+
+The pull request Code tab uses T3's toolbar and reading order around omp's lazy diff renderer, rather than adding a second diff library.
+Viewed checkboxes belong to GitHub and follow the viewer across clients.
+Line comments instead append pending findings to the dashboard's Review draft, preserving its accept, edit, preview, and explicit-post workflow.
+Commit-scoped diffs disable new comments because a review is pinned to the whole pull request's head.
+See [Pull requests](usage.md#pull-requests) and [Review drafts](architecture.md#review-drafts).

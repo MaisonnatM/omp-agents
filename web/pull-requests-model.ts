@@ -2,6 +2,7 @@
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf } from "../src/shared/moves";
+import type { ReviewDraft } from "../src/shared/review-drafts";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
@@ -346,4 +347,11 @@ export const commentCount = (detail: Pick<PullRequestDetail, "threads" | "conver
 export function withThreadResolved(detail: PullRequestDetail, id: string, resolved: boolean): Pick<PullRequestDetail, "threads" | "unresolved"> {
 	const threads = detail.threads.map(thread => (thread.id === id ? { ...thread, resolved } : thread));
 	return { threads, unresolved: { count: openThreads({ threads }).length, exact: detail.unresolved.exact } };
+}
+
+/** Why the Code tab takes no line comments: a commit is picked, or the Review draft is posted or reviews an older head; `null` when it takes them. */
+export function lineCommentsBlocked(commit: string | null, draft: ReviewDraft | undefined, headOid: string): string | null {
+	if (commit !== null) return "Line comments are written from All commits.";
+	if (draft && (draft.posted !== null || draft.head !== headOid)) return "The Review draft is posted or belongs to an older head. Discard it before adding comments.";
+	return null;
 }

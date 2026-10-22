@@ -894,12 +894,22 @@ An action that fails shows its error, and its control becomes available again.
   When a thread has more than the 20 comments loaded, **View on GitHub** opens the rest there.
   A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
   Above the rail are the comment count the tab shows, the commit count, and the count of reviewers whose latest verdict approves the newest commit, and **Newest first**, which flips the order without reversing replies within a thread.
-- **Code** shows the pull request's files as the [session changes](#session-changes) dialog shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and every file's diff in one scroll, or the open file in **File**, with ↓ and ↑ to step through them.
-  A renamed file shows **R**, and a copied one **A**.
-  It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
-  Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
-  In the session details sidebar's **PRs** tab, **Code** lists the files instead; a click on one opens the explorer in a dialog at that file, where the others open in place.
-- **Review draft** holds what a **Review** session wrote about the pull request, for you to post as your review.
+- **Code** shows every changed file with omp's diff renderer and a T3-style toolbar, on the page and in the sidebar.
+  **All commits** selects the whole pull request or one commit.
+  The toolbar counts **N of M viewed** and offers **Hide whitespace changes**, **Stacked diff view**, **Split diff view**, **Wrap lines**, **Collapse all files**, **Expand all files**, and the file tree toggle.
+  View preferences persist in this browser; narrow panels put layout, wrapping, and whitespace under **Diff options**.
+  Files read in source dependency order, then tests in their sources' order, then generated files.
+  The tree stays alphabetical, and ↓ and ↑ follow the diff's reading order.
+  Each file's **Viewed** checkbox reads and writes your GitHub viewed state; marking it collapses its diff.
+  **Changed** means GitHub reports a push since the file was viewed.
+  A failed write restores the previous checkbox and says why.
+  Renames show **R**, and binary or very large files say why no diff is available.
+  In **All commits**, click a line number, optionally Shift-click another on the same side for a range, then **Add comment**.
+  **Add to review draft** saves a pending finding locally, without posting to GitHub; Cmd+Enter or Ctrl+Enter saves, and Escape cancels the editor.
+  Open **Review draft** to accept, edit, dismiss, or post the finding.
+  A posted draft or one for an older head must be discarded before adding another comment.
+  A selected commit that leaves the pull request falls back to **All commits**.
+- **Review draft** holds findings from a **Review** session and comments added from **Code**, for you to post as your review.
   It says which commit the session reviewed; when the pull request moved on since, a warning names both commits, and the draft cannot post until a new **Review** session saves a draft of the new head.
   **Verdict** picks **Comment**, **Approve**, or **Request changes**, and **Summary** holds the review's words, kept once the field loses focus.
   **Findings** lists one card per issue the session found, under the file and line it is on, each **Pending** until you **Accept** or **Dismiss** it, which **Unaccept** and **Restore** undo; **Accept N pending** accepts every pending one, and **Edit** changes a finding's file, line, and words.
@@ -928,7 +938,7 @@ An action that fails shows its error, and its control becomes available again.
   Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
   **Fix CI and conflicts** rebases the branch and resolves its conflicts first, then fixes the checks that still fail on the rebased branch, in one session.
   **Review** reviews the pull request's head commit and saves what it finds as the pull request's review draft, through the dashboard's `save_review_draft` tool, which only that session gets, and resumes of it too; it posts nothing on GitHub, and the draft waits on the **Review draft** tab for you to post it.
-  A new draft of the same pull request replaces the one before it, findings and edits included.
+  A new draft of the same pull request replaces the one before it, findings and edits included, except the comments you added from **Code** on the same head, which stay after the new findings.
   **Thermonuclear review** runs the `thermonuclear-reviewer` agent on the pull request's diff.
   On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   A merged pull request has none.

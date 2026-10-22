@@ -64,9 +64,9 @@ export class ReviewDrafts {
 		return this.#deps.file.value.drafts;
 	}
 
-	/** Applies a page's edit; whether it changed anything. */
+	/** Applies a page's edit, an added finding taken now; whether it changed anything. */
 	edit(edit: ReviewDraftEdit): boolean {
-		return this.#deps.file.apply(edit);
+		return this.#deps.file.apply(edit.op === "add-finding" ? { ...edit, at: this.#deps.now() } : edit);
 	}
 
 	/**
@@ -165,7 +165,7 @@ export class ReviewDrafts {
 			description: [
 				`Save your review of ${name} as a draft the user reads in the dashboard, accepts or dismisses finding by finding, and posts on GitHub.`,
 				"It never posts anything itself; do not post on GitHub in any other way either.",
-				"Saving again replaces the whole draft, including what the user changed in it.",
+				"Saving again replaces the whole draft, including what the user changed in it, except the comments the user wrote on the same head commit, which stay after your findings.",
 				"`commit` is the head commit you reviewed, its full 40-character id: the review posts only while it is still the head.",
 				"`line` is a line of the file at that commit; a finding on a line the diff does not show, or with a null line, goes into the review's summary instead.",
 			].join(" "),
@@ -223,7 +223,7 @@ export class ReviewDrafts {
 				if (typeof path !== "string" || !path.trim()) throw new Error(`${at}.path must name a file.`);
 				if (line !== null && !(typeof line === "number" && Number.isSafeInteger(line) && line >= 1)) throw new Error(`${at}.line must be a line number from 1, or null.`);
 				if (typeof body !== "string" || !body.trim() || body.length > MAX_COMMENT_BODY) throw new Error(`${at}.body must be text of at most ${MAX_COMMENT_BODY} characters.`);
-				return { id: `f${index + 1}`, path: path.trim().replace(/^\.?\//, ""), line, body: body.trim(), state: "pending" };
+				return { id: `f${index + 1}`, path: path.trim().replace(/^\.?\//, ""), line, startLine: null, side: "RIGHT", body: body.trim(), state: "pending", source: "review" };
 			}),
 			savedAt: this.#deps.now(),
 			posted: null,

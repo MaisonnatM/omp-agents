@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import * as proc from "./proc";
-import { attachToPullRequest, savePullRequest, stateSteps } from "./pull-request-edit";
+import { attachToPullRequest, markPullRequestFileViewed, savePullRequest, stateSteps } from "./pull-request-edit";
 
 afterEach(() => mock.restore());
 
@@ -26,6 +26,31 @@ test("a branch update rebases the head read from GitHub, not a stale page", asyn
 	const mutation = calls.mock.calls.find(([argv]) => argv.some(arg => arg.includes("updatePullRequestBranch")))?.[0];
 	expect(mutation?.slice(-6)).toEqual(["-f", "id=PR_7", "-f", "head=latest-head", "-f", "method=REBASE"]);
 	expect({ title: detail.title, behindBy: detail.behindBy }).toEqual({ title: "Feature", behindBy: 0 });
+});
+
+describe("viewed files", () => {
+	test("marks and unmarks a path on the pull request node id through GraphQL, reading nothing back", async () => {
+		const gh = spyOn(proc, "runJson").mockImplementation(async argv => argv.some(arg => /(?:markFileAsViewed|unmarkFileAsViewed)\(/.test(arg))
+			? { data: { changed: { clientMutationId: null } } }
+			: { data: { repository: { pullRequest: { id: "PR_7" } } } });
+		for (const on of [true, false]) {
+			expect(await markPullRequestFileViewed({ owner: "acme", repo: "app", number: 7, path: "src/a file.ts", on })).toBeUndefined();
+		}
+		const mutations = gh.mock.calls.map(([argv]) => argv).filter(argv => argv.some(arg => /(?:markFileAsViewed|unmarkFileAsViewed)\(/.test(arg)));
+		expect(mutations).toHaveLength(2);
+		expect(mutations[0]?.find(arg => arg.startsWith("query="))).toContain("markFileAsViewed(input: { pullRequestId: $id, path: $path })");
+		expect(mutations[1]?.find(arg => arg.startsWith("query="))).toContain("unmarkFileAsViewed(input: { pullRequestId: $id, path: $path })");
+		expect(mutations.map(argv => argv.slice(-4))).toEqual([["-f", "id=PR_7", "-f", "path=src/a file.ts"], ["-f", "id=PR_7", "-f", "path=src/a file.ts"]]);
+		expect(gh.mock.calls).toHaveLength(4);
+	});
+
+	test("throws a refused viewed mutation", async () => {
+		const gh = spyOn(proc, "runJson").mockImplementation(async argv => argv.some(arg => arg.includes("markFileAsViewed("))
+			? { data: { markFileAsViewed: null }, errors: [{ message: "Path does not exist in this pull request" }] }
+			: { data: { repository: { pullRequest: { id: "PR_7" } } } });
+		await expect(markPullRequestFileViewed({ owner: "acme", repo: "app", number: 7, path: "missing.ts", on: true })).rejects.toThrow("Path does not exist");
+		expect(gh.mock.calls).toHaveLength(2);
+	});
 });
 
 describe("stateSteps", () => {

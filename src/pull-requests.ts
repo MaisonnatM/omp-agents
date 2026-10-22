@@ -179,7 +179,7 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 		number title body isDraft state reviewDecision mergeable mergeStateStatus headRefName headRefOid baseRefName createdAt updatedAt mergedAt closedAt additions deletions changedFiles locked
 		labels(first: 20) { nodes { name color } }
 		history: commits(last: 100) { nodes { commit {
-			abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
+			oid abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
 			associatedPullRequests(first: 10) { nodes { number } }
 		} } }
 		${REVIEW_FIELDS}
@@ -293,7 +293,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		if (owners.length > 0 && !owners.includes(pr.number)) return [];
 		const author = isObject(commit.author) ? commit.author : {};
 		const person = parsePerson(author.user) ?? { login: str(author.name) ?? "unknown", avatarUrl: str(author.avatarUrl) ?? null };
-		return [{ sha: str(commit.abbreviatedOid) ?? "", headline: str(commit.messageHeadline) ?? "", author: person, at, additions: num(commit.additions) ?? 0, deletions: num(commit.deletions) ?? 0 }];
+		return [{ oid: str(commit.oid) ?? "", sha: str(commit.abbreviatedOid) ?? "", headline: str(commit.messageHeadline) ?? "", author: person, at, additions: num(commit.additions) ?? 0, deletions: num(commit.deletions) ?? 0 }];
 	});
 	const labels = nodesOf(node.labels).flatMap(label => (isObject(label) && typeof label.name === "string" ? [{ name: label.name, color: str(label.color) ?? "888888" }] : []));
 	return {

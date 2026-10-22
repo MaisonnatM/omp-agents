@@ -1,7 +1,7 @@
 /** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Comments, Timeline, Code, and Review draft tabs. */
 import { ClipboardPen, FileDiff, FileText, History, MessageSquare } from "lucide-react";
 import { useContext, useEffect, useRef, useState } from "react";
-import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
+import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
@@ -136,8 +136,8 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 						<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
 					</div>
 				) : tab === "code" ? (
-					<div className={cn("flex min-h-0 flex-1 flex-col", !page && "pt-3")}>
-						<Code pr={pr} detail={detail} placement={placement} path={path} version={version} />
+					<div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !page && "-mx-4 h-[65vh] flex-none pt-3")}>
+						<Code key={prKey(pr)} pr={pr} detail={detail} placement={placement} path={path} version={version} />
 					</div>
 				) : (
 					<div className={cn("shrink-0", page && "px-6")}>

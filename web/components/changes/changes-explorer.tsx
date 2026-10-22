@@ -1,16 +1,16 @@
 import { ChevronRight } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useMemo } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
 import { fileTree, treeOrder } from "../../changes-model";
-import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { LineCounts } from "../line-counts";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { CodeView } from "./code-view";
-import { DiffStack, type DiffStackHandle } from "./diff-stack";
-import { type FileOpen, FileTree, StatusLetter, statusLabel } from "./file-tree";
+import { DiffStack, useCollapsedFiles } from "./diff-stack";
+import { type FileOpen, FileStepHint, FileTree, StatusLetter, statusLabel } from "./file-tree";
+import { useFileCursor } from "./use-file-cursor";
 
 /** Diff lists every file's changes in one scroll, unchanged runs folded; File shows the open file whole as it is now, its changes marked in the gutter. */
 const MODES = ["diff", "file"] as const;
@@ -58,34 +58,13 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 	});
 	const tree = useMemo(() => fileTree(files), [files]);
 	const order = useMemo(() => treeOrder(tree), [tree]);
-	// The file the explorer marks: the one asked for, then the one at the top of the diffs as you scroll them.
-	const [current, setCurrent] = useState(path);
-	const stack = useRef<DiffStackHandle>(null);
-	useEffect(() => {
-		setCurrent(path);
-		if (path !== null) stack.current?.scrollTo(path);
-	}, [path]);
-	const entry = order.find(file => file.path === current) ?? order[0] ?? null;
-	const open = (next: string): void => {
-		setCurrent(next);
-		stack.current?.scrollTo(next);
-		if (opener.hrefFor && !opener.onPick) location.hash = opener.hrefFor(next);
-		else opener.onPick?.(next);
-	};
-	const step = (by: 1 | -1): boolean => {
-		if (!entry) return false;
-		const next = order[order.indexOf(entry) + by];
-		if (next) open(next.path);
-		return true;
-	};
-	useShortcuts({ nextChangedFile: () => step(1), previousChangedFile: () => step(-1) });
+	const { stack, entry, open, setCurrent } = useFileCursor(order, path, opener);
+	const { collapsed, onCollapse } = useCollapsedFiles();
 
 	return (
 		<div className="relative flex min-h-0 flex-1">
 			<nav aria-label="Changed files" style={{ width: listWidth }} className="flex shrink-0 flex-col border-r border-border">
-				<p className="px-4 pt-3 pb-1 text-xs text-muted-foreground">
-					<kbd>{shortcutLabels("nextChangedFile")[0]}</kbd> and <kbd>{shortcutLabels("previousChangedFile")[0]}</kbd> step through the files
-				</p>
+				<FileStepHint />
 				<div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
 					<FileTree tree={tree} open={entry?.path ?? null} hrefFor={opener.hrefFor} onPick={open} />
 				</div>
@@ -123,7 +102,7 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 						</SizeProvider>
 					</div>
 					{mode === "diff" ? (
-						<DiffStack ref={stack} files={order} fileUrl={fileUrl} version={version} initial={entry.path} onCurrent={setCurrent} />
+						<DiffStack ref={stack} files={order} fileUrl={fileUrl} version={version} initial={entry.path} onCurrent={setCurrent} collapsed={collapsed} onCollapse={onCollapse} />
 					) : (
 						// Keyed by file, so shown removals start closed in the next one.
 						<CodeView key={entry.path} url={fileUrl(entry.path)} version={version} />

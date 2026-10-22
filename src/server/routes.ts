@@ -23,8 +23,8 @@ import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
 import { readStats, windowOf } from "../omp/stats";
 import { directoryOf } from "../paths";
-import { attachToPullRequest, loadPullRequestOptions, savePullRequest } from "../pull-request-edit";
-import { listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
+import { attachToPullRequest, loadPullRequestOptions, markPullRequestFileViewed, savePullRequest } from "../pull-request-edit";
+import { InvalidPullRequestCommit, listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
@@ -53,7 +53,10 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
-import { MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID } from "./wire";
+import {
+	MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
+	parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
+} from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
@@ -655,9 +658,18 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 		body =>
 			checked(
 				parsePullRequestEdit(body),
-				"Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, a review thread to resolve or unresolve, or a reply or comment of at most 65536 characters",
+				"Expected { owner, repo, number, change } with a title, branch update, label, reviewer, state, review thread, reply, or comment",
 			),
 		savePullRequest,
+	);
+
+	/** `PUT /api/pull-request/viewed`: `PullRequestViewedEdit`, one file marked viewed or not on GitHub; answers `{}`. */
+	const pullRequestViewed = write(
+		body => checked(parsePullRequestViewedEdit(body), "Expected { owner, repo, number, path, on }"),
+		async edit => {
+			await markPullRequestFileViewed(edit);
+			return {};
+		},
 	);
 
 	/** `PUT /api/pull-request/attachment`: `PullRequestAttachment`, whose images `gh pr edit --attach` appends to that pull request's description; answers `{}`. */
@@ -679,13 +691,21 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 		return repo instanceof Response ? repo : answer(() => loadPullRequestOptions(repo));
 	});
 
-	/** `GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>`: every file that pull request changes, read from GitHub anew, for its changes page. */
-	const pullRequestFiles = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => listPullRequestChanges(pr)));
+	const codeRefusal = (err: unknown): Response => fail(err instanceof InvalidPullRequestCommit ? 400 : 500, errorText(err));
 
-	/** `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
-	const pullRequestFile = pullRequestGet("Expected ?owner=&repo=&number=&path=", async (pr, params) => {
+	/** `GET /api/pull-request/files`: all changes, or `?commit=<oid>` for one commit of this pull request. */
+	const pullRequestFiles = get(async params => {
+		const pr = checked(parsePullRequestFilesQuery(params), "Expected ?owner=&repo=&number= and optional commit=<full OID>");
+		if (pr instanceof Response) return pr;
+		return listPullRequestChanges(pr, pr.commit).then(changes => Response.json(changes)).catch(codeRefusal);
+	});
+
+	/** `GET /api/pull-request/file`: a listed path's full diff, optionally scoped to `?commit=<oid>`. */
+	const pullRequestFile = get(async params => {
+		const pr = checked(parsePullRequestFilesQuery(params), "Expected ?owner=&repo=&number=&path= and optional commit=<full OID>");
+		if (pr instanceof Response) return pr;
 		const path = params.get("path") ?? "";
-		const file = await readPullRequestFile(pr, path).catch((err: unknown) => fail(500, errorText(err)));
+		const file = await readPullRequestFile(pr, path, pr.commit).catch(codeRefusal);
 		if (file instanceof Response) return file;
 		return file ? Response.json(file) : fail(404, `${prKey(pr)} changes no file ${path}`);
 	});
@@ -710,6 +730,7 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/pull-request/attachment": { PUT: pullRequestAttach },
+		"/api/pull-request/viewed": { PUT: pullRequestViewed },
 		"/api/merge-queue": { PUT: mergeQueue },
 		"/api/review-draft/preview": { GET: reviewDraftPreview },
 		"/api/review-draft/post": { PUT: reviewDraftPost },

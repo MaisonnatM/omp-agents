@@ -59,7 +59,7 @@ function setup(initial: PastSession[]) {
 		},
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 		projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
-		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change) },
+		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change.op === "add-finding" ? { ...change, at: 0 } : change) },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 		comparisons: { msg: () => ({ t: "comparisons", comparisons: [] }) },
@@ -87,6 +87,7 @@ function setup(initial: PastSession[]) {
 		lists,
 		pins,
 		scheduled,
+		reviewDrafts,
 		published,
 		sent,
 		pastPublished,
@@ -224,5 +225,25 @@ describe("registered whole-list broadcasts", () => {
 		]);
 		expect(published.map(msg => (msg.t === "scheduled" ? msg.sends.map(({ id, state }) => [id, state.phase]) : msg.t))).toEqual([[["going", "sending"]]]);
 		expect(scheduled.value.map(({ id, state }) => [id, state.phase])).toEqual([["going", "sending"]]);
+	});
+
+	test("an added finding answers the page once saved, and one on a draft of another head answers why", async () => {
+		const { lists, reviewDrafts, broadcasts, ws } = setup([]);
+		broadcasts.open(ws);
+		const answers: ServerMsg[] = [];
+		const page = { data: { views: new Map(), pageId: "page" }, send: (raw: string) => void answers.push(JSON.parse(raw)) } as unknown as Socket;
+		const ledger = new RequestLedger(createClientHandler({ lists } as SocketEnv), () => {});
+		ledger.open(page);
+		await ledger.handle(page, { t: "resume", frames: [] });
+		const pr = { owner: "o", repo: "r", number: 1 };
+		const finding = { path: "a.ts", line: 2, startLine: null, side: "RIGHT", body: "Mine." } as const;
+
+		await ledger.handle(page, { t: "review-draft", change: { op: "add-finding", pr, head: "a".repeat(40), finding }, ack: 1, floor: 1 });
+		await ledger.handle(page, { t: "review-draft", change: { op: "add-finding", pr, head: "b".repeat(40), finding }, ack: 2, floor: 2 });
+		expect(answers.filter(msg => msg.t === "done")).toEqual([
+			{ t: "done", ack: 1, error: null },
+			{ t: "done", ack: 2, error: "The review draft is on aaaaaaa, not the head bbbbbbb; discard it to start a new one." },
+		]);
+		expect(reviewDrafts.value.drafts.map(draft => draft.findings.map(({ id, body }) => [id, body]))).toEqual([[["f1", "Mine."]]]);
 	});
 });

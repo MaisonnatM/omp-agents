@@ -7,7 +7,7 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useId, useState } from "react";
 import { MAX_COMMENT_BODY, type PullRequest, pullRequestName } from "../../../../src/shared/github";
-import { type FindingState, REVIEW_VERDICTS, type ReviewDraft, type ReviewDraftEdit, type ReviewEvent, type ReviewFinding, type ReviewPreview, type ReviewVerdict } from "../../../../src/shared/review-drafts";
+import { findingLocation, type FindingState, REVIEW_VERDICTS, type ReviewDraft, type ReviewDraftEdit, type ReviewEvent, type ReviewFinding, type ReviewPreview, type ReviewVerdict } from "../../../../src/shared/review-drafts";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -146,7 +146,9 @@ function FindingCard({ pr, finding, locked, onEdit }: { pr: PullRequest; finding
 	return (
 		<li className={cn("rounded-md border border-border", finding.state === "dismissed" && "opacity-60")}>
 			<div className="flex min-h-9 flex-wrap items-center gap-2 border-b border-border px-2 py-1 text-xs text-muted-foreground">
-				<span className="min-w-0 truncate font-mono">{finding.line === null ? finding.path : `${finding.path}:${finding.line}`}</span>
+				<span className="min-w-0 truncate font-mono">
+					{findingLocation(finding)}
+				</span>
 				<span className={cn("shrink-0 rounded-full px-1.5 text-[10px] leading-4 font-medium", look)}>{label}</span>
 				{!locked && !editing && (
 					<span className="ml-auto flex shrink-0 items-center gap-1">
@@ -178,8 +180,8 @@ function FindingCard({ pr, finding, locked, onEdit }: { pr: PullRequest; finding
 				<FindingForm
 					finding={finding}
 					onCancel={() => setEditing(false)}
-					onSave={({ path, line, body }) => {
-						onEdit({ op: "finding", pr, id: finding.id, path, line, body });
+					onSave={change => {
+						onEdit({ op: "finding", pr, id: finding.id, ...change });
 						setEditing(false);
 					}}
 				/>
@@ -191,20 +193,22 @@ function FindingCard({ pr, finding, locked, onEdit }: { pr: PullRequest; finding
 }
 
 /** A finding's file, line, and text, to change and save. */
-function FindingForm({ finding, onSave, onCancel }: { finding: ReviewFinding; onSave: (finding: Pick<ReviewFinding, "path" | "line" | "body">) => void; onCancel: () => void }) {
+function FindingForm({ finding, onSave, onCancel }: { finding: ReviewFinding; onSave: (finding: Pick<ReviewFinding, "path" | "line" | "body" | "startLine" | "side">) => void; onCancel: () => void }) {
 	const id = useId();
 	const [path, setPath] = useState(finding.path);
-	const [line, setLine] = useState(finding.line === null ? "" : String(finding.line));
+	const [line, setLine] = useState(finding.line === null ? "" : finding.startLine === null ? String(finding.line) : `${finding.startLine}-${finding.line}`);
 	const [body, setBody] = useState(finding.body);
-	const lineNumber = line.trim() === "" ? null : Number(line);
-	const lineOk = lineNumber === null || (Number.isSafeInteger(lineNumber) && lineNumber >= 1);
+	const range = line.trim().match(/^(\d+)(?:-(\d+))?$/);
+	const lineNumber = line.trim() === "" ? null : Number(range?.[2] ?? range?.[1]);
+	const startLine = range?.[2] === undefined ? null : Number(range[1]);
+	const lineOk = lineNumber === null || (Number.isSafeInteger(lineNumber) && lineNumber >= 1 && (startLine === null || (Number.isSafeInteger(startLine) && startLine >= 1 && startLine <= lineNumber)));
 	const ready = path.trim() !== "" && body.trim() !== "" && body.length <= MAX_COMMENT_BODY && lineOk;
 	return (
 		<form
 			className="space-y-2 p-2"
 			onSubmit={event => {
 				event.preventDefault();
-				if (ready) onSave({ path: path.trim(), line: lineNumber, body });
+				if (ready) onSave({ path: path.trim(), line: lineNumber, body, startLine, side: finding.side });
 			}}
 		>
 			<div className="flex gap-2">
@@ -213,12 +217,12 @@ function FindingForm({ finding, onSave, onCancel }: { finding: ReviewFinding; on
 				</label>
 				<input id={`${id}-path`} value={path} onChange={event => setPath(event.target.value)} className={cn(FIELD, "min-w-0 flex-1 font-mono text-xs")} />
 				<label htmlFor={`${id}-line`} className="sr-only">
-					Line
+					Line or range
 				</label>
-				<input id={`${id}-line`} value={line} inputMode="numeric" placeholder="Line" onChange={event => setLine(event.target.value)} aria-invalid={!lineOk} className={cn(FIELD, "w-20 font-mono text-xs tabular-nums")} />
+				<input id={`${id}-line`} value={line} inputMode="numeric" placeholder="3-5" onChange={event => setLine(event.target.value)} aria-invalid={!lineOk} aria-describedby={!lineOk ? `${id}-line-error` : undefined} className={cn(FIELD, "w-20 font-mono text-xs tabular-nums")} />
 			</div>
 			<textarea aria-label="Finding" value={body} rows={3} onChange={event => setBody(event.target.value)} className={TEXTAREA} />
-			{!lineOk && <p className={ERROR_TEXT}>The line is a number from 1, or empty for the whole file.</p>}
+			{!lineOk && <p id={`${id}-line-error`} className={ERROR_TEXT}>Enter a line from 1, a range such as 3-5, or leave empty for the whole file.</p>}
 			<div className="flex justify-end gap-2">
 				<Button type="button" variant="ghost" size="compact" onClick={onCancel}>
 					Cancel
@@ -258,7 +262,7 @@ function PreviewBody({ preview: { payload, refusal } }: { preview: ReviewPreview
 					{payload.comments.map((comment, index) => (
 						<li key={index} className="rounded-md border border-border">
 							<p className="border-b border-border px-2 py-1 font-mono text-xs text-muted-foreground">
-								{comment.path}:{comment.line}
+								{findingLocation({ path: comment.path, line: comment.line, startLine: comment.start_line ?? null, side: comment.side })}
 							</p>
 							<Markdown text={comment.body} className="px-3 py-2" />
 						</li>
