@@ -7,7 +7,7 @@ import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { commentCount, openThreads } from "../../../pull-requests-model";
+import { commentCount } from "../../../pull-requests-model";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { actionFacts } from "../../../../src/shared/moves";
 import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../../../routing";
@@ -105,7 +105,6 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const page = placement === "page";
 	const options = usePullRequestOptions(pr);
 	const comments = detail ? commentCount(detail) : 0;
-	const timeline = detail ? detail.conversation.length + openThreads(detail).length : 0;
 	const pendingFindings = draft && !draft.posted ? draft.findings.filter(finding => finding.state === "pending").length : 0;
 	const [root, setRoot] = useState<HTMLDivElement | null>(null);
 	const foldRef = useRef<HTMLDivElement>(null);
@@ -120,7 +119,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 						{([
 							{ value: "summary", label: "Summary", Icon: FileText, name: "Summary" },
 							{ value: "comments", label: "Comments", Icon: MessageSquare, name: `Comments, ${comments} comments` },
-							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${timeline} comments and review threads` },
+							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${comments} comments` },
 							{ value: "code", label: "Code", Icon: FileDiff, name: "Code" },
 							...(draft ? [{ value: "review", label: "Review draft", Icon: ClipboardPen, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}` }] : []),
 						]).map(({ value, label, Icon, name }) => (
@@ -157,7 +156,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 							) : tab === "comments" ? (
 								<Comments detail={detail} save={save} send={send} />
 							) : tab === "timeline" ? (
-								<Timeline detail={detail} />
+								<Timeline detail={detail} placement={placement} />
 							) : (
 								draft && <ReviewDraftPanel draft={draft} headOid={detail.headOid} />
 							)}

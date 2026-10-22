@@ -320,6 +320,107 @@ describe("parseDetailAnswer", () => {
 		},
 	});
 
+	test("keeps merge and close times separately, without replacing the last update", () => {
+		const detail = parseDetailAnswer(answer({
+			state: "MERGED",
+			mergedAt: "2026-09-30T12:00:00Z",
+			closedAt: "2026-09-30T12:00:00Z",
+			updatedAt: "2026-09-30T12:05:00Z",
+		}), pr);
+		expect({ state: detail.state, mergedAt: detail.mergedAt, closedAt: detail.closedAt, updatedAt: detail.updatedAt }).toEqual({
+			state: "merged",
+			mergedAt: 1790769600000,
+			closedAt: 1790769600000,
+			updatedAt: 1790769900000,
+		});
+		const closed = parseDetailAnswer(answer({ state: "CLOSED", mergedAt: null, closedAt: "2026-09-30T11:00:00Z" }), pr);
+		expect({ state: closed.state, mergedAt: closed.mergedAt, closedAt: closed.closedAt }).toEqual({ state: "closed", mergedAt: null, closedAt: 1790766000000 });
+	});
+
+	test("returns null for absent, null, non-string, and invalid lifecycle times", () => {
+		for (const fields of [{}, { mergedAt: null, closedAt: null }, { mergedAt: "not a date", closedAt: "" }, { mergedAt: 1790769600000, closedAt: false }]) {
+			const detail = parseDetailAnswer(answer(fields), pr);
+			expect({ mergedAt: detail.mergedAt, closedAt: detail.closedAt }).toEqual({ mergedAt: null, closedAt: null });
+		}
+	});
+
+	test("keeps nonempty reactions of GitHub's known contents on comments, reviews, and thread replies with viewer participation", () => {
+		const detail = parseDetailAnswer(answer({
+			comments: { nodes: [{
+				author: teammate, body: "Thanks", createdAt: "2026-09-30T09:00:00Z", url: "https://github.example/c1",
+				reactionGroups: [
+					{ content: "THUMBS_UP", viewerHasReacted: true, users: { totalCount: 3 } },
+					{ content: "HEART", viewerHasReacted: false, users: { totalCount: 2 } },
+					{ content: "EYES", viewerHasReacted: false, users: { totalCount: 0 } },
+					{ content: "ROCKET", viewerHasReacted: false, users: {} },
+					{ content: "SPARKLES", viewerHasReacted: true, users: { totalCount: 5 } },
+					null,
+					{ users: { totalCount: 1 } },
+				],
+			}] },
+			reviews: { nodes: [{
+				state: "APPROVED", author: teammate, body: "", submittedAt: "2026-09-30T10:00:00Z", url: null,
+				reactionGroups: [{ content: "HOORAY", viewerHasReacted: false, users: { totalCount: 1 } }],
+			}] },
+			reviewThreads: { nodes: [{
+				id: "PRRT_reactions", path: "a.ts", line: 2, isResolved: false,
+				comments: { nodes: [
+					{ author: me, body: "Fixed", createdAt: "2026-09-30T11:00:00Z", url: null, reactionGroups: [{ content: "ROCKET", viewerHasReacted: true, users: { totalCount: 4 } }] },
+					{ author: teammate, body: "Looks good", createdAt: "2026-09-30T12:00:00Z", url: null },
+				] },
+			}] },
+		}), pr);
+		expect(detail.conversation).toEqual([
+			{
+				author: { login: "teammate", avatarUrl: null }, body: "Thanks", at: 1790758800000, url: "https://github.example/c1", review: null,
+				reactions: [{ content: "THUMBS_UP", count: 3, viewerHasReacted: true }, { content: "HEART", count: 2, viewerHasReacted: false }],
+			},
+			{
+				author: { login: "teammate", avatarUrl: null }, body: "", at: 1790762400000, url: null, review: "approved",
+				reactions: [{ content: "HOORAY", count: 1, viewerHasReacted: false }],
+			},
+		]);
+		expect(detail.threads[0]?.comments).toEqual([
+			{ author: { login: "me", avatarUrl: "https://avatars.example/me" }, body: "Fixed", at: 1790766000000, url: null, reactions: [{ content: "ROCKET", count: 4, viewerHasReacted: true }] },
+			{ author: { login: "teammate", avatarUrl: null }, body: "Looks good", at: 1790769600000, url: null, reactions: [] },
+		]);
+	});
+
+	test("reads dismissal from the review of the oldest comment it keeps, the thread's root, and keeps the full reply count", () => {
+		const detail = parseDetailAnswer(answer({
+			reviewThreads: { nodes: [
+				{
+					id: "PRRT_dropped_root", path: "a.ts", line: null, isResolved: true, isOutdated: true,
+					comments: { totalCount: 24, nodes: [
+						{ createdAt: "invalid", pullRequestReview: { state: "DISMISSED" } },
+						{ author: teammate, body: "Reply", createdAt: "2026-09-30T09:00:00Z", pullRequestReview: { state: "APPROVED" } },
+					] },
+				},
+				{
+					id: "PRRT_dismissed", path: "b.ts", line: 2, isResolved: false, isOutdated: false,
+					comments: { nodes: [
+						{ author: me, body: "Reply", createdAt: "2026-09-30T11:00:00Z", pullRequestReview: { state: "APPROVED" } },
+						{ author: teammate, body: "Root", createdAt: "2026-09-30T10:00:00Z", pullRequestReview: { state: "DISMISSED" } },
+					] },
+				},
+				{
+					id: "PRRT_current", path: "c.ts", line: 3, isResolved: false,
+					comments: { nodes: [
+						{ author: teammate, body: "Current", createdAt: "2026-09-30T10:00:00Z", pullRequestReview: { state: "CHANGES_REQUESTED" } },
+						{ author: me, body: "Reply", createdAt: "2026-09-30T11:00:00Z", pullRequestReview: { state: "DISMISSED" } },
+					] },
+				},
+				{ id: "PRRT_empty", path: "d.ts", line: 4, isResolved: false, comments: { nodes: [] } },
+			] },
+		}), pr);
+		expect(detail.threads.map(({ id, outdated, dismissed, commentCount, comments }) => ({ id, outdated, dismissed, commentCount, bodies: comments.map(comment => comment.body) }))).toEqual([
+			{ id: "PRRT_dropped_root", outdated: true, dismissed: false, commentCount: 24, bodies: ["Reply"] },
+			{ id: "PRRT_dismissed", outdated: false, dismissed: true, commentCount: 2, bodies: ["Root", "Reply"] },
+			{ id: "PRRT_current", outdated: false, dismissed: false, commentCount: 2, bodies: ["Current", "Reply"] },
+			{ id: "PRRT_empty", outdated: false, dismissed: false, commentCount: 0, bodies: [] },
+		]);
+	});
+
 	test("lists failing checks first, an unfinished run as pending, and a commit status by its context, beside GitHub's rollup", () => {
 		const { checkRuns, checks, unresolved } = parseDetailAnswer(
 			answer({
@@ -397,14 +498,17 @@ describe("parseDetailAnswer", () => {
 			["approved", ""],
 		]);
 		expect(detail.threads).toEqual([
-			{ id: "PRRT_a", path: "a.ts", line: 1, resolved: true, can: { reply: true, resolve: false, unresolve: true }, comments: [] },
+			{ id: "PRRT_a", path: "a.ts", line: 1, resolved: true, outdated: false, dismissed: false, can: { reply: true, resolve: false, unresolve: true }, commentCount: 0, comments: [] },
 			{
 				id: "PRRT_b",
 				path: "b.ts",
 				line: null,
 				resolved: false,
+				outdated: false,
+				dismissed: false,
 				can: { reply: false, resolve: false, unresolve: true },
-				comments: [{ author: { login: "ghost", avatarUrl: null }, body: "Gone line", at: Date.parse("2026-09-30T09:00:00Z"), url: null }],
+				commentCount: 1,
+				comments: [{ author: { login: "ghost", avatarUrl: null }, body: "Gone line", at: 1790758800000, url: null, reactions: [] }],
 			},
 		]);
 	});

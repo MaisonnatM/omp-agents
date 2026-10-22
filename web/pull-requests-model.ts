@@ -338,9 +338,9 @@ export const openThreads = ({ threads }: Pick<PullRequestDetail, "threads">): Pu
 /** The comments and reviews of the conversation that have words, which **Comments** lists. */
 export const spokenConversation = ({ conversation }: Pick<PullRequestDetail, "conversation">): PullRequestDetail["conversation"] => conversation.filter(event => event.body.trim() !== "");
 
-/** The comments **Comments** lists: every review thread's, resolved or not, and the conversation's with words. */
+/** The pull request's comments, which **Comments**, **Timeline**, and its header count: every review thread's, resolved or not and beyond the first 20 loaded, and the conversation's with words. */
 export const commentCount = (detail: Pick<PullRequestDetail, "threads" | "conversation">): number =>
-	detail.threads.reduce((sum, thread) => sum + thread.comments.length, 0) + spokenConversation(detail).length;
+	detail.threads.reduce((sum, thread) => sum + thread.commentCount, 0) + spokenConversation(detail).length;
 
 /** What the details show once thread `id` is `resolved`: its threads and their unresolved count together, so every count agrees while GitHub answers. */
 export function withThreadResolved(detail: PullRequestDetail, id: string, resolved: boolean): Pick<PullRequestDetail, "threads" | "unresolved"> {

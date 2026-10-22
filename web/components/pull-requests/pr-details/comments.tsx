@@ -10,7 +10,7 @@ import { chordLabel } from "../../../shortcuts";
 import { FoldButton } from "../../fold";
 import { ERROR_TEXT, isSubmitChord, type Submit } from "../../form-dialog";
 import { DetailSection, Markdown } from "../../sheet-details";
-import { EventBody, Message, ThreadPlace } from "../pr-timeline";
+import { EventBody, Message, ThreadPlace } from "./message";
 import type { SavePullRequest, SendPullRequest } from "../pr-fields";
 
 /** A text box that sends its draft with its button or Cmd+Enter, and keeps the draft, with the reason, when GitHub refuses it. */

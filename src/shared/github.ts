@@ -211,6 +211,17 @@ export interface PullRequestChanges {
 	files: ChangedEntry[];
 }
 
+/** GitHub's `ReactionContent` values. */
+export const REACTION_CONTENTS = ["THUMBS_UP", "THUMBS_DOWN", "LAUGH", "HOORAY", "CONFUSED", "HEART", "ROCKET", "EYES"] as const;
+export type ReactionContent = (typeof REACTION_CONTENTS)[number];
+
+/** A nonempty reaction group on a comment or review. */
+export interface PullRequestReaction {
+	content: ReactionContent;
+	count: number;
+	viewerHasReacted: boolean;
+}
+
 export interface PullRequestComment {
 	author: Person;
 	/** Markdown, as written on GitHub. */
@@ -218,6 +229,7 @@ export interface PullRequestComment {
 	/** When it was posted, in ms since the epoch. */
 	at: number;
 	url: string | null;
+	reactions: PullRequestReaction[];
 }
 
 /** A comment on the pull request, or a submitted review, which may carry no text when it only approves or asks for changes. */
@@ -233,8 +245,14 @@ export interface PullRequestThread {
 	path: string;
 	line: number | null;
 	resolved: boolean;
+	outdated: boolean;
+	/** Whether the review of its root, its oldest comment, was dismissed. */
+	dismissed: boolean;
 	/** Whether GitHub lets you reply to it, resolve it, and unresolve it, so the button a resolve or unresolve shows at once stays right. */
 	can: { reply: boolean; resolve: boolean; unresolve: boolean };
+	/** All comments, including replies beyond the first 20 loaded in `comments`. */
+	commentCount: number;
+	/** Oldest first. */
 	comments: PullRequestComment[];
 }
 
@@ -293,6 +311,9 @@ export interface PullRequestDetail extends PullRequest {
 	/** In ms since the epoch. */
 	createdAt: number;
 	updatedAt: number;
+	/** When it merged or closed, in ms since the epoch; null when GitHub reports no valid time. */
+	mergedAt: number | null;
+	closedAt: number | null;
 	labels: PullRequestLabel[];
 	/** Its own commits among the branch's latest 100, oldest first: none that GitHub links only to other pull requests. */
 	commits: PullRequestCommit[];
