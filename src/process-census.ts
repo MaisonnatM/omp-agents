@@ -2,37 +2,92 @@
  * The processes one root process started, which a session keeper (`src/keeper.ts`) stops with omp. omp's background
  * jobs, kernels, and subagents lead process groups or sessions of their own and are reparented once omp exits, so only
  * a note taken while omp is still their parent finds them; a process omp started since the last note escapes.
+ * The server's session process list (`src/server/session-processes.ts`) reads the same table, so this stays a leaf the keeper bundle loads.
  */
 
-/** Every process by pid, with its parent and start time. */
-type ProcessTable = Map<number, { ppid: number; started: string }>;
+/** One process as `ps` lists it. */
+export interface ProcessRow {
+	pid: number;
+	ppid: number;
+	pgid: number;
+	/** `ps`'s `lstart` in the C locale, such as `Thu Oct 23 11:21:58 2026`; with the pid it names the process. */
+	started: string;
+	/** Resident memory in KiB. */
+	rssKb: number;
+	/** The command line, as `ps` prints it. */
+	command: string;
+}
+
+/** Every process by pid. */
+export type ProcessTable = Map<number, ProcessRow>;
 
 /** Processes by pid, each with its start time, which tells it from a later process that reuses the pid. */
-type Processes = Map<number, string>;
+export type Processes = Map<number, string>;
 
-/** Every process now; `null` when `ps` failed. */
-function processTable(): ProcessTable | null {
-	const ps = Bun.spawnSync(["ps", "-A", "-o", "pid=,ppid=,lstart="]);
-	if (!ps.success) return null;
+/** `ps` with the columns {@link parsePs} reads, and the locale that keeps `lstart` in English for `Date.parse`. */
+export const PS_ARGV = ["ps", "-A", "-o", "pid=,ppid=,pgid=,rss=,lstart=,args="];
+export const PS_ENV = { LC_ALL: "C" };
+
+/**
+ * omp's shared workers run a command with this prefix (omp's `cli/worker-selectors.ts`). omp spawns each detached under
+ * whichever omp first needs it, and every other omp on the computer uses it after, so it is never that session's to stop.
+ */
+export const OMP_WORKER_PREFIX = "__omp_worker_";
+
+const PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s?(.*)$/;
+
+/** The table `ps` printed with {@link PS_ARGV}; a line it cannot read is skipped. */
+export function parsePs(text: string): ProcessTable {
 	const table: ProcessTable = new Map();
-	for (const line of ps.stdout.toString().split("\n")) {
-		const [pid, ppid, ...started] = line.trim().split(/\s+/);
-		if (pid && ppid && started.length > 0) table.set(Number(pid), { ppid: Number(ppid), started: started.join(" ") });
+	for (const line of text.split("\n")) {
+		const match = PS_LINE.exec(line);
+		if (!match) continue;
+		const [, pid, ppid, pgid, rss, started, command] = match;
+		table.set(Number(pid), { pid: Number(pid), ppid: Number(ppid), pgid: Number(pgid), started: started.split(/\s+/).join(" "), rssKb: Number(rss), command: command.trim() });
 	}
 	return table;
 }
 
-/** The processes under `root` in `table`, without `root`. */
-function descendants(table: ProcessTable, root: number): Processes {
+/** Every process now; `null` when `ps` failed. */
+function processTable(): ProcessTable | null {
+	const ps = Bun.spawnSync(PS_ARGV, { env: { ...process.env, ...PS_ENV } });
+	return ps.success ? parsePs(ps.stdout.toString()) : null;
+}
+
+/** The processes under `root` in `table`, without `root`, and without omp's shared workers and what they started. */
+export function descendants(table: ProcessTable, root: number): Processes {
 	const children = new Map<number, number[]>();
-	for (const [pid, { ppid }] of table) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+	for (const { pid, ppid } of table.values()) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
 	const found: Processes = new Map();
 	const queue = [...(children.get(root) ?? [])];
 	for (let pid = queue.shift(); pid !== undefined; pid = queue.shift()) {
-		found.set(pid, table.get(pid)?.started ?? "");
+		const row = table.get(pid);
+		if (!row || row.command.includes(OMP_WORKER_PREFIX)) continue;
+		found.set(pid, row.started);
 		queue.push(...(children.get(pid) ?? []));
 	}
 	return found;
+}
+
+/** A session's processes: omp with what shares its process group, its MCP servers, and each other process group under it, a job. */
+export interface SessionGroups {
+	omp: ProcessRow[];
+	/** Each job's processes, by process group id. */
+	jobs: Map<number, ProcessRow[]>;
+}
+
+/** The process groups under `root`, as {@link SessionGroups}; `null` when `table` does not list `root`. */
+export function sessionGroups(table: ProcessTable, root: number): SessionGroups | null {
+	const omp = table.get(root);
+	if (!omp) return null;
+	const groups: SessionGroups = { omp: [omp], jobs: new Map() };
+	for (const pid of descendants(table, root).keys()) {
+		const row = table.get(pid);
+		if (!row) continue;
+		if (row.pgid === omp.pgid) groups.omp.push(row);
+		else groups.jobs.set(row.pgid, [...(groups.jobs.get(row.pgid) ?? []), row]);
+	}
+	return groups;
 }
 
 /** Sends `name` to `pid`, which may be gone already. */
@@ -53,15 +108,16 @@ function forgetGone(processes: Processes, table: ProcessTable | null): boolean {
 
 /**
  * Stops `processes`: SIGTERM, then SIGKILL after `graceMs` to those `ps` still lists under the start time they had, so
- * a pid that a later process reuses is never signalled. Settles once none runs, or at the grace's end.
+ * a pid that a later process reuses is never signalled. Settles once none runs, or at the grace's end. `read` lists the
+ * processes; the server passes one that runs `ps` without blocking.
  */
-async function terminate(processes: Processes, graceMs: number): Promise<void> {
-	let listed = forgetGone(processes, processTable());
+export async function terminate(processes: Processes, graceMs: number, read: () => ProcessTable | null | Promise<ProcessTable | null> = processTable): Promise<void> {
+	let listed = forgetGone(processes, await read());
 	for (const pid of processes.keys()) signal(pid, "SIGTERM");
 	const deadline = Date.now() + graceMs;
 	while ((processes.size > 0 || !listed) && Date.now() < deadline) {
 		await Bun.sleep(50);
-		listed = forgetGone(processes, processTable());
+		listed = forgetGone(processes, await read());
 	}
 	for (const pid of processes.keys()) signal(pid, "SIGKILL");
 	if (!listed) console.error(`omp-agents: ps failed, so these processes may still run: ${[...processes.keys()].join(" ")}`);

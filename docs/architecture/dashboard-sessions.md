@@ -122,5 +122,7 @@ Attaching to a keeper that greeted never stops omp: a session file without a rea
 omp exiting on its own ends the same way, except that its processes are no longer under it, so the keeper stops the ones it noted before.
 omp's background jobs, kernels and subagents lead process groups or sessions of their own and are reparented once omp exits, so the keeper's `ProcessCensus` (`src/process-census.ts`) notes the processes under omp with `ps` a second after a tool call ends, since an async call starts its job just after it returns, and every 10 seconds, each with its start time so that a reused pid is never signalled.
 A process omp started since the last note escapes an omp that exits on its own.
+The census leaves alone every process whose command holds omp's `__omp_worker_` prefix, and everything under it, as `stopTree` does: omp starts its shared workers, such as a project's daemon broker or the LSP multiplexer, as children of whichever omp first needs them, and they serve every omp of the project or the machine, so stopping them with the session whose omp happened to start them would end every other session's services and shared browser.
+The services a session's broker runs for it are stopped by the server instead, once the session leaves the roster; see [Session processes](session-processes.md).
 A `ps` that fails is logged with the pids that may still run, rather than read as nothing left.
 A keeper exits whenever omp does, and omp exits when its keeper dies, since its stdin closes, and stops its own background jobs as it exits.
