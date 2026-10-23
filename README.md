@@ -209,7 +209,7 @@ flowchart LR
 - **Dashboard sessions** are omp child processes in RPC mode (`--mode rpc-ui`), spawned through omp's own `RpcClient`.
 
 The server imports these protocols from your installed omp instead of reimplementing them.
-Joining a terminal session makes it count `omp-agents` as one more participant and send its transcript snapshot and live events through its Collab relay (`collab.relayUrl`); see [why](docs/architecture.md#why-the-server-joins-every-terminal-session).
+Joining a terminal session makes it count `omp-agents` as one more participant and send its transcript snapshot and live events through its Collab relay (`collab.relayUrl`); see [why](docs/architecture/terminal-sessions.md#why-the-server-joins-every-terminal-session).
 
 See [docs/architecture.md](docs/architecture.md) for the design and the HTTP API, and [docs/code-layout.md](docs/code-layout.md) for where each file lives.
 

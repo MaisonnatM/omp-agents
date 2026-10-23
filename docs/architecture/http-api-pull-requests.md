@@ -1,0 +1,66 @@
+# HTTP API: pull requests
+
+`GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub or Graphite PR link.
+It reads only the title through `gh api graphql`, using the same validated pull request query as the details routes, and keeps each answer for 30 seconds, sharing in-flight reads.
+The page's existing `useRead` drops answers for a previous link and aborts the read when the link unmounts; explicit Markdown labels do not request a title.
+`GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers `PullRequestChanges`: title and branches from REST, the files from the paginated REST files endpoint, and each file's `viewerViewedState` from paginated GraphQL.
+Files are ordered by source dependencies, tests in source order, and generated files last.
+The optional `commit=<full oid>` scopes both `/files` and `/file` to a commit belonging to that pull request, with a separate cache entry and the blobs from that commit.
+Each list call reads GitHub again and keeps patches and blob ids for following file reads for 30 seconds.
+`GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>` answers one file of that list in full, `ChangedFileText`, and 404 for a path the list does not hold.
+GitHub's patch keeps three unchanged lines around each change, so `patchRows` in `src/shared/changes.ts` fills the lines before, between, and after its hunks from the file's text at the head, which one `gh api graphql` call reads by the blob id the list names.
+Both file readers answer through `fileText(path, rows, note)` in `src/shared/changes.ts`, so a file's rows and the note on why it has none take one shape.
+A removed file's patch holds every line, so it reads no blob; a file GitHub sends no patch for, a binary file, and one over `MAX_CHANGED_FILE_BYTES` answer a note.
+`GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>` answers the pull requests of the header's **N/M** stack menu, `StackedPullRequest[]` top first, from one `gh api graphql --paginate --slurp` read of the repository's open pull requests, forks left out, which it keeps for 30 seconds.
+`stackOf` in `src/pull-request-stack.ts` follows the base branches down from the pull request and the pull requests based on its branch up, so the stack holds those that the Pull requests page does not list.
+`GET /api/pull-request/options?owner=<o>&repo=<r>` answers `PullRequestOptions` for the pickers of a pull request's **Summary**: the repository's labels and the people its issues can be assigned to, whom a review can be asked of, each from `gh api --paginate --slurp` and sorted by name, kept five minutes per repository.
+`PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
+A `title` change carries a nonblank title of at most 256 characters and patches `repos/<owner>/<repo>/pulls/<number>`.
+A `body` change patches the same REST resource with the description as a literal `-f body=…` field, preserving whitespace and allowing an empty description, up to `MAX_PULL_REQUEST_BODY` (65536 characters).
+Comment and review authors carry `isBot` from GitHub's `__typename` `Bot`, which the **Bot comments** filter reads along with a `[bot]` login suffix, since some GitHub Apps comment under a login without one.
+An `update` change selects `merge` or `rebase` and calls `GITHUB_MERGES.update` with the node id and head read fresh from GitHub.
+`PUT /api/pull-request/viewed` takes a `PullRequestViewedEdit`, a pull request with `{ path, on }`, reads the pull request node id, calls `markFileAsViewed` or `unmarkFileAsViewed` through GraphQL, and answers `{}`, since the **Code** tab keeps its own viewed states.
+The queue uses the same update function with the merge method.
+`PUT /api/pull-request/checkout` takes a `PullRequestCheckout` from `src/shared/github.ts`, a pull request with `{ cwd, place, skill }`, checked by `parsePullRequestCheckout`, and answers 404 when `cwd` is not a directory.
+`checkOutPullRequest` in `src/pull-request-checkout.ts` refuses a `cwd` whose `origin` is another repository, reads the head branch and commit from REST, and answers a `CheckedOutPullRequest`: its `place`, the branch, whether it is at that commit, and at `worktree` the `instanceId` of the session it started; any refusal answers 409 with why.
+Place `here` refuses uncommitted changes to tracked files and runs `gh pr checkout <number> -R <owner>/<repo>` in `cwd`.
+Place `worktree` fetches `refs/pull/<number>/head` without tags or forcing into the head branch's name, or `pr-<number>/<name>` for a fork; a non-fast-forward rejection is explained as a local branch with commits of its own.
+It gives a branch from the same repository the upstream `origin/<name>`, unless a linked worktree already has the branch, which it reuses as it is.
+It refuses the branch while the main checkout has it, then starts a `new` session through the same start a socket `start` runs, with `branch: { kind: "existing" }`, the pinned `skill`, a prompt asking for a summary, and the pull request as its subject, so `checkoutDir` reuses or adds the worktree.
+Each open pull request detail adds one REST comparison of its base against its head commit.
+`behindBy` is the comparison's `behind_by` count, or `null` for an unavailable comparison or a finished pull request.
+A merge is no change of its own: it goes through `PUT /api/merge-queue`, whose `MergeQueue` runs GraphQL's `mergePullRequest` with `expectedHeadOid` the commit the confirmation showed, so GitHub refuses the merge once the branch moved past it.
+The pull request's answer carries that commit as `headOid` and the methods its repository allows as `mergeMethods`.
+A `thread` change, `{ id, resolved }`, runs GraphQL's `resolveReviewThread` or `unresolveReviewThread` on the review thread with that node id, which `parsePullRequestEdit` takes only as letters, digits, `_`, `-`, and the `=` an older base64 id ends with, at most 100.
+A `reply` change, `{ thread, body }`, runs `addPullRequestReviewThreadReply` on that thread.
+A `comment` change, `{ body }`, posts to REST's `repos/<o>/<r>/issues/<n>/comments`, the pull request's number naming it, with the body as a `-f` field, which `gh` sends as written, never as a number, a file, or a placeholder.
+A reply's or comment's body is not blank and at most 65536 characters, GitHub's limit.
+The pull request's answer lists every review thread among the first 100, resolved ones too, each with its node id and whether the viewer may reply, resolve, and unresolve it, from `viewerCanReply`, `viewerCanResolve`, and `viewerCanUnresolve`, so the button a resolve or unresolve shows at once stays right.
+The same detail GraphQL request reads `mergedAt`, `closedAt`, comment and review `reactionGroups`, each thread's `isOutdated`, its total comment count, and its root comment's review state for dismissal.
+Each thread still loads its first 20 comments, with the total count letting the Timeline link to replies beyond that limit on GitHub.
+Reaction groups carry their content, user count, and viewer participation for read-only display; lifecycle times remain separate from `updatedAt`.
+The Timeline adds no activity request and does not invent draft, ready, reopen, force-push, or base-change history from the pull request's current state.
+Its `unresolved` counts the open threads among those it lists, with `exact` false when GitHub has more than it listed, so the details' counts agree with their threads.
+GitHub's GraphQL has no `viewerCanComment` on a pull request, so its `canComment` is true unless the repository is archived, or the conversation is locked and the viewer's `viewerPermission` is below `WRITE`, as GitHub lets only people who can write comment on a locked conversation.
+Its `byViewer` is `viewerDidAuthor`, since GitHub refuses an approval or a change request from the pull request's author.
+A `review` change posts `{ event, body }` to `pulls/<n>/reviews`, leaving out a blank body; `canSubmitReview` in `src/shared/review-drafts.ts` decides whether one may post, for the composer and the server alike.
+Every mutation goes through `ghMutation` in `src/github.ts`, which throws GitHub's errors even when its answer carries `data`, since a refused mutation answers its field as `null` beside them.
+`PUT /api/pull-request` answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
+One change goes per call, so two changes made at once each keep the other.
+The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
+Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.
+
+`GET /api/github-media?url=<HTTPS URL>` reads GitHub images and videos through `src/github-media.ts`.
+The allowlist is `github.com/user-attachments/`, `private-user-images.githubusercontent.com`, `user-images.githubusercontent.com`, and `camo.githubusercontent.com`; credentials, alternate ports, and every other host or scheme are rejected.
+`githubMediaUrl` in `src/shared/github.ts` holds it, and the page loads every such image or video written on GitHub through this route, so the page's CSP allows only GitHub's avatars directly.
+It reads `gh auth token --hostname github.com` only for a `github.com` hop, at most once a minute, checks each of at most five redirects before fetching it, and never sends that token to a CDN.
+Only image and video content types pass, up to 20 MiB streamed under one 15-second deadline, with a five-minute private cache bounded to 32 entries and 40 MiB.
+Upstream cookies and headers do not pass through; responses have `nosniff` and a sandbox CSP.
+A `github.com` upload may redirect once into GitHub's signed upload bucket, `github-production-user-asset-6210df.s3.amazonaws.com`, which gets no token and which no other hop or request may reach.
+
+`PUT /api/merge-queue` takes a `MergeQueueChange` from `src/shared/merge-queue.ts`, checked by `parseMergeQueueChange` in `src/server/wire.ts`: `{ op: "add", method, prs }`, one to `MAX_QUEUED_STACK` (20) pull requests in any order, each with the head commit the confirmation showed or `null`, or `{ op: "cancel", id }`.
+It answers a `MergeQueueAnswer`, the queued merges after it, which every socket also hears as a `merges` message, and the pull requests it merged on the way, which `writeMergeQueue` in `web/reads.ts` marks merged in the list at once; a refusal, such as a branch that moved or a pull request already queued, is a 409 with the reason.
+The details' answer carries GitHub's `mergeStateStatus` as `mergeState`, which `mergesNow` in `src/shared/github.ts` reads to word the confirmation as a merge now or once it is ready.
+
+`GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>` answers a `ReviewPreview` from `src/shared/review-drafts.ts`: the `payload` posting would send, the pull request's `head` now, and the `refusal`, or `null`; see [Review drafts](review-drafts.md).
+`PUT /api/review-draft/post` takes `{ owner, repo, number }`, and optionally the composer's `submit: { verdict, summary }`, which the server checks the post against and writes into the draft, accepting its pending findings, once the post is not refused, so a refusal leaves the draft as it was; it posts that pull request's draft as one review, and answers the draft marked posted, which every socket also hears; a refusal, or GitHub's own, is a 409 with the reason.

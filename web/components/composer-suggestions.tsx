@@ -165,9 +165,9 @@ interface Suggestions {
 }
 
 /**
- * Suggested prompts, listed under the composer's action bar while the draft is empty; docs/usage.md describes the keys and
- * clicks. Marks join every send or fill, in list order; Esc, a send, a fill, and the list closing clear them. Focus stays
- * in the text field.
+ * Suggested prompts, listed under the composer's action bar while the draft is empty; docs/usage/composer.md describes the
+ * keys and clicks. Marks join every send or fill, in list order; Esc, a send, a fill, and the list closing clear them.
+ * Focus stays in the text field.
  */
 export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOptions): Suggestions {
 	const open = prompts.length > 0 && draft === "";

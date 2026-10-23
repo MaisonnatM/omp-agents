@@ -1,0 +1,36 @@
+# HTTP API: source control, sync, worktrees, and workspaces
+
+`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
+`gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.
+`PUT /api/source-control` takes a `SourceControlChange`, `{ op: "default", on }`, `{ op: "repo", repo, on }` with `on: null` dropping a repository's own choice, or `{ op: "clean-up", on }`, checked by `parseSourceControlChange` in `src/server/wire.ts`, and answers the same as the `GET`.
+A change that changes the settings saves `source-control.json` beside the access token and, for a change of the pulls on the server that holds the owner lock, pulls at once; a file from before `cleanUp` reads with it on.
+A pull, from that change or from the pull loop every five minutes, waits for the one under way, then runs `pullDefaultBranch` on each repository whose pulls are on.
+It reads the default branch from `origin/HEAD`, fetches it, and moves the local branch only when it is behind `origin`'s with no commits of its own: through `merge --ff-only` in the worktree that has it checked out, skipped when that worktree has changes to tracked files, else through `update-ref`.
+
+`GET /api/sync` answers a `SyncAnswer` from `src/shared/settings-sync.ts`: the `SyncSettings`, `{ remote, branch, excluded }`, and the last `SyncOutcome` or `null`.
+`PUT /api/sync` takes `SyncSettings`, checked by `parseSyncSettings`, which refuses an address that starts with `-`, holds whitespace, or carries a password, a branch name Git would refuse, and an unknown item, and answers the same as the `GET`.
+`PUT /api/sync/run` takes `{ choices }`, each conflicting path mapped to `local` or `remote`, checked by `parseSyncRun` in `src/server/wire.ts`, runs one sync, and answers the same as the `GET`, with a conflict or a failure as the last outcome rather than an error status.
+
+`GET /api/worktrees` lists the worktrees of every repository a session ran in, or of `?cwd=` when that directory is in a repository.
+Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, why removal is refused, and `merged`: `{ by: "pull-request", number }`, `{ by: "default-branch", branch }`, or `null`.
+A linked checkout is merged when `origin`'s default branch contains its commit, or when its branch's newest pull request merged no earlier than the branch's last commit; the pull requests come from one `gh api graphql` call per repository, and a failed call becomes an entry in `errors`.
+`GET /api/worktrees/metrics?repository=&path=` reads approximate allocated disk use, the last commit time, and the modified and untracked counts for one registered checkout.
+`PUT /api/worktrees/removal` previews a removal or performs one whose confirmation still matches that preview, up to `MAX_WORKTREE_BATCH` (100) worktrees per request.
+A preview with `merged: true`, which **Remove merged** sends, adds the `unmerged` blocker to every target the same check cannot show merged, so the page removes only the merged ones nothing else blocks.
+Removal uses `git worktree remove` without `--force`, so Git keeps the branch and still refuses a dirty or locked checkout.
+The preview reads the status with executable-mode detection forced on, and refuses a checkout whose index hides changes with assume-unchanged or skip-worktree flags.
+A missing directory is removed the same way, which drops only that registration.
+A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
+Starts that create no worktree, such as a resume or a routine's session, stay parallel and wait only while a removal runs.
+
+`PUT /api/worktree/release` takes `{ cwd, branch }`, an absolute directory in a repository and a branch name, checked by `parseBranchRelease` in `src/server/wire.ts`, and answers 404 when `cwd` is not a directory.
+`Worktrees.releaseBranch` lists the repository's worktrees, picks the linked one that has `branch` checked out, never the main, a bare, or a prunable registration, and removes it through `removeCheckout` without waiting for a session to leave.
+It answers a `BranchRelease` from `src/shared/git.ts`: `{ kind: "none" }` when no linked worktree has the branch, `{ kind: "removed", path }`, or `{ kind: "kept", path, why }` with the blockers' messages or Git's error.
+The page sends it when you copy a session header's branch or a pull request details' branch.
+
+`PUT /api/workspaces` takes a `WorkspaceChange`, `{ op, cwd }` with `op` one of `add`, `hide`, and `show`, checked by `parseWorkspaceChange` in `src/server/wire.ts`.
+`add` resolves `cwd` through `directoryOf` in `src/paths.ts`, which expands `~`, and answers 400 when it is not a directory; `hide` and `show` take an absolute path.
+`applyWorkspace` in `src/shared/workspaces.ts` applies one change: adding also shows a hidden directory, and a directory in both lists is hidden, so **Show** offers an added one again.
+A change that changes the list saves `workspaces.json` and sends every socket a `workspaces` message, its `list` of added and hidden directories, each with its `cwdDisplay`, also sent when a socket opens.
+A request's `?cwd=` may name an added directory, as the settings under **This workspace** and a workspace's pull request list do; the every-workspace pull request list and the worktrees inventory read only the directories sessions ran in.
+The page lists added directories after those sessions ran in, and drops a hidden directory, not the directories inside it, from its pickers, session lists, counts, and search, as it does `/tmp`.
