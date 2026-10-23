@@ -40,6 +40,6 @@
   `Loops.stop` stops every loop, closes the watchers, and drops a pending re-read; a file change reported after it is ignored.
 - `src/server/session-files.ts`: the session files on disk, omp's, Claude Code's, and Codex's, re-read file by file as the watchers report them, and the past list, each row with its `source`.
   It asks each format in `src/session-formats.ts` whether a changed path is its session file, and lists and reads through the format that owns the file.
-  `src/server/interrupted.ts` keeps which dashboard sessions were interrupted, once `recover` learned which of those that ran when the last server stopped survived it.
+  `src/server/interrupted.ts` keeps which dashboard sessions were interrupted, once `recover` learned which of those that ran when the last server stopped survived it, and reports each change to `midTurn`, those that stopped mid-turn, for the bell.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
   It applies a session's starting prompt to that session's main view with each of its live events, so a live user message and the removal of the prompt it replaces go out together.

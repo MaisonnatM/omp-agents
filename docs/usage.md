@@ -15,7 +15,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Ask about this](usage/ask-about-this.md)
 - [Composer](usage/composer.md)
 - [Send later](usage/send-later.md)
-  - [Continue after a usage limit](usage/send-later.md#continue-after-a-usage-limit)
+  - [Continue after a usage limit or a connection error](usage/send-later.md#continue-after-a-usage-limit-or-a-connection-error)
 - [Questions](usage/questions.md)
 - [Starting, ending, resuming, and forking](usage/starting-ending-resuming-and-forking.md)
 - [Replay from here](usage/replay-from-here.md)

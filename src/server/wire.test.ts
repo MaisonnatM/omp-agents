@@ -200,7 +200,7 @@ describe("parseClientMsg", () => {
 		expect(add({ at: "tomorrow" })).toBeNull();
 		expect(add({ reset: "" })).toBeNull();
 		expect(change({ op: "remove", id: "" })).toBeNull();
-		const continueTarget = { kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null };
+		const continueTarget = { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit", reply: null };
 		expect(add({ target: continueTarget })).toBeNull();
 		expect(change({ op: "update", send: { ...spec, target: continueTarget } })).toBeNull();
 		expect(change({ op: "continue", send: { ...spec, target: continueTarget } })).toBeNull();

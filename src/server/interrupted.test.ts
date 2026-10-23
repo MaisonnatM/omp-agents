@@ -82,6 +82,23 @@ describe("InterruptedSessions", () => {
 		expect(next.stoppedMidTurn("busy")).toBe(false);
 	});
 
+	test("the sessions that stopped mid-turn are reported each time they change after the start, which reports none", () => {
+		const path = fileIn();
+		started(path).setRunning(new Map([["busy", true], ["calm", false]]));
+		flushJsonFiles();
+		const reports: string[][] = [];
+		const tracker = new InterruptedSessions(path, () => reports.push(tracker.midTurn()));
+		tracker.recover(new Set());
+		expect([tracker.midTurn(), reports]).toEqual([["busy"], []]);
+
+		tracker.setRunning(new Map([["later", true]]));
+		tracker.interrupt("later");
+		tracker.dismiss("calm");
+		tracker.setRunning(new Map([["busy", false]]));
+		tracker.dismiss("later");
+		expect(reports).toEqual([["busy", "later"], ["later"], []]);
+	});
+
 	test("a list written before turns were tracked reads its sessions as idle", () => {
 		const path = fileIn();
 		mkdirSync(dirname(path));

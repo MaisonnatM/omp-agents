@@ -2,7 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { TurnFailure } from "../omp/turn-failure";
 import type { PlanUsage, PlanWindow } from "../shared/models";
+import type { ScheduledTarget } from "../shared/scheduled";
 import { AutoContinue, continueWhen, UNKNOWN_RESET_WAIT_MS } from "./auto-continue";
 import { occupiedBy } from "./project-runner";
 import { ScheduledFile } from "./scheduled-file";
@@ -18,11 +20,12 @@ const HOUR = 60 * MINUTE;
 
 const window = (label: string, resetsAt: number | null, exhausted: boolean): PlanWindow => ({ id: label, label, title: label, remaining: exhausted ? 0 : 0.5, resetsAt, exhausted });
 const plan = (provider: string, name: string, account: string | null, windows: PlanWindow[]): PlanUsage => ({ provider, name, account, windows, extra: null, resetCredits: null });
+const limit = (provider: string, retryAfterMs: number | null) => ({ kind: "usage-limit" as const, provider, retryAfterMs });
 
 describe("continueWhen", () => {
 	test("waits for the provider's used-up window, a minute after it resets, and names it", () => {
 		const plans = [plan("anthropic", "Anthropic", "me", [window("5h", NOW + 2 * HOUR, true), window("7d", NOW + 90 * HOUR, false)]), plan("opencode-go", "Opencode Go", null, [window("monthly", NOW + HOUR, true)])];
-		expect(continueWhen({ provider: "anthropic", retryAfterMs: 5 * HOUR }, plans, NOW)).toEqual({ at: NOW + 2 * HOUR + MINUTE, reset: "Anthropic 5h", provider: "Anthropic" });
+		expect(continueWhen(limit("anthropic", 5 * HOUR), plans, NOW)).toEqual({ at: NOW + 2 * HOUR + MINUTE, reset: "Anthropic 5h", provider: "Anthropic" });
 	});
 
 	test("an account serves again only once all its used-up windows reset, and the soonest account wins", () => {
@@ -30,24 +33,24 @@ describe("continueWhen", () => {
 			plan("anthropic", "Anthropic", "work", [window("5h", NOW + HOUR, true), window("7d", NOW + 30 * HOUR, true)]),
 			plan("anthropic", "Anthropic", "home", [window("5h", NOW + 3 * HOUR, true)]),
 		];
-		expect(continueWhen({ provider: "anthropic", retryAfterMs: null }, plans, NOW)).toEqual({ at: NOW + 3 * HOUR + MINUTE, reset: "Anthropic · home 5h", provider: "Anthropic" });
+		expect(continueWhen(limit("anthropic", null), plans, NOW)).toEqual({ at: NOW + 3 * HOUR + MINUTE, reset: "Anthropic · home 5h", provider: "Anthropic" });
 	});
 
 	test("without a used-up window it waits as long as the provider's error said", () => {
 		const plans = [plan("minimax-code", "Minimax Code", null, [window("4h", NOW + 3 * HOUR, false), window("7d", NOW - MINUTE, true)])];
-		expect(continueWhen({ provider: "minimax-code", retryAfterMs: 20 * MINUTE }, plans, NOW)).toEqual({ at: NOW + 21 * MINUTE, reset: "Minimax Code limit", provider: "Minimax Code" });
+		expect(continueWhen(limit("minimax-code", 20 * MINUTE), plans, NOW)).toEqual({ at: NOW + 21 * MINUTE, reset: "Minimax Code limit", provider: "Minimax Code" });
 	});
 
 	test("with no reset known, it tries again after a fixed wait and names no reset", () => {
 		const unknownReset = [plan("cursor", "Cursor", null, [window("monthly", null, true)])];
-		expect(continueWhen({ provider: "cursor", retryAfterMs: null }, unknownReset, NOW)).toEqual({ at: NOW + UNKNOWN_RESET_WAIT_MS, reset: null, provider: "Cursor" });
-		expect(continueWhen({ provider: "vercel-ai-gateway", retryAfterMs: null }, [], NOW)).toEqual({ at: NOW + HOUR, reset: null, provider: "Vercel Ai Gateway" });
+		expect(continueWhen(limit("cursor", null), unknownReset, NOW)).toEqual({ at: NOW + UNKNOWN_RESET_WAIT_MS, reset: null, provider: "Cursor" });
+		expect(continueWhen(limit("vercel-ai-gateway", null), [], NOW)).toEqual({ at: NOW + HOUR, reset: null, provider: "Vercel Ai Gateway" });
 	});
 
 	test("an account with nothing used up could serve now, so a blocked sibling's reset does not count", () => {
 		const plans = [plan("anthropic", "Anthropic", "work", [window("5h", NOW + 30 * HOUR, true)]), plan("anthropic", "Anthropic", "home", [window("5h", NOW + HOUR, false)])];
-		expect(continueWhen({ provider: "anthropic", retryAfterMs: 10 * MINUTE }, plans, NOW)).toEqual({ at: NOW + 11 * MINUTE, reset: "Anthropic limit", provider: "Anthropic" });
-		expect(continueWhen({ provider: "anthropic", retryAfterMs: null }, plans, NOW)).toEqual({ at: NOW + UNKNOWN_RESET_WAIT_MS, reset: null, provider: "Anthropic" });
+		expect(continueWhen(limit("anthropic", 10 * MINUTE), plans, NOW)).toEqual({ at: NOW + 11 * MINUTE, reset: "Anthropic limit", provider: "Anthropic" });
+		expect(continueWhen(limit("anthropic", null), plans, NOW)).toEqual({ at: NOW + UNKNOWN_RESET_WAIT_MS, reset: null, provider: "Anthropic" });
 	});
 });
 
@@ -80,7 +83,8 @@ function harness(dir = mkdtempSync(join(tmpdir(), "omp-agents-continue-"))) {
 	return { dir, file, fake, auto, holdUsage, pending };
 }
 
-const anthropic = (retryAfterMs: number | null) => ({ provider: "anthropic", retryAfterMs });
+const anthropic = (retryAfterMs: number | null) => limit("anthropic", retryAfterMs);
+const continued = (sessionId: string, provider: string, reply: string | null): ScheduledTarget => ({ kind: "continue", sessionId, provider, cause: "usage-limit", reply });
 
 describe("AutoContinue", () => {
 	test("a limit schedules one continue per session, from the usage read then, replacing the one it waited on", async () => {
@@ -89,10 +93,10 @@ describe("AutoContinue", () => {
 		await auto.limited("s1", anthropic(null), null);
 		fake.plans = [plan("anthropic", "Anthropic", null, [window("5h", NOW + 4 * HOUR, true)])];
 		await auto.limited("s1", anthropic(null), null);
-		await auto.limited("s2", { provider: "opencode-go", retryAfterMs: 30 * MINUTE }, null);
+		await auto.limited("s2", limit("opencode-go", 30 * MINUTE), null);
 		expect(pending()).toEqual([
-			[{ kind: "continue", sessionId: "s2", provider: "Opencode Go", reply: null }, NOW + 31 * MINUTE, "Opencode Go limit", "waiting"],
-			[{ kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null }, NOW + 4 * HOUR + MINUTE, "Anthropic 5h", "waiting"],
+			[continued("s2", "Opencode Go", null), NOW + 31 * MINUTE, "Opencode Go limit", "waiting"],
+			[continued("s1", "Anthropic", null), NOW + 4 * HOUR + MINUTE, "Anthropic 5h", "waiting"],
 		]);
 		expect(fake.changes).toBe(3);
 	});
@@ -101,7 +105,7 @@ describe("AutoContinue", () => {
 		const { fake, auto, pending } = harness();
 		fake.usageError = "omp usage timed out";
 		await auto.limited("s1", anthropic(2 * HOUR), null);
-		expect(pending()).toEqual([[{ kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null }, NOW + 2 * HOUR + MINUTE, "Anthropic limit", "waiting"]]);
+		expect(pending()).toEqual([[continued("s1", "Anthropic", null), NOW + 2 * HOUR + MINUTE, "Anthropic limit", "waiting"]]);
 	});
 
 	test("the session is held from the limit, before the usage read answers, until its continue goes", async () => {
@@ -156,7 +160,7 @@ describe("AutoContinue", () => {
 		auto.cancel("s3");
 		expect(pending()).toEqual([
 			[{ kind: "message", sessionId: "s1", text: "and then this" }, NOW + HOUR, null, "waiting"],
-			[{ kind: "continue", sessionId: "s2", provider: "Anthropic", reply: "two" }, NOW + HOUR + MINUTE, "Anthropic limit", "waiting"],
+			[continued("s2", "Anthropic", "two"), NOW + HOUR + MINUTE, "Anthropic limit", "waiting"],
 		]);
 		expect([fake.changes - changes, fake.released, auto.held("s2")]).toEqual([1, [["s1", "one"]], true]);
 	});
@@ -177,6 +181,53 @@ describe("AutoContinue", () => {
 		file.claim(file.value[0]!.id);
 		await auto.limited("s1", anthropic(2 * HOUR), null);
 		auto.cancel("s1");
-		expect([pending(), auto.held("s1")]).toEqual([[[{ kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null }, NOW + HOUR + MINUTE, "Anthropic limit", "sending"]], true]);
+		expect([pending(), auto.held("s1")]).toEqual([[[continued("s1", "Anthropic", null), NOW + HOUR + MINUTE, "Anthropic limit", "sending"]], true]);
+	});
+
+	const dropped: TurnFailure = { kind: "transient", provider: "openai-codex" };
+	/** Ends a turn of `s1` on `failure`; the minutes until the continue it then waits on, or `false` when it waits on none. */
+	const endTurn = (file: ScheduledFile, auto: AutoContinue, failure: TurnFailure | null): number | false => {
+		const held = auto.turnEnded("s1", failure, "Halfway.");
+		const waiting = file.value.find(send => send.target.kind === "continue" && send.target.sessionId === "s1" && send.state.phase === "waiting");
+		return held && waiting ? (waiting.at - NOW) / MINUTE : false;
+	};
+
+	test("a transient fault holds the session for a retry, and faults in a row wait 1, 2, 4, 8, then 16 minutes; the sixth leaves it idle", () => {
+		const { file, fake, auto, pending } = harness();
+		expect([endTurn(file, auto, dropped), pending(), auto.held("s1")]).toEqual([
+			1,
+			[[{ kind: "continue", sessionId: "s1", provider: "OpenAI Codex", cause: "transient", reply: "Halfway." }, NOW + MINUTE, null, "waiting"]],
+			true,
+		]);
+		const waits = [];
+		for (let fault = 0; fault < 5; fault++) {
+			const id = file.value[0]!.id;
+			file.claim(id);
+			file.sent(id);
+			auto.sendsChanged();
+			auto.turnStarted("s1");
+			waits.push(endTurn(file, auto, dropped));
+		}
+		expect([waits, pending(), auto.held("s1"), fake.released.length]).toEqual([[2, 4, 8, 16, false], [], false, 5]);
+		expect(endTurn(file, auto, dropped)).toBe(1);
+	});
+
+	test("a turn that ends cleanly or on a usage limit, an edited prompt, and End session start the retries over; a turn start does not", async () => {
+		const { file, auto } = harness();
+		const waits = [endTurn(file, auto, dropped)];
+		auto.turnStarted("s1");
+		waits.push(endTurn(file, auto, dropped));
+		auto.turnStarted("s1");
+		waits.push(endTurn(file, auto, null));
+		auto.turnStarted("s1");
+		waits.push(endTurn(file, auto, dropped));
+		auto.turnStarted("s1");
+		waits.push(endTurn(file, auto, dropped));
+		auto.cancel("s1");
+		waits.push(endTurn(file, auto, dropped));
+		await auto.limited("s1", anthropic(HOUR), null);
+		auto.turnStarted("s1");
+		waits.push(endTurn(file, auto, dropped));
+		expect(waits).toEqual([1, 2, false, 1, 2, 1, 1]);
 	});
 });

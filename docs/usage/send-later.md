@@ -25,14 +25,19 @@
 - Sends go on the dashboard's minute tick, so a send can go up to a minute after its time.
   A send whose time passed while the dashboard was closed goes at the first tick after it starts.
 
-## Continue after a usage limit
+## Continue after a usage limit or a connection error
 
 - When a provider's usage limit ends a turn of a session the dashboard started, such as MiniMax's `429 Token Plan usage limit reached` or Anthropic's used-up 5-hour window, the dashboard schedules `continue` for that session, the way **Send later** would.
   It reads `omp usage` again then, and when every account of that provider has a used-up window, it waits until the soonest account's windows reset, one minute after, such as **Continues when Anthropic 5h resets · Today at 14:32** above the composer.
   Otherwise it waits as long as the provider's error asked, **Continues when Anthropic limit resets**; when the error names no wait, it tries again in one hour and the row says the provider did not say when its limit resets.
   Only the main agent's turn counts: a turn whose subagents hit the limit continues once the main agent's own turn ends on it, and the subagents get no continue of their own.
-- The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit.
-- A session waits on one continue at most: a later limit moves it to the new reset.
+- When a connection or provider fault ends a turn of a session the dashboard started, after omp's own retries inside the turn gave up, such as `Couldn't reach chatgpt.com (getaddrinfo ENOTFOUND)` or `Anthropic stream stalled while waiting for the next event`, the dashboard schedules `continue` too, one minute later, such as **Retries after a connection error to Anthropic · Today at 14:32**.
+  Each fault in a row waits twice as long as the one before: 1, 2, 4, 8, then 16 minutes.
+  After five retries in a row that each ended the same way, the dashboard schedules nothing and leaves the session idle; a fault after that starts over at one minute.
+  A turn that ends any other way, an edited prompt, and **End session** start the count over, and so does a dashboard restart.
+  A usage limit wins over a fault, so a `429` that names a used-up plan waits for the reset instead.
+- The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit or a retry after the provider's connection error.
+- A session waits on one continue at most: a later limit moves it to the new reset, and a later fault to its next retry.
   Any new turn of that session cancels it, whoever sends the prompt: you, a project's coordinator or its updates, or a scheduled message; so do an edited prompt and **End session**.
 - Until the continue goes, fails, or you cancel it, the session stays on its task: a routine does not end the session, **After a merge** does not end it, a project worker keeps its slot, its coordinator hears the worker finished only if the continue fails or is canceled, and the bell does not call the project done.
   The sidebar and the **Projects** page still show it idle, and it stays on its task when the dashboard restarts.

@@ -252,12 +252,12 @@ describe("DashboardSession turns", () => {
 			type: "agent_end",
 			messages: [assistant("Done: ok\n\nSuggestions:\n1. Ship it"), { role: "assistant", content: [{ type: "toolCall", id: "t1" }] }, { role: "toolResult", content: [] }],
 		});
-		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", limit: null }]);
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", failure: null }]);
 		client.fire({ type: "agent_end", messages: [] });
-		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, limit: null });
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, failure: null });
 	});
 
-	test("a terminal agent_end whose last message failed on a usage limit reports the limit; a handover does not", async () => {
+	test("a terminal agent_end whose last message failed on a usage limit or a dropped connection reports how; a handover does not", async () => {
 		const { client, updates } = await startSession();
 		const limited = {
 			role: "assistant",
@@ -270,7 +270,12 @@ describe("DashboardSession turns", () => {
 		client.fire({ type: "agent_start" });
 		client.fire({ type: "agent_end", isTerminal: false, messages: [limited] });
 		client.fire({ type: "agent_end", messages: [limited] });
-		expect(updates.filter(update => update.kind === "turn-ended")).toEqual([{ kind: "turn-ended", reply: null, limit: { provider: "opencode-go", retryAfterMs: 200_813_000 } }]);
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "agent_end", messages: [{ role: "assistant", content: [], stopReason: "error", provider: "openai-codex", errorMessage: "Couldn't reach chatgpt.com (getaddrinfo ENOTFOUND). Check the URL, your network, or proxy." }] });
+		expect(updates.filter(update => update.kind === "turn-ended")).toEqual([
+			{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 } },
+			{ kind: "turn-ended", reply: null, failure: { kind: "transient", provider: "openai-codex" } },
+		]);
 	});
 
 	test("a turn's start is reported after the roster update that shows it working, and its end before the one that shows it idle", async () => {
@@ -752,7 +757,7 @@ describe("DashboardSession reattach", () => {
 		};
 		client.fire({ type: "agent_end", messages: [limited] });
 		const ended = updates.slice(from).filter(update => update.kind === "turn-ended" || update.kind === "roster");
-		expect([ended.slice(0, 2), session.status]).toEqual([[{ kind: "turn-ended", reply: null, limit: { provider: "opencode-go", retryAfterMs: 200_813_000 } }, { kind: "roster" }], "idle"]);
+		expect([ended.slice(0, 2), session.status]).toEqual([[{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 } }, { kind: "roster" }], "idle"]);
 	});
 
 	test("a session file with no directory in its header and a broken replay marker attaches where omp started, as a replay", async () => {

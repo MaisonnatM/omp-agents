@@ -33,9 +33,11 @@ omp's RPC mode does not title a session from its first prompt, as its terminal d
 While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
 `RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`.
 An `agent_end` that ends the run, not one that hands over to a queued follow-up (`isTerminal: false`), makes the session report `turn-ended` with its last reply: the text of the last assistant message that has any, without the suggested prompts `splitSuggestions` takes off, or `null` when none has text; the project runner reads it ([Projects](projects.md)).
-The same update carries `limit`, the provider's usage limit the run ended on, or `null`: `turnUpdate` in `src/live-session.ts` reads it with `usageLimitOf` in `src/omp/usage-limit.ts`, which reads the run's last assistant message, and counts it when its `stopReason` is `error` and omp's `classifyMessage` flags it `UsageLimit`, the same test omp's retry and credential rotation apply.
-It keeps the wait the error names, such as `retry-after-ms=…`, through omp's `extractRetryHint`; see [Scheduled sends](scheduled-sends.md) for the continue the server schedules for a session it started, including one it attached to after a restart.
-A dashboard session reports `turn-ended` before the roster update that shows it idle, so the server holds a session the limit stopped before the routine and project runners see it idle.
+The same update carries `failure`, how a provider's error ended the run, or `null`: `turnUpdate` in `src/live-session.ts` reads it with `turnFailureOf` in `src/omp/turn-failure.ts`, which reads the run's last assistant message when its `stopReason` is `error` and asks omp's `classifyMessage`, the same test omp's retry and credential rotation apply.
+A message flagged `UsageLimit` is a `usage-limit`, which keeps the wait the error names, such as `retry-after-ms=…`, through omp's `extractRetryHint`, and wins over `Transient`, which omp also sets on a `429`.
+A message flagged only `Transient`, such as a failed DNS lookup, a stalled stream, or a dropped connection that omp's own retries gave up on, is a `transient`; an abort, or an error with neither flag, such as `Usage preflight blocked`, is `null`.
+See [Scheduled sends](scheduled-sends.md) for the continue the server schedules for a session it started, including one it attached to after a restart.
+A dashboard session reports `turn-ended` before the roster update that shows it idle, so the server holds a session the failure stopped before the routine and project runners see it idle.
 Each main-agent `agent_start` makes the session report `turn-started` once its status reads working, whoever prompted it, which cancels a continue the session waits on.
 A session keeps running when the server stops, restarts, or crashes; only **End session**, or omp exiting on its own, ends it.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one that ended.
@@ -60,6 +62,7 @@ A session that runs again leaves the list, and `dismiss-interrupted` takes one o
 Each past row carries `interrupted`.
 `resume-all` resumes several past sessions at once, each the way a `start` with `resume` does, then sends `continue` as a prompt to each one that stopped mid-turn.
 The server answers with one `resumed-all` that names the instance id of each session that started and the errors of those that did not.
+`InterruptedSessions` calls back each time a write changes `midTurn`, the interrupted sessions that stopped mid-turn, and `Dashboard` then runs the bell's stopped check; `recover` reports nothing, since the server checks once it listed the session files, which give the notice each session's title and folder ([Notifications](notifications.md)).
 A terminal session keeps running when the dashboard stops, so the server tracks none of them.
 
 A subagent of a dashboard session takes a message through omp's `steer_subagent` command and stops with `cancel_subagent`; both reach only a subagent that runs, so the server offers them only for rows whose status is `running`.

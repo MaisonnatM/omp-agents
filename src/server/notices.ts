@@ -8,7 +8,7 @@ import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, moveOf, YOUR_MOVES, type YourMove } from "../shared/moves";
 import type { DashboardUpdateOutcome } from "../shared/dashboard-update";
 import type { PlanUsage } from "../shared/models";
-import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, UpdateSubject } from "../shared/notices";
+import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
 import { EVENT_LEAD_MS, usesClause } from "../shared/notices";
 import type { Project, Worker, WorkerPhase } from "../shared/projects";
 import type { SlackFound } from "../slack-messages";
@@ -59,6 +59,8 @@ export interface NoticeSources {
 	googleEvents(from: number, to: number): Promise<AccountFoundEvents[]>;
 	/** Every project not archived, as its notices see it. */
 	projects(): ProjectFacts[];
+	/** The interrupted dashboard sessions that stopped while their turn ran. */
+	stoppedSessions(): StoppedSession[];
 	now(): number;
 }
 
@@ -74,6 +76,8 @@ export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly No
 export const EVENT_KINDS = ["event"] as const satisfies readonly NoticeKind[];
 /** The kinds the project check looks for. */
 export const PROJECT_KINDS = ["project"] as const satisfies readonly NoticeKind[];
+/** The kinds the stopped-sessions check looks for. */
+export const STOPPED_KINDS = ["stopped"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -114,6 +118,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	credits: "providers out of credits",
 	event: "calendar events",
 	project: "projects that need you",
+	stopped: "sessions that stopped mid-turn",
 };
 
 /**
@@ -218,6 +223,16 @@ export function projectNotices(facts: ProjectFacts[], at: number): Unscoped[] {
 	});
 }
 
+/**
+ * One notice for every session in `sessions`, none when it is empty. Its id names the set, so a session that stops
+ * later makes it news again.
+ */
+function stoppedNotices(sessions: StoppedSession[], at: number): Unscoped[] {
+	if (sessions.length === 0) return [];
+	const sorted = sessions.toSorted((a, b) => a.sessionId.localeCompare(b.sessionId));
+	return [{ id: `stopped:${sorted.map(({ sessionId }) => sessionId).join(",")}`, at, kind: "stopped", sessions: sorted }];
+}
+
 export class Notices {
 	readonly #file: JsonFile<Marks>;
 	readonly #sources: NoticeSources;
@@ -282,6 +297,7 @@ export class Notices {
 		});
 		for (const scope of answered) this.#answered.add(scope);
 		this.#found = next;
+		const carried = this.#carryStoppedMarks(before, next);
 		for (const id of this.#status.keys()) if (!next.has(id)) this.#status.delete(id);
 		let rescoped = false;
 		for (const [id, { scope }] of next) {
@@ -294,8 +310,24 @@ export class Notices {
 			const scope = this.#markScopes.get(id);
 			return !next.has(id) && scope !== undefined && answered.has(scope);
 		};
-		if (this.#forgetGone(now, missingFromAnAnswer) || rescoped) this.#save();
+		if (this.#forgetGone(now, missingFromAnAnswer) || rescoped || carried) this.#save();
 		this.#changed();
+	}
+
+	/**
+	 * Gives the stopped notice a check found the marks of the one it replaced when it lists only sessions the old one
+	 * did, so a session that runs again is no news, while one that stops is. Whether any mark carried.
+	 */
+	#carryStoppedMarks(before: ReadonlyMap<string, Found>, next: ReadonlyMap<string, Found>): boolean {
+		const replaced = before.values().find(found => found.kind === "stopped" && !next.has(found.id));
+		const replacement = next.values().find(found => found.kind === "stopped" && !before.has(found.id));
+		if (replaced?.kind !== "stopped" || replacement?.kind !== "stopped") return false;
+		const listed = new Set(replaced.sessions.map(({ sessionId }) => sessionId));
+		if (!replacement.sessions.every(({ sessionId }) => listed.has(sessionId))) return false;
+		const marks = MARKS.filter(mark => this.#marks[mark].has(replaced.id));
+		for (const mark of marks) this.#marks[mark].add(replacement.id);
+		if (marks.length > 0) this.#markScopes.set(replacement.id, replacement.scope);
+		return marks.length > 0;
 	}
 
 	/** Forgets the marks of each notice `gone` says the checks no longer find, once it has been gone {@link MARK_GRACE_MS}. Whether any went. */
@@ -350,6 +382,8 @@ export class Notices {
 			}
 			case "project":
 				return all(projectNotices(this.#sources.projects(), this.#sources.now()), false);
+			case "stopped":
+				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
 		}
 	}
 
