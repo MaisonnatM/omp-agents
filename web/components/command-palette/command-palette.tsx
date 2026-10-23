@@ -27,6 +27,8 @@ import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoCategory } from "../../../src/user-todos-shared";
+import { addNote } from "../../../src/user-notes";
+import type { UserNote } from "../../../src/user-notes-shared";
 import {
 	type Accessory,
 	bumpFrecency,
@@ -52,7 +54,7 @@ import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
-import { hashForProjects, type OpenMode, type SidebarTab } from "../../routing";
+import { hashForNotes, hashForProjects, type OpenMode, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
@@ -80,6 +82,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	newTicket: PAGE_ICON.tickets,
 	sessions: PAGE_ICON.sessions,
 	todo: PAGE_ICON.todo,
+	notes: PAGE_ICON.notes,
 	calendar: PAGE_ICON.calendar,
 	inbox: PAGE_ICON.inbox,
 	routines: Repeat,
@@ -113,6 +116,7 @@ interface CommandPaletteProps {
 	todoCategories: readonly UserTodoCategory[] | null;
 	/** The todo list's top-level todos, which a search lists. */
 	todos: readonly UserTodo[];
+	notes: readonly UserNote[] | null;
 	/** Linear answers, so a search lists the tickets assigned to you. */
 	linearConnected: boolean;
 	/** Every project; the ones not archived list as items that open their page. */
@@ -131,9 +135,9 @@ export const CommandPalette = memo(function CommandPalette({ state, ...props }: 
 	return state && <OpenCommandPalette state={state} {...props} />;
 });
 
-function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, linearConnected, projects, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
-	const { send, start, end, changeTodo, workspaceSettings } = useDashboardActions();
-	const { starts, ending, pullRequestsScope } = useDashboardStatus();
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, projects, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
+	const { starts, ending, pullRequestsScope, connected } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
@@ -257,9 +261,17 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			),
 			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
+			...(connected && notes !== null ? [{
+				id: "command:create-note", section: "commands", title: "Create note", keywords: ["write", "markdown"], icon: PAGE_ICON.notes, accessories: [], kind: "Command",
+				actions: [[{ id: "create", title: "Create note", icon: PAGE_ICON.notes, run: { kind: "do", fn: () => {
+					const change = addNote();
+					changeNote(change);
+					location.hash = hashForNotes({ kind: "all" }, change.note.id);
+				} } }]],
+			} satisfies PaletteItem] : []),
 			...updateItem(selfUpdate),
 		];
-	}, [handlers, unavailable, tabs, selfUpdate]);
+	}, [handlers, unavailable, tabs, selfUpdate, connected, notes, changeNote]);
 
 	const workspaceItems = useMemo((): PaletteItem[] => {
 		const pickWorkspace = (cwd: string | null): void => {
@@ -282,7 +294,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		];
 	}, [workspaces, workspace, onPickWorkspace]);
 
-	const records = useMemo((): PaletteItem[] => recordItems({ todos, tickets, pullRequestRepos }), [todos, tickets, pullRequestRepos]);
+	const records = useMemo((): PaletteItem[] => recordItems({ todos, notes: notes ?? [], tickets, pullRequestRepos }), [todos, notes, tickets, pullRequestRepos]);
 	const conversations = useMemo(
 		(): PaletteItem[] =>
 			conversationItems(hits, hosts, past, (opened, cwd, mode, messageId) => {
@@ -329,13 +341,21 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 						},
 					]
 				: [];
+		const noteItems: PaletteItem[] = connected && notes !== null && search ? [{
+			id: "fallback:create-note", section: "fallback", title: `Create note “${search}”`, keywords: [], icon: PAGE_ICON.notes, accessories: [], kind: "Note",
+			actions: [[{ id: "create", title: "Create note", icon: PAGE_ICON.notes, run: { kind: "do", fn: () => {
+				const change = addNote({ title: search });
+				changeNote(change);
+				location.hash = hashForNotes({ kind: "all" }, change.note.id);
+			} } }]],
+		}] : [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...projectItems, ...records, ...conversations, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
+			root: () => [...sessionItems, ...projectItems, ...records, ...conversations, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...noteItems, ...ticketItem()],
 			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, projectItems, records, conversations, commandItems, workspaceItems, search, todoCategories, changeTodo, linearConnected, onCreateTicket]);
+	}, [viewId, sessionItems, projectItems, records, conversations, commandItems, workspaceItems, search, todoCategories, changeTodo, connected, notes, changeNote, linearConnected, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;

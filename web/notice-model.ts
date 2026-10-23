@@ -2,13 +2,13 @@
 import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
 import { type Notice, type UpdateSubject, usesClause } from "../src/shared/notices";
-import { providerLabel } from "./labels";
+import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
 import { hashForCalendar, hashForProjects, hashForPullRequests, hashForSettings } from "./routing";
 
 /** The bell's filters, each a source of notices. */
-export type NoticeSource = "github" | "slack" | "providers" | "calendar" | "projects" | "updates";
+export type NoticeSource = "github" | "slack" | "providers" | "calendar" | "projects" | "sessions" | "updates";
 
 /** Where a notice leads: a dashboard hash, or a page outside the dashboard that opens in a new tab. */
 export type NoticeLink = { href: string; external: boolean };
@@ -18,23 +18,27 @@ export type NoticeFace =
 	| { kind: "update" }
 	| { kind: "event"; color: string | null }
 	| { kind: "project"; about: "asks" | "stopped" | "done" }
+	| { kind: "stopped" }
 	| { kind: "provider"; provider: string; window: "plan" | "credits" }
 	| { kind: "move"; move: YourMove; person: { name: string; avatarUrl: string | null } | null }
 	| { kind: "slack"; person: { name: string; avatarUrl: string | null } };
 
 /**
  * A notice's button: **Update** (`ready` when it may run: before the update, and again after it failed), **Merge**,
- * which merges after a confirmation, or the quick action that makes a pull request's move.
+ * which merges after a confirmation, the quick action that makes a pull request's move, or **Continue all**, which
+ * resumes `sessionIds` and sends `continue` to each.
  */
 export type NoticeAction =
 	| { kind: "none" }
 	| { kind: "update"; label: "Update" | "Updating"; ready: boolean }
 	| { kind: "merge"; pr: PullRequestSummary }
-	| { kind: "quick"; pr: PullRequestSummary; action: PullRequestActionId; cwd: string };
+	| { kind: "quick"; pr: PullRequestSummary; action: PullRequestActionId; cwd: string }
+	| { kind: "continue-all"; sessionIds: string[] };
 
 /**
- * How a notice toasts. News toasts once while fresh and opens its link, staying `timeout` ms (`0` until dismissed). An
- * update toasts until dismissed and follows its status; `dismissedElsewhere` closes it once another tab saw it before it ran.
+ * How a notice toasts. News toasts once while fresh and opens its link, or acts as **Continue all**, staying `timeout` ms
+ * (`0` until dismissed). An update toasts until dismissed and follows its status; `dismissedElsewhere` closes it once
+ * another tab saw it before it ran.
  */
 export type NoticeToast = { kind: "news"; timeout: number } | { kind: "update"; dismissedElsewhere: boolean };
 
@@ -156,6 +160,21 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				preview: notice.about === "done" ? notice.text : `${notice.project}: ${notice.text}`,
 				link: { href: hashForProjects({ kind: "project", id: notice.projectId }), external: false },
 				face: { kind: "project", about: notice.about },
+			};
+		}
+		case "stopped": {
+			const count = notice.sessions.length;
+			return {
+				...NEWS,
+				source: "sessions",
+				headline: count === 1 ? "1 session stopped mid-turn" : `${count} sessions stopped mid-turn`,
+				// Named as the sidebar names a past session.
+				preview: notice.sessions.map(({ title, cwdDisplay }) => title ?? (cwdDisplay === null ? undefined : folderName(cwdDisplay)) ?? "Untitled session").join(" · "),
+				link: null,
+				face: { kind: "stopped" },
+				action: { kind: "continue-all", sessionIds: notice.sessions.map(({ sessionId }) => sessionId) },
+				// It comes at the server's start, which you may not watch.
+				toast: { kind: "news", timeout: 0 },
 			};
 		}
 		case "omp":

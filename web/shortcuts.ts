@@ -1,7 +1,7 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the sidebar shows, whichever it is. */
-export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
+export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7", "tab8"] as const;
 
 export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
 
@@ -36,6 +36,7 @@ export type ShortcutId =
 	| "newTicket"
 	| "sessions"
 	| "todo"
+	| "notes"
 	| "calendar"
 	| "inbox"
 	| "routines"
@@ -60,6 +61,11 @@ export type ShortcutId =
 	| "todoDue"
 	| "todoNew"
 	| "todoClose"
+	| "notesSearch"
+	| "notesNext"
+	| "notesPrevious"
+	| "notesNew"
+	| "notesClose"
 	| "calendarNewEvent"
 	| "inboxNext"
 	| "inboxPrevious"
@@ -107,6 +113,7 @@ export const SHORTCUT_CATEGORIES = [
 	{ id: "sessions", label: "Sessions" },
 	{ id: "pull-requests", label: "Pull requests" },
 	{ id: "todo", label: "Todo" },
+	{ id: "notes", label: "Notes" },
 	{ id: "inbox", label: "Inbox" },
 	{ id: "calendar", label: "Calendar" },
 	{ id: "changes", label: "Changes" },
@@ -222,9 +229,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
-	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Inbox pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Notes, Calendar, and Inbox pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
+	{ id: "notes", category: "general", label: "Go to your notes", command: "Go to notes", keys: [{ goTo: "n" }] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "inbox", category: "general", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
 	// After a G, R is also the Inbox page's `inboxReply`: the page outranks the App, so G then R replies while a conversation is open.
@@ -256,6 +264,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoDue", category: "todo", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{ id: "notesSearch", category: "notes", label: "Search the Notes page's notes", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
+	{ id: "notesNext", category: "notes", label: "Focus the next note, or open it while a note is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
+	{ id: "notesPrevious", category: "notes", label: "Focus the previous note, or open it while a note is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{ id: "notesNew", category: "notes", label: "Add a note and open it", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "notesClose", category: "notes", label: "Close the open note", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "calendarNewEvent", category: "calendar", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "inboxNext", category: "inbox", label: "Inbox: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "inboxPrevious", category: "inbox", label: "Inbox: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

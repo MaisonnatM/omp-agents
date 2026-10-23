@@ -19,6 +19,7 @@ import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
 import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
+import { NotesPage } from "./notes/page";
 import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
 import { SettingsPage } from "./settings/settings-page";
@@ -59,7 +60,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -100,6 +101,7 @@ export const PageSwitch = memo(function PageSwitch({
 	splits,
 	models,
 	userTodos,
+	userNotes,
 	routines,
 	projects,
 	workspaceList,
@@ -125,7 +127,7 @@ export const PageSwitch = memo(function PageSwitch({
 	resize,
 	toggleSidebar,
 }: PageSwitchProps) {
-	const { send, start, dismissStart, changeTodo } = useDashboardActions();
+	const { send, start, dismissStart, changeTodo, changeNote } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
@@ -192,6 +194,8 @@ export const PageSwitch = memo(function PageSwitch({
 					linearConnected={linearCallable}
 				/>
 			);
+		case "notes":
+			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "routines":
 			return (
 				// Keyed by its target, so leaving for another routine or the list closes the editor.

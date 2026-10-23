@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { flushJsonFiles } from "../fs";
 import type { PullRequestList, PullRequestSummary } from "../shared/github";
 import type { PlanUsage, PlanWindow } from "../shared/models";
 import type { AgentState } from "../shared/moves";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
+import { InterruptedSessions } from "./interrupted";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -76,6 +78,10 @@ interface State {
 	dashboardRefusal?: string;
 	/** How many times the dashboard check fetched omp-agents' branch. */
 	dashboardFetches?: number;
+	/** The dashboard sessions the server tracks, whose mid-turn stops the stopped check lists. */
+	interrupted?: InterruptedSessions;
+	/** What each listed session file gives the stopped check. */
+	listed?: Record<string, { title: string | null; cwdDisplay: string }>;
 	now?: number;
 }
 
@@ -123,6 +129,7 @@ function sources(state: State): NoticeSources {
 			return [{ account: "google-calendar", events: state.googleEvents ?? [] }];
 		},
 		projects: () => [],
+		stoppedSessions: () => (state.interrupted?.midTurn() ?? []).map(sessionId => ({ sessionId, title: state.listed?.[sessionId]?.title ?? null, cwdDisplay: state.listed?.[sessionId]?.cwdDisplay ?? null })),
 	now: () => state.now ?? 0,
 	};
 }
@@ -400,5 +407,69 @@ describe("Notices", () => {
 		state.now = 135 * MINUTE;
 		await notices.check(EVENT_KINDS);
 		expect(ids()).toEqual([]);
+	});
+
+	test("one notice names the sessions that stopped mid-turn, with what their listed files give, and a session that runs again leaves it", async () => {
+		const interruptedPath = join(dirname(noticesPath()), "interrupted.json");
+		new InterruptedSessions(interruptedPath).setRunning(new Map([["s-busy", true], ["s-also", true], ["s-calm", false]]));
+		flushJsonFiles();
+		// The server went down, and none of the three outlived it.
+		const interrupted = new InterruptedSessions(interruptedPath);
+		interrupted.recover(new Set());
+		const state: State = { latest: null, installed: "18.8.0", models: [], interrupted, listed: { "s-busy": { title: "Fix the login", cwdDisplay: "~/code/webapp" } }, now: 5 * MINUTE };
+		const notices = new Notices(noticesPath(), sources(state), () => {});
+
+		await notices.check(STOPPED_KINDS);
+		expect(notices.list).toEqual([
+			{
+				id: "stopped:s-also,s-busy",
+				at: 5 * MINUTE,
+				seen: false,
+				read: false,
+				kind: "stopped",
+				sessions: [
+					{ sessionId: "s-also", title: null, cwdDisplay: null },
+					{ sessionId: "s-busy", title: "Fix the login", cwdDisplay: "~/code/webapp" },
+				],
+			},
+		]);
+
+		interrupted.setRunning(new Map([["s-also", false]]));
+		state.now = 6 * MINUTE;
+		await notices.check(STOPPED_KINDS);
+		expect(notices.list).toEqual([{ id: "stopped:s-busy", at: 6 * MINUTE, seen: false, read: false, kind: "stopped", sessions: [{ sessionId: "s-busy", title: "Fix the login", cwdDisplay: "~/code/webapp" }] }]);
+
+		interrupted.dismiss("s-busy");
+		await notices.check(STOPPED_KINDS);
+		expect(notices.list).toEqual([]);
+	});
+
+	test("a stopped sessions' notice that only loses sessions keeps its marks, across a restart, and one that gains a session is news", async () => {
+		const path = noticesPath();
+		const interrupted = new InterruptedSessions(join(dirname(path), "interrupted.json"));
+		interrupted.recover(new Set());
+		interrupted.setRunning(new Map([["s-a", true], ["s-b", true]]));
+		interrupted.interrupt("s-a");
+		interrupted.interrupt("s-b");
+		const state: State = { latest: null, installed: "18.8.0", models: [], interrupted, now: MINUTE };
+		const notices = new Notices(path, sources(state), () => {});
+		const marks = (of: Notices) => of.list.map(({ id, seen, read }) => ({ id, seen, read }));
+		await notices.check(STOPPED_KINDS);
+		await notices.apply(["stopped:s-a,s-b"], "seen");
+		await notices.apply(["stopped:s-a,s-b"], "read");
+
+		interrupted.setRunning(new Map([["s-a", true]]));
+		state.now = 2 * MINUTE;
+		await notices.check(STOPPED_KINDS);
+		expect(marks(notices)).toEqual([{ id: "stopped:s-b", seen: true, read: true }]);
+		const restarted = new Notices(path, sources(state), () => {});
+		await restarted.check(STOPPED_KINDS);
+		expect(marks(restarted)).toEqual([{ id: "stopped:s-b", seen: true, read: true }]);
+
+		interrupted.setRunning(new Map([["s-a", true], ["s-c", true]]));
+		interrupted.interrupt("s-c");
+		state.now = 3 * MINUTE;
+		await notices.check(STOPPED_KINDS);
+		expect(marks(notices)).toEqual([{ id: "stopped:s-b,s-c", seen: false, read: false }]);
 	});
 });

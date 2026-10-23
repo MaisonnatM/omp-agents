@@ -6,11 +6,13 @@ import type { ServerMsg } from "../shared/protocol";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
 import type { ScheduledChange } from "../shared/scheduled";
 import type { WorkspaceChange } from "../shared/workspaces";
+import type { UserNoteChange } from "../user-notes-shared";
 import type { UserTodoChange } from "../user-todos-shared";
 import type { Peer } from "./request-ledger";
 
 interface ListChanges {
 	"user-todos": UserTodoChange;
+	"user-notes": UserNoteChange;
 	routines: Exclude<RoutineChange, { op: "run-now" }>;
 	scheduled: Exclude<ScheduledChange, { op: "send-now" }>;
 	workspaces: WorkspaceChange;

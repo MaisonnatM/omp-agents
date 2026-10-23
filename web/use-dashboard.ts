@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } 
 import type { PinChange } from "../src/shared/pins";
 import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
+import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText, socketUrl } from "./api";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
@@ -85,6 +86,8 @@ export interface Dashboard {
 	start: (op: StartOp) => void;
 	/** Change the Todo page's list, which shows at once and reaches the server and every other window. */
 	changeTodo: (change: UserTodoChange) => void;
+	/** Change the Notes page's list, which shows at once and reaches the server and every other window. */
+	changeNote: (change: UserNoteChange) => void;
 	/** Pin or unpin sessions, which shows at once and reaches the server and every other window. */
 	changePins: (change: PinChange) => void;
 }
@@ -224,6 +227,7 @@ export function useDashboard(): Dashboard {
 					case "usage":
 					case "models":
 					case "user-todos":
+					case "user-notes":
 					case "routines":
 					case "scheduled":
 					case "workspaces":
@@ -313,6 +317,13 @@ export function useDashboard(): Dashboard {
 		},
 		[send],
 	);
+	const changeNote = useCallback(
+		(change: UserNoteChange) => {
+			dispatch({ t: "user-note", change });
+			send({ t: "user-note", change });
+		},
+		[send],
+	);
 	const changePins = useCallback(
 		(change: PinChange) => {
 			dispatch({ t: "pin", change });
@@ -321,5 +332,5 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changePins };
+	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins };
 }

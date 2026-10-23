@@ -28,6 +28,10 @@ export const userTodosFile = join(configDir, "todos.json");
  * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
  */
 export const userTodoInboxDir = join(configDir, "todo-inbox");
+/** The Notes page's list, beside {@link tokenFile}. */
+export const userNotesFile = join(configDir, "notes.json");
+/** Where omp's `user_note` tool leaves the notes it adds and appends to, one JSON file each, so the server stays the only writer of {@link userNotesFile}. */
+export const userNoteInboxDir = join(configDir, "note-inbox");
 /** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
@@ -47,6 +51,8 @@ export const projectNotesDir = (id: string): string => join(dataDir, "projects",
 export const userNotesDir = join(dataDir, "user");
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
+/** When the idle stop ends a session's processes, beside {@link tokenFile}. */
+export const processesFile = join(configDir, "processes.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
 /** The address each Google account signs in as and the workspaces each address is linked to, beside {@link tokenFile}. */

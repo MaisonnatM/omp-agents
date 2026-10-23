@@ -38,13 +38,14 @@ import { isAnalyticsRange } from "../shared/analytics";
 import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, type PullRequestCheckout, type PullRequestRebase, prKey, type RebasedPullRequest, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
 import type { ProjectNotesAnswer } from "../shared/projects";
+import { parseProcessSettings, type ProcessSettings, type ProcessStop, type SessionProcesses } from "../shared/processes";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import type { ReplayComparison, ReplayDetail } from "../shared/replay";
 import { MEDIA_FILE_TYPES } from "../shared/transcript";
 import type { View } from "../shared/sessions";
-import { parseReviewDraftPost, parseView } from "./wire";
+import { parseProcessStop, parseReviewDraftPost, parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
 import { findMediaFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
@@ -143,6 +144,17 @@ export interface RouteEnv {
 	pullRequests: PullRequestRoutesEnv;
 	dashboard: DashboardRoutesEnv;
 	sync: SyncRoutesEnv;
+	processes: ProcessRoutesEnv;
+}
+
+/** What a live session runs besides omp, and when the idle stop ends it. */
+export interface ProcessRoutesEnv {
+	/** Live session `instanceId`'s processes; `null` when it does not run. */
+	list(instanceId: string): Promise<SessionProcesses | null>;
+	/** Stops the session's process `id`, unless it no longer runs, and answers what the session runs after; `null` when the session does not run. */
+	stop(stop: ProcessStop): Promise<SessionProcesses | null>;
+	settings(): ProcessSettings;
+	changeSettings(settings: ProcessSettings): ProcessSettings;
 }
 
 /** What the pull request routes hand on: the merge queue, through which every merge goes, review drafts, checkouts, which can start a session, and rebases, one repository at a time. */
@@ -934,6 +946,27 @@ function syncRoutes({ get, write }: RouteKit, env: SyncRoutesEnv): Routes {
 	};
 }
 
+class SessionNotRunning extends Error {}
+
+/** A live session's processes, the stop of one, and the idle stop's setting. */
+function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes {
+	const running = (found: SessionProcesses | null): SessionProcesses => {
+		if (!found) throw new SessionNotRunning();
+		return found;
+	};
+	const refuse = (err: unknown): Response | null => (err instanceof SessionNotRunning ? fail(404, "The session does not run") : null);
+	return {
+		"/api/session-processes": { GET: get(params => answer(async () => running(await env.list(params.get("instance") ?? "")), refuse)) },
+		"/api/session-processes/stop": {
+			PUT: write(body => checked(parseProcessStop(body), "Expected { instanceId, id } naming a live session and one of its processes"), async stop => running(await env.stop(stop)), refuse),
+		},
+		"/api/process-settings": {
+			GET: get(() => answer(async () => env.settings())),
+			PUT: write(body => checked(parseProcessSettings(body), "Expected { stopIdleAfterMinutes } of null, 15, 30, 60, or 120"), async settings => env.changeSettings(settings)),
+		},
+	};
+}
+
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
@@ -948,5 +981,6 @@ export function createRoutes(env: RouteEnv): Routes {
 		...todoRoutes(kit, env.todos),
 		...dashboardRoutes(kit, env.dashboard),
 		...syncRoutes(kit, env.sync),
+		...processRoutes(kit, env.processes),
 	};
 }

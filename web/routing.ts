@@ -18,12 +18,13 @@ export const SIDEBAR_TABS = [
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear" },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
+	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
 	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox, integration: "gmail" },
 	{ value: "settings", label: "Settings", icon: PAGE_ICON.settings, pinned: true },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId; pinned?: true }[];
 
-/** The sidebar's tab; the tickets, todo, calendar, inbox, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** The sidebar's tab; the tickets, todo, notes, calendar, inbox, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
@@ -89,6 +90,15 @@ export interface TodoRoute {
 	open: string | null;
 }
 
+/** Which notes the Notes page lists: every one, or those agents added. */
+export type NotesListView = { kind: "all" } | { kind: "agents" };
+
+/** The Notes page, listing `list`, with note `open` beside it when it is non-null and in the list. */
+export interface NotesRoute {
+	list: NotesListView;
+	open: string | null;
+}
+
 /** The Routines page: the list, or routine `target`'s settings and runs when it is non-null. */
 export interface RoutinesRoute {
 	target: string | null;
@@ -119,6 +129,7 @@ export type Page =
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
+	| ({ kind: "notes" } & NotesRoute)
 	| ({ kind: "routines" } & RoutinesRoute)
 	| ({ kind: "projects" } & ProjectsRoute)
 	| { kind: "calendar" }
@@ -167,6 +178,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
+ * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
  * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
@@ -196,6 +208,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const id = named ? null : decodeSegment(rest);
 		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
 	},
+	notes: (rest, query) => ({ kind: "notes", list: rest === "agents" ? { kind: "agents" } : { kind: "all" }, open: query.get("open") || null }),
 	routines: rest => ({ kind: "routines", target: rest ? decodeSegment(rest) : null }),
 	projects: rest => {
 		const id = rest && rest !== "new" ? decodeSegment(rest) : null;
@@ -228,6 +241,8 @@ function restOfPage(page: Page): string | null {
 			return page.target || null;
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
+		case "notes":
+			return page.list.kind === "all" ? null : page.list.kind;
 		case "routines":
 			return page.target === null ? null : encodeURIComponent(page.target);
 		case "inbox":
@@ -245,12 +260,13 @@ function restOfPage(page: Page): string | null {
 	}
 }
 
-/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo the Todo page opens; `null` for none. */
+/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo or note its page opens; `null` for none. */
 function queryOfPage(page: Page): string | null {
 	switch (page.kind) {
 		case "new":
 			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
 		case "todo":
+		case "notes":
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
 		case "settings":
 		case "pull-requests":
@@ -288,6 +304,7 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 	if (open) return hashForOpenTodo(id, open.categoryId);
 	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
 }
+export const hashForNotes = (list: NotesListView, open: string | null = null): string => hashForPage({ kind: "notes", list, open });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
 export const hashForProjects = (target: ProjectsTarget): string => hashForPage({ kind: "projects", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
@@ -353,7 +370,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `routines`, `projects`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `notes`, `routines`, `projects`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));

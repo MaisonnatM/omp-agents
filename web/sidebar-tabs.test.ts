@@ -19,6 +19,7 @@ const DEFAULT: TabLayout = [
 	{ tab: "tickets", hidden: false },
 	{ tab: "sessions", hidden: false },
 	{ tab: "todo", hidden: false },
+	{ tab: "notes", hidden: false },
 	{ tab: "calendar", hidden: false },
 	{ tab: "inbox", hidden: false },
 	{ tab: "settings", hidden: false },
@@ -48,6 +49,7 @@ test("decoding keeps each known tab once, never hides a pinned tab, and puts a m
 		{ tab: "tickets", hidden: false },
 		{ tab: "settings", hidden: false },
 		{ tab: "inbox", hidden: true },
+		{ tab: "notes", hidden: false },
 		{ tab: "calendar", hidden: false },
 		{ tab: "todo", hidden: false },
 		{ tab: "sessions", hidden: false },
@@ -62,8 +64,8 @@ test("a stored layout decodes back to itself", () => {
 test("moveTab swaps a tab with its neighbor and leaves a tab at either end where it is", () => {
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", -1)).toBe(DEFAULT_TAB_LAYOUT);
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "settings", 1)).toBe(DEFAULT_TAB_LAYOUT);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "settings", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "tickets", "sessions", "todo", "calendar", "settings", "inbox"]);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "sessions", "todo", "calendar", "inbox", "settings"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "settings", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "tickets", "sessions", "todo", "notes", "calendar", "settings", "inbox"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "sessions", "todo", "notes", "calendar", "inbox", "settings"]);
 });
 
 test("hideTab hides and shows a tab, but never a pinned one", () => {
@@ -74,7 +76,7 @@ test("hideTab hides and shows a tab, but never a pinned one", () => {
 
 test("shownTabs drops hidden and signed-out tabs and keeps the order", () => {
 	const layout = moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "settings", -1);
-	expect(shownTabs(layout, new Set(["tickets"]))).toEqual(["pull-requests", "sessions", "calendar", "settings", "inbox"]);
+	expect(shownTabs(layout, new Set(["tickets"]))).toEqual(["pull-requests", "sessions", "notes", "calendar", "settings", "inbox"]);
 });
 
 test("until the integrations answer, the tabs that wait on one are signed out", () => {
@@ -85,9 +87,10 @@ test("positionKey takes the position among the shown tabs, or none", () => {
 	const tabs = shownTabs(moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "settings", -1), new Set(["tickets"]));
 	expect(positionKey("pull-requests", tabs)).toBe("tab1");
 	expect(positionKey("sessions", tabs)).toBe("tab2");
-	expect(positionKey("calendar", tabs)).toBe("tab3");
-	expect(positionKey("settings", tabs)).toBe("tab4");
-	expect(positionKey("inbox", tabs)).toBe("tab5");
+	expect(positionKey("notes", tabs)).toBe("tab3");
+	expect(positionKey("calendar", tabs)).toBe("tab4");
+	expect(positionKey("settings", tabs)).toBe("tab5");
+	expect(positionKey("inbox", tabs)).toBe("tab6");
 	expect(positionKey("todo", tabs)).toBeUndefined();
 	expect(positionKey("tickets", tabs)).toBeUndefined();
 });
@@ -97,14 +100,15 @@ test("shortcutRows folds each shown tab's position key into its row, drops the p
 	const rows = shortcutRows(tabs);
 	const keysOf = (id: string) => rows.find(row => row.id === id)?.keys.map(bindingLabel);
 	const mod = IS_MAC ? "⌘" : "Ctrl+";
-	expect(keysOf("settings")).toEqual([`${mod}4`]);
+	expect(keysOf("settings")).toEqual([`${mod}5`]);
 	expect(keysOf("pull-requests")).toEqual([`${mod}1`]);
 	expect(keysOf("sessions")).toEqual([`${mod}2`]);
-	expect(keysOf("calendar")).toEqual([`${mod}3`]);
-	expect(keysOf("inbox")).toEqual([`${mod}5`, "G then I"]);
+	expect(keysOf("notes")).toEqual([`${mod}3`, "G then N"]);
+	expect(keysOf("calendar")).toEqual([`${mod}4`]);
+	expect(keysOf("inbox")).toEqual([`${mod}6`, "G then I"]);
 	expect(keysOf("todo")).toBeUndefined();
 	expect(keysOf("tickets")).toBeUndefined();
 	expect(keysOf("tab1")).toBeUndefined();
 	expect(keysOf("switcher")).toEqual([IS_MAC ? "⌘K" : "Ctrl+K"]);
-	expect(tabShortcutLabels("inbox", tabs)).toEqual([`${mod}5`, "G then I"]);
+	expect(tabShortcutLabels("inbox", tabs)).toEqual([`${mod}6`, "G then I"]);
 });

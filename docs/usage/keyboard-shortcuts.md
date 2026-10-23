@@ -28,8 +28,9 @@ Alt is Option on macOS.
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| Cmd+1 … Cmd+7 | Anywhere | Go to the first … seventh tab the sidebar shows |
-| C | Outside text fields, except on the Todo, Calendar, and Inbox pages | Create a Linear ticket, when connected |
+| Cmd+1 … Cmd+8 | Anywhere | Go to the first … eighth tab the sidebar shows |
+| C | Outside text fields, except on the Todo, Notes, Calendar, and Inbox pages | Create a Linear ticket, when connected |
+| G then N | Outside text fields | Go to your notes |
 | G then I | Outside text fields | Go to your Gmail inbox, when connected |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Go to your projects |
@@ -52,6 +53,10 @@ Alt is Option on macOS.
 | Shift+D | Todo page, outside text fields | Change the focused or open todo's due day |
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
+| / | Notes page, outside text fields | Search the notes |
+| ↓ / ↑ | Notes page, outside text fields | Focus the next or previous note, or open it while a note is open |
+| C | Notes page, outside text fields | Add a note and open it |
+| Esc | Notes page, outside text fields | Close the open note |
 | C | Calendar page, outside text fields | Add an event |
 | ↓ / ↑ | Inbox page, outside text fields | Focus the next or previous conversation, or open it while one is open |
 | Esc | Inbox page, outside text fields | Close the open conversation |
@@ -63,16 +68,16 @@ Alt is Option on macOS.
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Inbox, Calendar, and Changes.
+  The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Notes, Inbox, Calendar, and Changes.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
-- Cmd+1 through Cmd+7 go to the first through seventh tab the sidebar shows, even while typing; they replace the browser's tab selection when the dashboard handles them.
+- Cmd+1 through Cmd+8 go to the first through eighth tab the sidebar shows, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers follow the order the sidebar shows, which **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
   A number with no tab keeps its browser behavior.
-  In the default order the tabs are Pull requests, Tickets, Sessions, Todo, Calendar, Inbox, and Settings, so with both services connected Cmd+6 opens the **Inbox** and Cmd+7 **Settings**.
+  In the default order the tabs are Pull requests, Tickets, Sessions, Todo, Notes, Calendar, Inbox, and Settings, so with both services connected Cmd+7 opens the **Inbox** and Cmd+8 **Settings**.
   The **Inbox** takes its number like any tab and keeps G then I.
-  Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, 8, 9, or 0 keeps its browser behavior.
+  Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, 9, or 0 keeps its browser behavior.
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
 - In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.

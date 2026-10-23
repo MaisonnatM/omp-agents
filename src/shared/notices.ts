@@ -1,7 +1,7 @@
 /**
  * What the bell lists: a newer omp, routed model, or omp-agents build, a pull request whose next move is yours, a Slack message that
  * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), a calendar
- * event that starts soon, and a project that needs you.
+ * event that starts soon, a project that needs you, and the dashboard sessions that stopped mid-turn.
  */
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
@@ -114,10 +114,23 @@ export interface ProjectSubject {
 	text: string;
 }
 
+/** An interrupted dashboard session that stopped while its turn ran, with its listed file's title and `cwdDisplay`, each `null` while no listed file gives one. */
+export interface StoppedSession {
+	sessionId: string;
+	title: string | null;
+	cwdDisplay: string | null;
+}
+
+/** The interrupted dashboard sessions that stopped while their turn ran, which the page names as the sidebar names past sessions. */
+export interface StoppedSubject {
+	kind: "stopped";
+	sessions: StoppedSession[];
+}
+
 /** How long before an event starts its notice comes. */
 export const EVENT_LEAD_MS = 10 * 60_000;
 
-export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | ProjectSubject;
+export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | ProjectSubject | StoppedSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -134,6 +147,7 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| ProviderSubject
 	| EventSubject
 	| ProjectSubject
+	| StoppedSubject
 );
 
 /** `update` installs the release, rewrites the routing, or pulls omp-agents and restarts it; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */

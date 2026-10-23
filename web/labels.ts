@@ -168,6 +168,9 @@ export function formatBytes(bytes: number): string {
 	return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
 }
 
+/** A command line with each absolute path cut to its last segment: `/usr/local/bin/node /a/b/tsc -w` reads `node tsc -w`. */
+export const commandLabel = (command: string): string => command.replace(/(^|\s)\/(?:[^\s/]+\/)+(?=[^\s/])/g, "$1");
+
 /** A directory's last segment: `~/code/webapp` reads `webapp`. */
 export const folderName = (dir: string): string | undefined => dir.split("/").filter(Boolean).pop();
 

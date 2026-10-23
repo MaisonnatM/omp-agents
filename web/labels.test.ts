@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { age, dayLabel, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import { age, commandLabel, dayLabel, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -74,5 +74,13 @@ describe("ages", () => {
 
 	test("a full age shows hours with their minutes", () => {
 		expect(minutes.map(at => ago(at, false))).toEqual(["0m", "0m", "1m", "59m", "1h 0m", "23h 59m", "1d", "0m"]);
+	});
+});
+
+describe("command labels", () => {
+	test("absolute paths read as their last segment, and the rest stays as typed", () => {
+		expect(commandLabel("/opt/homebrew/bin/node /Users/me/app/node_modules/.bin/tsc --noEmit -w")).toBe("node tsc --noEmit -w");
+		expect(commandLabel("smoke-hold: /bin/zsh -l -c bun -e 'x/y'")).toBe("smoke-hold: zsh -l -c bun -e 'x/y'");
+		expect(commandLabel("vite --port 5173")).toBe("vite --port 5173");
 	});
 });

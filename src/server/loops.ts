@@ -20,6 +20,8 @@ const ACTIVITY_CHECK_MS = 2 * 60_000;
 const PULL_MS = 5 * 60_000;
 /** Each dashboard check fetches the branch the server runs from. */
 const DASHBOARD_CHECK_MS = 5 * 60_000;
+/** Each process sample runs `ps` once and asks every daemon broker for its services. */
+const PROCESS_SAMPLE_MS = 15_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -42,6 +44,8 @@ export interface LoopHandlers {
 	onPullTick(): Promise<void>;
 	/** At once, then every {@link DASHBOARD_CHECK_MS}, listener or not. */
 	onDashboardTick(): Promise<void>;
+	/** Every {@link PROCESS_SAMPLE_MS}, listener or not. */
+	onProcessTick(): Promise<void>;
 }
 
 /**
@@ -116,6 +120,7 @@ export class Loops {
 			repeat("activity check", this.#on.onActivityTick, ACTIVITY_CHECK_MS),
 			repeat("pull", this.#on.onPullTick, PULL_MS, 0),
 			repeat("dashboard check", this.#on.onDashboardTick, DASHBOARD_CHECK_MS, 0),
+			repeat("processes", this.#on.onProcessTick, PROCESS_SAMPLE_MS),
 		];
 	}
 

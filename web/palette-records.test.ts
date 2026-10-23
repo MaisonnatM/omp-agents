@@ -5,6 +5,7 @@ import type { Ticket } from "../src/shared/tickets";
 import type { TodoStatus, UserTodo, UserTodoLeaf } from "../src/user-todos-shared";
 import type { OpenMode } from "./routing";
 import { conversationItems, recordItems } from "./palette-records";
+import { paletteSections } from "./command-palette";
 
 const leaf = (id: string, text: string, status: TodoStatus): UserTodoLeaf => ({
 	id,
@@ -59,6 +60,7 @@ const pr: PullRequestSummary = {
 
 test("each todo, closed ones too, ticket, and pull request opens where the dashboard shows it, and a todo under another names its parent", () => {
 	const items = recordItems({
+		notes: [],
 		todos: [todo({ categoryId: "work", children: [leaf("c1", "Write the test", "done")] })],
 		tickets: [ticket],
 		pullRequestRepos: [
@@ -91,6 +93,14 @@ test("each todo, closed ones too, ticket, and pull request opens where the dashb
 				{ kind: "link", href: "https://github.com/Acme/web/pull/4", external: true },
 			],
 		],
+	]);
+});
+
+test("note content is searchable and opens its note even with no title", () => {
+	const items = recordItems({ todos: [], tickets: [], pullRequestRepos: [], notes: [{ id: "n1", title: "", body: "Staging smoke findings", todoId: null, addedBy: null, createdAt: "2026-10-05T09:00:00.000Z", updatedAt: "2026-10-05T09:00:00.000Z" }] });
+	const found = paletteSections(items, "STAGING smoke", {}, 0);
+	expect(found.map(section => [section.heading, section.items.map(item => [item.id, item.title, item.kind, item.actions[0][0]?.run])])).toEqual([
+		["Notes", [["note:n1", "Untitled", "Note", { kind: "link", href: "#notes?open=n1" }]]],
 	]);
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { usageLimitOf } from "./usage-limit";
+import { type TurnFailure, turnFailureOf } from "./turn-failure";
 
 /** Assistant messages that ended turns in real omp session files, as omp recorded them. */
 const recorded = {
@@ -74,52 +74,91 @@ const recorded = {
 			"402 This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 59774. To increase, visit https://openrouter.ai/settings/credits and add more credits",
 	},
 	streamTimeout: { api: "openai-completions", provider: "minimax-code", model: "MiniMax-M3", errorId: 397312, errorMessage: "OpenAI completions stream timed out while waiting for the first event" },
+	anthropicNotFound: {
+		api: "anthropic-messages",
+		provider: "anthropic",
+		model: "claude-opus-5-5",
+		errorId: 135168,
+		errorMessage: "Couldn't reach api.anthropic.com (getaddrinfo ENOTFOUND). Check the URL, your network, or proxy.",
+	},
+	codexRetryBudget: {
+		api: "openai-codex-responses",
+		provider: "openai-codex",
+		model: "gpt-6.1-sol",
+		errorId: 135168,
+		errorMessage: "Retry budget exhausted after 10 retries: Couldn't reach chatgpt.com (getaddrinfo ENOTFOUND). Check the URL, your network, or proxy.",
+	},
+	codexStalled: { api: "openai-codex-responses", provider: "openai-codex", model: "gpt-6.1-sol", errorId: 397312, errorMessage: "OpenAI Codex SSE stream stalled while waiting for the next event" },
+	socketClosed: { api: "anthropic-messages", provider: "anthropic", model: "claude-opus-5-5", errorId: 135168, errorMessage: "The socket connection was closed unexpectedly before the response completed" },
+	connectionError: { api: "anthropic-messages", provider: "anthropic", model: "claude-opus-5-5", errorId: 135168, errorMessage: "Connection error." },
+	usagePreflight: {
+		api: "openai-codex-responses",
+		provider: "openai-codex",
+		model: "gpt-6.1-sol",
+		errorId: 0,
+		errorMessage: "Usage preflight blocked: All eligible configured included-plan routes are depleted or unavailable, and no usable paid fallback is available.",
+	},
 };
 
 const failed = (fields: object) => ({ role: "assistant", content: [], stopReason: "error", ...fields });
-const endedOn = (...messages: object[]) => usageLimitOf([{ role: "user", content: "go on" }, ...messages]);
+const endedOn = (...messages: object[]) => turnFailureOf([{ role: "user", content: "go on" }, ...messages]);
+const limit = (provider: string, retryAfterMs: number | null): TurnFailure => ({ kind: "usage-limit", provider, retryAfterMs });
 
-describe("usageLimitOf", () => {
+describe("turnFailureOf", () => {
 	test("a provider's usage limit, plan cap, or spend budget ends the turn on a limit, with the wait its error names", () => {
 		expect(
 			[recorded.minimaxTokenPlan, recorded.minimaxRateLimit, recorded.anthropic, recorded.opencodeGo, recorded.cursorOutOfUsage, recorded.cursorResourceExhausted, recorded.vercelBudget].map(
 				message => endedOn(failed(message)),
 			),
 		).toEqual([
-			{ provider: "minimax-code", retryAfterMs: null },
-			{ provider: "minimax-code", retryAfterMs: null },
-			{ provider: "anthropic", retryAfterMs: 5_215_000 },
-			{ provider: "opencode-go", retryAfterMs: 200_813_000 },
-			{ provider: "cursor", retryAfterMs: null },
-			{ provider: "cursor", retryAfterMs: null },
-			{ provider: "vercel-ai-gateway", retryAfterMs: null },
+			limit("minimax-code", null),
+			limit("minimax-code", null),
+			limit("anthropic", 5_215_000),
+			limit("opencode-go", 200_813_000),
+			limit("cursor", null),
+			limit("cursor", null),
+			limit("vercel-ai-gateway", null),
 		]);
+	});
+
+	test("a lookup that failed, a stream that stalled or timed out, or a dropped connection ends the turn on a transient fault", () => {
+		expect(
+			[recorded.anthropicNotFound, recorded.codexRetryBudget, recorded.codexStalled, recorded.streamTimeout, recorded.socketClosed, recorded.connectionError].map(message => endedOn(failed(message))),
+		).toEqual([
+			{ kind: "transient", provider: "anthropic" },
+			{ kind: "transient", provider: "openai-codex" },
+			{ kind: "transient", provider: "openai-codex" },
+			{ kind: "transient", provider: "minimax-code" },
+			{ kind: "transient", provider: "anthropic" },
+			{ kind: "transient", provider: "anthropic" },
+		]);
+	});
+
+	test("a 429 that omp also counts as transient stays a usage limit", () => {
+		expect(endedOn(failed(recorded.minimaxRateLimit))).toEqual(limit("minimax-code", null));
 	});
 
 	test("a live event's message, which may not carry omp's flags yet, still reads from its error's text", () => {
 		const { errorId: _, ...live } = recorded.minimaxTokenPlan;
-		expect(endedOn(failed(live))).toEqual({ provider: "minimax-code", retryAfterMs: null });
+		const { errorId: __, ...offline } = recorded.anthropicNotFound;
+		expect([endedOn(failed(live)), endedOn(failed(offline))]).toEqual([limit("minimax-code", null), { kind: "transient", provider: "anthropic" }]);
 	});
 
 	test("omp's retry budget prefix keeps the limit it ended on", () => {
-		expect(endedOn(failed({ ...recorded.opencodeGo, errorMessage: `Retry budget exhausted after 3 retries: ${recorded.opencodeGo.errorMessage}` }))).toEqual({
-			provider: "opencode-go",
-			retryAfterMs: 200_813_000,
-		});
+		expect(endedOn(failed({ ...recorded.opencodeGo, errorMessage: `Retry budget exhausted after 3 retries: ${recorded.opencodeGo.errorMessage}` }))).toEqual(limit("opencode-go", 200_813_000));
 	});
 
-	test("an error that is not a usage limit, an abort, or a reply ends the turn on none", () => {
+	test("an error that is neither a usage limit nor transient, an abort, or a reply ends the turn on none", () => {
 		expect(endedOn(failed(recorded.openrouterMaxTokens))).toBeNull();
-		expect(endedOn(failed(recorded.streamTimeout))).toBeNull();
+		expect(endedOn(failed(recorded.usagePreflight))).toBeNull();
 		expect(endedOn({ ...failed(recorded.minimaxTokenPlan), stopReason: "aborted" })).toBeNull();
+		expect(endedOn({ ...failed(recorded.anthropicNotFound), stopReason: "aborted" })).toBeNull();
 		expect(endedOn({ role: "assistant", content: [{ type: "text", text: "ok" }], stopReason: "stop" })).toBeNull();
 	});
 
-	test("only the last assistant message counts: a limit omp recovered from earlier in the turn ends it on none", () => {
+	test("only the last assistant message counts: a failure omp recovered from earlier in the turn ends it on none", () => {
 		expect(endedOn(failed(recorded.minimaxTokenPlan), { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" }, { role: "toolResult", content: [] })).toBeNull();
-		expect(endedOn({ role: "assistant", content: [{ type: "text", text: "starting" }], stopReason: "toolUse" }, { role: "toolResult", content: [] }, failed(recorded.anthropic))).toEqual({
-			provider: "anthropic",
-			retryAfterMs: 5_215_000,
-		});
+		expect(endedOn(failed(recorded.codexStalled), { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" })).toBeNull();
+		expect(endedOn({ role: "assistant", content: [{ type: "text", text: "starting" }], stopReason: "toolUse" }, { role: "toolResult", content: [] }, failed(recorded.anthropic))).toEqual(limit("anthropic", 5_215_000));
 	});
 });

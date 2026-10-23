@@ -15,6 +15,7 @@ import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { createClientHandler, type SocketEnv } from "./socket";
 import { UserTodosFile } from "./user-todos-file";
+import { UserNotesFile } from "./user-notes-file";
 import { WorkspacesFile } from "./workspaces-file";
 import type { Socket, SocketData } from "./views";
 
@@ -37,6 +38,7 @@ function setup(initial: PastSession[]) {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-lists-"));
 	dirs.push(dir);
 	const todos = new UserTodosFile(join(dir, "todos.json"));
+	const notes = new UserNotesFile(join(dir, "notes.json"));
 	const routines = new RoutinesFile(join(dir, "routines.json"));
 	const scheduled = new ScheduledFile(join(dir, "scheduled.json"));
 	const workspaces = new WorkspacesFile(join(dir, "workspaces.json"));
@@ -45,6 +47,7 @@ function setup(initial: PastSession[]) {
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
+		"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
 		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, 1000) },
 		workspaces: {
@@ -179,6 +182,7 @@ describe("registered whole-list broadcasts", () => {
 		const replies: ServerMsg[] = [];
 		const peer = { send: (msg: ServerMsg) => void replies.push(msg) };
 		expect(lists.apply("user-todos", { op: "remove", id: "missing" }, peer)).toBe(false);
+		expect(lists.apply("user-notes", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("routines", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);

@@ -1,9 +1,10 @@
-/** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, and more, under the workspace picker. */
+/** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, notes, and more, under the workspace picker. */
 import { Folder, Keyboard, Search } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import type { Routine } from "../../src/routines";
+import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { SidebarContent, SidebarGroup, SidebarHeader, SidebarMenu } from "@/components/ui/sidebar";
@@ -16,7 +17,7 @@ import { yourMoveCount } from "../pull-requests-model";
 import { folderName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { pullRequestsStore, ticketsStore } from "../reads";
-import { hashForTickets, type SettingsRoute, type SidebarTab, type TodoListView } from "../routing";
+import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -27,6 +28,7 @@ import { SectionLink } from "./section-link";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
 import { InboxNav } from "./inbox/inbox-nav";
+import { NotesNav } from "./notes/nav";
 import { SessionList } from "./session-list";
 import { SettingsNav } from "./settings/settings-nav";
 import { workspaceItems } from "./workspace-picker";
@@ -142,6 +144,11 @@ const SIDEBAR_TAB_FIT = {
 		tab: "@min-[33rem]/sidebar:[&>svg]:hidden @max-[33rem]/sidebar:flex-1 @max-[33rem]/sidebar:justify-center @max-[33rem]/sidebar:px-0.5",
 		label: "@max-[33rem]/sidebar:sr-only",
 	},
+	8: {
+		list: "@max-[36.5rem]/sidebar:self-stretch",
+		tab: "@min-[36.5rem]/sidebar:[&>svg]:hidden @max-[36.5rem]/sidebar:flex-1 @max-[36.5rem]/sidebar:justify-center @max-[36.5rem]/sidebar:px-0.5",
+		label: "@max-[36.5rem]/sidebar:sr-only",
+	},
 } satisfies Record<number, TabFit>;
 
 interface RosterProps {
@@ -173,6 +180,10 @@ interface RosterProps {
 	todoView: TodoListView;
 	/** Unfiltered sessions, so the workspace picker does not hide a todo's linked session. */
 	todoSessions: KnownSessions;
+	/** The Notes page's list, `null` until the server sends it. */
+	userNotes: UserNoteList | null;
+	/** The list the Notes page shows. */
+	notesView: NotesListView;
 	routines: Routine[];
 	/** The page under the Calendar tab that is open. */
 	calendarTab: CalendarTabPage;
@@ -210,6 +221,8 @@ export function Roster({
 	userTodos,
 	todoView,
 	todoSessions,
+	userNotes,
+	notesView,
 	routines,
 	calendarTab,
 	settingsRoute,
@@ -233,7 +246,7 @@ export function Roster({
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
-	const fit = SIDEBAR_TAB_FIT[tabs.length <= 5 ? 5 : tabs.length === 6 ? 6 : 7];
+	const fit = SIDEBAR_TAB_FIT[tabs.length <= 5 ? 5 : tabs.length === 6 ? 6 : tabs.length === 7 ? 7 : 8];
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">
@@ -306,6 +319,11 @@ export function Roster({
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
 					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="notes" asChild>
+				<SidebarContent>
+					<NotesNav list={userNotes} view={notesView} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="calendar" asChild>
