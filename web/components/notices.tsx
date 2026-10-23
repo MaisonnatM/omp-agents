@@ -1,5 +1,5 @@
-/** The sidebar's notices bell: pull request, Slack, provider, calendar, project, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
-import { Bell, CalendarClock, CheckCheck, CircleCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageCircleQuestion, MessageSquare, Sparkles, Users, Wallet, X } from "lucide-react";
+/** The sidebar's notices bell: pull request, Slack, provider, calendar, project, stopped-session, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
+import { Bell, CalendarClock, CheckCheck, CircleAlert, CircleCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, ListRestart, type LucideIcon, MessageCircleQuestion, MessageSquare, Sparkles, Users, Wallet, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import type { PullRequestSummary } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
@@ -32,6 +32,7 @@ const FILTERS: [NoticeSource | "all", string, ReactNode][] = [
 	["providers", "Providers", <Gauge key="providers" aria-hidden className={TAB_LOGO} />],
 	["calendar", "Calendar", <CalendarClock key="calendar" aria-hidden className={TAB_LOGO} />],
 	["projects", "Projects", <Users key="projects" aria-hidden className={TAB_LOGO} />],
+	["sessions", "Sessions", <CircleAlert key="sessions" aria-hidden className={TAB_LOGO} />],
 	["updates", "Updates", <Sparkles key="updates" aria-hidden className={cn(TAB_LOGO, "text-violet-600 dark:text-violet-400")} />],
 ];
 
@@ -76,6 +77,8 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 			return { logo: sparkles, label: "omp" };
 		case "dashboard":
 			return { logo: sparkles, label: "omp-agents" };
+		case "stopped":
+			return { logo: <CircleAlert aria-hidden className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
 		default: {
 			const unhandled: never = notice;
 			return unhandled;
@@ -95,7 +98,7 @@ export function NoticeOrigin({ notice }: { notice: Notice }) {
 }
 const BADGE = "absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full ring-2 ring-popover";
 
-/** A notice's picture: who it comes from with a badge for its source; an update's or a move nobody made's source tile; or a provider's logo with a warning badge. */
+/** A notice's picture: who it comes from with a badge for its source; an update's, a stopped session's, or a move nobody made's source tile; or a provider's logo with a warning badge. */
 function Face({ face }: { face: NoticeFace }) {
 	switch (face.kind) {
 		case "update":
@@ -108,6 +111,12 @@ function Face({ face }: { face: NoticeFace }) {
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
 					<CalendarClock aria-hidden className="m-auto size-4" style={{ color: face.color ?? undefined }} />
+				</span>
+			);
+		case "stopped":
+			return (
+				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-amber-500/10">
+					<CircleAlert aria-hidden className="m-auto size-4 text-amber-600 dark:text-amber-400" />
 				</span>
 			);
 		case "project": {
@@ -191,7 +200,7 @@ function NoticeMerge({ pr, onMerged }: { pr: PullRequestSummary; onMerged: () =>
 	);
 }
 
-/** A notice's button: **Update**, the quick action that makes a pull request's move, or **Merge**. */
+/** A notice's button: **Update**, the quick action that makes a pull request's move, **Merge**, or **Continue all**. */
 function NoticeAction({ id, action, send, onDone }: { id: string; action: Action; send: Send; onDone: () => void }) {
 	const { start } = useDashboardActions();
 	const { connected, starts } = useDashboardStatus();
@@ -231,6 +240,25 @@ function NoticeAction({ id, action, send, onDone }: { id: string; action: Action
 					}}
 				>
 					{QUICK_ACTIONS[action.action].label}
+				</Button>
+			);
+		}
+		case "continue-all": {
+			const resuming = starts.resumeAll?.phase === "starting";
+			return (
+				<Button
+					variant="secondary"
+					size="compact"
+					leadingIcon={ListRestart}
+					loading={resuming}
+					disabled={!connected || resuming}
+					onClick={() => {
+						start({ kind: "resume-all", sessionIds: action.sessionIds });
+						read();
+						onDone();
+					}}
+				>
+					Continue all
 				</Button>
 			);
 		}

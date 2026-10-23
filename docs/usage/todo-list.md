@@ -71,6 +71,7 @@
   A GitHub table and raw HTML are not formatting the editor knows: they show and save as the text you wrote, one block per line.
   Saving an edit rewrites some markdown the way the editor writes it: a sublist indents four spaces, and `_italic_` and `__bold__` become stars.
   A `*`, `_`, `` ` ``, or `~` you type saves as typed, unless one in the note would read as formatting; then each of them saves after a backslash.
+  A top-level todo's **Notes** section also lists separate [Notes page](notes.md) notes linked to it, with **+** to create one titled after the todo.
   A top-level todo then lists its sub-todos, with how many are done, a bar of that share, and each one's status and its priority when it has one; click one to open it, and the **+** adds one.
   A card then shows its latest linked session's work state and, when that live session has a question open, its title and **Reply in session**, which opens that session.
   For an open todo, the card's **Work on it** and **Plan it** start a session on it at once, and **Start session** opens the draft; with no linked session, only those buttons show.

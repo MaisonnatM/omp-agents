@@ -10,6 +10,8 @@ import type { ScheduledSend } from "../src/shared/scheduled";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
 import type { Routine } from "../src/routines";
+import { applyUserNote } from "../src/user-notes";
+import type { UserNoteChange, UserNoteList } from "../src/user-notes-shared";
 import { applyUserTodo } from "../src/user-todos";
 import type { UserTodoChange, UserTodoList } from "../src/user-todos-shared";
 import { applyDelta } from "./keyed-list";
@@ -45,6 +47,8 @@ export interface DashboardState extends PaneNavigation {
 	models: Map<string, ModelList>;
 	/** The Todo page's list, `null` until the server first sends it; a change shows here before the server answers. */
 	userTodos: UserTodoList | null;
+	/** The Notes page's list, `null` until the server first sends it; a change shows here before the server answers. */
+	userNotes: UserNoteList | null;
 	/** Every routine, empty until the server first sends them. */
 	routines: Routine[];
 	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
@@ -66,7 +70,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -85,6 +89,7 @@ export type Action =
 	| { t: "ended"; instanceId: string }
 	| { t: "new-session-completions"; completions: Completions }
 	| { t: "user-todo"; change: UserTodoChange }
+	| { t: "user-note"; change: UserNoteChange }
 	| { t: "pin"; change: PinChange }
 	| ServerAction;
 
@@ -206,6 +211,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, models: new Map(state.models).set(action.instanceId, { data: { models: action.models }, error: action.error }) };
 		case "user-todos":
 			return { ...state, userTodos: action.list };
+		case "user-notes":
+			return { ...state, userNotes: action.list };
 		case "routines":
 			return { ...state, routines: action.routines };
 		case "scheduled":
@@ -224,6 +231,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, reviewDrafts: action.list };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
+		case "user-note":
+			return state.userNotes ? { ...state, userNotes: applyUserNote(state.userNotes, action.change) } : state;
 		case "pin": {
 			const pins = applyPins(state.pins, action.change);
 			return pins === state.pins ? state : { ...state, pins };
@@ -254,6 +263,7 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		usage: null,
 		models: new Map(),
 		userTodos: null,
+		userNotes: null,
 		routines: [],
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },

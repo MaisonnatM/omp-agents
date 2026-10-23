@@ -13,6 +13,10 @@ import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
 import { OrderButton, Section } from "./editor";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { putJson } from "../../api";
+import { useEditableRead } from "../../editable-read";
+import { type ProcessSettings, STOP_IDLE_CHOICES } from "../../../src/shared/processes";
 
 const THEME_OPTIONS: Record<Theme, [string, LucideIcon]> = {
 	system: ["System", Monitor],
@@ -120,7 +124,43 @@ function SessionNotifications() {
 	);
 }
 
-/** The dashboard's own choices, kept in this browser rather than in omp's files. `workspace` names `cwd` for the skill list. */
+type IdleChoice = "off" | "15" | "30" | "60" | "120";
+const IDLE_CHOICES: Record<IdleChoice, string> = { off: "Off", "15": "After 15 minutes", "30": "After 30 minutes", "60": "After 1 hour", "120": "After 2 hours" };
+
+/** When the server stops what sessions run besides omp: once every session a process serves has been idle that long. */
+function IdleProcessStop() {
+	const read = useEditableRead<ProcessSettings>("/api/process-settings");
+	const minutes = read.data?.stopIdleAfterMinutes;
+	const choose = (choice: IdleChoice): void => {
+		const next: ProcessSettings = { stopIdleAfterMinutes: STOP_IDLE_CHOICES.find(each => String(each ?? "off") === choice) ?? null };
+		read.edit(next, () => putJson<ProcessSettings>("/api/process-settings", next));
+	};
+	return (
+		<Section
+			title="Stop idle processes"
+			meta="Dev servers, watchers, and services a session starts besides omp. A process stops once every session it serves has been idle that long; a session's Processes tab shows when. Saved on the server."
+		>
+			{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
+			{minutes !== undefined && (
+				<Select<IdleChoice> items={IDLE_CHOICES} value={minutes === null ? "off" : (String(minutes) as IdleChoice)} onValueChange={next => next && choose(next)}>
+					<SelectTrigger aria-label="Stop idle processes" className="w-fit">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{(Object.keys(IDLE_CHOICES) as IdleChoice[]).map(choice => (
+							<SelectItem key={choice} value={choice}>
+								{IDLE_CHOICES[choice]}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			)}
+			{read.saveError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{`Not saved: ${read.saveError}`}</p>}
+		</Section>
+	);
+}
+
+/** The dashboard's own choices, most kept in this browser rather than in omp's files. `workspace` names `cwd` for the skill list. */
 export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspace: string | null }) {
 	const [theme, setTheme] = useTheme();
 	const { hideTools, hideThinking, toggleTools, toggleThinking } = useContext(ActivityVisibility);
@@ -156,6 +196,7 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 			</Section>
 			<SidebarTabs />
 			<SessionNotifications />
+			<IdleProcessStop />
 			<PinnedSkill cwd={cwd} workspace={workspace} />
 		</>
 	);

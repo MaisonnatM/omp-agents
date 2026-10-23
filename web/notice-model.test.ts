@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { Notice } from "../src/shared/notices";
+import type { Notice, StoppedSession } from "../src/shared/notices";
 import { presentNotice, TOAST_MS } from "./notice-model";
 
 const NOW = 1791000000000;
@@ -30,4 +30,25 @@ test("new omp-agents commits name their count and branch, and their Update pulls
 	const dashboard = (commits: number): Notice => ({ id: "d", ...flags, kind: "dashboard", branch: "main", commits, status: { state: "available" } });
 	expect(presentNotice(dashboard(1), NOW)).toMatchObject({ source: "updates", headline: "omp-agents update: 1 new commit on main", preview: "Update pulls them and restarts omp-agents.", action: { kind: "update", label: "Update", ready: true } });
 	expect(presentNotice(dashboard(4), NOW).headline).toBe("omp-agents update: 4 new commits on main");
+});
+
+test("sessions that stopped mid-turn are counted, named as past sessions are, stay toasted, and Continue all carries their ids", () => {
+	const stopped = (sessions: StoppedSession[]): Notice => ({ id: "x", ...flags, kind: "stopped", sessions });
+	expect(presentNotice(stopped([{ sessionId: "s1", title: "Fix the login", cwdDisplay: "~/code/webapp" }]), NOW)).toMatchObject({ source: "sessions", headline: "1 session stopped mid-turn", preview: "Fix the login" });
+	expect(
+		presentNotice(
+			stopped([
+				{ sessionId: "s1", title: "Fix the login", cwdDisplay: "~/code/webapp" },
+				{ sessionId: "s2", title: null, cwdDisplay: "~/code/api" },
+				{ sessionId: "s3", title: null, cwdDisplay: null },
+			]),
+			NOW,
+		),
+	).toMatchObject({
+		headline: "3 sessions stopped mid-turn",
+		preview: "Fix the login · api · Untitled session",
+		link: null,
+		action: { kind: "continue-all", sessionIds: ["s1", "s2", "s3"] },
+		toast: { kind: "news", timeout: 0 },
+	});
 });

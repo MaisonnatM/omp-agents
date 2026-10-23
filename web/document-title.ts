@@ -20,6 +20,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return page.target ?? "Tickets";
 		case "todo":
 			return "Todo";
+		case "notes":
+			return "Notes";
 		case "routines":
 			return "Routines";
 		case "projects": {

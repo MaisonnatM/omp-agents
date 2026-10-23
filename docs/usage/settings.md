@@ -77,7 +77,7 @@
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
   If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
-- **Preferences** holds the dashboard's own choices, saved in the browser's localStorage, not in omp's files.
+- **Preferences** holds the dashboard's own choices, saved in the browser's localStorage, not in omp's files, except **Stop idle processes**, which the server keeps.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
   **Sidebar tabs** lists the seven sidebar tabs in the order the sidebar shows them, each with the Cmd+number it takes now, a switch that shows or hides it, and buttons that move it up or down.
@@ -86,6 +86,9 @@
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Inbox** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off.
+  **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 minutes, 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
+  A process stops once every session it serves has been idle that long; see [Session details sidebar](session-details-sidebar.md).
+  The server keeps the choice in `processes.json` beside its access token, so it applies with no page open.
   **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the sidebar's workspace, and says which, or your own skills with **All workspaces**.
@@ -99,7 +102,7 @@
   **After a merge**, on by default and kept in the same file, ends each session the dashboard started that is linked to a pull request that merges, once the session is idle and every pull request it submitted or worked on is merged or closed, whether the merge came from the dashboard or anywhere else.
   It never ends an omp session you run in a terminal, nor one another dashboard started, and it leaves a worktree that any live session, a terminal one included, still works in.
   The dashboard sees a merge it made at once, and one made elsewhere within two minutes; a merge made before the dashboard started, or before the session linked the pull request, ends nothing.
-  A session still working when its pull request merges, or waiting to continue after a usage limit, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
+  A session still working when its pull request merges, or waiting to continue after a usage limit or a connection error, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
   A project's workers follow their project's **Workers' pull requests** instead, and a coordinator never ends.
   **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in this browser, and a method the repository does not allow falls back to the first one it does.

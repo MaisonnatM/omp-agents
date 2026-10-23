@@ -71,6 +71,10 @@ _Avoid_: Alert, notification (reserved for session notifications)
 The review a **Review** session saved of one pull request, with its verdict, summary, and findings, which waits in the dashboard for the user to accept, edit, and post.
 _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 
+**Note**:
+A Markdown entry on the Notes page, optionally linked to a top-level todo.
+It is separate from a todo's notes field and from the project and user Markdown directories shown on the Projects page.
+
 ## Unattended work
 
 **Routine**:

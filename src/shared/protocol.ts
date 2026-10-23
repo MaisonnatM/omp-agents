@@ -1,5 +1,6 @@
 /** The messages the dashboard socket carries between the server and the page. */
 import type { Routine, RoutineChange } from "../routines";
+import type { UserNoteChange, UserNoteList } from "../user-notes-shared";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { DiscussionEvent, DiscussionRequest } from "./discussions";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
@@ -43,6 +44,8 @@ export type ServerMsg =
 	| { t: "withdrawn"; view: LiveView; reqId: number; messages: WithdrawnMessage[] }
 	/** The Todo page's list, whole, sent when a socket opens and after every change. */
 	| { t: "user-todos"; list: UserTodoList }
+	/** The Notes page's list, whole, sent when a socket opens and after every change. */
+	| { t: "user-notes"; list: UserNoteList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
@@ -113,6 +116,8 @@ export type ClientMsg =
 	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
 	/** Change the Todo page's list; every socket then gets the list as it is after. */
 	| { t: "user-todo"; change: UserTodoChange }
+	/** Change the Notes page's list; every socket then gets the list as it is after. */
+	| { t: "user-note"; change: UserNoteChange }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
 	/** Schedule a message or a session start, cancel one, take one back to edit, or send one now; every socket then gets the scheduled sends as they are after. */

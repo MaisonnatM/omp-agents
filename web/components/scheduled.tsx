@@ -142,11 +142,13 @@ export function ScheduleButton({ draft, files, disabled, pending, onSchedule }: 
 
 /**
  * `Anthropic 5h reset · Today at 14:32`, or the time alone for one picked by hand. A continue says so:
- * `Continues when Anthropic 5h resets · Today at 14:32`, or, when its provider named no reset, that it tries at a guessed time.
+ * `Continues when Anthropic 5h resets · Today at 14:32`, or, when its provider named no reset, that it tries at a guessed time;
+ * a retry says what it retries after: `Retries after a connection error to Anthropic · Today at 14:32`.
  */
 export function whenLabel(send: ScheduledSend, now: number): string {
 	const when = whenWords(send.at, now);
 	if (send.target.kind === "continue") {
+		if (send.target.cause === "transient") return `Retries after a connection error to ${send.target.provider} · ${when}`;
 		return send.reset ? `Continues when ${send.reset} resets · ${when}` : `Continues · ${when} · ${send.target.provider} did not say when its limit resets`;
 	}
 	return send.reset ? `${send.reset} reset · ${when}` : when;
@@ -242,7 +244,7 @@ function whatOf(target: ScheduledTarget): string {
 		case "message":
 			return "Message";
 		case "continue":
-			return `Continue after the ${target.provider} usage limit`;
+			return target.cause === "transient" ? `Retry after the ${target.provider} connection error` : `Continue after the ${target.provider} usage limit`;
 		case "start":
 			return `New session in ${folderName(target.request.cwd) ?? target.request.cwd}`;
 		default: {

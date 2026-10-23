@@ -250,7 +250,7 @@ describe("SessionGuest follow-ups", () => {
 		socket.frame({ t: "event", event: { type: "agent_start" } });
 		socket.frame({ t: "event", event: { type: "agent_end", isTerminal: false, messages: [] } });
 		socket.frame({ t: "event", event: { type: "agent_end", messages: [{ role: "assistant", content: [{ type: "text", text: "Merged." }] }] } });
-		expect(turns()).toEqual([{ kind: "turn-started" }, { kind: "turn-ended", reply: "Merged.", limit: null }]);
+		expect(turns()).toEqual([{ kind: "turn-started" }, { kind: "turn-ended", reply: "Merged.", failure: null }]);
 	});
 
 	test("a held follow-up can be taken back until its turn ends", async () => {

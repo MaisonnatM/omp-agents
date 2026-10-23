@@ -43,8 +43,12 @@ export class InterruptedSessions {
 	readonly #sessions: Map<string, SessionState>;
 	/** The sessions that ran when the last server stopped and did not survive it. */
 	#stoppedWithServer: ReadonlySet<string> = new Set();
+	readonly #midTurnChanged: () => void;
+	/** {@link midTurn} as {@link #midTurnChanged} last heard it, one id per line. */
+	#reportedMidTurn: string;
 
-	constructor(path: string) {
+	/** `midTurnChanged` runs each time {@link midTurn} changes, except in {@link recover}. */
+	constructor(path: string, midTurnChanged: () => void = () => {}) {
 		this.#file = new JsonFile(path, {
 			parse: value => (isSaved(value) ? value : fromLists(value)),
 			holds: "a list of interrupted sessions",
@@ -52,6 +56,8 @@ export class InterruptedSessions {
 		});
 		const saved = this.#file.load()?.sessions ?? [];
 		this.#sessions = new Map(saved.map(({ id, interrupted, working }) => [id, { interrupted, working }]));
+		this.#midTurnChanged = midTurnChanged;
+		this.#reportedMidTurn = this.midTurn().join("\n");
 	}
 
 	/**
@@ -66,6 +72,8 @@ export class InterruptedSessions {
 			stopped.add(id);
 		}
 		this.#stoppedWithServer = stopped;
+		// The server's start checks the sessions that stopped mid-turn itself, once their files are listed to title them.
+		this.#reportedMidTurn = this.midTurn().join("\n");
 		if (stopped.size > 0) this.#save();
 	}
 
@@ -82,6 +90,11 @@ export class InterruptedSessions {
 	stoppedMidTurn(sessionId: string): boolean {
 		const state = this.#sessions.get(sessionId);
 		return state?.interrupted === true && state.working;
+	}
+
+	/** The interrupted sessions that stopped while their turn ran, by session id. */
+	midTurn(): string[] {
+		return [...this.#sessions].flatMap(([id, { interrupted, working }]) => (interrupted && working ? [id] : [])).toSorted();
 	}
 
 	/** The dashboard sessions that run now, each with whether its turn runs. A session that runs again, once resumed, is no longer interrupted. */
@@ -119,5 +132,9 @@ export class InterruptedSessions {
 
 	#save(): void {
 		this.#file.save({ sessions: [...this.#sessions].map(([id, state]) => ({ id, ...state })) });
+		const midTurn = this.midTurn().join("\n");
+		if (midTurn === this.#reportedMidTurn) return;
+		this.#reportedMidTurn = midTurn;
+		this.#midTurnChanged();
 	}
 }

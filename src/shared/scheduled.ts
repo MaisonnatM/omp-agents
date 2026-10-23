@@ -10,11 +10,15 @@ export type ScheduledTarget =
 	/** A new session, started as the new-session draft would start it; it carries no images. */
 	| { kind: "start"; request: NewSessionRequest }
 	/**
-	 * {@link CONTINUE_PROMPT} to session `sessionId`, sent as a message is, after `provider`'s usage limit ended its turn; `provider` is the name
-	 * the page shows (`Anthropic`), and `reply` the text that turn ended on, `null` for none, which the session's project hears only if the
-	 * continue never goes. The dashboard schedules it, at most one per session, and a turn the session starts first cancels it.
+	 * {@link CONTINUE_PROMPT} to session `sessionId`, sent as a message is, after `provider`'s usage limit (`cause` `usage-limit`) or a
+	 * transient connection or provider fault (`transient`) ended its turn; `provider` is the name the page shows (`Anthropic`), and `reply`
+	 * the text that turn ended on, `null` for none, which the session's project hears only if the continue never goes. The dashboard
+	 * schedules it, at most one per session, and a turn the session starts first cancels it.
 	 */
-	| { kind: "continue"; sessionId: string; provider: string; reply: string | null };
+	| { kind: "continue"; sessionId: string; provider: string; cause: ContinueCause; reply: string | null };
+
+/** What ended the turn a continue picks back up: a provider's usage limit, or a transient connection or provider fault. */
+export type ContinueCause = "usage-limit" | "transient";
 
 /** The prompt that picks a session's cut-off work back up, as one typed in omp's terminal would. */
 export const CONTINUE_PROMPT = "continue";
@@ -83,8 +87,11 @@ function parseScheduledTarget(value: unknown): Parsed<ScheduledTarget> {
 			return { ok: { kind: "start", request: request.ok } };
 		}
 		case "continue": {
-			const { sessionId, provider, reply } = value;
-			return isNonEmpty(sessionId) && isNonEmpty(provider) && (reply === null || typeof reply === "string") ? { ok: { kind: "continue", sessionId, provider, reply } } : null;
+			// A continue saved before transient retries existed has no cause and followed a usage limit.
+			const { sessionId, provider, reply, cause = "usage-limit" } = value;
+			return isNonEmpty(sessionId) && isNonEmpty(provider) && (cause === "usage-limit" || cause === "transient") && (reply === null || typeof reply === "string")
+				? { ok: { kind: "continue", sessionId, provider, cause, reply } }
+				: null;
 		}
 		default:
 			return null;

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { packageDir } from "../../src/omp/install";
@@ -46,19 +46,20 @@ if (input.command) {
 	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
 } else if (input.run) {
-	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false });
-	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null } }));
+	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false, sessionManager });
+	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null }));
 } else {
 	if (!tool) throw new Error("No tool schema registered");
 	console.log(JSON.stringify({ valid: tool.parameters.safeParse(input.params).success }));
 }
 `;
 
-function exercise(name: "ship" | "todos" | "worktree-guard" | "projects" | "google-accounts", input: object, env: Record<string, string> = {}): {
+function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "projects" | "google-accounts", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
 	run: { isError: boolean; stage: string | null };
+	text: string | null;
 	prompt: string[] | null;
 } {
 	const child = Bun.spawnSync([
@@ -182,6 +183,55 @@ describe("user_todo optional due date", () => {
 	test.each([undefined, "2026-10-07", "2026-1-7", "tomorrow"])("date format boundary %s", due => {
 		const { valid } = exercise("todos", { params: { action: "add", text: "Review the PR", due } });
 		expect(valid).toBe(due === undefined || due === "2026-10-07");
+	});
+});
+
+describe("user_note", () => {
+	const root = mkdtempSync(join(tmpdir(), "notes-extension-"));
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+	const env = { XDG_CONFIG_HOME: join(root, "config") };
+	const config = join(root, "config", "omp-agents");
+	const inbox = join(config, "note-inbox");
+	const at = "2026-10-05T09:00:00.000Z";
+	mkdirSync(config, { recursive: true });
+	writeFileSync(
+		join(config, "notes.json"),
+		JSON.stringify({
+			notes: [
+				{ id: "n1", title: "Deploy checklist", body: "Run the staging smoke first.", todoId: "t1", addedBy: null, createdAt: at, updatedAt: at },
+				{ id: "n2", title: "Reading list", body: "Designing Data-Intensive Applications", todoId: null, addedBy: null, createdAt: at, updatedAt: at },
+			],
+		}),
+	);
+	writeFileSync(join(config, "todos.json"), JSON.stringify({ todos: [{ id: "t1", text: "Ship the release" }] }));
+	const call = (params: object, sessionId = "s1") => exercise("notes", { run: true, params, sessionId }, env);
+	const left = () => readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
+
+	test("list keeps the notes holding every word of the query, in any case, and names the todo each belongs to", () => {
+		const { text } = call({ action: "list", query: "SMOKE staging" });
+		expect(text?.split("\n")).toEqual([`- Deploy checklist (id n1, updated ${new Date(at).toLocaleDateString("en-CA")}, todo "Ship the release")`]);
+		expect(call({ action: "list", query: "" }).text?.split("\n")).toHaveLength(2);
+	});
+
+	test("a session adding a note it already added gets the first one's id, and the note lists before the dashboard applies it", () => {
+		const first = call({ action: "add", title: "Findings", body: "The cache misses." });
+		const again = call({ action: "add", title: " Findings ", todo_id: "" });
+		const [added] = left();
+		expect(first.text).toBe(`Added to the user's notes (id ${added.note.id}).`);
+		expect(again.text).toContain(`already added it (id ${added.note.id})`);
+		expect(added.note).toMatchObject({ title: "Findings", body: "The cache misses.", todoId: null, addedBy: "s1" });
+		call({ action: "add", title: "Findings" }, "s2");
+		expect(left()).toHaveLength(2);
+		expect(call({ action: "list", query: "cache" }).text).toContain(`Findings (id ${added.note.id}`);
+	});
+
+	test("append needs a note that exists, and read shows its title and body", () => {
+		expect(call({ action: "append", id: "gone", text: "More" }).run.isError).toBe(true);
+		expect(call({ action: "append", id: "n2", text: "Thinking in Systems" }).run.isError).toBe(false);
+		expect(left().at(-1)).toMatchObject({ op: "append", id: "n2", text: "Thinking in Systems" });
+		expect(call({ action: "read", id: "n1" }).text).toBe("Deploy checklist\n\nRun the staging smoke first.");
+		expect(call({ action: "read", id: "n2" }).text).toBe("Reading list\n\nDesigning Data-Intensive Applications\n\nThinking in Systems");
+		expect(call({ action: "list", query: "thinking systems" }).text).toContain("Reading list (id n2");
 	});
 });
 

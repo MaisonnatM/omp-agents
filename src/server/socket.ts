@@ -146,6 +146,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	"set-fast": ({ sessions }, _peer, { instanceId, enabled }) => sessions.started(instanceId)?.setFast(enabled),
 	answer: ({ sessions }, _peer, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ lists }, peer, { change }) => void lists.apply("user-todos", change, peer),
+	"user-note": ({ lists }, peer, { change }) => void lists.apply("user-notes", change, peer),
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),

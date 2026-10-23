@@ -17,7 +17,7 @@ export interface PaletteView {
 }
 
 export const PALETTE_VIEWS: Record<PaletteViewId, PaletteView> = {
-	root: { title: "omp agents", icon: Command, placeholder: "Search sessions, todos, tickets, pull requests, and commands…", suggestions: 5 },
+	root: { title: "omp agents", icon: Command, placeholder: "Search sessions, todos, notes, tickets, pull requests, and commands…", suggestions: 5 },
 	workspaces: { title: "Choose workspace", icon: Folder, placeholder: "Search workspaces…", suggestions: 0 },
 	createTodo: { title: "Create todo", icon: ListTodo, placeholder: "Todo title, optionally ending in a due day or #category", suggestions: 0 },
 };
@@ -51,12 +51,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "projects" | "past" | "todos" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "createTodo" | "fallback";
+export type HomeSection = "running" | "projects" | "past" | "todos" | "notes" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `note:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`, `fallback:create-note`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -240,6 +240,7 @@ const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }
 	projects: { heading: "Projects", listing: "browsed" },
 	past: { heading: "Past", listing: "browsed" },
 	todos: { heading: "Todos", listing: "searched" },
+	notes: { heading: "Notes", listing: "searched" },
 	tickets: { heading: "Tickets", listing: "searched" },
 	pullRequests: { heading: "Pull requests", listing: "searched" },
 	conversations: { heading: "In conversations", listing: "found" },

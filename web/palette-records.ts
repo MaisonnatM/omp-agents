@@ -4,17 +4,19 @@ import { prKey, pullRequestName, pullRequestUrl, type RepoPullRequests } from ".
 import type { ConversationHit, PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
+import type { UserNote } from "../src/user-notes-shared";
 import type { Accessory, PaletteItem } from "./command-palette";
 import { hostLabel, pastLabel } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
-import { hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
+import { hashForNotes, hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
 import { type SessionEntry, viewOf } from "./session-actions";
 import { TODO_STATUS } from "./todo-views";
 
 export interface PaletteRecords {
 	/** The todo list's top-level todos, each with its own. */
 	todos: readonly UserTodo[];
+	notes: readonly UserNote[];
 	/** The Linear issues assigned to you. */
 	tickets: readonly Ticket[];
 	/** The open pull requests of the sidebar's workspace. */
@@ -22,7 +24,7 @@ export interface PaletteRecords {
 }
 
 /** One palette item for every todo, closed ones too, ticket, and pull request; a todo under another names its parent below its title. */
-export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords): PaletteItem[] {
+export function recordItems({ todos, notes, tickets, pullRequestRepos }: PaletteRecords): PaletteItem[] {
 	const todoItems = todos.flatMap(todo =>
 		[todo, ...todo.children].map(
 			(leaf): PaletteItem => ({
@@ -75,7 +77,17 @@ export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords
 			],
 		};
 	});
-	return [...todoItems, ...ticketItems, ...pullRequestItems];
+	const noteItems = notes.map((note): PaletteItem => ({
+		id: `note:${note.id}`,
+		section: "notes",
+		title: note.title || "Untitled",
+		keywords: [note.body],
+		icon: PAGE_ICON.notes,
+		accessories: [{ kind: "age", at: Date.parse(note.updatedAt) }],
+		kind: "Note",
+		actions: [[{ id: "open", title: "Open note", icon: PAGE_ICON.notes, run: { kind: "link", href: hashForNotes({ kind: "all" }, note.id) } }]],
+	}));
+	return [...todoItems, ...noteItems, ...ticketItems, ...pullRequestItems];
 }
 
 /** Open `view`, whose session ran in `cwd`, in the focused pane or a split, scrolled to message `messageId`. */

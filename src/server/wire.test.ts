@@ -8,7 +8,7 @@ import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -200,7 +200,7 @@ describe("parseClientMsg", () => {
 		expect(add({ at: "tomorrow" })).toBeNull();
 		expect(add({ reset: "" })).toBeNull();
 		expect(change({ op: "remove", id: "" })).toBeNull();
-		const continueTarget = { kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null };
+		const continueTarget = { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit", reply: null };
 		expect(add({ target: continueTarget })).toBeNull();
 		expect(change({ op: "update", send: { ...spec, target: continueTarget } })).toBeNull();
 		expect(change({ op: "continue", send: { ...spec, target: continueTarget } })).toBeNull();
@@ -875,5 +875,15 @@ describe("replay start requests", () => {
 	});
 	test("rejects malformed tokens, settings, and views instead of accepting a raw source path", () => {
 		for (const change of [{ token: null }, { token: "" }, { thinking: 3 }, { prompt: {} }, { model: { provider: "openai-codex" } }, { view: { file: "/arbitrary/source.jsonl" } }]) expect(msg({ ...start, ...change })).toBeNull();
+	});
+});
+
+describe("parseProcessStop", () => {
+	test("takes a session's instance id and one of its process ids, and nothing else", () => {
+		expect(parseProcessStop({ instanceId: "i1", id: '["job",110,"Fri Oct 3 09:00:00 2026"]' })).toEqual({ ok: { instanceId: "i1", id: '["job",110,"Fri Oct 3 09:00:00 2026"]' } });
+		expect(parseProcessStop({ instanceId: "i1", id: "" })).toBeNull();
+		expect(parseProcessStop({ instanceId: " ", id: "x" })).toBeNull();
+		expect(parseProcessStop({ instanceId: "i1", id: 7 })).toBeNull();
+		expect(parseProcessStop(null)).toBeNull();
 	});
 });

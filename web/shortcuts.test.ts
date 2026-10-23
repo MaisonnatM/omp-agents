@@ -49,7 +49,7 @@ test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's wind
 test("browser-reserved chords stay the browser's, apart from app new-session and PR-close bindings", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [key, code] of [["t", "KeyT"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["9", "Digit9"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 		expect(pressOn(mac, "w", "KeyW", mod)).toEqual(["closePullRequestTab"]);
@@ -58,9 +58,9 @@ test("browser-reserved chords stay the browser's, apart from app new-session and
 	}
 });
 
-test("Cmd+1–7 go to the sidebar's tabs by position on macOS, Ctrl+1–7 elsewhere, including AZERTY", () => {
-	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
-	const azerty = ["&", "é", "\"", "'", "(", "-", "è"];
+test("Cmd+1–8 go to the sidebar's tabs by position on macOS, Ctrl+1–8 elsewhere, including AZERTY", () => {
+	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7", "tab8"] as const;
+	const azerty = ["&", "é", "\"", "'", "(", "-", "è", "_"];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
 		for (const [index, id] of positions.entries()) {
@@ -83,7 +83,7 @@ test("a letter key that types no ASCII letter matches by its physical key, an AS
 	expect(pressOn(true, "˚", "KeyK", { meta: true })).toEqual(["switcher"]);
 	expect(press("?", "KeyM", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);
-	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer", "todoSearch"]);
+	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer", "todoSearch", "notesSearch"]);
 	expect(pressOn(true, "÷", "Slash", { meta: true, alt: true })).toEqual(["model"]);
 });
 
@@ -103,6 +103,7 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([
 		{ id: "restore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
+		{ id: "notesClose", scope: "outside-fields", key: 0 },
 		{ id: "inboxClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
@@ -110,6 +111,7 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([
 		{ id: "focusComposer", scope: "outside-fields", key: 0 },
 		{ id: "todoSearch", scope: "outside-fields", key: 0 },
+		{ id: "notesSearch", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("i", "KeyI", { ctrl: true }), null, false)).toEqual([{ id: "focusComposer", scope: "anywhere", key: 1 }]);
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
@@ -119,9 +121,9 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	]);
 });
 
-test("↓ and ↑ step through sessions, pull requests, todos, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "inboxNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "inboxPrevious", "previousChangedFile"]);
+test("↓ and ↑ step through sessions, pull requests, todos, notes, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "notesNext", "inboxNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "inboxPrevious", "previousChangedFile"]);
 	expect(press("j", "KeyJ")).toEqual([]);
 	expect(press("k", "KeyK")).toEqual([]);
 });
@@ -134,12 +136,14 @@ test("Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", 
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then R, P, W, or I goes to a page only right after a plain G, and P alone picks a todo's priority", () => {
+test("G then N, R, P, W, or I goes to a page only right after a plain G, and P alone picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	// R alone replies on an open conversation, so after a G both match, as G then P does below.
 	expect(after("g", "r")).toEqual(["routines", "inboxReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "i")).toEqual(["inbox"]);
+	expect(after("g", "n")).toEqual(["notes"]);
+	expect(after(null, "n")).toEqual([]);
 	expect(after(null, "i")).toEqual([]);
 	expect(after(null, "w")).toEqual([]);
 	expect(after("h", "w")).toEqual([]);

@@ -3,7 +3,7 @@ import { isObject } from "../src/json";
 import { errorText, getJson } from "./api";
 import { keyedStore } from "./keyed-store";
 
-/** How often an open page asks again; the server answers from its cache in between. */
+/** How often an open page asks again by default; the server answers from its cache in between. */
 const POLL_MS = 60_000;
 
 export interface PolledRead<T> {
@@ -24,6 +24,8 @@ interface PolledStoreOptions<T> {
 	url: (scope: string | null, fresh: boolean) => string;
 	/** Keeps reads in localStorage, each through `decode` when the page loads, which answers `null` for a read kept in another shape; omitted for memory-only stores. */
 	cache?: { key: string; decode: (raw: unknown) => T | null };
+	/** How often a mounted component reads again; {@link POLL_MS} when omitted. */
+	pollMs?: number;
 }
 
 /**
@@ -31,7 +33,7 @@ interface PolledStoreOptions<T> {
  * while a page that uses it is open. The scope names what the read is about, such as a workspace; it is `null`
  * for a read about everything, or in a store with one entry. Entries and their cache hold `null` under `""`.
  */
-export function createPolledStore<T>({ url, cache }: PolledStoreOptions<T>) {
+export function createPolledStore<T>({ url, cache, pollMs = POLL_MS }: PolledStoreOptions<T>) {
 	const empty: PolledEntry<T> = { read: null, error: null, refreshing: false };
 
 	function storedEntries(): Map<string, PolledRead<T>> {
@@ -115,7 +117,7 @@ export function createPolledStore<T>({ url, cache }: PolledStoreOptions<T>) {
 	}
 
 	/**
-	 * Reads `scope` now and every {@link POLL_MS} until the returned function is called. Callers of the same scope share
+	 * Reads `scope` now and every `pollMs` until the returned function is called. Callers of the same scope share
 	 * one timer: the first starts it, and the last to stop clears it.
 	 */
 	function poll(scope: string | null = null): () => void {
@@ -125,7 +127,7 @@ export function createPolledStore<T>({ url, cache }: PolledStoreOptions<T>) {
 			running.callers += 1;
 		} else {
 			void refresh(scope);
-			pollers.set(key, { callers: 1, timer: setInterval(() => void refresh(scope), POLL_MS) });
+			pollers.set(key, { callers: 1, timer: setInterval(() => void refresh(scope), pollMs) });
 		}
 		return () => {
 			const poller = pollers.get(key);
@@ -143,7 +145,7 @@ export function createPolledStore<T>({ url, cache }: PolledStoreOptions<T>) {
 	return {
 		/** `scope`'s entry, as the store last read it. */
 		use: (scope: string | null = null): PolledEntry<T> => useEntry(scope, false),
-		/** `scope`'s entry, read again now and every {@link POLL_MS} while mounted and `enabled`, showing the kept read meanwhile. */
+		/** `scope`'s entry, read again now and every `pollMs` while mounted and `enabled`, showing the kept read meanwhile. */
 		usePolling: (scope: string | null = null, enabled = true): PolledEntry<T> => useEntry(scope, enabled),
 		poll,
 		refresh,

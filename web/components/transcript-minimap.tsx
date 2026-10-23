@@ -23,12 +23,18 @@ const VIEWPORT = '[data-slot="message-scroller-viewport"]';
 /** Gestures that mean the reader scrolls the transcript themselves, which ends a jump's pin. */
 const READER_SCROLL = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
 
-/** The transcript viewport beside the rail: both sit in the same `MessageScroller`. */
-const viewportOf = (rail: HTMLElement | null): HTMLElement | null =>
-	rail?.closest('[data-slot="message-scroller"]')?.querySelector<HTMLElement>(VIEWPORT) ?? null;
+/** The transcript viewport around `inside`, which sits in the same `MessageScroller`. */
+export const viewportOf = (inside: HTMLElement | null): HTMLElement | null =>
+	inside?.closest('[data-slot="message-scroller"]')?.querySelector<HTMLElement>(VIEWPORT) ?? null;
 
-const messageIn = (viewport: HTMLElement, id: string): HTMLElement | null =>
+export const messageIn = (viewport: HTMLElement, id: string): HTMLElement | null =>
 	viewport.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(id)}"]`);
+
+/** Scrolls `viewport` alone to `message`, since `scrollIntoView` would also scroll the pane's clipped ancestors. */
+export function scrollToMessage(viewport: HTMLElement, message: HTMLElement, reduceMotion: boolean): void {
+	const top = viewport.scrollTop + message.getBoundingClientRect().top - viewport.getBoundingClientRect().top - SCROLL_GAP;
+	viewport.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+}
 
 /** The turn whose prompt last crossed the reading line. */
 function readingTurn(turns: OutlineTurn[], viewport: HTMLElement): string | null {
@@ -81,9 +87,7 @@ function useReadingTurn(turns: OutlineTurn[], rail: RefObject<HTMLElement | null
 		if (!viewport || !message) return;
 		pinned.current = id;
 		setCurrent(id);
-		// Set the viewport alone, since `scrollIntoView` would also scroll the pane's clipped ancestors.
-		const top = viewport.scrollTop + message.getBoundingClientRect().top - viewport.getBoundingClientRect().top - SCROLL_GAP;
-		viewport.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+		scrollToMessage(viewport, message, reduceMotion);
 	};
 	return { current, jump };
 }

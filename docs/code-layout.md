@@ -33,6 +33,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from `outline` in `web/transcript-view.ts`.
+  **Chat history**, the blurred column of the session's prompts over it, is `PromptHistory` in `web/components/prompt-history.tsx`, opened by `PromptHistoryButton` from the same file in the live composer's `rightSlot` in `web/components/conversation.tsx`.
   A tool row's image thumbnails open one viewer that the transcript owns, `ImageViewer` from `web/components/media-viewer.tsx`, over every tool image of the conversation.
 - Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the road-icon toggle after the session's title in `web/components/pane.tsx` swaps for the transcript.
 - Replay from here: the sibling prompt-row action in `web/components/trajectory.tsx` opens `ReplayDialog` in `web/components/replay-dialog.tsx`; `FormDialog` provides its focus, escape, and pending-submit behavior.
@@ -40,7 +41,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts; a project's coordinator shows `web/components/project-details.tsx` instead.
-  Its tabs are **PRs** in `session-pull-requests-tab.tsx` and **Tickets** in `session-tickets-tab.tsx`, both in `web/components/`.
+  Its tabs are **PRs** in `session-pull-requests-tab.tsx`, **Tickets** in `session-tickets-tab.tsx`, and **Processes** in `session-processes-tab.tsx`, all in `web/components/`.
   The **Images** section and the transcript share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in a new tab, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
   The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.
@@ -69,6 +70,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
+  - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`.
   - Inbox: `web/components/inbox/inbox-page.tsx`.
   - Routines: `web/components/routines/routines-page.tsx`.
@@ -102,6 +104,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Routines, Projects, Calendar, and Inbox](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Routines, Projects, Calendar, and Inbox](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

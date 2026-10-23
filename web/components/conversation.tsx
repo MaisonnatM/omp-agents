@@ -32,6 +32,7 @@ import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
 import { ScheduleButton, ScheduledMessages, useScheduleSend } from "./scheduled";
 import { deliveryOf, type Subject, subjectOf } from "./subject";
+import { PromptHistoryButton } from "./prompt-history";
 import { Trajectory } from "./trajectory";
 import { Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
@@ -335,6 +336,7 @@ function LiveConversation({
 								{sessionId !== null && writable && (
 									<ScheduleButton draft={draft} files={attachments.files.length} disabled={!connected} pending={schedule.pending} onSchedule={schedule.run} />
 								)}
+								{!trajectory && <PromptHistoryButton view={view} />}
 								{writable && <AttachButton onClick={() => openFilePicker()} />}
 							</>
 						)}

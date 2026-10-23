@@ -2,9 +2,10 @@ import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "
 import type { Notice } from "../../src/shared/notices";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
+import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { PaletteEvent } from "../command-palette";
-import type { PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
+import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
@@ -29,6 +30,8 @@ interface AppSidebarProps {
 	/** The server has sent the session lists. */
 	listed: boolean;
 	userTodos: UserTodoList | null;
+	userNotes: UserNoteList | null;
+	notesView: NotesListView;
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	hosts: RosterHost[];
 	past: PastSession[];
@@ -58,6 +61,8 @@ export const AppSidebar = memo(function AppSidebar({
 	tabs,
 	listed,
 	userTodos,
+	userNotes,
+	notesView,
 	hosts,
 	past,
 	notices,
@@ -106,6 +111,8 @@ export const AppSidebar = memo(function AppSidebar({
 			onTab={onTab}
 			userTodos={userTodos}
 			todoView={todoView}
+			userNotes={userNotes}
+			notesView={notesView}
 			todoSessions={todoSessions}
 			routines={routines}
 			calendarTab={calendarTab}

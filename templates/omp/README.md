@@ -71,6 +71,8 @@ Files, in `agent/`:
   On any other branch the main checkout is edited in place, as `AGENTS.md` asks, and the clones omp makes for `isolated: true` subagents pass too.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add/check changes.
   An omitted or empty `due` value means no due date; a nonempty value must use `YYYY-MM-DD`.
+- `extensions/notes.ts`: `user_note` lists and reads the dashboard's notes and queues add/append changes.
+  An empty parameter reads as left out, and a session that adds a title it already added gets that note's id back.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.
 
