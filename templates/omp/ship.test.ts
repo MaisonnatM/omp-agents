@@ -8,8 +8,11 @@ const extension: {
 	prSelector(args: string[]): string[];
 	selectorOwner(selector: string[]): string | undefined;
 	otherOwner(owner: string | undefined, repo: string | undefined): boolean;
+	publishBlocker(body: string): string | undefined;
+	CHECKBOX: string;
+	PROOF_BOX: string;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
-const { commands, ghPr, prSelector, selectorOwner, otherOwner } = extension;
+const { commands, ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, CHECKBOX, PROOF_BOX } = extension;
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
 function readySelectors(line: string): string[][] {
@@ -56,5 +59,27 @@ describe("ship command parsing", () => {
 		[undefined, "maxence/omp-agents", false],
 	])("%s against %s differs: %s", (owner, repo, differs) => {
 		expect(otherOwner(owner, repo)).toBe(differs);
+	});
+});
+
+describe("publish gate", () => {
+	const reviewed = `## Checks\n${CHECKBOX}`;
+
+	test("a reviewed PR without a proof box goes live", () => {
+		expect(publishBlocker(reviewed)).toBeUndefined();
+	});
+
+	test("an unreviewed PR is blocked on the review", () => {
+		expect(publishBlocker(PROOF_BOX)).toContain(CHECKBOX);
+	});
+
+	test.each([PROOF_BOX, `  ${PROOF_BOX} (UI changes: run verify-yampa, attach screenshot)`])("a reviewed PR with %j is blocked on the box", box => {
+		const reason = publishBlocker(`${reviewed}\n${box}`);
+		expect(reason).toContain(PROOF_BOX);
+		expect(reason).not.toContain(CHECKBOX);
+	});
+
+	test.each(["- [x] Browser proof", "- [X] Browser proof (UI changes)"])("a reviewed PR with %j goes live", box => {
+		expect(publishBlocker(`${reviewed}\n${box}`)).toBeUndefined();
 	});
 });
