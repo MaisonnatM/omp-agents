@@ -26,6 +26,19 @@ describe("docs stay readable by agents", () => {
 	});
 });
 
+/**
+ * Agents read a whole doc or grep across one, so a large file costs every reader that opens it.
+ * Split a doc that grows past this into one file per feature, as `docs/usage/`, `docs/architecture/`, and `docs/code-layout/` are.
+ */
+const MAX_BYTES = 32 * 1024;
+
+describe("docs stay small enough to read whole", () => {
+	test.each(docs)("%s", file => {
+		const bytes = Bun.file(join(root, file)).size;
+		expect(bytes > MAX_BYTES ? `${bytes} bytes; split it into files under ${MAX_BYTES} bytes` : null).toBeNull();
+	});
+});
+
 /** A backticked path from the repository root, such as `web/app.tsx`; spaces, globs, and `<placeholders>` never match. */
 const REPO_PATH = /`((?:src|web|desktop|scripts|templates|docs)\/[^`\s*<>{}]*)`/g;
 /** Build output the checkout does not hold until a build. */

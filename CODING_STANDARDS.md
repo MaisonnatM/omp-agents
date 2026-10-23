@@ -9,9 +9,10 @@ Then read the section for the work: [omp imports](#omp-imports), [omp internals]
 - Add or update tests for behavior you change.
 - Run `bun test` and `bun run typecheck` and fix what they report.
   After you change `desktop/`, run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
-- Update `docs/usage.md` when the interface changes, `docs/architecture.md` when the server or a protocol changes, and `docs/code-layout.md` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
+- Update `docs/usage/` when the interface changes, `docs/architecture/` when the server or a protocol changes, and `docs/code-layout/` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
+  Each of `docs/usage.md`, `docs/architecture.md`, and `docs/code-layout.md` lists its directory's files, one per feature; add a file there when you add one, and split a file before it reaches the 32 KiB that `src/docs.test.ts` allows.
   The README holds only features, installation, and configuration.
-- Look a feature up in `docs/usage.md` by the words the page shows, such as a button's or a tab's label, rather than by a code identifier, which the interface docs rarely name.
+- Look a feature up in `docs/usage/` by the words the page shows, such as a button's or a tab's label, rather than by a code identifier, which the interface docs rarely name.
 - Bump the tested omp version at all five of its pins together: `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, and the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
   Bump Bun's version in both workflows together with the README's.
   Check a new omp release with `bun run omp-release` and the [omp release skill](.agents/skills/omp-release/SKILL.md) before you bump it.
@@ -25,7 +26,7 @@ It checks each export this app uses at startup, so add a new export there.
 ## omp internals
 
 Read omp's docs before its source: `omp://rpc.md` (RPC frames and commands), `omp://session.md` (session file format), `omp://collab.md`, and `omp://extensions.md`.
-Then read [omp modules](docs/architecture.md#omp-modules), which lists the source files this app uses.
+Then read [omp modules](docs/architecture/omp-modules.md), which lists the source files this app uses.
 After you read omp's source to learn a subsystem, add its files and the exports you used there, so the next agent starts there.
 
 ## Where changes go
@@ -42,5 +43,5 @@ Tools that read a doc cut a line at 768 characters, and an edit that copies the 
 
 ## Template sync
 
-After you edit an installed file under `~/.omp/agent/` that `templates/omp/` also holds, copy it into the matching file there; [Starter kit and docs](docs/code-layout.md#starter-kit-and-docs) says which of `agent/` and `maintainer/` holds it.
+After you edit an installed file under `~/.omp/agent/` that `templates/omp/` also holds, copy it into the matching file there; [Starter kit and docs](docs/code-layout/starter-kit-and-docs.md) says which of `agent/` and `maintainer/` holds it.
 `bun run omp-template --dry-run` lists a copy that has drifted as `keep yours`.

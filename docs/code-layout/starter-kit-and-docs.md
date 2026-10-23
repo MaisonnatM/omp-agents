@@ -1,0 +1,21 @@
+# Starter kit and docs
+
+`templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
+Its `agent/` files are the default kit.
+`templates/omp/README.md` lists what each of its extensions does.
+`agent/extensions/google-accounts.ts` tells a session which Google account each Gmail and Google Calendar MCP server signs in as, and which addresses its workspace links; `templates/omp/google-accounts.test.ts` tests its workspace lookup against a real repository and a linked worktree outside it, and its prompt text, and `templates/omp/extensions.test.ts` runs its hook on scratch files.
+`agent/extensions/request-log.ts` both records each provider request and, run with Bun, rebuilds the requests a session file records and checks their hashes; `templates/omp/request-log.test.ts` records requests through omp's own blob store and checks every rebuilt body against the one sent.
+`agent/extensions/ship.ts` gates draft PRs and putting a PR live on bash commands it splits into words outside quotes; `templates/omp/ship.test.ts` tests that parsing, the `gh pr view` selector it builds from a `gh pr ready`, the owner check that skips the gate for someone else's repository, and `publishBlocker`, which requires the thermonuclear checkbox and no unchecked `- [ ] Browser proof` box.
+`maintainer/` is the maintainer git profile, `AGENTS.md` and `templates/omp/maintainer/docs/git-workflow.md`, copied only when you pass `--maintainer`, and a file there replaces the `agent/` file with the same path.
+[Template sync](../../CODING_STANDARDS.md#template-sync) says how to copy an edited live file back.
+The default `agent/AGENTS.md` keeps worktree and force-push safety inline and links to the model and review references under `agent/docs/`.
+The profile's `templates/omp/maintainer/docs/git-workflow.md` detects Graphite with `git rev-parse --path-format=absolute --git-common-dir`, so the same procedure works from a checkout, a linked worktree, or a nested directory.
+The repository's agent guide links to the [coding standards](../../CODING_STANDARDS.md), which every contributor follows, and to [agent smoke checks](../agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
+It also links [decisions](../decisions.md), why each design choice was made, [`LEARNINGS.md`](../../LEARNINGS.md), pitfalls agents hit here, and [`GLOSSARY.md`](../../GLOSSARY.md), the project's vocabulary.
+[Getting started](../getting-started.md) walks a new user through a first session and each integration's sign-in, and `docs/images/` holds the README's screenshot.
+`docs/usage.md`, `docs/architecture.md`, and `docs/code-layout.md` are indexes, one line per file in `docs/usage/`, `docs/architecture/`, and `docs/code-layout/`, so an agent reads only the feature it needs; `src/docs.test.ts` fails a doc over 32 KiB.
+`patches/omp-18.12.3-paid-cursor-fallback.patch` preserves the external OMP runtime's paid Cursor fallback implementation and regression tests against upstream `v18.12.3`.
+It is not loaded or applied by the dashboard; [omp modules](../architecture/omp-modules.md) describes its base, application, and installation boundary.
+`scripts/omp-release.ts` (`bun run omp-release [version]`) checks an omp release against this codebase: it installs that release and the tested one, runs `src/omp/modules.ts` and `bun test` against the release, and writes a report of the test result, the omp files that changed between the two, and their changelogs to `node_modules/.cache/`.
+`.agents/skills/omp-release/SKILL.md` is the skill an agent follows to sort that report into what must change, what to adopt, and docs drift, and to open the version bump when only the pins must change.
+`scripts/pr-parity.ts` (`bun scripts/pr-parity.ts --omp <sign-in address> [--t3 <url>]`) screenshots the pull request panel of a running dashboard, and of T3 Code when `--t3` names one, in the same states at one viewport and panel width, masks avatars and relative times, and writes the PNGs, side-by-side and pixelmatch diff images, and a `report.md` of diff ratios to `tmp/parity/<run>/`; [Parity harness](../agent-smoke.md#parity-harness) says how to run it.

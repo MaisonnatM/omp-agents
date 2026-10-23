@@ -5,7 +5,7 @@ description: Check a new omp release against omp-agents before the tested versio
 
 # omp release check
 
-omp-agents imports omp's own modules from the installed package (see [omp modules](../../../docs/architecture.md#omp-modules)), so each omp release can break it, change behavior it relies on, or add something the dashboard should handle.
+omp-agents imports omp's own modules from the installed package (see [omp modules](../../../docs/architecture/omp-modules.md)), so each omp release can break it, change behavior it relies on, or add something the dashboard should handle.
 This check finds which, with evidence, and moves the version pins only when nothing else needs to change.
 
 An unattended run (a routine started the session, or the prompt says unattended) makes every call itself and ends with the report; it never asks a question.
@@ -41,13 +41,13 @@ Remove the clone afterwards.
 ## 4. Sort every finding
 
 Go through every changelog section and every changed file in the report.
-For each, find what in this repository it touches: the bullet of [omp modules](../../../docs/architecture.md#omp-modules) that names the file, the `src/omp/` file that loads it, and the callers of the export, found with grep.
+For each, find what in this repository it touches: the bullet of [omp modules](../../../docs/architecture/omp-modules.md) that names the file, the `src/omp/` file that loads it, and the callers of the export, found with grep.
 Each finding goes in one bucket:
 
 - **MUST change**: a failing test or module check, an export or behavior this repository relies on that the release changed (RPC frames and commands, the session file format, settings keys, paths), a patch whose source hunks no longer apply, and the version pins, which every newer release needs.
   The pins are `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, and the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
 - **SHOULD adopt**: a new capability the dashboard should handle as an RPC host or a session viewer, such as a new RPC command, frame, or field, a new session entry type, or a new extension UI request.
-- **Docs drift**: a statement in `docs/architecture.md`, `docs/usage.md`, or `docs/code-layout.md` that the release makes false, such as a moved file, a renamed export, or changed behavior that a doc describes.
+- **Docs drift**: a statement under `docs/architecture/`, `docs/usage/`, or `docs/code-layout/` that the release makes false, such as a moved file, a renamed export, or changed behavior that a doc describes.
 
 Every finding carries four pieces of evidence: the changelog version, the quoted changelog entry (or `no changelog entry` for one found only in a diff), the repository `file:line` it affects, and the omp `file:line` that shows it.
 A changed file with no finding goes on a No impact line with a one-sentence reason.

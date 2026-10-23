@@ -1,0 +1,85 @@
+# Sessions sidebar
+
+- The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
+- The dot before each session shows its state.
+  Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
+- Under **All workspaces**, a session row with a title starts with a badge that names its workspace, the last segment of its working directory.
+  With one workspace picked, the rows show no badge.
+  A row without a title shows the workspace's name as its label, with no badge.
+- The workspace picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
+  It lists the directories that a live or saved session ran in, live sessions' directories first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces.
+  The session counts then count that directory's sessions only, such as `2 running` and `9 past`.
+  Picking a workspace also opens its most recently started running session in the focused pane, unless that pane already shows a session from the workspace or a page such as a pull request, Settings, or the new-session draft covers the panes.
+  Choose **All workspaces** to list every session again.
+  The choice is saved in the browser's localStorage.
+  If no session from the saved directory is left, the sidebar lists every session.
+- **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
+  It shows its key, Cmd+N, on its right.
+- The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
+  A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
+  While empty, it shows its key, Cmd+F, on its right.
+  Cmd+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, the browser's Find keeps Cmd+F.
+  Cmd+K opens the command menu, which searches every workspace instead.
+- Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
+  Starting or opening one does not replace the saved workspace.
+  Their saved transcripts remain available through a direct session link.
+- A workspace hidden in **Settings › Workspaces** is left out the same way, but only its own directory: sessions in a directory inside it stay listed.
+- **Pin** in a row's menu moves the session to the **Pinned** group at the top of the list, and **Unpin** moves it back.
+  The group lists pinned running sessions first, then pinned past ones, interrupted ones first, and shows only while it has a row.
+  A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
+  The selected workspace applies to the group too.
+  The server keeps the pins in `pins.json` beside its access token, by session id, so every browser tab and the desktop app show the same ones.
+  Pins that a browser kept before then move to the server the first time its page connects.
+- Each project lists its coordinator and workers in a group of its own at the top of the list, above **Pinned**, even when they run in `/tmp`; see [Projects](projects.md).
+- A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
+  A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
+  The group shows only while it has a row.
+- Click the **Pinned**, **Idle**, **Running**, **Interrupted**, or **Past** group label to collapse or expand its rows.
+  The browser's localStorage keeps each group's choice across tabs, workspaces, navigation, and reloads, even while the group has no rows.
+- The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
+  Select one to read its transcript.
+  The page cannot write to it until you resume it.
+  A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
+  Claude Code's sessions in `~/.claude/projects` and Codex's in `~/.codex/sessions` list here too, among omp's.
+  `CLAUDE_CONFIG_DIR` and `CODEX_HOME` move those directories as they move them for their agents.
+  Their rows name their source first among their details, **Claude Code** or **Codex**; omp's rows name no source.
+  Their transcripts keep updating while the agent writes, and the conversation search finds their prompts and replies.
+  They are read-only: the pane's header reads `Read-only · Claude Code` or `Read-only · Codex`, and neither the header nor the row's menu offers **Resume** or **Fork from here**.
+  An unknown or malformed line shows in the transcript as one warning with the line's start, alongside any text or tools the reader understood.
+  Their subagents' sessions are left out of the list.
+  The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
+- The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because omp exited on its own, or stopped while no dashboard ran, as when the computer restarted.
+  A session the dashboard started keeps running when the dashboard server stops, restarts, or crashes, turn, background jobs, and subagents included, and the next server shows it live again, so it never shows here for that.
+  It shows as working again when its turn ran, compacted, or waited on a background job's result as the server stopped.
+  The group shows only while it has a row.
+  Its **Resume all** button resumes every session it lists, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
+  A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
+  When some fail to start, a note under the group label names how many and the first reason, until **Dismiss**.
+  **Move to past** in a row's menu moves it to the past sessions.
+  A session that you end, resume, or move leaves the group.
+  The server keeps the list in `interrupted.json` beside its access token, so it survives a restart.
+  Sessions started in a terminal keep running when the dashboard stops too, and never show here.
+- The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under the header, and the bottom fades while more rows sit below.
+- Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, or the left edge of the session details sidebar.
+  With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
+  Double-click the edge to reset the width.
+  Resize handles show no tooltip on hover or while dragging.
+  The button at the outer corner of the sessions sidebar's header hides it: the sidebar slides shut and the button glides with its edge to the narrow strip it leaves, on the header's line, where a click shows it again.
+  Both sidebars slide open and shut in about a quarter second, or at once when the system asks for reduced motion.
+  The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
+  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
+  Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
+- The left sidebar's session rows leave out the full working directory and the model; hover the workspace in the pane header to see the directory, and the composer shows the model.
+- A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
+  Hover the logo to see the plan's name and account, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
+  A provider without a logo shows the plan's name instead.
+  A window is named by its length plus its model tier (`7d fable`).
+  Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
+  Amber means less than 20% is left, and red means the window is used up, as omp reports it.
+  Hover or focus a window to see omp's full limit name and when it resets.
+  Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
+  A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
+  The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
+- The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
+  The strip reads them again every five seconds while the page is visible.
+- **Terminal**, at the start of the strip's right side, shows or hides the [terminal](terminal.md).

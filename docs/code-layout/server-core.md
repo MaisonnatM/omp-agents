@@ -1,0 +1,45 @@
+# Server: entry point, routes, sockets, and session registry
+
+- `src/server.ts`: the entry point.
+  Builds the page, loads the access token, builds the `Dashboard`, starts the HTTP and WebSocket server on its routes and socket handlers, then starts it.
+  `PORT` sets the port, 4317 by default.
+  On `SIGINT`, `SIGTERM`, or the desktop shell's pipe ending, `shutdown()` awaits `Dashboard.stop` before it stops the server and exits; the process's `exit` handler calls `Dashboard.exited`, which writes what the stores have not and releases the owner lock, however the process exits.
+  `restart()`, which **Update dashboard** calls, stops the same way, keeps the owner lock for the same pid and port, and runs the server's own command again in the same process through `process.execve`; a signal or the pipe ending during a restart makes it exit instead.
+  Every dashboard socket first hears the page's build, `pageBuild` in `src/server/page.ts`, so a page another build served reloads.
+- `src/preflight.ts`: the first import of `src/server.ts`.
+  It checks the Bun version and loads `src/omp/install.ts`, so a missing requirement, such as `omp` absent from `PATH`, prints one `omp-agents:` line saying how to fix it and exits 1 instead of a stack trace.
+- `src/server/dashboard.ts`: `Dashboard`, the composition root: it builds the stores, `LiveSessions`, `Views`, `Notices`, `ListRegistry`, `Broadcasts`, the inboxes, `Worktrees`, the starter, `RoutineRunner`, `ProjectRunner`, `MergeCleanup`, `MergeQueue`, `Loops`, and the socket handler in dependency order, each handed the parts above it, and owns the live-update switch, the registry listing, the file rescans, the activity check, the merge queue's 15-second loop, and the owner lock's takeover.
+  Two edges point down, closing the only cycles: a live session's update reaches the parts built after `LiveSessions`, and a notice change reaches the `Broadcasts` that reads the notices; no constructor calls either.
+  It also owns the `ForeignUsage` index that each Analytics read refreshes.
+  Nothing follows the registry, watches a directory, or publishes before `start(server)`; `stop()` first stops the loops and both inboxes, so no tick publishes while the rest shuts down, then ends the sessions started here, hangs up on the shells, stops omp-stats, flushes the stores, and aborts the routine commands still running.
+- `src/server/list-registry.ts`: `ListRegistry`, the authoritative builders for the nine whole-list socket messages, registered beside their store apply functions in `Dashboard`.
+  An edit publishes its list when it changes; a no-op resends the current list only to its requesting peer.
+  Routines and scheduled sends register only edits: their run-now and send-now actions stay with their runners, and notices and the queued merges keep their own action handlers.
+- `src/server/broadcasts.ts`: `Broadcasts`, what every socket hears on the `roster` topic: the roster, the past list, plan usage, and the whole lists from `ListRegistry`.
+  Opening sockets get every registered list; `pushList` publishes only a message that changed, while roster and past messages keep their row-level deltas.
+- `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie), `refuseUntil`, which holds the dashboard socket back until the sessions are reattached, and the JSON answer helpers.
+  `/api/` requests and sockets are admitted by the cookie alone, so a stray `?token=` on a signed-in request changes nothing; only `/` reads `?token=`, to set the cookie.
+  `src/server/auth.ts` keeps the token file and parses the cookie, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
+- `src/server/routes.ts`: the `/api/` endpoints, in nine groups (sessions, integrations, providers, calendar, Gmail, pull requests, files, todos, and the dashboard's own update), each handed only its part of `RouteEnv`.
+  Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
+  `src/server/wire.ts` parses every socket message and request body into typed values; every parser returns a `Parsed<T>` from `src/json.ts`, `{ ok }` or `null`, and the two OAuth client parsers `{ error }` in place of `null`, a reason the page shows.
+  A shape the server also keeps in a file is parsed by its domain module, which `wire.ts` imports, so a file store never imports the transport: `parseRoutineSpec` in `src/routines.ts`, `parseScheduledSpec` in `src/shared/scheduled.ts`, `parseEventWhen` in `src/shared/calendar.ts`, and `parseNewSessionRequest`, the new-session start that a scheduled start keeps, in `src/shared/sessions.ts`.
+- `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
+- `src/server/socket.ts`: handles each socket message, answering through a `Peer` from `src/server/request-ledger.ts`; see [Socket requests](../architecture/socket-requests.md).
+  `src/server/start.ts` starts, forks, resumes, and replays dashboard sessions for the page's `start` and `resume-all` requests, and refuses to fork or resume a Claude Code or Codex session before it starts omp.
+  `src/server/session-end.ts` ends a session for the page's `end` message and the end inbox; its cleanup callback calls `Worktrees.removeCheckout` and logs why a checkout stays in **Settings → Worktrees**.
+  `src/server/discussions.ts` holds `Discussions`, the **Ask about this** answers under way by the socket that asked, which `discuss` starts, `discuss-stop` aborts, and a socket's close aborts all of; see [Ask about this](../architecture/ask-about-this.md).
+- `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
+  Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's `unread` turn, the session's facts, and the subject a quick action started it on, to make the roster rows.
+  The registry keeps each session's unread turn, the turn it ended since a page showed it in a focused window: `Dashboard` sets it with `markUnread` at `turn-ended` and clears it with `markRead` at `turn-started`, both from `turnUpdate` in `src/live-session.ts`, and `markRead` clears it for the page's `read` message too; see [Session notifications](../architecture/notifications.md#session-notifications).
+  The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
+  `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
+  After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
+- `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, activity, and pull loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
+  It keeps one recursive watcher per session format's root: it makes omp's when missing, and watches Claude Code's and Codex's only once they exist, trying a missing one again on each rescan.
+  `Loops.stop` stops every loop, closes the watchers, and drops a pending re-read; a file change reported after it is ignored.
+- `src/server/session-files.ts`: the session files on disk, omp's, Claude Code's, and Codex's, re-read file by file as the watchers report them, and the past list, each row with its `source`.
+  It asks each format in `src/session-formats.ts` whether a changed path is its session file, and lists and reads through the format that owns the file.
+  `src/server/interrupted.ts` keeps which dashboard sessions were interrupted, once `recover` learned which of those that ran when the last server stopped survived it.
+  `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
+  It applies a session's starting prompt to that session's main view with each of its live events, so a live user message and the removal of the prompt it replaces go out together.

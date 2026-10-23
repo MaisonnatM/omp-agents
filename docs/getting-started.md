@@ -43,7 +43,7 @@ The [starter kit](../templates/omp/README.md) sets this for you.
 
 Open **Settings › Integrations**.
 Each service there reaches omp's sessions through an MCP server, so connecting it once gives both the dashboard and every new omp session its tools.
-[Integrations](usage.md#integrations) describes each row's states and menu.
+[Integrations](usage/integrations.md) describes each row's states and menu.
 
 ### Linear
 

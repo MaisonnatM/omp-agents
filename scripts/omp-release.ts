@@ -1,7 +1,7 @@
 /**
  * Checks an omp release against this codebase before the version pins move to it: installs the release and the tested
  * one side by side, runs `src/omp/modules.ts` and `bun test` against the release, and writes a report with the result,
- * every omp file this app loads or `docs/architecture.md` names that changed between the two, and the changelogs between them.
+ * every omp file this app loads or `docs/architecture/omp-modules.md` names that changed between the two, and the changelogs between them.
  *
  *   bun run omp-release [version]
  *
@@ -17,10 +17,10 @@ import { $ } from "bun";
 const ROOT = join(import.meta.dir, "..");
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
 const VERSION = /^\d+\.\d+\.\d+(?:-[\w.]+)?$/;
-/** A path inside an omp install, such as `pi-coding-agent/src/collab/registry.ts`, as `docs/architecture.md` writes it. */
+/** A path inside an omp install, such as `pi-coding-agent/src/collab/registry.ts`, as `docs/architecture/omp-modules.md` writes it. */
 const OMP_PATH = /^(?:pi|omp)-[a-z-]+\/src\//;
 
-type Source = "modules.ts" | "architecture.md";
+type Source = "modules.ts" | "omp-modules.md";
 type FileState = "changed" | "unchanged" | `missing in ${string}`;
 interface Run {
 	exitCode: number;
@@ -64,14 +64,12 @@ function loadedFiles(): string[] {
 }
 
 /**
- * The omp files the omp modules section of `docs/architecture.md` names.
+ * The omp files `docs/architecture/omp-modules.md` names.
  * A name without a package, such as `protocol.ts` or `task/executor.ts`, is a file already named, else one beside an
  * earlier full path in the same bullet or under that path's `src/`; a name that resolves to none of them is returned as unresolved.
  */
 function documentedFiles(scopes: string[]): { files: string[]; unresolved: string[] } {
-	const doc = readFileSync(join(ROOT, "docs", "architecture.md"), "utf8");
-	const section = doc.split(/^## /m).find(part => part.startsWith("omp modules\n"));
-	if (!section) throw new Error("docs/architecture.md has no ## omp modules section");
+	const section = readFileSync(join(ROOT, "docs", "architecture", "omp-modules.md"), "utf8");
 	const files: string[] = [];
 	const unresolved: string[] = [];
 	for (const bullet of section.split(/\n(?=\S)/)) {
@@ -119,7 +117,7 @@ try {
 
 	const documented = documentedFiles([testedScope, targetScope]);
 	const sources = new Map<string, Set<Source>>();
-	for (const [source, files] of [["modules.ts", loaded], ["architecture.md", documented.files]] as const) {
+	for (const [source, files] of [["modules.ts", loaded], ["omp-modules.md", documented.files]] as const) {
 		for (const file of files) sources.set(file, (sources.get(file) ?? new Set<Source>()).add(source));
 	}
 	const states = [...sources.keys()].sort().map(file => {
@@ -162,10 +160,10 @@ try {
 		"",
 		"## omp files",
 		"",
-		`Each omp file \`src/omp/modules.ts\` loads or the omp modules section of \`docs/architecture.md\` names, compared between ${tested} and ${target}.`,
+		`Each omp file \`src/omp/modules.ts\` loads or \`docs/architecture/omp-modules.md\` names, compared between ${tested} and ${target}.`,
 		"",
 		...states.map(({ file, state, from }) => `- ${state}: \`${file}\` (${from})`),
-		...(documented.unresolved.length ? ["", `Names in \`docs/architecture.md\` that resolved to no omp file: ${documented.unresolved.map(name => `\`${name}\``).join(", ")}.`] : []),
+		...(documented.unresolved.length ? ["", `Names in \`docs/architecture/omp-modules.md\` that resolved to no omp file: ${documented.unresolved.map(name => `\`${name}\``).join(", ")}.`] : []),
 		"",
 		"## Changelogs",
 		"",
