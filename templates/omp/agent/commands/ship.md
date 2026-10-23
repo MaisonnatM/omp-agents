@@ -40,6 +40,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch 
    Call `ship_stage({stage:"ready_gate"})`.
 5. **Put live for review.** Show the issue, PR URL, checks, findings and dispositions before promotion.
    Run `gh pr ready <number>` only after the review checkbox is in the body.
+   A PR that changes `front/components/` or `front/app/` also needs `- [x] Browser proof` in the body: run the verify-yampa skill, attach a screenshot of the changed UI, then add the line.
    The extension asks the user for approval and blocks the command if they decline or no UI is available.
    Request the named reviewer, if any, only after promotion succeeds.
    Call `ship_stage({stage:"live"})`.

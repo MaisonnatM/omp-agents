@@ -8,8 +8,11 @@ const extension: {
 	prSelector(args: string[]): string[];
 	selectorOwner(selector: string[]): string | undefined;
 	otherOwner(owner: string | undefined, repo: string | undefined): boolean;
+	publishBlocker(body: string, files: string[]): string | undefined;
+	CHECKBOX: string;
+	BROWSER_PROOF: string;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
-const { commands, ghPr, prSelector, selectorOwner, otherOwner } = extension;
+const { commands, ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, CHECKBOX, BROWSER_PROOF } = extension;
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
 function readySelectors(line: string): string[][] {
@@ -56,5 +59,34 @@ describe("ship command parsing", () => {
 		[undefined, "maxence/omp-agents", false],
 	])("%s against %s differs: %s", (owner, repo, differs) => {
 		expect(otherOwner(owner, repo)).toBe(differs);
+	});
+});
+
+describe("publish gate", () => {
+	const reviewed = `## Checks\n${CHECKBOX}`;
+
+	test("a reviewed PR outside the console UI goes live", () => {
+		expect(publishBlocker(reviewed, ["yampa/api.py", "front/e2e/a.spec.ts"])).toBeUndefined();
+	});
+
+	test("an unreviewed PR is blocked on the review", () => {
+		expect(publishBlocker("", ["README.md"])).toContain(CHECKBOX);
+	});
+
+	test.each([["front/components/button.tsx"], ["front/app/routes/agents.tsx"]])("a reviewed PR changing %s needs browser proof", file => {
+		const reason = publishBlocker(reviewed, [file]);
+		expect(reason).toContain(BROWSER_PROOF);
+		expect(reason).toContain("verify-yampa");
+		expect(reason).not.toContain(CHECKBOX);
+	});
+
+	test("browser proof unblocks a reviewed UI change", () => {
+		expect(publishBlocker(`${reviewed}\n${BROWSER_PROOF}`, ["front/app/root.tsx"])).toBeUndefined();
+	});
+
+	test("an unreviewed UI change without proof names both", () => {
+		const reason = publishBlocker("", ["front/components/x.tsx"]);
+		expect(reason).toContain(CHECKBOX);
+		expect(reason).toContain(BROWSER_PROOF);
 	});
 });

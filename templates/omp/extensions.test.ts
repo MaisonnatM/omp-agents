@@ -107,6 +107,17 @@ describe("ship publication gate", () => {
 		expect(confirmations).toBe(1);
 	});
 
+	// The harness's `gh` answers `gh pr view` and `gh pr diff --name-only` alike, so one stdout is both the body and the changed files.
+	test.each([["", true], ["\n- [x] Browser proof", false]])("a reviewed console UI change needs browser proof (%j blocks: %s)", (proof, blocked) => {
+		const { result, confirmations } = exercise("ship", {
+			command: "gh pr ready 7", approve: true,
+			response: { code: 0, stdout: `- [x] Thermo-nuclear code quality review${proof}\nfront/components/button.tsx`, stderr: "" },
+		});
+		expect(result?.block ?? false).toBe(blocked);
+		expect(confirmations).toBe(blocked ? 0 : 1);
+		if (blocked) expect(result?.reason).toContain("verify-yampa");
+	});
+
 	// The harness's `gh` answers every call with `response`, so `gh repo view` names the cwd repository `me/app` and the PR body lacks the checkbox.
 	test.each([["dustinspecker/awesome-eslint", false], ["me/app", true], ["ME/other", true]])("gh pr ready -R %s is gated: %s", (repo, gated) => {
 		const { result, confirmations } = exercise("ship", {

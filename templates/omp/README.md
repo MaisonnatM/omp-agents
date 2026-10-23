@@ -49,6 +49,7 @@ Files, in `agent/`:
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
   `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the thermonuclear gate.
+  A PR that changes `front/components/` or `front/app/` also needs `- [x] Browser proof` in its body before it goes live.
 - `extensions/cache-tail.ts`: Anthropic caches the tools and system prompt for an hour and the conversation for five minutes.
   A five-minute cache write costs 1.25 times the input price and an hour-long one twice that, and a conversation tail is read again within seconds, so this cuts the write bill without losing the warm head after a pause.
   It also stops cache warming while the session is idle.

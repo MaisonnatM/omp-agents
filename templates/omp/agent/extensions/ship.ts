@@ -6,6 +6,9 @@ import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
 export const CHECKBOX = "- [x] Thermo-nuclear code quality review";
+export const BROWSER_PROOF = "- [x] Browser proof";
+/** Console UI paths: a PR that changes them goes live only with a screenshot from the running console. */
+const UI_PATH = /^front\/(components|app)\//;
 const POLL_MS = 60_000;
 const TURN_REFRESH_MS = 15_000;
 
@@ -245,6 +248,18 @@ export function otherOwner(owner: string | undefined, repo: string | undefined):
 	return owner !== undefined && own !== undefined && owner.toLowerCase() !== own.toLowerCase();
 }
 
+/** Why a PR with this body and these changed files may not go live, or `undefined` when it may. */
+export function publishBlocker(body: string, files: string[]): string | undefined {
+	const reasons: string[] = [];
+	if (!body.includes(CHECKBOX)) {
+		reasons.push(`the PR is not live until the thermonuclear review is applied and pushed. Run the thermonuclear stage, then add \`${CHECKBOX}\` to the PR body.`);
+	}
+	if (files.some(file => UI_PATH.test(file)) && !body.includes(BROWSER_PROOF)) {
+		reasons.push(`the PR changes front/components or front/app, so it is not live without browser proof. Run the verify-yampa skill, attach a screenshot of the changed UI to the PR, then add \`${BROWSER_PROOF}\` to the PR body.`);
+	}
+	return reasons.length > 0 ? `Blocked: ${reasons.join(" Also, ")}` : undefined;
+}
+
 export default function ship(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const prSchema = z.object({
@@ -346,17 +361,20 @@ export default function ship(pi: ExtensionAPI) {
 		lastSummary = summary;
 	}
 
-	async function bodyHasCheckbox(selector: string[], cwd: string): Promise<string | undefined> {
-		const r = await gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd);
-		if (r.code !== 0) {
-			const error = r.stderr.trim() || r.stdout.trim();
+	async function publishCheck(selector: string[], cwd: string): Promise<string | undefined> {
+		const [view, diff] = await Promise.all([
+			gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd),
+			gh(["pr", "diff", ...selector, "--name-only"], cwd),
+		]);
+		if (view.code !== 0) {
+			const error = view.stderr.trim() || view.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {
 				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
 			}
 			return `Could not read the PR body to check the thermonuclear review: ${error}`;
 		}
-		if (!r.stdout.includes(CHECKBOX)) return `Blocked: the PR is not live until the thermonuclear review is applied and pushed. Run the thermonuclear stage, then add \`${CHECKBOX}\` to the PR body.`;
-		return undefined;
+		if (diff.code !== 0) return `Could not read the PR's changed files to check for browser proof: ${diff.stderr.trim() || diff.stdout.trim()}`;
+		return publishBlocker(view.stdout, diff.stdout.split("\n").filter(Boolean));
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -386,14 +404,14 @@ export default function ship(pi: ExtensionAPI) {
 				// A PR to someone else's repository, such as an awesome list, follows that project's process, not /ship.
 				const owner = selectorOwner(selector);
 				if (owner && otherOwner(owner, await resolveRepo(cwd))) continue;
-				const reason = await bodyHasCheckbox(selector, cwd);
+				const reason = await publishCheck(selector, cwd);
 				if (reason) return { block: true, reason };
 				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The thermonuclear review is complete. Mark this draft ready for human review?"))) {
 					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
 				}
 			}
 			if (words[0] === "gt" && (words[1] === "submit" || words[1] === "ss") && words.some(a => a === "--publish" || a === "-p")) {
-				const reason = await bodyHasCheckbox([], cwd);
+				const reason = await publishCheck([], cwd);
 				if (reason) return { block: true, reason };
 				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "Publish this reviewed PR for human review?"))) {
 					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
