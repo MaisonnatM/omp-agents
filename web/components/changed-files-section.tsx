@@ -15,11 +15,11 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine } from "../../src/shared/transcript";
+import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals } from "../../src/shared/transcript";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { shortPaths } from "../changes-model";
 import { age, readTime } from "../labels";
+import { FileDiff } from "./file-diff";
 import { LineCounts } from "./line-counts";
 import { ViewerDialog } from "./viewer-dialog";
 
@@ -44,61 +44,44 @@ function iconOf(name: string): LucideIcon {
 	return (dot >= 0 && ICON_BY_EXTENSION.get(name.slice(dot + 1).toLowerCase())) || FileIcon;
 }
 
-/** omp's numbered diff, `+12|added`, `-12|removed`, ` 12|context`, with blank lines between hunks. */
-function Diff({ diff }: { diff: string }) {
-	return (
-		<div className="font-mono text-[11px] leading-4" data-diff>
-			{diff.split("\n").map((line, index) => {
-				const parsed = parseDiffLine(line);
-				if (!parsed) return <div key={index} className="h-2" aria-hidden />;
-				const { sign, number, text } = parsed;
-				return (
-					<div
-						key={index}
-						className={cn(
-							"flex",
-							sign === "+" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : sign === "-" ? "bg-red-500/10 text-red-700 dark:text-red-300" : "text-muted-foreground",
-						)}
-					>
-						<span className="w-10 shrink-0 pr-1.5 text-right opacity-60 select-none">{number}</span>
-						<span className="w-3 shrink-0 select-none">{sign}</span>
-						<span className="min-w-0 flex-1 break-all whitespace-pre-wrap">{text || " "}</span>
-					</div>
-				);
-			})}
-		</div>
-	);
-}
-
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
-/** A change's kind and time, then what it recorded: an edit's line counts and diff, or how many lines a write wrote. */
-function Change({ change }: { change: FileChange }) {
+function Change({ path, change }: { path: string; change: FileChange }) {
 	let counts: ReactNode;
-	let body: ReactNode;
 	switch (change.tool) {
 		case "edit":
 			counts = <LineCounts added={change.added} removed={change.removed} />;
-			body = change.diff && <Diff diff={change.diff} />;
 			break;
 		case "write":
 			counts = change.lines !== null && <span className="shrink-0 font-mono text-[11px] whitespace-nowrap tabular-nums">{plural(change.lines, "line")}</span>;
-			body = <p className="text-xs text-muted-foreground">Written whole, so omp recorded no diff.</p>;
 			break;
 		default: {
 			const unhandled: never = change;
 			return unhandled;
 		}
 	}
+	const caption = (
+		<>
+			<span className="font-medium text-foreground">{CHANGE_LABEL[change.kind]}</span>
+			{change.at !== null && (
+				<time className="text-muted-foreground" dateTime={new Date(change.at).toISOString()}>
+					{readTime(change.at)}
+				</time>
+			)}
+			<span className="flex-1" />
+			{counts}
+		</>
+	);
 	return (
 		<li className="space-y-1">
-			<p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
-				<span className="font-medium text-foreground">{CHANGE_LABEL[change.kind]}</span>
-				{change.at !== null && <time dateTime={new Date(change.at).toISOString()}>{readTime(change.at)}</time>}
-				<span className="flex-1" />
-				{counts}
-			</p>
-			{body}
+			{change.tool === "edit" ? (
+				<FileDiff path={path} diff={change.diff} caption={caption} />
+			) : (
+				<>
+					<p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">{caption}</p>
+					<p className="text-xs text-muted-foreground">Written whole, so omp recorded no diff.</p>
+				</>
+			)}
 		</li>
 	);
 }
@@ -137,9 +120,9 @@ export function FileChangesDialog({ file, onClose }: { file: ChangedFile; onClos
 			bodyLabel={`Changes to ${file.path}, newest first`}
 			onClose={onClose}
 		>
-			<ol className="space-y-5 p-4">
+			<ol className="space-y-3 p-4">
 				{changes.toReversed().map((change, index) => (
-					<Change key={changes.length - index} change={change} />
+					<Change key={changes.length - index} path={file.path} change={change} />
 				))}
 			</ol>
 		</ViewerDialog>

@@ -13,6 +13,9 @@
   Click a file to open the [session's changes](session-changes.md) at that file, or **Review** at the first file.
   A subagent has no changes of its own checkout and no **Review** button.
   Clicking its file opens the changes omp recorded instead, newest first, with each change's kind, time, line counts, and numbered diff.
+  Each recorded edit uses a Kobra-inspired diff card with old and new line numbers, syntax colors, and a horizontal code scroller.
+  Added lines have a green tint and solid edge mark; removed lines have a red tint and hatched edge mark.
+  The signs distinguish additions and removals without color, and an ellipsis separates hunks where omp omitted unchanged lines.
   That dialog follows the file while the agent keeps editing it, and Esc closes it.
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.

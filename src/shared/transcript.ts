@@ -1,5 +1,7 @@
 /** What a transcript shows: its items, the files its agent changed, its images, and the files it opens. */
 
+import type { DiffRow } from "./changes";
+
 /** The extensions of the files that agent text may open in the page's file dialog, `GET /api/file`. */
 export const TEXT_FILE_EXTENSIONS: readonly string[] = ["md", "markdown", "txt", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "xml", "diff", "patch"];
 /** The most bytes of a text file that `GET /api/file` reads. */
@@ -102,6 +104,36 @@ const DIFF_LINE = /^([+\- ])\s*(\d+)\|(.*)$/;
 export function parseDiffLine(line: string): DiffLine | null {
 	const parts = DIFF_LINE.exec(line);
 	return parts ? { sign: parts[1] as DiffLine["sign"], number: parts[2], text: parts[3] } : null;
+}
+
+/**
+ * omp's numbered diff as its hunks, each line numbered on both sides. omp numbers an added line on the new side and
+ * every other line on the old, and its diff holds every change of the edit, so the offset between the sides is what
+ * the lines before it added less what they removed.
+ */
+export function editHunks(diff: string): DiffRow[][] {
+	const hunks: DiffRow[][] = [];
+	let hunk: DiffRow[] = [];
+	let offset = 0;
+	for (const line of diff.split("\n")) {
+		const parsed = parseDiffLine(line);
+		if (!parsed) {
+			if (hunk.length > 0) hunks.push(hunk);
+			hunk = [];
+			continue;
+		}
+		const { sign, text } = parsed;
+		const number = Number(parsed.number);
+		if (sign === "+") {
+			hunk.push({ sign, old: null, new: number, text });
+			offset++;
+		} else if (sign === "-") {
+			hunk.push({ sign, old: number, new: null, text });
+			offset--;
+		} else hunk.push({ sign, old: number, new: number + offset, text });
+	}
+	if (hunk.length > 0) hunks.push(hunk);
+	return hunks;
 }
 
 /** Lines a change adds and removes: an edit's diff counts; a created file's write adds every line it wrote; a rewrite counts none, as omp records no diff of it. */

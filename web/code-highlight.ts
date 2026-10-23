@@ -44,11 +44,18 @@ export function highlightLines(text: string, language: string): Token[][] {
 	return lines;
 }
 
-/** Each diff row's tokens: a removed row's from the old side, every other row's from the new side. */
+/** Each diff row's tokens: a removed row's from the old side, every other row's from the new side, each side highlighted as one text of its rows in order. */
 export function highlightRows(rows: readonly DiffRow[], path: string): Token[][] {
 	const extension = path.slice(path.lastIndexOf(".") + 1);
 	const side = (number: (row: DiffRow) => number | null) => highlightLines(rows.filter(row => number(row) !== null).map(row => row.text).join("\n"), extension);
 	const before = side(row => row.old);
 	const after = side(row => row.new);
-	return rows.map(row => (row.sign === "-" ? before[row.old! - 1] : after[row.new! - 1]) ?? []);
+	let oldIndex = 0;
+	let newIndex = 0;
+	return rows.map(row => {
+		const tokens = row.sign === "-" ? before[oldIndex] : after[newIndex];
+		if (row.old !== null) oldIndex++;
+		if (row.new !== null) newIndex++;
+		return tokens ?? [];
+	});
 }
