@@ -75,10 +75,10 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 		<Header
 			title={title}
 			trailing={
-				<>
+				<div className="flex shrink-0 items-center gap-2" data-header-title-actions>
 					{subject.kind === "session" && shown && <SessionIdCopy id={shown.sessionId} />}
 					{titleAction}
-				</>
+				</div>
 			}
 			status={status}
 			alert={!ending && phase.phase === "ended"}

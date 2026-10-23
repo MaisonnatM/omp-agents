@@ -18,7 +18,7 @@ interface HeaderProps {
 export function Header({ title, meta, status, alert = false, leading, trailing, children }: HeaderProps) {
 	return (
 		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6">
-			<div className="flex min-w-0 items-center gap-2">
+			<div className="flex min-w-0 items-center gap-2" data-header-title>
 				{leading}
 				<div className="min-w-0">
 					<h2 className="truncate text-sm font-semibold">{title}</h2>

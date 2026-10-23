@@ -182,7 +182,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			)}
-			<div className="relative mx-auto w-full max-w-3xl px-3 pb-3">
+			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
 				{completion.popup}
 				<ComposerEditor value={editorRef}>
 					<InputMessage

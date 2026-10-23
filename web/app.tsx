@@ -13,6 +13,7 @@ import {
 	MentionListsContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
+import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { DiscussionPanel } from "./components/discussion-panel";
 import { FileDialog } from "./components/file-dialog";
 import { PageSwitch } from "./components/page-switch";
@@ -324,6 +325,7 @@ export function App() {
 								/>
 							</SidebarProvider>
 							<StatusBar usage={state.usage} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
+							<DesktopLinkPreview />
 						</div>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>

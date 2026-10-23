@@ -278,7 +278,7 @@ function LiveConversation({
 					<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
 				</AskAboutSelection>
 			)}
-			<div className="relative mx-auto w-full max-w-3xl px-3 pb-3">
+			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
 				{requests[0] && (
 					<UserRequestCard
 						key={requests[0].id}
