@@ -1,11 +1,12 @@
-import { Copy, Ellipsis, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Link, X, Zap } from "lucide-react";
-import { type PullRequest, type PullRequestDetail, prKey, pullRequestUrl, type SettableState } from "../../../src/shared/github";
+import { Copy, Ellipsis, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Link, RefreshCw, X, Zap } from "lucide-react";
+import { type PullRequest, type PullRequestDetail, type PullRequestSummary, prKey, pullRequestUrl, type SettableState } from "../../../src/shared/github";
 import type { QueuedMerge } from "../../../src/shared/merge-queue";
 import { MERGE_METHOD_LABELS, type MergeMethod } from "../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { graphiteUrl } from "../../pull-requests-model";
+import { graphiteUrl, rebaseApplies } from "../../pull-requests-model";
+import { type RebaseState, useRebaseState } from "../../pull-request-rebases";
 import { QUICK_ACTIONS } from "../../quick-actions";
 import { useAction } from "../../use-action";
 import { useCopy } from "../../use-copy";
@@ -21,20 +22,31 @@ export interface HeaderMergeMenu {
 	onCancel: () => void;
 }
 
+/** **Rebase on** its base, offered when {@link rebaseApplies} to `facts`, the pull request as its quick actions see it. */
+export interface MenuRebase {
+	facts: PullRequestSummary;
+	run: () => void;
+}
+
+const REBASE_LABELS: Record<RebaseState, string> = { queued: "Queued to rebase", running: "Rebasing…" };
+
 interface PullRequestMenuProps {
 	pr: PullRequest;
 	state: PullRequestDetail["state"] | null;
 	quick: QuickActionsProps;
 	onState: (to: SettableState) => void;
 	merge?: HeaderMergeMenu;
+	rebase?: MenuRebase | null;
 	pending?: boolean;
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
 	label: string;
 }
 
-export function PullRequestMenu({ pr, state, quick, onState, merge, pending = false, open, onOpenChange, label }: PullRequestMenuProps) {
+export function PullRequestMenu({ pr, state, quick, onState, merge, rebase, pending = false, open, onOpenChange, label }: PullRequestMenuProps) {
 	const confirm = useInlineConfirm(prKey(pr));
+	const rebasing = useRebaseState(pr);
+	const offersRebase = !!rebase && rebaseApplies(rebase.facts);
 	const { copy } = useCopy();
 	const clipboard = useAction(async (value: string) => { await copy(value); }, "Could not copy");
 	const changesState = state === "open" || state === "draft";
@@ -48,7 +60,12 @@ export function PullRequestMenu({ pr, state, quick, onState, merge, pending = fa
 			</Tooltip>
 			<DropdownMenuContent align="end" className="min-w-56">
 				{quick.actions.map(id => <MenuItem key={id} title={QUICK_ACTIONS[id].description} disabled={quick.pending !== null} onClick={() => quick.onRun(id)}><Zap />{QUICK_ACTIONS[id].label}</MenuItem>)}
-				{quick.actions.length > 0 && <MenuSeparator />}
+				{offersRebase && (
+					<MenuItem title="Rebase the branch on its base, run the repository's pre-push checks, and push it with --force-with-lease" disabled={rebasing !== null} onClick={rebase.run}>
+						<RefreshCw />{rebasing ? REBASE_LABELS[rebasing] : `Rebase on ${rebase.facts.base}`}
+					</MenuItem>
+				)}
+				{(quick.actions.length > 0 || offersRebase) && <MenuSeparator />}
 				{changesState && merge && merge.allowed.length > 1 && <>
 					<MenuRadioGroup aria-label="Merge method" value={merge.method ?? ""} onValueChange={value => { const method = merge.allowed.find(candidate => candidate === value); if (method) merge.onPick(method); }}>
 						{merge.allowed.map(method => <MenuRadioItem key={method} value={method} disabled={pending || !!merge.queued} closeOnClick><GitMerge />{MERGE_METHOD_LABELS[method]}</MenuRadioItem>)}

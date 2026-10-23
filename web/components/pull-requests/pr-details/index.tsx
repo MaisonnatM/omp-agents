@@ -13,7 +13,9 @@ import { type PullRequestActionId, pullRequestActions } from "../../../../src/pu
 import { actionFacts } from "../../../../src/shared/moves";
 import type { OpenMode } from "../../../routing";
 import { useEditableRead } from "../../../editable-read";
-import { useRead, writePullRequest } from "../../../reads";
+import { type RebaseHooks, rebasePullRequest } from "../../../pull-request-rebases";
+import { pullRequestsStore, useRead, writePullRequest } from "../../../reads";
+import type { MenuRebase } from "../pr-menu";
 import type { QuickActionsProps } from "../../quick-actions";
 import { useDashboardStatus } from "../../dashboard-context";
 import { ERROR_TEXT } from "../../form-dialog";
@@ -98,6 +100,8 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	}, [placement]);
 	const facts = listed && actionFacts(listed, detail);
 	const quick: QuickActionsProps = { actions: facts ? pullRequestActions(facts) : [], pending, onRun: (action: PullRequestActionId) => facts && onRun(facts, action) };
+	const rebaseHooks: RebaseHooks = { resolve: ({ pr: rebased }) => onRun(rebased, "resolve-conflicts"), refresh: () => { void pullRequestsStore.refresh(workspace, { fresh: true }); reload(); } };
+	const rebase: MenuRebase | null = facts && cwd !== null ? { facts, run: () => rebasePullRequest({ pr: facts, cwd }, rebaseHooks) } : null;
 	const page = placement === "page";
 	const options = usePullRequestOptions(pr);
 	const comments = detail ? commentCount(detail) : 0;
@@ -110,7 +114,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	return (
 		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr relative flex min-h-0 flex-1 flex-col", page && "h-full")}>
 			<div className={cn("shrink-0 bg-background", !page && "pt-2")}>
-				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
+				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} rebase={rebase} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
 					<SegmentedTabsList aria-label="Pull request details">
 						{([

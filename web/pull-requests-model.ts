@@ -153,6 +153,34 @@ function stackMembers(pullRequests: PullRequestSummary[]): Map<PullRequestSummar
 	return members;
 }
 
+/** Your open or draft pull request without conflicts, whose branch a rebase may push; one with conflicts gets **Resolve conflicts** instead. */
+const rebasable = (pr: PullRequestSummary): boolean => pr.role === "author" && pr.state !== "merged" && !pr.conflicts;
+
+/** Whether **Rebase on** its base applies to `pr`: your pull request, behind its base and without conflicts. */
+export const rebaseApplies = (pr: PullRequestSummary): boolean => rebasable(pr) && pr.behind;
+
+/** A branch of the pull request's repository, as one key: a stack links its pull requests by branch within one repository. */
+export const branchKey = (pr: PullRequest, branch: string): string => `${repoKey(pr)}:${branch}`;
+
+/**
+ * What **Rebase behind** rebases, in order: the pull requests {@link rebaseApplies} to, and every rebasable one stacked
+ * on one of them in the same repository, which falls behind only once the one below it is pushed. The bottom of a stack
+ * comes first; otherwise they keep the order of `pullRequests`.
+ */
+export function rebaseOrder(pullRequests: readonly PullRequestSummary[]): PullRequestSummary[] {
+	const above = Map.groupBy(pullRequests.filter(pr => rebasable(pr) && pr.stackedOn !== null), pr => branchKey(pr, pr.stackedOn!));
+	const chosen = new Set(pullRequests.filter(rebaseApplies));
+	// A set's loop also visits what it adds, and adds nothing twice, so a cycle of bases ends.
+	for (const pr of chosen) for (const child of above.get(branchKey(pr, pr.head)) ?? []) chosen.add(child);
+	const byHead = new Map([...chosen].map(pr => [branchKey(pr, pr.head), pr]));
+	const depth = (pr: PullRequestSummary): number => {
+		const seen = new Set([pr]);
+		for (let below = byHead.get(branchKey(pr, pr.stackedOn ?? "")); below && !seen.has(below); below = byHead.get(branchKey(below, below.stackedOn ?? ""))) seen.add(below);
+		return seen.size;
+	};
+	return pullRequests.filter(pr => chosen.has(pr)).map(pr => ({ pr, depth: depth(pr) })).sort((a, b) => a.depth - b.depth).map(({ pr }) => pr);
+}
+
 /** How the list orders a section's pull requests; a stack's members sit together, top first, in every sort. */
 export type PullRequestSort = "updated" | "newest" | "oldest" | "manual";
 

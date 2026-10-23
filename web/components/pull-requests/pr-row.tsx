@@ -346,6 +346,8 @@ export interface RowBase {
 	cwd: string;
 	/** The same function for every row, so a row that its props leave unchanged is not drawn again. */
 	onQuickAction: (pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => void;
+	/** Queues the rebase of the pull request on its base, from `cwd`; the same function for every row, like `onQuickAction`. */
+	onRebase: (pr: PullRequestSummary, cwd: string) => void;
 	/** Whether the row's `⋯` menu is open, which the `.` shortcut also sets. */
 	actionsOpen: boolean;
 	/** The same function for every row, like `onQuickAction`. */
@@ -388,6 +390,7 @@ const ROW_EQUAL: PropEqual<RowBase> = {
 	pending: Object.is,
 	cwd: Object.is,
 	onQuickAction: Object.is,
+	onRebase: Object.is,
 	actionsOpen: Object.is,
 	onActionsOpenChange: Object.is,
 	onChange: Object.is,
@@ -400,13 +403,14 @@ const sameRowProps = sameProps<RowProps>({
 	moveId: Object.is,
 });
 
-function RowMenu({ pr, change, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[ListChange]> }) {
+function RowMenu({ pr, change, pending, cwd, onQuickAction, onRebase, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "onRebase" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[ListChange]> }) {
 	return (
 		<PullRequestMenu
 			pr={pr}
 			state={pr.state}
 			// The menu lists `pullRequestActions(pr)`, so it runs only one of those.
 			quick={{ actions: pullRequestActions(pr), pending, onRun: action => onQuickAction(pr, cwd, action as PullRequestActionId) }}
+			rebase={{ facts: pr, run: () => onRebase(pr, cwd) }}
 			onState={to => change.run({ field: "state", state: to })}
 			pending={change.pending}
 			open={actionsOpen}

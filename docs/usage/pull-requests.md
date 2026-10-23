@@ -86,6 +86,12 @@
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
   The row's `⋯` menu is always visible in the table; in the sidebar it shows while you hover or focus the row, while a session starts on it, or while a change goes to GitHub.
   It holds the quick actions that apply, then **Convert to draft** on an open pull request or **Mark ready for review** on a draft, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change.
+  On your own open pull request without merge conflicts whose base has commits its branch lacks, **Rebase on main**, named after its base, follows the quick actions.
+  It rebases the branch on its base from the repository's most recently used workspace, runs the repository's pre-push checks, and pushes the branch with `--force-with-lease`.
+  One rebase runs at a time, so the item reads **Queued to rebase** behind another one, then **Rebasing…** until the push ends, which can take minutes.
+  A toast says what came of it: the rebase, a branch that already had its base, or the server's reason for refusing, such as uncommitted changes in the workspace, local commits the pull request lacks, or failed checks.
+  When the rebase stops at a conflict, a toast counts the conflicting files and a **Resolve conflicts** session starts on the pull request, as its quick action does.
+  The list reads GitHub again once the rebases end.
   A state change or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
   Click a **Merge** badge for a popover that reads the pull request from GitHub and confirms the merge; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
@@ -112,6 +118,11 @@
   These keys apply only while the Pull requests page shows a PR.
   The desktop app gives that Cmd+W to the page rather than its native window Close command.
   A plain browser may reserve Cmd+W and close its browser tab before the page can prevent it; use the glyph or context menu there.
+- **Rebase N behind** at the top of the Pull requests page shows while N of your pull requests can rebase on their base, counting the ones stacked on them.
+  The first click arms **Confirm rebase of N?**, and a second click within three seconds rebases them one at a time, as **Rebase on main** does, the bottom of each stack first.
+  A pull request stacked on one whose rebase stopped at a conflict or failed is skipped.
+  Each rebase, conflict, and failure toasts as it happens, and a last toast sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
+  The button reads **Rebasing…** and waits while any rebase is queued or running.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any sort but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.

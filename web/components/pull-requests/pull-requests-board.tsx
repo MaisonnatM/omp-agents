@@ -28,6 +28,7 @@ import {
 	orderedRepos,
 	placedManual,
 	sectionFoldKey,
+	rebaseOrder,
 	sectionTitles,
 	shownPullRequests,
 	stepTarget,
@@ -36,6 +37,7 @@ import {
 import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart } from "../../quick-actions";
+import { type RebaseHooks, type RebaseJob, rebasePullRequest, rebasePullRequests } from "../../pull-request-rebases";
 import type { PolledEntry } from "../../polled-store";
 import { pullRequestsStore, writePullRequest } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
@@ -282,6 +284,10 @@ export interface PullRequests {
 	/** What a list row or a board card of `row` takes, from functions every row shares, so a row's props change only with what it shows. */
 	rowBase: (row: SectionRow, cwd: string) => RowBase;
 	onQuickAction: RowBase["onQuickAction"];
+	onRebase: RowBase["onRebase"];
+	/** What **Rebase behind** rebases, in order, each from its repository's first workspace. */
+	behind: RebaseJob[];
+	onRebaseBehind: () => void;
 	onActionsOpenChange: RowBase["onActionsOpenChange"];
 	onChange: RowBase["onChange"];
 }
@@ -349,6 +355,9 @@ export function usePullRequests({ workspace, hosts, past, route }: PullRequestsP
 	/** The row, by {@link rowId}, whose `⋯` menu is open. */
 	const [actionsOpen, setActionsOpen] = useState<string | null>(null);
 	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
+	const refresh = useCallback(() => void pullRequestsStore.refresh(workspace, { fresh: true }), [workspace]);
+	const rebaseHooks = useMemo((): RebaseHooks => ({ resolve: ({ pr, cwd }) => onQuickAction(pr, cwd, "resolve-conflicts"), refresh }), [onQuickAction, refresh]);
+	const onRebase = useCallback((pr: PullRequestSummary, cwd: string) => rebasePullRequest({ pr, cwd }, rebaseHooks), [rebaseHooks]);
 	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
 	const onChange = useCallback(
 		async (pr: PullRequestSummary, change: ListChange) => {
@@ -367,22 +376,32 @@ export function usePullRequests({ workspace, hosts, past, route }: PullRequestsP
 				pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
 				cwd,
 				onQuickAction,
+				onRebase,
 				actionsOpen: actionsOpen === rowId(row.pr),
 				onActionsOpenChange,
 				onChange,
 			};
 		},
-		[sessions, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange, onChange],
+		[sessions, targetKey, open, quick, actionsOpen, onQuickAction, onRebase, onActionsOpenChange, onChange],
 	);
 	const repos = useMemo(() => (list ? orderedRepos(list.repos, order) : []), [list, order]);
 	const sectionsOf = useMemo(() => repos.map(repo => ("error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agent))), [repos, order, agent]);
+	const behind = useMemo(
+		() =>
+			repos.flatMap((repo): RebaseJob[] => {
+				if ("error" in repo) return [];
+				const cwd = repo.cwds[0];
+				return cwd === undefined ? [] : rebaseOrder(repo.pullRequests).map(pr => ({ pr, cwd }));
+			}),
+		[repos],
+	);
 	const shownOrder = useMemo(
 		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOf.flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
 		[order, sectionsOf],
 	);
 	return {
 		poll,
-		refresh: () => void pullRequestsStore.refresh(workspace, { fresh: true }),
+		refresh,
 		list,
 		route,
 		agent,
@@ -395,6 +414,9 @@ export function usePullRequests({ workspace, hosts, past, route }: PullRequestsP
 		shownOrder,
 		rowBase,
 		onQuickAction,
+		onRebase,
+		behind,
+		onRebaseBehind: () => rebasePullRequests(behind, rebaseHooks),
 		onActionsOpenChange,
 		onChange,
 	};

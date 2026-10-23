@@ -13,6 +13,7 @@
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the Pull requests page and the tickets page show.
   `web/pull-requests-model.ts` holds the pull requests' moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it, over `moveOf` in `src/shared/moves.ts`.
   It also holds which sections start folded, sorts rows by move, and keeps each stack's rows together by the chain of base branches.
+  `rebaseApplies` decides which pull requests offer **Rebase on** their base, and `rebaseOrder` lists what **Rebase behind** rebases: those, and the pull requests stacked on them, bottom of each stack first.
   `boardColumns` lays the board's columns out, one per section over every readable repository, `shownBoardPullRequests` lists the cards of its open columns in order, and `boardDrop` decides what dropping a card on another column does: the quick action, the merge confirmation, the draft state change, or a refusal with why.
   `openThreads` lists unresolved threads, `commentCount` counts the comments that the **Timeline** tab and its header show, and `withThreadResolved` keeps a thread's state and unresolved count together.
   `web/pull-request-comments.ts` combines Summary conversations, filters bot and completed discussions, and pages recent conversations before ordering them.
