@@ -18,17 +18,12 @@ const CROWDED_LABEL_CLASS = "@max-[30rem]/sidebar:sr-only";
 /** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
 const PANEL_VIEWPORT = "pt-2";
 
-/** A pinned panel keeps its header at the top edge, which must neither fade nor sit below a padding that the text scrolls through. */
-const PINNED_VIEWPORT = "scroll-fade-bottom-only";
-
 export interface DetailsTab<T extends string> {
 	value: T;
 	icon: LucideIcon;
 	name: string;
 	/** Shown as a badge, which screen readers hear through the tab's name; zero shows none. */
 	count: number;
-	/** With anything to list, the panel pins its own header to the top edge instead of padding below the sidebar's; empty, it pads as every tab does. */
-	pinned?: boolean;
 	/** The content scrolls itself inside the panel's full height, as a pull request's details do below their header and tabs. */
 	scrollsItself?: boolean;
 	content: ReactNode;
@@ -52,7 +47,7 @@ function tabLabel(name: string, count: number): { label: string; badge: number |
 }
 
 
-/** A tab with nothing to show yet, the same in every tab whether its panel is pinned or padded. */
+/** A tab with nothing to show yet. */
 export function DetailsEmpty({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
 	return (
 		<Empty className="py-10">
@@ -99,7 +94,7 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 						</TabPanel>
 					) : (
 						<TabPanel key={each.value} value={each.value} asChild>
-							<SidebarContent viewportClassName={each.pinned && each.count > 0 ? PINNED_VIEWPORT : PANEL_VIEWPORT}>{each.content}</SidebarContent>
+							<SidebarContent viewportClassName={PANEL_VIEWPORT}>{each.content}</SidebarContent>
 						</TabPanel>
 					),
 				)}

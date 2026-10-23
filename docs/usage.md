@@ -7,6 +7,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Sessions sidebar](#sessions-sidebar)
 - [Terminal](#terminal)
 - [Session details sidebar](#session-details-sidebar)
+- [Changed files and images](#changed-files-and-images)
 - [Session changes](#session-changes)
 - [Panes, splits, and links](#panes-splits-and-links)
 - [Conversations](#conversations)
@@ -149,42 +150,15 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Session details sidebar
 
-- The right sidebar shows what the focused pane's agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
-  It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Files**, **Media**, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
-  Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
-  When the sidebar is too narrow for every tab's icon, the tabs show their names alone; with **Tickets** among them, they show their icons alone until you widen the sidebar past 30rem, and hovering one names it.
-  The sidebar remembers the tab you chose, for every view.
+- The right sidebar shows the focused session's pull requests and Linear issues, including those of its subagents.
+  It follows a live session, one of its subagents, or a past session.
+  It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
+- Its tabs are **PRs** and **Tickets**, which shows only for a session with a Linear issue.
+  Each tab shows its name and a badge with its item count.
+  The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
+  A saved choice of the former **Files** or **Media** tab falls back to **PRs**.
 - A project's coordinator, which changes no code itself, gets other tabs instead: **Workers**, **Notes**, and **PRs**; see [Projects](#projects).
   It remembers its own tab, **Workers** at first, apart from a session's.
-- **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
-  Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
-  As in the session's changes, a count of zero is left out, so a file the agent only added to shows `+12` alone.
-  A path inside the session's working directory shows relative to it.
-  Click a file to open the [session's changes](#session-changes) in a dialog over the page, at that file.
-  A subagent has no changes of its own checkout, so on a subagent's Files tab a click opens the file's changes as omp recorded them instead, newest first: each with its kind, its time, its lines added and removed, and its diff with line numbers.
-  That dialog follows the file while the agent keeps editing it, and Esc closes it.
-  A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
-  A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
-  A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-  The search field above the list stays pinned to the top of the sidebar while the list scrolls; it keeps the files whose path holds every word typed, in any order and any case, and the heading then counts and totals those, as in `2 of 9 files changed`; Esc clears it.
-  Opening another session clears the search.
-- Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
-- **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
-  It also shows the image files the session wrote that a tool call or its result named, such as the `page.png` a script saved; a named file counts as written when it changed after the session started, so paths in source code and older files stay out.
-  Each file shows once, at the first time a tool named or returned it.
-  On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
-  Images you attached to your own prompts are left out, since the transcript shows them.
-  Each thumbnail names the agent whose tool returned it and how long ago; its tooltip adds the file's path for an image on this computer.
-  Click one to see it large, with the tool, its file's name, and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
-  **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
-  New images show up while the agents run.
-  Hover or focus a thumbnail to show its checkbox; once one image is selected, every checkbox shows and a click on a thumbnail selects it instead of opening it.
-  The bar above the images counts the selection and sends it, in the order you selected it.
-  **Add to PR description** lists the session's pull requests by number and title, and appends the images to the one you pick with `gh pr edit --attach`; it takes PNG, JPEG, GIF, WebP, and SVG images of up to 10 MB, 50 at a time.
-  An image with a file on this computer goes as that file, under its name and with its name as alt text; any other goes as shown, with the call's summary as alt text.
-  **Attach to Linear issue** lists the session's issues, and attaches each image to the one you pick, as the new-issue dialog attaches files; the images Linear refused stay selected.
-  Either button is disabled, with a tooltip saying why, when the session has no pull request or no issue; **Clear** empties the selection.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   The first one shows until you pick another from the header's **N/M** stack menu, the same popover as the session header's pull request button, or from its **Also on this session** list, which says whether the session submitted or worked on each pull request.
   The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
@@ -198,14 +172,53 @@ An action that fails shows its error, and its control becomes available again.
   Opening the tab, picking another issue, and each start and end of the view's turn read it from Linear.
 - A tab with nothing to show says so.
 
+## Changed files and images
+
+- A changes card sits directly above each live session's or subagent's composer, and below a past session's transcript.
+  It has separate **Files** and **Images** sections, each shown only when it has items.
+  Click a section's header to fold or unfold it.
+  Both start open, and the browser's localStorage keeps each choice across sessions and reloads.
+- **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
+  Each row shows a file-type icon, the file's name, and its lines added and removed, which the header totals.
+  When files share a name, muted parent folders distinguish them.
+  The tooltip shows the full path, whether the session created, edited, or deleted the file, how often it changed, and how long ago.
+  As in the session's changes, a count of zero is left out, so a file the agent only added to shows `+12` alone.
+  A path inside the session's working directory shows relative to it.
+  Click a file to open the [session's changes](#session-changes) at that file, or **Review** at the first file.
+  A subagent has no changes of its own checkout and no **Review** button.
+  Clicking its file opens the changes omp recorded instead, newest first, with each change's kind, time, line counts, and numbered diff.
+  That dialog follows the file while the agent keeps editing it, and Esc closes it.
+  A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
+  A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
+  A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
+  The file list scrolls within the card, keeping its header and the composer visible.
+- Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
+- **Images** shows a horizontal thumbnail strip of the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
+  It also shows the image files the session wrote that a tool call or its result named, such as the `page.png` a script saved; a named file counts as written when it changed after the session started, so paths in source code and older files stay out.
+  Each file shows once, at the first time a tool named or returned it.
+  On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
+  Images you attached to your own prompts are left out, since the transcript shows them.
+  Each thumbnail's tooltip names the agent and tool, the image's age, and its file path when it has one.
+  Click one to see it large, with the tool, its file's name, and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
+  **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
+  New images show up while the agents run.
+  Hover or focus a thumbnail to show its checkbox; once one image is selected, every checkbox shows and a click on a thumbnail selects it instead of opening it.
+  The bar above the images counts the selection and sends it, in the order you selected it.
+  **Add to PR description** lists the session's pull requests by number and title, and appends the images to the one you pick with `gh pr edit --attach`; it takes PNG, JPEG, GIF, WebP, and SVG images of up to 10 MB, 50 at a time.
+  An image with a file on this computer goes as that file, under its name and with its name as alt text; any other goes as shown, with the call's summary as alt text.
+  **Attach to Linear issue** lists the session's issues, and attaches each image to the one you pick, as the new-issue dialog attaches files; the images Linear refused stay selected.
+  Either button is disabled, with a tooltip saying why, when the session has no pull request or no issue; **Clear** empties the selection.
+
 ## Session changes
 
-- A click on a file in the sidebar's **Files** tab shows the files the session changed as an editor does, in a dialog over the page, at that file; Esc or the close button closes it.
+- Clicking a file in the changes card's **Files** section shows the session's changes in a dialog, at that file.
+  **Review** opens the same dialog at the first file.
+  Esc or the close button closes it.
 - The dialog knows two sets of files.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
   The other is what the session's own `edit` and `write` calls changed, from its transcript, including files outside the checkout and files changed back to how they were.
   The header names the branch and the base it compares against, and totals the files and the lines added and removed.
-- The dialog opens on **This session**, which keeps only the files the session's own calls changed, as the Files tab lists them; **All changes** shows both sets; edits that a subagent or a shell command made count only under **All changes**.
+- The dialog opens on **This session**, which keeps only the files the session's own calls changed, as the **Files** section lists them; **All changes** shows both sets; edits that a subagent or a shell command made count only under **All changes**.
 - The explorer on the left shows the files as folders, a folder holding only one folder joined with it, such as `web/components/changes`.
   Click a folder to close or open it.
   Each file shows its lines added and removed, a blue dot when the session's own calls changed it, and a letter for what git says happened: **A** added, **U** untracked, **M** modified, **D** deleted, and **S** for a file only the session's calls name, outside the checkout or no different from the base.
@@ -295,7 +308,7 @@ An action that fails shows its error, and its control becomes available again.
 - A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large, with the tool and what the call said it did.
   The arrows, or the Left and Right keys, step to the previous and next tool image of the conversation, across calls, and the external-link button opens the image in a new tab.
   A tool group that returned images stays open.
-  Hiding tool calls hides them too; the **Media** tab still lists every one.
+  Hiding tool calls hides them too; the changes card's **Images** section still lists every one.
 - A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
   Click the session's title to open the session's main agent in the pane, or focus the pane that already shows it.
@@ -1807,7 +1820,7 @@ The packaged app, or `bun run desktop` from a checkout, shows the dashboard in i
   The window never leaves the dashboard.
 - Cmd+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.
   The menu takes none of the dashboard's own shortcuts.
-  Right-click in a text field for cut, copy, paste, and spelling suggestions, and on an image, such as one in the **Media** tab's viewer, for **Copy Image**.
+  Right-click in a text field for cut, copy, paste, and spelling suggestions, and on an image, such as one in the **Images** section's viewer, for **Copy Image**.
 - The window remembers its size and position.
 - The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
   A session without a name reads as its workspace, and nothing open reads `omp agents`.
