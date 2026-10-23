@@ -60,8 +60,8 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
         transition={spring.moderate}
         style={{ transformOrigin: isUser ? "bottom right" : "bottom left" }}
         className={cn(
-          "group/message flex max-w-[80%] flex-col gap-1.5",
-          isUser ? "items-end self-end" : "items-start self-start",
+          "group/message flex flex-col gap-1.5",
+          isUser ? "max-w-[80%] items-end self-end" : "w-full items-stretch",
           className
         )}
         {...props}

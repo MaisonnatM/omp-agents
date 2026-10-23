@@ -1,7 +1,7 @@
 /**
- * Where the server finds the files it ships beside its code: the page, the session keeper, and the omp templates. A
- * packaged app names its resources directory in `OMP_AGENTS_RESOURCES`, which `scripts/build-desktop-artifact.ts` fills;
- * a checkout leaves it unset.
+ * Where the server finds the files it ships beside its code: the page, the session keeper, the session visuals
+ * extension, and the omp templates. A packaged app names its resources directory in `OMP_AGENTS_RESOURCES`, which
+ * `scripts/build-desktop-artifact.ts` fills; a checkout leaves it unset.
  */
 import { join } from "node:path";
 
@@ -16,3 +16,8 @@ export const ompTemplateDir: string = join(packagedResources ?? join(import.meta
 
 /** The script each session's keeper runs (`src/keeper.ts`): its bundle in a packaged app. */
 export const keeperScript: string = packagedResources ? join(packagedResources, "keeper.js") : join(import.meta.dir, "..", "keeper.ts");
+
+/** The omp extension every session the dashboard starts loads (`src/omp/session-visuals-extension.ts`): its bundle in a packaged app. */
+export const sessionVisualsExtension: string = packagedResources
+	? join(packagedResources, "session-visuals-extension.js")
+	: join(import.meta.dir, "..", "omp", "session-visuals-extension.ts");

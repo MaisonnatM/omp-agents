@@ -1,4 +1,4 @@
-/** `ImageViewer`, one image of a list shown large, which the Media tab and the transcript's tool images open. */
+/** `ImageViewer`, one image of a list shown large, which the changes card and the transcript's tool images open. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import type { ReactNode } from "react";

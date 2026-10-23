@@ -75,6 +75,11 @@
   --focus-ring: #6B97FF;
   --tint: rgb(0 0 0 / 0.08);
   --tint-hover: rgb(0 0 0 / 0.065);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
 }
 
 .dark {
@@ -136,6 +141,11 @@
   --overlay: 255 255 255;
   --tint: rgb(255 255 255 / 0.25);
   --tint-hover: rgb(255 255 255 / 0.2);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
 }
 
 @theme inline {
@@ -167,6 +177,11 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
   --color-diff-addition: var(--diff-addition);
   --color-diff-deletion: var(--diff-deletion);
   --color-diff-addition-foreground: var(--diff-addition-foreground);

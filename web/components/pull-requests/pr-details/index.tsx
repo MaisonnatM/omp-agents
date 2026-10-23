@@ -160,7 +160,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 					</div>
 				)}
 			</SegmentedTabPanel>
-			{detail && (
+			{page && detail && (
 				<div className="absolute right-4 bottom-3 z-20">
 					<PullRequestComposer key={prKey(pr)} detail={detail} openDraft={openDraft} send={send} onDraftPosted={reload} />
 				</div>

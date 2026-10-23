@@ -1,4 +1,4 @@
-/** The changes explorer's pure layout: the tree, the diff's folds, the file view's gutter marks, and which file the Files tab opens. */
+/** The changes explorer's pure layout: the tree, the diff's folds, the file view's gutter marks, and the changes card's paths. */
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
 import { absoluteFilePath } from "./file-paths";
 
@@ -185,7 +185,7 @@ export function fileLines(rows: readonly DiffRow[]): { lines: FileLine[]; remove
 }
 
 /**
- * The path the session's changes list gives the file that the Files tab names `path`, relative to the session's `cwd` or
+ * The path the session's changes list gives the file that the changes card names `path`, relative to the session's `cwd` or
  * absolute with `~`; `null` when the list holds no such file. A `~` path inside the checkout matches by its tail.
  */
 export function changesPathOf(path: string, cwd: string | null, root: string | null, files: readonly ChangedEntry[]): string | null {
@@ -195,4 +195,23 @@ export function changesPathOf(path: string, cwd: string | null, root: string | n
 	if (has(path)) return path;
 	const tails = files.filter(file => path.endsWith(`/${file.path}`));
 	return tails.reduce<string | null>((best, file) => (best === null || file.path.length > best.length ? file.path : best), null);
+}
+
+/**
+ * Each path's file name, and the fewest folders above it that tell it from another path of the same name, as `web/`
+ * for `web/app.tsx` beside `src/app.tsx`; the folders are `""` for a name no other path shares.
+ */
+export function shortPaths(paths: readonly string[]): { name: string; dir: string }[] {
+	const split = paths.map(path => {
+		const parts = path.split("/");
+		return { name: parts.at(-1)!, folders: parts.slice(0, -1) };
+	});
+	const tail = (folders: string[], count: number): string => folders.slice(-count).join("/");
+	return split.map(({ name, folders }, at) => {
+		const twins = split.filter((other, index) => index !== at && other.name === name);
+		if (twins.length === 0 || folders.length === 0) return { name, dir: "" };
+		let count = 1;
+		while (count < folders.length && twins.some(twin => tail(twin.folders, count) === tail(folders, count))) count++;
+		return { name, dir: `${tail(folders, count)}/` };
+	});
 }

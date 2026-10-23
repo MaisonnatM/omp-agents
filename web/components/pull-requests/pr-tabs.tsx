@@ -1,6 +1,6 @@
-/** The strip of open pull request tabs above a PR detail, on the Pull requests page and in a PRs sidebar, which reorders, scrolls, and closes them. */
+/** The strip of open pull request tabs above a PR detail on the Pull requests page, which reorders, scrolls, and closes them. */
 import { ChevronLeft, ChevronRight, Copy, Link, Plus, X } from "lucide-react";
-import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type PointerEvent, useEffect, useRef, useState } from "react";
 import { prKey, pullRequestName, pullRequestUrl, type PullRequest, type PullRequestSummary } from "../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuSeparator } from "@/components/ui/menu";
@@ -21,26 +21,29 @@ function StateGlyph({ state }: { state: PullRequestSummary["state"] | null }) {
 interface TabLabelProps {
 	pr: PullRequest;
 	active: boolean;
-	href: string | null;
-	onOpen: () => void;
+	href: string;
 	onMove: (by: -1 | 1) => void;
 }
 
-function TabLabel({ pr, active, href, onOpen, onMove }: TabLabelProps) {
-	const label = {
-		"data-tab-label": true,
-		title: pullRequestName(pr),
-		className: "truncate rounded-sm select-none focus-visible:ring-2 focus-visible:ring-ring",
-		onKeyDown: (event: KeyboardEvent) => {
-			if (!event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
-			event.preventDefault();
-			event.stopPropagation();
-			onMove(event.key === "ArrowLeft" ? -1 : 1);
-		},
-	};
-	return href
-		? <a href={href} aria-current={active ? "page" : undefined} draggable={false} {...label}>#{pr.number}</a>
-		: <button type="button" aria-current={active ? "true" : undefined} onClick={onOpen} {...label}>#{pr.number}</button>;
+function TabLabel({ pr, active, href, onMove }: TabLabelProps) {
+	return (
+		<a
+			href={href}
+			aria-current={active ? "page" : undefined}
+			draggable={false}
+			data-tab-label
+			title={pullRequestName(pr)}
+			className="truncate rounded-sm select-none focus-visible:ring-2 focus-visible:ring-ring"
+			onKeyDown={event => {
+				if (!event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+				event.preventDefault();
+				event.stopPropagation();
+				onMove(event.key === "ArrowLeft" ? -1 : 1);
+			}}
+		>
+			#{pr.number}
+		</a>
+	);
 }
 
 interface Props extends PullRequestTabsControl {
@@ -48,8 +51,8 @@ interface Props extends PullRequestTabsControl {
 	workspace: string | null;
 	/** Brings back the list to pick another PR from; without it the strip has no **+**. */
 	onAdd?: () => void;
-	/** Where each tab links; without it each tab is a button that shows its PR in place. */
-	hrefOf?: (tab: PullRequestTab) => string;
+	/** Where each tab links. */
+	hrefOf: (tab: PullRequestTab) => string;
 }
 
 export function PullRequestTabsStrip({ tabs, dispatch, workspace, onAdd, hrefOf }: Props) {
@@ -136,7 +139,7 @@ export function PullRequestTabsStrip({ tabs, dispatch, workspace, onAdd, hrefOf 
 									<StateGlyph state={(list && listedPullRequest(list, pr)?.pr.state) ?? null} />
 									<X aria-hidden className="hidden size-3 group-hover/tab:block group-focus-within/tab:block [@media(hover:none)]:block" />
 								</button>
-								<TabLabel pr={pr} active={tabs.active === prKey(pr)} href={hrefOf?.(pr) ?? null} onOpen={() => dispatch({ type: "open", pr })} onMove={by => dispatch({ type: "move", pr, to: index + by })} />
+								<TabLabel pr={pr} active={tabs.active === prKey(pr)} href={hrefOf(pr)} onMove={by => dispatch({ type: "move", pr, to: index + by })} />
 							</ContextMenuTrigger>
 							<ContextMenuContent>
 								<MenuItem onClick={() => clipboard.run(pullRequestUrl(pr))}><Link />Copy link</MenuItem>

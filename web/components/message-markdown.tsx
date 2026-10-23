@@ -21,6 +21,7 @@ import { LocalMedia, MediaStrip } from "./local-media";
 import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { type ChipProps, isChipKind, PromptChip } from "./prompt-chip";
+import { isVisualLanguage, SessionVisual } from "./session-visual";
 
 /** Where text written on GitHub may load images from directly; its uploads load through `githubMediaPath`. The page's CSP allows the same host. */
 const GITHUB_AVATARS = "https://avatars.githubusercontent.com/";
@@ -213,12 +214,24 @@ function PromptChipSpan({ node, ...props }: ComponentProps<"span"> & ExtraProps)
 const textOf = (node: Element | ElementContent): string =>
 	node.type === "text" ? node.value : node.type === "element" ? node.children.map(textOf).join("") : "";
 
-/** A code block, colored by its fence's language, which titles it, with a copy button. A `<pre>` in GitHub's raw HTML has no `<code>` and no language. */
-const codeBlock: Components["pre"] = ({ node }) => {
+/** A `<pre>`'s fence language, from its `<code>`'s `language-*` class, and its text. A `<pre>` in GitHub's raw HTML has no `<code>` and no language. */
+function fenceOf(node: Element | undefined): { language: string | null; text: string } {
 	const code = node?.children.find((child): child is Element => child.type === "element" && child.tagName === "code");
 	const className = code?.properties.className;
 	const language = (Array.isArray(className) ? className : []).map(String).find(name => name.startsWith("language-"))?.slice("language-".length) ?? null;
-	const text = node ? textOf(code ?? node).replace(/\n$/, "") : "";
+	return { language, text: node ? textOf(code ?? node).replace(/\n$/, "") : "" };
+}
+
+function CodeLines({ text, language }: { text: string; language: string | null }) {
+	return highlightLines(text, language ?? "").map((tokens, index) => (
+		<CodeBlockLine key={index}>
+			{tokens.map((token, at) => (token.className ? <span key={at} className={token.className}>{token.text}</span> : token.text))}
+		</CodeBlockLine>
+	));
+}
+
+/** A code block, colored by its fence's language, which titles it, with a copy button. */
+function FencedCode({ language, text }: { language: string | null; text: string }) {
 	const copy = <CodeBlockCopyButton value={text} />;
 	return (
 		<CodeBlock>
@@ -231,18 +244,25 @@ const codeBlock: Components["pre"] = ({ node }) => {
 				<CodeBlockActions>{copy}</CodeBlockActions>
 			)}
 			<CodeBlockContent>
-				{highlightLines(text, language ?? "").map((tokens, index) => (
-					<CodeBlockLine key={index}>
-						{tokens.map((token, at) => (token.className ? <span key={at} className={token.className}>{token.text}</span> : token.text))}
-					</CodeBlockLine>
-				))}
+				<CodeLines text={text} language={language} />
 			</CodeBlockContent>
 		</CodeBlock>
 	);
+}
+
+const codeBlock: Components["pre"] = ({ node }) => <FencedCode {...fenceOf(node)} />;
+
+/** In a session's message, a `mermaid` or `chart` fence draws as a diagram or a chart; any other is a code block. */
+const sessionCodeBlock: Components["pre"] = ({ node }) => {
+	const { language, text } = fenceOf(node);
+	if (!isVisualLanguage(language)) return <FencedCode language={language} text={text} />;
+	return <SessionVisual language={language} source={text} code={<CodeLines text={text} language={language} />} />;
 };
 
 const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage, true), figure: mediaFigure, pre: codeBlock };
 const PROMPT_COMPONENTS: Components = { ...AGENT_COMPONENTS, span: PromptChipSpan };
+const SESSION_AGENT_COMPONENTS: Components = { ...AGENT_COMPONENTS, pre: sessionCodeBlock };
+const SESSION_PROMPT_COMPONENTS: Components = { ...PROMPT_COMPONENTS, pre: sessionCodeBlock };
 const GITHUB_COMPONENTS: Components = { a: link, img: githubImg, video, pre: codeBlock };
 
 /** GitHub's schema, plus the `<video>` a Linear issue's recording or a GitHub upload becomes, with its `<source>`. */
@@ -284,6 +304,12 @@ export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePath
 
 /** A user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips. */
 export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
+
+/** A settled message in a session's conversation: agent text whose `mermaid` and `chart` fences draw as visuals. */
+export const SESSION_AGENT_PRESET: MarkdownPreset = { ...AGENT_PRESET, components: SESSION_AGENT_COMPONENTS };
+
+/** A user's prompt in a session's conversation, whose `mermaid` and `chart` fences draw as visuals. */
+export const SESSION_PROMPT_PRESET: MarkdownPreset = { ...PROMPT_PRESET, components: SESSION_PROMPT_COMPONENTS };
 
 /**
  * Text written on GitHub or Linear, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which

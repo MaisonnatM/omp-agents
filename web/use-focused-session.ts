@@ -15,7 +15,7 @@ export interface FocusedSession {
 	past: PastSession | undefined;
 	/** An ended live session's last roster row, for the header after it left the roster. */
 	lastHost: RosterHost | null;
-	/** The session the view belongs to, whose changes the Files tab opens; `null` for a subagent's view and for a live session not yet in the roster. */
+	/** The session the view belongs to; `null` for a subagent's view and for a live session not yet in the roster. */
 	sessionId: string | null;
 	/** The view's roster row, an ended session's last one, or its past entry: what the PRs tab lists. */
 	row: RosterHost | PastSession | undefined;

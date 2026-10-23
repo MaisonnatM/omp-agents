@@ -1,7 +1,7 @@
 import { GitPullRequest } from "lucide-react";
-import { prKey, type LinkedPullRequest } from "../../src/shared/github";
-import { useSessionPullRequestTabs } from "../pull-request-tabs";
-import { PullRequestTabsStrip } from "./pull-requests/pr-tabs";
+import { useState } from "react";
+import type { LinkedPullRequest, PullRequest } from "../../src/shared/github";
+import type { PullRequestDetailTab } from "../pull-request-tabs";
 import type { RosterHost } from "../../src/shared/sessions";
 import { DetailsEmpty } from "./details-sidebar-frame";
 import { PullRequestDetails } from "./pull-requests/pr-page";
@@ -16,22 +16,25 @@ interface PullRequestsTabProps {
 	version?: unknown;
 	/** The `instanceId` of the live session the sidebar belongs to, `null` for a past one. */
 	current: string | null;
-	/** The identity, stable across the session's live and past views, under which the browser keeps its open tabs. */
-	scope: string;
 }
 
 /**
  * The session's pull requests in the right sidebar: one's details as the Pull requests page shows them, the first until another
- * is picked from its stack or from the session's other pull requests in the header's stack menu.
+ * is picked from its stack or from the session's other pull requests in the header's stack menu. Callers key it by session, so a
+ * pick lasts only while the sidebar shows that session.
  */
-export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version, current, scope }: PullRequestsTabProps) {
-	const { tabs, dispatch } = useSessionPullRequestTabs(scope, pullRequests[0]);
-	const shown = tabs.open.find(pr => prKey(pr) === tabs.active);
+export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version, current }: PullRequestsTabProps) {
+	const [picked, setPicked] = useState<PullRequest | null>(null);
+	const [tab, setTab] = useState<PullRequestDetailTab>("summary");
+	const shown = picked ?? pullRequests[0];
 	if (!shown) return <DetailsEmpty icon={GitPullRequest} title="No pull request yet" description="Pull requests this session opens or works on show here." />;
+	const pick = (pr: PullRequest): void => {
+		setPicked(pr);
+		setTab("summary");
+	};
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<PullRequestTabsStrip tabs={tabs} dispatch={dispatch} workspace={workspace} />
-			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} tab={shown.detailTab} onTab={tab => dispatch({ type: "detail", pr: shown, tab })} onPick={pr => dispatch({ type: "open", pr })} session={pullRequests} current={current} />
+			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} tab={tab} onTab={setTab} onPick={pick} session={pullRequests} current={current} />
 		</div>
 	);
 }

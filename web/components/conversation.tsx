@@ -19,6 +19,7 @@ import type { Dashboard } from "../use-dashboard";
 import type { ScheduleWhen } from "../scheduled-model";
 import { AskAboutSelection } from "./ask-about-selection";
 import { useCompletion } from "./completion-popup";
+import { ChangesCard } from "./changes-card";
 import { blockedShortcut, ComposerEditor, ComposerNote, ComposerTray, DirectoryLabel, EmptyConversation, OVER_TRAY } from "./composer";
 import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
@@ -288,6 +289,13 @@ function LiveConversation({
 					/>
 				)}
 				{completion.popup}
+				<ChangesCard
+					view={view}
+					sessionId={sessionId}
+					cwd={shown?.cwd ?? null}
+					working={working}
+					facts={shown}
+				/>
 				<ComposerEditor value={editorRef}>
 					<InputMessage
 						editorRef={editorRef}

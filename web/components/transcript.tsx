@@ -70,7 +70,7 @@ import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoin
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { ImageViewer } from "./media-viewer";
-import { MessageMarkdown, PROMPT_PRESET } from "./message-markdown";
+import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TranscriptMinimap } from "./transcript-minimap";
 
@@ -504,9 +504,10 @@ const MessageRow = memo(function MessageRow({
 				data-pending={pending || undefined}
 			>
 				{editor ?? (item.kind === "user" && (item.text || item.skill) ? (
-					<MessageMarkdown text={copyText(item)} preset={PROMPT_PRESET} />
+					<MessageMarkdown text={copyText(item)} preset={SESSION_PROMPT_PRESET} />
 				) : item.text ? (
-					<MessageMarkdown text={item.text} />
+					// A streaming reply keeps its fences as code, so a diagram or chart draws once, from its whole source.
+					<MessageMarkdown text={item.text} preset={item.kind === "assistant" && item.streaming ? AGENT_PRESET : SESSION_AGENT_PRESET} />
 				) : null)}
 			</ChatMessage>
 			{failed && (
