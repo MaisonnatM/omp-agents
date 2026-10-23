@@ -18,6 +18,8 @@ export async function buildPage(): Promise<Map<string, Blob>> {
 		entrypoints: [join(import.meta.dir, "..", "..", "web", "index.html")],
 		plugins: [tailwind],
 		minify: true,
+		// A dynamic import becomes its own chunk, so the diagram renderer loads only when a session draws one.
+		splitting: true,
 		define: { "process.env.NODE_ENV": '"production"' },
 	});
 	if (!build.success) throw new AggregateError(build.logs, "cannot build the page");
