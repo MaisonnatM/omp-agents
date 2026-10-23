@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { useStoredState } from "./stored-state";
 
 /** The page's color scheme: follow the OS, or pin light or dark. */
@@ -31,4 +32,15 @@ export function useTheme(): [Theme, (theme: Theme) => void] {
 		applyTheme(next);
 	};
 	return [theme, pick];
+}
+
+function onClassChange(changed: () => void): () => void {
+	const observer = new MutationObserver(changed);
+	observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+	return () => observer.disconnect();
+}
+
+/** Whether the page shows dark now, read from the `.dark` class the tokens switch on, so it also follows the OS under `system`. */
+export function useDarkClass(): boolean {
+	return useSyncExternalStore(onClassChange, () => document.documentElement.classList.contains("dark"));
 }

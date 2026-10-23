@@ -37,6 +37,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [New and local events](#new-and-local-events)
   - [Gmail](#gmail)
 - [Front-end components](#front-end-components)
+  - [Session visuals](#session-visuals)
 
 ## omp modules
 
@@ -167,7 +168,7 @@ Every transcript comes from the session files on this machine, not from a networ
   The watcher's changes poke it only for its own file, that file's `.<file>.lock` sidecar, and anything under its artifacts directory, since a subagent's appends do not touch the session file, and a sibling session's writes leave it alone.
   The view's socket topic carries them as `media` messages: the whole list once the files are read, then only the images each later read added, which the page sorts in newest first.
   A file rewritten shorter, or the first read, sends the whole list again.
-  The Media tab sends selected images on: `PUT /api/pull-request/attachment` takes `PullRequestAttachment` from `src/shared/github.ts`, a pull request and 1 to 50 PNG, JPEG, GIF, WebP, or SVG images of up to 10 MB in base64, each with alt text, which are the limits and types of `gh pr edit --attach`.
+  The changes card's Images section sends selected images on: `PUT /api/pull-request/attachment` takes `PullRequestAttachment` from `src/shared/github.ts`, a pull request and 1 to 50 PNG, JPEG, GIF, WebP, or SVG images of up to 10 MB in base64, each with alt text, which are the limits and types of `gh pr edit --attach`.
   `attachToPullRequest` in `src/pull-request-edit.ts` writes them to a temporary directory, each named for its place and ending in its type's extension, since `gh` reads the type from it, runs `gh pr edit <n> -R <owner>/<repo> --attach <file>#<alt>` for every image, which appends them and keeps the body, and removes the directory however `gh` ends.
   When some uploads fail, `gh` exits non-zero yet still adds the others, so the error the page shows can come with a changed description.
   Each image for a Linear issue goes through `PUT /api/ticket/attachment`, as the new-issue dialog's files do.
@@ -502,7 +503,7 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
 
 ### Packaging and releases
 
-`scripts/build-desktop-artifact.ts`, modeled on T3 Code's script of the same name, builds `desktop/dist/resources` (the server bundled into `server.js` with Tailwind left out, the page prebuilt by `buildPage`, and the starter kit with its installer bundled into `install.js`), downloads the Bun of the build's own version for each architecture into `desktop/dist/bun-<arch>`, and runs electron-builder with a config it generates, which writes a DMG, a zip, their blockmaps, and `latest-mac.yml` to `desktop/release`.
+`scripts/build-desktop-artifact.ts`, modeled on T3 Code's script of the same name, builds `desktop/dist/resources` (the server bundled into `server.js` with Tailwind left out, the page prebuilt by `buildPage`, the keeper and the session visuals extension bundled into `keeper.js` and `session-visuals-extension.js`, and the starter kit with its installer bundled into `install.js`), downloads the Bun of the build's own version for each architecture into `desktop/dist/bun-<arch>`, and runs electron-builder with a config it generates, which writes a DMG, a zip, their blockmaps, and `latest-mac.yml` to `desktop/release`.
 It signs and notarizes when `CSC_LINK` and the `APPLE_API_KEY*` variables are set, with the hardened runtime and `desktop/entitlements.mac.plist`, which lets Bun JIT; otherwise it signs ad hoc.
 `--mock-update-port <port>` points the update feed at `scripts/mock-update-server.ts`, which serves `desktop/release`, to try an update without publishing.
 `.github/workflows/release.yml` runs on every push to `main`, one run at a time with a newer push cancelling an older run: it sets `desktop/package.json`'s patch version to the run number, keeping its major and minor, then runs the checks, one build for arm64 and x64 on an Apple silicon runner, and a GitHub Release tagged `vX.Y.Z` with every artifact.
@@ -1538,9 +1539,9 @@ The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Men
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
 
-Open pull request tabs use `web/pull-request-tabs.ts` and the same `useStoredState` localStorage mechanism as the sidebar layout.
-The main Pull requests page shares one ordered strip between windows and stores no active tab, since its route says which PR shows.
-Each session's or project's PRs sidebar keeps its own tabs and active tab, and keeps navigation local to that sidebar; one key holds them by the session's ID, which stays the same from its live view to its past one, or by the project's ID, for the 20 sidebars whose tabs changed last.
+The Pull requests page's open tabs use `web/pull-request-tabs.ts` and the same `useStoredState` localStorage mechanism as the sidebar layout.
+The page shares one ordered strip between windows and stores no active tab, since its route says which PR shows.
+A session's or project's PRs sidebar has no strip; `SessionPullRequestsTab` holds the PR it shows and its detail tab in component state, keyed by the session or project, so nothing is stored.
 Only the main PR detail registers the copy-number, copy-link, and close-tab shortcuts.
 While `PullRequestDetailPage` is mounted it tells the desktop shell through `window.ompDesktop.ownsClose`, and the Electron window's `before-input-event` then bypasses native menu shortcuts for Cmd+W, so the page can prevent the native Close action without the shell knowing the dashboard's routes.
 
@@ -1571,3 +1572,21 @@ A relative path resolves against `FileBaseContext`: the pane's session worktree,
 Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` and its `<source>`, each with only a `src`.
 It shows GitHub's avatars and images from the route for a Linear issue's files, and shows images and plays videos uploaded to GitHub through `GET /api/github-media`; a video from anywhere else, and any other image, renders as a link.
 `web/index.html` sets the page's `Content-Security-Policy`.
+
+### Session visuals
+
+A session's conversation renders through `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET`, which `MessageRow` in `web/components/transcript.tsx` passes for a settled reply and for a prompt; a streaming reply keeps `AGENT_PRESET`, so its fences stay code until the whole source has arrived.
+Every other Markdown, such as GitHub's and Linear's text, the file dialog, and a turn's reasoning, keeps its preset, with no visuals.
+In those two presets a `mermaid` or `chart` fence renders as `SessionVisual` from `web/components/session-visual.tsx`, and any other fence as the code block above.
+`src/shared/session-visuals.ts` holds the rules both sides share: `mermaidKind` reads a diagram's first line as beautiful-mermaid's `detectDiagramType` does and accepts only flowcharts, sequence, state, class, and ER diagrams, in at most `MAX_MERMAID_SOURCE` characters, and `parseChartSpec` turns a chart's JSON into a `ChartSpec` or the first rule it breaks.
+A chart's keys must be letters, digits, `_`, and `-`, since `ChartStyle` in `web/components/ui/chart.tsx`, shadcn's chart, writes each series key into a CSS custom property, `--color-<key>`.
+A chart renders through that component and `recharts`, its series colored `var(--chart-1)` to `var(--chart-5)` from `web/globals.css`.
+A diagram renders with `renderMermaidSVGAsync` from `beautiful-mermaid`, which the page imports on first use; `buildPage` in `src/server/page.ts` builds with `splitting`, so the library and its ELK layout are a chunk of their own.
+The SVG never enters the page's DOM: it shows as an `<img>` whose source is a blob URL, revoked when the source or theme changes or the block unmounts, so its markup cannot script the page, and the CSP already allows `blob:` images.
+An image cannot read the page's CSS variables, so the diagram takes the concrete colors of `--background`, `--foreground`, and `--muted-foreground` where the `.dark` class stands, read through a probe element, and renders again when `useDarkClass` in `web/theme.ts` sees the class change.
+A render that a newer source or theme outdated is dropped, and a render that throws shows the fence's text with the error.
+
+The model learns the two formats from `src/omp/session-visuals-extension.ts`, whose `before_agent_start` handler appends a paragraph, built from the same limits, to the system prompt.
+`DashboardSession` passes it with `-e` when it starts, forks, or resumes a session (`withSessionVisuals` in `src/dashboard-session.ts`), but not for a replay, or for a resumed replay, whose requests the replay guard compares with the original's, system prompt included.
+The extension sits outside `templates/omp/agent/`, so the starter kit never installs it and a terminal session never loads it, and it types the part of omp's API it uses by hand, as `tsc` cannot resolve omp's package.
+`sessionVisualsExtension` in `src/server/resources.ts` names the file, and the packaged app ships it bundled as `session-visuals-extension.js`, as it ships the keeper.

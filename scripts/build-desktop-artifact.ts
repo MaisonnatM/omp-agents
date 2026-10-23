@@ -34,7 +34,7 @@ async function bundle(entry: string, outdir: string, naming: string, options: Pa
 	if (!build.success) throw new AggregateError(build.logs, `cannot bundle ${entry}`);
 }
 
-/** The server, its page, and the starter kit, the same for every architecture. */
+/** The server, its page, the session visuals extension, and the starter kit, the same for every architecture. */
 async function buildResources(): Promise<void> {
 	rmSync(RESOURCES, { recursive: true, force: true });
 	const pageDir = join(RESOURCES, "page");
@@ -43,6 +43,7 @@ async function buildResources(): Promise<void> {
 	// The packaged server reads the prebuilt page, so `buildPage`'s Tailwind import never runs there.
 	await bundle(join(ROOT, "src", "server.ts"), RESOURCES, "server.js", { target: "bun", external: ["bun-plugin-tailwind"] });
 	await bundle(join(ROOT, "src", "keeper.ts"), RESOURCES, "keeper.js", { target: "bun" });
+	await bundle(join(ROOT, "src", "omp", "session-visuals-extension.ts"), RESOURCES, "session-visuals-extension.js", { target: "bun" });
 	// The installer reads its layers beside itself, as `templates/omp/install.ts` does in a checkout.
 	const kitOut = join(RESOURCES, "templates", "omp");
 	cpSync(join(KIT, "agent"), join(kitOut, "agent"), { recursive: true });

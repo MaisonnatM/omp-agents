@@ -89,8 +89,9 @@ The detail query reads merge and close times alongside existing data in one Grap
 
 ## Keep open pull requests in browser-local tabs
 
-The PR page and each session's PRs sidebar keep their open tabs, order, and selected detail tab through `useStoredState`.
-The page's route alone says which PR shows and whether it shows **Code**, so another window showing a different PR keeps its own; a session sidebar, which has no route, stores its active PR.
+The PR page keeps its open tabs, order, and selected detail tab through `useStoredState`.
+The page's route alone says which PR shows and whether it shows **Code**, so another window showing a different PR keeps its own.
+A session's or project's PRs sidebar has no strip: it had one with its own stored tabs, which did not work, so it now shows one pull request in memory, the session's first until another is picked.
 Opening an existing PR focuses it, and closing the active tab chooses the right neighbour before the left, matching T3 Code.
 A small pointer reorder needs no drag dependency; Alt+Left and Alt+Right on the number give the same operation to keyboard users.
 The strip adds no panel controls of T3's: the sessions sidebar keeps its own rail toggle, and thread-details, panel maximize, and panel visibility have no equivalent surface on the PR page.
