@@ -8,11 +8,11 @@ const extension: {
 	prSelector(args: string[]): string[];
 	selectorOwner(selector: string[]): string | undefined;
 	otherOwner(owner: string | undefined, repo: string | undefined): boolean;
-	publishBlocker(body: string, files: string[]): string | undefined;
+	publishBlocker(body: string): string | undefined;
 	CHECKBOX: string;
-	BROWSER_PROOF: string;
+	PROOF_BOX: string;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
-const { commands, ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, CHECKBOX, BROWSER_PROOF } = extension;
+const { commands, ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, CHECKBOX, PROOF_BOX } = extension;
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
 function readySelectors(line: string): string[][] {
@@ -65,28 +65,21 @@ describe("ship command parsing", () => {
 describe("publish gate", () => {
 	const reviewed = `## Checks\n${CHECKBOX}`;
 
-	test("a reviewed PR outside the console UI goes live", () => {
-		expect(publishBlocker(reviewed, ["yampa/api.py", "front/e2e/a.spec.ts"])).toBeUndefined();
+	test("a reviewed PR without a proof box goes live", () => {
+		expect(publishBlocker(reviewed)).toBeUndefined();
 	});
 
 	test("an unreviewed PR is blocked on the review", () => {
-		expect(publishBlocker("", ["README.md"])).toContain(CHECKBOX);
+		expect(publishBlocker(PROOF_BOX)).toContain(CHECKBOX);
 	});
 
-	test.each([["front/components/button.tsx"], ["front/app/routes/agents.tsx"]])("a reviewed PR changing %s needs browser proof", file => {
-		const reason = publishBlocker(reviewed, [file]);
-		expect(reason).toContain(BROWSER_PROOF);
-		expect(reason).toContain("verify-yampa");
+	test.each([PROOF_BOX, `  ${PROOF_BOX} (UI changes: run verify-yampa, attach screenshot)`])("a reviewed PR with %j is blocked on the box", box => {
+		const reason = publishBlocker(`${reviewed}\n${box}`);
+		expect(reason).toContain(PROOF_BOX);
 		expect(reason).not.toContain(CHECKBOX);
 	});
 
-	test("browser proof unblocks a reviewed UI change", () => {
-		expect(publishBlocker(`${reviewed}\n${BROWSER_PROOF}`, ["front/app/root.tsx"])).toBeUndefined();
-	});
-
-	test("an unreviewed UI change without proof names both", () => {
-		const reason = publishBlocker("", ["front/components/x.tsx"]);
-		expect(reason).toContain(CHECKBOX);
-		expect(reason).toContain(BROWSER_PROOF);
+	test.each(["- [x] Browser proof", "- [X] Browser proof (UI changes)"])("a reviewed PR with %j goes live", box => {
+		expect(publishBlocker(`${reviewed}\n${box}`)).toBeUndefined();
 	});
 });

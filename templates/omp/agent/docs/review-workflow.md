@@ -13,6 +13,14 @@ Read the current PR description and update it with `gh pr edit <N> --body-file <
 If the checkbox already exists, leave it unchanged.
 Append it under an existing checklist; otherwise add a `## Checks` section before any `<!-- CURSOR_SUMMARY -->` Bugbot block, or at the end when there is no such block.
 
+## Proof boxes
+
+A repository's PR template can declare `- [ ] Browser proof`.
+The ship extension blocks `gh pr ready` and `gt submit --publish` while the PR body has that box unchecked.
+It checks the box, not a screenshot: do what the box and the repository's instructions ask, such as attaching a screenshot as [PR screenshots](#pr-screenshots) describes, then change it to `- [x] Browser proof`.
+Delete the line only when it does not apply to the PR, such as a template box for UI changes on a PR without one.
+Edit the box with `gh pr edit <N> --body-file <file>`, keeping the rest of the description.
+
 ## PR description layout
 
 Use bullets or an aligned `text` code block for comparisons, rather than markdown pipe tables.

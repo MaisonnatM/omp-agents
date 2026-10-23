@@ -26,7 +26,8 @@ extension({
 	},
 	registerTool(registered) { tool = registered; },
 	appendEntry() {},
-	async exec() { return input.response; },
+	// input.responses answers by subcommand, such as "pr view" or "repo view"; input.response answers the rest.
+	async exec(_command, args) { return input.responses?.[args.slice(0, 2).join(" ")] ?? input.response; },
 });
 if (input.command) {
 	if (!gate) throw new Error("No command gate registered");
@@ -107,22 +108,23 @@ describe("ship publication gate", () => {
 		expect(confirmations).toBe(1);
 	});
 
-	// The harness's `gh` answers `gh pr view` and `gh pr diff --name-only` alike, so one stdout is both the body and the changed files.
-	test.each([["", true], ["\n- [x] Browser proof", false]])("a reviewed console UI change needs browser proof (%j blocks: %s)", (proof, blocked) => {
+	test.each([["- [ ] Browser proof (UI changes: run verify-yampa, attach screenshot)", true], ["- [x] Browser proof (UI changes: run verify-yampa, attach screenshot)", false]])("a reviewed PR with %j is blocked: %s", (box, blocked) => {
 		const { result, confirmations } = exercise("ship", {
 			command: "gh pr ready 7", approve: true,
-			response: { code: 0, stdout: `- [x] Thermo-nuclear code quality review${proof}\nfront/components/button.tsx`, stderr: "" },
+			responses: { "pr view": { code: 0, stdout: `## Checks\n${box}\n- [x] Thermo-nuclear code quality review`, stderr: "" } },
 		});
 		expect(result?.block ?? false).toBe(blocked);
 		expect(confirmations).toBe(blocked ? 0 : 1);
-		if (blocked) expect(result?.reason).toContain("verify-yampa");
+		if (blocked) expect(result?.reason).toContain("- [ ] Browser proof");
 	});
 
-	// The harness's `gh` answers every call with `response`, so `gh repo view` names the cwd repository `me/app` and the PR body lacks the checkbox.
 	test.each([["dustinspecker/awesome-eslint", false], ["me/app", true], ["ME/other", true]])("gh pr ready -R %s is gated: %s", (repo, gated) => {
 		const { result, confirmations } = exercise("ship", {
 			command: `gh pr ready 5 -R ${repo} >/dev/null`, approve: true,
-			response: { code: 0, stdout: "me/app", stderr: "" },
+			responses: {
+				"repo view": { code: 0, stdout: "me/app", stderr: "" },
+				"pr view": { code: 0, stdout: "Unreviewed PR", stderr: "" },
+			},
 		});
 		expect(result?.block ?? false).toBe(gated);
 		expect(confirmations).toBe(0);

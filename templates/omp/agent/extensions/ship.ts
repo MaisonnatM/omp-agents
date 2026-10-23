@@ -6,9 +6,8 @@ import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
 export const CHECKBOX = "- [x] Thermo-nuclear code quality review";
-export const BROWSER_PROOF = "- [x] Browser proof";
-/** Console UI paths: a PR that changes them goes live only with a screenshot from the running console. */
-const UI_PATH = /^front\/(components|app)\//;
+/** A proof box a repository's PR template declares; the PR goes live only once the author checks it. The gate reads the box, not the proof behind it. */
+export const PROOF_BOX = "- [ ] Browser proof";
 const POLL_MS = 60_000;
 const TURN_REFRESH_MS = 15_000;
 
@@ -34,8 +33,8 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'implement', issue}).",
 	implement: "Implement and commit on the issue's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
-	thermonuclear: `Run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body.`,
-	ready_gate: "Ask the user to approve, then run `gh pr ready <N>`.",
+	thermonuclear: `Run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, ask the user to approve, then run \`gh pr ready <N>\`.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
 };
@@ -248,16 +247,15 @@ export function otherOwner(owner: string | undefined, repo: string | undefined):
 	return owner !== undefined && own !== undefined && owner.toLowerCase() !== own.toLowerCase();
 }
 
-/** Why a PR with this body and these changed files may not go live, or `undefined` when it may. */
-export function publishBlocker(body: string, files: string[]): string | undefined {
-	const reasons: string[] = [];
+/** Why a PR with this body may not go live, or `undefined` when it may: it needs the thermonuclear checkbox and no unchecked proof box. */
+export function publishBlocker(body: string): string | undefined {
 	if (!body.includes(CHECKBOX)) {
-		reasons.push(`the PR is not live until the thermonuclear review is applied and pushed. Run the thermonuclear stage, then add \`${CHECKBOX}\` to the PR body.`);
+		return `Blocked: the PR is not live until the thermonuclear review is applied and pushed. Run the thermonuclear stage, then add \`${CHECKBOX}\` to the PR body.`;
 	}
-	if (files.some(file => UI_PATH.test(file)) && !body.includes(BROWSER_PROOF)) {
-		reasons.push(`the PR changes front/components or front/app, so it is not live without browser proof. Run the verify-yampa skill, attach a screenshot of the changed UI to the PR, then add \`${BROWSER_PROOF}\` to the PR body.`);
+	if (body.split("\n").some(line => line.trimStart().startsWith(PROOF_BOX))) {
+		return `Blocked: the PR body has an unchecked \`${PROOF_BOX}\` box from the repository's PR template. Do what the box and the repository's instructions ask, then check it; delete the line only when it does not apply to this PR.`;
 	}
-	return reasons.length > 0 ? `Blocked: ${reasons.join(" Also, ")}` : undefined;
+	return undefined;
 }
 
 export default function ship(pi: ExtensionAPI) {
@@ -362,19 +360,15 @@ export default function ship(pi: ExtensionAPI) {
 	}
 
 	async function publishCheck(selector: string[], cwd: string): Promise<string | undefined> {
-		const [view, diff] = await Promise.all([
-			gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd),
-			gh(["pr", "diff", ...selector, "--name-only"], cwd),
-		]);
-		if (view.code !== 0) {
-			const error = view.stderr.trim() || view.stdout.trim();
+		const r = await gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd);
+		if (r.code !== 0) {
+			const error = r.stderr.trim() || r.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {
 				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
 			}
-			return `Could not read the PR body to check the thermonuclear review: ${error}`;
+			return `Could not read the PR body to check its review and proof boxes: ${error}`;
 		}
-		if (diff.code !== 0) return `Could not read the PR's changed files to check for browser proof: ${diff.stderr.trim() || diff.stdout.trim()}`;
-		return publishBlocker(view.stdout, diff.stdout.split("\n").filter(Boolean));
+		return publishBlocker(r.stdout);
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
