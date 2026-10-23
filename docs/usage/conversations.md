@@ -52,6 +52,9 @@
   Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
+- The clock button in the composer, shown once a session has two prompts, opens **Chat history**: it blurs the conversation and gathers every prompt you sent into one column over it, newest at the bottom.
+  Prompts that were in view slide from their place into the column.
+  Click a prompt to close the history, scroll the conversation to it, and briefly outline its bubble; the X in the button's place, Escape, or a click on the blur closes it where you were.
 - In a session the dashboard started, a prompt sent to an idle session shows at once, dimmed, at the end of the conversation, and the session shows as working.
   That covers a new session's first message, a suggested prompt, and an edited prompt.
   omp takes up to a few seconds before its turn starts, and the prompt shows in full once it does.

@@ -32,6 +32,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from `outline` in `web/transcript-view.ts`.
+  **Chat history**, the blurred column of the session's prompts over it, is `PromptHistory` in `web/components/prompt-history.tsx`, opened by `PromptHistoryButton` from the same file in the live composer's `rightSlot` in `web/components/conversation.tsx`.
   A tool row's image thumbnails open one viewer that the transcript owns, `ImageViewer` from `web/components/media-viewer.tsx`, over every tool image of the conversation.
 - Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the road-icon toggle after the session's title in `web/components/pane.tsx` swaps for the transcript.
 - Replay from here: the sibling prompt-row action in `web/components/trajectory.tsx` opens `ReplayDialog` in `web/components/replay-dialog.tsx`; `FormDialog` provides its focus, escape, and pending-submit behavior.
