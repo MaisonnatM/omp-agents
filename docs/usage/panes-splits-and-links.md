@@ -41,6 +41,6 @@
 - A part of the hash that does not decode, such as `#todo/%E0`, names nothing: the page opens without it, and a pane it names drops.
 - When a pane's view fails to render, that pane shows **This view failed to render.** with the error under it, and the other panes and the sidebar keep working; the pane's header buttons still close or maximize it.
   A page that fails shows the same in its place, and opening another view clears it.
-- Session conversations, their composers, and the new-session composer are at most 34rem wide.
+- Session conversations, their composers, and the new-session composer are at most 48rem wide.
 - A session header shows its **Copy session ID** and trajectory buttons only while the pointer is over the title, while one of them has keyboard focus, or always on a touch screen.
 - In the desktop app, pointing at or tabbing to a link shows its address at the bottom left of the window, as a browser does.
