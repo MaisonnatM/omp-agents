@@ -49,8 +49,8 @@ export interface DashboardStatus {
 		quick: StartOf<"quick"> | null;
 		resumeAll: StartOf<"resume-all"> | null;
 	};
-	/** The live sessions the page asked the server to end, by instance id, until it answers. */
-	ending: ReadonlySet<string>;
+	/** The live sessions the page asked the server to end, by instance id, with the session each ran, until it answers. */
+	ending: ReadonlyMap<string, string | null>;
 	/**
 	 * The workspace `cwd` whose pull request entry `App` polls, `null` for all workspaces. A component that wants the pull requests
 	 * reads that entry, never another scope's: the all-workspaces entry asks GitHub about every repository.

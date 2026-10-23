@@ -81,7 +81,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} />
 					</AskAboutSelection>
 				)}
-				<div className="mx-auto w-full max-w-3xl px-3">
+				<div className="mx-auto w-full max-w-conversation px-3">
 					<ChangesCard view={view} sessionId={sessionId} cwd={session?.cwd ?? null} working={false} facts={session} className="mb-3 rounded-xl pb-0" />
 				</div>
 			</div>

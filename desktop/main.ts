@@ -27,7 +27,7 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { OWNS_CLOSE_CHANNEL } from "../src/shared/desktop-bridge";
+import { OWNS_CLOSE_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
@@ -241,6 +241,14 @@ function createWindow(): BrowserWindow {
 	win.once("ready-to-show", () => win.show());
 
 	const contents = win.webContents;
+	const sendTargetURL = (url: string): void => {
+		if (isDashboard(contents.getURL())) contents.send(TARGET_URL_CHANNEL, url);
+	};
+	contents.on("update-target-url", (_event, url) => sendTargetURL(url));
+	contents.on("did-start-navigation", details => {
+		if (details.isMainFrame) sendTargetURL("");
+	});
+	win.on("blur", () => sendTargetURL(""));
 	let pageOwnsClose = false;
 	ipcMain.on(OWNS_CLOSE_CHANNEL, (event, owns: unknown) => {
 		if (event.sender === contents && isDashboard(event.senderFrame?.url ?? "") && typeof owns === "boolean") pageOwnsClose = owns;

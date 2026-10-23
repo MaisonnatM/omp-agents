@@ -604,7 +604,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		<OpenToolImage.Provider value={openImage}>
 			<MessageScroller className="@container flex-1">
 				<MessageScrollerViewport>
-					<MessageScrollerContent className="mx-auto max-w-3xl gap-3 p-3" aria-relevant="additions text" data-transcript>
+					<MessageScrollerContent className="mx-auto max-w-conversation gap-3 p-3" aria-relevant="additions text" data-transcript>
 						{visibleBlocks.map(block => {
 							if (block.kind === "activity") {
 								return (

@@ -10,6 +10,7 @@ export const DESKTOP_BRIDGE = "ompDesktop";
 export const BADGE_CHANNEL = "omp-agents:badge";
 export const ALERT_CHANNEL = "omp-agents:alert";
 export const OWNS_CLOSE_CHANNEL = "omp-agents:owns-close";
+export const TARGET_URL_CHANNEL = "omp-agents:target-url";
 
 /** The moment a live session came to need you: it asks you something, or it ended a turn. */
 export interface SessionAlert {
@@ -28,4 +29,6 @@ export interface DesktopBridge {
 	alert(alert: SessionAlert): void;
 	/** Whether the page handles Cmd+W (Ctrl+W) itself, so the window's Close menu item lets it through; absent in an app built before it. */
 	ownsClose?(owns: boolean): void;
+	/** Reports the hovered or focused link's URL; an empty string clears it. Returns the subscription's cleanup; absent in an app built before it. */
+	onTargetURL?(listener: (url: string) => void): () => void;
 }

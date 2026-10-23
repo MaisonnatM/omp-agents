@@ -2,7 +2,7 @@
 import { BarChart3, Blocks, FileText, Folders, GitBranch, GitMerge, KeyRound, type LucideIcon, Plug, RefreshCcw, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
-import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
+import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
@@ -314,6 +314,13 @@ export function routeFromHash(hash: string): Route {
 		return sessionId === null ? { kind: "panes", layout: EMPTY_LAYOUT } : { kind: "session", sessionId };
 	}
 	return { kind: "panes", layout: layoutFromPanes(raw) };
+}
+
+/** The hash that names `route`, the inverse of {@link routeFromHash}. */
+export function hashForRoute(route: Route): string {
+	if (route.kind === "page") return hashForPage(route.page);
+	if (route.kind === "session") return hashForSession(route.sessionId);
+	return hashForLayout(route.layout);
 }
 
 /** The view a session id opens: the live host that runs the session, else its saved transcript. */
