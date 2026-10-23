@@ -22,7 +22,7 @@ To learn where uncommitted or unmerged changes came from, search past sessions w
 ## Test servers
 
 A server, dev server, or other listener you start to test or verify never takes a default port, such as 3000, 3001, 4200, 4317, 5000, 5173, 8000, or 8080: the user's own servers and other sessions run there.
-Use the port range the repository's docs name; otherwise pick a random port between 20000 and 39999 and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN` first.
+Use the port range the repository's docs name; otherwise pick a random port between 20000 and 39999 and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN || echo free` first: `lsof` exits 1 when nothing listens, and `free` marks that as the expected answer.
 Pass the port through the tool's port flag or `PORT`, and point every browser, curl, and proxy call at it.
 
 ## omp-agents dashboard
