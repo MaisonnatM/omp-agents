@@ -3,10 +3,9 @@
  * The server rebases the branch, runs the repository's checks, and pushes it; a conflict hands it to **Resolve conflicts**.
  */
 import { useSyncExternalStore } from "react";
-import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest } from "../src/shared/github";
+import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest, repoKey } from "../src/shared/github";
 import { errorText, putJson } from "./api";
 import { toasts } from "./components/toaster";
-import { branchKey } from "./pull-requests-model";
 
 /** A pull request to rebase, from `cwd`, the workspace a session on it starts in. */
 export interface RebaseJob {
@@ -14,7 +13,7 @@ export interface RebaseJob {
 	cwd: string;
 }
 
-/** What a run calls back. */
+/** What a run calls back: those of the page that queued it, even once you have moved to another workspace. */
 export interface RebaseHooks {
 	/** Starts **Resolve conflicts** on a pull request whose rebase stopped at a conflict. */
 	resolve: (job: RebaseJob) => void;
@@ -25,10 +24,10 @@ export interface RebaseHooks {
 /** Where a pull request stands in the queue. */
 export type RebaseState = "queued" | "running";
 
-/** How a rebase ended: as the server answered, failed, or skipped, since a bulk run skips the stack above one that stopped. */
+/** How a rebase ended: as the server answered, failed, or skipped, since the queue skips the stack above one that stopped. */
 type Outcome = RebasedPullRequest["kind"] | "failed" | "skipped";
 
-/** Whether an outcome stops the run from rebasing the pull requests stacked above it. */
+/** Whether an outcome stops the queue from rebasing the pull requests stacked above it. */
 const STOPS: Record<Outcome, boolean> = { rebased: false, current: false, conflict: true, failed: true, skipped: true };
 
 interface Run {
@@ -37,14 +36,16 @@ interface Run {
 	hooks: RebaseHooks;
 	total: number;
 	left: number;
-	/** The head branches, by {@link branchKey}, of the pull requests that stopped. */
-	stopped: Set<string>;
 	outcomes: Record<Outcome, number>;
 }
 
 const queue: { job: RebaseJob; run: Run }[] = [];
 let states: ReadonlyMap<string, RebaseState> = new Map();
 let draining = false;
+/** A branch of the pull request's repository, as one key: the queue spans repositories, and a stack links its pull requests by branch within one. */
+const branchKey = (pr: PullRequest, branch: string): string => `${repoKey(pr)}:${branch}`;
+/** The head branches, by {@link branchKey}, of the pull requests that stopped since the queue was last empty, whatever run queued them. */
+const stopped = new Set<string>();
 const listeners = new Set<() => void>();
 
 function setState(key: string, state: RebaseState | null): void {
@@ -69,9 +70,9 @@ export function useRebaseState(pr: PullRequest): RebaseState | null {
 /** Whether a rebase is queued or running. */
 export const useRebasing = (): boolean => useSyncExternalStore(subscribe, () => states.size > 0);
 
-/** Rebases `job`, toasting what came of it, unless a pull request below it stopped earlier in the run. */
+/** Rebases `job`, toasting what came of it, unless a pull request below it stopped earlier. */
 async function rebaseOne({ pr, cwd }: RebaseJob, run: Run): Promise<Outcome> {
-	if (pr.stackedOn !== null && run.stopped.has(branchKey(pr, pr.stackedOn))) return "skipped";
+	if (pr.stackedOn !== null && stopped.has(branchKey(pr, pr.stackedOn))) return "skipped";
 	try {
 		const request: PullRequestRebase = { owner: pr.owner, repo: pr.repo, number: pr.number, cwd };
 		const done = await putJson<RebasedPullRequest>("/api/pull-request/rebase", request);
@@ -114,19 +115,20 @@ async function drain(): Promise<void> {
 		const outcome = await rebaseOne(job, run);
 		setState(key, null);
 		run.outcomes[outcome] += 1;
-		if (STOPS[outcome]) run.stopped.add(branchKey(job.pr, job.pr.head));
+		if (STOPS[outcome]) stopped.add(branchKey(job.pr, job.pr.head));
 		run.left -= 1;
 		if (run.left > 0) continue;
 		run.hooks.refresh();
 		if (run.bulk) toasts.add(summary(run));
 	}
+	stopped.clear();
 	draining = false;
 }
 
 function enqueue(jobs: readonly RebaseJob[], hooks: RebaseHooks, bulk: boolean): void {
 	const fresh = jobs.filter(({ pr }) => !states.has(prKey(pr)));
 	if (fresh.length === 0) return;
-	const run: Run = { bulk, hooks, total: fresh.length, left: fresh.length, stopped: new Set(), outcomes: { rebased: 0, current: 0, conflict: 0, failed: 0, skipped: 0 } };
+	const run: Run = { bulk, hooks, total: fresh.length, left: fresh.length, outcomes: { rebased: 0, current: 0, conflict: 0, failed: 0, skipped: 0 } };
 	for (const job of fresh) {
 		queue.push({ job, run });
 		setState(prKey(job.pr), "queued");

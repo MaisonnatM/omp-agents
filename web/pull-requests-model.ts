@@ -130,19 +130,25 @@ interface StackMember {
 	size: number;
 }
 
+/** The bottom of `pr`'s stack among `byHead`, the pull requests by head branch, and how many there are from `pr` down to it, both counted. */
+function chainBelow(pr: PullRequestSummary, byHead: ReadonlyMap<string, PullRequestSummary>): { bottom: PullRequestSummary; size: number } {
+	// GitHub cannot report a cycle of bases, but one must not hang the page.
+	const seen = new Set([pr]);
+	let bottom = pr;
+	for (let below = byHead.get(pr.stackedOn ?? ""); below && !seen.has(below); below = byHead.get(below.stackedOn ?? "")) {
+		seen.add(below);
+		bottom = below;
+	}
+	return { bottom, size: seen.size };
+}
+
 /** Each open or draft pull request in a stack of two or more that the list holds, by the chain of base branches. */
 function stackMembers(pullRequests: PullRequestSummary[]): Map<PullRequestSummary, StackMember> {
 	const live = pullRequests.filter(pr => pr.state !== "merged");
 	const byHead = new Map(live.map(pr => [pr.head, pr]));
 	const places = live.map(pr => {
-		// GitHub cannot report a cycle of bases, but one must not hang the page.
-		const seen = new Set([pr]);
-		let bottom = pr;
-		for (let below = byHead.get(pr.stackedOn ?? ""); below && !seen.has(below); below = byHead.get(below.stackedOn ?? "")) {
-			seen.add(below);
-			bottom = below;
-		}
-		return { pr, root: bottom.head, position: seen.size };
+		const { bottom, size } = chainBelow(pr, byHead);
+		return { pr, root: bottom.head, position: size };
 	});
 	const members = new Map<PullRequestSummary, StackMember>();
 	for (const stack of Map.groupBy(places, place => place.root).values()) {
@@ -159,26 +165,18 @@ const rebasable = (pr: PullRequestSummary): boolean => pr.role === "author" && p
 /** Whether **Rebase on** its base applies to `pr`: your pull request, behind its base and without conflicts. */
 export const rebaseApplies = (pr: PullRequestSummary): boolean => rebasable(pr) && pr.behind;
 
-/** A branch of the pull request's repository, as one key: a stack links its pull requests by branch within one repository. */
-export const branchKey = (pr: PullRequest, branch: string): string => `${repoKey(pr)}:${branch}`;
-
 /**
- * What **Rebase behind** rebases, in order: the pull requests {@link rebaseApplies} to, and every rebasable one stacked
- * on one of them in the same repository, which falls behind only once the one below it is pushed. The bottom of a stack
+ * What **Rebase behind** rebases in one repository's `pullRequests`, in order: those {@link rebaseApplies} to, and every
+ * rebasable one stacked on one of them, which falls behind only once the one below it is pushed. The bottom of a stack
  * comes first; otherwise they keep the order of `pullRequests`.
  */
 export function rebaseOrder(pullRequests: readonly PullRequestSummary[]): PullRequestSummary[] {
-	const above = Map.groupBy(pullRequests.filter(pr => rebasable(pr) && pr.stackedOn !== null), pr => branchKey(pr, pr.stackedOn!));
+	const above = Map.groupBy(pullRequests.filter(pr => rebasable(pr) && pr.stackedOn !== null), pr => pr.stackedOn);
 	const chosen = new Set(pullRequests.filter(rebaseApplies));
 	// A set's loop also visits what it adds, and adds nothing twice, so a cycle of bases ends.
-	for (const pr of chosen) for (const child of above.get(branchKey(pr, pr.head)) ?? []) chosen.add(child);
-	const byHead = new Map([...chosen].map(pr => [branchKey(pr, pr.head), pr]));
-	const depth = (pr: PullRequestSummary): number => {
-		const seen = new Set([pr]);
-		for (let below = byHead.get(branchKey(pr, pr.stackedOn ?? "")); below && !seen.has(below); below = byHead.get(branchKey(below, below.stackedOn ?? ""))) seen.add(below);
-		return seen.size;
-	};
-	return pullRequests.filter(pr => chosen.has(pr)).map(pr => ({ pr, depth: depth(pr) })).sort((a, b) => a.depth - b.depth).map(({ pr }) => pr);
+	for (const pr of chosen) for (const child of above.get(pr.head) ?? []) chosen.add(child);
+	const byHead = new Map([...chosen].map(pr => [pr.head, pr]));
+	return pullRequests.filter(pr => chosen.has(pr)).map(pr => ({ pr, depth: chainBelow(pr, byHead).size })).sort((a, b) => a.depth - b.depth).map(({ pr }) => pr);
 }
 
 /** How the list orders a section's pull requests; a stack's members sit together, top first, in every sort. */

@@ -10,7 +10,7 @@
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either; the details count `unresolved` from the threads they keep, so their counts and threads agree.
   The details also read the last 100 commits with the pull requests GitHub links each to, and keep a commit linked to none or to this one, since a branch that merged its trunk lists the trunk's commits too.
 - `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), the branch a worktree had checked out at a given time (`headHistory`, `branchAt`), and the worktree a new session's branch runs in.
-  It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
+  It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, `worktreesOf`, which parses `git worktree list --porcelain -z`, and `holderOf`, the worktree that has a branch checked out, which the pull request checkout and rebase use too.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the linked worktree a directory is in, or returns `null` for a main checkout or a directory outside git, waiting up to 15 seconds for a session that just ended to leave it: it polls only which live sessions occupy the checkout, then runs the full preview once.
   `releaseBranch` removes the linked worktree that has a branch checked out through `removeCheckout` without that wait, and answers a `BranchRelease` from `src/shared/git.ts`, for `PUT /api/worktree/release`.
   `deleteMergedBranch` deletes a local branch only while its commit is the one its pull request merged, or one that commit contains, and no worktree has it checked out, for the cleanup after a merge.
@@ -31,6 +31,7 @@
   It also lists picker choices for `GET /api/pull-request/options` and appends images with `attachToPullRequest`.
   `src/pull-request-checkout.ts` checks out a pull request for `PUT /api/pull-request/checkout`: with `gh pr checkout` in a checkout, or on its head branch in a worktree with a new session that the route's starter opens there.
   `src/pull-request-rebase.ts` rebases a pull request's branch onto its base for `PUT /api/pull-request/rebase`, in the worktree that has the branch or a temporary one, and force-pushes it with a lease through the repository's pre-push hook, one repository at a time.
+  Both read the pull request's head and base branches through `headOf` in `src/pull-request-head.ts`, and refuse a workspace of another repository through `assertWorkspaceOf` there.
   `src/pull-request-merge.ts` holds `GITHUB_MERGES`, the merge and its steps, including merge or rebase branch updates, and the status reads.
   `src/pull-requests.ts` adds `behindBy` with one REST base-to-head comparison per detail read.
   `src/pull-request-review.ts` holds a review draft's side of GitHub: `readReviewTarget`, the head and the lines each file's diff shows, the viewer's login, the reviews and their comments a retry compares, and `postReview`, one `POST` of the review through `ghRestPost` in `src/github.ts`.

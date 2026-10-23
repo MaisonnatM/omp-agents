@@ -561,8 +561,8 @@ describe("rebaseOrder", () => {
 		expect(numbers(prs)).toEqual([1, 6]);
 	});
 
-	test("adds the pull requests stacked above one it takes, in its repository only, up to one with conflicts", () => {
-		const prs = [pr(1, { behind: true }), above(2, 1), above(3, 2), above(4, 3, { conflicts: true }), above(5, 4), above(6, 1, { repo: "api" }), above(7, 1, { state: "merged" })];
+	test("adds the pull requests stacked above one it takes, up to one with conflicts", () => {
+		const prs = [pr(1, { behind: true }), above(2, 1), above(3, 2), above(4, 3, { conflicts: true }), above(5, 4), above(7, 1, { state: "merged" })];
 		expect(numbers(prs)).toEqual([1, 2, 3]);
 	});
 

@@ -120,7 +120,7 @@
   A plain browser may reserve Cmd+W and close its browser tab before the page can prevent it; use the glyph or context menu there.
 - **Rebase N behind** at the top of the Pull requests page shows while N of your pull requests can rebase on their base, counting the ones stacked on them.
   The first click arms **Confirm rebase of N?**, and a second click within three seconds rebases them one at a time, as **Rebase on main** does, the bottom of each stack first.
-  A pull request stacked on one whose rebase stopped at a conflict or failed is skipped.
+  A pull request stacked on one whose rebase stopped at a conflict or failed is skipped, even when a **Rebase on main** click queued that one before.
   Each rebase, conflict, and failure toasts as it happens, and a last toast sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
   The button reads **Rebasing…** and waits while any rebase is queued or running.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.

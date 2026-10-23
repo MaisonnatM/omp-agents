@@ -89,4 +89,17 @@ describe("rebasePullRequests", () => {
 		expect(requested.map(({ number }) => number)).toEqual([1, 2]);
 		expect(toasted.at(-1)).toEqual({ title: "Rebased 2 of 2 pull requests", description: undefined });
 	});
+
+	test("skips a pull request stacked on one that an earlier run, still in the queue, stopped at a conflict", async () => {
+		answers = { 1: reply(200, rebased("me/branch-1", "conflict")), 2: reply(200, rebased("me/branch-2")) };
+		const single = settled(hooks => rebasePullRequest(job(1), hooks));
+		const bulk = settled(hooks => rebasePullRequests([job(1), job(2, 1)], hooks));
+		expect(await single).toEqual([job(1)]);
+		await bulk;
+		expect(requested.map(({ number }) => number)).toEqual([1]);
+		expect(toasted.at(-1)).toEqual({ title: "Rebased 0 of 1 pull request", description: "1 skipped, stacked on one that stopped." });
+
+		await settled(hooks => rebasePullRequests([job(2, 1)], hooks));
+		expect(requested.map(({ number }) => number)).toEqual([1, 2]);
+	});
 });

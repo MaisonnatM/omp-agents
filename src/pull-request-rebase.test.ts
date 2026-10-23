@@ -152,7 +152,7 @@ describe("refusals", () => {
 
 	test("refuses a pull request whose branch is in a fork", async () => {
 		const { rebase } = await setup();
-		spyOn(proc, "runJson").mockResolvedValue({ head: { ref: "feature", repo: { full_name: "someone/app" } }, base: { ref: "main", repo: { full_name: "acme/app" } } });
+		spyOn(proc, "runJson").mockResolvedValue({ title: "Add the change", head: { ref: "feature", sha: "unused", repo: { full_name: "someone/app" } }, base: { ref: "main", repo: { full_name: "acme/app" } } });
 		await expect(rebase()).rejects.toThrow("Pull request #7's branch is in a fork, which this dashboard does not push to.");
 	});
 });

@@ -153,7 +153,10 @@ export interface PullRequestSummary extends PullRequest {
 	head: string;
 	/** The branch it merges into. */
 	base: string;
-	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
+	/**
+	 * `base` when that is not the repository's default branch, else `null`: the PR below it in a stack. The server
+	 * derives it, since the summary does not carry the default branch.
+	 */
 	stackedOn: string | null;
 	/** Its base has commits its branch lacks and you may update the branch: GitHub's `viewerCanUpdateBranch`, true with conflicts too, false once merged. */
 	behind: boolean;

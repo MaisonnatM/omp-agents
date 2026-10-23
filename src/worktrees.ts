@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { lstat, readdir } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
-import { canonical, commonDir, git, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
+import { canonical, commonDir, git, holderOf, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { run } from "./proc";
@@ -499,8 +499,8 @@ export class Worktrees {
 	 * waiting for a session to leave, so the branch can be checked out elsewhere. A main checkout is never one.
 	 */
 	async releaseBranch(cwd: string, branch: string): Promise<BranchRelease> {
-		const holder = (await worktreesOf(cwd)).find(registration => !registration.main && !registration.bare && registration.prunable === null && registration.branch === branch);
-		const result = holder ? await this.removeCheckout(holder.path, 0) : null;
+		const holder = await holderOf(cwd, branch);
+		const result = holder && !holder.main ? await this.removeCheckout(holder.path, 0) : null;
 		if (!result) return { kind: "none" };
 		if (result.removed) return { kind: "removed", path: result.path };
 		return { kind: "kept", path: result.path, why: result.error ?? result.blockers.map(blocker => blocker.message).join(" ") };
