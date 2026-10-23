@@ -54,6 +54,7 @@
   The group shows only while it has a row.
   Its **Resume all** button resumes every session it lists, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
+  The notices bell's **Sessions** tab lists those that stopped mid-turn, and its **Continue all** resumes them the same way; see [Notifications](notifications.md).
   When some fail to start, a note under the group label names how many and the first reason, until **Dismiss**.
   **Move to past** in a row's menu moves it to the past sessions.
   A session that you end, resume, or move leaves the group.

@@ -1,7 +1,7 @@
 # Notifications
 
 - The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
-- Six sources feed it.
+- Seven sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
@@ -23,19 +23,22 @@
   - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
     All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
   - **Projects**: a project that needs you, checked every minute: a worker's question its coordinator left unanswered once the coordinator is idle or stopped, a worker that stopped without **End session**, and a project whose workers are all done with nothing left for its coordinator.
-- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, **Projects**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
+  - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **End session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
+    They are the interrupted sessions of the sessions sidebar whose turn ran, checked as the dashboard starts, every minute, and each time one stops, resumes, or moves to past.
+- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, **Projects**, **Sessions**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in a new tab, or the **Calendar** page for an event on this computer.
-  Selecting an update's notice marks it read.
+  Selecting an update's or stopped sessions' notice marks it read.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
+- The stopped sessions' notice offers **Continue all**, on the toast or in the bell, which resumes every session it lists and sends each the prompt `continue`, as the sidebar's **Resume all** does, and marks the notice read.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
-  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or **Calendar** for an event kept on this computer, omp for an update of omp or a model, or omp-agents for its own.
-  A pull request's, Slack message's, provider's, or event's toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts.
-  A pull request's, Slack message's, or provider's toast closes after a few seconds; an event's stays until you dismiss it or the event ends, and an update's until you dismiss it.
+  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or **Calendar** for an event kept on this computer, omp for an update of omp or a model, or omp-agents for its own and for stopped sessions.
+  A pull request's, Slack message's, provider's, event's, or stopped sessions' toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts.
+  A pull request's, Slack message's, or provider's toast closes after a few seconds; an event's stays until you dismiss it or the event ends, and an update's or stopped sessions' until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
   - For omp, it runs `omp update`, which installs the newest release.
     Restart omp-agents to load it, since the running server keeps the omp it started with.
@@ -44,7 +47,7 @@
     A chain keyed by the old model keeps its key, and a workspace's `.omp/config.yml` stays as it was.
   - For omp-agents, it is **Update dashboard**, as in [Updating omp-agents](updating-omp-agents.md).
 - **×** clears a notice from the bell.
-  A cleared update comes back with a newer version, a cleared pull request notice when the pull request comes back to the move after a while, a cleared Slack notice with a newer message, a cleared plan notice when the window runs out again a while after it reset, and a cleared credits notice when the credits run out again a while after a request worked.
+  A cleared update comes back with a newer version, a cleared pull request notice when the pull request comes back to the move after a while, a cleared Slack notice with a newer message, a cleared plan notice when the window runs out again a while after it reset, a cleared credits notice when the credits run out again a while after a request worked, and a cleared stopped sessions' notice when another session stops mid-turn; one that only resumes keeps the notice cleared, seen, or read as it was.
 - The server keeps which notices were seen, read, and cleared in `notices.json` beside its access token.
 
 ## Session notifications

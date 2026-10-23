@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { Notice } from "../../src/shared/notices";
 import type { ClientMsg } from "../../src/shared/protocol";
 import { follow, presentNotice } from "../notice-model";
+import type { StartOp } from "../starts";
 import { NoticeOrigin } from "./notices";
 import { toasts } from "./toaster";
 
@@ -12,9 +13,10 @@ const TOAST_FRESH_MS = 15 * 60_000;
 /**
  * Shows each notice the user has not seen as a toast, under the logo and name of its source; closing it marks the notice seen, so it toasts once across reloads
  * and pages. An update's toast stays until dismissed and keeps its text and **Update** in step with the notice. Any
- * other notice's toast shows only while its news is fresh and opens what it is about, for as long as its presentation says.
+ * other notice's toast shows only while its news is fresh and opens what it is about, or resumes its sessions with
+ * **Continue all**, for as long as its presentation says.
  */
-export function useNoticeToasts(notices: Notice[], connected: boolean, send: (msg: ClientMsg) => void): void {
+export function useNoticeToasts(notices: Notice[], connected: boolean, send: (msg: ClientMsg) => void, start: (op: StartOp) => void): void {
 	const open = useRef(new Set<string>());
 	useEffect(() => {
 		const close = (id: string) => {
@@ -45,13 +47,22 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 					onClose,
 					title: shown.headline,
 					description: <span className="line-clamp-2">{shown.preview}</span>,
-					actionProps: {
-						children: "Open",
-						onClick: () => {
-							follow(shown.link);
-							send({ t: "notice", ids: [id], op: "read" });
-						},
-					},
+					actionProps:
+						action.kind === "continue-all"
+							? {
+									children: "Continue all",
+									onClick: () => {
+										start({ kind: "resume-all", sessionIds: action.sessionIds });
+										send({ t: "notice", ids: [id], op: "read" });
+									},
+								}
+							: {
+									children: "Open",
+									onClick: () => {
+										follow(shown.link);
+										send({ t: "notice", ids: [id], op: "read" });
+									},
+								},
 				});
 				continue;
 			}
@@ -73,5 +84,5 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 				toasts.update(id, content);
 			}
 		}
-	}, [notices, connected, send]);
+	}, [notices, connected, send, start]);
 }

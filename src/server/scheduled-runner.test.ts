@@ -88,8 +88,8 @@ describe("ScheduledRunner", () => {
 	test("a due continue sends `continue` to its session, resuming it when it is not running", async () => {
 		const { file, fake, runner, add } = harness();
 		fake.live.set("s1", []);
-		add("live", T0, { kind: "continue", sessionId: "s1", provider: "Anthropic", reply: "Halfway." });
-		add("past", T0, { kind: "continue", sessionId: "s-past", provider: "Opencode Go", reply: null });
+		add("live", T0, { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit", reply: "Halfway." });
+		add("past", T0, { kind: "continue", sessionId: "s-past", provider: "OpenAI Codex", cause: "transient", reply: null });
 		await runner.tick();
 		expect([fake.live.get("s1"), fake.live.get("s-past"), fake.requests]).toEqual([["continue"], ["continue"], [{ kind: "resume", sessionId: "s-past" }]]);
 		expect(file.value).toEqual([]);

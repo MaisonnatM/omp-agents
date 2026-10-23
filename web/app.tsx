@@ -69,7 +69,7 @@ export function App() {
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
-	useNoticeToasts(state.notices, state.connected, send);
+	useNoticeToasts(state.notices, state.connected, send, start);
 	useAttention(state, page, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const integrations = integrationsStore.usePolling().read?.data.integrations;

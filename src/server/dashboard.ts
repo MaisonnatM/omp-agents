@@ -59,7 +59,7 @@ import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops, repeat } from "./loops";
 import { cleanupEnds, MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
 import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
@@ -100,7 +100,7 @@ const MERGE_QUEUE_TICK_MS = 15_000;
 export class Dashboard {
 	readonly #files = new SessionFiles();
 	readonly #foreignUsage = new ForeignUsage(SESSION_FORMATS, listPrice);
-	readonly #interrupted = new InterruptedSessions(interruptedFile);
+	readonly #interrupted = new InterruptedSessions(interruptedFile, () => void this.#notices.check(STOPPED_KINDS));
 	readonly #todos = new UserTodosFile(userTodosFile);
 	readonly #routines = new RoutinesFile(routinesFile);
 	readonly #scheduled = new ScheduledFile(scheduledFile);
@@ -224,6 +224,11 @@ export class Dashboard {
 									),
 					})),
 				projects: () => this.#projectRunner.noticeFacts(),
+				stoppedSessions: () =>
+					interrupted.midTurn().map(sessionId => {
+						const saved = files.savedOf(sessionId);
+						return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
+					}),
 				now: Date.now,
 			},
 			() => this.#broadcasts.pushList("notices"),
@@ -357,7 +362,7 @@ export class Dashboard {
 			released: (sessionId, reply) => {
 				const session = sessions.bySessionId(sessionId);
 				if (!session) return;
-				// A continue that went left the session working; one canceled or dismissed leaves the turn ended where the limit stopped it.
+				// A continue that went left the session working; one canceled or dismissed leaves the turn ended where the failure stopped it.
 				if (session.row().status === "idle") projectRunner.turnEnded(session.instanceId, reply);
 				runner.observe(session.instanceId);
 				projectRunner.observe(session.instanceId);
@@ -453,7 +458,7 @@ export class Dashboard {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
 				this.#publishScheduled();
-				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS]);
+				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS, ...STOPPED_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
 				// It reads every sandbox's checkout, which takes minutes, so the routines and sends after it do not wait for it.
@@ -571,7 +576,8 @@ export class Dashboard {
 	/**
 	 * Starts following omp: attaches to the sessions the last server left running, seeds the user's notes and moves each
 	 * project's older notes to their places now, watches the session files and the inboxes, takes the owner lock when it
-	 * is free, lists the files and the registry, and starts the loops; `publisher` is the server now listening.
+	 * is free, lists the files, checks for the sessions that stopped mid-turn, lists the registry, and starts the loops;
+	 * `publisher` is the server now listening.
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
@@ -593,6 +599,8 @@ export class Dashboard {
 		this.#todoInbox.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
+		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
+		await this.#notices.check(STOPPED_KINDS);
 		const [calendarServer] = await findMcpServers(MCP_SERVICES["google-calendar"].host);
 		if (calendarServer) this.#calendars.adopt(calendarServer.name);
 		await this.#listRegistry();
@@ -703,15 +711,14 @@ export class Dashboard {
 				if (this.#sessions.markRead(instanceId)) this.#broadcasts.rosterChanged();
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				if (sessionId) this.#autoContinue.cancel(sessionId);
+				if (sessionId) this.#autoContinue.turnStarted(sessionId);
 				return;
 			}
 			case "turn-ended": {
 				this.#sessions.markUnread(instanceId, update.reply);
-				// A session started here that a usage limit stopped is held for its continue; its project hears of the turn only if the continue never goes.
+				// A session started here that a usage limit or a transient fault stopped is held for its continue; its project hears of the turn only if the continue never goes.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
-				if (update.limit && sessionId) void this.#autoContinue.limited(sessionId, update.limit, update.reply);
-				else this.#projectRunner.turnEnded(instanceId, update.reply);
+				if (!sessionId || !this.#autoContinue.turnEnded(sessionId, update.failure, update.reply)) this.#projectRunner.turnEnded(instanceId, update.reply);
 				this.#broadcasts.rosterChanged();
 				return;
 			}

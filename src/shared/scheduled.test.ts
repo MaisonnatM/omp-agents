@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { applyScheduled, type ScheduledSend } from "./scheduled";
+import { applyScheduled, parseScheduledSpec, type ScheduledSend } from "./scheduled";
 import { newSessionRequest } from "./sessions";
 
 const start = (prompt: string) => ({ kind: "start" as const, request: newSessionRequest("/work/app", prompt) });
@@ -17,5 +17,16 @@ describe("applyScheduled update", () => {
 		const update = (id: string) => () => applyScheduled(sends, { op: "update", send: { id, at: 10, reset: null, target: start("x") } }, 99);
 		expect(update("a")).toThrow("It is already sending.");
 		expect(update("missing")).toThrow("It is no longer scheduled.");
+	});
+});
+
+describe("parseScheduledSpec", () => {
+	test("a continue saved without a cause followed a usage limit; one with a transient cause keeps it, and an unknown cause is dropped", () => {
+		const continued = (cause?: unknown) => parseScheduledSpec({ id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null, cause } });
+		expect([continued(), continued("transient"), continued("outage")]).toEqual([
+			{ ok: { id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit", reply: null } } },
+			{ ok: { id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "transient", reply: null } } },
+			null,
+		]);
 	});
 });
