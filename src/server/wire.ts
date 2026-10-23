@@ -32,6 +32,7 @@ import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent,
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
+import type { ProcessStop } from "../shared/processes";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import {
 	GITHUB_NAME,
@@ -556,6 +557,11 @@ export function parseSyncRun(body: unknown): Parsed<Record<string, SyncSide>> {
 	if (!isObject(body) || !isObject(body.choices) || Array.isArray(body.choices)) return null;
 	const choices = Object.entries(body.choices);
 	return choices.length <= 10_000 && choices.every(([, side]) => isSyncSide(side)) ? { ok: Object.fromEntries(choices) as Record<string, SyncSide> } : null;
+}
+
+/** The body of `PUT /api/session-processes/stop`: a live session's instance id and the id of one of its processes. */
+export function parseProcessStop(body: unknown): Parsed<ProcessStop> {
+	return isObject(body) && isNonEmpty(body.instanceId) && isNonEmpty(body.id) ? { ok: { instanceId: body.instanceId, id: body.id } } : null;
 }
 
 /** The most pull requests one queued merge takes: a stack taller than this is merged in parts. */

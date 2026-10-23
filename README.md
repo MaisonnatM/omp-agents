@@ -42,6 +42,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Start a session in any workspace, on any branch or a new one in its own git worktree, resume a past one, or fork a conversation from any prompt or reply.
   Ending a session removes the git worktree it worked in, and keeps its branch and any worktree with uncommitted changes.
   An agent can end its own session through the starter kit's `end_session` tool, so "Merge on main, then end the session" needs no follow-up.
+- **Session processes.**
+  A live session's dev servers, watchers, and omp broker services, biggest memory first, each with a Stop button; the server stops them once their sessions have been idle for 30 minutes, or a time you pick, and when their session ends.
 - **Pull requests.**
   A Graphite-style list of your GitHub pull requests, sorted by whose move it is and linked to the sessions that submitted or worked on them.
 - **Linear tickets.**

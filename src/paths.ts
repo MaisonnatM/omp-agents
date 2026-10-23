@@ -51,6 +51,8 @@ export const projectNotesDir = (id: string): string => join(dataDir, "projects",
 export const userNotesDir = join(dataDir, "user");
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
+/** When the idle stop ends a session's processes, beside {@link tokenFile}. */
+export const processesFile = join(configDir, "processes.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
 /** The address each Google account signs in as and the workspaces each address is linked to, beside {@link tokenFile}. */

@@ -10,6 +10,8 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Why the server joins every terminal session](architecture/terminal-sessions.md#why-the-server-joins-every-terminal-session)
 - [Dashboard sessions](architecture/dashboard-sessions.md)
   - [Session keepers](architecture/dashboard-sessions.md#session-keepers)
+- [Session processes](architecture/session-processes.md)
+  - [The idle stop](architecture/session-processes.md#the-idle-stop)
 - [Replay from here](architecture/replay-from-here.md)
 - [Socket requests](architecture/socket-requests.md)
 - [Ask about this](architecture/ask-about-this.md)

@@ -617,6 +617,45 @@ export interface IsolationOwnershipModule {
 export interface WorktreeCliModule {
 	stopRetainedMount(dir: string): Promise<boolean>;
 }
+/** A daemon broker's scope (pi-tui src/apps/ps-data.ts `PsScope`): a project's runtime directory, or a machine-wide service's. */
+export interface DaemonScope {
+	kind: "project" | "global";
+	runtimeDir: string;
+	/** The canonical project directory, once the broker named it. */
+	projectDir?: string;
+	service?: string;
+	brokerPid?: number;
+}
+/** One daemon a broker runs or ran (pi-tui src/tools/daemon.ts `DaemonSnapshot`), with the fields the dashboard reads. */
+export interface DaemonSnapshot {
+	name: string;
+	/** The generation: a restart under the same name gets another. */
+	id: string;
+	state: "starting" | "running" | "ready" | "restarting" | "stopping" | "exited" | "failed";
+	pid?: number;
+	/** In ms since the epoch. */
+	startedAt: number;
+	/** The omp session id of the session that started it; omp's shared browser has none. */
+	owner?: string;
+}
+/** A broker scope's daemons (pi-tui src/apps/ps-data.ts `PsScopeReport`); `supervised` is false for a record a dead broker left on disk. */
+export interface DaemonReport {
+	scope: DaemonScope;
+	daemons: { snapshot: DaemonSnapshot; command?: string; supervised: boolean }[];
+}
+/** `omp ps` (src/cli/ps-data.ts): every broker scope's daemons, without spawning a broker, and a client of one scope's broker. */
+export interface PsDataModule {
+	collectReports(all: boolean, target: { dir?: string; global?: string }): Promise<DaemonReport[]>;
+	scopeClient(scope: DaemonScope): Promise<{ request(operation: { op: "stop"; name: string; id?: string; timeoutMs: number }): Promise<unknown>; close(): void }>;
+}
+/** `omp ps`'s table (pi-tui src/apps/ps-data.ts): the daemon states with no process behind them. */
+export interface PsTableModule {
+	TERMINAL_STATES: Partial<Record<DaemonSnapshot["state"], true>>;
+}
+/** The daemon broker's paths (src/launch/paths.ts): the project directory a broker scope is keyed by. */
+export interface LaunchPathsModule {
+	canonicalProjectDir(dir: string): Promise<string>;
+}
 
 type Kind = "function" | "number" | "object" | "string";
 
@@ -853,3 +892,6 @@ export const isolationOwnership = await load<IsolationOwnershipModule>(join(srcD
 	hasLiveIsolationOwner: "function",
 });
 export const worktreeCli = await load<WorktreeCliModule>(join(srcDir, "cli", "worktree-cli.ts"), { stopRetainedMount: "function" });
+export const psData = await load<PsDataModule>(join(srcDir, "cli", "ps-data.ts"), { collectReports: "function", scopeClient: "function" });
+export const psTable = await load<PsTableModule>(join(dirname(packageDir), "pi-tui", "src", "apps", "ps-data.ts"), { TERMINAL_STATES: "object" });
+export const launchPaths = await load<LaunchPathsModule>(join(srcDir, "launch", "paths.ts"), { canonicalProjectDir: "function" });

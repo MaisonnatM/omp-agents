@@ -23,11 +23,12 @@ import { answerDiscussion } from "../omp/discussion";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { findMcpServers } from "../omp/mcp";
+import { ompDaemons } from "../omp/daemons";
 import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, processesFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -62,6 +63,8 @@ import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
+import { ProcessSettingsFile } from "./process-settings-file";
+import { readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
 import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
 import { occupiedBy, ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
 import { ProjectWatch } from "./project-watch";
@@ -110,6 +113,7 @@ export class Dashboard {
 	readonly #workspaces: WorkspacesFile;
 	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
+	readonly #processSettings = new ProcessSettingsFile(processesFile);
 	readonly #reviewDrafts = new ReviewDrafts({
 		file: new ReviewDraftsFile(reviewDraftsFile),
 		github: { target: readReviewTarget, reviews: listReviews, reviewComments: listReviewComments, viewer: viewerLogin, post: postReview },
@@ -143,6 +147,8 @@ export class Dashboard {
 	};
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
+	/** What each live session runs besides omp, which it stops on request, when idle, and once the session left. */
+	readonly #processWatch: SessionProcessWatch;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
 	readonly #reattached = Promise.withResolvers<void>();
 	readonly #endInbox: EndInbox;
@@ -304,6 +310,18 @@ export class Dashboard {
 			},
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
+		this.#processWatch = new SessionProcessWatch({
+			...ompDaemons(),
+			readTable: readProcessTable,
+			stopProcesses,
+			sessions: () => sessions.rows(files.factsOf),
+			now: Date.now,
+			owner: () => ownerLock.held,
+			stopIdleAfterMinutes: () => {
+				this.#processSettings.reload();
+				return this.#processSettings.value.stopIdleAfterMinutes;
+			},
+		});
 		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "replay" || request.kind === "new" && request.branch !== null);
 		const startSession = (this.#startSession = request => startWith(request, null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
@@ -484,6 +502,10 @@ export class Dashboard {
 				if (ownerLock.held) await this.#sourceControl.pull(this.#workspaceCwds());
 			},
 			onDashboardTick: () => notices.check(DASHBOARD_KINDS),
+			// Only the owner stops idle processes and what a gone session left, so only it needs the sessions' idle clocks.
+			onProcessTick: async () => {
+				if (ownerLock.held) await this.#processWatch.tick();
+			},
 		});
 		this.#requests = new RequestLedger(createClientHandler({
 			sessions,
@@ -572,6 +594,18 @@ export class Dashboard {
 			},
 			dashboard: this.#selfUpdate,
 			sync: this.#settingsSync,
+			processes: {
+				list: instanceId => this.#processWatch.list(instanceId),
+				stop: ({ instanceId, id }) => this.#processWatch.stop(instanceId, id),
+				settings: () => {
+					this.#processSettings.reload();
+					return this.#processSettings.value;
+				},
+				changeSettings: settings => {
+					this.#processSettings.apply(settings);
+					return this.#processSettings.value;
+				},
+			},
 		});
 	}
 
