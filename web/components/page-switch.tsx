@@ -17,6 +17,7 @@ import { InboxPage } from "./inbox/inbox-page";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
+import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
 import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
@@ -152,6 +153,7 @@ export const PageSwitch = memo(function PageSwitch({
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
+					board={note => <NewSessionBoard cwd={cwd} hosts={visible.hosts} past={visible.past} workspace={workspace} note={note} />}
 				/>
 			);
 		}

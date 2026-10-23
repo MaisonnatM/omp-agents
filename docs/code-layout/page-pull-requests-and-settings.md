@@ -1,6 +1,7 @@
 # Page: pull requests, tickets, settings, integrations, and primitives
 
 - `web/components/pull-requests/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
+  `web/components/new-session-board.tsx` is the New session page's board of todos, sessions, and pull requests above the composer; `web/new-session-board-model.ts` picks and orders its rows.
   `web/components/tickets/tickets-page.tsx` is the tickets page, `ticket-row.tsx` an issue's row with its state and priority glyphs and chips, and `ticket-details.tsx` one issue laid out as Linear lays it out, its text and comments beside its fields.
   `web/components/pull-requests/avatars.tsx` holds the state icons, the avatars, and the reviewers' pictures that a pull request's rows and details share.
   `web/components/integrations/` holds the integration rows that the Settings page's Integrations section, `web/components/settings/integrations-tab.tsx`, sorts into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which `DisconnectedPage` in `disconnected-page.tsx` shows on the tickets and Inbox pages while Linear or Gmail is not connected.
