@@ -32,9 +32,17 @@ See [Session keepers](architecture/dashboard-sessions.md#session-keepers).
 
 ## One server owns the unattended work
 
-Servers on different ports share `~/.config/omp-agents`, so `server.lock` names the one server that runs routines, scheduled sends, the todo inbox, and the daily clean-up.
+Servers on different ports share `~/.config/omp-agents`, so `server.lock` names the one server that runs routines, scheduled sends, the todo and note inboxes, and the daily clean-up.
 Two servers running them would start every routine twice.
 See [One server runs the unattended work](architecture/routines.md#one-server-runs-the-unattended-work).
+
+## Keep Notes page entries in one server-owned JSON file
+
+Notes live in `notes.json`, not individual Markdown files.
+The server remains the only writer, while agents submit adds and appends through `note-inbox/`.
+This follows the todo list's reducer, optimistic socket updates, and owner-lock model.
+The tradeoff is that each note is not a greppable Markdown file.
+The Projects page's project and user notes directories remain separate.
 
 ## The desktop shell never imports the server
 

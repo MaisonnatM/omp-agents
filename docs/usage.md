@@ -27,6 +27,8 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [MCP servers](usage/mcp-servers.md)
 - [Todo list](usage/todo-list.md)
   - [Todos from agents](usage/todo-list.md#todos-from-agents)
+- [Notes](usage/notes.md)
+  - [Notes from agents](usage/notes.md#notes-from-agents)
 - [Calendar](usage/calendar.md)
 - [Inbox](usage/inbox.md)
 - [Routines](usage/routines.md)

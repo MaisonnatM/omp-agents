@@ -69,6 +69,7 @@ import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, Vie
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
+import { parseNoteChange } from "../user-notes-parse";
 import { isTodoId, parseTodoChange } from "../user-todos-parse";
 import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequest, type WorktreeTarget } from "../worktrees-shared";
 
@@ -374,6 +375,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	"user-todo"(value) {
 		const change = parseTodoChange(value.change);
 		return change && { ok: { t: "user-todo", change } };
+	},
+	"user-note"(value) {
+		const change = parseNoteChange(value.change);
+		return change && { ok: { t: "user-note", change } };
 	},
 	routine(value) {
 		const change = parseRoutineChange(value.change);

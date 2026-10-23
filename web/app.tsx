@@ -11,6 +11,7 @@ import {
 	type DashboardStatus,
 	DashboardStatusContext,
 	MentionListsContext,
+	UserNotesContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
@@ -34,7 +35,7 @@ import { toasts } from "./components/toaster";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { hashForRoute, hashForView, type OpenMode, type TodoListView } from "./routing";
+import { hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -50,13 +51,14 @@ import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
 const ALL_TODOS: TodoListView = { kind: "all" };
+const ALL_NOTES: NotesListView = { kind: "all" };
 
 /**
  * The dashboard: the socket's state, sliced into what each part reads, and the parts. Each hook it calls owns one
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changePins } = useDashboard();
+	const { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -164,8 +166,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, endHost, setFilePath, setNewTicket, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const replay = startOf(state.starts, "replay");
@@ -188,6 +190,7 @@ export function App() {
 	);
 	/** The routine the Routines page shows; one another window deleted shows the list. */
 	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
+	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -207,6 +210,8 @@ export function App() {
 										tabs={tabs}
 										listed={state.listed}
 										userTodos={state.userTodos}
+										userNotes={state.userNotes}
+										notesView={notesView}
 										hosts={state.hosts}
 										notices={state.notices}
 										past={state.past}
@@ -226,42 +231,45 @@ export function App() {
 										<ActivityVisibility.Provider value={display.activityVisibility}>
 											<ToolsExpanded value={display.toolsExpanded}>
 												<MentionListsContext.Provider value={mentionLists}>
-													<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
-														<PageSwitch
-															page={page}
-															hosts={state.hosts}
-															past={state.past}
-															lastHosts={state.lastHosts}
-															layout={layout}
-															splits={state.splits}
-															models={state.models}
-															userTodos={state.userTodos}
-															routines={state.routines}
-															projects={state.projects}
-															workspaceList={state.workspaceList}
-															pins={state.pins}
-															newSessionCompletions={state.newSessionCompletions}
-															connected={state.connected}
-															listed={state.listed}
-															rosterError={state.rosterError}
-															newStart={startOf(state.starts, "new")}
-															projectStart={startOf(state.starts, "project")}
-															scope={scope}
-															defaultWorkspace={defaultWorkspace}
-															sectionTarget={sectionTarget}
-															todoView={todoView}
-															routinesTarget={routinesTarget}
-															linear={linear}
-															linearCallable={linearCallable}
-															maximized={maximized}
-															hasDetails={detailsView !== null}
-															rightOpen={sidebars.panels.right.open}
-															show={show}
-															close={close}
-															resize={resize}
-															toggleSidebar={toggleSidebar}
-														/>
-													</RenderBoundary>
+													<UserNotesContext.Provider value={state.userNotes}>
+														<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
+															<PageSwitch
+																page={page}
+																hosts={state.hosts}
+																past={state.past}
+																lastHosts={state.lastHosts}
+																layout={layout}
+																splits={state.splits}
+																models={state.models}
+																userTodos={state.userTodos}
+																userNotes={state.userNotes}
+																routines={state.routines}
+																projects={state.projects}
+																workspaceList={state.workspaceList}
+																pins={state.pins}
+																newSessionCompletions={state.newSessionCompletions}
+																connected={state.connected}
+																listed={state.listed}
+																rosterError={state.rosterError}
+																newStart={startOf(state.starts, "new")}
+																projectStart={startOf(state.starts, "project")}
+																scope={scope}
+																defaultWorkspace={defaultWorkspace}
+																sectionTarget={sectionTarget}
+																todoView={todoView}
+																routinesTarget={routinesTarget}
+																linear={linear}
+																linearCallable={linearCallable}
+																maximized={maximized}
+																hasDetails={detailsView !== null}
+																rightOpen={sidebars.panels.right.open}
+																show={show}
+																close={close}
+																resize={resize}
+																toggleSidebar={toggleSidebar}
+															/>
+														</RenderBoundary>
+													</UserNotesContext.Provider>
 												</MentionListsContext.Provider>
 											</ToolsExpanded>
 										</ActivityVisibility.Provider>
@@ -315,6 +323,7 @@ export function App() {
 									tabs={tabs}
 									todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 									todos={mentionLists.todos}
+									notes={state.userNotes?.notes ?? null}
 									linearConnected={linearCallable}
 									projects={state.projects}
 									onCreateTicket={setNewTicket}

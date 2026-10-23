@@ -2,6 +2,7 @@
 import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
+import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { MentionLists } from "../mentions";
 import type { StartOf } from "../starts";
@@ -20,6 +21,7 @@ export interface DashboardActions {
 	dismissStart: Dashboard["dismissStart"];
 	openNewSession: Dashboard["openNewSession"];
 	changeTodo: Dashboard["changeTodo"];
+	changeNote: Dashboard["changeNote"];
 	/** End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast. */
 	end: (instanceId: string) => void;
 	/** Open the text, image, or video file at an absolute or `~/` path in the file dialog. */
@@ -84,3 +86,6 @@ export function useMentionLists(): MentionLists {
 
 /** The Todo page's list as the server last sent it, `null` until it arrives, for a prompt's todo chips to find where each todo is now. */
 export const UserTodosContext = createContext<UserTodoList | null>(null);
+
+/** The Notes page's list as the server last sent it, `null` until it arrives, for a todo's details to list the notes that belong to it. */
+export const UserNotesContext = createContext<UserNoteList | null>(null);

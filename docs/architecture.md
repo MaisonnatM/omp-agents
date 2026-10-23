@@ -25,6 +25,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Scheduled sends](architecture/scheduled-sends.md)
 - [Projects](architecture/projects.md)
 - [Pins](architecture/pins.md)
+- [User notes](architecture/user-notes.md)
 - [Notifications](architecture/notifications.md)
   - [Session notifications](architecture/notifications.md#session-notifications)
 - [Merges, and the cleanup after one](architecture/merges-and-the-cleanup-after-one.md)

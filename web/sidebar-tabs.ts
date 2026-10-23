@@ -76,7 +76,7 @@ export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] |
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
  * `signedOut` stays the same set until a tab's service signs in or out, whatever the integrations' polls answer, and
- * `shown`, which Cmd+1 through Cmd+7 go to, stays with it until the layout changes.
+ * `shown`, which Cmd+1 through Cmd+8 go to, stays with it until the layout changes.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;

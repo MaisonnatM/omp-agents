@@ -3,13 +3,14 @@ import type { View } from "../src/shared/sessions";
 import { type Layout, openView, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 
 /** The sidebar tab that goes with each page; the panes keep the one you chose. A session's changes and the projects go with the sessions. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar", inbox: "inbox", settings: "settings", projects: "sessions" };
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", notes: "notes", calendar: "calendar", routines: "calendar", inbox: "inbox", settings: "settings", projects: "sessions" };
 
 /** The page each tab shows, but for Sessions, which shows the panes, and Settings, which keeps its section and workspace. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions" | "settings">, Page> = {
 	"pull-requests": { kind: "pull-requests", target: null },
 	tickets: { kind: "tickets", target: null },
 	todo: { kind: "todo", list: { kind: "all" }, open: null },
+	notes: { kind: "notes", list: { kind: "all" }, open: null },
 	calendar: { kind: "calendar" },
 	inbox: { kind: "inbox", target: null },
 };

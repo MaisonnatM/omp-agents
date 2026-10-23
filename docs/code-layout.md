@@ -69,6 +69,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
+  - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`.
   - Inbox: `web/components/inbox/inbox-page.tsx`.
   - Routines: `web/components/routines/routines-page.tsx`.
@@ -102,6 +103,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Routines, Projects, Calendar, and Inbox](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Routines, Projects, Calendar, and Inbox](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)
