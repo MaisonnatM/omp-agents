@@ -17,7 +17,8 @@ const NUMBER_TONE = { "+": "bg-emerald-500/20", "-": "bg-red-500/20", " ": "" } 
 const MARK_TONE = { added: "bg-emerald-500", modified: "bg-sky-500" } as const;
 const NUMBER = "w-12 shrink-0 select-none pr-3 text-right text-muted-foreground/70";
 
-function Code({ tokens }: { tokens: readonly Token[] }) {
+/** One line's tokens, each in its `hljs-*` classes. */
+export function Code({ tokens }: { tokens: readonly Token[] }) {
 	return tokens.map((token, index) => (
 		<span key={index} className={token.className || undefined}>
 			{token.text}

@@ -46,21 +46,9 @@ function iconOf(name: string): LucideIcon {
 
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
+/** A change's kind and time, then what it recorded: an edit's line counts and diff, or how many lines a write wrote. */
 function Change({ path, change }: { path: string; change: FileChange }) {
-	let counts: ReactNode;
-	switch (change.tool) {
-		case "edit":
-			counts = <LineCounts added={change.added} removed={change.removed} />;
-			break;
-		case "write":
-			counts = change.lines !== null && <span className="shrink-0 font-mono text-[11px] whitespace-nowrap tabular-nums">{plural(change.lines, "line")}</span>;
-			break;
-		default: {
-			const unhandled: never = change;
-			return unhandled;
-		}
-	}
-	const caption = (
+	const caption = (counts: ReactNode) => (
 		<>
 			<span className="font-medium text-foreground">{CHANGE_LABEL[change.kind]}</span>
 			{change.at !== null && (
@@ -72,18 +60,29 @@ function Change({ path, change }: { path: string; change: FileChange }) {
 			{counts}
 		</>
 	);
-	return (
-		<li className="space-y-1">
-			{change.tool === "edit" ? (
-				<FileDiff path={path} diff={change.diff} caption={caption} />
-			) : (
-				<>
-					<p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">{caption}</p>
+	switch (change.tool) {
+		case "edit": {
+			const head = caption(<LineCounts added={change.added} removed={change.removed} />);
+			return (
+				<li className="space-y-1">
+					{change.diff ? <FileDiff path={path} diff={change.diff} caption={head} /> : <p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">{head}</p>}
+				</li>
+			);
+		}
+		case "write":
+			return (
+				<li className="space-y-1">
+					<p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
+						{caption(change.lines !== null && <span className="shrink-0 font-mono text-[11px] whitespace-nowrap tabular-nums">{plural(change.lines, "line")}</span>)}
+					</p>
 					<p className="text-xs text-muted-foreground">Written whole, so omp recorded no diff.</p>
-				</>
-			)}
-		</li>
-	);
+				</li>
+			);
+		default: {
+			const unhandled: never = change;
+			return unhandled;
+		}
+	}
 }
 
 interface FileLook {
