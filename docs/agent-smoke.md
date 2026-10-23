@@ -5,7 +5,7 @@ Every check starts with [Server lifecycle and authentication](#server-lifecycle-
 ## Server lifecycle and authentication
 
 `bun start` serves `http://127.0.0.1:4317`, where the user's own dashboard usually runs.
-Other agent sessions run smoke servers at the same time, so pick a random smoke port between 20000 and 39999 for the whole session, and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN`, which prints nothing for a free port.
+Other agent sessions run smoke servers at the same time, so pick a random smoke port between 20000 and 39999 for the whole session, and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN || echo free`, which prints `free` for a free port instead of failing with `lsof`'s exit code 1.
 Start the server with `bash` as a named service: `command: "PORT=<port> bun src/server.ts"`, `name: "<unique-name>"`, and `ready: {log: "Sign in at"}`.
 Service calls omit `async` and `timeout`; a readiness deadline belongs in `ready.timeout`.
 Finite checks use `async: true` when needed, without `name` or `ready`.
