@@ -5,6 +5,7 @@ import type { UserTodoList } from "../../src/user-todos-shared";
 import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
+import type { SplitAxis } from "../pane-navigation";
 import type { Layout, Page, TodoListView } from "../routing";
 import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
@@ -57,7 +58,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splitRatios" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -83,6 +84,8 @@ interface PageSwitchProps extends PageState {
 	hasDetails: boolean;
 	rightOpen: boolean;
 	show: (layout: Layout) => void;
+	close: (index: number) => void;
+	resize: (axis: SplitAxis, ratio: number) => void;
 	toggleSidebar: (side: "right") => void;
 }
 
@@ -93,6 +96,7 @@ export const PageSwitch = memo(function PageSwitch({
 	past,
 	lastHosts,
 	layout,
+	splitRatios,
 	models,
 	userTodos,
 	routines,
@@ -116,6 +120,8 @@ export const PageSwitch = memo(function PageSwitch({
 	hasDetails,
 	rightOpen,
 	show,
+	close,
+	resize,
 	toggleSidebar,
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
@@ -233,6 +239,9 @@ export const PageSwitch = memo(function PageSwitch({
 						hasDetails={hasDetails}
 						rightOpen={rightOpen}
 						show={show}
+						close={close}
+						ratios={splitRatios}
+						resize={resize}
 						toggleSidebar={toggleSidebar}
 					/>
 				);

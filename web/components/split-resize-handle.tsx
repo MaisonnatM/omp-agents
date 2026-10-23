@@ -1,36 +1,18 @@
-/** The draggable line between split panes and the stored ratio that sizes them. */
+/** The draggable line between controlled split panes. */
 import { cn } from "@/lib/utils";
-import { useStoredState } from "../stored-state";
+import type { SplitAxis } from "../pane-navigation";
 import { Separator, useDragSeparator } from "./drag-separator";
-
-/**
- * The line between split panes, as a separator laid over the grid's 1px gap: pointer drag, arrow keys,
- * double-click to reset, and the ratio stored in localStorage at every change, drag moves included, like the
- * sidebar's handle. The ratio is the first column's share of the width, or the first row's share of the height.
- */
-export type SplitAxis = "columns" | "rows";
 
 /** Narrowest pane, in px, that a drag or key leaves on either side. */
 const MIN_PANE: Record<SplitAxis, number> = { columns: 320, rows: 160 };
 const DEFAULT_RATIO = 0.5;
 const STEP = 0.02;
-const STORAGE_KEYS: Record<SplitAxis, string> = {
-	columns: "omp-agents.split-columns",
-	rows: "omp-agents.split-rows",
-};
 
 /** `ratio` of a `size`-px grid, kept so both sides get {@link MIN_PANE}, or an even split when they cannot. */
 function clamp(ratio: number, axis: SplitAxis, size: number): number {
 	const min = Math.min(DEFAULT_RATIO, MIN_PANE[axis] / size);
 	return Math.min(1 - min, Math.max(min, ratio));
 }
-
-/** The ratio of `axis` that localStorage keeps, and its setter. */
-export const useSplitRatio = (axis: SplitAxis): [number, (ratio: number) => void] =>
-	useStoredState(STORAGE_KEYS[axis], raw => {
-		const stored = Number(raw);
-		return stored > 0 && stored < 1 ? stored : DEFAULT_RATIO;
-	});
 
 /** Where a track boundary sits in a grid with a 1px gap, `ratio` of the way along it. */
 export const splitAt = (ratio: number): string => `calc((100% - 1px) * ${ratio})`;

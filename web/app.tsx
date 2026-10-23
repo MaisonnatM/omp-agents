@@ -33,7 +33,7 @@ import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
+import { hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -55,7 +55,7 @@ const ALL_TODOS: TodoListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, send, request, end, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins } = useDashboard();
+	const { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changePins } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -86,23 +86,15 @@ export function App() {
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
-	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, liveHosts: state.hosts, cwd: focused.cwd });
-	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, liveHosts: state.hosts, cwd: focused.cwd };
+	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, cwd: focused.cwd });
+	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, cwd: focused.cwd };
 
 	const endHost = useCallback(
 		(instanceId: string): void => {
 			if (latest.current.ending.has(instanceId)) return;
-			const listedBeforeEnd = latest.current.listedHosts;
-			end(instanceId).then(
-				() => {
-					const { layout, liveHosts, ending } = latest.current;
-					const eligible = new Set(liveHosts.filter(host => !ending.has(host.instanceId)).map(host => host.instanceId));
-					show(endSession(layout, instanceId, listedBeforeEnd, eligible));
-				},
-				(error: unknown) => toasts.add({ title: "Could not end the session", description: errorText(error) }),
-			);
+			end(instanceId, latest.current.listedHosts).catch((error: unknown) => toasts.add({ title: "Could not end the session", description: errorText(error) }));
 		},
-		[end, show],
+		[end],
 	);
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
@@ -240,6 +232,7 @@ export function App() {
 															past={state.past}
 															lastHosts={state.lastHosts}
 															layout={layout}
+															splitRatios={state.splitRatios}
 															models={state.models}
 															userTodos={state.userTodos}
 															routines={state.routines}
@@ -263,6 +256,8 @@ export function App() {
 															hasDetails={detailsView !== null}
 															rightOpen={sidebars.panels.right.open}
 															show={show}
+															close={close}
+															resize={resize}
 															toggleSidebar={toggleSidebar}
 														/>
 													</RenderBoundary>

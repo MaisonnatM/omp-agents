@@ -8,7 +8,10 @@
 - Cmd-click a row (Ctrl-click on Linux and Windows), or choose **Open in split** from its menu, to open it in another pane.
   Up to four conversations share the page: one fills it, two sit side by side, and three or four form a 2x2 grid.
   Each pane scrolls on its own, and its composer sends to its own session or subagent.
-  A plain click replaces the focused pane.
+  A plain click on a row outside the split opens it alone, full width, and the page remembers the split.
+  A plain click on any session of that split later brings the split back, in the same order and sizes, with that session focused.
+  Closing a pane, or ending its session, forgets the split it belonged to, and a new split that shares a session replaces the older one.
+  Back and forward return to the exact panes in the hash.
   Click or tab into a pane to focus it.
   A new session or a fork opens in the focused pane.
   With four panes open, Cmd-click and **Open in split** replace the focused pane.
@@ -24,10 +27,10 @@
 - Drag the line between the columns, or between the rows, to resize the panes; each side keeps at least 320 px of width or 160 px of height.
   The lines also take focus: the arrow keys move them, Shift with an arrow moves them further, and Home and End move them to either limit.
   Double-click a line to return it to the middle.
-  The sizes are stored in the browser, so they survive a reload.
+  Each split keeps its own sizes while the page is open, and the sizes of the split on screen are stored in the browser, so they survive a reload.
 - The maximize button in a pane's header makes that pane fill the page.
   The other panes keep running behind it, with their drafts and scroll positions, and the restore button or Esc brings the split back exactly as it was.
-  A plain click on a row opens it in the maximized pane.
+  A plain click on a row outside the split opens it alone, as above; a remembered split comes back unmaximized.
   Cmd-click and **Open in split** bring the split back.
   Closing the maximized pane brings the split back too.
 - The hash holds every pane, in order, separated by commas, and `@<n>` names the focused pane counting from 0, for example `#7c51f77b,past/01a0f6a5@1`.
@@ -38,3 +41,6 @@
 - A part of the hash that does not decode, such as `#todo/%E0`, names nothing: the page opens without it, and a pane it names drops.
 - When a pane's view fails to render, that pane shows **This view failed to render.** with the error under it, and the other panes and the sidebar keep working; the pane's header buttons still close or maximize it.
   A page that fails shows the same in its place, and opening another view clears it.
+- Session conversations, their composers, and the new-session composer are at most 34rem wide.
+- A session header shows its **Copy session ID** and trajectory buttons only while the pointer is over the title, while one of them has keyboard focus, or always on a touch screen.
+- In the desktop app, pointing at or tabbing to a link shows its address at the bottom left of the window, as a browser does.

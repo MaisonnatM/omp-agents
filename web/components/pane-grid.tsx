@@ -2,9 +2,10 @@ import { memo, useCallback, useRef } from "react";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { type ModelList, UNREAD } from "../reads";
-import { closePane, hashForView, type Layout } from "../routing";
+import type { SplitAxis, SplitRatios } from "../pane-navigation";
+import { hashForView, type Layout } from "../routing";
 import { Pane } from "./pane";
-import { SplitResizeHandle, splitAt, useSplitRatio } from "./split-resize-handle";
+import { SplitResizeHandle, splitAt } from "./split-resize-handle";
 
 interface PaneGridProps {
 	layout: Layout;
@@ -20,6 +21,9 @@ interface PaneGridProps {
 	hasDetails: boolean;
 	rightOpen: boolean;
 	show: (layout: Layout) => void;
+	close: (index: number) => void;
+	ratios: SplitRatios;
+	resize: (axis: SplitAxis, ratio: number) => void;
 	toggleSidebar: (side: "right") => void;
 }
 
@@ -27,17 +31,18 @@ interface PaneGridProps {
  * The panes in their grid, up to four, with the handles that resize it. It takes only what the panes read, and every
  * pane's props stay equal while a token streams, so the grid renders for roster and layout changes alone.
  */
-export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts, models, workspaces, maximized, hasDetails, rightOpen, show, toggleSidebar }: PaneGridProps) {
-	const [columns, setColumns] = useSplitRatio("columns");
-	const [rows, setRows] = useSplitRatio("rows");
+export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts, models, workspaces, maximized, hasDetails, rightOpen, show, close, ratios: { columns, rows }, resize, toggleSidebar }: PaneGridProps) {
+	const setColumns = useCallback((ratio: number) => resize("columns", ratio), [resize]);
+	const setRows = useCallback((ratio: number) => resize("rows", ratio), [resize]);
 	const latest = useRef(layout);
 	latest.current = layout;
 	const onLayout = useCallback(
 		(index: number, kind: "max" | "close") => {
 			const current = latest.current;
-			show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
+			if (kind === "close") close(index);
+			else show({ ...current, focus: index, maximized: !current.maximized });
 		},
-		[show],
+		[show, close],
 	);
 	const toggleRight = useCallback(() => toggleSidebar("right"), [toggleSidebar]);
 	const split = layout.panes.length > 1;

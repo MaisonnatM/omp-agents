@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
 import type { PinChange } from "../src/shared/pins";
 import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
@@ -8,9 +8,8 @@ import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-draf
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
 import { applyPaneMessage, retainPanes, retainTrajectories, useShownTrajectories } from "./pane-store";
+import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
 import {
-	hashForLayout,
-	hashForPage,
 	hashForView,
 	type Layout,
 	layoutAfterResumeAll,
@@ -24,6 +23,16 @@ import {
 import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
 
 const NO_VIEWS: View[] = [];
+
+const SPLIT_STORAGE_KEYS: Record<SplitAxis, string> = { columns: "omp-agents.split-columns", rows: "omp-agents.split-rows" };
+
+function readSplitRatios(): SplitRatios {
+	const read = (axis: SplitAxis): number => {
+		const value = Number(localStorage.getItem(SPLIT_STORAGE_KEYS[axis]));
+		return value > 0 && value < 1 ? value : DEFAULT_SPLIT_RATIOS[axis];
+	};
+	return { columns: read("columns"), rows: read("rows") };
+}
 
 const PAGE_ID = crypto.randomUUID();
 
@@ -56,12 +65,14 @@ export interface Dashboard {
 	 */
 	request: (msg: ClientMsg) => Promise<void>;
 	/** End live session `instanceId`, which counts as ending until the server answers; rejects with why it could not. */
-	end: (instanceId: string) => Promise<void>;
-	/** Show `view` in the focused pane, or in a new pane for `split`. */
+	end: (instanceId: string, listed: string[]) => Promise<void>;
+	/** Select a session and its remembered split, or explicitly edit the current split. */
 	open: (view: View, mode: OpenMode) => void;
 	focus: (index: number) => void;
 	/** Show `layout`, as a new history entry. */
 	show: (layout: Layout) => void;
+	close: (index: number) => void;
+	resize: (axis: SplitAxis, ratio: number) => void;
 	/** Show `page` over the panes, as a new history entry. */
 	navigate: (page: Page) => void;
 	/** Open the new-session draft in the default directory, clearing a failed start's error. */
@@ -82,7 +93,9 @@ export interface Dashboard {
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
 export function useDashboard(): Dashboard {
-	const [state, dispatch] = useReducer(reduce, null, () => initialState(routeFromHash(location.hash)));
+	const [state, dispatch] = useReducer(reduce, null, () => initialState(routeFromHash(location.hash), readSplitRatios()));
+	const stateRef = useRef(state);
+	stateRef.current = state;
 	const socketRef = useRef<WebSocket | null>(null);
 	const layoutRef = useRef(state.layout);
 	layoutRef.current = state.layout;
@@ -125,10 +138,12 @@ export function useDashboard(): Dashboard {
 	}, []);
 
 	const end = useCallback(
-		async (instanceId: string) => {
+		async (instanceId: string, listed: string[]) => {
+			const sessionId = stateRef.current.hosts.find(host => host.instanceId === instanceId)?.sessionId ?? stateRef.current.lastHosts.get(instanceId)?.sessionId ?? null;
 			dispatch({ t: "end", instanceId });
 			try {
 				await request({ t: "end", instanceId });
+				dispatch({ t: "end-success", instanceId, sessionId, listed });
 			} finally {
 				dispatch({ t: "ended", instanceId });
 			}
@@ -136,24 +151,32 @@ export function useDashboard(): Dashboard {
 		[request],
 	);
 
-	const show = useCallback((layout: Layout) => {
-		location.hash = hashForLayout(layout);
-		dispatch({ t: "route", route: { kind: "panes", layout } });
-	}, []);
-
-	const navigate = useCallback((next: Page) => {
-		location.hash = hashForPage(next);
-	}, []);
-
-	// Moving focus, or opening a session link, is not navigation, so it rewrites the current history entry.
-	const replace = useCallback((layout: Layout) => {
-		history.replaceState(null, "", hashForLayout(layout) || location.pathname + location.search);
-		dispatch({ t: "route", route: { kind: "panes", layout } });
-	}, []);
-
-	const open = useCallback((view: View, mode: OpenMode) => show(openView(layoutRef.current, view, mode)), [show]);
-
+	const show = useCallback((layout: Layout) => dispatch({ t: "panes", command: { kind: "edit", layout } }), []);
+	const navigate = useCallback((next: Page) => dispatch({ t: "navigate", page: next }), []);
+	const replace = useCallback((layout: Layout) => dispatch({ t: "panes", command: { kind: "edit", layout }, replace: true }), []);
+	const open = useCallback((view: View, mode: OpenMode) => dispatch({ t: "panes", command: { kind: "select", view, mode } }), []);
 	const focus = useCallback((index: number) => replace({ ...layoutRef.current, focus: index }), [replace]);
+	const close = useCallback((index: number) => dispatch({ t: "panes", command: { kind: "close", index } }), []);
+	const resize = useCallback((axis: SplitAxis, ratio: number) => dispatch({ t: "panes", command: { kind: "resize", axis, ratio } }), []);
+
+	const writtenRevision = useRef(0);
+	useLayoutEffect(() => {
+		const write = state.historyWrite;
+		if (!write || write.revision <= writtenRevision.current) return;
+		writtenRevision.current = write.revision;
+		if (location.hash === write.hash) return;
+		const url = write.hash || location.pathname + location.search;
+		if (write.mode === "replace") history.replaceState(null, "", url);
+		else history.pushState(null, "", url);
+	}, [state.historyWrite]);
+
+	useEffect(() => {
+		for (const axis of ["columns", "rows"] as const) {
+			const ratio = state.splitRatios[axis];
+			if (ratio === DEFAULT_SPLIT_RATIOS[axis]) localStorage.removeItem(SPLIT_STORAGE_KEYS[axis]);
+			else localStorage.setItem(SPLIT_STORAGE_KEYS[axis], String(ratio));
+		}
+	}, [state.splitRatios]);
 
 	useEffect(() => {
 		// A start's answer settles it, then the panes follow the start as it was before.
@@ -310,5 +333,5 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, page, send, request, end, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins };
+	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changePins };
 }
