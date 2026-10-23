@@ -56,6 +56,9 @@ mma-mode includes poteto. Do not treat poteto as optional for nontrivial work.
   In omp, read `~/.omp/agent/docs/git-workflow.md`; in Cursor, read `~/.cursor/rules/graphite-cli.mdc`.
   Never `git push` or `gh pr create` unless the user explicitly overrides this transport.
 - Commits only when asked. A draft PR request counts as the ask.
+- Slop gate.
+  Before any commit, draft PR, or "ready", strip AI slop and narrating comments from the diff.
+  In omp, follow the cleanup route in `skill://poteto-mode`; in Cursor, use `deslop`.
 
 ## Approval tokens
 
