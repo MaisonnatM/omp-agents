@@ -514,3 +514,5 @@
 .dark :is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-attr) { color: #8bdcb4; }
 .dark :is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal) { color: #f5c27b; }
 .dark :is(.message-markdown, .code-lines) :is(.hljs-title, .hljs-function) { color: #9cbfff; }
+/* A removed row's gutter mark, hatched so it reads apart from an added row's solid one. */
+.diff-mark-removed { background: repeating-linear-gradient(45deg, var(--diff-deletion) 0 2px, transparent 2px 4px); opacity: .8; }

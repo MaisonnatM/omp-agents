@@ -22,6 +22,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Changed files and images above the composer: `ChangesCard` in `web/components/changes-card.tsx`, mounted by `conversation.tsx`, and below a past session's transcript by `past-conversation.tsx`.
   Its **Files** section is `ChangedFileList` in `changed-files-section.tsx`; its **Images** section is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request or Linear issue.
   The sections fold independently, with closed sections kept by `useStoredKeys`.
+  A subagent's recorded edits open `FileChangesDialog` in `changed-files-section.tsx`, with Kobra-inspired cards from `web/components/file-diff.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
