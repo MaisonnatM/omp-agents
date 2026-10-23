@@ -67,7 +67,7 @@
   **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; a refused change is undone.
   A thread you can reply to has a reply box: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and a refusal keeps the draft.
   Replies go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
-- The round button at the bottom right of the details opens the composer, shown only when GitHub lets you comment.
+- The round button at the bottom right of the details on the Pull requests page opens the composer, shown only when GitHub lets you comment; a session's **PRs** sidebar has none.
   Its badge counts the Review draft's pending findings.
   **Comment** posts a comment; **Close with comment** asks **Confirm close?** and then posts the comment and closes the pull request, and a closed one offers **Reopen with comment**.
   **Review (N)**, offered on an open or draft pull request, picks **Comment**, **Approve**, or **Request changes**, the last two not on your own pull request, and a summary; **Submit review** accepts every pending finding of an open Review draft and posts it, or posts the review alone.

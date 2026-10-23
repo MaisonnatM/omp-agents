@@ -1,11 +1,13 @@
 # Session changes
 
-- A click on a file in the sidebar's **Files** tab shows the files the session changed as an editor does, in a dialog over the page, at that file; Esc or the close button closes it.
+- Clicking a file in the changes card's **Files** section shows the session's changes in a dialog, at that file.
+  **Review** opens the same dialog at the first file.
+  Esc or the close button closes it.
 - The dialog knows two sets of files.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
   The other is what the session's own `edit` and `write` calls changed, from its transcript, including files outside the checkout and files changed back to how they were.
   The header names the branch and the base it compares against, and totals the files and the lines added and removed.
-- The dialog opens on **This session**, which keeps only the files the session's own calls changed, as the Files tab lists them; **All changes** shows both sets; edits that a subagent or a shell command made count only under **All changes**.
+- The dialog opens on **This session**, which keeps only the files the session's own calls changed, as the **Files** section lists them; **All changes** shows both sets; edits that a subagent or a shell command made count only under **All changes**.
 - The explorer on the left shows the files as folders, a folder holding only one folder joined with it, such as `web/components/changes`.
   Click a folder to close or open it.
   Each file shows its lines added and removed, a blue dot when the session's own calls changed it, and a letter for what git says happened: **A** added, **U** untracked, **M** modified, **D** deleted, and **S** for a file only the session's calls name, outside the checkout or no different from the base.

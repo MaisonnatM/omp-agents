@@ -2,7 +2,7 @@
 
 - `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the workspace picker; `web/components/pull-requests/pull-requests-nav.tsx` is its Pull requests tab, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more, and `web/components/project-group.tsx` the group of one project in it, each worker's row named by the title its coordinator gave it.
-  `web/components/sidebar-search.tsx` is the search field that the Sessions tab and the right sidebar's Files tab share; given a shortcut, as the Sessions tab gives Cmd+F, the key puts the cursor in it and the empty field shows the key on its right.
+  `web/components/sidebar-search.tsx` is the Sessions tab's search field; given a shortcut, as the Sessions tab gives Cmd+F, the key puts the cursor in it and the empty field shows the key on its right.
   `web/components/kbd.tsx` holds `Kbd`, the key chip the command palette draws, and `ShortcutChip`, the smaller chip with a shortcut's first key that **New session** and that search field show on their right.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed.
   Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace or role badge.

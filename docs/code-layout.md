@@ -19,12 +19,16 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`.
 - Gray strip under the composer, with the directory and the context ring: `ComposerTray` in `web/components/composer.tsx`; the ring is `ContextRing` in `web/components/context-ring.tsx`.
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
+- Changed files and images above the composer: `ChangesCard` in `web/components/changes-card.tsx`, mounted by `conversation.tsx`, and below a past session's transcript by `past-conversation.tsx`.
+  Its **Files** section is `ChangedFileList` in `changed-files-section.tsx`; its **Images** section is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request or Linear issue.
+  The sections fold independently, with closed sections kept by `useStoredKeys`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx` and tool calls and thinking as `ActivityGroup`, on shadcn's `Trace` from `web/components/ui/trace.tsx`.
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
+  In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from `outline` in `web/transcript-view.ts`.
   A tool row's image thumbnails open one viewer that the transcript owns, `ImageViewer` from `web/components/media-viewer.tsx`, over every tool image of the conversation.
 - Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the road-icon toggle after the session's title in `web/components/pane.tsx` swaps for the transcript.
@@ -33,10 +37,10 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts; a project's coordinator shows `web/components/project-details.tsx` instead.
-  Its tabs: **Files** in `files-tab.tsx`, **Media** in `media-tab.tsx`, **PRs** in `session-pull-requests-tab.tsx`, and **Tickets** in `session-tickets-tab.tsx`, all in `web/components/`.
-  The **Media** tab's viewer and the transcript's share `ImageViewer` from `web/components/media-viewer.tsx`: the image large with its caption, `N of M`, the buttons and Left and Right keys to the images before and after it, open in a new tab, and Close.
+  Its tabs are **PRs** in `session-pull-requests-tab.tsx` and **Tickets** in `session-tickets-tab.tsx`, both in `web/components/`.
+  The **Images** section and the transcript share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in a new tab, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
-  The floating comment and review composer at its bottom right is `PullRequestComposer` in `pr-details/composer.tsx`.
+  The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.
   `header.tsx` draws T3's crumbs, **Check out** menu, inline-confirmed primary action, title editor, base freshness warning, copyable command and branch, stack menu, and linked-sessions count; the **Check out** menu is `CheckoutMenu` in `checkout-menu.tsx`.
   The Reviewers and Labels pickers and collapsible Description, Checks, and Comments sections live in **Summary**.
   `web/components/segmented-tabs.tsx` provides its T3-styled 24px tabs with Radix keyboard navigation and tab-panel semantics.
@@ -45,11 +49,11 @@ Start a UI change here, then read that file's entry under [Page](#page).
   `code.tsx` holds the **Code** tab's commit scope and which files are folded, and composes `code-toolbar.tsx`, its toolbar, `diff-preferences.ts`, the diff options it keeps on this computer, `viewed-files.tsx`, GitHub's viewed state and the **Viewed** checkbox, `code-files.tsx`, the diffs and file tree, and `diff-controls.tsx`, the line comment box.
   A pull request row's **Review draft** tag is `ReviewDraftTag` in `web/components/pull-requests/pr-row.tsx`.
   The same details show in two places, so reproduce a layout bug in the one the user means: the Pull requests page's `pr-page.tsx`, and the right sidebar's **PRs** tab, a much narrower column.
-  The open `#N` strip above those details is `PullRequestTabsStrip` in `web/components/pull-requests/pr-tabs.tsx`, backed by `web/pull-request-tabs.ts`.
+  The open `#N` strip above the page's details is `PullRequestTabsStrip` in `web/components/pull-requests/pr-tabs.tsx`, backed by `web/pull-request-tabs.ts`; the sidebar's **PRs** tab has none.
 - Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
 - The three things called Files:
-  - The right sidebar's Files tab, a session's changed files: `FilesTab` in `web/components/files-tab.tsx`.
-  - The session changes dialog that tab opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
+  - The changes card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
+  - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
   - Settings › Files, omp's own config files: `Files` in `web/components/settings/files-tab.tsx`.
 - A file opened from a path in agent text: `web/components/file-dialog.tsx`.
 - **Ask about this**, the button on selected text and the discussion panel at the top right: the button is `AskAboutSelection` in `web/components/ask-about-selection.tsx`, which wraps the transcript in `conversation.tsx` and `past-conversation.tsx` and the explorer in `web/components/pull-requests/pr-details/code.tsx`; the panel is `DiscussionPanel` in `web/components/discussion-panel.tsx`, which `web/app.tsx` mounts, over `web/discussions.ts`.

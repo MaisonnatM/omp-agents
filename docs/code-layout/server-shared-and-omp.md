@@ -17,10 +17,12 @@
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
   `slug.ts` holds `slug`, the lower-case, dashed name segment that a worker's branch and a project's inbox file take.
+  `session-visuals.ts` holds the `mermaid` and `chart` fences' rules, `mermaidKind` and `parseChartSpec` with their limits, which the page checks a fence with and the session visuals extension tells the model.
   `discussions.ts` holds **Ask about this**'s request, its events, the limits `parseDiscussionRequest` in `src/server/wire.ts` holds it to, `discussionPrompt`, the one message the model gets, and `sessionMessage`, what **Send to session** sends.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, `documents.ts`, and `isolation.ts` wrap one area each.
   `context-index.ts` keeps the context-source index beside omp-stats' database: each request of each session file split by source, re-read only for files that changed.
   `discussion.ts` holds `answerDiscussion`, one streamed model call on omp's `smol` role, else `default`, that answers **Ask about this** outside every session.
+  `session-visuals-extension.ts` is the omp extension, loaded with `-e`, that appends the two visual fence formats to the system prompt of a session the dashboard starts, resumes, or forks; `sessionVisualsExtension` in `src/server/resources.ts` names its file, a bundle beside `server.js` in the packaged app.
 - `src/analytics.ts`: merges Claude Code's and Codex's requests into omp-stats' `StatsRead` with `withForeignUsage`, then folds per-file rows into sessions and workspaces.
   It joins each saved session's `SessionSummary`, its title and working directory, without reading transcripts.
 - `src/context-sources.ts`: splits a request's input by source, from its context messages and a subagent's recorded system prompt, and folds the index's rows into the Analytics tab's context-source report.

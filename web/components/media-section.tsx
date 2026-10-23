@@ -1,18 +1,17 @@
-import { ChevronDown, GitPullRequest, Images, type LucideIcon, MessageSquare, Paperclip } from "lucide-react";
+/** The changes card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
+import { ChevronDown, GitPullRequest, type LucideIcon, MessageSquare, Paperclip } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type LinkedPullRequest, type PullRequestDetail, pullRequestName } from "../../src/shared/github";
 import type { View } from "../../src/shared/sessions";
 import { type AgentMedia, mediaExtension, mediaUrl } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
-import { SidebarGroup } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { errorText, putJson } from "../api";
 import { age } from "../labels";
 import { useRead } from "../reads";
 import { useAction } from "../use-action";
 import { useDashboardActions } from "./dashboard-context";
-import { DetailsEmpty } from "./details-sidebar-frame";
 import { ImageViewer } from "./media-viewer";
 import { fileBase64 } from "./prompt-attachments";
 import { toasts } from "./toaster";
@@ -166,7 +165,7 @@ function MediaActions({ picked, pullRequests, tickets, onSent, onClear }: MediaA
 	}, "Could not attach the images to the Linear issue");
 	const pending = toPullRequest.pending || toTicket.pending;
 	return (
-		<div className="sticky top-0 z-20 -mx-2 -mt-2 flex flex-wrap items-center gap-1 bg-background px-4 pt-2 pb-1">
+		<div className="flex flex-wrap items-center gap-1 px-2 pt-1">
 			<span className="mr-auto text-xs text-muted-foreground tabular-nums" aria-live="polite">
 				{picked.length} selected
 			</span>
@@ -189,8 +188,8 @@ function MediaActions({ picked, pullRequests, tickets, onSent, onClear }: MediaA
 	);
 }
 
-interface MediaTabProps {
-	media: AgentMedia[] | null;
+interface MediaStripProps {
+	media: AgentMedia[];
 	view: View;
 	/** What the session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
@@ -199,50 +198,43 @@ interface MediaTabProps {
 }
 
 /**
- * The images the view's agent and its subagents' tools returned or wrote, newest first, as thumbnails that open large.
- * Selected ones go to one of the session's pull requests' descriptions or to one of its Linear issues; while any is
- * selected, a click selects instead of opening.
+ * The images the view's agent and its subagents' tools returned or wrote, newest first, as a row of thumbnails that open
+ * large. Selected ones go to one of the session's pull requests' descriptions or to one of its Linear issues; while any
+ * is selected, a click selects instead of opening.
  */
-export function MediaTab({ media, view, pullRequests, tickets }: MediaTabProps) {
+export function MediaStrip({ media, view, pullRequests, tickets }: MediaStripProps) {
 	const [shown, setShown] = useState<string | null>(null);
 	const [selected, setSelected] = useState<string[]>([]);
-	if (!media) return null;
-	if (media.length === 0) return <DetailsEmpty icon={Images} title="No images yet" description="Screenshots and images the agent's tools return or write to files show here." />;
 	const index = shown === null ? -1 : media.findIndex(item => mediaKey(item) === shown);
 	const byKey = new Map(media.map(item => [mediaKey(item), item]));
 	const picked = selected.flatMap(key => byKey.get(key) ?? []);
 	const toggle = (key: string): void => setSelected(keys => (keys.includes(key) ? keys.filter(other => other !== key) : [...keys, key]));
 	return (
-		<SidebarGroup>
+		<>
 			{picked.length > 0 && (
 				<MediaActions picked={picked} pullRequests={pullRequests} tickets={tickets} onSent={left => setSelected(left.map(mediaKey))} onClear={() => setSelected([])} />
 			)}
-			<ul className="grid grid-cols-2 gap-2 px-2 py-1" aria-label="Images, newest first">
+			<ul className="flex gap-1.5 overflow-x-auto px-2 py-1.5" aria-label="Images, newest first">
 				{media.map(item => {
 					const key = mediaKey(item);
 					const checked = selected.includes(key);
 					return (
-						<li key={key} className="group relative min-w-0">
+						<li key={key} className="group relative shrink-0">
 							<Tooltip
 								content={
 									<>
-										{captionOf(item)}
+										{captionOf(item)} · {age(item.at)} ago
 										{item.path && <span className="block font-mono break-all">{item.path}</span>}
 									</>
 								}
-								side="left"
 							>
 								<button
 									type="button"
 									onClick={() => (picked.length > 0 ? toggle(key) : setShown(key))}
 									aria-pressed={picked.length > 0 ? checked : undefined}
-									className="flex w-full flex-col gap-1 rounded-md p-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-accent"
+									className="block rounded-md p-0.5 outline-none hover:bg-background/70 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-background aria-pressed:ring-2 aria-pressed:ring-ring"
 								>
-									<img src={item.src} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="aspect-video w-full rounded-sm border border-border bg-muted object-cover object-top" />
-									<span className="flex min-w-0 items-baseline gap-1 text-xs">
-										<span className="min-w-0 flex-1 truncate text-foreground">{agentName(item)}</span>
-										<span className="shrink-0 tabular-nums text-muted-foreground">{age(item.at)}</span>
-									</span>
+									<img src={item.src} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="h-14 w-24 rounded-sm border border-border bg-muted object-cover object-top" />
 								</button>
 							</Tooltip>
 							<input
@@ -250,13 +242,13 @@ export function MediaTab({ media, view, pullRequests, tickets }: MediaTabProps) 
 								checked={checked}
 								onChange={() => toggle(key)}
 								aria-label={`Select ${captionOf(item)}`}
-								className={`absolute top-2.5 left-2.5 size-4 accent-current group-focus-within:opacity-100 group-hover:opacity-100 ${picked.length > 0 ? "opacity-100" : "opacity-0"}`}
+								className={`absolute top-1.5 left-1.5 size-3.5 accent-current group-focus-within:opacity-100 group-hover:opacity-100 ${picked.length > 0 ? "opacity-100" : "opacity-0"}`}
 							/>
 						</li>
 					);
 				})}
 			</ul>
 			{index >= 0 && <MediaViewer media={media} index={index} view={view} onShow={setShown} />}
-		</SidebarGroup>
+		</>
 	);
 }

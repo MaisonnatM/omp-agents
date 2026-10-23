@@ -1,12 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
-import { changeBlocks, changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, lastAtOrAbove, treeOrder, withMember } from "./changes-model";
+import { changeBlocks, changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, lastAtOrAbove, shortPaths, treeOrder, withMember } from "./changes-model";
 
 const same = (count: number, from = 1): DiffRow[] => Array.from({ length: count }, (_, at) => ({ sign: " ", old: from + at, new: from + at, text: "" }));
 const added: DiffRow = { sign: "+", old: null, new: 0, text: "" };
 const removed: DiffRow = { sign: "-", old: 0, new: null, text: "" };
 const entry = (path: string): ChangedEntry => ({ path, status: "modified", added: 1, removed: 0, session: false });
 const shown = (items: DiffItem[]) => items.map(item => (item.kind === "row" ? item.index : `fold ${item.from}-${item.to}`));
+
+describe("shortPaths", () => {
+	test("names a file alone, and adds the fewest folders that tell two of one name apart", () => {
+		expect(shortPaths(["web/app.tsx", "src/app.tsx", "README.md", "x/web/a.ts", "y/web/a.ts", "app.tsx", "docs/README.txt"])).toEqual([
+			{ name: "app.tsx", dir: "web/" },
+			{ name: "app.tsx", dir: "src/" },
+			{ name: "README.md", dir: "" },
+			{ name: "a.ts", dir: "x/web/" },
+			{ name: "a.ts", dir: "y/web/" },
+			{ name: "app.tsx", dir: "" },
+			{ name: "README.txt", dir: "" },
+		]);
+	});
+});
 
 describe("lastAtOrAbove", () => {
 	const tops = [0, 100, 100, 250, 900];
@@ -104,7 +118,7 @@ describe("fileTree", () => {
 });
 describe("changesPathOf", () => {
 	const files = [entry("web/app.tsx"), entry("~/notes/plan.md"), entry("app.tsx")];
-	test("finds the Files tab's path in the changes list, from a subdirectory, outside the checkout, or by its tail under ~", () => {
+	test("finds the changes card's path in the changes list, from a subdirectory, outside the checkout, or by its tail under ~", () => {
 		expect(changesPathOf("app.tsx", "/repo/web", "/repo", files)).toBe("web/app.tsx");
 		expect(changesPathOf("app.tsx", "/repo", "/repo", files)).toBe("app.tsx");
 		expect(changesPathOf("~/notes/plan.md", "/repo", "/repo", files)).toBe("~/notes/plan.md");

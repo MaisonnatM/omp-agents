@@ -44,3 +44,4 @@ For installation, see the [README](../README.md); for the interface, see [Using 
     - [New and local events](architecture/http-api-google-calendar.md#new-and-local-events)
   - [Gmail](architecture/http-api-gmail.md)
 - [Front-end components](architecture/front-end-components.md)
+  - [Session visuals](architecture/front-end-components.md#session-visuals)

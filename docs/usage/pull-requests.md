@@ -106,10 +106,10 @@
   Closing the active tab selects its right neighbour, then its left, or returns to the list when none remain.
   Right-click a tab, or press Shift+F10 on its number, for **Copy link**, **Copy PR number**, **Close**, and **Close others**.
   Wheel over the strip to scroll it horizontally; chevrons appear when tabs overflow.
-  The browser keeps the open tabs, their order, and each PR's selected detail tab across reloads, and a session sidebar's for the 20 sessions whose tabs changed last.
-  A session's **PRs** sidebar has its own strip, which starts on the session's first pull request and shows it again once its last tab closes; its **Summary** opens the session's other pull requests there without changing the page.
+  The browser keeps the open tabs, their order, and each PR's selected detail tab across reloads.
+  A session's **PRs** sidebar has no strip: it shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
   Cmd+Shift+K copies the open page PR's `#N`, Cmd+Shift+C copies its GitHub link, and Cmd+W closes its tab.
-  These keys apply only while the Pull requests page shows a PR, not in the session sidebar.
+  These keys apply only while the Pull requests page shows a PR.
   The desktop app gives that Cmd+W to the page rather than its native window Close command.
   A plain browser may reserve Cmd+W and close its browser tab before the page can prevent it; use the glyph or context menu there.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.

@@ -27,8 +27,15 @@
 - A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large, with the tool and what the call said it did.
   The arrows, or the Left and Right keys, step to the previous and next tool image of the conversation, across calls, and the external-link button opens the image in a new tab.
   A tool group that returned images stays open.
-  Hiding tool calls hides them too; the **Media** tab still lists every one.
+  Hiding tool calls hides them too; the changes card's **Images** section still lists every one.
 - A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.
+- In a session's conversation, a `mermaid` or `chart` code block in a message draws as a diagram or a chart once the message settles; while a reply streams, it shows as code.
+  A `mermaid` block draws a flowchart (`graph` or `flowchart` with a direction such as `TD` or `LR`), a `sequenceDiagram`, a `stateDiagram-v2`, a `classDiagram`, or an `erDiagram`, named on its first line, in up to 20,000 characters.
+  A `chart` block holds one JSON object: `{"type": "bar" | "line" | "area" | "pie", "title"?, "description"?, "x", "series": [{"key", "label"?}], "data": [...]}`.
+  Each row holds the `x` key, text or a number, and each series key, a finite number, and nothing else; a chart has 1 to 5 series and 1 to 500 rows, and a pie exactly one series, whose `x` names each slice.
+  The block's header switches between **Preview** and **Source**, copies the block's exact text, and expands the visual into a dialog for a narrow pane.
+  A block that breaks these rules, such as a pie or gantt diagram, an unknown key, or a value that is not a number, shows its text with a note that says why.
+  Each session the dashboard starts, resumes, or forks is told these two formats in its system prompt; a replay and a terminal session are not, so a replay's requests still match the original's.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
   Click the session's title to open the session's main agent in the pane, or focus the pane that already shows it.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.

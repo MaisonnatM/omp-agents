@@ -22,6 +22,15 @@ import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } 
 import { isUserPrompt, type StartingPrompt } from "./transcript";
 import { SerialLane } from "./serial-lane";
 import { ASK_DIALOG_OPT_IN, PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
+import { sessionVisualsExtension } from "./server/resources";
+
+/**
+ * `launch` with the extension that tells omp which fenced blocks the dashboard draws as diagrams and charts. A replay
+ * goes without it, as its requests must match the original's system prompt.
+ */
+function withSessionVisuals(launch: RpcLaunch): RpcLaunch {
+	return { ...launch, args: ["-e", sessionVisualsExtension, ...launch.args] };
+}
 
 interface RpcAgent {
 	id: string;
@@ -195,7 +204,7 @@ export class DashboardSession implements LiveSession {
 		launch: RpcLaunch,
 		emit: (update: DashboardUpdate) => void,
 	): Promise<DashboardSession> {
-		return DashboardSession.#spawn(instanceId, cwd, launch, emit, async client => {
+		return DashboardSession.#spawn(instanceId, cwd, withSessionVisuals(launch), emit, async client => {
 			if (model) await client.setModel(model.provider, model.id);
 			if (thinking) {
 				const levels = await client.getAvailableThinkingLevels();
@@ -231,7 +240,7 @@ export class DashboardSession implements LiveSession {
 		// omp would repair such a file in place on open.
 		if (await endsMidTurn(sourceFile)) throw new Error("this session ended mid-turn. Resume it in omp once, then fork.");
 		let prompt = "";
-		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), launch, emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), withSessionVisuals(launch), emit, async client => {
 			if ((await client.switchSession(sourceFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 			try {
 				const branched = await client.branch(entryId);
@@ -249,7 +258,7 @@ export class DashboardSession implements LiveSession {
 	/** Spawn omp with `launch` holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
 	static async resume(instanceId: string, sessionFile: string, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		const replay = await launchForReplayResume(sessionFile, launch);
-		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.launch, emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.marker ? replay.launch : withSessionVisuals(replay.launch), emit, async client => {
 			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 			if (replay.marker) await requireReplayReady(sessionFile, replay.marker.id, replay.launch.readyToken);
 		});

@@ -1,6 +1,7 @@
 # Server: sessions and transcripts
 
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes; `reattach` opens one a previous server started, and `dispose` hangs up without stopping omp.
+  `withSessionVisuals` adds `src/omp/session-visuals-extension.ts` to every launch but a replay's, whose requests must match the original's.
   `src/keeper.ts` is the session keeper, the detached process that holds one session's omp, lends its stdio frame by frame to one server at a time over a Unix socket, so the session outlives the server, and stops every process omp started when the session ends; `src/keeper-link.ts` is the server's side, which starts, lists, and connects to keepers, and `reattachAll` in `src/server/start.ts` attaches to them at startup.
   `src/keeper-wire.ts` holds the greeting, the stop line, the pid file's name, and `KeeperMeta`, the only words the two sides share, so the keeper's bundle holds none of the server; `src/process-census.ts` is the keeper's `ProcessCensus`, which notes the processes under omp with `ps` and stops the noted ones when the session ends, and `stopTree`, with which the server stops a stuck keeper's tree.
   `src/prompt-turn.ts` holds its `PromptTurn`: whether the main agent's turn runs and which prompt omp admitted while idle has not shown yet, with one method per event that moves them.

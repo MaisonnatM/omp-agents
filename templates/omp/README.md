@@ -86,7 +86,7 @@ Files, in `agent/`:
 ## Maintainer git profile
 
 `bun run omp-template --maintainer` also copies [`maintainer/`](maintainer) on top of the same relative paths.
-The profile includes `AGENTS.md` for local-main pushing and worktree cleanup, `docs/git-workflow.md` for draft-first Graphite shipping, and `skills/mma-mode/` for maintainer steering.
+The profile includes `AGENTS.md` for local-main pushing and worktree cleanup, `docs/git-workflow.md` for draft-first Graphite shipping, `skills/mma-mode/` for maintainer steering, and `skills/best-in-class-approach/`, the quality bar mma-mode stacks for build and review.
 Mma-mode resolves poteto by URI and loads only references matching the current task instead of a monolithic contract.
 The default install does not copy those files.
 `--force` still overwrites a file you already have, including one the profile replaces.

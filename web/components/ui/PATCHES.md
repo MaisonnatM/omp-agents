@@ -35,6 +35,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 
 - `files`: the names of the files a sent prompt carried as text, shown as chips above the bubble, in place of the registry's `File`s held in the browser and its `thumbnailSize`.
 - `images`: the addresses of the images a sent prompt carried, shown above the bubble.
+- The assistant message spans the transcript column, whose `max-w-3xl` bounds it, in place of the registry's `max-w-[80%]` on every message; the user bubble keeps `max-w-[80%]`.
 - The hover group is named `group/message`, so a nested `group` inside a message does not reveal its actions.
 - The bubble is `max-w-full`, so wide code blocks stay inside it.
 
@@ -84,6 +85,9 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   `CodeBlockCopyButton` is Fluid's `Button` at `icon-compact`, since Fluid's has no `icon-xs`, and `ui/code-block.tsx` drops `"use client"`.
   `CodeBlockLine` drops the `supports-[content:counter(line)_/_'']` alt text for line numbers, since Bun's CSS parser rejects `content: counter(line) / ''` and fails the page build; the dashboard shows no line numbers.
   The shadcn utilities they use are `web/shadcn.css`, with `scrollbar-thin`, which the registry's code block uses and no stylesheet defines.
+- `ui/chart.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/chart.json`).
+  It imports `cn` from `@/lib/utils` and drops `"use client"`; the rest is the registry file unchanged.
+  Its `--chart-1` to `--chart-5` colors are shadcn's defaults, in `web/globals.css`.
 
 ## `kibo-ui/calendar/index.tsx`
 

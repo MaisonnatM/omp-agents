@@ -8,6 +8,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Sessions sidebar](usage/sessions-sidebar.md)
 - [Terminal](usage/terminal.md)
 - [Session details sidebar](usage/session-details-sidebar.md)
+- [Changed files and images](usage/changed-files-and-images.md)
 - [Session changes](usage/session-changes.md)
 - [Panes, splits, and links](usage/panes-splits-and-links.md)
 - [Conversations](usage/conversations.md)
