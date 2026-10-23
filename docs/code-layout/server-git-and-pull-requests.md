@@ -30,6 +30,7 @@
   `src/pull-request-edit.ts` saves titles, descriptions, labels, review requests, states, branch updates, and conversation changes for `PUT /api/pull-request`, and viewed files for `PUT /api/pull-request/viewed`.
   It also lists picker choices for `GET /api/pull-request/options` and appends images with `attachToPullRequest`.
   `src/pull-request-checkout.ts` checks out a pull request for `PUT /api/pull-request/checkout`: with `gh pr checkout` in a checkout, or on its head branch in a worktree with a new session that the route's starter opens there.
+  `src/pull-request-rebase.ts` rebases a pull request's branch onto its base for `PUT /api/pull-request/rebase`, in the worktree that has the branch or a temporary one, and force-pushes it with a lease through the repository's pre-push hook, one repository at a time.
   `src/pull-request-merge.ts` holds `GITHUB_MERGES`, the merge and its steps, including merge or rebase branch updates, and the status reads.
   `src/pull-requests.ts` adds `behindBy` with one REST base-to-head comparison per detail read.
   `src/pull-request-review.ts` holds a review draft's side of GitHub: `readReviewTarget`, the head and the lines each file's diff shows, the viewer's login, the reviews and their comments a retry compares, and `postReview`, one `POST` of the review through `ghRestPost` in `src/github.ts`.
