@@ -35,7 +35,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   Its tabs: **Files** in `files-tab.tsx`, **Media** in `media-tab.tsx`, **PRs** in `session-pull-requests-tab.tsx`, and **Tickets** in `session-tickets-tab.tsx`, all in `web/components/`.
   The **Media** tab's viewer and the transcript's share `ImageViewer` from `web/components/media-viewer.tsx`: the image large with its caption, `N of M`, the buttons and Left and Right keys to the images before and after it, open in a new tab, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
-  The floating comment and review composer at its bottom right is `PullRequestComposer` in `pr-details/composer.tsx`.
+  The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.
   `header.tsx` draws T3's crumbs, **Check out** menu, inline-confirmed primary action, title editor, base freshness warning, copyable command and branch, stack menu, and linked-sessions count; the **Check out** menu is `CheckoutMenu` in `checkout-menu.tsx`.
   The Reviewers and Labels pickers and collapsible Description, Checks, and Comments sections live in **Summary**.
   `web/components/segmented-tabs.tsx` provides its T3-styled 24px tabs with Radix keyboard navigation and tab-panel semantics.
@@ -44,7 +44,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   `code.tsx` holds the **Code** tab's commit scope and which files are folded, and composes `code-toolbar.tsx`, its toolbar, `diff-preferences.ts`, the diff options it keeps on this computer, `viewed-files.tsx`, GitHub's viewed state and the **Viewed** checkbox, `code-files.tsx`, the diffs and file tree, and `diff-controls.tsx`, the line comment box.
   A pull request row's **Review draft** tag is `ReviewDraftTag` in `web/components/pull-requests/pr-row.tsx`.
   The same details show in two places, so reproduce a layout bug in the one the user means: the Pull requests page's `pr-page.tsx`, and the right sidebar's **PRs** tab, a much narrower column.
-  The open `#N` strip above those details is `PullRequestTabsStrip` in `web/components/pull-requests/pr-tabs.tsx`, backed by `web/pull-request-tabs.ts`.
+  The open `#N` strip above the page's details is `PullRequestTabsStrip` in `web/components/pull-requests/pr-tabs.tsx`, backed by `web/pull-request-tabs.ts`; the sidebar's **PRs** tab has none.
 - Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
 - The three things called Files:
   - The right sidebar's Files tab, a session's changed files: `FilesTab` in `web/components/files-tab.tsx`.
@@ -561,8 +561,8 @@ The page lives in `web/`.
   In the board view, the page stays mounted while a pull request shows, docking `PullRequestDetails` beside the board in a plain column of the page's full height, as the session sidebar's PRs tab does, so the details keep their header above their own scroller.
   `pull-requests-kanban.tsx` holds `usePullRequestsColumns`, the board's columns with their own folds and keys, which step column by column; it draws the columns, drags a card through `usePointerDrag` in `web/use-pointer-drag.ts` with a card in hand that tilts with its speed, shows each column's slot or refusal, picks a card up with Space for ← and →, and runs a drop's step.
   `pr-page.tsx` shows one pull request's details in the main content, in a frame of its own that lets the **Code** tab fill the height under the header.
-  `pr-tabs.tsx` renders the open PR strip, context menu, pointer reorder, wheel scroll, and overflow chevrons on the page and session sidebar.
-  `web/pull-request-tabs.ts` keeps their order and per-PR detail tab through `useStoredState`; the page's active tab is its route, and a session sidebar also stores its own.
+  `pr-tabs.tsx` renders the page's open PR strip, context menu, pointer reorder, wheel scroll, and overflow chevrons.
+  `web/pull-request-tabs.ts` keeps their order and per-PR detail tab through `useStoredState`; the page's active tab is its route.
   `pr-page.tsx` registers the page-only copy and close shortcuts and, while mounted, claims Cmd+W through the desktop bridge, which `desktop/main.ts` then keeps from the native Close accelerator.
   Its `PullRequestDetails` shows the same details, with the same quick actions, on the page and in the session details sidebar; its `placement` decides whether it says why the Pull requests page does not list the pull request, and `PullRequestDetailContent` in `pr-details/index.tsx` takes it too, for the heading's level and size, whether it takes focus, whether the header and tab bar stick to the top of the sidebar's scroll, and the **Code** explorer's height.
   `PullRequestDetails` hands it the list entry and how to start a quick action, and `PullRequestDetailContent` derives the menu's quick actions from `actionFacts`.

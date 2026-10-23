@@ -1538,9 +1538,9 @@ The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Men
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
 
-Open pull request tabs use `web/pull-request-tabs.ts` and the same `useStoredState` localStorage mechanism as the sidebar layout.
-The main Pull requests page shares one ordered strip between windows and stores no active tab, since its route says which PR shows.
-Each session's or project's PRs sidebar keeps its own tabs and active tab, and keeps navigation local to that sidebar; one key holds them by the session's ID, which stays the same from its live view to its past one, or by the project's ID, for the 20 sidebars whose tabs changed last.
+The Pull requests page's open tabs use `web/pull-request-tabs.ts` and the same `useStoredState` localStorage mechanism as the sidebar layout.
+The page shares one ordered strip between windows and stores no active tab, since its route says which PR shows.
+A session's or project's PRs sidebar has no strip; `SessionPullRequestsTab` holds the PR it shows and its detail tab in component state, keyed by the session or project, so nothing is stored.
 Only the main PR detail registers the copy-number, copy-link, and close-tab shortcuts.
 While `PullRequestDetailPage` is mounted it tells the desktop shell through `window.ompDesktop.ownsClose`, and the Electron window's `before-input-event` then bypasses native menu shortcuts for Cmd+W, so the page can prevent the native Close action without the shell knowing the dashboard's routes.
 

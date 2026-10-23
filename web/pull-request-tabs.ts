@@ -13,10 +13,6 @@ export interface PullRequestTabs {
 	active: string | null;
 }
 const PULL_REQUEST_TABS_KEY = "omp-agents.pull-request-tabs";
-const SESSION_TABS_KEY = "omp-agents.session-pull-request-tabs";
-/** How many sessions' sidebar tabs the browser keeps, the ones changed last. */
-export const SESSION_TABS_KEPT = 20;
-const EMPTY: PullRequestTabs = { open: [], active: null };
 const isDetailTab = (value: unknown): value is PullRequestDetailTab => DETAIL_TABS.some(tab => tab === value);
 
 function decodeTabList(items: unknown): PullRequestTab[] {
@@ -37,38 +33,6 @@ export function decodePageTabs(raw: string | null): PullRequestTab[] {
 	} catch {
 		return [];
 	}
-}
-
-/** A session sidebar's tabs, under `scope`, the session's stable identity. */
-export interface SessionPullRequestTabs extends PullRequestTabs {
-	scope: string;
-}
-
-export function decodeSessionTabs(raw: string | null): SessionPullRequestTabs[] {
-	try {
-		const items: unknown = JSON.parse(raw ?? "null");
-		const sessions: SessionPullRequestTabs[] = [];
-		for (const item of Array.isArray(items) ? items : []) {
-			if (!item || typeof item !== "object" || typeof item.scope !== "string" || sessions.some(other => other.scope === item.scope)) continue;
-			const open = decodeTabList(item.open);
-			sessions.push({ scope: item.scope, open, active: open.some(pr => prKey(pr) === item.active) ? item.active : null });
-		}
-		return sessions;
-	} catch {
-		return [];
-	}
-}
-
-export function sessionTabsOf(sessions: readonly SessionPullRequestTabs[], scope: string): PullRequestTabs {
-	const found = sessions.find(session => session.scope === scope);
-	return found ? { open: found.open, active: found.active } : EMPTY;
-}
-
-/** `sessions` with `scope`'s tabs replaced and moved last, keeping the {@link SESSION_TABS_KEPT} changed last; no tab drops the entry. */
-export function storeSessionTabs(sessions: readonly SessionPullRequestTabs[], scope: string, tabs: PullRequestTabs): SessionPullRequestTabs[] {
-	const others = sessions.filter(session => session.scope !== scope);
-	const next = tabs.open.length === 0 ? others : [...others, { scope, open: tabs.open, active: tabs.active }];
-	return next.slice(-SESSION_TABS_KEPT);
 }
 
 export const pullRequestTabHash = (tab: PullRequestTab): string => (tab.detailTab === "code" ? hashForPullRequestFiles(tab) : hashForPullRequests(tab));
@@ -152,22 +116,4 @@ export function usePagePullRequestTabs(target: PullRequest | null): PullRequestT
 		location.hash = shown ? pullRequestTabHash(shown) : hashForPullRequests(null);
 	};
 	return { tabs, dispatch };
-}
-
-/** A session sidebar's tabs as it shows them: `first` while no other tab is active, so the sidebar always shows a PR. */
-export function sessionPullRequestTabs(stored: PullRequestTabs, first: PullRequest | undefined): PullRequestTabs {
-	return stored.active === null && first ? changePullRequestTabs(stored, { type: "open", pr: first }) : stored;
-}
-
-/** A session sidebar's strip, under `scope`, which stores its own active tab, since the sidebar has no route. */
-export function useSessionPullRequestTabs(scope: string, first: PullRequest | undefined): PullRequestTabsControl {
-	const [sessions, setSessions] = useStoredState(SESSION_TABS_KEY, decodeSessionTabs, JSON.stringify);
-	return {
-		tabs: sessionPullRequestTabs(sessionTabsOf(sessions, scope), first),
-		dispatch: event => setSessions(previous => {
-			const tabs = sessionPullRequestTabs(sessionTabsOf(previous, scope), first);
-			const next = changePullRequestTabs(tabs, event);
-			return next === tabs ? previous : storeSessionTabs(previous, scope, next);
-		}),
-	};
 }

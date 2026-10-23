@@ -775,10 +775,10 @@ An action that fails shows its error, and its control becomes available again.
   Closing the active tab selects its right neighbour, then its left, or returns to the list when none remain.
   Right-click a tab, or press Shift+F10 on its number, for **Copy link**, **Copy PR number**, **Close**, and **Close others**.
   Wheel over the strip to scroll it horizontally; chevrons appear when tabs overflow.
-  The browser keeps the open tabs, their order, and each PR's selected detail tab across reloads, and a session sidebar's for the 20 sessions whose tabs changed last.
-  A session's **PRs** sidebar has its own strip, which starts on the session's first pull request and shows it again once its last tab closes; its **Summary** opens the session's other pull requests there without changing the page.
+  The browser keeps the open tabs, their order, and each PR's selected detail tab across reloads.
+  A session's **PRs** sidebar has no strip: it shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
   Cmd+Shift+K copies the open page PR's `#N`, Cmd+Shift+C copies its GitHub link, and Cmd+W closes its tab.
-  These keys apply only while the Pull requests page shows a PR, not in the session sidebar.
+  These keys apply only while the Pull requests page shows a PR.
   The desktop app gives that Cmd+W to the page rather than its native window Close command.
   A plain browser may reserve Cmd+W and close its browser tab before the page can prevent it; use the glyph or context menu there.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
@@ -871,7 +871,7 @@ An action that fails shows its error, and its control becomes available again.
   **Resolve** resolves a thread and **Unresolve** opens it again, each shown only when GitHub lets you; a refused change is undone.
   A thread you can reply to has a reply box: **Reply**, or Cmd+Enter, Ctrl+Enter elsewhere, sends it, and a refusal keeps the draft.
   Replies go to GitHub as written, up to its 65536 characters, and the details then read the pull request again.
-- The round button at the bottom right of the details opens the composer, shown only when GitHub lets you comment.
+- The round button at the bottom right of the details on the Pull requests page opens the composer, shown only when GitHub lets you comment; a session's **PRs** sidebar has none.
   Its badge counts the Review draft's pending findings.
   **Comment** posts a comment; **Close with comment** asks **Confirm close?** and then posts the comment and closes the pull request, and a closed one offers **Reopen with comment**.
   **Review (N)**, offered on an open or draft pull request, picks **Comment**, **Approve**, or **Request changes**, the last two not on your own pull request, and a summary; **Submit review** accepts every pending finding of an open Review draft and posts it, or posts the review alone.

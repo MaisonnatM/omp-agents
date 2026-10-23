@@ -100,7 +100,7 @@ export function ProjectDetails({ project, working, cwd, workspace, hosts, past, 
 					name: "PRs",
 					count: pullRequests.length,
 					scrollsItself: true,
-					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={current} scope={`project:${project.id}`} />,
+					content: <SessionPullRequestsTab key={project.id} pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={current} />,
 				},
 			]}
 		/>

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { changePullRequestTabs as change, decodePageTabs, decodeSessionTabs, neighbourAfterClose, pageDetailTab, type PullRequestTabs, SESSION_TABS_KEPT, sessionPullRequestTabs, sessionTabsOf, storeSessionTabs } from "./pull-request-tabs";
+import { changePullRequestTabs as change, decodePageTabs, neighbourAfterClose, pageDetailTab, type PullRequestTabs } from "./pull-request-tabs";
 
 const first = { owner: "acme", repo: "app", number: 1 };
 const second = { owner: "acme", repo: "app", number: 2 };
@@ -25,44 +25,14 @@ test("closing an inactive tab leaves the active PR alone", () => {
 	expect(change(opened(), { type: "close", pr: second })).toEqual({ open: [{ ...first, detailTab: "summary" }, { ...third, detailTab: "summary" }], active: "acme/app#3" });
 });
 
-test("moving tabs retains the active PR and each detail tab across storage", () => {
+test("moving a tab retains the active PR and each detail tab", () => {
 	let tabs = change(opened(), { type: "detail", pr: second, tab: "code" });
 	tabs = change(tabs, { type: "move", pr: third, to: 0 });
-	const stored = JSON.stringify(storeSessionTabs([], "session:s", tabs));
-	expect(sessionTabsOf(decodeSessionTabs(stored), "session:s")).toEqual({ open: [{ ...third, detailTab: "summary" }, { ...first, detailTab: "summary" }, { ...second, detailTab: "code" }], active: "acme/app#3" });
+	expect(tabs).toEqual({ open: [{ ...third, detailTab: "summary" }, { ...first, detailTab: "summary" }, { ...second, detailTab: "code" }], active: "acme/app#3" });
 });
 
 test("close others focuses the kept tab", () => {
 	expect(change(opened(), { type: "close-others", pr: second })).toEqual({ open: [{ ...second, detailTab: "summary" }], active: "acme/app#2" });
-});
-
-test("a session sidebar shows its first PR until another tab is active", () => {
-	const empty: PullRequestTabs = { open: [], active: null };
-	expect(sessionPullRequestTabs(empty, first)).toEqual({ open: [{ ...first, detailTab: "summary" }], active: "acme/app#1" });
-	expect(sessionPullRequestTabs(empty, undefined)).toEqual(empty);
-	const picked = change(opened(), { type: "open", pr: second });
-	expect(sessionPullRequestTabs(picked, first)).toBe(picked);
-	const closed = change(change(empty, { type: "open", pr: second }), { type: "close", pr: second });
-	expect(sessionPullRequestTabs(closed, first)).toEqual({ open: [{ ...first, detailTab: "summary" }], active: "acme/app#1" });
-});
-
-test("storage rejects malformed PRs and duplicate identities, and resets an invalid active tab", () => {
-	expect(decodeSessionTabs("broken")).toEqual([]);
-	const open = [null, { ...first, detailTab: "old" }, { ...first, owner: "ACME" }, { ...second, number: -1 }];
-	expect(decodeSessionTabs(JSON.stringify([{ scope: "session:s", open, active: "missing" }, { scope: "session:s", open: [second], active: null }, { open }]))).toEqual([{ scope: "session:s", open: [{ ...first, detailTab: "summary" }], active: null }]);
-});
-
-test("each session keeps its own tabs, the last changed move last, and the oldest past the cap drop", () => {
-	let sessions = storeSessionTabs([], "session:a", opened());
-	sessions = storeSessionTabs(sessions, "session:b", change({ open: [], active: null }, { type: "open", pr: second }));
-	expect(sessionTabsOf(sessions, "session:a")).toEqual(opened());
-	expect(sessionTabsOf(sessions, "session:c")).toEqual({ open: [], active: null });
-	sessions = storeSessionTabs(sessions, "session:a", change(opened(), { type: "open", pr: first }));
-	expect(sessions.map(session => session.scope)).toEqual(["session:b", "session:a"]);
-	expect(storeSessionTabs(sessions, "session:b", { open: [], active: null }).map(session => session.scope)).toEqual(["session:a"]);
-	for (let at = 0; at < SESSION_TABS_KEPT; at++) sessions = storeSessionTabs(sessions, `session:${at}`, opened());
-	expect(sessions).toHaveLength(20);
-	expect(sessions[0]?.scope).toBe("session:0");
 });
 
 test("the page's route alone says whether a PR shows Code", () => {
@@ -89,4 +59,9 @@ test("the page stores its tabs' order and detail tabs without an active tab", ()
 	expect(decodePageTabs(JSON.stringify(open))).toEqual(open);
 	expect(decodePageTabs(JSON.stringify({ open, active: "acme/app#1" }))).toEqual([]);
 	expect(decodePageTabs("broken")).toEqual([]);
+});
+
+test("page storage rejects malformed PRs and duplicate identities", () => {
+	const open = [null, { ...first, detailTab: "old" }, { ...first, owner: "ACME" }, { ...second, number: -1 }];
+	expect(decodePageTabs(JSON.stringify(open))).toEqual([{ ...first, detailTab: "summary" }]);
 });

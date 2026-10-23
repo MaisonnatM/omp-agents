@@ -53,7 +53,7 @@ export function SessionDetails({ view, working, sessionId, cwd, pullRequests, ti
 					name: "PRs",
 					count: pullRequests.length,
 					scrollsItself: true,
-					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={view.kind === "live" ? view.instanceId : null} scope={`session:${scope}`} />,
+					content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={view.kind === "live" ? view.instanceId : null} />,
 				},
 				...(tickets.length > 0
 					? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", count: tickets.length, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
