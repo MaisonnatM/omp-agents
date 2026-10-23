@@ -54,8 +54,8 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** What the page offers to pick up above the composer; a scheduled start shows none. */
-	board?: ReactNode;
+	/** The hero and board above the composer, given the line under its heading; a scheduled start shows none. */
+	board?: (note: string) => ReactNode;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -177,18 +177,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			) : (
-				<div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto px-3" data-empty-conversation>
-					<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-80 max-w-3xl rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--primary)_9%,transparent),transparent)] blur-[24px]" />
-					<div className="relative m-auto flex w-full flex-col items-center gap-7 py-8">
-						<div className="space-y-1.5 text-center">
-							<h2 className="text-[30px] leading-tight font-semibold tracking-[-0.022em] text-balance">Start a session</h2>
-							<p className="text-sm text-pretty text-muted-foreground">
-								{todo ? `Your todo “${todo.text}” links to the session once it starts.` : "Describe new work, or pick up something below."}
-							</p>
-						</div>
-						{board}
-					</div>
-				</div>
+				board?.(
+					(target.creates
+						? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
+						: "Describe new work, or pick up something below. It starts when you send the first message, so leaving this draft leaves nothing running.") +
+						(todo ? ` Your todo “${todo.text}” links to the session once it starts.` : ""),
+				)
 			)}
 			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
 				{completion.popup}

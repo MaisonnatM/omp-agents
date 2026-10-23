@@ -34,8 +34,8 @@ const todo = (id: string, status: UserTodo["status"]): UserTodo => ({ id, text: 
 const past = (sessionId: string, fields: Partial<PastSession> = {}): PastSession => ({ sessionId, title: sessionId, cwd: "/code/webapp", cwdDisplay: "~/code/webapp", source: "omp", modifiedAt: 0, interrupted: false, ...fields }) as PastSession;
 
 describe("new session board", () => {
-	test("todos leave out closed ones and list the ones in progress first", () => {
-		expect(boardTodos([todo("a", "todo"), todo("b", "done"), todo("c", "in-progress"), todo("d", "canceled"), todo("e", "backlog")]).map(t => t.id)).toEqual(["c", "a", "e"]);
+	test("todos leave out closed ones and group by status in the Todo page's order", () => {
+		expect(boardTodos([todo("e", "backlog"), todo("a", "todo"), todo("b", "done"), todo("c", "in-progress"), todo("d", "canceled"), todo("f", "todo")]).map(t => t.id)).toEqual(["c", "a", "f", "e"]);
 	});
 
 	test("sessions are the workspace's omp ones, interrupted first, then the latest", () => {
