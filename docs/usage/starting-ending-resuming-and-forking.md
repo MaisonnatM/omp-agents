@@ -3,6 +3,12 @@
 - To start a session, click **New session** at the top of the **Sessions** tab.
   The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker under the composer shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
+  Above the composer, under **Start a session**, a board lists up to four items in each of three columns.
+  **Todos for agents** lists the open todos, in progress first; clicking one starts a draft from it, as **Start** on the Todo page does.
+  **Pick up where you left off** lists the selected workspace's omp sessions, interrupted ones first, then the latest; clicking one resumes it.
+  **Pull requests waiting** lists the pull requests whose move is yours and that a quick action hands to an agent; clicking one runs that quick action, as its badge on the Pull requests page does.
+  **All** opens the Todo page or the Pull requests page.
+  A scheduled start shows no board.
   The directory is the selected workspace's, else the open session's, else the newest live session's, else the newest past session's.
   To start in another directory, under **All workspaces** or not, pick it in the directory picker in the strip under the composer, or press Cmd+Alt+P.
   It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
