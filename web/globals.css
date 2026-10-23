@@ -326,23 +326,6 @@
   }
 }
 
-[data-header-title-actions] {
-  opacity: 0;
-  pointer-events: none;
-}
-
-[data-header-title]:is(:hover, :focus-within) [data-header-title-actions] {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-@media (hover: none) {
-  [data-header-title-actions] {
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-
   html.transitioning *, html.transitioning *::before, html.transitioning *::after {
     transition: border-radius 180ms ease-in-out, background-color 180ms ease-in-out, color 180ms ease-in-out, border-color 180ms ease-in-out, fill 180ms ease-in-out, stroke 180ms ease-in-out !important;
 }

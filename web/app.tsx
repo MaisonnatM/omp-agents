@@ -31,9 +31,10 @@ import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
+import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
+import { hashForRoute, hashForView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -225,14 +226,14 @@ export function App() {
 										<ActivityVisibility.Provider value={display.activityVisibility}>
 											<ToolsExpanded value={display.toolsExpanded}>
 												<MentionListsContext.Provider value={mentionLists}>
-													<RenderBoundary resetKey={page ? hashForPage(page) : hashForLayout(layout)}>
+													<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
 														<PageSwitch
 															page={page}
 															hosts={state.hosts}
 															past={state.past}
 															lastHosts={state.lastHosts}
 															layout={layout}
-															splitRatios={state.splitRatios}
+															splits={state.splits}
 															models={state.models}
 															userTodos={state.userTodos}
 															routines={state.routines}

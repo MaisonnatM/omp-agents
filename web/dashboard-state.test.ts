@@ -63,10 +63,10 @@ describe("dashboard state", () => {
 
 	test("a session is ending from the page's ask until the server answers, and asking twice changes nothing", () => {
 		const ending = reduce(blank(), { t: "end", instanceId: "a" });
-		expect([...ending.ending]).toEqual(["a"]);
+		expect([...ending.ending.keys()]).toEqual(["a"]);
 		expect(reduce(ending, { t: "end", instanceId: "a" })).toBe(ending);
 		const both = reduce(ending, { t: "end", instanceId: "b" });
-		expect([...reduce(both, { t: "ended", instanceId: "a" }).ending]).toEqual(["b"]);
+		expect([...reduce(both, { t: "ended", instanceId: "a" }).ending.keys()]).toEqual(["b"]);
 		expect(reduce(ending, { t: "ended", instanceId: "b" })).toBe(ending);
 	});
 });

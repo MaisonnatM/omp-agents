@@ -29,7 +29,7 @@ interface PaneGridProps {
 
 /**
  * The panes in their grid, up to four, with the handles that resize it. It takes only what the panes read, and every
- * pane's props stay equal while a token streams, so the grid renders for roster and layout changes alone.
+ * pane's props stay equal while a token streams, so the grid renders for roster, layout, and divider changes alone.
  */
 export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts, models, workspaces, maximized, hasDetails, rightOpen, show, close, ratios: { columns, rows }, resize, toggleSidebar }: PaneGridProps) {
 	const setColumns = useCallback((ratio: number) => resize("columns", ratio), [resize]);

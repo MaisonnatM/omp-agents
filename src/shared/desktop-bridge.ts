@@ -29,6 +29,6 @@ export interface DesktopBridge {
 	alert(alert: SessionAlert): void;
 	/** Whether the page handles Cmd+W (Ctrl+W) itself, so the window's Close menu item lets it through; absent in an app built before it. */
 	ownsClose?(owns: boolean): void;
-	/** Reports the hovered or focused link's URL; an empty string clears it. Returns the subscription's cleanup. */
-	onTargetURL(listener: (url: string) => void): () => void;
+	/** Reports the hovered or focused link's URL; an empty string clears it. Returns the subscription's cleanup; absent in an app built before it. */
+	onTargetURL?(listener: (url: string) => void): () => void;
 }

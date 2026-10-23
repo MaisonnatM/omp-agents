@@ -21,16 +21,14 @@ import {
 	viewForSession,
 } from "./routing";
 import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
+import { storedNumber, storeOrRemove } from "./stored-state";
 
 const NO_VIEWS: View[] = [];
 
 const SPLIT_STORAGE_KEYS: Record<SplitAxis, string> = { columns: "omp-agents.split-columns", rows: "omp-agents.split-rows" };
 
 function readSplitRatios(): SplitRatios {
-	const read = (axis: SplitAxis): number => {
-		const value = Number(localStorage.getItem(SPLIT_STORAGE_KEYS[axis]));
-		return value > 0 && value < 1 ? value : DEFAULT_SPLIT_RATIOS[axis];
-	};
+	const read = (axis: SplitAxis): number => storedNumber(SPLIT_STORAGE_KEYS[axis], value => value > 0 && value < 1, DEFAULT_SPLIT_RATIOS[axis]);
 	return { columns: read("columns"), rows: read("rows") };
 }
 
@@ -94,8 +92,6 @@ export interface Dashboard {
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
 export function useDashboard(): Dashboard {
 	const [state, dispatch] = useReducer(reduce, null, () => initialState(routeFromHash(location.hash), readSplitRatios()));
-	const stateRef = useRef(state);
-	stateRef.current = state;
 	const socketRef = useRef<WebSocket | null>(null);
 	const layoutRef = useRef(state.layout);
 	layoutRef.current = state.layout;
@@ -139,11 +135,10 @@ export function useDashboard(): Dashboard {
 
 	const end = useCallback(
 		async (instanceId: string, listed: string[]) => {
-			const sessionId = stateRef.current.hosts.find(host => host.instanceId === instanceId)?.sessionId ?? stateRef.current.lastHosts.get(instanceId)?.sessionId ?? null;
 			dispatch({ t: "end", instanceId });
 			try {
 				await request({ t: "end", instanceId });
-				dispatch({ t: "end-success", instanceId, sessionId, listed });
+				dispatch({ t: "end-success", instanceId, listed });
 			} finally {
 				dispatch({ t: "ended", instanceId });
 			}
@@ -159,24 +154,17 @@ export function useDashboard(): Dashboard {
 	const close = useCallback((index: number) => dispatch({ t: "panes", command: { kind: "close", index } }), []);
 	const resize = useCallback((axis: SplitAxis, ratio: number) => dispatch({ t: "panes", command: { kind: "resize", axis, ratio } }), []);
 
-	const writtenRevision = useRef(0);
 	useLayoutEffect(() => {
 		const write = state.historyWrite;
-		if (!write || write.revision <= writtenRevision.current) return;
-		writtenRevision.current = write.revision;
-		if (location.hash === write.hash) return;
+		if (!write || location.hash === write.hash) return;
 		const url = write.hash || location.pathname + location.search;
 		if (write.mode === "replace") history.replaceState(null, "", url);
 		else history.pushState(null, "", url);
 	}, [state.historyWrite]);
 
 	useEffect(() => {
-		for (const axis of ["columns", "rows"] as const) {
-			const ratio = state.splitRatios[axis];
-			if (ratio === DEFAULT_SPLIT_RATIOS[axis]) localStorage.removeItem(SPLIT_STORAGE_KEYS[axis]);
-			else localStorage.setItem(SPLIT_STORAGE_KEYS[axis], String(ratio));
-		}
-	}, [state.splitRatios]);
+		for (const axis of ["columns", "rows"] as const) storeOrRemove(SPLIT_STORAGE_KEYS[axis], String(state.splits.ratios[axis]), String(DEFAULT_SPLIT_RATIOS[axis]));
+	}, [state.splits.ratios]);
 
 	useEffect(() => {
 		// A start's answer settles it, then the panes follow the start as it was before.

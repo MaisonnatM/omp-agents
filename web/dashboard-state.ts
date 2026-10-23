@@ -16,7 +16,7 @@ import { applyDelta } from "./keyed-list";
 import type { Completions } from "./pane-store";
 import { changePanes, DEFAULT_SPLIT_RATIOS, type PaneCommand, type PaneNavigation, type SplitRatios } from "./pane-navigation";
 import type { ModelList } from "./reads";
-import { EMPTY_LAYOUT, endSession, hashForLayout, hashForPage, type Layout, type Page, type Route, sameView } from "./routing";
+import { EMPTY_LAYOUT, endSession, hashForLayout, hashForRoute, type Layout, type Page, type Route, sameView } from "./routing";
 import { beginStart, dismissSettled, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
 
 export interface DashboardState extends PaneNavigation {
@@ -29,9 +29,8 @@ export interface DashboardState extends PaneNavigation {
 	listed: boolean;
 	/** What the URL hash shows over the panes: a page, or a `#session/<id>` link until the session lists show where it runs; `null` for the panes. */
 	cover: Exclude<Route, { kind: "panes" }> | null;
-	/** The last outbound URL instruction. Incoming history never emits one. */
-	historyWrite: { revision: number; hash: string; mode: "push" | "replace" } | null;
-	historyRevision: number;
+	/** The last outbound URL instruction, a new object for each; incoming history never emits one. */
+	historyWrite: { hash: string; mode: "push" | "replace" } | null;
 	/** Last roster row seen for each open live session, by instance id, kept after it leaves the roster. */
 	lastHosts: Map<string, RosterHost>;
 	/** Starts of new, forked, resumed, and quick-action sessions, and of **Resume all**, by the `reqId` the server answers with. */
@@ -62,8 +61,8 @@ export interface DashboardState extends PaneNavigation {
 	merges: QueuedMerge[];
 	/** The review drafts the server keeps, posted ones too, empty until the server first sends them. */
 	reviewDrafts: ReviewDraft[];
-	/** The live sessions this page asked the server to end, by instance id, until it answers. */
-	ending: ReadonlySet<string>;
+	/** The live sessions this page asked the server to end, by instance id, with the session each ran then, until the server answers. */
+	ending: ReadonlyMap<string, string | null>;
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
@@ -74,7 +73,7 @@ export type Action =
 	| { t: "route"; route: Route }
 	| { t: "panes"; command: PaneCommand; replace?: boolean }
 	| { t: "navigate"; page: Page }
-	| { t: "end-success"; instanceId: string; sessionId: string | null; listed: string[] }
+	| { t: "end-success"; instanceId: string; listed: string[] }
 	| { t: "start"; reqId: number; op: StartOp }
 	/** Start `reqId` failed with no answer from the server: its request was refused or never sent. */
 	| { t: "start-failed"; reqId: number; error: string }
@@ -125,19 +124,18 @@ function withLayout(state: DashboardState, next: Layout): DashboardState {
 }
 
 function withPanes(state: DashboardState, command: PaneCommand): DashboardState {
-	const navigation = changePanes(state, command, state.hosts, state.lastHosts);
-	if (navigation === state) return state;
-	const retained = withLayout(state, navigation.layout);
-	if (retained === state && navigation.splitRatios === state.splitRatios && navigation.splitGroups === state.splitGroups && navigation.splitPending === state.splitPending) return state;
-	return { ...retained, splitRatios: navigation.splitRatios, splitGroups: navigation.splitGroups, splitPending: navigation.splitPending };
+	const { layout, splits } = changePanes(state, command, state.hosts, state.lastHosts);
+	const next = withLayout(state, layout);
+	return next.splits === splits ? next : { ...next, splits };
 }
 
+/** The route the URL hash names for `state`: the page or session link over the panes, else the panes. */
+export const routeOf = (state: Pick<DashboardState, "cover" | "layout">): Route => state.cover ?? { kind: "panes", layout: state.layout };
+
 function writeRoute(state: DashboardState, next: DashboardState, mode: "push" | "replace"): DashboardState {
-	const hash = next.cover?.kind === "page" ? hashForPage(next.cover.page) : hashForLayout(next.layout);
-	const previous = state.cover?.kind === "page" ? hashForPage(state.cover.page) : state.cover?.kind === "session" ? `#session/${encodeURIComponent(state.cover.sessionId)}` : hashForLayout(state.layout);
-	if (hash === previous) return next;
-	const revision = state.historyRevision + 1;
-	return { ...next, historyRevision: revision, historyWrite: { revision, hash, mode } };
+	const hash = hashForRoute(routeOf(next));
+	if (hash === hashForRoute(routeOf(state))) return next;
+	return { ...next, historyWrite: { hash, mode } };
 }
 
 export function reduce(state: DashboardState, action: Action): DashboardState {
@@ -152,12 +150,13 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		}
 		case "panes": {
 			const next = withPanes(state, action.command);
-			return writeRoute(state, { ...next, cover: null }, action.replace ? "replace" : "push");
+			return writeRoute(state, next.cover === null ? next : { ...next, cover: null }, action.replace ? "replace" : "push");
 		}
 		case "navigate":
 			return writeRoute(state, { ...state, cover: { kind: "page", page: action.page } }, "push");
 		case "end-success": {
-			const forgotten = action.sessionId === null ? state : withPanes(state, { kind: "forget-session", sessionId: action.sessionId });
+			const sessionId = state.ending.get(action.instanceId) ?? null;
+			const forgotten = sessionId === null ? state : withPanes(state, { kind: "forget-session", sessionId });
 			const eligible = new Set(state.hosts.filter(host => !state.ending.has(host.instanceId)).map(host => host.instanceId));
 			const layout = endSession(state.layout, action.instanceId, action.listed, eligible);
 			return writeRoute(state, { ...withPanes(forgotten, { kind: "edit", layout }), cover: null }, "push");
@@ -170,11 +169,14 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		}
 		case "dismiss-start":
 			return { ...state, starts: dismissSettled(state.starts, action.kind) };
-		case "end":
-			return state.ending.has(action.instanceId) ? state : { ...state, ending: new Set(state.ending).add(action.instanceId) };
+		case "end": {
+			if (state.ending.has(action.instanceId)) return state;
+			const sessionId = state.hosts.find(host => host.instanceId === action.instanceId)?.sessionId ?? state.lastHosts.get(action.instanceId)?.sessionId ?? null;
+			return { ...state, ending: new Map(state.ending).set(action.instanceId, sessionId) };
+		}
 		case "ended": {
 			if (!state.ending.has(action.instanceId)) return state;
-			const ending = new Set(state.ending);
+			const ending = new Map(state.ending);
 			ending.delete(action.instanceId);
 			return { ...state, ending };
 		}
@@ -182,8 +184,7 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, newSessionCompletions: action.completions };
 		case "roster": {
 			const hosts = applyDelta(state.hosts, action.reset, action.hosts, host => host.instanceId, action.removed);
-			const next = { ...state, hosts, rosterError: action.error, lastHosts: rememberHosts(state.lastHosts, hosts, state.layout) };
-			return withPanes(next, { kind: "sources" });
+			return { ...state, hosts, rosterError: action.error, lastHosts: rememberHosts(state.lastHosts, hosts, state.layout) };
 		}
 		case "past":
 			return { ...state, past: applyDelta(state.past, action.reset, action.sessions, session => session.sessionId, action.removed).sort(newestPastFirst), listed: true };
@@ -235,8 +236,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 }
 
 /** The state of a page that has just loaded at `route`. */
-export function initialState(route: Route, splitRatios: SplitRatios = DEFAULT_SPLIT_RATIOS): DashboardState {
-	const state: DashboardState = {
+export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_RATIOS): DashboardState {
+	return {
 		connected: false,
 		hosts: [],
 		rosterError: null,
@@ -244,11 +245,8 @@ export function initialState(route: Route, splitRatios: SplitRatios = DEFAULT_SP
 		listed: false,
 		cover: route.kind === "panes" ? null : route,
 		layout: route.kind === "panes" ? route.layout : EMPTY_LAYOUT,
-		splitRatios,
-		splitGroups: [],
-		splitPending: route.kind === "panes" && route.layout.panes.length > 1,
+		splits: { ratios, groups: [] },
 		historyWrite: null,
-		historyRevision: 0,
 		lastHosts: new Map(),
 		starts: new Map(),
 		newSessionCompletions: null,
@@ -264,7 +262,6 @@ export function initialState(route: Route, splitRatios: SplitRatios = DEFAULT_SP
 		notices: [],
 		merges: [],
 		reviewDrafts: [],
-		ending: new Set(),
+		ending: new Map(),
 	};
-	return withPanes(state, { kind: "sources" });
 }

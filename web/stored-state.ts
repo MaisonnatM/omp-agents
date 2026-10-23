@@ -18,6 +18,21 @@ if (typeof window !== "undefined") window.addEventListener("storage", event => {
 	else raws.set(event.key, event.newValue);
 });
 
+/** Stores `value` under `key`, or removes the key when `value` is the default, so a value reset to it follows the default if it changes. */
+export function storeOrRemove(key: string, value: string, defaultValue: string): void {
+	const kept = value === defaultValue ? null : value;
+	if (kept === null) localStorage.removeItem(key);
+	else localStorage.setItem(key, kept);
+	raws.set(key, kept);
+}
+
+/** The number localStorage keeps under `key` when `valid` takes it, else `fallback`. */
+export function storedNumber(key: string, valid: (value: number) => boolean, fallback: number): number {
+	const raw = readRaw(key);
+	const value = Number(raw);
+	return raw !== null && valid(value) ? value : fallback;
+}
+
 /**
  * A value that localStorage keeps under `key`, and its setter, which stores it at once and stays the same function
  * across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored, is the
@@ -35,11 +50,7 @@ export function useStoredState<T>(key: string, decode: (raw: string | null) => T
 		(next: T | ((prev: T) => T)): void => {
 			const { decode, encode } = codec.current;
 			const resolved = typeof next === "function" ? (next as (prev: T) => T)(decode(readRaw(key))) : next;
-			const encoded = encode(resolved);
-			const kept = encoded === encode(decode(null)) ? null : encoded;
-			if (kept === null) localStorage.removeItem(key);
-			else localStorage.setItem(key, kept);
-			raws.set(key, kept);
+			storeOrRemove(key, encode(resolved), encode(decode(null)));
 		},
 		[key],
 	);

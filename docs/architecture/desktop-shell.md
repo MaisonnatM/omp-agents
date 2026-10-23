@@ -23,7 +23,7 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
   An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the MCP sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
 - The page runs with context isolation and the sandbox on, and gets no Node or Electron API.
   Its preload, `desktop/preload.ts`, hands it only `window.ompDesktop`, the `DesktopBridge` of `src/shared/desktop-bridge.ts`, whose `badge`, `alert`, and `ownsClose` send one IPC message each; see [Session notifications](notifications.md#session-notifications).
-  Its `onTargetURL` receives the address of the link under the pointer or keyboard focus from the window's `update-target-url` event, and an empty string when the window blurs or navigates.
+  Its `onTargetURL`, absent in an app built before it, receives the address of the link under the pointer or keyboard focus from the window's `update-target-url` event, and an empty string when the window blurs or navigates.
   The main process takes each one only from the window's own dashboard frame.
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
