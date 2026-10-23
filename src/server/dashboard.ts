@@ -32,6 +32,7 @@ import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, inte
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
+import { rebasePullRequest } from "../pull-request-rebase";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
@@ -591,6 +592,7 @@ export class Dashboard {
 				previewReviewDraft: pr => this.#reviewDrafts.preview(pr),
 				postReviewDraft: (pr, submit) => this.#reviewDrafts.post(pr, submit),
 				checkOutPullRequest: checkout => checkOutPullRequest(checkout, this.#startSession),
+				rebasePullRequest,
 			},
 			dashboard: this.#selfUpdate,
 			sync: this.#settingsSync,

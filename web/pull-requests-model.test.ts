@@ -27,6 +27,7 @@ import {
 	sectionTitles,
 	shownBoardPullRequests,
 	shownPullRequests,
+	rebaseOrder,
 	sessionStack,
 	stepTarget,
 	withPullRequestState,
@@ -49,7 +50,9 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	additions: 0,
 	deletions: 0,
 	head: `me/branch-${number}`,
+	base: "main",
 	stackedOn: null,
+	behind: false,
 	unresolved: { count: 0, exact: true },
 	conversations: 0,
 	updatedAt: number,
@@ -539,5 +542,37 @@ describe("lineCommentsBlocked", () => {
 		expect(lineCommentsBlocked("c1", draft("old"), "abc")).toBe("Line comments are written from All commits.");
 		expect(lineCommentsBlocked(null, draft("old"), "abc")).toBe("The Review draft is posted or belongs to an older head. Discard it before adding comments.");
 		expect(lineCommentsBlocked(null, draft("abc", { id: 7, url: "u", at: 2 }), "abc")).toBe("The Review draft is posted or belongs to an older head. Discard it before adding comments.");
+	});
+});
+
+describe("rebaseOrder", () => {
+	const numbers = (prs: PullRequestSummary[]) => rebaseOrder(prs).map(({ number }) => number);
+	const above = (number: number, below: number, fields: Partial<PullRequestSummary> = {}) => pr(number, { base: `me/branch-${below}`, stackedOn: `me/branch-${below}`, ...fields });
+
+	test("takes your open pull requests behind their base, without conflicts", () => {
+		const prs = [
+			pr(1, { behind: true }),
+			pr(2),
+			pr(3, { behind: true, conflicts: true }),
+			pr(4, { behind: true, role: "reviewer" }),
+			pr(5, { behind: false, state: "merged" }),
+			pr(6, { behind: true, state: "draft" }),
+		];
+		expect(numbers(prs)).toEqual([1, 6]);
+	});
+
+	test("adds the pull requests stacked above one it takes, up to one with conflicts", () => {
+		const prs = [pr(1, { behind: true }), above(2, 1), above(3, 2), above(4, 3, { conflicts: true }), above(5, 4), above(7, 1, { state: "merged" })];
+		expect(numbers(prs)).toEqual([1, 2, 3]);
+	});
+
+	test("rebases the bottom of a stack before what sits on it, otherwise in list order", () => {
+		const prs = [above(3, 2), pr(9, { behind: true }), above(2, 1, { behind: true }), pr(1, { behind: true }), above(4, 1)];
+		expect(numbers(prs)).toEqual([9, 1, 2, 4, 3]);
+	});
+
+	test("ends on a cycle of bases", () => {
+		const prs = [above(1, 2, { behind: true }), above(2, 1)];
+		expect(numbers(prs)).toEqual([1, 2]);
 	});
 });

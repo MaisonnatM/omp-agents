@@ -67,7 +67,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - System notifications of sessions that ask or finish, and the desktop app's Dock badge: `useAttention` in `web/use-attention.ts`, shown by `desktop/attention.ts` in the desktop app; their switch is `SessionNotifications` in `web/components/settings/preferences-tab.tsx`.
 - Pages, each routed by `web/routing.ts`:
   - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, with the board above its composer, `NewSessionBoard` in `new-session-board.tsx`, which lists what `web/new-session-board-model.ts` picks.
-  - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
+  - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button at its top, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
   - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.

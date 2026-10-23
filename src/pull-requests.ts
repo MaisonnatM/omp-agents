@@ -24,7 +24,7 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }`;
 
 const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision mergeable headRefName baseRefName updatedAt mergedAt additions deletions
+	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName updatedAt mergedAt additions deletions
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -123,7 +123,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 	const parsed = parsePullRequestHead(node);
 	const updatedAt = Date.parse(str(node.mergedAt) ?? str(node.updatedAt) ?? "");
 	if (!parsed || Number.isNaN(updatedAt)) return null;
-	const { base, state, ...head } = parsed;
+	const { state, ...head } = parsed;
 	// GitHub's search index lags a close by up to a minute, so `is:open` can still return a pull request whose own state says closed.
 	if (state === "closed") return null;
 	const repository = isObject(node.repository) ? node.repository : {};
@@ -135,7 +135,8 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 		...head,
 		state,
 		role,
-		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
+		stackedOn: defaultBranch !== undefined && head.base !== defaultBranch ? head.base : null,
+		behind: state !== "merged" && node.viewerCanUpdateBranch === true,
 		updatedAt,
 		conversations: totalOf(node.comments) + totalOf(node.reviewThreads),
 	};

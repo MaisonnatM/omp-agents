@@ -56,3 +56,15 @@ test("run hands the child this process's environment as it is now, such as the t
 	expect((await run(["/bin/sh", "-c", 'echo "$PI_CODING_AGENT_DIR"'])).stdout).toBe(`${process.env.PI_CODING_AGENT_DIR}\n`);
 	expect((await run(["/bin/sh", "-c", 'echo "$PI_CODING_AGENT_DIR"'], { env: { PI_CODING_AGENT_DIR: "/elsewhere" } })).stdout).toBe("/elsewhere\n");
 });
+
+test("run with `child` hides the server's own PORT and keeps what `env` adds", async () => {
+	const saved = process.env.PORT;
+	process.env.PORT = "4317";
+	try {
+		expect((await run(["/bin/sh", "-c", 'echo "[$PORT][$EXTRA]"'], { child: true, env: { EXTRA: "kept" } })).stdout).toBe("[][kept]\n");
+		expect((await run(["/bin/sh", "-c", 'echo "[$PORT]"'])).stdout).toBe("[4317]\n");
+	} finally {
+		if (saved === undefined) delete process.env.PORT;
+		else process.env.PORT = saved;
+	}
+});

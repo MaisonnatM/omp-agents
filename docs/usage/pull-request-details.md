@@ -28,6 +28,7 @@
   Rows keep their popover confirmation and **Queued** or **Stopped** badge.
   The server keeps merges in `merges.json` beside its access token and resumes them after a restart.
   The `⋯` menu starts with the quick actions, including fixes for CI, conflicts, and review comments.
+  On your own open pull request without conflicts that the Pull requests page lists as behind its base, **Rebase on main**, named after its base, follows them, as in a row's `⋯` menu, and the details read the pull request again once it ends.
   Next come the merge methods, **Ready for review** or **Convert to draft**, links to GitHub and Graphite, **Copy link**, and **Copy PR number**.
   A method picked there applies to this pull request's merge button; **Last selected** in Settings remembers it only once you confirm a merge with it.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.

@@ -49,6 +49,7 @@ import {
 	type PullRequestCheckout,
 	type PullRequestChange,
 	type PullRequestEdit,
+	type PullRequestRebase,
 	type PullRequestViewedEdit,
 	type PullRequestImage,
 	type Repo,
@@ -542,6 +543,13 @@ export function parsePullRequestCheckout(body: unknown): Parsed<PullRequestCheck
 	const pr = parsePullRequest(body.owner, body.repo, body.number);
 	const skill = parseSkill(body.skill);
 	return pr && skill && { ok: { ...pr.ok, cwd: body.cwd, place: body.place, skill: skill.ok } };
+}
+
+/** The body of `PUT /api/pull-request/rebase`, with `cwd` an absolute directory. */
+export function parsePullRequestRebase(body: unknown): Parsed<PullRequestRebase> {
+	if (!isObject(body) || !isNonEmpty(body.cwd) || !body.cwd.startsWith("/")) return null;
+	const pr = parsePullRequest(body.owner, body.repo, body.number);
+	return pr && { ok: { ...pr.ok, cwd: body.cwd } };
 }
 
 /** The body of `PUT /api/source-control`. */

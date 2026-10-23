@@ -3,6 +3,7 @@
  * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, and the dashboard's own update.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
+import type { Server } from "bun";
 import { join } from "node:path";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
@@ -34,7 +35,7 @@ import { ClientConfigError } from "../mcp-clients";
 import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
-import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, type PullRequestCheckout, prKey, type Repo } from "../shared/github";
+import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, type PullRequestCheckout, type PullRequestRebase, prKey, type RebasedPullRequest, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
 import type { ProjectNotesAnswer } from "../shared/projects";
 import { parseProcessSettings, type ProcessSettings, type ProcessStop, type SessionProcesses } from "../shared/processes";
@@ -57,7 +58,7 @@ import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
 	MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
-	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
+	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
 } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
@@ -156,7 +157,7 @@ export interface ProcessRoutesEnv {
 	changeSettings(settings: ProcessSettings): ProcessSettings;
 }
 
-/** What the pull request routes hand on: the merge queue, through which every merge goes, review drafts, and checkouts, which can start a session. */
+/** What the pull request routes hand on: the merge queue, through which every merge goes, review drafts, checkouts, which can start a session, and rebases, one repository at a time. */
 export interface PullRequestRoutesEnv {
 	/** Apply `change` to the merge queue; answers the queued merges after it and what it merged, or rejects with why it refused. */
 	changeMergeQueue(change: MergeQueueChange): Promise<MergeQueueAnswer>;
@@ -166,9 +167,12 @@ export interface PullRequestRoutesEnv {
 	postReviewDraft(pr: PullRequest, submit?: ReviewSubmit): Promise<ReviewDraft>;
 	/** Checks out the pull request at its place, a worktree with a new session on it or the checkout itself; rejects with why it refused. */
 	checkOutPullRequest(checkout: PullRequestCheckout): Promise<CheckedOutPullRequest>;
+	/** Rebases the pull request's branch onto its base and pushes it through the repository's pre-push hook; rejects with why it refused or failed. */
+	rebasePullRequest(rebase: PullRequestRebase): Promise<RebasedPullRequest>;
 }
 
-type Handler = (req: Request) => Promise<Response>;
+/** A route's handler; Bun passes its server, whose `timeout` lifts a slow request's idle timeout. */
+type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) => Promise<Response>;
 /** HTTP handlers by path and method, as `Bun.serve` takes them. */
 export type Routes = Record<string, Partial<Record<"GET" | "PUT", Handler>>>;
 
@@ -757,11 +761,31 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 		err => fail(409, errorText(err)),
 	);
 
+	const rebaseWrite = write(
+		async body => {
+			const rebase = checked(parsePullRequestRebase(body), "Expected { owner, repo, number, cwd } with cwd an absolute directory");
+			if (rebase instanceof Response) return rebase;
+			const cwd = await directoryOf(rebase.cwd);
+			return cwd ? { ...rebase, cwd } : fail(404, `${rebase.cwd.trim()} is not a directory.`);
+		},
+		env.rebasePullRequest,
+		err => fail(409, errorText(err)),
+	);
+	/**
+	 * `PUT /api/pull-request/rebase`: `PullRequestRebase`; answers a `RebasedPullRequest`, or 409 with why it refused or failed.
+	 * Its push runs the repository's pre-push hook, which can take minutes, past Bun's idle timeout, so the request has none.
+	 */
+	const pullRequestRebase: Handler = (req, server) => {
+		server.timeout(req, 0);
+		return rebaseWrite(req, server);
+	};
+
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/github-media": { GET: githubMedia },
 		"/api/pull-request/attachment": { PUT: pullRequestAttach },
 		"/api/pull-request/checkout": { PUT: pullRequestCheckout },
+		"/api/pull-request/rebase": { PUT: pullRequestRebase },
 		"/api/pull-request/viewed": { PUT: pullRequestViewed },
 		"/api/merge-queue": { PUT: mergeQueue },
 		"/api/review-draft/preview": { GET: reviewDraftPreview },

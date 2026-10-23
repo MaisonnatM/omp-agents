@@ -2,7 +2,7 @@
  * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
  * is; or on a board, a column per section, with the details of the pull request it shows docked beside it.
  */
-import { Maximize2, X } from "lucide-react";
+import { Maximize2, RefreshCw, X } from "lucide-react";
 import { type PullRequest, repoKey } from "../../../src/shared/github";
 import { type PullRequestDetailTab, pullRequestTabHash, usePagePullRequestTabs } from "../../pull-request-tabs";
 import { useState } from "react";
@@ -14,7 +14,9 @@ import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
+import { useRebasing } from "../../pull-request-rebases";
 import { DROP_LINE } from "../../use-drag-order";
+import { useInlineConfirm } from "../../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
@@ -142,6 +144,26 @@ function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: strin
 	);
 }
 
+/**
+ * **Rebase behind**: once you confirm, rebases each of your pull requests behind its base, with the stacks above them,
+ * bottom first. It waits while any rebase is queued or running; nothing shows while none is behind.
+ */
+function RebaseBehindButton({ pulls }: { pulls: PullRequests }) {
+	const rebasing = useRebasing();
+	const confirm = useInlineConfirm("rebase-behind");
+	const count = pulls.behind.length;
+	if (count === 0) return null;
+	const armed = confirm.isArmed("rebase");
+	const label = rebasing ? "Rebasing…" : armed ? `Confirm rebase of ${count}?` : `Rebase ${count} behind`;
+	return (
+		<Tooltip content="Rebase each of your pull requests behind its base, and the ones stacked on them, bottom first: each runs the repository's pre-push checks and pushes with --force-with-lease" forceOpen={armed ? false : undefined}>
+			<Button size="compact" variant="outline" leadingIcon={RefreshCw} disabled={rebasing} aria-label={label} {...confirm.props("rebase", pulls.onRebaseBehind)}>
+				{label}
+			</Button>
+		</Tooltip>
+	);
+}
+
 interface PullRequestsPageProps {
 	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
 	workspace: string | null;
@@ -191,6 +213,7 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 					actions={
 						<>
 							<UnmatchedTip unmatched={unmatched} />
+							<RebaseBehindButton pulls={pulls} />
 							<SegmentedTabs value={view} onValueChange={next => onView(next as PullRequestsView)} activationMode="manual">
 								<SegmentedTabsList aria-label="View">
 									<SegmentedTab value="list">List</SegmentedTab>
