@@ -151,8 +151,12 @@ export interface PullRequestSummary extends PullRequest {
 	additions: number;
 	deletions: number;
 	head: string;
+	/** The branch it merges into. */
+	base: string;
 	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
 	stackedOn: string | null;
+	/** Its base has commits its branch lacks and you may update the branch: GitHub's `viewerCanUpdateBranch`, true with conflicts too, false once merged. */
+	behind: boolean;
 	/** Review threads not yet resolved. `exact` is false when GitHub listed only some threads, so `count` is a floor. */
 	unresolved: { count: number; exact: boolean };
 	/** Comments and review threads, resolved ones too, as GitHub's own list counts its conversation. */
@@ -188,7 +192,9 @@ const isSummary = fields<PullRequestSummary>({
 	additions: isNumber,
 	deletions: isNumber,
 	head: isString,
+	base: isString,
 	stackedOn: nullable(isString),
+	behind: isBoolean,
 	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean }),
 	conversations: isNumber,
 	updatedAt: isNumber,
@@ -430,6 +436,17 @@ export type CheckedOutPullRequest = {
 	/** The branch is at the pull request's latest commit; local commits keep it where it is. */
 	onHead: boolean;
 } & ({ place: "here" } | { place: "worktree"; instanceId: string });
+
+/** The body of `PUT /api/pull-request/rebase`: pull request `number` of `owner/repo`, rebased onto its base from `cwd`, a checkout of its repository. */
+export interface PullRequestRebase extends PullRequest {
+	cwd: string;
+}
+
+/**
+ * What `PUT /api/pull-request/rebase` did to branch `branch` on base `onto`: pushed it rebased, found its base already in
+ * it, or stopped at a conflict in `files` and left it as it was, for **Resolve conflicts** to take over.
+ */
+export type RebasedPullRequest = { branch: string; onto: string } & ({ kind: "rebased" } | { kind: "current" } | { kind: "conflict"; files: string[] });
 
 /** What the details' Labels and Reviewers pickers offer for a repository. */
 export interface PullRequestOptions {

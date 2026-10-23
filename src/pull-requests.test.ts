@@ -95,7 +95,7 @@ test("a workspace removed after its origin was read leaves the pull request list
 });
 
 describe("parseListAnswer", () => {
-	test("maps GitHub's states, keeps a PR once, and names the base of a stacked PR", () => {
+	test("maps GitHub's states, keeps a PR once, names the base of a stacked PR, and counts a merged PR as never behind", () => {
 		const prs = parseListAnswer(
 			{
 				data: {
@@ -103,6 +103,7 @@ describe("parseListAnswer", () => {
 						nodes: [
 							node(1, {
 								baseRefName: "me/branch-0",
+								viewerCanUpdateBranch: true,
 								additions: 587,
 								deletions: 125,
 								reviewDecision: "APPROVED",
@@ -113,7 +114,7 @@ describe("parseListAnswer", () => {
 						],
 					},
 					reviewing: { nodes: [node(3, { author: { login: "teammate", avatarUrl: null }, reviewDecision: "CHANGES_REQUESTED" }), node(1, {})] },
-					merged: { nodes: [node(4, { state: "MERGED", mergedAt: "2026-09-30T08:00:00Z" })] },
+					merged: { nodes: [node(4, { state: "MERGED", mergedAt: "2026-09-30T08:00:00Z", viewerCanUpdateBranch: true })] },
 				},
 			},
 			repo,
@@ -133,7 +134,9 @@ describe("parseListAnswer", () => {
 				additions: 587,
 				deletions: 125,
 				head: "me/branch-1",
+				base: "me/branch-0",
 				stackedOn: "me/branch-0",
+				behind: true,
 				unresolved: { count: 0, exact: true },
 				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -152,7 +155,9 @@ describe("parseListAnswer", () => {
 				additions: 0,
 				deletions: 0,
 				head: "me/branch-2",
+				base: "main",
 				stackedOn: null,
+				behind: false,
 				unresolved: { count: 0, exact: true },
 				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -171,7 +176,9 @@ describe("parseListAnswer", () => {
 				additions: 0,
 				deletions: 0,
 				head: "me/branch-3",
+				base: "main",
 				stackedOn: null,
+				behind: false,
 				unresolved: { count: 0, exact: true },
 				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -190,7 +197,9 @@ describe("parseListAnswer", () => {
 				additions: 0,
 				deletions: 0,
 				head: "me/branch-4",
+				base: "main",
 				stackedOn: null,
+				behind: false,
 				unresolved: { count: 0, exact: true },
 				conversations: 0,
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
