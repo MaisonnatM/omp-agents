@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { commands } from "./agent/extensions/shell/commands";
 
 // Imported by path, not statically: a static import pulls the extension into `tsc`, where its `@oh-my-pi/pi-coding-agent` import does not resolve.
 const extension: {
-	commands(line: string): string[][];
 	ghPr(words: string[], sub: "create" | "ready"): string[] | undefined;
 	prSelector(args: string[]): string[];
 	selectorOwner(selector: string[]): string | undefined;
@@ -12,7 +12,7 @@ const extension: {
 	CHECKBOX: string;
 	PROOF_BOX: string;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
-const { commands, ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, CHECKBOX, PROOF_BOX } = extension;
+const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, CHECKBOX, PROOF_BOX } = extension;
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
 function readySelectors(line: string): string[][] {
