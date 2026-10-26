@@ -19,9 +19,13 @@ The installer:
 - applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
 - adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there.
 
-A file or a setting that you already have keeps your version, and the installer lists it as `keep yours`.
-Pass `--force` to overwrite those with the kit's version.
-Running the installer again changes nothing that already matches.
+The installer records each installed file's SHA-256 hash by relative path in `.omp-template-files.json` in your omp agent directory.
+An unedited installed file takes the kit's newer version automatically.
+A local edit, a differing file with no recorded hash, or a setting you already chose stays as `keep yours`; pass `--force` to replace it.
+An existing file that already matches the kit is recorded too, so current installations can opt into future updates without overwriting anything.
+Older differing files with no recorded hash stay protected; the installer does not infer ownership from Git history.
+`--dry-run` writes neither files nor hashes.
+Running the installer again leaves matching content alone.
 
 Restart running omp sessions to pick up the new files and settings.
 

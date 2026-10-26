@@ -1,8 +1,9 @@
 /**
  * Installs the omp starter kit: copies `agent/` into the omp agent directory and applies `config.yml` through
- * `omp config set`, so omp writes every setting and leaves the rest of your config alone. A file or a setting you
- * already have keeps your version unless you pass `--force`. `--maintainer` copies `maintainer/` on top, and a
- * file there replaces the `agent/` file with the same relative path.
+ * `omp config set`, so omp writes every setting and leaves the rest of your config alone. Files it installed update
+ * while unedited; local edits and preexisting differing files stay unless you pass `--force`. Settings you already
+ * chose also stay without `--force`. `--maintainer` copies `maintainer/` on top, and a file there replaces the
+ * `agent/` file with the same relative path.
  *
  *   bun run omp-template [--dry-run] [--force] [--maintainer]
  */
@@ -10,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { deepEquals, Glob } from "bun";
+import { atomicWriteText } from "../../src/fs";
 import { errorText, isObject } from "../../src/json";
 
 type Json = Record<string, unknown>;
@@ -66,6 +68,59 @@ export function planValue(current: unknown, value: unknown, force: boolean): Act
 	return force ? "update" : "keep";
 }
 
+interface FileStep extends KitFile {
+	dest: string;
+	current: string | undefined;
+	action: Action;
+}
+
+interface FilePlan {
+	files: FileStep[];
+	statePath: string;
+	installed: Record<string, string>;
+}
+
+const digest = (text: string): string => new Bun.CryptoHasher("sha256").update(text).digest("hex");
+
+/** Only a per-path hash written by an earlier install authorizes replacing a differing file. */
+export function planFiles(files: KitFile[], agentDir: string, force: boolean): FilePlan {
+	const statePath = join(agentDir, ".omp-template-files.json");
+	const installed: unknown = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+	if (!isObject(installed) || Array.isArray(installed)) throw new Error(`${statePath} does not hold installed file hashes`);
+	const hashes: Record<string, string> = {};
+	for (const [rel, hash] of Object.entries(installed)) {
+		if (typeof hash !== "string" || !/^[a-f0-9]{64}$/.test(hash)) throw new Error(`${statePath} does not hold installed file hashes`);
+		hashes[rel] = hash;
+	}
+	return {
+		statePath,
+		installed: hashes,
+		files: files.map(file => {
+			const dest = join(agentDir, file.rel);
+			const current = existsSync(dest) ? readFileSync(dest, "utf8") : undefined;
+			const unchanged = current !== undefined && Object.hasOwn(hashes, file.rel) && hashes[file.rel] === digest(current);
+			return { ...file, dest, current, action: planValue(current, file.text, force || unchanged) };
+		}),
+	};
+}
+
+/** Record only successfully installed or already-equal files; a kept local edit never becomes the baseline. */
+export async function installFiles({ files, statePath, installed }: FilePlan): Promise<void> {
+	for (const file of files) {
+		if (file.action === "keep") continue;
+		const current = existsSync(file.dest) ? readFileSync(file.dest, "utf8") : undefined;
+		if (current !== file.current) throw new Error(`${file.dest} changed after planning; run the installer again`);
+		if (file.action === "create" || file.action === "update") {
+			mkdirSync(dirname(file.dest), { recursive: true });
+			writeFileSync(file.dest, file.text);
+		}
+		const hash = digest(file.text);
+		if (Object.hasOwn(installed, file.rel) && installed[file.rel] === hash) continue;
+		installed[file.rel] = hash;
+		await atomicWriteText(statePath, `${JSON.stringify(installed, null, "\t")}\n`);
+	}
+}
+
 /** A YAML file's top-level mapping; an empty file reads as none. */
 function readYamlMapping(path: string): Json {
 	const parsed: unknown = Bun.YAML.parse(readFileSync(path, "utf8"));
@@ -118,10 +173,8 @@ async function main(argv: string[]): Promise<void> {
 
 	const layers = [layerFiles(join(kit, "agent"))];
 	if (maintainer) layers.push(layerFiles(join(kit, "maintainer")));
-	const files = overlayFiles(layers).map(file => {
-		const dest = join(agentDir, file.rel);
-		return { ...file, dest, action: planValue(existsSync(dest) ? readFileSync(dest, "utf8") : undefined, file.text, force) };
-	});
+	const filePlan = planFiles(overlayFiles(layers), agentDir, force);
+	const { files } = filePlan;
 	for (const file of files) print(file.action, `file ${file.rel}`);
 
 	const listed: unknown = JSON.parse(await omp(["config", "list", "--json"]));
@@ -144,10 +197,7 @@ async function main(argv: string[]): Promise<void> {
 	}
 
 	const writes = (action: Action): boolean => action === "create" || action === "update";
-	for (const file of files.filter(f => writes(f.action))) {
-		mkdirSync(dirname(file.dest), { recursive: true });
-		writeFileSync(file.dest, file.text);
-	}
+	await installFiles(filePlan);
 	for (const { target, value } of settings.filter(s => writes(s.action))) {
 		await omp(["config", "set", target, typeof value === "object" ? JSON.stringify(value) : String(value)]);
 	}

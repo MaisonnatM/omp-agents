@@ -46,3 +46,4 @@ Tools that read a doc cut a line at 768 characters, and an edit that copies the 
 
 After you edit an installed file under `~/.omp/agent/` that `templates/omp/` also holds, copy it into the matching file there; [Starter kit and docs](docs/code-layout/starter-kit-and-docs.md) says which of `agent/` and `maintainer/` holds it.
 `bun run omp-template --dry-run` lists a copy that has drifted as `keep yours`.
+An unedited file that still matches its recorded `.omp-template-files.json` hash updates automatically; an already-equal file is recorded on the next non-dry install.

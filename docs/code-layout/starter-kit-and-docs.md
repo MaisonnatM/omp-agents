@@ -1,6 +1,8 @@
 # Starter kit and docs
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
+The installer records per-path file hashes in the agent directory's `.omp-template-files.json`, updates files that still match their installed hash, adopts already-equal files, and leaves local edits and differing untracked files alone without `--force`.
+`templates/omp/install.test.ts` covers successive file upgrades, preserved edits, exact-match adoption, force, and planning without writes, alongside layered files and settings.
 Its `agent/` files are the default kit.
 `templates/omp/README.md` lists what each of its extensions does.
 `agent/extensions/google-accounts.ts` tells a session which Google account each Gmail and Google Calendar MCP server signs in as, and which addresses its workspace links; `templates/omp/google-accounts.test.ts` tests its workspace lookup against a real repository and a linked worktree outside it, and its prompt text, and `templates/omp/extensions.test.ts` runs its hook on scratch files.
