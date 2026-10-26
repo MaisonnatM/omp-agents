@@ -5,13 +5,20 @@
 import { mkdir, readdir, readFile, realpath, rm, rmdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
-import { atomicWriteText, JsonFile } from "./fs";
-import { errorText, isObject, parseJson } from "./json";
+import { atomicWriteText, JsonFile, type ReducerFile } from "./fs";
+import { errorText, isObject, type Parsed, parseJson } from "./json";
 import { SerialLane } from "./serial-lane";
-import { DEFAULT_SYNC_SETTINGS, isSyncOutcome, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncItem, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip } from "./shared/settings-sync";
+import type { HiddenCalendars } from "./server/calendars-file";
+import type { ListKind } from "./server/list-registry";
+import type { PagePreferences } from "./shared/preferences";
+import type { ProcessSettings } from "./shared/processes";
+import { DEFAULT_SYNC_SETTINGS, isSyncOutcome, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncItem, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip, type SyncStoreId } from "./shared/settings-sync";
 import type { SourceControlSettings } from "./shared/source-control";
+import type { WorkspaceList } from "./shared/workspaces";
 import { parseSourceControlSettings, type SourceControl } from "./source-control";
 import { plainPath, type RepoFile, SyncRepo } from "./sync-repo";
+import type { UserNoteList } from "./user-notes-shared";
+import type { UserTodoList } from "./user-todos-shared";
 
 /** `path` with `home` shortened to `~`, as every machine names it. */
 export const portablePath = (path: string, home: string): string => (path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path);
@@ -57,8 +64,65 @@ export function canonicalJson(value: unknown): string {
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
 
-/** Merges JSON values key by key where both sides changed an object; `undefined` is an absent key, and `null` the conflict. */
-function mergeJson(base: unknown, local: unknown, remote: unknown, prefer: SyncSide | undefined): { ok: unknown } | null {
+/**
+ * `entries` by the identity a list merges each by, in order: a string is its own, an object its string `id`. `null` when
+ * one has none or two share one, which leaves the list one value.
+ */
+function byIdentity(entries: readonly unknown[]): Map<string, unknown> | null {
+	const map = new Map<string, unknown>();
+	for (const entry of entries) {
+		const id = typeof entry === "string" ? `s:${entry}` : isPlainObject(entry) && typeof entry.id === "string" ? `o:${entry.id}` : undefined;
+		if (id === undefined || map.has(id)) return null;
+		map.set(id, entry);
+	}
+	return map;
+}
+
+const sameOrder = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((id, index) => id === b[index]);
+
+/**
+ * Merges three lists entry by entry. An entry on both sides merges with {@link mergeJson}; one a side added stays; one a
+ * side deleted goes, unless the other side changed it, which conflicts. The order follows the side that reordered the
+ * entries all three hold, and puts the other side's additions after the entry before each there.
+ */
+function mergeList(base: Map<string, unknown>, local: Map<string, unknown>, remote: Map<string, unknown>, prefer: SyncSide | undefined): { ok: unknown[] } | null {
+	const kept = new Map<string, unknown>();
+	for (const id of new Set([...local.keys(), ...remote.keys()])) {
+		if (local.has(id) && remote.has(id)) {
+			const entry = mergeJson(base.get(id), local.get(id), remote.get(id), prefer);
+			if (!entry) return null;
+			kept.set(id, entry.ok);
+			continue;
+		}
+		const side: SyncSide = local.has(id) ? "local" : "remote";
+		const entry = (side === "local" ? local : remote).get(id);
+		const changed = !base.has(id) || !Bun.deepEquals(entry, base.get(id));
+		if (changed && base.has(id) && !prefer) return null;
+		if (!base.has(id) || (changed && prefer === side)) kept.set(id, entry);
+	}
+	const shared = (side: Map<string, unknown>): string[] => [...side.keys()].filter(id => base.has(id) && local.has(id) && remote.has(id));
+	const [inBase, inLocal, inRemote] = [shared(base), shared(local), shared(remote)];
+	let lead: Map<string, unknown>;
+	if (sameOrder(inLocal, inBase)) lead = remote;
+	else if (sameOrder(inRemote, inBase) || sameOrder(inLocal, inRemote)) lead = local;
+	else if (prefer) lead = prefer === "local" ? local : remote;
+	else return null;
+	const merged = [...lead.keys()].filter(id => kept.has(id));
+	let cursor = -1;
+	for (const id of (lead === local ? remote : local).keys()) {
+		if (!kept.has(id)) continue;
+		const at = merged.indexOf(id);
+		if (at >= 0) cursor = at;
+		else merged.splice(++cursor, 0, id);
+	}
+	return { ok: merged.map(id => kept.get(id)) };
+}
+
+/**
+ * Merges JSON values key by key where both sides changed an object, and entry by entry where both changed a list whose
+ * entries each have their own identity; `undefined` is an absent key, and `null` the conflict.
+ */
+export function mergeJson(base: unknown, local: unknown, remote: unknown, prefer: SyncSide | undefined): { ok: unknown } | null {
 	if (Bun.deepEquals(local, remote)) return { ok: local };
 	if (Bun.deepEquals(local, base)) return { ok: remote };
 	if (Bun.deepEquals(remote, base)) return { ok: local };
@@ -72,13 +136,17 @@ function mergeJson(base: unknown, local: unknown, remote: unknown, prefer: SyncS
 		}
 		return { ok: merged };
 	}
+	if (Array.isArray(local) && Array.isArray(remote) && (base === undefined || Array.isArray(base))) {
+		const [from, mine, theirs] = [base ?? [], local, remote].map(byIdentity);
+		if (from && mine && theirs) return mergeList(from, mine, theirs, prefer);
+	}
 	return prefer ? { ok: prefer === "local" ? local : remote } : null;
 }
 
 /**
  * One file's three-way merge: `null` is a file that is absent. A side that did not change since `base` takes the other's;
- * two different changes conflict, unless `prefer` names the side to keep. With `json`, two changes to an object merge key
- * by key first.
+ * two different changes conflict, unless `prefer` names the side to keep. With `json`, two changes merge with
+ * {@link mergeJson} first.
  */
 export function mergeFile(base: Version, local: Version, remote: Version, json: boolean, prefer?: SyncSide): { ok: Version } | { conflict: true } {
 	if (same(local, remote)) return { ok: local };
@@ -136,8 +204,8 @@ export function planSync({ items, base, local, remote, skipped, choices }: SyncI
 /** A store the server holds in memory, as sync reads and replaces it, with its values in the form every machine keeps. */
 export interface SyncStore {
 	read(): unknown;
-	/** Whether `value`, from the remote, is one {@link write} takes. */
-	accepts(value: unknown): boolean;
+	/** `value`, from a merge or the remote, as {@link read} gives it once {@link write} took it; `null` for one it does not take. */
+	parse(value: unknown): Parsed<unknown>;
 	write(value: unknown): void;
 }
 
@@ -145,7 +213,10 @@ export interface SyncStore {
 export function sourceControlStore(store: SourceControl, home: string): SyncStore {
 	return {
 		read: () => ({ ...store.settings, repos: Object.fromEntries(Object.entries(store.settings.repos).map(([repo, on]) => [portablePath(repo, home), on])) }),
-		accepts: value => parseSourceControlSettings(value) !== null,
+		parse: value => {
+			const settings = parseSourceControlSettings(value);
+			return settings && { ok: settings };
+		},
 		write: value => {
 			const settings = parseSourceControlSettings(value) as SourceControlSettings;
 			store.replace({ ...settings, repos: Object.fromEntries(Object.entries(settings.repos).map(([repo, on]) => [localPath(repo, home), on])) });
@@ -153,11 +224,123 @@ export function sourceControlStore(store: SourceControl, home: string): SyncStor
 	};
 }
 
+/** What sync needs of a {@link ReducerFile}. */
+type SyncedFile<S> = Pick<ReducerFile<S, never>, "json" | "parse" | "replace">;
+
+/** How a file's JSON travels: `portable` turns it into what every machine keeps, and `local` turns that back. */
+interface Carriage {
+	portable(json: unknown): unknown;
+	local(json: unknown): unknown;
+}
+
+const AS_IS: Carriage = { portable: json => json, local: json => json };
+
+/** A store over `file`, carried as its file's JSON through `carriage`; `changed` runs after a write that changed what it reads. */
+function fileStore<S>(file: SyncedFile<S>, changed: () => void = () => {}, carriage: Carriage = AS_IS): SyncStore {
+	const read = (): unknown => carriage.portable(file.json());
+	return {
+		read,
+		parse: value => {
+			const parsed = file.parse(carriage.local(value));
+			return parsed === null ? null : { ok: carriage.portable(file.json(parsed)) };
+		},
+		write: value => {
+			const parsed = file.parse(carriage.local(value));
+			if (parsed === null) throw new Error("Sync cannot write a value its store does not keep");
+			if (Bun.deepEquals(carriage.portable(file.json(parsed)), read())) return;
+			file.replace(parsed);
+			changed();
+		},
+	};
+}
+
+/** One store over several, carried as an object of each one's value under its name. */
+function partsStore(parts: Readonly<Record<string, SyncStore>>): SyncStore {
+	const named = Object.entries(parts);
+	return {
+		read: () => Object.fromEntries(named.map(([name, part]) => [name, part.read()])),
+		parse: value => {
+			const ok: Record<string, unknown> = {};
+			for (const [name, part] of named) {
+				const parsed = part.parse(isPlainObject(value) ? value[name] : undefined);
+				if (!parsed) return null;
+				ok[name] = parsed.ok;
+			}
+			return { ok };
+		},
+		write: value => {
+			for (const [name, part] of named) part.write(isPlainObject(value) ? value[name] : undefined);
+		},
+	};
+}
+
+/** Notes by id: each edit moves its note first, so as a list two machines' edits of two notes would disagree on the order. */
+const NOTES_BY_ID: Carriage = {
+	portable: json => (isPlainObject(json) && Array.isArray(json.notes) ? { ...json, notes: Object.fromEntries(json.notes.map(note => [note.id, note])) } : json),
+	local: json => (isPlainObject(json) && isPlainObject(json.notes) ? { ...json, notes: Object.values(json.notes) } : json),
+};
+
+/** Each todo once, where the list first holds it: a todo two machines moved to two places arrives in both. */
+const TODOS_ONCE: Carriage = {
+	portable: json => json,
+	local: json => {
+		if (!isPlainObject(json)) return json;
+		const seen = new Set<unknown>();
+		const once = (todos: unknown): unknown =>
+			Array.isArray(todos)
+				? todos.flatMap(todo => {
+						if (!isPlainObject(todo)) return [todo];
+						if (seen.has(todo.id)) return [];
+						seen.add(todo.id);
+						return [Array.isArray(todo.children) ? { ...todo, children: once(todo.children) } : todo];
+					})
+				: todos;
+		return { ...json, todos: once(json.todos), archive: once(json.archive) };
+	},
+};
+
+/** The page's preferences, `{}` while no page has handed the server any. */
+const PAGE_VALUES: Carriage = {
+	portable: json => (isPlainObject(json) && isPlainObject(json.values) ? json.values : {}),
+	local: values => ({ values }),
+};
+
+/** Each directory of each list under `home` named from it. */
+function homePaths(home: string): Carriage {
+	const each = (json: unknown, path: (path: string, home: string) => string): unknown =>
+		isPlainObject(json) ? Object.fromEntries(Object.entries(json).map(([key, list]) => [key, Array.isArray(list) ? list.map(entry => (typeof entry === "string" ? path(entry, home) : entry)) : list])) : json;
+	return { portable: json => each(json, portablePath), local: json => each(json, localPath) };
+}
+
+/** The files sync carries beside omp's. */
+export interface SyncedFiles {
+	sourceControl: SourceControl;
+	notes: SyncedFile<UserNoteList>;
+	todos: SyncedFile<UserTodoList>;
+	preferences: SyncedFile<PagePreferences | null>;
+	processes: SyncedFile<ProcessSettings>;
+	workspaces: SyncedFile<WorkspaceList>;
+	calendars: SyncedFile<HiddenCalendars>;
+}
+
+/** Every store sync carries, over `files`; `changed` hears each list a sync rewrote, for the pages that show it. */
+export function syncStores(files: SyncedFiles, home: string, changed: (list: ListKind) => void): Record<SyncStoreId, SyncStore> {
+	return {
+		"source-control": sourceControlStore(files.sourceControl, home),
+		notes: fileStore(files.notes, () => changed("user-notes"), NOTES_BY_ID),
+		todos: fileStore(files.todos, () => changed("user-todos"), TODOS_ONCE),
+		preferences: partsStore({ page: fileStore(files.preferences, () => changed("preferences"), PAGE_VALUES), processes: fileStore(files.processes) }),
+		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
+		// The Calendar page asks for its calendars again, and the server reads which are hidden as it answers.
+		calendars: fileStore(files.calendars),
+	};
+}
+
 export interface SyncPlaces {
 	/** omp's agent directory, `~/.omp/agent`. */
 	omp: string;
 	home: string;
-	stores: Record<"source-control", SyncStore>;
+	stores: Record<SyncStoreId, SyncStore>;
 }
 
 type Read = { file: RepoFile } | { skip: SyncSkip["reason"] } | null;
@@ -182,7 +365,10 @@ async function readText(path: string, home: string): Promise<Read> {
 /** Where a file or directory under omp's agent directory lives here; a link at its top is followed, so a dotfiles link stays one. */
 const topOf = (path: string, places: SyncPlaces): Promise<string> => realpath(join(places.omp, path)).catch(() => join(places.omp, path));
 
-/** The portable files of `items` on this machine, by repository path, and those it leaves out: links, binaries, large files, and credentials. */
+/**
+ * The portable files of `items` on this machine, by repository path, and those it leaves out: links, binaries, large
+ * files, and credentials, a store's included.
+ */
 export async function readLocal(items: readonly SyncItem[], places: SyncPlaces): Promise<{ files: Map<string, RepoFile>; skipped: SyncSkip[] }> {
 	const files = new Map<string, RepoFile>();
 	const skipped: SyncSkip[] = [];
@@ -194,7 +380,8 @@ export async function readLocal(items: readonly SyncItem[], places: SyncPlaces):
 	for (const item of items) {
 		const { source } = item;
 		if (source.kind === "store") {
-			take(item.path, { file: { text: canonicalJson(places.stores[source.store].read()), executable: false } });
+			const text = canonicalJson(places.stores[source.store].read());
+			take(item.path, CREDENTIAL_SHAPES.some(shape => shape.test(text)) ? { skip: "credential" } : { file: { text, executable: false } });
 			continue;
 		}
 		const top = await topOf(source.path, places);
@@ -218,13 +405,20 @@ export async function readLocal(items: readonly SyncItem[], places: SyncPlaces):
 	return { files, skipped };
 }
 
-/** Writes `changes` here: a store through the server's own store, a file through an atomic replace, `null` as a delete. */
-export async function applyLocal(items: readonly SyncItem[], changes: ReadonlyMap<string, Version>, places: SyncPlaces): Promise<void> {
+/**
+ * Writes `changes` here: a store through the server's own store, a file through an atomic replace, `null` as a delete.
+ * `read` is what {@link readLocal} read before the sync: a store changed since keeps that change over the sync's.
+ */
+export async function applyLocal(items: readonly SyncItem[], changes: ReadonlyMap<string, Version>, places: SyncPlaces, read: ReadonlyMap<string, RepoFile>): Promise<void> {
 	for (const [path, file] of changes) {
 		const item = itemOf(items, path);
 		if (!item) continue;
 		if (item.source.kind === "store") {
-			if (file) places.stores[item.source.store].write(JSON.parse(file.text));
+			const store = places.stores[item.source.store];
+			const now = { text: canonicalJson(store.read()), executable: false };
+			const before = read.get(path) ?? null;
+			const kept = same(now, before) ? { ok: file } : mergeFile(before, now, file, true, "local");
+			if ("ok" in kept && kept.ok) store.write(JSON.parse(kept.ok.text));
 			continue;
 		}
 		const top = await topOf(item.source.path, places);
@@ -317,9 +511,18 @@ export class SettingsSync {
 		const at = Date.now();
 		const plan = planSync({ items, base, local: local.files, remote: remoteFiles, skipped: local.skipped.map(skip => skip.path), choices });
 		if (plan.conflicts) return { kind: "conflict", at, conflicts: plan.conflicts, skipped: local.skipped };
-		for (const [path, file] of plan.toLocal) {
+		// A merged list may not be in the form its store keeps, such as todos to do before done, so each side gets that form.
+		for (const path of new Set([...plan.toLocal.keys(), ...plan.toRemote.keys()])) {
 			const item = itemOf(items, path);
-			if (item?.source.kind === "store" && file && !this.#places.stores[item.source.store].accepts(parseJson(file.text))) throw new Error(`${path} on the remote is not ${item.label.toLowerCase()}`);
+			const file = plan.toLocal.get(path) ?? plan.toRemote.get(path);
+			if (item?.source.kind !== "store" || !file) continue;
+			const parsed = this.#places.stores[item.source.store].parse(parseJson(file.text));
+			if (!parsed) throw new Error(`${path} from the remote is not ${item.label.toLowerCase()}`);
+			const settled = { text: canonicalJson(parsed.ok), executable: false };
+			plan.toLocal.delete(path);
+			plan.toRemote.delete(path);
+			if (!same(settled, local.files.get(path))) plan.toLocal.set(path, settled);
+			if (!same(settled, remoteFiles.get(path))) plan.toRemote.set(path, settled);
 		}
 		// Pushing before writing here means a sync that stops halfway leaves this machine as the next sync expects to find it.
 		let applied = head;
@@ -327,8 +530,8 @@ export class SettingsSync {
 			applied = await repo.commit(head, plan.toRemote, `Sync from ${hostname()}`);
 			await repo.push(applied, branch);
 		}
-		await applyLocal(items, plan.toLocal, this.#places);
+		await applyLocal(items, plan.toLocal, this.#places, local.files);
 		if (applied) await repo.setRef(baseRef, applied);
-		return { kind: "synced", at, received: [...plan.toLocal.keys()], sent: [...plan.toRemote.keys()], skipped: local.skipped };
+		return { kind: "synced", at, received: [...plan.toLocal.keys()].sort(), sent: [...plan.toRemote.keys()].sort(), skipped: local.skipped };
 	}
 }

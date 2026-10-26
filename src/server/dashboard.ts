@@ -36,7 +36,7 @@ import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
-import { SettingsSync, sourceControlStore } from "../settings-sync";
+import { SettingsSync, syncStores } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -121,7 +121,7 @@ export class Dashboard {
 		onChange: () => this.#broadcasts.pushList("review-drafts"),
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
-	readonly #settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores: { "source-control": sourceControlStore(this.#sourceControl, HOME) } });
+	readonly #settingsSync: SettingsSync;
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
 	readonly #localEvents = new LocalEventsFile(localEventsFile);
@@ -177,6 +177,13 @@ export class Dashboard {
 		// An older version kept the workspace list in `projects.json`, so it moves first.
 		adoptOldWorkspaces(oldWorkspacesFile, workspacesFile);
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
+		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
+		const stores = syncStores(
+			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars },
+			HOME,
+			list => this.#broadcasts.pushList(list),
+		);
+		this.#settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores });
 		const files = this.#files;
 		const todos = this.#todos;
 		const notes = this.#notes;

