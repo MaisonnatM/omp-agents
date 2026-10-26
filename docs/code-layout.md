@@ -80,7 +80,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
     Settings › Activity, with its never-used, most-used, navigation, and active-time reports: `ActivityTab` in `web/components/settings/activity-tab.tsx`.
     Settings › Integrations' Google account lines, with **Add account**, **Remove**, and the workspace picker: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
-    Settings › Worktrees, with its **Merged** marks and **Remove merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`.
+    Settings › Worktrees, with its totals, filters, **Merged** and blocker badges, selection bar, and **Remove merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`.
     Settings › Sync, with its remote, **Sync** button, last outcome, conflict choices, and item switches: `SyncTab` in `web/components/settings/sync-tab.tsx`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry and some from shadcn's, with the shadcn utilities they need in `web/shadcn.css`; change them only as `web/components/ui/PATCHES.md` describes.
