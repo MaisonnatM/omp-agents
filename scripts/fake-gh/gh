@@ -1,0 +1,31 @@
+#!/usr/bin/env bun
+/**
+ * A stand-in for GitHub's `gh` on a smoke server's `PATH`: it answers from the JSON fixture `FAKE_GH_FIXTURE` names,
+ * read again on every call so an edit of the file changes what GitHub says while the server runs, and never runs the real `gh`.
+ * The fixture is `{ "rules": [{ "when": ["<substring>", ...], "stdout": <JSON value or string>, "exit"?: <code> }] }`;
+ * the first rule whose every `when` occurs in the space-joined arguments answers. `FAKE_GH_LOG`, when set, gets one JSON line per call.
+ */
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
+
+interface Rule {
+	when: string[];
+	stdout: unknown;
+	exit?: number;
+}
+
+const argv = process.argv.slice(2);
+const asked = argv.join(" ");
+const fixture = process.env.FAKE_GH_FIXTURE;
+const rules: Rule[] = fixture && existsSync(fixture) ? JSON.parse(readFileSync(fixture, "utf8")).rules : [];
+const index = rules.findIndex(rule => rule.when.every(part => asked.includes(part)));
+const log = process.env.FAKE_GH_LOG;
+if (log) appendFileSync(log, `${JSON.stringify({ at: new Date().toISOString(), argv, rule: index === -1 ? null : index })}\n`);
+
+const rule = rules[index];
+if (rule) {
+	process.stdout.write(typeof rule.stdout === "string" ? rule.stdout : `${JSON.stringify(rule.stdout)}\n`);
+	process.exitCode = rule.exit ?? 0;
+} else {
+	process.stderr.write(`fake gh: no fixture rule answers gh ${asked}\n`);
+	process.exitCode = 1;
+}

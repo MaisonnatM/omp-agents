@@ -1,7 +1,7 @@
 /**
  * Screenshots omp's pull request panel, and T3 Code's when `--t3` names a running T3 Code, in the same states at one
  * viewport and panel width, then writes each pair side by side with a pixelmatch diff and a report of the diff ratios.
- * It starts no server: `--omp` is a running dashboard's sign-in address.
+ * It starts no server: `--omp` is a running dashboard's sign-in address, which must serve this checkout as it is now.
  */
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,6 +9,8 @@ import { parseArgs } from "node:util";
 import pixelmatch from "pixelmatch";
 import { type BrowserContext, chromium, type Locator, type Page, type Request } from "playwright-core";
 import { PNG } from "pngjs";
+import { describeServed, type ServedBuild } from "../src/served-build";
+import { checkServed, defaultRun, provenanceProblem } from "./served";
 
 const USAGE = `Usage: bun scripts/pr-parity.ts --omp <url with ?token=> [--t3 <url>] [--pr owner/repo#N] [--draft N] [--merged N] [--closed N] [--theme light|dark|both] [--page <hash>]... [--run <name>]`;
 
@@ -235,11 +237,11 @@ interface Row {
 
 const cell = (captured: boolean | null): string => (captured === null ? "not run" : captured ? "captured" : "absent");
 
-function report(run: string, commit: string, rows: Row[], pages: string[]): string {
+function report(run: string, served: ServedBuild, rows: Row[], pages: string[]): string {
 	const lines = [
 		`# Parity run ${run}`,
 		"",
-		`Commit ${commit}, viewport ${VIEWPORT.width}×${VIEWPORT.height}, panel ${PANEL_WIDTH}px, masked in ${MASK_COLOR}.`,
+		`Served ${describeServed(served)}; viewport ${VIEWPORT.width}×${VIEWPORT.height}, panel ${PANEL_WIDTH}px, masked in ${MASK_COLOR}.`,
 		"",
 		"| Theme | Pull request | State | omp | T3 | Diff |",
 		"| --- | --- | --- | --- | --- | --- |",
@@ -275,8 +277,13 @@ async function main(): Promise<void> {
 	const apps = [omp(values.omp), ...(values.t3 ? [t3(values.t3)] : [])];
 	const pages = values.page.map(hash => hash.replace(/^#/, ""));
 
-	const commit = (await Bun.$`git rev-parse --short HEAD`.quiet().text()).trim();
-	const run = values.run ?? `${commit}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+	const check = await checkServed(values.omp);
+	const problem = provenanceProblem(check.provenance);
+	if (problem) {
+		console.error(problem);
+		process.exit(1);
+	}
+	const run = values.run ?? defaultRun(check.local);
 	const root = join(import.meta.dir, "..", "tmp", "parity", run);
 
 	const browser = await chromium.launch();
@@ -312,7 +319,7 @@ async function main(): Promise<void> {
 	} finally {
 		await browser.close();
 	}
-	await Bun.write(join(root, "report.md"), report(run, commit, rows, pages));
+	await Bun.write(join(root, "report.md"), report(run, check.served, rows, pages));
 	console.log(root);
 }
 

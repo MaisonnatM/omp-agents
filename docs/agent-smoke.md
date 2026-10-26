@@ -35,7 +35,7 @@ The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shel
 
 ## Browser smoke
 
-Open the page in managed headless Chromium.
+Open the page in managed headless Chromium, or prove a route's texts with [Smoke proof](#smoke-proof), which also checks that the server serves this checkout as it is now.
 Without `relay: false`, `browser.open` tries the omp browser relay, then fails with "extension never connected" or times out after 30 seconds.
 Without `viewport`, Chromium renders at 800×600, below the layout's desktop breakpoints, so screenshots show the narrow layout.
 
@@ -65,10 +65,51 @@ Besides a live session's own hash, the routes are:
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `files`, or `worktrees`.
 
+## Smoke proof
+
+A smoke server serves the code it started with, so a check against a server started before the last edit, or from another worktree, proves nothing about the edit.
+The server prints what it serves at startup, as `Serving <checkout> <branch>@<commit>, tree <tree>, page <page>`, and answers it at `GET /api/dashboard/build`.
+`scripts/smoke-proof.ts` checks that first, then opens a route and waits for texts to show or go away.
+
+```sh
+bun scripts/smoke-proof.ts --omp "http://127.0.0.1:<port>/?token=<token>" [--route <hash>] [--expect <text>]... [--expect-absent <text>]... [--timeout <seconds, default 15>] [--checkout <dir>] [--run <name>]
+```
+
+It compares the server's checkout and working tree with this checkout's, or with `--checkout`'s, as `git add -A` would stage it now, untracked files included and ignored ones not.
+
+- `match`: the server serves this checkout as it is now, and the run goes on.
+- `stale`: the checkout changed since the server started; restart the smoke server and run again.
+- `other-checkout`: the server runs from another checkout, which the report names; start a smoke server from this one.
+- `unknown`: the server names no git checkout, as a packaged app does; start a smoke server from this checkout.
+
+Anything but `match` exits 1 before a browser opens.
+On `match` it opens the sign-in address with `--route` as its hash in headless Chromium at 1920×1080, and checks that the tab ran the page the server built, hashing the `index.html` it loaded as the server does.
+Once the page has drawn the roster, it polls until every `--expect` text is visible and every `--expect-absent` text is not, or `--timeout` passes, then takes a screenshot.
+A text counts as visible when an element whose whole text is exactly it, case and all, shows inside the viewport, so a longer title holding it or a row scrolled out of view does not count.
+It writes `tmp/smoke/<run>/report.json`, `report.md`, and `screenshot.png`, prints that directory, and exits 0 only when provenance matches, the tab ran the served page, and every expectation held.
+The report holds both identities, the verdict, the address without its token, the route, the page check, each expectation's result, and the time; `<run>` defaults to the local commit and the time.
+
+## Pull request header fixture
+
+The session header's pull request moves, such as **Open PR**, depend on what GitHub says of the session's branch, which a smoke check cannot change on a real repository.
+`scripts/fake-gh/gh` stands in for `gh` on a smoke server's `PATH`: it answers from the JSON rules in `FAKE_GH_FIXTURE`, read again on every call, exits 1 with one stderr line for any call no rule answers, and appends each call to `FAKE_GH_LOG`.
+Sessions that server starts get the fake `gh` too, so nothing reaches GitHub.
+`scripts/pr-header-fixture.ts <dir> (--pr <number> | --no-pr)` creates `<dir>/repo`, a checkout of `smoke-fixture/webapp` on branch `feature`, once, and writes the rules that say `feature` heads no pull request or open PR `#<number>`.
+
+1. Run `bun scripts/pr-header-fixture.ts <dir> --no-pr`, which prints the env for the smoke server and the new-session route.
+2. Start the smoke server with that env and fresh `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (see [Isolated state](#isolated-state)).
+3. Open the printed `#new/<encoded repo>` route and start a session with the prompt `Reply with just the word ok. Use no tools.`.
+4. Run `bun scripts/smoke-proof.ts --omp <sign-in address> --route <the session's hash> --expect "Open PR"`.
+5. Run `bun scripts/pr-header-fixture.ts <dir> --pr 7`, which leaves the repository as it is.
+6. Run `bun scripts/smoke-proof.ts --omp <sign-in address> --route <the session's hash> --expect-absent "Open PR" --expect "#7" --timeout 90`, since the server asks GitHub about a branch with no pull request once a minute.
+
+`<dir>/gh.log` then shows which GitHub reads the server made and which rule answered each.
+The rules answer only the reads behind the header, so the pull request panel says it cannot load the pull request.
+
 ## Parity harness
 
 `scripts/pr-parity.ts` compares the pull request panel with T3 Code's, so a change to it shows its screenshots before and after.
-Start a smoke server first; the harness starts nothing.
+Start a smoke server from this checkout first; the harness starts nothing, and exits 1 with the reason unless the server serves this checkout as it is now, as [Smoke proof](#smoke-proof) checks.
 
 ```sh
 bun scripts/pr-parity.ts --omp "http://127.0.0.1:<port>/?token=<token>" [--t3 <url>] [--pr owner/repo#N] [--draft N] [--merged N] [--closed N] [--theme light|dark|both] [--page <hash>]... [--run <name>]
@@ -80,7 +121,7 @@ A state whose control the app lacks is reported `absent`.
 `--page` adds a whole-window capture of another route of the dashboard, such as `settings` or `past/<session id>`.
 `--t3` takes a running T3 Code's address, with any query its pairing needs; without it only the dashboard is captured.
 Masks cover avatars, `<time>` elements, and labels such as `updated 8m ago` or `Today`, in magenta; add a region to `MASKS` in the script, not to one capture.
-Each run writes `tmp/parity/<run>/<theme>/<number>-<state>.<omp|t3>.png`, a `side-by-side` and `diff` image when both apps ran, and `report.md`; `<run>` defaults to the commit and the time.
+Each run writes `tmp/parity/<run>/<theme>/<number>-<state>.<omp|t3>.png`, a `side-by-side` and `diff` image when both apps ran, and `report.md`, which names the checkout, branch, commit, tree, and page the server serves; `<run>` defaults to the local commit and the time.
 Chromium is the `playwright-core` build that `~/Library/Caches/ms-playwright` holds; when it is missing, `bunx playwright-core install chromium-headless-shell` fetches it.
 
 ## Desktop smoke
