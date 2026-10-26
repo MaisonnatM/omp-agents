@@ -7,11 +7,11 @@ Your first session, then the integrations that each need a sign-in.
 
 - Install omp and sign in to at least one model provider with `/login` in omp's terminal.
   The dashboard uses the providers omp already has; **Settings › Providers** lists them.
-- Follow the README's [Quick start](../README.md#quick-start) and open the sign-in address that `bun start` prints.
+- Follow the README's [Quick start](../README.md#quick-start) to install the app, or run `bun run desktop` from a clone, and open it.
 
 ## Your first session
 
-1. Click **New session** at the top of the **Sessions** tab, or press Cmd+N (Ctrl+N on Linux and Windows) in the desktop app, or S outside a text field.
+1. Click **New session** at the top of the **Sessions** tab, or press Cmd+N (Ctrl+N on Linux and Windows), or S outside a text field.
 2. Pick the workspace omp runs in, and a branch or a new worktree if the folder is a git repository.
 3. Type a prompt and press Enter.
    omp starts when you send the first message, so a draft you leave starts nothing.

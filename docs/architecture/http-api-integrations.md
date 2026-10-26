@@ -84,7 +84,7 @@ The workspace links are kept by address, so the accounts added again take their 
 Linear still reads the OAuth endpoints from metadata, registers a client when the authorization server offers registration, and listens on `localhost:3000`.
 Slack, Google Calendar, and Gmail refuse to start until `setup.configured` is true, so they do not open an authorization URL that has no client ID.
 The flow then receives the saved client ID, client secret, scope, redirect, callback port, callback path, and prompt.
-It answers the integration once the flow has the service's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in a new tab.
+It answers the integration once the flow has the service's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in the default browser.
 When the browser comes back, the server stores the tokens under the server's credential id, where `omp token` finds them.
 The stored client secret is the one dynamic registration issued, or the configured secret when registration did not issue one.
 That is the secret a later refresh sends.

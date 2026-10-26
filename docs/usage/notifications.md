@@ -1,7 +1,7 @@
 # Notifications
 
-- The bell sits after the command menu button at the right of the desktop app's title bar on macOS, beside the window's title; in a browser, at the end of the page's header.
-  With split panes in a browser, only the top right pane's header shows them, before its details toggle.
+- The bell sits after the command menu button at the right of the title bar on macOS, beside the window's title; elsewhere, at the end of the page's header.
+  With split panes off macOS, only the top right pane's header shows them, before its details toggle.
 - Six sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
@@ -29,7 +29,7 @@
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
-- A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in a new tab, or the **Calendar** page for an event on this computer.
+- A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in your default browser, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in your default browser, or the **Calendar** page for an event on this computer.
   Selecting an update's or stopped sessions' notice marks it read.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
@@ -57,7 +57,5 @@
   Clicking it brings the window up on that session.
 - Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before; a session that asks while its turn is unread notifies the question.
   A session that already waited when the page loads, or when the page reconnects, raises none.
-- A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window and tab agrees.
-- The desktop app shows them unless **Settings › Preferences › Notifications** turns them off.
-  A browser shows them only once you turn that switch on and allow the dashboard's notifications when the browser asks; when it blocks them, the switch says so.
-  Each window keeps the switch in its own localStorage.
+- A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window agrees.
+- The app shows them unless **Settings › Preferences › Notifications** turns them off, and keeps that switch in its localStorage.

@@ -29,18 +29,18 @@ The dashboard treats it that way:
   A token file that other accounts could read may already be known, so the server replaces it with a new token rather than trust it.
   The token survives restarts.
   To rotate the token, delete the file and restart the server.
-- The sign-in address that the server prints carries the token.
-  Opening it answers a page that keeps the token in the dashboard origin's `localStorage` and replaces itself with `/`, so the token leaves the address bar and history.
-  That page sends no `Referer`, is never cached, and runs only its own script.
+- Only the desktop app's window receives the token, and no address carries it: the server prints none, and `/?token=` signs nothing in.
+  The window's preload asks the main process for it over a synchronous IPC message, and the main process answers only the window's own dashboard frame, with the token and the media key, which the preload writes into the dashboard origin's `localStorage` before the page's scripts run.
   `localStorage` belongs to one origin, scheme, host, and port, so no page on another port can read it.
   A cookie would not do: browsers send a `127.0.0.1` cookie to every port of that host, where any other program could log it.
   The server deletes the cookie that older versions set.
 - The page sends the token as an `Authorization: Bearer` header, and the WebSocket sends it as the subprotocol `bearer.<token>`, since a browser's socket can send no header.
   The server answers the socket with its own subprotocol, so the token never comes back in the handshake.
-  Without it, `/api/` answers a 401 JSON error, the WebSocket upgrade is refused, and the page shows how to sign in.
+  Without it, `/api/` answers a 401 JSON error, the WebSocket upgrade is refused, and the page says to open the omp agents app.
 - An image, a video, or the mail frame sends no header, so the page adds a media key to their addresses as `?key=`.
   The key is an HMAC of the token, which opens only the routes that serve such media, and the token cannot be worked back from it.
 - `/` and the page's scripts and styles need no token: they hold no data, and read everything through the API.
+  A browser tab on the dashboard's address gets that page with no token, so it reads nothing and says to open the omp agents app.
   The server still refuses them under another `Host`, and refuses the scripts and styles to another site.
 - The desktop app checks who answers on the port before it sends the token there.
   It asks `GET /api/hello` with a random nonce, and only a server that holds the token can answer with the HMAC of the token, the port, and that nonce.
@@ -48,11 +48,11 @@ The dashboard treats it that way:
   The WebSocket and the writes also need an `Origin` that matches it, and the writes require a `Content-Type: application/json` body, which a cross-site form cannot send.
   Every `/api/` request, reads included, is refused when its `Sec-Fetch-Site` header is present and not `same-origin`, so a page on another site cannot make your browser look up your pull requests or models.
 - Session addresses such as `http://127.0.0.1:<port>/#session/<session id>` carry no token.
-  Clicking one in a browser that has signed in opens the session, since the page reads the token from its own `localStorage`.
-  In a browser that never signed in, the page shows how to sign in.
+  In the desktop window one opens the session, since the page reads the token from its own `localStorage`; a browser tab that opens one says to open the omp agents app.
 - Agent text cannot load remote images: Markdown images in transcripts render as links unless they are `data:` URLs, so a prompt-injected reply cannot send data out through an image URL.
   Text from GitHub keeps images only from GitHub's own image hosts.
   The page's `Content-Security-Policy` limits scripts, connections, and workers to the dashboard itself, and images to the dashboard, `data:`, `blob:`, and those GitHub hosts.
 - The token stops web pages and other user accounts, not a program that runs as you: it can read the token file, and it can read your omp files itself.
   Run the dashboard only on a machine that you alone use, and do not expose the port through a tunnel or a proxy.
-  A program of another account that listens on the dashboard's port while the dashboard is down can serve a page that reads the origin's `localStorage`, so do not open the dashboard's address in a browser while it is down on a shared machine.
+  A program of another account that listens on the dashboard's port while the dashboard is down can serve a page that reads the origin's `localStorage`.
+  The desktop app checks with `GET /api/hello` that the server holds the token before its window first loads the page, but a reload while the server is down would load that program's page, so on a shared machine do not reload the window then.

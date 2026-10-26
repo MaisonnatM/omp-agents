@@ -104,7 +104,7 @@
   A state change, a review request, or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
   Click a **Merge** badge for a popover that reads the pull request from GitHub and confirms the merge; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
-  Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
+  Click a repository or a section heading to fold it; the app keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
@@ -113,7 +113,7 @@
   The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
-  Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the browser's localStorage keeps the last one of each workspace.
+  Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the app keeps the last one of each workspace.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
   A pull request's details open on **Summary**.
   A session's **PRs** sidebar shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
@@ -130,8 +130,8 @@
   A stack moves as one, and its pull requests keep their order from the top of the stack.
   Drag a repository's name on the page or in its sidebar index to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
-  The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- **List** and **Board** at the top of the Pull requests page switch its view, and the browser's localStorage keeps the choice.
+  The app keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
+- **List** and **Board** at the top of the Pull requests page switch its view, and the app keeps the choice.
   The board shows a column per section, in the sections' order, each holding the pull requests of every repository as cards: the move's badge, state, and age, the title, the repository and number with the reason, then the sessions, stack, conversations, checks, reviewers, and lines added and removed.
   The repository shows on a card only when the board spans more than one.
   **Recently merged** starts folded; click a column's title to fold it to a narrow strip with its count, and click the strip to unfold it.

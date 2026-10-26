@@ -6,5 +6,5 @@ A `pin` socket message carries a `PinChange`, `{ op, sessionIds }` with `op` one
 `applyPins` in `src/shared/pins.ts` applies it, and never toggles, so the same change sent twice pins or unpins once.
 Every socket hears the pins after each change as a `pins` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the pins back to its own socket alone.
 The page shows a change before the server answers, and its **Pin** and **Unpin** send `pin` or `unpin` from the pins it holds.
-Pins an older page kept in the browser's localStorage, under `omp-agents.pinned-sessions`, go to the server as one `pin` the first time the page hears the pins, and the key is then removed.
+Pins an older page kept in localStorage, under `omp-agents.pinned-sessions`, go to the server as one `pin` the first time the page hears the pins, and the key is then removed.
 Each server keeps its own copy in memory, as with the workspaces, so a routine's pin shows at once on the pages of the server that owns routines.

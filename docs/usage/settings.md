@@ -10,7 +10,7 @@
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
   Choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range; **Today** starts at local midnight.
-  Each range's last result is cached in your browser, so switching back, reopening the page, or reloading shows it while a fresh read runs.
+  Each range's last result is cached in the app, so switching back, reopening the page, or reloading shows it while a fresh read runs.
   A failed refresh keeps the cached result and shows the error.
   Refreshes run only while **Analytics** is open, every five seconds during indexing and every 30 seconds otherwise.
   While a range with no cached result loads, the previous range's numbers remain visible but dimmed.
@@ -85,7 +85,7 @@
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
   If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
-- **Preferences** holds the dashboard's own choices, saved in the browser's localStorage, not in omp's files, except **Stop idle processes**, which the server keeps.
+- **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files, except **Stop idle processes**, which the server keeps.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
   **Sidebar tabs** lists the seven sidebar tabs in the order the sidebar shows them, each with the Cmd+number it takes now, a switch that shows or hides it, and buttons that move it up or down.
@@ -112,12 +112,12 @@
   The dashboard sees a merge it made at once, and one made elsewhere within two minutes; a merge made before the dashboard started, or before the session linked the pull request, ends nothing.
   A session still working when its pull request merges, or waiting to continue after a usage limit or a connection error, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
-  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in this browser, and a method the repository does not allow falls back to the first one it does.
+  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in the app, and a method the repository does not allow falls back to the first one it does.
 - **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
-  The server keeps the list in `workspaces.json` beside its access token, so every browser tab and the desktop app show the same workspaces.
+  The server keeps the list in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
   With **All workspaces**, **Models**, **Files**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.

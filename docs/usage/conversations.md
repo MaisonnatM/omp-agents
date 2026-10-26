@@ -15,17 +15,17 @@
 - The model's thinking is a line in that same group, **Thinking** while the model still writes it and **Thought** after, with its text under it; click the line to fold the text.
   A thinking block the provider redacts, which has no text, stays out.
   **Settings → Preferences** has a switch for each, **Show tool calls** and **Show thinking**, which hides the tool rows or the thinking text in every pane; the heading stays.
-  The choice is saved in this browser.
+  The choice is saved in the app.
   Cmd+Shift+E shows or hides the tool rows, and Alt+T (Option+T on macOS) shows or hides the thinking.
   Cmd+E still opens or closes the group.
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
   A tool group that spawned subagents stays open.
   In a live session or subagent, each id is a link with the subagent's status dot (green running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
-  Click it to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in a new tab.
+  Click it to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in the app window in place of what it shows.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
 - A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large, with the tool and what the call said it did.
-  The arrows, or the Left and Right keys, step to the previous and next tool image of the conversation, across calls, and the external-link button opens the image in a new tab.
+  The arrows, or the Left and Right keys, step to the previous and next tool image of the conversation, across calls, and the external-link button opens the image in your default browser.
   A tool group that returned images stays open.
   Hiding tool calls hides them too; the changes card's **Images** section still lists every one.
 - A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.
@@ -67,7 +67,7 @@
   Bare GitHub and Graphite pull request URLs resolve to the PR's actual title through your signed-in GitHub CLI.
   Explicit Markdown labels and link titles stay as written.
   While a PR title loads, or if GitHub cannot read it, its repository and number stay visible; other bare service links use an issue identifier or **Slack message**.
-  The link still opens its original address in a new tab.
+  The link still opens its original address in your default browser.
   Other HTTP and HTTPS links keep their original label, with no icon.
   Link labels are semibold (font weight 600) and underlined beside their icons, without underlining the icons.
   A link loads nothing before you click it: a favicon fetched from the link's host, or from a favicon service, would send that hostname out the moment the text rendered, and a prompt-injected agent can write a secret into a hostname.

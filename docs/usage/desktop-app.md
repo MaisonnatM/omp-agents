@@ -1,9 +1,10 @@
 # Desktop app
 
-The packaged app, or `bun run desktop` from a checkout, shows the dashboard in its own window; see the [README](../../README.md#desktop-app) to install it.
+omp-agents runs as a desktop app: the packaged app, or `bun run desktop` from a checkout, shows the dashboard in its own window; see the [README](../../README.md#quick-start) to install it.
 
-- The window is the same page as a browser tab, on the same address, `http://127.0.0.1:<port>`.
-  It keeps its own localStorage, so folded sections, the sidebar widths, the theme, and the pinned skill start fresh in the window and stay apart from a browser's.
+- The window loads the dashboard from its server on `http://127.0.0.1:<port>`, and the app hands it the access token itself.
+  A browser tab on that address gets the page but no token, so it says to open the omp agents app instead.
+- The window keeps its own localStorage, so folded sections, the sidebar widths, the theme, and the pinned skill stay as you left them across launches.
 - At launch, the app asks the port for the dashboard's sign-in.
   When an omp-agents server answers, the window uses it, and quitting the app leaves it running.
   When nothing listens, the app starts the server, the one it ships or its checkout's, and stops it when you quit.
@@ -25,7 +26,7 @@ The packaged app, or `bun run desktop` from a checkout, shows the dashboard in i
   The menu takes none of the dashboard's own shortcuts.
   Right-click in a text field for cut, copy, paste, and spelling suggestions, and on an image, such as one in the **Images** section's viewer, for **Copy Image**.
 - The window remembers its size and position.
-- The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
+- The window title follows what the page shows: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
   A session without a name reads as its workspace, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
 - Alt+Shift+Cmd+T, from any app, brings the window up with the command menu's **Create todo** open, so you can type a title and press Enter to create a todo.

@@ -23,11 +23,11 @@
   A running session adds **Pin** (**Unpin** once pinned), its pull requests on GitHub, **Workspace settings**, **Copy path**, **Copy session ID**, and **End session** when the dashboard can end it.
   A past session adds **Resume**, which opens its transcript and continues it as the header's **Resume** does, then the same pin, links, and copies.
   An interrupted session adds **Move to past** after **Resume**.
-  Elsewhere on the page, right-click keeps the browser's own menu.
+  Elsewhere on the page, right-click shows the window's own menu, as [Desktop app](desktop-app.md) describes.
 - Drag the line between the columns, or between the rows, to resize the panes; each side keeps at least 320 px of width or 160 px of height.
   The lines also take focus: the arrow keys move them, Shift with an arrow moves them further, and Home and End move them to either limit.
   Double-click a line to return it to the middle.
-  Each split keeps its own sizes while the page is open, and the sizes of the split on screen are stored in the browser, so they survive a reload.
+  Each split keeps its own sizes while the page is open, and the sizes of the split on screen are stored in the app, so they survive a reload.
 - The maximize button in a pane's header makes that pane fill the page.
   The other panes keep running behind it, with their drafts and scroll positions, and the restore button or Esc brings the split back exactly as it was.
   A plain click on a row outside the split opens it alone, as above; a remembered split comes back unmaximized.
@@ -43,4 +43,4 @@
   A page that fails shows the same in its place, and opening another view clears it.
 - Session conversations, their composers, and the new-session composer are at most 48rem wide.
 - A session header shows its **Copy session ID** and trajectory buttons only while the pointer is over the title, while one of them has keyboard focus, or always on a touch screen.
-- In the desktop app, pointing at or tabbing to a link shows its address at the bottom left of the window, as a browser does.
+- Pointing at or tabbing to a link shows its address at the bottom left of the window.

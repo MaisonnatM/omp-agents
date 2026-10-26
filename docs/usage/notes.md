@@ -18,7 +18,7 @@ Outside text fields, ↑ and ↓ focus rows or open the neighboring note while a
 Enter opens a focused row, and Esc or **Close the note** closes the detail.
 Right-click a note, or focus it and press the context-menu key or Shift+F10, for **Open**, **Rename**, which opens it and focuses its title, **Open todo** when it is linked to one, and **Delete**.
 `#notes?open=<id>` addresses one note, and `#notes/agents?open=<id>` addresses it in the list of notes from agents.
-The divider resizes the list, and the browser remembers its width.
+The divider resizes the list, and the app remembers its width.
 On narrow pages, the open note replaces the list.
 
 The **Todo** picker links a note to one top-level todo, including an archived todo, or clears the link with **No todo**.
