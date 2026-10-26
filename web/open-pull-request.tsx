@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import type { LiveView, RosterHost, View } from "../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { errorText } from "./api";
+import { errorText } from "../src/json";
 import { useDashboardActions } from "./components/dashboard-context";
 import { deliveryOf, subjectOf } from "./components/subject";
 import { toasts } from "./components/toaster";

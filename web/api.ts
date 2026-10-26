@@ -1,6 +1,6 @@
 /** The page's HTTP client. Whatever the server answers, a failure is an `ApiError` with a readable message. */
 import type { BranchRelease } from "../src/shared/git";
-import type { SettingsError } from "../src/shared/models";
+import { isObject } from "../src/json";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
 
 export class ApiError extends Error {
@@ -12,9 +12,6 @@ export class ApiError extends Error {
 		super(message);
 	}
 }
-
-/** What a failure says to the person reading the page. */
-export const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** The address of this server's socket at `path`, `wss:` when the page loaded over https, so a TLS proxy serves the sockets as it serves `fetch`. */
 export const socketUrl = (path: string): string => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${path}`;
@@ -30,8 +27,9 @@ export async function readJson<T>(response: Response): Promise<T> {
 		throw new ApiError(text.trim() ? `${status}: ${text.trim().slice(0, 200)}` : status);
 	}
 	if (!response.ok) {
-		const { error, conflict } = body as Partial<SettingsError>;
-		throw new ApiError(typeof error === "string" ? error : `HTTP ${response.status}`, conflict === true);
+		const error = isObject(body) ? body.error : null;
+		const conflict = isObject(body) && body.conflict === true;
+		throw new ApiError(typeof error === "string" ? error : `HTTP ${response.status}`, conflict);
 	}
 	return body as T;
 }

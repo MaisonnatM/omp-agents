@@ -5,7 +5,7 @@ import { MAX_COMMENT_BODY, type PullRequestComment, type PullRequestDetail, type
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuSwitchItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { errorText } from "../../../api";
+import { errorText } from "../../../../src/json";
 import { withThreadResolved } from "../../../pull-requests-model";
 import { conversationItems, decodeCommentFilter, filterConversations, pageConversations } from "../../../pull-request-comments";
 import { useStoredState } from "../../../stored-state";

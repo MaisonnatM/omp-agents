@@ -19,10 +19,12 @@ A tagged message from a page the ledger does not know yet is logged and dropped,
 Replies and `done` go to the page's current socket; `Peer.socket`, the socket a message came on, is only for `watch`, which sets that socket's views.
 A request the page makes while disconnected rejects at once with "Not connected to the server.", and one it made before keeps waiting across the reconnect, with no time limit.
 A prompt that fails comes back to the composer with its files and a note, and a failed answer lets the question card take another.
+Prompt preparation errors and `PromptRefused` both reject the request.
+An existing session notice is not repeated by the socket handler.
 A handler's error goes to the server's log once, with its message type, on the run that threw.
 A page loaded before page ids tags its requests with no `floor`, so the server drops them until the page reloads.
 
-`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, projects, notices, and review drafts.
+`ListRegistry` in `src/server/list-registry.ts` is authoritative for the whole-list snapshots a socket receives.
 `Dashboard` registers each typed message builder once, beside its store's edit function when it has synchronous edits.
 `Broadcasts.open` iterates these registrations, so a new list needs no separate opening-snapshot or push method.
 `Broadcasts.pushList(kind)` uses that same builder and suppresses an identical whole-list message; roster and past messages still send their row-level deltas.

@@ -8,7 +8,7 @@
  * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
 import { isObject, str } from "./json";
-import { imagesOf, oneLine, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
+import { imagesOf, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
 import { splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import { isDashboardPrompt, type Item } from "./shared/transcript";

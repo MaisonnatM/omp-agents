@@ -13,7 +13,9 @@
   `web/components/quick-actions.tsx` holds the tickets' row menu, the buttons on a pull request's, an issue's, or a todo's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
   `web/components/status-dot.tsx` draws that dot for each session status, and `web/components/ship-step.tsx` a session's /ship stage, as `3/7 · Draft PR`.
-- `web/api.ts`: the page's HTTP client, `errorText`, which says what any failure was, and `socketUrl`, the address of the dashboard's and a terminal's WebSocket, `wss:` when the page is on HTTPS.
+- `web/api.ts`: the page's HTTP client and `socketUrl`, the address of the dashboard's and a terminal's WebSocket, `wss:` when the page is on HTTPS.
+  Error responses are narrowed from unknown JSON and retain HTTP context when their body is malformed.
+  The page and server share `errorText` from `src/json.ts`.
   `settingsUrl` names a settings route for one workspace, or for the user's own files, and `releaseWorktree` asks the server to remove the linked worktree that has a branch checked out.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as a pull request's stack, the settings page's model catalog, or the new-session draft's model list.

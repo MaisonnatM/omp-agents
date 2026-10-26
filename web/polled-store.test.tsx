@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, jest, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { decoder, fields, isNumber } from "../src/json";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 
 const memory = new Map<string, string>();
-globalThis.localStorage = {
+const storage: Storage = {
 	getItem: key => memory.get(key) ?? null,
 	setItem: (key, value) => {
 		memory.set(key, value);
@@ -17,7 +17,23 @@ globalThis.localStorage = {
 	get length() {
 		return memory.size;
 	},
-} as Storage;
+};
+
+let storageDescriptor: PropertyDescriptor | undefined;
+let fetchDescriptor: PropertyDescriptor | undefined;
+beforeEach(() => {
+	storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+	fetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, "fetch");
+	Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+	memory.clear();
+});
+
+function fetchWith(implementation: (url: string, signal: AbortSignal | null | undefined) => Promise<Response>): void {
+	jest.spyOn(globalThis, "fetch").mockImplementation(Object.assign(
+		(input: RequestInfo | URL, init?: RequestInit) => implementation(String(input), init?.signal),
+		{ preconnect: globalThis.fetch.preconnect },
+	));
+}
 
 const keys: string[] = [];
 const decodeN = decoder(fields<{ n: number }>({ n: isNumber }));
@@ -45,6 +61,11 @@ function text(polled: { use(scope: string | null): PolledEntry<{ n: number }> },
 afterEach(() => {
 	for (const key of keys) localStorage.removeItem(key);
 	keys.length = 0;
+	mock.restore();
+	if (storageDescriptor) Object.defineProperty(globalThis, "localStorage", storageDescriptor);
+	else Reflect.deleteProperty(globalThis, "localStorage");
+	if (fetchDescriptor) Object.defineProperty(globalThis, "fetch", fetchDescriptor);
+	else Reflect.deleteProperty(globalThis, "fetch");
 });
 
 describe("polled store", () => {
@@ -55,11 +76,11 @@ describe("polled store", () => {
 			finishFirst = resolve;
 		});
 		let calls = 0;
-		globalThis.fetch = (async () => {
+		fetchWith(async () => {
 			calls += 1;
 			if (calls === 1) return first;
 			return new Response(JSON.stringify({ n: 2 }), { status: 200 });
-		}) as unknown as typeof fetch;
+		});
 		const older = polled.refresh("a");
 		const newer = polled.refresh("a");
 		finishFirst(new Response(JSON.stringify({ n: 1 }), { status: 200 }));
@@ -115,11 +136,13 @@ describe("polled store", () => {
 	test("reads of two scopes in flight at once both complete, and each refresh aborts only a read of its own scope", async () => {
 		const polled = store();
 		const pending = new Map<string, { signal: AbortSignal; finish: (n: number) => void }>();
-		globalThis.fetch = ((url: string, { signal }: { signal: AbortSignal }) =>
-			new Promise<Response>((resolve, reject) => {
-				signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
-				pending.set(url, { signal, finish: n => resolve(new Response(JSON.stringify({ n }), { status: 200 })) });
-			})) as unknown as typeof fetch;
+		fetchWith((url, signal) => {
+			if (!signal) throw new Error("A polled read must be cancellable.");
+			const { promise, resolve, reject } = Promise.withResolvers<Response>();
+			signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+			pending.set(url, { signal, finish: n => resolve(new Response(JSON.stringify({ n }), { status: 200 })) });
+			return promise;
+		});
 		const a = polled.refresh("a");
 		const b = polled.refresh("b");
 		expect(pending.get("/polled/a")?.signal.aborted).toBe(false);
@@ -144,10 +167,10 @@ describe("polled store", () => {
 		try {
 			const polled = store();
 			const requested: string[] = [];
-			globalThis.fetch = (async (url: string) => {
+			fetchWith(async url => {
 				requested.push(url);
 				return new Response(JSON.stringify({ n: 1 }), { status: 200 });
-			}) as unknown as typeof fetch;
+			});
 			const stopFirst = polled.poll("a");
 			const stopSecond = polled.poll("a");
 			const stopOther = polled.poll("b");
@@ -171,11 +194,11 @@ describe("polled store", () => {
 	test("ensure reads once and again only after the kept answer changes or the in-flight one settles", async () => {
 		const polled = store();
 		const pending = new Map<string, { finish: (n: number) => void }>();
-		globalThis.fetch = ((url: string) => {
+		fetchWith(url => {
 			const { promise, resolve } = Promise.withResolvers<Response>();
 			pending.set(url, { finish: n => resolve(new Response(JSON.stringify({ n }), { status: 200 })) });
 			return promise;
-		}) as unknown as typeof fetch;
+		});
 		polled.ensure("a");
 		polled.ensure("a");
 		expect(pending.size).toBe(1);
@@ -189,10 +212,10 @@ describe("polled store", () => {
 	test("ensure without persistence or validators leaves localStorage untouched", async () => {
 		const polled = createPolledStore<{ n: number }>({ url: () => "/polled" });
 		let calls = 0;
-		globalThis.fetch = (async () => {
+		fetchWith(async () => {
 			calls += 1;
 			return new Response(JSON.stringify({ n: 1 }));
-		}) as unknown as typeof fetch;
+		});
 		await polled.refresh();
 		expect(memory.size).toBe(0);
 		expect(calls).toBe(1);

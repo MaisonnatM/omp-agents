@@ -1,19 +1,19 @@
 /**
- * Which server runs the unattended work. Every server of one user shares `~/.config/omp-agents`, and a smoke run on
- * another port runs beside the app's own server, so something has to decide which of them starts routines and applies the
- * todo inbox, or each would do it. The server that holds this lock does; the others wait and try again, and one of them
- * takes over once the owner exits. The lock is a file naming its owner's pid and port.
- * A lock whose process is gone is stale and is taken over. A crash that leaves a pid another process now uses keeps the
- * others waiting until that file is deleted.
+ * Ownership for the server's unattended work and short shared-file mutations.
+ * A hard-linked file publishes its owner's pid and port whole. A dead owner can be replaced.
+ * Stale removal holds the same kind of lock at `<file>.reap`, so competing reclaimers cannot unlink a new owner.
+ * A process id reused by another program keeps the lock held until that file is deleted.
  */
 import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { errorText, isObject } from "../json";
+import { errorText, isObject } from "./json";
 
 export interface LockHolder {
 	pid: number;
 	port: number;
 }
+
+const pause = new Int32Array(new SharedArrayBuffer(4));
 
 /** Whether process `pid` runs; a process that another user owns runs too. */
 export function isRunning(pid: number): boolean {
@@ -71,6 +71,15 @@ export class OwnerLock {
 		return this.#held;
 	}
 
+	/** Waits for a short file mutation to finish, or refuses it rather than writing without ownership. */
+	wait(timeoutMs = 5000): void {
+		const deadline = Date.now() + timeoutMs;
+		while (!this.acquire()) {
+			if (Date.now() >= deadline) throw new Error(`Timed out taking the lock ${this.#file}.`);
+			Atomics.wait(pause, 0, 0, 10);
+		}
+	}
+
 	/** Gives the lock up on shutdown, unless another server took it over. */
 	release(): void {
 		if (this.#held && this.#isMine(this.holder())) rmSync(this.#file, { force: true });
@@ -82,16 +91,29 @@ export class OwnerLock {
 	}
 
 	#take(): boolean {
-		for (let attempt = 0; attempt < 2; attempt++) {
-			const created = this.#create();
-			if (created !== "exists") return created === "made";
-			const holder = this.holder();
-			if (this.#isMine(holder)) return true;
-			if (holder && this.#running(holder.pid)) return false;
-			// A stale lock names a process that is gone. The holder may have changed since the read; only the file read as stale goes.
-			if (JSON.stringify(this.holder()) === JSON.stringify(holder)) rmSync(this.#file, { force: true });
+		const created = this.#create();
+		if (created !== "exists") return created === "made";
+		const holder = this.holder();
+		if (this.#isMine(holder)) return true;
+		if (holder && this.#running(holder.pid)) return false;
+		const recovery = new OwnerLock(`${this.#file}.reap`, this.#self.port, this.#running, this.#self.pid);
+		if (!recovery.acquire()) return false;
+		try {
+			let text: string;
+			try {
+				text = readFileSync(this.#file, "utf8");
+			} catch (error) {
+				if (isObject(error) && error.code === "ENOENT") return this.#create() === "made";
+				throw error;
+			}
+			const current = parseHolder(text);
+			if (this.#isMine(current)) return true;
+			if (current && this.#running(current.pid)) return false;
+			rmSync(this.#file, { force: true });
+			return this.#create() === "made";
+		} finally {
+			recovery.release();
 		}
-		return false;
 	}
 
 	/** Creates the lock file whole. A file linked into place is complete when it first shows, and of several servers that start at once exactly one links it. */

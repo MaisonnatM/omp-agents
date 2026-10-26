@@ -1,7 +1,7 @@
 /** The one rule for which attached files a prompt carries, applied both as files attach and as a prompt sends. */
 import { MAX_PROMPT_DOCUMENT_BYTES, MAX_PROMPT_FILE_CHARS, type PromptFile, withFiles } from "../src/shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, type PromptImage } from "../src/shared/sessions";
-import { errorText } from "./api";
+import { errorText } from "../src/json";
 
 const MB = 1024 * 1024;
 

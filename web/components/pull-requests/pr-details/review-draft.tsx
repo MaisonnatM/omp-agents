@@ -7,7 +7,7 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useId, useState } from "react";
 import { MAX_COMMENT_BODY, type PullRequest, pullRequestName } from "../../../../src/shared/github";
-import { findingLocation, type FindingState, REVIEW_VERDICTS, type ReviewDraft, type ReviewDraftEdit, type ReviewEvent, type ReviewFinding, type ReviewPreview, type ReviewVerdict } from "../../../../src/shared/review-drafts";
+import { findingLocation, type FindingState, REVIEW_VERDICTS, type ReviewDraft, type ReviewDraftEdit, type ReviewEvent, type ReviewFinding, type ReviewPreview } from "../../../../src/shared/review-drafts";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";

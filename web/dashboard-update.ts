@@ -1,6 +1,7 @@
 /** The command palette's **Update dashboard**. */
 import type { DashboardUpdateOutcome } from "../src/shared/dashboard-update";
-import { errorText, putJson } from "./api";
+import { errorText } from "../src/json";
+import { putJson } from "./api";
 import { toasts } from "./components/toaster";
 
 export const DASHBOARD_UPDATE_URL = "/api/dashboard/update";

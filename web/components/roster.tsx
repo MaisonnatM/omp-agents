@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
 import { yourMoveCount } from "../pull-requests-model";
 import { folderName } from "../labels";
-import { PAGE_ICON } from "../page-icons";
 import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";

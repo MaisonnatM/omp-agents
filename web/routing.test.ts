@@ -9,7 +9,6 @@ import {
 	hashForInbox,
 	hashForPullRequests,
 	hashForLayout,
-	hashForPage,
 	hashForNewSession,
 	hashForPullRequestFiles,
 	hashForProjects,

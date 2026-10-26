@@ -3,7 +3,8 @@
  * answer, from a read or a write, and the edits that show over it until they answer.
  */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { errorText, getJson } from "./api";
+import { errorText } from "../src/json";
+import { getJson } from "./api";
 import type { ReadState } from "./reads";
 
 /** An edit that shows at once, until the service answers it. */

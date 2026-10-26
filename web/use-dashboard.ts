@@ -4,7 +4,8 @@ import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/share
 import type { View } from "../src/shared/sessions";
 import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
-import { errorText, socketUrl } from "./api";
+import { errorText } from "../src/json";
+import { socketUrl } from "./api";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDiscussionMessage, discussionDisconnected } from "./discussions";

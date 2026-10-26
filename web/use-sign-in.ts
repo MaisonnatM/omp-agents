@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { SignInState } from "../src/shared/accounts";
-import { errorText } from "./api";
+import { errorText } from "../src/json";
 
 /** How often the page asks again while a provider's sign-in page is open, to notice the sign-in soon after it ends. */
 const WAITING_POLL_MS = 2_000;

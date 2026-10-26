@@ -7,7 +7,8 @@ import { type AgentMedia, mediaExtension, mediaUrl } from "../../src/shared/tran
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { errorText, putJson } from "../api";
+import { errorText } from "../../src/json";
+import { putJson } from "../api";
 import { age } from "../labels";
 import { useRead } from "../reads";
 import { useAction } from "../use-action";

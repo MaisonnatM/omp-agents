@@ -1,6 +1,6 @@
 /** The terminal panel's tabs and how they start: restored from the shells the server runs, or one new shell when it runs none. */
 import type { TerminalInfo } from "../../../src/shared/terminals";
-import { errorText } from "../../api";
+import { errorText } from "../../../src/json";
 import { newTab, restoredTab, type Tab } from "./terminal-tab";
 
 /** The panel's tabs: still reading the server's shells, that read failed with `error`, or the tabs it shows. */

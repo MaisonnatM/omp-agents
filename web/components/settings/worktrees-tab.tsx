@@ -4,7 +4,8 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { MAX_WORKTREE_BATCH, type WorktreeEntry, type WorktreeInventory, type WorktreeMerge, type WorktreeMetrics, type WorktreeRemovalPlan, type WorktreeRemovalResult } from "../../../src/worktrees-shared";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { changeWorktrees, errorText, readWorktreeMetrics, readWorktrees } from "../../api";
+import { changeWorktrees, readWorktreeMetrics, readWorktrees } from "../../api";
+import { errorText } from "../../../src/json";
 import { age, formatBytes } from "../../labels";
 
 type SortKey = "name" | "activity" | "size";

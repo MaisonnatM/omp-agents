@@ -29,7 +29,8 @@ import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/sha
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
-import { errorText, getJson, putJson } from "./api";
+import { errorText } from "../src/json";
+import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 import { withPullRequestReviewers, withPullRequestState } from "./pull-requests-model";
 import { pickedInbox } from "./inbox-model";

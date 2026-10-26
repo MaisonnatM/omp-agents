@@ -1,20 +1,13 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { rm, mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { canonicalJson, rebuildRequests, sha256 } from "../templates/omp/agent/extensions/replay/request-log-reader";
-import type { RebuiltRequest } from "../templates/omp/agent/extensions/replay/request-log-reader";
-import { containsPrompt } from "../templates/omp/agent/extensions/replay/replay-check";
 import { canonical, git, worktreeAt, worktreesOf } from "./git";
 import { isObject } from "./json";
-import { blobsDir } from "./omp/config";
-import { openPromptCut, writePromptFork } from "./omp/replay-fork";
-import type { PromptCut } from "./omp/replay-fork";
-import { exitDiagnostics, loader, transcriptEntry } from "./omp/modules";
+import { openPromptCut, readReplayBlob, readReplaySession } from "./omp/replay-fork";
 import { writeReplayConfig } from "./omp/replay-launch";
 import { REPLAY_CHECK, REPLAY_MARKER, replayMarkerOf, requestCheckOf } from "./shared/replay";
 import type { ReplayComparison, ReplayDetail, ReplayFacts, ReplayMarker } from "./shared/replay";
-import { type ModelOption, modelOfSelector } from "./shared/models";
+import type { ModelOption } from "./shared/models";
 import type { Turn } from "./shared/trajectory";
 import { Trajectory } from "./trajectory";
 
@@ -40,41 +33,12 @@ async function ompSpelling(path: string): Promise<string> {
 	const same = await Promise.all([canonical(stripped), canonical(path)]).then(([a, b]) => a === b, () => false);
 	return same ? stripped : path;
 }
-function originalRequest(cut: PromptCut): RebuiltRequest | null {
-	const entries = cut.manager.getEntries();
-	const start = entries.findIndex(entry => entry.id === cut.prompt.id);
-	const boundary = entries.slice(start + 1).findIndex(entry => transcriptEntry.userTurnDraft(entry) !== undefined);
-	const after = entries.slice(start + 1, boundary < 0 ? undefined : start + 1 + boundary);
-	const assistant = after.find(entry => entry.type === "message" && isObject(entry.message) && entry.message.role === "assistant");
-	if (!assistant || !isObject(assistant.message)) return null;
-	const assistantMessage = assistant.message;
-	const content = isObject(cut.prompt.message) ? cut.prompt.message.content : cut.prompt.content;
-	const candidates = after.slice(0, after.indexOf(assistant)).filter(entry => entry.type === "custom" && entry.customType === "omp-request-log.record" && isObject(entry.data) && entry.data.model === assistantMessage.model && typeof entry.data.leafId === "string" && cut.manager.getBranch(entry.data.leafId).some(parent => parent.id === cut.prompt.id));
-	const rebuilt = rebuildRequests(entries.map(entry => JSON.stringify(entry)).join("\n"), hash => readFileSync(join(blobsDir, hash), "utf8"));
-	const main = candidates.flatMap(entry => {
-		const data = entry.data;
-		if (!isObject(data)) return [];
-		const request = rebuilt.find(request => request.record.requestHash === data.requestHash && request.record.leafId === data.leafId);
-		return request?.body && containsPrompt(request.body, content) ? [request] : [];
-	});
-	return main.length === 1 ? main[0]! : null;
-}
-function originalSettings(cut: PromptCut, request: RebuiltRequest | null): { model: ModelOption | null; thinking: string | null } {
-	let selector: string | null = null;
-	let thinking: string | null = null;
-	for (const entry of cut.before) {
-		if (entry.type === "model_change" && (!entry.role || entry.role === "default") && typeof entry.model === "string") selector = entry.model;
-		if (entry.type === "thinking_level_change" && typeof entry.thinkingLevel === "string") thinking = entry.thinkingLevel;
-	}
-	return { model: request?.record.provider && request.record.model ? { provider: request.record.provider, id: request.record.model } : selector ? modelOfSelector(selector) : null, thinking: request?.record.thinkingLevel ?? thinking };
-}
 export async function replayDetail(file: string, entryId: string): Promise<ReplayDetail> {
 	const cut = await openPromptCut(file, entryId);
 	try {
-		const settings = originalSettings(cut, originalRequest(cut));
-		const pin: SourcePin = { file, sessionId: cut.sessionId, entryId, ancestry: sha256(canonicalJson([cut.manager.getHeader(), ...cut.before, cut.prompt])) };
-		return { token: sign(pin), sessionId: cut.sessionId, cwd: cut.cwd, prompt: cut.text, images: cut.images, ...settings };
-	} finally { await cut.manager.close(); }
+		const pin: SourcePin = { file, sessionId: cut.sessionId, entryId, ancestry: cut.ancestry };
+		return { token: sign(pin), sessionId: cut.sessionId, cwd: cut.cwd, prompt: cut.text, images: cut.images, model: cut.model, thinking: cut.thinking };
+	} finally { await cut.close(); }
 }
 export interface PreparedReplay {
 	marker: ReplayMarker;
@@ -102,17 +66,15 @@ export async function prepareReplay(choice: { token: string; model: ModelOption 
 		if (config) await rm(config, { force: true });
 	};
 	try {
-		if (pin.sessionId !== cut.sessionId || pin.ancestry !== sha256(canonicalJson([cut.manager.getHeader(), ...cut.before, cut.prompt]))) throw new Error("The selected prompt or its history changed. Open Replay from here again.");
+		if (pin.sessionId !== cut.sessionId || pin.ancestry !== cut.ancestry) throw new Error("The selected prompt or its history changed. Open Replay from here again.");
 		const firstText = choice.prompt ?? cut.text;
 		if (firstText.trimStart().startsWith("!") || /^\/(?!skill:)/.test(firstText.trimStart())) throw new Error("Replay needs a model prompt, not a shell or local slash command. Use text or /skill:<name>.");
 		if (!Number.isFinite(cut.at)) throw new Error("This prompt has no recorded timestamp.");
 		const repo = await worktreeAt(cut.cwd);
 		if (!repo) throw new Error(`Replay needs the original cwd's git repository. ${cut.cwd} is unavailable or outside git.`);
-		const request = originalRequest(cut);
-		const origin = originalSettings(cut, request);
-		const model = choice.model ?? origin.model;
+		const model = choice.model ?? cut.model;
 		if (!model) throw new Error("The original model was not recorded. Choose a model for this replay.");
-		const thinking = choice.thinking ?? origin.thinking;
+		const thinking = choice.thinking ?? cut.thinking;
 		if (!thinking || thinking === "auto") throw new Error("Choose a concrete thinking level. Automatic thinking cannot identify one replay request reliably.");
 		const id = randomUUID();
 		const reflog = await git(cut.cwd, "reflog", "show", "--date=unix", "--format=%H %gd", "HEAD").catch(() => "");
@@ -130,26 +92,20 @@ export async function prepareReplay(choice: { token: string; model: ModelOption 
 		const printedTop = !subdirectory ? cut.cwd : cut.cwd.endsWith(`/${subdirectory}`) ? cut.cwd.slice(0, -subdirectory.length - 1) : null;
 		const cwd = await ompSpelling(join(root, subdirectory));
 		await mkdir(cwd, { recursive: true });
-		const trajectory = new Trajectory(true);
-		for (const entry of cut.manager.getEntries()) trajectory.applyEntry(entry);
-		const originalTurn = trajectory.turns().find(turn => turn.id === pin.entryId);
-		if (!originalTurn) throw new Error("The original turn is not a replayable trajectory prompt.");
-		const originalTurnRef = cut.manager.putBlobSync(Buffer.from(JSON.stringify(originalTurn))).ref;
-		const bodyRef = request?.body && request.hash === request.record.requestHash ? cut.manager.putBlobSync(Buffer.from(canonicalJson(request.body))).ref : null;
+		const original = cut.freezeOriginal();
 		const marker: ReplayMarker = {
 			v: 1, id, source: { sessionId: pin.sessionId, file: pin.file, turnId: pin.entryId, at: cut.at },
 			roots: { original: [...new Set([repo.top, await canonical(repo.top), ...(printedTop ? [printedTop] : [])])], replay: await ompSpelling(root) }, base: { sha, how: historicalSha ? "reflog" : "head-now" },
-			model, thinking, modelChanged: !!origin.model && (origin.model.id !== model.id || origin.model.provider !== model.provider), promptEdited: choice.prompt !== null && choice.prompt !== cut.text,
-			repaired: exitDiagnostics.createInterruptedToolResults(cut.before, "fork").length > 0, originalTurnRef,
-			original: request && bodyRef ? { api: request.record.api, model: request.record.model, hash: request.record.requestHash, bodyRef } : null,
+			model, thinking, modelChanged: !!cut.model && (cut.model.id !== model.id || cut.model.provider !== model.provider), promptEdited: choice.prompt !== null && choice.prompt !== cut.text,
+			repaired: cut.repaired, ...original,
 		};
-		const written = await writePromptFork(cut.manager, cut.prompt.parentId ?? null, cwd, marker);
+		const written = await cut.fork(cwd, marker);
 		forkFile = written.file;
 		config = await writeReplayConfig(forkFile);
 		return { marker, forkFile, cwd, config, first: { text: choice.prompt ?? cut.text, images: cut.images }, discard };
 	} catch (error) {
 		try {
-			await cut.manager.close();
+			await cut.close();
 		} finally {
 			await discard();
 		}
@@ -172,7 +128,7 @@ export function replayOriginalTurn(marker: ReplayMarker): Turn {
 }
 
 export async function replayComparison(file: string): Promise<ReplayComparison> {
-	const entries = await loader.loadEntriesFromFile(file);
+	const { entries, requestFor } = await readReplaySession(file);
 	const fold = new ReplayFold();
 	const trajectory = new Trajectory(true);
 	for (const entry of entries) {
@@ -184,19 +140,12 @@ export async function replayComparison(file: string): Promise<ReplayComparison> 
 	const original = replayOriginalTurn(facts.marker);
 	let originalBody: unknown = null;
 	try { if (facts.marker.original) originalBody = readReplayBlob(facts.marker.original.bodyRef); } catch { /* Missing source data is already an unknown pre-send check. */ }
-	const rebuilt = rebuildRequests(entries.map(entry => JSON.stringify(entry)).join("\n"), hash => readFileSync(join(blobsDir, hash), "utf8"));
 	const check = facts.request;
 	const replayTurnId = facts.turnId;
-	const targetAt = entries.findIndex(entry => entry.id === replayTurnId);
-	const logged = targetAt >= 0 && entries.slice(targetAt + 1).some(entry => entry.type === "custom" && entry.customType === "omp-request-log.record" && isObject(entry.data) && entry.data.requestHash === check?.replayHash);
-	const recorded = logged && check?.replayHash ? rebuilt.find(request => request.record.requestHash === check.replayHash && request.hash === check.replayHash) : null;
+	const recorded = check?.replayHash ? requestFor(replayTurnId, check.replayHash) : null;
 	if (check && check.status !== "unknown" && (!recorded || recorded.hash !== check.replayHash)) facts = { ...facts, request: { status: "unknown", rawEqual: null, reason: "The replay request log did not reconstruct to the pre-send check's SHA-256." } };
 	const replay = trajectory.turns().find(turn => turn.id === replayTurnId) ?? null;
 	if (!facts.request && replay && replay.steps.some(step => step.kind === "request")) facts = { ...facts, request: { status: "unknown", rawEqual: null, reason: "No main provider request could be correlated with this replay prompt before send." } };
 	return { facts, original, replay, requestBodies: { original: originalBody, replay: recorded?.body ?? null } };
 }
 
-function readReplayBlob(ref: string): unknown {
-	if (!/^blob:sha256:[a-f0-9]{64}$/.test(ref)) throw new Error("Replay data has an invalid blob reference.");
-	return JSON.parse(readFileSync(join(blobsDir, ref.slice("blob:sha256:".length)), "utf8"));
-}

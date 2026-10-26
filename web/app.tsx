@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
-import { errorText } from "./api";
+import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import {

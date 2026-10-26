@@ -36,8 +36,8 @@
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, and the image files the session wrote that their calls or results named, for the `media` message.
 - `src/trajectory.ts`: folds a transcript's entries into turns, with their injections, requests, tool calls, and usage, for the `turns` message; `TrajectoryTail` reads the file through `FoldedFile` and `ReadQueue`.
   `src/shared/trajectory.ts` holds `Turn`, its steps, and `TokenUsage`.
-- `src/replay.ts`: source pinning, original request correlation and settings, detached checkout preparation, owned failure cleanup, immutable original native blobs, `ReplayFold`, and full replay comparison.
-  `src/omp/replay-fork.ts` is the installed native prompt-cut and private-fork adapter, including images, skills, unresolved calls, relocation, and additional-directory clearing.
+- `src/replay.ts`: source token pinning and revalidation, detached checkout preparation, owned failure cleanup, `ReplayFold`, and full replay comparison.
+  `src/omp/replay-fork.ts` owns native prompt and ancestor reads, original request correlation and settings, immutable evidence blobs, and the private fork, including images, skills, unresolved calls, relocation, and additional-directory clearing.
   `src/omp/replay-launch.ts` supplies the private safe LSP overlay, protected RPC launch, resume preparation, and nonce-bound guard readiness.
   `src/shared/replay.ts` defines replay details, markers, check evidence and comparison data, plus ordered tool and complete final-text comparison.
   `templates/omp/agent/extensions/replay-guard.ts` installs the persistent model tool policy and the pre-send check.

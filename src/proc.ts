@@ -73,10 +73,11 @@ export interface ShellResult {
 }
 
 /**
- * Runs `command` through `sh -c` in `cwd` and settles when it exits, whatever its exit code. Rejects only when it cannot spawn.
+ * Runs `command` through `sh -c` in `cwd` and settles when it exits, whatever its exit code. Rejects if already aborted or unable to spawn.
  * Its stderr goes into its output in order with stdout; output past `maxOutput` keeps its end, after `…`.
  */
 export async function runShell(command: string, cwd: string, opts: ShellOptions): Promise<ShellResult> {
+	opts.signal?.throwIfAborted();
 	const child = Bun.spawn(["/bin/sh", "-c", `exec 2>&1\n${command}`], { cwd, env: childEnv(), stdin: "ignore", stdout: "pipe", stderr: "ignore", detached: true });
 	// The command's own children keep the pipe open after `sh` dies, so stopping it signals its whole process group.
 	const stop = (): void => {
@@ -87,8 +88,9 @@ export async function runShell(command: string, cwd: string, opts: ShellOptions)
 		}
 	};
 	const timer = setTimeout(stop, opts.timeoutMs);
-	opts.signal?.addEventListener("abort", stop);
+	opts.signal?.addEventListener("abort", stop, { once: true });
 	try {
+		if (opts.signal?.aborted) stop();
 		let output = "";
 		let cut = false;
 		const keep = (text: string): void => {
