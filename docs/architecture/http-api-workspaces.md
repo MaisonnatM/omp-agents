@@ -23,6 +23,15 @@ A missing directory is removed the same way, which drops only that registration.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
 Starts that create no worktree, such as a resume or a routine's session, stay parallel and wait only while a removal runs.
 
+`WorktreeOccupants` supplies named, located directories and unresolved repository scopes to `Worktrees`.
+It protects each live session's default directory and reported worktree, plus each resident subagent's native default directory and every declared Bash `cwd`.
+Terminal idle and parked subagents remain resident. Dashboard subagents remain resident while running, including descendants whose parent already completed.
+Missing or unreadable transcripts, incomplete writes, and malformed working-directory records add an unresolved scope without dropping earlier known directories.
+Changed transcripts are fingerprinted to distinguish appends from rewritten prefixes. A rewrite rereads the native header and working-directory records while retaining earlier protected paths.
+A disconnected roster or surviving child's parent session switch retains earlier child evidence until a live roster confirms departure or the parent process leaves.
+Known directories protect only their containing canonical checkout, including another repository. Unresolved scopes protect their repository, or every checkout when that repository cannot be identified.
+These checks use declared working directories, not every filesystem path a tool touches.
+
 `PUT /api/worktree/release` takes `{ cwd, branch }`, an absolute directory in a repository and a branch name, checked by `parseBranchRelease` in `src/server/wire.ts`, and answers 404 when `cwd` is not a directory.
 `Worktrees.releaseBranch` lists the repository's worktrees, picks the linked one that has `branch` checked out, never the main, a bare, or a prunable registration, and removes it through `removeCheckout` without waiting for a session to leave.
 It answers a `BranchRelease` from `src/shared/git.ts`: `{ kind: "none" }` when no linked worktree has the branch, `{ kind: "removed", path }`, or `{ kind: "kept", path, why }` with the blockers' messages or Git's error.

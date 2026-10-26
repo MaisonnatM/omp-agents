@@ -57,7 +57,9 @@
   Selected rows show a bar at the bottom of the page with their count, size, **Clear**, and **Delete**.
   **Delete** asks before it removes a linked worktree or forgets a registration whose directory is already gone.
   It keeps the branch and session transcripts.
-  It refuses the main checkout, a locked checkout, unsaved changes, a nested repository, a checkout this dashboard or a live session is using, and a checkout whose subagent locations are unknown.
+  It refuses the main checkout, a locked checkout, unsaved changes, a nested repository, and a checkout this dashboard, a live session, or a resident subagent uses.
+  Subagent blockers name the session and subagent. Known default and Bash working directories protect their containing checkouts, not unrelated siblings.
+  Missing or incomplete subagent evidence and disconnected rosters keep repository-wide protection. If the repository is unknown too, every checkout stays protected.
   Ignored files such as dependencies and `.env` are deleted with the checkout, and the confirmation names them.
   A detached commit that no branch contains is named before its registration can be removed.
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.

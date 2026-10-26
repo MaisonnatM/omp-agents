@@ -10,29 +10,25 @@ import type { MergedPullRequest } from "./pull-requests";
 import type { BranchRelease } from "./shared/git";
 import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMerge, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
 
-interface Occupant {
-	cwd: string;
-	unknownAgents: boolean;
-}
+export type WorktreeOccupant =
+	| { kind: "located"; cwd: string; label: string }
+	| { kind: "unlocated"; scopeCwd: string; label: string };
 
 interface WorktreesEnv {
 	knownCwds(): string[];
 	activity(): { id: string; cwd: string; modifiedAt: number }[];
-	live(): Occupant[];
+	live(): readonly WorktreeOccupant[] | Promise<readonly WorktreeOccupant[]>;
 	serverCwd: string;
 	/** The branches of `branches` whose newest pull request in `repository`'s GitHub repository merged. */
 	mergedPullRequests(repository: string, branches: string[]): Promise<Map<string, MergedPullRequest>>;
 }
 
-interface HostUse {
-	path: string;
-	unknownAgents: boolean;
-	repository: string | null;
-	unknownRepository: boolean;
-}
+type OccupantUse =
+	| { kind: "located"; path: string; label: string }
+	| { kind: "unlocated"; scopeCwd: string; repository: string | null; label: string };
 
 interface UseSnapshot {
-	hosts: HostUse[];
+	occupants: OccupantUse[];
 	activity: { id: string; path: string; modifiedAt: number }[];
 }
 
@@ -149,28 +145,33 @@ export class Worktrees {
 		return (this.#server ??= canonical(this.env.serverCwd));
 	}
 
-	/** Every live session's canonical directory, with the repository of one that has resident subagents. */
-	async #liveHosts(): Promise<HostUse[]> {
-		const live = this.env.live();
-		const canonicalOf = await probeEach(live.map(host => host.cwd), canonical);
-		const paths = live.map(host => unwrap(canonicalOf.get(host.cwd)));
-		const repositoryOf = await probeEach(paths.filter((_, index) => live[index]!.unknownAgents), commonDir);
-		return live.map((host, index) => {
-			const path = paths[index]!;
-			const probed = host.unknownAgents ? repositoryOf.get(path) : undefined;
-			return { path, unknownAgents: host.unknownAgents, repository: probed?.ok ? probed.value : null, unknownRepository: probed?.ok === false };
+	/** Known actor directories and the repository scopes of actors whose location is still unresolved. */
+	async #liveOccupants(): Promise<OccupantUse[]> {
+		const live = await this.env.live();
+		const canonicalOf = await probeEach(live.map(occupant => occupant.kind === "located" ? occupant.cwd : occupant.scopeCwd), canonical);
+		const scopes = live.flatMap(occupant => {
+			if (occupant.kind === "located") return [];
+			const probed = canonicalOf.get(occupant.scopeCwd);
+			return probed?.ok ? [probed.value] : [];
+		});
+		const repositoryOf = await probeEach(scopes, commonDir);
+		return live.map((occupant): OccupantUse => {
+			if (occupant.kind === "located") return { kind: "located", path: unwrap(canonicalOf.get(occupant.cwd)), label: occupant.label };
+			const path = canonicalOf.get(occupant.scopeCwd);
+			const repository = path?.ok ? repositoryOf.get(path.value) : undefined;
+			return { kind: "unlocated", scopeCwd: path?.ok ? path.value : occupant.scopeCwd, repository: repository?.ok ? repository.value : null, label: occupant.label };
 		});
 	}
 
-	/** The canonical directories live sessions run in, idle and waiting ones included, and the server's own: a checkout that holds one is in use. */
+	/** Every known live actor directory, idle and waiting ones included, and the server's own. */
 	async inUse(): Promise<string[]> {
-		const [hosts, server] = await Promise.all([this.#liveHosts(), this.#serverPath()]);
-		return [...hosts.map(host => host.path), server];
+		const [occupants, server] = await Promise.all([this.#liveOccupants(), this.#serverPath()]);
+		return [...new Set([...occupants.flatMap(occupant => occupant.kind === "located" ? [occupant.path] : []), server])];
 	}
 
 	/** One canonical view of live sessions and saved activity, reused for every worktree in the request. */
 	async #snapshot(): Promise<UseSnapshot> {
-		const hosts = await this.#liveHosts();
+		const occupants = await this.#liveOccupants();
 		const sessions = this.env.activity().filter(session => session.cwd);
 		const canonicalOf = await probeEach(sessions.map(session => session.cwd), canonical);
 		// An unavailable saved directory is not activity in this checkout.
@@ -178,18 +179,28 @@ export class Worktrees {
 			const probed = canonicalOf.get(session.cwd);
 			return probed?.ok ? [{ id: session.id, path: probed.value, modifiedAt: session.modifiedAt }] : [];
 		});
-		return { hosts, activity };
+		return { occupants, activity };
 	}
 
 	#occupancy(snapshot: UseSnapshot, repository: string, path: string): WorktreeBlocker[] {
-		const blockers: WorktreeBlocker[] = [];
-		let unknown = false;
-		for (const host of snapshot.hosts) {
-			if (beneath(path, host.path)) blockers.push({ code: "occupied", message: `A live omp session uses ${host.path}, including idle or waiting sessions.` });
-			if (host.unknownAgents && (host.unknownRepository || host.repository === repository)) unknown = true;
+		const located = new Map<string, Set<string>>();
+		const unlocated = new Map<string, Set<string>>();
+		for (const occupant of snapshot.occupants) {
+			if (occupant.kind === "located") {
+				if (!beneath(path, occupant.path)) continue;
+				const paths = located.get(occupant.label) ?? new Set<string>();
+				paths.add(occupant.path);
+				located.set(occupant.label, paths);
+			} else if (occupant.repository === null || occupant.repository === repository) {
+				const scopes = unlocated.get(occupant.label) ?? new Set<string>();
+				scopes.add(occupant.scopeCwd);
+				unlocated.set(occupant.label, scopes);
+			}
 		}
-		if (unknown) blockers.push({ code: "unknown-agent-location", message: "This repository has resident subagents whose checkout locations are unknown." });
-		return blockers;
+		return [
+			...[...located].map(([label, paths]): WorktreeBlocker => ({ code: "occupied", message: `${label} uses ${[...paths].join(", ")}.` })),
+			...[...unlocated].map(([label, scopes]): WorktreeBlocker => ({ code: "unknown-agent-location", message: `Cannot locate ${label} from ${[...scopes].join(", ")}; its checkout may still be in use.` })),
+		];
 	}
 
 	async #detachedLoss(entry: Checkout): Promise<boolean> {
@@ -485,7 +496,7 @@ export class Worktrees {
 		const target = { repository: await canonical(at.common), path: await canonical(at.top) };
 		const until = Date.now() + waitMs;
 		// Only live sessions decide this wait, so the checkout is read in full once, after they leave or the time is up.
-		while (Date.now() < until && this.#occupancy({ hosts: await this.#liveHosts(), activity: [] }, target.repository, target.path).some(blocker => blocker.code === "occupied")) await Bun.sleep(500);
+		while (Date.now() < until && this.#occupancy({ occupants: await this.#liveOccupants(), activity: [] }, target.repository, target.path).some(blocker => blocker.code === "occupied")) await Bun.sleep(500);
 		const plan = await this.preview(target);
 		// An unreadable plan always names its blocker.
 		if (plan.blockers.length || plan.kind === "unreadable") return { ...target, removed: false, blockers: plan.blockers, error: null };

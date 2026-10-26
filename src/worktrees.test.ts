@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runChecked } from "./proc";
-import { Worktrees } from "./worktrees";
+import { Worktrees, type WorktreeOccupant } from "./worktrees";
 import type { MergedPullRequest } from "./pull-requests";
 import type { WorktreeRemovalPlan } from "./worktrees-shared";
 
@@ -86,7 +86,7 @@ describe("worktree removal", () => {
 		const worktrees = new Worktrees({
 			knownCwds: () => [],
 			activity: () => [],
-			live: () => (leaving-- > 0 ? [{ cwd: join(path, "src"), unknownAgents: false }] : []),
+			live: () => (leaving-- > 0 ? [{ kind: "located", cwd: join(path, "src"), label: "Session leaving" }] : []),
 			serverCwd: "/no/such/dashboard",
 			mergedPullRequests: noPullRequests,
 		});
@@ -95,7 +95,7 @@ describe("worktree removal", () => {
 		expect(await worktrees.removeCheckout(main)).toBeNull();
 		expect(await worktrees.removeCheckout(parent)).toBeNull();
 		const stuck = await linked(parent, main, "stuck");
-		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: stuck, unknownAgents: false }], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
+		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ kind: "located", cwd: stuck, label: "Session stuck" }], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
 		expect((await busy.removeCheckout(stuck, 0))?.blockers.map(blocker => blocker.code)).toEqual(["occupied"]);
 	});
 
@@ -111,8 +111,9 @@ describe("worktree removal", () => {
 			knownCwds: () => [main],
 			activity: () => [],
 			live: () => [
-				{ cwd: join(occupied, "src"), unknownAgents: false },
-				{ cwd: main, unknownAgents: true },
+				{ kind: "located", cwd: join(occupied, "src"), label: "Session active" },
+				{ kind: "located", cwd: main, label: "Session parent" },
+				{ kind: "unlocated", scopeCwd: main, label: "Session parent subagent unresolved" },
 			],
 			serverCwd: locked,
 			mergedPullRequests: noPullRequests,
@@ -249,10 +250,14 @@ describe("worktree removal", () => {
 		const dirty = await linked(parent, main, "dirty");
 		writeFileSync(join(dirty, "untracked.txt"), "keep\n");
 		const occupied = await linked(parent, main, "occupied");
-		const trees = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: occupied, unknownAgents: false }], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
-		expect(await trees.releaseBranch(main, "dirty")).toEqual({ kind: "kept", path: dirty, why: "Tracked modifications or untracked files must be preserved before removal." });
+		const trees = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ kind: "located", cwd: occupied, label: "Session active" }], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
+		expect(await trees.releaseBranch(main, "dirty")).toMatchObject({ kind: "kept", path: dirty });
 		expect(existsSync(join(dirty, "untracked.txt"))).toBe(true);
-		expect(await trees.releaseBranch(main, "occupied")).toEqual({ kind: "kept", path: occupied, why: `A live omp session uses ${occupied}, including idle or waiting sessions.` });
+		const kept = await trees.releaseBranch(main, "occupied");
+		expect(kept).toMatchObject({ kind: "kept", path: occupied });
+		if (kept.kind !== "kept") throw new Error("Expected the occupied checkout to stay.");
+		expect(kept.why).toContain("Session active");
+		expect(kept.why).toContain(occupied);
 		expect(existsSync(occupied)).toBe(true);
 	});
 
@@ -338,6 +343,182 @@ describe("worktree removal", () => {
 		const repository = listed.repositories[0]?.repository ?? "";
 		const plans = await trees.previewAll([{ repository, path: landed }, { repository, path: open }], true);
 		expect(plans.map(plan => plan.blockers)).toEqual([[], [{ code: "unmerged", message: "Cannot tell whether this worktree merged: gh is down" }]]);
+	});
+
+	test("known subagents protect their own checkouts across repositories without holding an unrelated sibling", async () => {
+		const first = await repo();
+		const second = await repo();
+		const occupied = await linked(first.parent, first.main, "child");
+		const sibling = await linked(first.parent, first.main, "sibling");
+		const other = await linked(second.parent, second.main, "other-child");
+		const inside = join(occupied, "src");
+		const otherInside = join(other, "front");
+		mkdirSync(inside);
+		mkdirSync(otherInside);
+		const trees = new Worktrees({
+			knownCwds: () => [first.main, second.main],
+			activity: () => [],
+			live: async () => [
+				{ kind: "located", cwd: first.main, label: "Session checkout" },
+				{ kind: "located", cwd: inside, label: "Session checkout subagent Review" },
+				{ kind: "located", cwd: otherInside, label: "Session checkout subagent Review" },
+			],
+			serverCwd: first.main,
+			mergedPullRequests: noPullRequests,
+		});
+		const repository = await common(first.main);
+		const otherRepository = await common(second.main);
+		const plans = await trees.previewAll([{ repository, path: occupied }, { repository, path: sibling }, { repository: otherRepository, path: other }], false);
+		expect(plans.map(plan => plan.blockers.map(blocker => blocker.code))).toEqual([["occupied"], [], ["occupied"]]);
+		expect(plans[0]?.blockers[0]?.message).toContain("Session checkout subagent Review");
+		expect(plans[0]?.blockers[0]?.message).toContain(inside);
+		expect(plans[2]?.blockers[0]?.message).toContain("Session checkout subagent Review");
+		expect(plans[2]?.blockers[0]?.message).toContain(otherInside);
+		const listed = await trees.inventory(null);
+		expect(listed.repositories.flatMap(item => item.worktrees.filter(entry => !entry.main).map(entry => [entry.path, entry.blockers.map(blocker => blocker.code)]))).toEqual([
+			[occupied, ["occupied"]],
+			[sibling, []],
+			[other, ["occupied"]],
+		]);
+		expect(await trees.inUse()).toEqual([first.main, inside, otherInside]);
+		const siblingPlan = readable(plans[1]!);
+		expect((await trees.remove([siblingPlan])).map(result => result.removed)).toEqual([true]);
+		expect(existsSync(sibling)).toBe(false);
+		expect(existsSync(occupied)).toBe(true);
+		expect(existsSync(other)).toBe(true);
+	});
+
+	test("canonical child directories deduplicate one actor while retaining every named actor and path", async () => {
+		const { parent, main } = await repo();
+		const path = await linked(parent, main);
+		const inside = join(path, "src", "nested");
+		const extra = join(path, "lib");
+		mkdirSync(inside, { recursive: true });
+		mkdirSync(extra);
+		const alias = join(parent, "alias");
+		symlinkSync(path, alias);
+		const trees = new Worktrees({
+			knownCwds: () => [main],
+			activity: () => [],
+			live: () => [
+				{ kind: "located", cwd: join(alias, "src", "nested"), label: "Session build subagent A" },
+				{ kind: "located", cwd: inside, label: "Session build subagent A" },
+				{ kind: "located", cwd: extra, label: "Session build subagent A" },
+				{ kind: "located", cwd: inside, label: "Session build subagent B" },
+			],
+			serverCwd: main,
+			mergedPullRequests: noPullRequests,
+		});
+		const plan = await trees.preview({ repository: await common(main), path });
+		expect(plan.blockers.map(blocker => blocker.code)).toEqual(["occupied", "occupied"]);
+		expect(plan.blockers[0]?.message).toContain("Session build subagent A");
+		expect(plan.blockers[0]?.message).toContain(inside);
+		expect(plan.blockers[0]?.message).toContain(extra);
+		expect(plan.blockers[1]?.message).toContain("Session build subagent B");
+		expect(plan.blockers[1]?.message).toContain(inside);
+		expect(await trees.inUse()).toEqual([inside, extra, main]);
+	});
+
+	test("unlocated actors block only their scoped repository and keep known cross-repository evidence", async () => {
+		const first = await repo();
+		const second = await repo();
+		const scoped = await linked(first.parent, first.main, "scoped");
+		const sibling = await linked(first.parent, first.main, "sibling");
+		const other = await linked(second.parent, second.main, "known");
+		const unrelated = await linked(second.parent, second.main, "unrelated");
+		const inside = join(scoped, "src");
+		mkdirSync(inside);
+		const trees = new Worktrees({
+			knownCwds: () => [first.main, second.main],
+			activity: () => [],
+			live: () => [
+				{ kind: "unlocated", scopeCwd: inside, label: "Session partial subagent A" },
+				{ kind: "unlocated", scopeCwd: first.main, label: "Session partial subagent A" },
+				{ kind: "unlocated", scopeCwd: first.main, label: "Session partial subagent B" },
+				{ kind: "located", cwd: other, label: "Session partial subagent A" },
+			],
+			serverCwd: first.main,
+			mergedPullRequests: noPullRequests,
+		});
+		const repository = await common(first.main);
+		const otherRepository = await common(second.main);
+		const plans = await trees.previewAll([
+			{ repository, path: scoped },
+			{ repository, path: sibling },
+			{ repository: otherRepository, path: other },
+			{ repository: otherRepository, path: unrelated },
+		], false);
+		expect(plans.map(plan => plan.blockers.map(blocker => blocker.code))).toEqual([
+			["unknown-agent-location", "unknown-agent-location"],
+			["unknown-agent-location", "unknown-agent-location"],
+			["occupied"],
+			[],
+		]);
+		expect(plans[0]?.blockers[0]?.message).toContain("Session partial subagent A");
+		expect(plans[0]?.blockers[0]?.message).toContain(inside);
+		expect(plans[0]?.blockers[1]?.message).toContain("Session partial subagent B");
+		expect(plans[2]?.blockers[0]?.message).toContain(other);
+		expect(await trees.inUse()).toEqual([other, first.main]);
+	});
+
+	test("a scope whose repository cannot be resolved protects checkouts in every repository", async () => {
+		const first = await repo();
+		const second = await repo();
+		const path = await linked(first.parent, first.main);
+		const other = await linked(second.parent, second.main);
+		const loop = join(first.parent, "loop");
+		symlinkSync(loop, loop);
+		const targets = [{ repository: await common(first.main), path }, { repository: await common(second.main), path: other }];
+		for (const scopeCwd of [first.parent, join(first.parent, "missing"), loop]) {
+			const trees = new Worktrees({
+				knownCwds: () => [first.main, second.main],
+				activity: () => [],
+				live: () => [
+					{ kind: "located", cwd: path, label: "Session partial subagent known" },
+					{ kind: "unlocated", scopeCwd, label: "Session partial subagent unknown" },
+				],
+				serverCwd: first.main,
+				mergedPullRequests: noPullRequests,
+			});
+			const plans = await trees.previewAll(targets, false);
+			expect(plans.map(plan => plan.blockers.map(blocker => blocker.code))).toEqual([["occupied", "unknown-agent-location"], ["unknown-agent-location"]]);
+			expect(plans[1]?.blockers[0]?.message).toContain("Session partial subagent unknown");
+			expect(plans[1]?.blockers[0]?.message).toContain(scopeCwd);
+			expect(await trees.inUse()).toEqual([path, first.main]);
+		}
+	});
+
+	test("removal takes fresh child occupancy after an otherwise removable preview", async () => {
+		const { parent, main } = await repo();
+		const path = await linked(parent, main);
+		const inside = join(path, "src");
+		mkdirSync(inside);
+		let live: readonly WorktreeOccupant[] = [];
+		const trees = new Worktrees({
+			knownCwds: () => [main],
+			activity: () => [],
+			live: async () => live,
+			serverCwd: main,
+			mergedPullRequests: noPullRequests,
+		});
+		const target = { repository: await common(main), path };
+		const plan = readable(await trees.preview(target));
+		expect(plan.blockers).toEqual([]);
+		live = [{ kind: "located", cwd: inside, label: "Session started subagent child" }];
+		const results = await trees.remove([plan]);
+		expect(results.map(result => ({ removed: result.removed, codes: result.blockers.map(blocker => blocker.code), error: result.error }))).toEqual([
+			{ removed: false, codes: ["occupied"], error: null },
+		]);
+		expect(results[0]?.blockers[0]?.message).toContain("Session started subagent child");
+		expect(results[0]?.blockers[0]?.message).toContain(inside);
+		expect(existsSync(path)).toBe(true);
+		live = [{ kind: "unlocated", scopeCwd: main, label: "Session started subagent unresolved" }];
+		const unresolved = await trees.remove([plan]);
+		expect(unresolved.map(result => ({ removed: result.removed, codes: result.blockers.map(blocker => blocker.code), error: result.error }))).toEqual([
+			{ removed: false, codes: ["unknown-agent-location"], error: null },
+		]);
+		expect(unresolved[0]?.blockers[0]?.message).toContain("Session started subagent unresolved");
+		expect(existsSync(path)).toBe(true);
 	});
 });
 

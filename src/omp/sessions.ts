@@ -1,5 +1,5 @@
 /** omp's session files: listing them, renaming one, and reading whether a process left one mid-turn. */
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { oneLine } from "../session-entries";
 import type { SessionSource } from "../shared/sessions";
 import { isDashboardPrompt } from "../shared/transcript";
@@ -73,6 +73,16 @@ class OneFileStorage extends storage.FileSessionStorage {
 export async function readSessionFile(path: string): Promise<SavedSession | null> {
 	const [session] = await listing.listSessionsReadOnly(dirname(path), new OneFileStorage(path));
 	return session ? saved(session) : null;
+}
+
+/** The current native header's cwd, without the listing cache, bounded as omp's own header reader is. */
+export async function readSessionCwd(path: string): Promise<string | null> {
+	let cwd: string | null = null;
+	await loader.visitEntriesFromFileStream(path, entry => {
+		if (entry.type === "session" && typeof entry.id === "string" && typeof entry.cwd === "string" && isAbsolute(entry.cwd)) cwd = entry.cwd;
+		return false;
+	}, { maxRecords: 1, maxBytes: 1024 * 1024 });
+	return cwd;
 }
 
 /** Give the saved session at `path`, which no omp runs, `title` as the user's own, as omp's `/rename` does. */

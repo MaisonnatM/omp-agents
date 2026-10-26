@@ -47,6 +47,7 @@ import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
+import { WorktreeOccupants } from "./worktree-occupants";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
 import { EndInbox } from "./end-inbox";
@@ -280,17 +281,13 @@ export class Dashboard {
 			},
 			joinFor: request => this.#reviewDrafts.join(request),
 		});
+		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
 			knownCwds: () => this.knownCwds(),
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
 			mergedPullRequests,
-			live() {
-				return sessions.rows(files.factsOf).map(host => ({
-					cwd: host.cwd,
-					unknownAgents: host.control.phase !== "live" || host.agents.some(agent => (host.source === "terminal" ? agent.status !== "aborted" : agent.status === "running")),
-				}));
-			},
+			live: () => occupants.snapshot(sessions.rows(files.factsOf), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
 		this.#processWatch = new SessionProcessWatch({

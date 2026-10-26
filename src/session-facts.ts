@@ -226,6 +226,8 @@ export class SessionFactsScan {
 	ship: ShipProgress | null = null;
 	/** The `cwd` arguments of bash calls as written, each once, the most recently used last. */
 	readonly workDirs = new Set<string>();
+	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
+	unreadableLines = false;
 	readonly replay = new ReplayFold();
 
 	/** `prompts`: whether the transcript is the session's own, whose user prompts name the work the user asked for. */
@@ -242,6 +244,7 @@ export class SessionFactsScan {
 		try {
 			entry = JSON.parse(line);
 		} catch {
+			this.unreadableLines = true;
 			return;
 		}
 		if (!isObject(entry)) return;
