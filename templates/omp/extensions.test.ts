@@ -1,48 +1,71 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { packageDir } from "../../src/omp/install";
 
 const loader = `
+import { spawnSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 const { z } = createRequire(join(process.argv[2], "package.json"))("zod");
-// The same harness loads whichever installed extension the caller selects.
-const { default: extension } = await import(process.argv[3]);
 const input = JSON.parse(process.argv[4]);
-let gate;
-let agentStart;
+// Importing omp's exports takes about a second, so only a test that reads them asks for them.
+const pi = input.omp ? await import(process.argv[2]) : undefined;
 let tool;
 let confirmations = 0;
 const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
-extension({
-	// Importing omp's exports takes about a second, so only a test that reads them asks for them.
-	pi: input.omp ? await import(process.argv[2]) : undefined,
-	zod: z,
-	on(name, handler) {
-		if (name === "tool_call") gate = handler;
-		if (name === "before_agent_start") agentStart = handler;
-	},
-	registerTool(registered) { tool = registered; },
-	appendEntry() {},
-	// input.responses answers by subcommand, such as "pr view" or "repo view"; input.response answers the rest.
-	async exec(_command, args) { return input.responses?.[args.slice(0, 2).join(" ")] ?? input.response; },
-});
+// Loads an extension as one omp session does and returns its handlers by event name.
+function load(extension) {
+	const hooks = {};
+	extension({
+		pi,
+		zod: z,
+		on(name, handler) { hooks[name] = handler; },
+		registerTool(registered) { tool = registered; },
+		appendEntry() {},
+		// input.responses answers by subcommand, such as "pr view" or "repo view"; input.response answers the rest.
+		async exec(_command, args) { return input.responses?.[args.slice(0, 2).join(" ")] ?? input.response; },
+	});
+	return hooks;
+}
+// The same harness loads whichever installed extension the caller selects.
+const hooks = load((await import(process.argv[3])).default);
 if (input.command) {
-	if (!gate) throw new Error("No command gate registered");
-	const result = await gate({ toolName: "bash", input: { command: input.command } }, {
+	if (!hooks.tool_call) throw new Error("No command gate registered");
+	const result = await hooks.tool_call({ toolName: "bash", input: { command: input.command } }, {
 		cwd: process.cwd(), hasUI: true,
 		ui: { async confirm() { confirmations++; return input.approve; } },
 	});
 	console.log(JSON.stringify({ result: result ?? null, confirmations }));
-} else if (input.write) {
-	// attempts repeats the call, as an agent retrying after a block does; the last answer counts.
-	let result;
-	for (let i = 0; i < (input.attempts ?? 1); i++) result = await gate({ toolName: "write", input: { path: input.write } }, { cwd: process.cwd(), sessionManager, agent: { kind: "main" } });
-	console.log(JSON.stringify({ result: result ?? null }));
+} else if (input.calls) {
+	// One omp process: its session, and a subagent session that loads the extension again, as omp does for each session.
+	const sub = load((await import(process.argv[3] + "?sub")).default);
+	const results = [];
+	for (const call of input.calls) {
+		const cwd = call.cwd ?? process.cwd();
+		const ctx = { cwd, hasUI: false, sessionManager: { getSessionId: () => call.sessionId ?? "session" }, agent: { kind: call.agent ?? "main" } };
+		const session = call.agent === "sub" ? sub : hooks;
+		let reason = null;
+		// external is another process changing the checkout outside omp.
+		if (call.external) spawnSync("bash", ["-c", call.external], { cwd, stdio: "ignore" });
+		else if (call.shutdown) await session.session_shutdown({ type: "session_shutdown" }, ctx);
+		else {
+			const event = { toolCallId: String(results.length), ...(call.write ? { toolName: "write", input: { path: call.write } } : { toolName: "bash", input: { command: call.bash } }) };
+			reason = (await session.tool_call(event, ctx))?.reason ?? null;
+			// An allowed call runs, unless dry asks only for the guard's answer.
+			if (reason === null && !call.dry) {
+				if (call.write) writeFileSync(call.write, ctx.sessionManager.getSessionId() + "\\n");
+				else await session.tool_result({ ...event, isError: spawnSync("bash", ["-c", call.bash], { cwd, stdio: "ignore" }).status !== 0 }, ctx);
+			}
+		}
+		results.push(reason);
+	}
+	console.log(JSON.stringify({ results }));
 } else if (input.agentStart) {
-	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
+	const result = await hooks.before_agent_start({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false, sessionManager });
@@ -60,6 +83,7 @@ function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-
 	run: { isError: boolean; stage: string | null };
 	text: string | null;
 	prompt: string[] | null;
+	results: (string | null)[];
 } {
 	const child = Bun.spawnSync([
 		process.execPath, "run", "-", packageDir,
@@ -161,15 +185,203 @@ describe("worktree guard", () => {
 	git("clone", "-q", "main", "plain");
 	afterAll(() => rmSync(root, { recursive: true, force: true }));
 
+	const guarded = (calls: object[]) => exercise("worktree-guard", { calls }).results.at(-1) !== null;
+
 	test.each([["main", true], ["plain", true], ["feature", false], ["isolated/m", false]])("a first write in the %s clone", (checkout, blocked) => {
-		const { result } = exercise("worktree-guard", { write: join(root, checkout, "file.txt") });
-		expect(result?.block ?? false).toBe(blocked);
+		expect(guarded([{ write: join(root, checkout, "file.txt"), dry: true }])).toBe(blocked);
 	});
 
 	// `downstream` is on `trunk`, the default branch its `origin/HEAD` names; `feature` has no remote and is on neither `main` nor `master`.
 	test.each([["main", true], ["downstream", true], ["feature", false]])("a retried write in the %s checkout is blocked: %s", (checkout, blocked) => {
-		const { result } = exercise("worktree-guard", { write: join(root, checkout, "file.txt"), attempts: 2 });
-		expect(result?.block ?? false).toBe(blocked);
+		const write = { write: join(root, checkout, "file.txt"), dry: true };
+		expect(guarded([write, write])).toBe(blocked);
+	});
+});
+
+describe("checkout ownership", () => {
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "checkout-owner-")));
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+	// No user or system config: a hook or a signing key there would change what the commands below do.
+	const env = {
+		GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+		GIT_AUTHOR_NAME: "test", GIT_AUTHOR_EMAIL: "test@example.com", GIT_COMMITTER_NAME: "test", GIT_COMMITTER_EMAIL: "test@example.com",
+	};
+	const git = (dir: string, ...args: string[]) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf8", stdio: "pipe", env: { ...process.env, ...env } }).trim();
+	let repos = 0;
+	// A repository with one commit on `main` and `other`, checked out on `feat`.
+	const repo = () => {
+		const dir = join(root, `repo-${++repos}`);
+		mkdirSync(dir);
+		git(dir, "init", "-q", "-b", "main");
+		writeFileSync(join(dir, "file.txt"), "start\n");
+		git(dir, "add", "file.txt");
+		git(dir, "commit", "-q", "-m", "start");
+		git(dir, "branch", "other");
+		git(dir, "switch", "-q", "-c", "feat");
+		return dir;
+	};
+	// Each list runs in one new omp process; a call is a write, a bash command, another process's command, or a shutdown.
+	const calls = (list: object[]) => exercise("worktree-guard", { calls: list }, env).results;
+	const claimFile = (dir: string) => join(git(dir, "rev-parse", "--path-format=absolute", "--git-dir"), "omp-checkout-owner.json");
+	// The test process is alive for as long as the omp processes it starts, so its claim reads as another live session's.
+	const claimByAnother = (dir: string, owner: object = {}) => {
+		const started = execFileSync("ps", ["-o", "lstart=", "-p", String(process.pid)], { encoding: "utf8" }).trim();
+		writeFileSync(claimFile(dir), JSON.stringify({ pid: process.pid, started, session: "theirs", at: new Date().toISOString(), ...owner }));
+	};
+	// `true` for the block that names the test's claim on `dir`, else the reason itself, so a mismatch shows which reason came back.
+	const held = (reason: string | null, dir: string) => (reason?.includes(`session theirs, pid ${process.pid}`) && reason.includes(`delete ${claimFile(dir)}`)) || reason;
+
+	test("another live session's checkout with uncommitted changes takes no switch, commit, or edit, while reads and a worktree of one's own pass", () => {
+		const dir = repo();
+		writeFileSync(join(dir, "file.txt"), "theirs\n");
+		claimByAnother(dir);
+		const worktree = `${dir}-wt`;
+		const results = calls([
+			{ bash: "git checkout main", cwd: dir },
+			{ bash: "git commit -qam mine", cwd: dir },
+			{ write: join(dir, "file.txt") },
+			{ bash: "git status && git log -1", cwd: dir },
+			{ bash: `git worktree add -q -b mine ${worktree} main`, cwd: dir },
+			{ write: join(worktree, "file.txt") },
+			{ bash: "git commit -qam mine", cwd: worktree },
+		]);
+		expect(results.map(reason => held(reason, dir))).toEqual([true, true, true, null, null, null, null]);
+		expect([git(dir, "branch", "--show-current"), readFileSync(join(dir, "file.txt"), "utf8")]).toEqual(["feat", "theirs\n"]);
+		expect(git(worktree, "log", "-1", "--format=%s")).toBe("mine");
+	});
+
+	test("another live session's linked worktree with uncommitted changes cannot be removed or moved from another checkout", () => {
+		const dir = repo();
+		const worktree = `${dir}-theirs`;
+		git(dir, "worktree", "add", "-q", "-b", "theirs", worktree);
+		writeFileSync(join(worktree, "file.txt"), "theirs\n");
+		claimByAnother(worktree);
+		const results = calls([
+			{ bash: `git worktree remove --force ${worktree}`, cwd: dir },
+			{ bash: `git worktree move ${basename(worktree)} ${dir}-moved`, cwd: root },
+		]);
+		expect(results.map(reason => held(reason, worktree))).toEqual([true, true]);
+		expect(readFileSync(join(worktree, "file.txt"), "utf8")).toBe("theirs\n");
+	});
+
+	test("a rebase paused on a clean tree still holds the checkout", () => {
+		const dir = repo();
+		git(dir, "commit", "-q", "--allow-empty", "-m", "theirs");
+		git(dir, "-c", "sequence.editor=sed -i.bak s/^pick/edit/", "rebase", "-q", "-i", "--keep-empty", "main");
+		claimByAnother(dir);
+		const [reason] = calls([{ bash: "git switch main", cwd: dir }]);
+		expect(held(reason, dir)).toBe(true);
+	});
+
+	test("a clean checkout passes to the next session that changes it", () => {
+		const dir = repo();
+		claimByAnother(dir);
+		expect(calls([{ bash: "git merge -q other", cwd: dir, sessionId: "next" }])).toEqual([null]);
+		expect(JSON.parse(readFileSync(claimFile(dir), "utf8"))).toMatchObject({ session: "next" });
+	});
+
+	test.each([
+		["has ended", { pid: spawnSync("true").pid }],
+		["reused its pid", { started: "Thu Jan  1 00:00:00 1970" }],
+	])("a claim whose process %s passes to the next session", (_, owner) => {
+		const dir = repo();
+		writeFileSync(join(dir, "file.txt"), "theirs\n");
+		claimByAnother(dir, owner);
+		expect(calls([{ bash: "git commit -qam mine", cwd: dir, sessionId: "next" }])).toEqual([null]);
+		expect(JSON.parse(readFileSync(claimFile(dir), "utf8"))).toMatchObject({ session: "next" });
+	});
+
+	test.each(["feat", "main"])("after another process switches the checkout to main, changes wait for a switch to %s that succeeds", target => {
+		const dir = repo();
+		const results = calls([
+			{ write: join(dir, "file.txt") },
+			{ external: "git checkout -q main", cwd: dir },
+			{ write: join(dir, "file.txt") },
+			{ bash: "git switch -c rescue", cwd: dir },
+			{ bash: "git switch -q nope", cwd: dir },
+			{ bash: `git switch -q ${target} && git commit -qam work`, cwd: dir },
+			{ bash: `git switch -q ${target}`, cwd: dir },
+			{ bash: "git commit -qam work", cwd: dir },
+		]);
+		const drift = "is on `main`, but this session left it on `feat`: another process switched it.";
+		expect(results.map(reason => reason?.includes(drift) ?? null)).toEqual([null, null, true, true, null, true, null, null]);
+		expect([git(dir, "branch", "--show-current"), git(dir, "log", "-1", "--format=%s")]).toEqual([target, "work"]);
+	});
+
+	test("after another process switches the checkout, switches pass and every other change waits", () => {
+		const dir = repo();
+		const blocked = {
+			"git checkout feat": false, "git checkout feat 2>/dev/null": false, "git switch feat": false, "gt co feat": false, "gh pr checkout 7": false,
+			"git checkout -b x": true, "git checkout -- file.txt": true, "git checkout .": true, "git checkout feat file.txt": true, "git switch -c x": true,
+			"gt create x": true, "gt m -a": true, "git stash": true, "git stash pop": true, "git reset --hard": true, "git branch -m x": true,
+			"git -c core.pager=cat commit": true, "git switch feat; git commit": true,
+			"env GIT_EDITOR=true git rebase --continue": true, "command git commit": true, 'bash -c "git commit -qam x"': true, "sh -c 'git checkout feat'": false,
+			"git status": false, "git stash list": false, "git branch x": false, "git worktree list": false, "gt log": false, "gt submit": false,
+			"gh pr view": false, "echo git commit": false, "git constructor": false, "bash -lc 'git status'": false,
+		};
+		const commands = Object.keys(blocked);
+		const results = calls([
+			{ write: join(dir, "file.txt") },
+			{ external: "git checkout -q main", cwd: dir },
+			...commands.map(bash => ({ bash, cwd: dir, dry: true })),
+		]);
+		expect(Object.fromEntries(commands.map((command, i) => [command, results[i + 2] !== null]))).toEqual(blocked);
+	});
+
+	test("this session's own branch changes move where it expects HEAD, a failed command that moved HEAD included", () => {
+		const dir = repo();
+		const results = calls([
+			{ write: join(dir, "file.txt") },
+			{ bash: "git switch -q -c feat2", cwd: dir },
+			{ write: join(dir, "file.txt") },
+			{ bash: "git switch -q other && false", cwd: dir },
+			{ bash: "git commit -qam work", cwd: dir },
+		]);
+		expect(results).toEqual([null, null, null, null, null]);
+		expect([git(dir, "branch", "--show-current"), git(dir, "log", "-1", "--format=%s")]).toEqual(["other", "work"]);
+	});
+
+	test("a subagent shares its session's checkout and its view of HEAD", () => {
+		const dir = repo();
+		const results = calls([
+			{ write: join(dir, "file.txt") },
+			{ write: join(dir, "file.txt"), agent: "sub", sessionId: "sub" },
+			{ bash: "git commit -qam work", cwd: dir, agent: "sub" },
+			{ external: "git checkout -q main", cwd: dir },
+			{ write: join(dir, "file.txt"), agent: "sub" },
+		]);
+		expect(results.map(reason => reason?.includes("but this session left it on `feat`") ?? null)).toEqual([null, null, null, null, true]);
+	});
+
+	test.each([["main", false], ["sub", true]])("shutting down a %s session keeps the claim: %p", (agent, kept) => {
+		const dir = repo();
+		calls([{ write: join(dir, "file.txt") }, { shutdown: true, agent }]);
+		expect(existsSync(claimFile(dir))).toBe(kept);
+	});
+
+	test("a command changes the checkout its cd, -C, or --cwd names, and one named through a variable waits", () => {
+		const dir = repo();
+		writeFileSync(join(dir, "file.txt"), "theirs\n");
+		claimByAnother(dir);
+		const name = basename(dir);
+		const expected = {
+			[`cd ${name} && git commit -qam x`]: "held",
+			[`git -C ${name} commit -qam x`]: "held",
+			[`git -C ${dir}/.. -C ${name} stash`]: "held",
+			[`gt --cwd ${dir} modify -a`]: "held",
+			[`gt --cwd=${dir} modify -a`]: "held",
+			[`cd ${name}; cd ..; git commit -qam x`]: null,
+			[`cd -P ${name} && git commit -qam x`]: "held",
+			[`bash -c "cd ${name} && git commit -qam x"`]: "held",
+			[`git -C "$REPO" commit -qam x`]: "unlocated",
+			[`cd "$(mktemp -d)" && git commit`]: "unlocated",
+			[`pushd && git commit`]: "unlocated",
+			[`git -C "$REPO" status`]: null,
+		};
+		const commands = Object.keys(expected);
+		const results = calls(commands.map(bash => ({ bash, cwd: root, dry: true })));
+		const outcome = (reason: string | null) => (reason === null ? null : reason.includes("cannot locate") ? "unlocated" : held(reason, dir) === true ? "held" : reason);
+		expect(Object.fromEntries(commands.map((command, i) => [command, outcome(results[i])]))).toEqual(expected);
 	});
 });
 
