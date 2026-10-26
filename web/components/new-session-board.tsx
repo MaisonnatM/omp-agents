@@ -5,7 +5,7 @@ import { prKey } from "../../src/shared/github";
 import { agentOn } from "../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
-import { localDay } from "../days";
+import { localDay } from "../../src/shared/days";
 import { pastLabel } from "../labels";
 import { boardPullRequests, boardSessions, boardTodos, BOARD_ROWS } from "../new-session-board-model";
 import { readPinnedSkill } from "../pinned-skill";

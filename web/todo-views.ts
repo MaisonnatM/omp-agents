@@ -3,7 +3,7 @@ import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQu
 import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
-import { localDay } from "./days";
+import { localDay } from "../src/shared/days";
 import { DAY_FORMAT } from "./labels";
 import type { TodoListView } from "./routing";
 import type { StatusKind } from "./tickets-model";

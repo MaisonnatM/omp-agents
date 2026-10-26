@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { useStoredState } from "../stored-state";
 import { Separator, useDragSeparator } from "./drag-separator";
@@ -130,6 +131,7 @@ export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 	return (
 		<Tooltip content={`${open ? "Hide" : "Show"} the ${name.toLowerCase()} sidebar`} shortcut={shortcutLabels(shortcut)} side="bottom">
 			<Button
+				{...activityControl(side === "left" ? "sidebar.left.toggle" : "sidebar.right.toggle")}
 				variant="ghost"
 				size="icon-compact"
 				className="shrink-0 text-muted-foreground"

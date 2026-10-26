@@ -21,6 +21,7 @@ import {
 } from "../src/shared/calendar";
 import { decodeInboxAnswer, type InboxAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
+import { type ActivityRead, decodeActivity } from "../src/shared/activity";
 import { decodePullRequestList, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestEdit, type PullRequestList, type PullRequestViewedEdit, type RepoPullRequests } from "../src/shared/github";
 import type { MergeQueueAnswer, MergeQueueChange } from "../src/shared/merge-queue";
 import type { ModelEntry } from "../src/shared/models";
@@ -219,6 +220,12 @@ export function useConversationHits(query: string): ConversationHit[] {
 export const analyticsStore = createPolledStore<Analytics>({
 	url: range => `/api/analytics?range=${range ?? "24h"}`,
 	cache: { key: "omp-agents.analytics-cache", decode: decodeAnalytics },
+});
+
+/** Settings › Activity's report over a range, `30d` by default. */
+export const activityStore = createPolledStore<ActivityRead>({
+	url: range => `/api/activity?range=${range ?? "30d"}`,
+	cache: { key: "omp-agents.activity-cache", decode: decodeActivity },
 });
 
 /** The context sources of Settings › Analytics; the scope is the request's query (range, workspace, session), so reads stay in memory. */

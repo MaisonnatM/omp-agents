@@ -13,6 +13,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
+import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
 import { folderName } from "../labels";
 import { pullRequestsStore, ticketsStore } from "../reads";
@@ -55,6 +56,7 @@ function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspac
 		<CommandPicker
 			trigger={<span className="truncate">{label}</span>}
 			icon={Folder}
+			control="sidebar.workspace"
 			tooltip={selected?.cwdDisplay ?? "All workspaces"}
 			shortcut="workspace"
 			ariaLabel={`Show sessions from: ${label}`}
@@ -247,7 +249,7 @@ export function Roster({
 				<h1 className="sr-only">omp sessions</h1>
 				<SidebarWorkspacePicker workspaces={workspaces} current={workspace} onPick={onPickWorkspace} />
 				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
-					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
+					<Button {...activityControl("shortcuts.open")} variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 						<Keyboard />
 					</Button>
 				</Tooltip>

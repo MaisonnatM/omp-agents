@@ -67,9 +67,11 @@ import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/da
 import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
+import { DAY_MS } from "../shared/days";
+import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
-const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
+const MAX_EVENT_SPAN_MS = 62 * DAY_MS;
 
 /** What the session routes read: the directories sessions ran in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
@@ -140,6 +142,8 @@ export interface RouteEnv {
 	pullRequests: PullRequestRoutesEnv;
 	dashboard: DashboardRoutesEnv;
 	sync: SyncRoutesEnv;
+	/** The page's activity events, for Settings › Activity. */
+	activity: ActivityRoutesEnv;
 	processes: ProcessRoutesEnv;
 }
 
@@ -173,7 +177,7 @@ type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) => Promi
 export type Routes = Record<string, Partial<Record<"GET" | "PUT", Handler>>>;
 
 /** The ways a route answers: a read of its query, a read that a tag loads, and a write of its JSON body. */
-interface RouteKit {
+export interface RouteKit {
 	/** A read: admitted like every other, then handed the request's query. */
 	get(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
 	/** `get` for a file that an image, a video, or a frame loads, which sends no header: it also takes the media key as `?key=`. */
@@ -952,7 +956,7 @@ function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes 
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
-	return {
+	const routes: Routes = {
 		...sessionRoutes(kit, env.sessions),
 		...integrationRoutes(kit, env.integrations),
 		...providerRoutes(kit),
@@ -965,4 +969,5 @@ export function createRoutes(env: RouteEnv): Routes {
 		...syncRoutes(kit, env.sync),
 		...processRoutes(kit, env.processes),
 	};
+	return { ...routes, ...activityRoutes(kit, env.activity, routes) };
 }

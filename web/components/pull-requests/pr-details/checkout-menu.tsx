@@ -3,6 +3,7 @@ import type { CheckedOutPullRequest, CheckoutPlace, PullRequest, PullRequestChec
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../../../activity";
 import { putJson } from "../../../api";
 import { readPinnedSkill } from "../../../pinned-skill";
 import { useAction } from "../../../use-action";
@@ -41,6 +42,7 @@ export function CheckoutMenu({ pr, cwd, onOpen }: { pr: PullRequest; cwd: string
 		<DropdownMenu>
 			<Tooltip content="Check out this pull request">
 				<DropdownMenuTrigger
+					{...activityControl("pr-details.checkout")}
 					render={<Button size="xs" variant="outline" className="shrink-0 @max-[35rem]/pr-header:gap-0.5 [&_svg:last-child]:text-muted-foreground" leadingIcon={GitBranch} trailingIcon={ChevronDown} disabled={checkOut.pending} aria-label={label} />}
 				>
 					<span className="@max-[35rem]/pr-header:hidden">{label}</span>

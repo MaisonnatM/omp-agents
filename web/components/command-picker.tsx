@@ -7,6 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip } from "@/components/ui/tooltip";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
+import type { ControlId } from "../../src/shared/activity";
+import { activityControl } from "../activity";
 import type { ReadState } from "../reads";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { ComposerEditor } from "./composer";
@@ -135,10 +137,12 @@ interface CommandPickerProps {
 	list: PickerList;
 	/** What the list reads when no item matches; nothing when omitted. */
 	empty?: ReactNode;
+	/** The Activity control a click on the trigger records; none when omitted. */
+	control?: ControlId;
 }
 
 /** A button that opens a searchable, grouped list of choices; picking one closes it. The dashboard's every combobox. */
-export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty }: CommandPickerProps) {
+export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty, control }: CommandPickerProps) {
 	const [inner, setInner] = useState(false);
 	const shown = open ?? inner;
 	const change = (next: boolean): void => {
@@ -150,6 +154,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 	const button = (
 		<PopoverTrigger asChild>
 			<Button
+				{...(control ? activityControl(control) : {})}
 				variant="ghost"
 				size="compact"
 				leadingIcon={icon}

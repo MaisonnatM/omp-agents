@@ -1,6 +1,7 @@
 import type { ContextUsage } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 
 /** From these fractions of the window used, the ring turns amber, then red. */
 const FILLING = 0.7;
@@ -18,6 +19,7 @@ export function ContextRing({ context }: { context: ContextUsage }) {
 	return (
 		<Tooltip content={label}>
 			<span
+				{...activityControl("composer.context-ring")}
 				role="meter"
 				aria-label="Context used"
 				aria-valuemin={0}

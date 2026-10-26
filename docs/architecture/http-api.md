@@ -1,6 +1,6 @@
 # HTTP API
 
-This file holds the settings and analytics endpoints and the rules every endpoint follows; [How omp-agents works](../architecture.md) lists the files for the other endpoints.
+This file holds the settings, analytics, and activity endpoints and the rules every endpoint follows; [How omp-agents works](../architecture.md) lists the files for the other endpoints.
 
 **Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace.
 The server loads omp's settings with omp's own read-only loader (`Settings.loadReadOnly` in `pi-coding-agent/src/config/settings.ts`), the same way a session that starts in that directory would, and applies omp's rule for which roles use the `default` chain (`expandDefaultRetryFallbackChains`).
@@ -14,6 +14,9 @@ The answer includes totals, time buckets with per-provider usage, provider total
 
 `GET /api/analytics/context?range=<range>[&cwd=<directory>][&session=<id>]` answers `ContextReport`, the context sources over the range, defaulting to `24h`, for every workspace, one working directory, or one session; an unknown range returns 400.
 It includes the requests, their input tokens and input cost, the sources by tokens, the workspaces with input in the range, the 20 sessions with the most input in the chosen workspace, and the index's progress while it syncs.
+
+`GET /api/activity?range=<range>` answers `ActivityRead`, the page's activity over the range, defaulting to `30d`, with the same ranges as Analytics; an unknown range returns 400 `Unknown activity range`.
+It includes each feature's uses, every feature's last use over all stored rows, the moves between views, the time on each view, each local day's active time, visits, and actions, and `serverActions`, every route that takes a `PUT`, for the inventory; see [Activity](activity.md).
 
 Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 

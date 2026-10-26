@@ -6,6 +6,7 @@ import { MEDIA_KEY_PARAM, MEDIA_KEY_STORAGE_KEY, SOCKET_PROTOCOL, SOCKET_TOKEN_P
 import type { BranchRelease } from "../src/shared/git";
 import { isObject } from "../src/json";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
+import { record } from "./activity";
 
 export class ApiError extends Error {
 	constructor(
@@ -89,7 +90,9 @@ export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> 
 	return readJson<T>(await apiFetch(url, { signal }));
 }
 
+/** A `PUT`, which counts as the user's action, keyed by its route. */
 export async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+	record("action", `put ${url.split("?", 1)[0]}`);
 	return readJson<T>(
 		await apiFetch(url, {
 			method: "PUT",

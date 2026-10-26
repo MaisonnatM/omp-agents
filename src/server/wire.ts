@@ -64,6 +64,7 @@ import type { MergeQueueChange } from "../shared/merge-queue";
 import { canSubmitReview, FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding, type ReviewSubmit } from "../shared/review-drafts";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
+import { type ActivityEvent, isActivityEvent, MAX_ACTIVITY_BATCH } from "../shared/activity";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
@@ -267,6 +268,9 @@ export function parseDiscussionRequest(value: unknown): Parsed<DiscussionRequest
 	return { ok: { source, quote, turns, question } };
 }
 
+/** One activity event, {@link isActivityEvent}'s fields only. */
+const parseActivityEvent = (value: unknown): ActivityEvent | null => (isActivityEvent(value) ? { kind: value.kind, key: value.key, via: value.via, at: value.at } : null);
+
 /** Each socket message's parser, by its `t`. */
 const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) => Parsed<MsgOf<T>> } = {
 	watch(value) {
@@ -381,6 +385,11 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		return isCounter(value.id) && request ? { ok: { t: "discuss", id: value.id, request: request.ok } } : null;
 	},
 	"discuss-stop": ({ id }) => (isCounter(id) ? { ok: { t: "discuss-stop", id } } : null),
+	activity({ client, first, events }) {
+		if (typeof client !== "string" || !UUID.test(client) || !isCounter(first) || !Array.isArray(events) || events.length === 0 || events.length > MAX_ACTIVITY_BATCH) return null;
+		const parsed = parseAll(events, parseActivityEvent);
+		return parsed && { ok: { t: "activity", client, first, events: parsed } };
+	},
 };
 
 const isClientMsgType = (t: unknown): t is ClientMsg["t"] => typeof t === "string" && Object.hasOwn(clientParsers, t);

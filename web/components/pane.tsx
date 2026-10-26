@@ -5,6 +5,7 @@ import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import type { ModelList } from "../reads";
 import { hashForView } from "../routing";
 import { shortcutLabels } from "../shortcuts";
@@ -75,6 +76,7 @@ export const Pane = memo(function Pane({
 	const trajectoryToggle = (
 		<Tooltip content={trajectory ? "Show the transcript" : "Show the trajectory: each turn's injected context, model requests, tool calls, and token usage"} side="bottom">
 			<Button
+				{...activityControl("trajectory.toggle")}
 				variant="ghost"
 				size="icon-compact"
 				aria-label="Trajectory"
@@ -88,7 +90,7 @@ export const Pane = memo(function Pane({
 	);
 	const actions = (
 		<>
-			{replay && <Button size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
+			{replay && <Button {...activityControl("replay-compare.open")} size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
 			{count > 1 && (
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">

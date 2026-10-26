@@ -61,7 +61,22 @@ Besides a live session's own hash, the routes are:
 - `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
 - `#calendar`, `#routines`, `#routines/<id>`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
-- `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `files`, or `worktrees`.
+- `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `files`, or `worktrees`.
+
+## Activity reconcile
+
+`scripts/activity-reconcile.ts` checks that Settings › Activity counts exactly what a browser did.
+Start a smoke server first; the script starts nothing.
+
+```sh
+bun scripts/activity-reconcile.ts --url http://127.0.0.1:<port> --token <token> [--agent]
+```
+
+It launches Chromium from `playwright-core` without its automation flags, opens six views, presses three shortcuts, runs two palette commands, and starts a session in `/tmp` with one prompt, then waits for the recorder's flush.
+It compares `GET /api/activity?range=today` before and after with what it did and prints `reconcile: 0 differences`, or each difference and exits 1.
+With `--agent` it keeps the automation flags and passes with `reconcile: 0 rows recorded for automated browser`.
+A smoke server records only while it holds `server.lock`, so run it against a server on isolated state.
+`scripts/activity-bench.ts --rows <n> --runs <n>` times the store's appends and the 90-day read on a throwaway database.
 
 ## Smoke proof
 

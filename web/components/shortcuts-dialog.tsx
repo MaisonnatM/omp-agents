@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import type { SidebarTab } from "../routing";
 import { bindingLabel, IS_MAC, SHORTCUT_CATEGORIES, scopeOf } from "../shortcuts";
 import { type ShortcutRow, shortcutRows } from "../sidebar-tabs";
@@ -85,7 +86,7 @@ export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; o
 					<Tabs size="compact" defaultValue={SHORTCUT_CATEGORIES[0].id} className="mt-4 flex min-h-0 flex-1 flex-col">
 						<TabsList aria-label="Category" className="self-start">
 							{SHORTCUT_CATEGORIES.map(({ id, label }) => (
-								<TabItem key={id} value={id} label={label} />
+								<TabItem {...activityControl("shortcuts.tab")} key={id} value={id} label={label} />
 							))}
 						</TabsList>
 						{SHORTCUT_CATEGORIES.map(({ id }) => (

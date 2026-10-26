@@ -61,6 +61,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { errorText } from "../../src/json";
+import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
@@ -235,6 +236,7 @@ function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: stri
 			{srcs.map((src, index) => (
 				// A result's images never change, so their order names them.
 				<button
+					{...activityControl("media-viewer.open")}
 					key={index}
 					type="button"
 					aria-label={`Open ${label(index).toLowerCase()}`}
@@ -269,7 +271,7 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 	const visible = entries.filter(entry => (entry.kind === "thinking" ? !hideThinking : !hideTools));
 	return (
 		<TraceCollapsible open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="max-w-2xl self-start">
-			<TraceCollapsibleTrigger>
+			<TraceCollapsibleTrigger {...activityControl("transcript.activity-group")}>
 				<TraceLine status={running ? "running" : undefined}>
 					<TraceIcon>{running ? <LoaderIcon className="animate-spin" /> : tools.length ? <CircleCheck /> : <Brain />}</TraceIcon>
 					<TraceTitle>{header}</TraceTitle>
@@ -667,7 +669,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 				</MessageScrollerViewport>
 				<TranscriptMinimap items={items} working={working} />
 				<PromptHistory view={view} items={items} working={working} />
-				<MessageScrollerButton />
+				<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />
 			</MessageScroller>
 			{shownImage && (
 				<ImageViewer

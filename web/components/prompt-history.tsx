@@ -13,6 +13,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useShape } from "@/lib/shape-context";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { keyedStore } from "../keyed-store";
 import { skillLabel } from "../labels";
 import { useTranscript } from "../pane-store";
@@ -46,6 +47,7 @@ export const PromptHistoryButton = memo(function PromptHistoryButton({ view }: {
 	return (
 		<Tooltip content={open ? "Close chat history" : "Chat history: every prompt you sent"} side="top">
 			<Button
+				{...activityControl("prompt-history.toggle")}
 				id={triggerId(view)}
 				variant="ghost"
 				size="icon-sm"
@@ -159,6 +161,7 @@ function Panel({ view, items, working }: { view: View; items: Item[]; working: b
 							transition={from !== undefined ? spring.moderate : { ...spring.moderate, delay: stagger }}
 						>
 							<button
+								{...activityControl("prompt-history.jump")}
 								type="button"
 								onClick={() => pick(turn.id)}
 								className={cn(

@@ -211,9 +211,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 									open={directoriesOpen}
 									onOpenChange={setDirectoriesOpen}
 									onPick={onPickCwd}
+									control="composer.directory"
 								/>
 								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
-								<ModelPicker {...models.picker} disabled={starting || !connected} />
+								<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
 								{draftSkill !== null && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 							</>
 						}

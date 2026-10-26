@@ -24,6 +24,7 @@ import {
 } from "./routing";
 import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
 import { storedNumber, storeOrRemove } from "./stored-state";
+import { flushActivity, installActivity, record, recordAction, viewOf } from "./activity";
 
 const NO_VIEWS: View[] = [];
 
@@ -118,7 +119,9 @@ export function useDashboard(): Dashboard {
 
 	const send = useCallback((msg: ClientMsg) => {
 		const ws = socketRef.current;
-		if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+		if (ws?.readyState !== WebSocket.OPEN) return;
+		ws.send(JSON.stringify(msg));
+		recordAction(msg);
 	}, []);
 
 	const outbox = useRef(new Map<number, { frame: AckedFrame; resolve: () => void; reject: (error: Error) => void }>());
@@ -134,8 +137,13 @@ export function useDashboard(): Dashboard {
 		const frame: AckedFrame = { ...msg, ack, floor: Math.min(ack, ...outbox.current.keys()) };
 		outbox.current.set(ack, { frame, resolve, reject });
 		ws.send(JSON.stringify(frame));
+		recordAction(msg);
 		return promise;
 	}, []);
+
+	useEffect(() => installActivity({ connected: () => socketRef.current?.readyState === WebSocket.OPEN, send: batch => request(batch) }), [request]);
+	const view = viewOf(state.cover, state.layout);
+	useEffect(() => record("view", view), [view]);
 
 	const end = useCallback(
 		async (instanceId: string, listed: string[]) => {
@@ -189,6 +197,7 @@ export function useDashboard(): Dashboard {
 				dispatch({ t: "connected", connected: true });
 				ws.send(JSON.stringify({ t: "watch", views: watchedRef.current, trajectories: trajectoriesRef.current } satisfies ClientMsg));
 				ws.send(JSON.stringify({ t: "resume", frames: [...outbox.current.values()].map(entry => entry.frame) } satisfies ResumeFrame));
+				flushActivity();
 			};
 			ws.onmessage = event => {
 				const msg = JSON.parse(String(event.data)) as ServerMsg;

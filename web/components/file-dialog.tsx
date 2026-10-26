@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { MAX_TEXT_FILE_BYTES, mediaUrl, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 import { linkedFile } from "../file-paths";
 import { parseDelimited } from "../delimited";
@@ -41,7 +42,7 @@ function MediaDialog({ path, video, onClose }: { path: string; video: boolean; o
 			onClose={onClose}
 			actions={
 				<Tooltip content={copied ? "Copied" : "Copy the path"}>
-					<Button variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(path)}>
+					<Button {...activityControl("file-dialog.copy-path")} variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(path)}>
 						{copied ? <Check /> : <Copy />}
 					</Button>
 				</Tooltip>
@@ -77,12 +78,12 @@ function TextFileDialog({ path, onClose }: { path: string; onClose: () => void }
 			actions={
 				<>
 					{look !== "text" && file && (
-						<Button variant="ghost" size="compact" onClick={() => setSource(shown => !shown)}>
+						<Button {...activityControl("file-dialog.source")} variant="ghost" size="compact" onClick={() => setSource(shown => !shown)}>
 							{source ? "Show rendered" : "Show source"}
 						</Button>
 					)}
 					<Tooltip content={copied ? "Copied" : "Copy the path"}>
-						<Button variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(file?.path ?? path)}>
+						<Button {...activityControl("file-dialog.copy-path")} variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(file?.path ?? path)}>
 							{copied ? <Check /> : <Copy />}
 						</Button>
 					</Tooltip>

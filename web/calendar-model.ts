@@ -7,7 +7,7 @@ import type { GoogleAccount } from "../src/shared/accounts";
 import { type CalendarEvent, calendarKey, type EventWhen, type GoogleCalendar, type GoogleEventRef, type LocalEvent, type LocalEventRef, type NewEventCalendar } from "../src/shared/calendar";
 import type { Ticket, TicketStatusType } from "../src/shared/tickets";
 import type { UserTodoList } from "../src/user-todos-shared";
-import { daysBetween, localDay } from "./days";
+import { daysBetween, localDay } from "../src/shared/days";
 
 /** The one color of the events kept on this computer, a neutral slate. */
 const LOCAL_EVENT_COLOR = "#64748b";

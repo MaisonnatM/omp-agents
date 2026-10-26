@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { putJson } from "../../api";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
-import { dateOfDay, localDay } from "../../days";
+import { dateOfDay, localDay } from "../../../src/shared/days";
 import { calendarEventsStore, localEventsStore, monthSpan, ticketsStore, useGoogleCalendars } from "../../reads";
 import { hashForOpenTodo, hashForRoutines, hashForTickets } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";

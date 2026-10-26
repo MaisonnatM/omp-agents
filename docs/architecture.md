@@ -21,6 +21,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Plan quota](architecture/plan-quota.md)
 - [Analytics](architecture/analytics.md)
   - [Context sources](architecture/analytics.md#context-sources)
+- [Activity](architecture/activity.md)
 - [Routines](architecture/routines.md)
   - [One server runs the unattended work](architecture/routines.md#one-server-runs-the-unattended-work)
   - [Isolation sandboxes](architecture/routines.md#isolation-sandboxes)

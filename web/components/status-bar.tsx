@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import type { DashboardState } from "../dashboard-state";
 import { commandLabel, formatBytes, hostLabel } from "../labels";
 import { sessionProcessesStore, useRead, writeProcessStop } from "../reads";
@@ -30,7 +31,7 @@ function CpuFact({ cpu, hosts }: { cpu: string; hosts: readonly RosterHost[] }) 
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...popover.trigger} type="button" aria-label={`CPU ${cpu} busy`} className={cn(FACT, "hover:text-foreground")}>
+				<button {...activityControl("status-bar.cpu")} {...popover.trigger} type="button" aria-label={`CPU ${cpu} busy`} className={cn(FACT, "hover:text-foreground")}>
 					<Cpu aria-hidden className="size-3 shrink-0" />
 					{cpu}
 				</button>
@@ -190,7 +191,7 @@ export function StatusBar({ usage, hosts, terminalOpen, onToggleTerminal }: Stat
 			<PlanUsageList usage={usage} />
 			<div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 text-muted-foreground">
 				<Tooltip content={terminalOpen ? "Hide the terminal" : "Show the terminal"} shortcut={shortcutLabels("terminal")} side="top">
-					<button type="button" aria-pressed={terminalOpen} onClick={onToggleTerminal} className={cn(FACT, "hover:text-foreground", terminalOpen && "text-foreground")}>
+					<button {...activityControl("status-bar.terminal")} type="button" aria-pressed={terminalOpen} onClick={onToggleTerminal} className={cn(FACT, "hover:text-foreground", terminalOpen && "text-foreground")}>
 						<SquareTerminal aria-hidden className="size-3 shrink-0" />
 						Terminal
 					</button>

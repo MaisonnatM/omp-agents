@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, Blocks, FileText, Folders, GitBranch, GitMerge, KeyRound, type LucideIcon, Plug, RefreshCcw, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
+import { BarChart3, Blocks, FileText, Folders, GitBranch, GitMerge, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
@@ -60,6 +60,7 @@ export interface InboxRoute {
  */
 export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: BarChart3, scope: "general" },
+	{ value: "activity", label: "Activity", icon: MousePointerClick, scope: "general" },
 	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, scope: "general" },
 	{ value: "providers", label: "Providers", icon: KeyRound, scope: "general" },
 	{ value: "integrations", label: "Integrations", icon: Plug, scope: "general" },

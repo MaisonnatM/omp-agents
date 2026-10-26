@@ -1,9 +1,7 @@
 /** The settings tab for omp's request usage by time, model, workspace, agent, tool, and session, and the context sources that fill it. */
-import { lazy, Suspense, useEffect, useState } from "react";
-import type { ReactNode } from "react";
-import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
+import { lazy, Suspense, useEffect } from "react";
+import type { Analytics, AnalyticsSession } from "../../../src/shared/analytics";
 import { hashForSession } from "../../../src/shared/sessions";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { folderName, modelLabel, modelOrg, providerLabel, readTime } from "../../labels";
 import { analyticsStore } from "../../reads";
@@ -11,12 +9,12 @@ import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
 import { compact, dollars, full } from "./analytics-format";
 import { ContextSources } from "./context-sources";
+import { RangePicker, useRangedRead } from "./range";
+import { Count, percent, RowHead, Table } from "./table";
 
 // `recharts` is a chunk of its own, loaded when the tab first draws its chart.
 const ProviderTrend = lazy(() => import("./provider-trend").then(module => ({ default: module.ProviderTrend })));
 
-const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
-const rangeLabel: Record<AnalyticsRange, string> = { today: "Today", "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", all: "All" };
 
 /** How many of a session's models its row names before `+N`. */
 const SESSION_MODELS = 3;
@@ -36,25 +34,6 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 			{hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
 		</div>
 	);
-}
-
-/** `wide` keeps a many-column table legible by scrolling it sideways on narrow screens; the first `textColumns` align to the start. */
-function Table({ label, columns, textColumns = 1, wide = false, children }: { label: string; columns: string[]; textColumns?: number; wide?: boolean; children: ReactNode }) {
-	return (
-		<div className="overflow-x-auto">
-			<table className={`w-full text-sm ${wide ? "min-w-[40rem]" : ""}`}>
-				<caption className="sr-only">{label}</caption>
-				<thead className="text-xs text-muted-foreground">
-					<tr>{columns.map((column, index) => <th key={column} scope="col" className={`pb-2 font-medium ${index === 0 ? "text-start" : index < textColumns ? "ps-4 text-start" : "ps-4 text-end"}`}>{column}</th>)}</tr>
-				</thead>
-				<tbody>{children}</tbody>
-			</table>
-		</div>
-	);
-}
-
-function Count({ children, title }: { children: ReactNode; title?: string }) {
-	return <td className="whitespace-nowrap border-t border-border py-2 ps-4 text-end tabular-nums" title={title}>{children}</td>;
 }
 
 function AgentSplit({ agents }: { agents: Analytics["agents"] }) {
@@ -84,13 +63,13 @@ function SessionRow({ session }: { session: AnalyticsSession }) {
 	const name = title ?? (listed ? (folderName(cwd) ?? "Untitled session") : "Deleted session");
 	return (
 		<tr>
-			<th scope="row" className="max-w-48 border-t border-border py-2 text-start font-medium">
+			<RowHead className="max-w-48">
 				{listed ? (
 					<a href={hashForSession(sessionId)} className="block truncate rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring" title={name}>{name}</a>
 				) : (
 					<span className="block truncate font-normal text-muted-foreground" title={`${sessionId}: its transcript is no longer on disk`}>{name}</span>
 				)}
-			</th>
+			</RowHead>
 			<td className="max-w-32 truncate border-t border-border py-2 ps-4 text-muted-foreground" title={cwd}>{folderName(cwd) ?? cwd}</td>
 			<Count title={`${full.format(usage.tokens.total)} tokens`}>{compact.format(usage.tokens.total)}</Count>
 			<Count title={`${full.format(subagentTokens)} subagent tokens`}>{percent.format(usage.tokens.total ? subagentTokens / usage.tokens.total : 0)}</Count>
@@ -122,13 +101,13 @@ function UsageBody({ data }: { data: Analytics }) {
 					<h3 id="analytics-models" className="text-sm font-semibold">Models</h3>
 					<Table label="Models by token usage" columns={["Model", "Tokens", "Requests", "Cost", "Tokens/s"]}>
 						{models.map(model => <tr key={model.selector}>
-							<th scope="row" className="border-t border-border py-2 text-start font-medium" title={model.selector}>
+							<RowHead title={model.selector}>
 								<span className="inline-flex items-center gap-2">
 									<OrgIcon org={modelOrg(model.selector)} className="size-4 shrink-0" />
 									{modelLabel(model.selector)}
 									{sharedLabels.has(modelLabel(model.selector)) && <span className="text-xs font-normal text-muted-foreground">{providerLabel(model.selector.slice(0, model.selector.indexOf("/")))}</span>}
 								</span>
-							</th>
+							</RowHead>
 							<Count title={`${full.format(model.tokens.total)} tokens`}>{compact.format(model.tokens.total)}</Count>
 							<Count>{full.format(model.requests)}</Count>
 							<Count>{dollars(model.cost)}</Count>
@@ -140,7 +119,7 @@ function UsageBody({ data }: { data: Analytics }) {
 					<h3 id="analytics-workspaces" className="text-sm font-semibold">Workspaces</h3>
 					<Table label="Workspaces by token usage" columns={["Workspace", "Tokens", "Requests", "Cost"]}>
 						{workspaces.map(workspace => <tr key={workspace.cwd}>
-							<th scope="row" className="max-w-64 truncate border-t border-border py-2 text-start font-medium" title={workspace.cwd}>{folderName(workspace.cwd) ?? workspace.cwd}</th>
+							<RowHead className="max-w-64 truncate" title={workspace.cwd}>{folderName(workspace.cwd) ?? workspace.cwd}</RowHead>
 							<Count title={`${full.format(workspace.tokens.total)} tokens`}>{compact.format(workspace.tokens.total)}</Count>
 							<Count>{full.format(workspace.requests)}</Count>
 							<Count>{dollars(workspace.cost)}</Count>
@@ -153,7 +132,7 @@ function UsageBody({ data }: { data: Analytics }) {
 				<h3 id="analytics-tools" className="text-sm font-semibold">Tools</h3>
 				<Table label="Tool usage" columns={["Tool", "Calls", "Errors", "Attributed tokens"]}>
 					{tools.map(tool => <tr key={tool.name}>
-						<th scope="row" className="border-t border-border py-2 text-start font-medium">{tool.name}</th>
+						<RowHead>{tool.name}</RowHead>
 						<Count>{full.format(tool.calls)}</Count>
 						<Count>{full.format(tool.errors)}</Count>
 						<Count title={`${full.format(Math.round(tool.tokenShare))} attributed tokens`}>{compact.format(tool.tokenShare)}</Count>
@@ -172,17 +151,7 @@ function UsageBody({ data }: { data: Analytics }) {
 
 /** Analytics over the chosen range, refreshed while the tab shows: often while omp-stats indexes, slower after it finishes. */
 export function AnalyticsTab({ active }: { active: boolean }) {
-	const [range, setRange] = useState<AnalyticsRange>("24h");
-	const entry = analyticsStore.use(range);
-	const answer = entry.read?.data ?? null;
-	const [last, setLast] = useState<Analytics | null>(null);
-	if (answer !== null && answer !== last) setLast(answer);
-	const { error } = entry;
-	const data = answer ?? (error === null ? last : null);
-	const switching = data !== null && data.range !== range;
-	useEffect(() => {
-		if (active) void analyticsStore.refresh(range);
-	}, [active, range]);
+	const { range, setRange, data, error, switching } = useRangedRead(analyticsStore, "24h", active);
 	useEffect(() => {
 		if (!active) return;
 		const timer = setInterval(() => void analyticsStore.refresh(range), data?.sync.phase === "syncing" ? 5_000 : 30_000);
@@ -190,13 +159,7 @@ export function AnalyticsTab({ active }: { active: boolean }) {
 	}, [active, range, data?.sync.phase]);
 	return (
 		<div className="space-y-7">
-			<div role="group" aria-label="Time range" className="flex flex-wrap gap-1">
-				{ANALYTICS_RANGES.map(option => (
-					<Button key={option} variant="ghost" size="compact" active={option === range} aria-pressed={option === range} onClick={() => setRange(option)}>
-						{rangeLabel[option]}
-					</Button>
-				))}
-			</div>
+			<RangePicker range={range} onChange={setRange} />
 			{data?.sync.phase === "syncing" && <p role="status" className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Indexing sessions… {data.sync.total > 0 && `${full.format(data.sync.current)} of ${full.format(data.sync.total)}`}</p>}
 			{data?.sync.phase === "error" && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Indexing failed. omp will retry: {data.sync.error ?? "Unknown error"}</p>}
 			{error && data && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot refresh analytics: {error}</p>}

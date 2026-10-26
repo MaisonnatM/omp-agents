@@ -12,6 +12,7 @@ Each socket the page opens sends `resume` after `watch`, with every tagged messa
 The ledger sends the recorded replies of each request it ran, and its `done` once settled; it runs a request it never got; and it forgets every request the page no longer lists.
 A reply for a live session goes only to a socket that shows it, which a resume after `watch` already knows.
 Each tagged message also carries `floor`, the lowest `ack` the page still waits on, and the ledger forgets the requests below it.
+The page's `activity` batches wait on `done` too, so a batch leaves the page's outbox only once the server holding `server.lock` stored it, another server dropped it, or the server answered an error, which drops it so it cannot hold back the batches after it (see [Activity](activity.md)).
 
 The ledger first hears of a page at its `resume`, which then lists only requests the page sent before this server knew it: to a server that has since restarted, or to this one more than an hour ago, since the ledger forgets a page an hour after its last socket closed.
 Each of them gets `done` with the error `FORGOTTEN`, "The server restarted or lost track of this page before it answered. Check whether it took effect.", and the ledger records that answer, so a later resume gets it again and nothing runs.

@@ -2,6 +2,7 @@ import { existsSync, type FSWatcher, mkdirSync, watch } from "node:fs";
 import { join } from "node:path";
 import { errorText } from "../json";
 import type { SessionFormat } from "../session-formats";
+import { DAY_MS } from "../shared/days";
 
 /** The registry has no change feed; listing it is one local IPC round trip per host. */
 const POLL_MS = 1500;
@@ -46,6 +47,8 @@ export interface LoopHandlers {
 	onDashboardTick(): Promise<void>;
 	/** Every {@link PROCESS_SAMPLE_MS}, listener or not. */
 	onProcessTick(): Promise<void>;
+	/** Every {@link DAY_MS}, listener or not; the server's start does the first run's work itself. */
+	onDailyTick(): Promise<void>;
 }
 
 /**
@@ -121,6 +124,7 @@ export class Loops {
 			repeat("pull", this.#on.onPullTick, PULL_MS, 0),
 			repeat("dashboard check", this.#on.onDashboardTick, DASHBOARD_CHECK_MS, 0),
 			repeat("processes", this.#on.onProcessTick, PROCESS_SAMPLE_MS),
+			repeat("daily", this.#on.onDailyTick, DAY_MS),
 		];
 	}
 

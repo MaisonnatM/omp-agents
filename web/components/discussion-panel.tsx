@@ -4,6 +4,7 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { DISCUSSION_SYSTEM_PROMPT, discussionPrompt, MAX_DISCUSSION_QUESTION, sessionMessage } from "../../src/shared/discussions";
 import { Button } from "@/components/ui/button";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
+import { activityControl } from "../activity";
 import { type AskedTurn, askDiscussion, closeDiscussion, type Discussion, discussionRequest, stopDiscussion, useDiscussion } from "../discussions";
 import { useAction } from "../use-action";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
@@ -70,7 +71,7 @@ function Panel({ discussion }: { discussion: Discussion }) {
 				<h2 id={titleId} className="min-w-0 flex-1 text-sm font-medium">
 					Ask about this
 				</h2>
-				<Button variant="ghost" size="icon-compact" aria-label="Close the discussion" onClick={close}>
+				<Button {...activityControl("discussion.close")} variant="ghost" size="icon-compact" aria-label="Close the discussion" onClick={close}>
 					<X aria-hidden />
 				</Button>
 			</header>

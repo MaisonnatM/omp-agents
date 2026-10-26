@@ -7,6 +7,7 @@ import { useReducedMotion } from "framer-motion";
 import { type ComponentProps, memo, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { skillLabel } from "../labels";
 import { type OutlineTurn, outline } from "../transcript-view";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
@@ -128,6 +129,7 @@ function Line({ turn, index, active, onJump }: { turn: OutlineTurn; index: numbe
 		<HoverCard openDelay={80} closeDelay={100}>
 			<HoverCardTrigger asChild>
 				<button
+					{...activityControl("minimap.jump")}
 					type="button"
 					data-slot="minimap-line"
 					data-active={active || undefined}
@@ -156,6 +158,7 @@ function Step({ direction, disabled, onClick }: { direction: "previous" | "next"
 	return (
 		<Tooltip content={label} side={direction === "previous" ? "top" : "bottom"}>
 			<button
+				{...activityControl("minimap.step")}
 				type="button"
 				aria-label={label}
 				disabled={disabled}
