@@ -1,17 +1,14 @@
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
-import type { Notice } from "../../src/shared/notices";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import type { PaletteEvent } from "../command-palette";
 import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { pullRequestsPageShows, usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
-import { NoticesBell } from "./notices";
 import { Roster } from "./roster";
 
 const NO_VIEWS: View[] = [];
@@ -35,7 +32,6 @@ interface AppSidebarProps {
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	hosts: RosterHost[];
 	past: PastSession[];
-	notices: Notice[];
 	routines: Routine[];
 	todoView: TodoListView;
 	routinesTarget: string | null;
@@ -43,7 +39,6 @@ interface AppSidebarProps {
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
 	onPickWorkspace: (cwd: string | null) => void;
-	dispatchPalette: Dispatch<PaletteEvent>;
 	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -65,7 +60,6 @@ export const AppSidebar = memo(function AppSidebar({
 	notesView,
 	hosts,
 	past,
-	notices,
 	routines,
 	todoView,
 	routinesTarget,
@@ -73,7 +67,6 @@ export const AppSidebar = memo(function AppSidebar({
 	sectionTarget,
 	onSectionTarget,
 	onPickWorkspace,
-	dispatchPalette,
 	setShortcutsOpen,
 }: AppSidebarProps) {
 	const [pullRequestsView] = usePullRequestsView();
@@ -92,9 +85,7 @@ export const AppSidebar = memo(function AppSidebar({
 		() => (page?.kind === "calendar" ? page : page?.kind === "routines" ? ({ kind: "routines", target: routinesTarget } as const) : null),
 		[page, routinesTarget],
 	);
-	const onShowSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
-	const bell = useMemo(() => <NoticesBell notices={notices} />, [notices]);
 	return (
 		<Roster
 			workspaces={workspaces}
@@ -123,9 +114,7 @@ export const AppSidebar = memo(function AppSidebar({
 			hosts={visible.hosts}
 			workspace={workspace}
 			onPickWorkspace={onPickWorkspace}
-			onShowSearch={onShowSearch}
 			onShowShortcuts={onShowShortcuts}
-			bell={bell}
 		/>
 	);
 });

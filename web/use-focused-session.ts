@@ -23,6 +23,8 @@ export interface FocusedSession {
 	cwd: string | undefined;
 	/** The directory the session works in: its worktree, else its directory; `null` without a session. */
 	workDir: string | null;
+	/** The document title, which the desktop title bar shows too. */
+	title: string;
 }
 
 /**
@@ -49,5 +51,5 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { wo
 	}, [host?.instanceId, host?.cwd, workspace]);
 	const session = host ?? past;
 	const sessionId = view?.kind === "past" ? view.sessionId : view?.kind === "live" && view.agentId === null ? ((host ?? lastHost)?.sessionId ?? null) : null;
-	return { view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workDir: session ? (session.worktree ?? session.cwd) : null };
+	return { view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workDir: session ? (session.worktree ?? session.cwd) : null, title };
 }

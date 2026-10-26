@@ -244,6 +244,8 @@ function createWindow(): BrowserWindow {
 		...savedBounds(),
 		show: false,
 		title: "omp agents",
+		// On macOS the page draws the title bar, `DesktopTitleBar`, with the command menu and the bell; the buttons sit centered in its 36px.
+		...(IS_MAC ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 14, y: 12 } } : {}),
 		// macOS takes the app's icon from the Dock instead.
 		icon: ICON,
 		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD },
