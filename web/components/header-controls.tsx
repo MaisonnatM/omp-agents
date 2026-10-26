@@ -4,6 +4,7 @@ import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { shortcutLabels } from "../shortcuts";
 import { NoticesBell } from "./notices";
 
@@ -19,7 +20,7 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 	return (
 		<div className="flex shrink-0 items-center gap-1">
 			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
-				<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
+				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
 					<Search />
 				</Button>
 			</Tooltip>

@@ -190,9 +190,6 @@ export const VIEWS = [
 	{ key: "calendar", label: "Calendar" },
 	{ key: "routines", label: "Routines" },
 	{ key: "routines/item", label: "A routine" },
-	{ key: "projects", label: "Projects" },
-	{ key: "projects/new", label: "New project" },
-	{ key: "projects/item", label: "A project" },
 	{ key: "inbox", label: "Inbox", tab: "inbox" },
 	{ key: "inbox/new", label: "New mail", tab: "inbox" },
 	{ key: "inbox/item", label: "A mail conversation", tab: "inbox" },
@@ -218,8 +215,6 @@ function pageView(page: Page): ViewKey {
 			return page.open === null ? "todo" : "todo/item";
 		case "notes":
 			return page.open === null ? "notes" : "notes/item";
-		case "projects":
-			return page.target.kind === "list" ? "projects" : page.target.kind === "new" ? "projects/new" : "projects/item";
 		case "inbox":
 			return page.target === null ? "inbox" : page.target === "new" ? "inbox/new" : "inbox/item";
 		case "scheduled":

@@ -8,7 +8,7 @@ A key never holds a title, a path, a session id, or anything the user typed; the
 
 `web/activity.ts` holds the recorder, which `web/use-dashboard.ts` installs once per page load under a fresh client id from `crypto.randomUUID()`.
 
-- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, `projects/new`, or `inbox/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
+- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, or `inbox/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
   `viewOf` returns a `ViewKey`, so a view missing from `VIEWS` is a type error, and the hook records it whenever it changes.
 - A **command** is a shortcut that took its key, recorded in `dispatch` in `web/shortcuts.ts` with `via: "keyboard"`, or a palette command, recorded in `web/components/command-palette/command-palette.tsx` with `via: "palette"`.
   Its key is the shortcut id in kebab case, `newSession` as `new-session`, so both channels share one key.
@@ -71,8 +71,8 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Replay from here | control, action | `replay.open`; starting the replay is the dialog's request |
 | Replay comparison | control | `replay-compare.open` |
 | Scroll-to-bottom arrow | control | `transcript.scroll-to-bottom` |
-| Left sidebar | view, command, control | each tab's page view; tab and toggle shortcuts; `sidebar.left.toggle`, `sidebar.workspace`, `sidebar.command-menu`, `shortcuts.open`; untagged roster rows open a session, which records its view |
-| Right sidebar (session or project details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.tickets`, `project-details.tab.workers`, `project-details.tab.notes`, `project-details.tab.pull-requests`; images use the `media-viewer.*` controls |
+| Left sidebar | view, command, control | each tab's page view; tab and toggle shortcuts; `sidebar.left.toggle`, `sidebar.workspace`, `shortcuts.open`; untagged roster rows open a session, which records its view |
+| Right sidebar (session details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.tickets`; images use the `media-viewer.*` controls |
 | Pull request details (tabs, composer, header, checkout menu, checks, timeline) | view, control, action | views `pull-requests/item`, `pull-requests/files`; `pr-details.tab.summary`, `pr-details.tab.timeline`, `pr-details.tab.code`, `pr-details.tab.review`, `pr-details.checkout`; on the page the Code tab also sets the hash, so it shows as view `pull-requests/files`; edits, comments, merges, and checkouts are `PUT`s or action `review-draft` |
 | Bottom bar | control, command, action | `status-bar.terminal`, `status-bar.cpu`; command `terminal`; a process's Stop is a `PUT`; plan quota is display only |
 | Files: the changes card's Files section | control | `changes-card.file`, `changes-card.files.fold` |
@@ -80,9 +80,9 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Files: Settings › Files | view | `settings/files` |
 | File dialog | control | `file-dialog.open`, `file-dialog.source`, `file-dialog.copy-path` |
 | Ask about this and the discussion panel | control, action | `ask-about.open`, `discussion.close`; actions `discuss`, `discuss-stop`; Send to session is action `prompt` |
-| Command palette | command | the command each item runs; the sidebar's button is control `sidebar.command-menu` |
+| Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |
-| Notification bell | control | `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags |
+| Notification bell and command menu button | control, command | `header.command-menu`, which opens the command palette as command `switcher` does; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags |
 | System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switch in Settings › Preferences is a `PUT` |
 | Pages: New session | view | `new` |
 | Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view.list`, `pull-requests.view.board`; Rebase N behind is a `PUT` |
@@ -92,7 +92,6 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Calendar | view | `calendar` |
 | Pages: Inbox | view | `inbox`, `inbox/new`, `inbox/item` |
 | Pages: Routines | view | `routines`, `routines/item` |
-| Pages: Projects | view | `projects`, `projects/new`, `projects/item` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |
@@ -103,5 +102,5 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Colors, the font, and tokens | not applicable | no interaction |
 
 The checkout menu lives at `web/components/pull-requests/pr-details/checkout-menu.tsx`, not `pull-requests/checkout-menu.tsx` as the plan lists.
-`CommandPicker`, `DirectoryPicker`, and `ModelPicker` take an optional `control`, so the same picker on the Projects page, the routine editor, Settings, or the replay dialog records nothing.
+`CommandPicker`, `DirectoryPicker`, and `ModelPicker` take an optional `control`, so the same picker on the routine editor, Settings, or the replay dialog records nothing.
 `DetailsTab` takes a required `control`, so every new right-sidebar tab must name one.
