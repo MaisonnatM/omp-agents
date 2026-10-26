@@ -1,6 +1,6 @@
 /** Pull request links, what each pull request waits on next, the list's sections and stacks, the board's columns and what a drop on one does, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestThread, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass } from "../src/shared/moves";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 
@@ -91,6 +91,23 @@ const REASON: Record<MoveId, (pr: PullRequestSummary) => string> = {
 
 /** Why `pr` waits on `move`, as its row's second line says after its number. */
 export const reason = (pr: PullRequestSummary, move: MoveId): string => REASON[move](pr);
+
+/** Who started the open threads a **Reply** waits on: `ai` of them a bot, `human` a person, with the tooltip saying so. */
+export interface ThreadStarters {
+	ai: number;
+	human: number;
+	label: string;
+}
+
+/** Who started `pr`'s open threads while it waits on `move`, as its row's tag shows; `null` unless a **Reply** waits on some listed thread. */
+export function threadStarters(pr: PullRequestSummary, move: MoveId): ThreadStarters | null {
+	const { count, exact, bots } = pr.unresolved;
+	if (move !== "reply" || count === 0) return null;
+	const human = count - bots;
+	const threads = (n: number): string => `${n} open ${n === 1 ? "thread" : "threads"}`;
+	const counted = [bots > 0 && `${threads(bots)} from AI`, human > 0 && `${threads(human)} from people`].filter(Boolean).join(", ");
+	return { ai: bots, human, label: exact ? counted : `${counted}, among the threads GitHub listed` };
+}
 
 /** The first quick action that hands `move` on `pr` to an agent and applies to `pr`, if any. */
 export function moveAction(pr: PullRequestSummary, move: MoveId): PullRequestActionId | null {
@@ -415,18 +432,11 @@ export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr:
 /** Every pull request `repos` lists, leaving out the repositories GitHub could not read. */
 export const listedPullRequests = (repos: readonly RepoPullRequests[]): PullRequestSummary[] => repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests));
 
-/** A change a row makes that moves its pull request in the list: a state change; a merge goes through the merge queue. */
-export type ListChange = Extract<PullRequestChange, { field: "state" }>;
+/** A change a row makes to its pull request in the list: a state change or a review request; a merge goes through the merge queue. */
+export type ListChange = Extract<PullRequestChange, { field: "state" | "reviewer" }>;
 
-/**
- * The list after `pr` took `state` on GitHub at `at`, until the list is read again: a closed pull request leaves it,
- * since it lists none; a merged one moves to **Recently merged**. Every repository and row it leaves alone stays the same object.
- */
-export function withPullRequestState(list: PullRequestList, pr: PullRequest, state: ListChange["state"] | "merged", at: number): PullRequestList {
-	const changed = (row: PullRequestSummary): PullRequestSummary[] => {
-		if (state === "merged") return [{ ...row, state, updatedAt: at }];
-		return state === "closed" ? [] : [{ ...row, state }];
-	};
+/** The list with `changed` in place of `pr`'s row; every repository and row it leaves alone stays the same object. */
+function withRow(list: PullRequestList, pr: PullRequest, changed: (row: PullRequestSummary) => PullRequestSummary[]): PullRequestList {
 	return {
 		...list,
 		repos: list.repos.map(repo =>
@@ -437,11 +447,34 @@ export function withPullRequestState(list: PullRequestList, pr: PullRequest, sta
 	};
 }
 
+/**
+ * The list after `pr` took `state` on GitHub at `at`, until the list is read again: a closed pull request leaves it,
+ * since it lists none; a merged one moves to **Recently merged**. Every repository and row it leaves alone stays the same object.
+ */
+export function withPullRequestState(list: PullRequestList, pr: PullRequest, state: SettableState | "merged", at: number): PullRequestList {
+	return withRow(list, pr, row => {
+		if (state === "merged") return [{ ...row, state, updatedAt: at }];
+		return state === "closed" ? [] : [{ ...row, state }];
+	});
+}
+
+/**
+ * `reviewers` once a review is asked of `login` (`on`), first and waiting, in place of what they did before; or once
+ * the request is withdrawn, which drops them. A re-request without `avatarUrl` keeps the picture they had.
+ */
+export function withReviewer(reviewers: readonly Reviewer[], login: string, on: boolean, avatarUrl: string | null): Reviewer[] {
+	const others = reviewers.filter(reviewer => reviewer.login !== login);
+	if (!on) return others;
+	const picture = avatarUrl ?? reviewers.find(reviewer => reviewer.login === login)?.avatarUrl ?? null;
+	return [{ login, avatarUrl: picture, state: "requested" }, ...others];
+}
+
+/** The list after a review was asked of `login` on `pr`, or withdrawn, until the list is read again. */
+export const withPullRequestReviewers = (list: PullRequestList, pr: PullRequest, login: string, on: boolean, avatarUrl: string | null): PullRequestList =>
+	withRow(list, pr, row => [{ ...row, reviewers: withReviewer(row.reviewers, login, on, avatarUrl) }]);
+
 /** How many pull requests in the list wait on your move. */
 export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): number => listedPullRequests(repos).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
-
-/** The review threads not yet resolved, in GitHub's order. */
-export const openThreads = ({ threads }: Pick<PullRequestDetail, "threads">): PullRequestThread[] => threads.filter(thread => !thread.resolved);
 
 /** The comments and reviews of the conversation that have words. */
 export const spokenConversation = ({ conversation }: Pick<PullRequestDetail, "conversation">): PullRequestDetail["conversation"] => conversation.filter(event => event.body.trim() !== "");
@@ -453,7 +486,7 @@ export const commentCount = (detail: Pick<PullRequestDetail, "threads" | "conver
 /** What the details show once thread `id` is `resolved`: its threads and their unresolved count together, so every count agrees while GitHub answers. */
 export function withThreadResolved(detail: PullRequestDetail, id: string, resolved: boolean): Pick<PullRequestDetail, "threads" | "unresolved"> {
 	const threads = detail.threads.map(thread => (thread.id === id ? { ...thread, resolved } : thread));
-	return { threads, unresolved: { count: openThreads({ threads }).length, exact: detail.unresolved.exact } };
+	return { threads, unresolved: unresolvedOf(threads, detail.unresolved.exact) };
 }
 
 /** Why the Code tab takes no line comments: a commit is picked, or the Review draft is posted or reviews an older head; `null` when it takes them. */

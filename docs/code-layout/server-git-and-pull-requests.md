@@ -8,6 +8,7 @@
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
   The list leaves out a pull request whose own state says closed, which the open searches still return for up to a minute after a close, since GitHub's search index lags it.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either; the details count `unresolved` from the threads they keep, so their counts and threads agree.
+  `unresolved.bots` counts the open threads whose first comment a bot wrote, by `isBotAuthor` in `src/shared/github.ts`, the same test as the details' **Bot comments** filter; the list reads only each thread's first comment's author for it, and the details count it through `unresolvedOf`.
   The details also read the last 100 commits with the pull requests GitHub links each to, and keep a commit linked to none or to this one, since a branch that merged its trunk lists the trunk's commits too.
 - `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), the branch a worktree had checked out at a given time (`headHistory`, `branchAt`), and the worktree a new session's branch runs in.
   It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, `worktreesOf`, which parses `git worktree list --porcelain -z`, and `holderOf`, the worktree that has a branch checked out, which the pull request checkout and rebase use too.

@@ -102,17 +102,6 @@ Reactions are read-only, and replies beyond the detail query's first 20 comments
 Commit rows open the commit on GitHub.
 The detail query reads merge and close times alongside existing data in one GraphQL request; absent historical events stay absent rather than being inferred from current branch or draft state.
 
-## Keep open pull requests in browser-local tabs
-
-The PR page keeps its open tabs, order, and selected detail tab through `useStoredState`.
-The page's route alone says which PR shows and whether it shows **Code**, so another window showing a different PR keeps its own.
-A session's or project's PRs sidebar has no strip: it had one with its own stored tabs, which did not work, so it now shows one pull request in memory, the session's first until another is picked.
-Opening an existing PR focuses it, and closing the active tab chooses the right neighbour before the left, matching T3 Code.
-A small pointer reorder needs no drag dependency; Alt+Left and Alt+Right on the number give the same operation to keyboard users.
-The strip adds no panel controls of T3's: the sessions sidebar keeps its own rail toggle, and thread-details, panel maximize, and panel visibility have no equivalent surface on the PR page.
-The terminal remains in the existing status bar, as T3 also omits its terminal control on the PR list page.
-See [Pull requests](usage/pull-requests.md).
-
 ## Code review keeps omp's renderer and local drafts
 
 The pull request Code tab uses T3's toolbar and reading order around omp's lazy diff renderer, rather than adding a second diff library.

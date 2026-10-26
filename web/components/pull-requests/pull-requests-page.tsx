@@ -3,10 +3,8 @@
  * is; or on a board, a column per section, with the details of the pull request it shows docked beside it.
  */
 import { Maximize2, RefreshCw, X } from "lucide-react";
-import { type PullRequest, repoKey } from "../../../src/shared/github";
-import { type PullRequestDetailTab, pullRequestTabHash, usePagePullRequestTabs } from "../../pull-request-tabs";
+import { type PullRequest, prKey, repoKey } from "../../../src/shared/github";
 import { useState } from "react";
-import { PullRequestTabsStrip } from "./pr-tabs";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
@@ -38,6 +36,7 @@ import {
 	workspacesLabel,
 } from "./pull-requests-board";
 import { PullRequestsKanban } from "./pull-requests-kanban";
+import type { PullRequestDetailTab } from "./pr-details";
 import { SectionCount } from "./pull-requests-nav";
 import { PullRequestDetailPage, PullRequestDetails } from "./pr-page";
 import { PullRequestTableRow } from "./pr-row";
@@ -183,7 +182,7 @@ export function PullRequestsPage(props: PullRequestsPageProps) {
 	const [view, setView] = usePullRequestsView();
 	const { workspace, hosts, route } = props;
 	// Checking the target first narrows the route to one with its files.
-	if (route.target && pullRequestsPageShows(view, route) === "details") return <PullRequestDetailPage workspace={workspace} hosts={hosts} target={route.target} files={route.files} />;
+	if (route.target && pullRequestsPageShows(view, route) === "details") return <PullRequestDetailPage key={prKey(route.target)} workspace={workspace} hosts={hosts} target={route.target} files={route.files} />;
 	return <PullRequestsOverview {...props} view={view} onView={setView} />;
 }
 
@@ -197,11 +196,8 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 	const pulls = usePullRequests({ workspace, hosts, past, route });
 	const unmatched = pulls.poll.read?.data.unmatched ?? [];
 	const docked = view === "board" && route.target !== null ? route : null;
-	const { tabs, dispatch } = usePagePullRequestTabs(null);
 	return (
-		<div className="flex h-full min-h-0 flex-1 flex-col">
-			{tabs.open.length > 0 && <PullRequestTabsStrip tabs={tabs} dispatch={dispatch} workspace={workspace} hrefOf={pullRequestTabHash} />}
-			<div className="flex min-h-0 flex-1">
+		<div className="flex h-full min-h-0 flex-1">
 			<div className="flex min-w-0 flex-1 flex-col">
 				<ListPage
 					title="Pull requests"
@@ -239,7 +235,6 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 				</ListPage>
 			</div>
 			{docked && <DockedDetails workspace={workspace} hosts={hosts} route={docked} onExpand={() => onView("list")} />}
-			</div>
 		</div>
 	);
 }

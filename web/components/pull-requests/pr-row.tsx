@@ -1,15 +1,15 @@
-/** A pull request's row in the lists, or its card on the board, with its move badge, review draft tag, checks icon, review state, diff size, and `⋯` menu. */
-import { CircleCheck, CircleX, ClipboardPen, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
-import { memo, type MouseEvent, useState } from "react";
+/** A pull request's row in the lists, or its card on the board, with its move badge, review draft tag, who started the threads a **Reply** waits on, checks icon, reviewers picker, diff size, and `⋯` menu, whose actions also open on right-click. */
+import { CircleCheck, CircleX, ClipboardPen, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, Sparkles, User, UserCheck, UserPlus, UserX } from "lucide-react";
+import { memo, type MouseEvent, type ReactElement, type ReactNode, useRef, useState } from "react";
 import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import { type MoveId, readyOnceChecksPass } from "../../../src/shared/moves";
 import { reviewDraftOf, waitsOnYou } from "../../../src/shared/review-drafts";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace } from "../../pull-requests-model";
+import { type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace, threadStarters, withReviewer } from "../../pull-requests-model";
 import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
@@ -23,7 +23,10 @@ import { useDashboardStatus } from "../dashboard-context";
 import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
 import { MergePopover, useMergeTarget } from "./merge-popover";
-import { PullRequestMenu } from "./pr-menu";
+import { errorText } from "../../api";
+import { toasts } from "../toaster";
+import { type PullRequestOptionsRead, type ReviewerChange, ReviewersField, usePullRequestOptions } from "./pr-fields";
+import { PullRequestMenu, PullRequestMenuItems, type PullRequestMenuItemsProps } from "./pr-menu";
 
 /** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
 function StateTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
@@ -99,6 +102,33 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 /** A row's changes to its pull request, pending until GitHub answers; a refusal shows as a toast. */
 const useRowChange = (pr: PullRequestSummary, onChange: RowProps["onChange"]): Action<[ListChange]> =>
 	useAction((change: ListChange) => onChange(pr, change), "GitHub refused the change");
+
+/** A row's review requests, and the row's pull request with them shown. */
+interface ReviewRequests {
+	shown: PullRequestSummary;
+	send: (change: ReviewerChange) => void;
+}
+
+/**
+ * A row's review requests: each shows at once over the row's reviewers and goes to GitHub after the ones before it, so
+ * quick picks all land, in order, and a pick reads the requests before it; a refusal drops its pick and shows as a toast.
+ */
+function useReviewRequests(pr: PullRequestSummary, options: PullRequestOptionsRead, onChange: RowProps["onChange"]): ReviewRequests {
+	const [queued, setQueued] = useState<ReviewerChange[]>([]);
+	const chain = useRef(Promise.resolve());
+	const send = (change: ReviewerChange): void => {
+		setQueued(current => [...current, change]);
+		chain.current = chain.current
+			.then(() => onChange(pr, change))
+			.catch((error: unknown) => { toasts.add({ title: "GitHub refused the change", description: errorText(error) }); })
+			// GitHub's answer reaches the list before the pick leaves the queue, and showing a pick twice changes nothing.
+			.finally(() => setQueued(current => current.slice(1)));
+	};
+	if (queued.length === 0) return { shown: pr, send };
+	const people = options.data?.reviewers ?? [];
+	const reviewers = queued.reduce((list, { login, on }) => withReviewer(list, login, on, people.find(person => person.login === login)?.avatarUrl ?? null), pr.reviewers);
+	return { shown: { ...pr, reviewers }, send };
+}
 
 /** A merge confirmation's open state. */
 interface MergeOpen {
@@ -197,6 +227,17 @@ export function ReviewState({ pr, max, className }: { pr: PullRequestSummary; ma
 	return icon && <IconTip icon={icon} className={className} />;
 }
 
+/** The review column: where review stands, on a button that asks for reviews or withdraws them; a merged pull request's only shows it. */
+function ReviewPicker({ options, review: { shown, send } }: { options: PullRequestOptionsRead; review: ReviewRequests }) {
+	if (shown.state === "merged") return <ReviewState pr={shown} max={2} />;
+	const shows = shown.reviewers.length > 0 || REVIEW_ICON[shown.review] !== null;
+	return (
+		<ReviewersField pr={shown} options={options} onChange={send} className="-mx-1 h-6 px-1 font-normal">
+			{shows ? <ReviewState pr={shown} max={2} /> : <UserPlus aria-hidden className="size-4 text-muted-foreground/60" />}
+		</ReviewersField>
+	);
+}
+
 /** How many comments and review threads the pull request holds, as GitHub's list shows it; nothing when it has none. */
 function ConversationCount({ pr }: { pr: PullRequestSummary }) {
 	if (pr.conversations === 0) return null;
@@ -206,6 +247,20 @@ function ConversationCount({ pr }: { pr: PullRequestSummary }) {
 			<span role="img" aria-label={label} className="flex shrink-0 items-center gap-0.5 text-xs tabular-nums text-muted-foreground">
 				<MessageSquare aria-hidden className="size-3.5" />
 				{pr.conversations}
+			</span>
+		</Tooltip>
+	);
+}
+
+/** Who started the open threads a **Reply** waits on, AI or people, each with its count; nothing for any other move. */
+function ThreadStartersTag({ pr, move }: { pr: PullRequestSummary; move: MoveId }) {
+	const starters = threadStarters(pr, move);
+	if (!starters) return null;
+	return (
+		<Tooltip content={starters.label}>
+			<span role="img" aria-label={starters.label} className="flex shrink-0 items-center gap-1.5 tabular-nums">
+				{starters.ai > 0 && <span className="flex items-center gap-0.5"><Sparkles aria-hidden className="size-3.5" />{starters.ai}</span>}
+				{starters.human > 0 && <span className="flex items-center gap-0.5"><User aria-hidden className="size-3.5" />{starters.human}</span>}
 			</span>
 		</Tooltip>
 	);
@@ -403,20 +458,33 @@ const sameRowProps = sameProps<RowProps>({
 	moveId: Object.is,
 });
 
-function RowMenu({ pr, change, pending, cwd, onQuickAction, onRebase, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "onRebase" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary; change: Action<[ListChange]> }) {
+/** What a row's `⋯` menu and its right-click menu list. */
+function rowMenuItems({ pr, change, review, options, pending, cwd, onQuickAction, onRebase }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "onRebase"> & { pr: PullRequestSummary; change: Action<[ListChange]>; review: ReviewRequests; options: PullRequestOptionsRead }): PullRequestMenuItemsProps {
+	return {
+		pr,
+		state: pr.state,
+		// The menu lists `pullRequestActions(pr)`, so it runs only one of those.
+		quick: { actions: pullRequestActions(pr), pending, onRun: action => onQuickAction(pr, cwd, action as PullRequestActionId) },
+		rebase: { facts: pr, run: () => onRebase(pr, cwd) },
+		onState: to => change.run({ field: "state", state: to }),
+		reviewers: { pr: review.shown, options, onChange: review.send },
+		pending: change.pending,
+	};
+}
+
+function RowMenu({ items, actionsOpen, onActionsOpenChange }: Pick<RowProps, "actionsOpen" | "onActionsOpenChange"> & { items: PullRequestMenuItemsProps }) {
+	return <PullRequestMenu {...items} open={actionsOpen} onOpenChange={open => onActionsOpenChange(items.pr, open)} label="Pull request actions" />;
+}
+
+/** A row or card, drawn by `render` around `children`, whose `⋯` menu's actions also open on right-click. */
+function RowContextMenu({ items, render, children }: { items: PullRequestMenuItemsProps; render: ReactElement; children: ReactNode }) {
 	return (
-		<PullRequestMenu
-			pr={pr}
-			state={pr.state}
-			// The menu lists `pullRequestActions(pr)`, so it runs only one of those.
-			quick={{ actions: pullRequestActions(pr), pending, onRun: action => onQuickAction(pr, cwd, action as PullRequestActionId) }}
-			rebase={{ facts: pr, run: () => onRebase(pr, cwd) }}
-			onState={to => change.run({ field: "state", state: to })}
-			pending={change.pending}
-			open={actionsOpen}
-			onOpenChange={open => onActionsOpenChange(pr, open)}
-			label="Pull request actions"
-		/>
+		<ContextMenu>
+			<ContextMenuTrigger render={render}>{children}</ContextMenuTrigger>
+			<ContextMenuContent className="min-w-56">
+				<PullRequestMenuItems {...items} />
+			</ContextMenuContent>
+		</ContextMenu>
 	);
 }
 
@@ -457,14 +525,22 @@ function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; target
  */
 export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, onChange, ...actions }: RowProps) {
 	const change = useRowChange(pr, onChange);
+	const options = usePullRequestOptions(pr);
+	const review = useReviewRequests(pr, options, onChange);
+	const items = rowMenuItems({ pr, change, review, options, ...actions });
 	return (
-		<li
-			id={rowId(pr)}
-			{...drag.handle}
-			{...drag.target}
-			data-move={moveId}
-			onClick={event => openFromRow(event, pr)}
-			className={cn("group/row relative cursor-pointer", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+		<RowContextMenu
+			items={items}
+			render={
+				<li
+					id={rowId(pr)}
+					{...drag.handle}
+					{...drag.target}
+					data-move={moveId}
+					onClick={event => openFromRow(event, pr)}
+					className={cn("group/row relative cursor-pointer", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+				/>
+			}
 		>
 			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-1 h-4 w-px bg-border" />}
 			{stack?.joinsBelow && <span aria-hidden className="absolute top-4 bottom-0 left-1 w-px bg-border" />}
@@ -481,6 +557,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
+					<ThreadStartersTag pr={pr} move={move} />
 					<span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
 						<StackInfo stack={stack} base={pr.stackedOn} />
 						<SessionChips sessions={sessions} onOpen={onOpen} compact />
@@ -495,9 +572,9 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 					actions.pending === null && !change.pending && "opacity-0",
 				)}
 			>
-				<RowMenu pr={pr} change={change} {...actions} />
+				<RowMenu items={items} {...actions} />
 			</span>
-		</li>
+		</RowContextMenu>
 	);
 }, sameRowProps);
 
@@ -513,16 +590,24 @@ const WIDE = "hidden @3xl/pull-requests:flex";
 /** A pull request in the Pull requests page's table: one line per column, with the author, number, and reason under its title. */
 export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, onChange, ...actions }: RowProps) {
 	const change = useRowChange(pr, onChange);
+	const options = usePullRequestOptions(pr);
+	const review = useReviewRequests(pr, options, onChange);
+	const items = rowMenuItems({ pr, change, review, options, ...actions });
 	// A review's reason names its author, which this row shows already.
 	const why = move === "review" ? null : reason(pr, move);
 	return (
-		<li
-			id={rowId(pr)}
-			{...drag.handle}
-			{...drag.target}
-			data-move={moveId}
-			onClick={event => openFromRow(event, pr)}
-			className={cn("group/row relative cursor-pointer px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+		<RowContextMenu
+			items={items}
+			render={
+				<li
+					id={rowId(pr)}
+					{...drag.handle}
+					{...drag.target}
+					data-move={moveId}
+					onClick={event => openFromRow(event, pr)}
+					className={cn("group/row relative cursor-pointer px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+				/>
+			}
 		>
 			<RowMoveBadge pr={pr} move={move} {...actions} />
 			<div className="min-w-0">
@@ -539,6 +624,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 						<>
 							<span aria-hidden>·</span>
 							<span className="min-w-0 truncate">{why}</span>
+							<ThreadStartersTag pr={pr} move={move} />
 						</>
 					)}
 				</p>
@@ -550,15 +636,15 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 				<StackInfo stack={stack} base={pr.stackedOn} />
 			</span>
 			<span><ChecksIcon checks={pr.checks} /></span>
-			<span><ReviewState pr={pr} max={2} /></span>
+			<span><ReviewPicker options={options} review={review} /></span>
 			<span className={cn(WIDE, "justify-end")}>
 				<DiffSize pr={pr} />
 			</span>
 			<Age at={pr.updatedAt} compact exact className="shrink-0 text-right text-xs tabular-nums text-muted-foreground" />
 			<span className="flex justify-end">
-				<RowMenu pr={pr} change={change} {...actions} />
+				<RowMenu items={items} {...actions} />
 			</span>
-		</li>
+		</RowContextMenu>
 	);
 }, sameRowProps);
 
@@ -586,19 +672,27 @@ export const CARD_KEY = "data-card";
  */
 export const PullRequestCard = memo(function PullRequestCard({ row: { pr, move, stack }, repo, sessions, targeted, onOpen, onChange, mergeOpen, onMergeOpenChange, held, ...actions }: CardProps) {
 	const change = useRowChange(pr, onChange);
+	const options = usePullRequestOptions(pr);
+	const review = useReviewRequests(pr, options, onChange);
+	const items = rowMenuItems({ pr, change, review, options, ...actions });
 	return (
-		<li
-			id={rowId(pr)}
-			{...{ [CARD_KEY]: prKey(pr) }}
-			aria-busy={held === "moving" || undefined}
-			onClick={event => openFromRow(event, pr)}
-			className={cn(
-				"group/card relative cursor-grab touch-pan-y select-none space-y-1.5 rounded-lg border border-border bg-background p-2.5 shadow-xs/5 transition-[border-color,opacity] hover:border-foreground/20",
-				targeted && "border-ring ring-1 ring-ring",
-				held === "lifted" && "border-dashed opacity-35 shadow-none",
-				held === "picked" && "ring-2 ring-ring",
-				held === "moving" && "motion-safe:animate-pulse",
-			)}
+		<RowContextMenu
+			items={items}
+			render={
+				<li
+					id={rowId(pr)}
+					{...{ [CARD_KEY]: prKey(pr) }}
+					aria-busy={held === "moving" || undefined}
+					onClick={event => openFromRow(event, pr)}
+					className={cn(
+						"group/card relative cursor-grab touch-pan-y select-none space-y-1.5 rounded-lg border border-border bg-background p-2.5 shadow-xs/5 transition-[border-color,opacity] hover:border-foreground/20",
+						targeted && "border-ring ring-1 ring-ring",
+						held === "lifted" && "border-dashed opacity-35 shadow-none",
+						held === "picked" && "ring-2 ring-ring",
+						held === "moving" && "motion-safe:animate-pulse",
+					)}
+				/>
+			}
 		>
 			<div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
 				<RowMoveBadge pr={pr} move={move} merge={{ open: mergeOpen, onOpenChange: open => onMergeOpenChange(pr, open) }} {...actions} />
@@ -611,6 +705,7 @@ export const PullRequestCard = memo(function PullRequestCard({ row: { pr, move, 
 				<span className="min-w-0 shrink truncate tabular-nums">{repo ? `${repo}#${pr.number}` : `#${pr.number}`}</span>
 				<span aria-hidden>·</span>
 				<span className="min-w-0 flex-1 truncate">{reason(pr, move)}</span>
+				<ThreadStartersTag pr={pr} move={move} />
 			</p>
 			<div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
 				<SessionChips sessions={sessions} onOpen={onOpen} compact />
@@ -618,7 +713,7 @@ export const PullRequestCard = memo(function PullRequestCard({ row: { pr, move, 
 				<ConversationCount pr={pr} />
 				<ChecksIcon checks={pr.checks} className="[&_svg]:size-3.5" />
 				<span className="ml-auto flex min-w-0 items-center gap-2">
-					<ReviewState pr={pr} max={2} />
+					<ReviewPicker options={options} review={review} />
 					<DiffSize pr={pr} />
 				</span>
 			</div>
@@ -628,8 +723,8 @@ export const PullRequestCard = memo(function PullRequestCard({ row: { pr, move, 
 					actions.pending === null && !change.pending && "opacity-0",
 				)}
 			>
-				<RowMenu pr={pr} change={change} {...actions} />
+				<RowMenu items={items} {...actions} />
 			</span>
-		</li>
+		</RowContextMenu>
 	);
 }, sameCardProps);

@@ -21,7 +21,7 @@ const pr = (number: number, stackedOn: number | null = null): PullRequestSummary
 	base: stackedOn === null ? "main" : `me/branch-${stackedOn}`,
 	stackedOn: stackedOn === null ? null : `me/branch-${stackedOn}`,
 	behind: true,
-	unresolved: { count: 0, exact: true },
+	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	updatedAt: number,
 });

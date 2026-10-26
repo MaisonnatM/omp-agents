@@ -16,12 +16,18 @@ function ContextMenu({
 
 /** Opens on right-click, long-press, and, from the keyboard, the context-menu key or Shift+F10. */
 function ContextMenuTrigger({
+  onContextMenu,
   onKeyDown,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Trigger>) {
   return (
     <ContextMenuPrimitive.Trigger
       data-slot="context-menu-trigger"
+      onContextMenu={(event) => {
+        onContextMenu?.(event)
+        // React passes up events from the popups the trigger's content portals out, which are not right-clicks on it.
+        if (!event.currentTarget.contains(event.target as Node)) event.preventBaseUIHandler()
+      }}
       onKeyDown={(event) => {
         onKeyDown?.(event)
         if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return

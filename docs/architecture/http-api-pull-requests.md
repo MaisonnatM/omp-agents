@@ -53,7 +53,7 @@ The same detail GraphQL request reads `mergedAt`, `closedAt`, comment and review
 Each thread still loads its first 20 comments, with the total count letting the Timeline link to replies beyond that limit on GitHub.
 Reaction groups carry their content, user count, and viewer participation for read-only display; lifecycle times remain separate from `updatedAt`.
 The Timeline adds no activity request and does not invent draft, ready, reopen, force-push, or base-change history from the pull request's current state.
-Its `unresolved` counts the open threads among those it lists, with `exact` false when GitHub has more than it listed, so the details' counts agree with their threads.
+Its `unresolved` counts the open threads among those it lists, with `exact` false when GitHub has more than it listed, and `bots`, how many of them a bot started, so the details' counts agree with their threads.
 GitHub's GraphQL has no `viewerCanComment` on a pull request, so its `canComment` is true unless the repository is archived, or the conversation is locked and the viewer's `viewerPermission` is below `WRITE`, as GitHub lets only people who can write comment on a locked conversation.
 Its `byViewer` is `viewerDidAuthor`, since GitHub refuses an approval or a change request from the pull request's author.
 A `review` change posts `{ event, body }` to `pulls/<n>/reviews`, leaving out a blank body; `canSubmitReview` in `src/shared/review-drafts.ts` decides whether one may post, for the composer and the server alike.

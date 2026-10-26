@@ -76,7 +76,6 @@ bun scripts/pr-parity.ts --omp "http://127.0.0.1:<port>/?token=<token>" [--t3 <u
 
 It opens `#pull-requests/<owner>/<repo>/<number>` in headless Chromium at 1440×900 with the panel pinned to 720 pixels, in light and dark, and captures Summary, Timeline, Code, the checks popover, the `⋯` menu, the Check out menu, the open comment and review composer, and the Summary scrolled down; `--draft`, `--merged`, and `--closed` add the Summary of other pull requests of the same repository.
 `--pr` defaults to `yampa-ai/yampa#6833`.
-States run sequentially because the browser-local PR tabs share their selected detail tab between pages in one context.
 A state whose control the app lacks is reported `absent`.
 `--page` adds a whole-window capture of another route of the dashboard, such as `settings` or `past/<session id>`.
 `--t3` takes a running T3 Code's address, with any query its pairing needs; without it only the dashboard is captured.
@@ -94,8 +93,7 @@ Drive the window through the Chrome DevTools Protocol: `osascript` keys go to th
 
 - Page: `http://127.0.0.1:<page port>/json` lists it; `Runtime.evaluate` runs JS and `Page.captureScreenshot` captures it.
 - Main process: `http://127.0.0.1:<main port>/json` lists it; evaluate `process.mainModule.require("electron")` to reach `app`, `BrowserWindow`, and `Menu`.
-  `BrowserWindow.getAllWindows()[0].close()` is the native Cmd+W outside a PR detail, `app.emit("activate")` a Dock click, and `app.quit()` Cmd+Q.
-  While a PR detail shows, the page receives Cmd+W instead: drive it through CDP and check both the selected PR and `isVisible()` afterward, not only whether the page survives.
+  `BrowserWindow.getAllWindows()[0].close()` is what Cmd+W does, `app.emit("activate")` a Dock click, and `app.quit()` Cmd+Q.
   Replace `shell.openExternal` with a function recording its address to verify links without opening the user's browser.
 
 The page's `window.close()` destroys the window and quits the app, unlike Cmd+W.

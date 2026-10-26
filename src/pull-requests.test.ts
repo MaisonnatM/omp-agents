@@ -137,7 +137,7 @@ describe("parseListAnswer", () => {
 				base: "me/branch-0",
 				stackedOn: "me/branch-0",
 				behind: true,
-				unresolved: { count: 0, exact: true },
+				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
@@ -158,7 +158,7 @@ describe("parseListAnswer", () => {
 				base: "main",
 				stackedOn: null,
 				behind: false,
-				unresolved: { count: 0, exact: true },
+				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
@@ -179,7 +179,7 @@ describe("parseListAnswer", () => {
 				base: "main",
 				stackedOn: null,
 				behind: false,
-				unresolved: { count: 0, exact: true },
+				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
@@ -200,7 +200,7 @@ describe("parseListAnswer", () => {
 				base: "main",
 				stackedOn: null,
 				behind: false,
-				unresolved: { count: 0, exact: true },
+				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
 			},
@@ -286,11 +286,34 @@ describe("parseListAnswer", () => {
 			repo,
 		);
 		expect(prs.map(pr => [pr.number, pr.unresolved])).toEqual([
-			[1, { count: 0, exact: true }],
-			[2, { count: 3, exact: true }],
-			[3, { count: 100, exact: false }],
-			[4, { count: 0, exact: false }],
+			[1, { count: 0, exact: true, bots: 0 }],
+			[2, { count: 3, exact: true, bots: 0 }],
+			[3, { count: 100, exact: false, bots: 0 }],
+			[4, { count: 0, exact: false, bots: 0 }],
 		]);
+	});
+
+	test("counts the open threads a bot started, by GitHub's type or a `[bot]` login, leaving out resolved ones and threads without a first comment", () => {
+		const thread = (isResolved: boolean, author?: Record<string, unknown>) => ({ isResolved, comments: { nodes: author ? [{ author }] : [] } });
+		const bugbot = { __typename: "Bot", login: "cursor" };
+		const [pr] = parseListAnswer(
+			{
+				data: {
+					authored: {
+						nodes: [
+							node(1, {
+								reviewThreads: {
+									totalCount: 5,
+									nodes: [thread(false, bugbot), thread(false, { __typename: "User", login: "github-actions[bot]" }), thread(false, { __typename: "User", login: "amy" }), thread(true, bugbot), thread(false)],
+								},
+							}),
+						],
+					},
+				},
+			},
+			repo,
+		);
+		expect(pr?.unresolved).toEqual({ count: 4, exact: true, bots: 2 });
 	});
 
 	test("leaves out a pull request that an open search still returns after it closed", () => {
@@ -457,7 +480,7 @@ describe("parseDetailAnswer", () => {
 			pr,
 		);
 		expect(checks).toBe("failing");
-		expect(unresolved).toEqual({ count: 0, exact: true });
+		expect(unresolved).toEqual({ count: 0, exact: true, bots: 0 });
 		expect(checkRuns).toEqual([
 			{ name: "deploy", state: "failing", url: "https://ci.example/deploy" },
 			{ name: "test", state: "failing", url: null },
@@ -500,7 +523,7 @@ describe("parseDetailAnswer", () => {
 			pr,
 		);
 		expect(detail.state).toBe("closed");
-		expect(detail.unresolved).toEqual({ count: 1, exact: true });
+		expect(detail.unresolved).toEqual({ count: 1, exact: true, bots: 0 });
 		expect(detail.conversation.map(event => [event.review, event.body])).toEqual([
 			["changes-requested", "Not yet"],
 			[null, "Why?"],
@@ -525,8 +548,27 @@ describe("parseDetailAnswer", () => {
 	test("counts the unresolved threads among those it lists, as a floor when GitHub lists only the first page", () => {
 		const thread = (id: string, isResolved: boolean) => ({ id, isResolved, path: "a.ts", line: 1, comments: { nodes: [] } });
 		const unresolved = (reviewThreads: unknown) => parseDetailAnswer(answer({ reviewThreads }), pr).unresolved;
-		expect(unresolved({ totalCount: 3, nodes: [thread("PRRT_a", false), thread("PRRT_b", true), thread("PRRT_c", false)] })).toEqual({ count: 2, exact: true });
-		expect(unresolved({ totalCount: 150, nodes: [thread("PRRT_a", false), thread("PRRT_b", true)] })).toEqual({ count: 1, exact: false });
+		expect(unresolved({ totalCount: 3, nodes: [thread("PRRT_a", false), thread("PRRT_b", true), thread("PRRT_c", false)] })).toEqual({ count: 2, exact: true, bots: 0 });
+		expect(unresolved({ totalCount: 150, nodes: [thread("PRRT_a", false), thread("PRRT_b", true)] })).toEqual({ count: 1, exact: false, bots: 0 });
+	});
+
+	test("counts the open threads whose oldest comment a bot wrote, whatever order GitHub lists the comments in", () => {
+		const comment = (login: string, typename: string, createdAt: string) => ({ author: { __typename: typename, login }, body: "", createdAt, url: null });
+		const thread = (id: string, isResolved: boolean, comments: unknown[]) => ({ id, isResolved, path: "a.ts", line: 1, comments: { nodes: comments } });
+		const { unresolved } = parseDetailAnswer(
+			answer({
+				reviewThreads: {
+					totalCount: 3,
+					nodes: [
+						thread("PRRT_a", false, [comment("amy", "User", "2026-10-01T11:00:00Z"), comment("coderabbitai", "Bot", "2026-10-01T10:00:00Z")]),
+						thread("PRRT_b", false, [comment("amy", "User", "2026-10-01T10:00:00Z"), comment("coderabbitai", "Bot", "2026-10-01T11:00:00Z")]),
+						thread("PRRT_c", true, [comment("coderabbitai", "Bot", "2026-10-01T10:00:00Z")]),
+					],
+				},
+			}),
+			pr,
+		);
+		expect(unresolved).toEqual({ count: 2, exact: true, bots: 1 });
 	});
 
 	test("lets you comment unless the repository is archived, or the conversation is locked and you cannot write to the repository", () => {

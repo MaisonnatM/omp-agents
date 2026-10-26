@@ -118,7 +118,7 @@ export function Summary({ detail, options, save, send }: SummaryProps) {
 		<div>
 			<section className="space-y-2 px-4 pt-2.5 pb-1" aria-label="Pull request metadata">
 				<MetaRow icon={Users} label="Reviewers">
-					<ReviewersField detail={detail} options={options} save={save}>
+					<ReviewersField pr={detail} options={options} onChange={(change, reviewers) => save(change, { reviewers })}>
 						{detail.reviewers.length ? <Reviewers reviewers={detail.reviewers} /> : <span className="text-muted-foreground">None</span>}
 					</ReviewersField>
 				</MetaRow>

@@ -53,7 +53,8 @@ Start a UI change here, then read that file's entry under [Page](#page).
   `code.tsx` holds the **Code** tab's commit scope and which files are folded, and composes `code-toolbar.tsx`, its toolbar, `diff-preferences.ts`, the diff options it keeps on this computer, `viewed-files.tsx`, GitHub's viewed state and the **Viewed** checkbox, `code-files.tsx`, the diffs and file tree, and `diff-controls.tsx`, the line comment box.
   A pull request row's **Review draft** tag is `ReviewDraftTag` in `web/components/pull-requests/pr-row.tsx`.
   The same details show in two places, so reproduce a layout bug in the one the user means: the Pull requests page's `pr-page.tsx`, and the right sidebar's **PRs** tab, a much narrower column.
-  The open `#N` strip above the page's details is `PullRequestTabsStrip` in `web/components/pull-requests/pr-tabs.tsx`, backed by `web/pull-request-tabs.ts`; the sidebar's **PRs** tab has none.
+  A table row's or card's review cell, which asks for reviews, is `ReviewPicker` in `pr-row.tsx`, over `ReviewersField` in `pr-fields.tsx`, the **Summary**'s Reviewers picker.
+  A row's or card's right-click menu is `RowContextMenu` in `pr-row.tsx`, which lists the `⋯` menu's `PullRequestMenuItems` from `pr-menu.tsx`, with its **Reviewers** submenu.
 - Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
 - The three things called Files:
   - The changes card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.

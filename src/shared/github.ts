@@ -128,6 +128,9 @@ export interface Person {
 	isBot?: boolean;
 }
 
+/** Whether a bot wrote it, such as Cursor Bugbot, CodeRabbit, or Copilot: GitHub says so, or its login ends in GitHub's `[bot]`. */
+export const isBotAuthor = (person: Person): boolean => person.isBot === true || /\[bot\]$/i.test(person.login);
+
 /** Where one reviewer stands: their latest review, or `requested` while a review from them is pending. */
 export type ReviewerState = "approved" | "changes-requested" | "commented" | "requested";
 
@@ -160,8 +163,11 @@ export interface PullRequestSummary extends PullRequest {
 	stackedOn: string | null;
 	/** Its base has commits its branch lacks and you may update the branch: GitHub's `viewerCanUpdateBranch`, true with conflicts too, false once merged. */
 	behind: boolean;
-	/** Review threads not yet resolved. `exact` is false when GitHub listed only some threads, so `count` is a floor. */
-	unresolved: { count: number; exact: boolean };
+	/**
+	 * Review threads not yet resolved, `bots` of them started by a bot. `exact` is false when GitHub listed only some
+	 * threads, so `count` is a floor and `bots` counts only those listed.
+	 */
+	unresolved: { count: number; exact: boolean; bots: number };
 	/** Comments and review threads, resolved ones too, as GitHub's own list counts its conversation. */
 	conversations: number;
 	/** Last update, or the merge for a merged PR, in ms since the epoch. */
@@ -198,7 +204,7 @@ const isSummary = fields<PullRequestSummary>({
 	base: isString,
 	stackedOn: nullable(isString),
 	behind: isBoolean,
-	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean }),
+	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean, bots: isNumber }),
 	conversations: isNumber,
 	updatedAt: isNumber,
 });
@@ -207,7 +213,7 @@ const REPO: Shape<Repo & { cwds: string[] }> = { owner: isString, repo: isString
 const isListed = fields<Repo & { cwds: string[]; pullRequests: PullRequestSummary[] }>({ ...REPO, pullRequests: arrayOf(isSummary) });
 const isFailed = fields<Repo & { cwds: string[]; error: string }>({ ...REPO, error: isString });
 
-/** A kept {@link PullRequestList} with every repository and pull request whole, or `null`: a read saved before the list carried each PR's diff size reads GitHub again. */
+/** A kept {@link PullRequestList} with every repository and pull request whole, or `null`: a read saved before the list carried each PR's diff size or who started its open threads reads GitHub again. */
 export const decodePullRequestList = decoder(
 	fields<PullRequestList>({
 		repos: arrayOf((repo: unknown): repo is RepoPullRequests => isListed(repo) || isFailed(repo)),
@@ -302,6 +308,12 @@ export interface PullRequestThread {
 	commentCount: number;
 	/** Oldest first. */
 	comments: PullRequestComment[];
+}
+
+/** The unresolved count of `threads`, with `exact` as GitHub listed them; a thread's starter is its oldest comment's author. */
+export function unresolvedOf(threads: PullRequestThread[], exact: boolean): PullRequestSummary["unresolved"] {
+	const open = threads.filter(thread => !thread.resolved);
+	return { count: open.length, exact, bots: open.filter(({ comments: [first] }) => first !== undefined && isBotAuthor(first.author)).length };
 }
 
 /** A commit on the pull request's branch. */

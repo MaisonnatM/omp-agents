@@ -21,15 +21,13 @@ Radix owns automatic arrow-key selection, roving focus, and the tab-to-panel ARI
 The check transport remains `{ name, state, url }`, with no timing or separate workflow-approval fields.
 Skipped checks stay in the completed group but never count as passed.
 
-The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
+The sidebar rows' and pull request rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
+It leaves a right-click inside a popup the row portals out, such as a picker's search field, to the browser, since React passes that event up to the row.
 
-The Pull requests page's open tabs use `web/pull-request-tabs.ts` and the same `useStoredState` localStorage mechanism as the sidebar layout.
-The page shares one ordered strip between windows and stores no active tab, since its route says which PR shows.
-A session's or project's PRs sidebar has no strip; `SessionPullRequestsTab` holds the PR it shows and its detail tab in component state, keyed by the session or project, so nothing is stored.
-Only the main PR detail registers the copy-number, copy-link, and close-tab shortcuts.
-While `PullRequestDetailPage` is mounted it tells the desktop shell through `window.ompDesktop.ownsClose`, and the Electron window's `before-input-event` then bypasses native menu shortcuts for Cmd+W, so the page can prevent the native Close action without the shell knowing the dashboard's routes.
+A session's or project's PRs sidebar holds the PR it shows and its detail tab in `SessionPullRequestsTab`'s component state, keyed by the session or project, so nothing is stored.
+Only the main PR detail registers the copy-number and copy-link shortcuts.
 
 Every fixed list of choices uses shadcn's Base UI `select`, vendored as `web/components/ui/select.tsx` with the menu's popup and row look, in place of the browser's `<select>`.
 `FormDialog` is Base UI's `Dialog`, so a `Select` in its form opens and takes focus there; Esc in one of the form's Radix pickers closes only the picker.
