@@ -2,7 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 import { commandKey, record } from "./activity";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the sidebar shows, whichever it is. */
-export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7", "tab8"] as const;
+export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
 
 export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
 
@@ -206,7 +206,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
-	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [] },
+	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ goTo: "," }] },
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{

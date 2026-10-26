@@ -95,6 +95,8 @@ export const CONTROLS = [
 	{ id: "shortcuts.tab", label: "Keyboard shortcuts category tab", area: "Sidebar" },
 	{ id: "calendar.routines.toggle", label: "Calendar routine visibility", area: "Calendar" },
 	{ id: "header.command-menu", label: "Command menu button", area: "Header" },
+	{ id: "header.group", label: "Dev and Ops switch", area: "Header" },
+	{ id: "header.settings", label: "Settings button", area: "Header" },
 	{ id: "notices.open", label: "Notification bell", area: "Notifications" },
 	{ id: "notices.filter", label: "Notifications source filter", area: "Notifications" },
 	{ id: "notices.read-all", label: "Notifications, mark all as read", area: "Notifications" },

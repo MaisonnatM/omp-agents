@@ -1,6 +1,6 @@
 # Notifications
 
-- The bell sits after the command menu button at the right of the title bar on macOS, beside the window's title; elsewhere, at the end of the page's header.
+- The bell sits after the command menu button and before the Settings gear at the right of the title bar on macOS, beside the window's title; elsewhere, at the end of the page's header.
   With split panes off macOS, only the top right pane's header shows them, before its details toggle.
 - Six sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.

@@ -35,10 +35,10 @@ import { toasts } from "./components/toaster";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
+import { hashForRoute, hashForView, type NotesListView, type OpenMode, TAB_GROUPS, type TabGroup, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
-import { useSidebarTabs } from "./sidebar-tabs";
+import { groupTabs, useSidebarTabs } from "./sidebar-tabs";
 import { startOf } from "./starts";
 import { useAttention } from "./use-attention";
 import { useDashboard } from "./use-dashboard";
@@ -78,7 +78,8 @@ export function App() {
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useMemo(() => settingsRoute(page), [page]);
-	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, latestSession: sessions.latest, settings, navigate, show });
+	const { tab, showTab, group, showGroup } = useSidebarTab({ page, signedOutTabs, shown: tabs, layout, latestSession: sessions.latest, navigate, show });
+	const emptyGroups = useMemo((): ReadonlySet<TabGroup> => new Set(TAB_GROUPS.flatMap(({ value }) => (groupTabs(tabs, value).length === 0 ? [value] : []))), [tabs]);
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
@@ -188,7 +189,21 @@ export function App() {
 	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
-	const headerControls = useMemo(() => <HeaderControls notices={state.notices} onShowSearch={showSearch} />, [state.notices, showSearch]);
+	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
+	const headerControls = useMemo(
+		() => (
+			<HeaderControls
+				notices={state.notices}
+				onShowSearch={showSearch}
+				group={group}
+				emptyGroups={emptyGroups}
+				onGroup={showGroup}
+				settingsOpen={page?.kind === "settings"}
+				onToggleSettings={toggleSettings}
+			/>
+		),
+		[state.notices, showSearch, group, emptyGroups, showGroup, page?.kind, toggleSettings],
+	);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -208,6 +223,7 @@ export function App() {
 											tab={tab}
 											onTab={showTab}
 											tabs={tabs}
+											group={group}
 											listed={state.listed}
 											userTodos={state.userTodos}
 											userNotes={state.userNotes}

@@ -8,24 +8,34 @@ import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
 
+/** The header's switch between the sidebar's two sets of tabs: Dev for code work, Ops for the day around it. */
+export const TAB_GROUPS = [
+	{ value: "dev", label: "Dev" },
+	{ value: "ops", label: "Ops" },
+] as const;
+
+export type TabGroup = (typeof TAB_GROUPS)[number]["value"];
+
 /**
- * The sidebar's tabs, in order. A tab with an `integration` shows, and its shortcut applies, only while omp holds a
- * sign-in to that service, even one the service refuses, which the page then offers to reconnect. A `pinned` tab always
- * shows, whatever the user hides: Settings, which leads back to the others.
+ * The sidebar's tabs, in order, each in the `group` whose bar shows it. A tab with an `integration` shows, and its
+ * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
+ * offers to reconnect. Settings is no tab: the header's button opens it.
  */
 export const SIDEBAR_TABS = [
-	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"] },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear" },
-	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
-	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
-	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes },
-	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
-	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox, integration: "gmail" },
-	{ value: "settings", label: "Settings", icon: PAGE_ICON.settings, pinned: true },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId; pinned?: true }[];
+	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], group: "dev" },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, group: "dev", integration: "linear" },
+	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, group: "dev" },
+	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, group: "dev" },
+	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, group: "ops" },
+	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, group: "ops" },
+	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox, group: "ops", integration: "gmail" },
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: TabGroup; integration?: McpIntegrationId }[];
 
-/** The sidebar's tab; the tickets, todo, notes, calendar, inbox, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A tab of the sidebar's bar; the tickets, todo, notes, calendar, and inbox tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
+
+/** What the sidebar shows: a tab's panel, or the settings sections while the Settings page is open. */
+export type SidebarPanel = SidebarTab | "settings";
 
 const PAST_PREFIX = "past/";
 

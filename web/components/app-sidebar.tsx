@@ -3,7 +3,7 @@ import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
+import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, TabGroup, SidebarPanel, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
@@ -20,10 +20,12 @@ interface AppSidebarProps {
 	page: Page | null;
 	/** The panes on screen. */
 	panes: View[];
-	tab: SidebarTab;
+	tab: SidebarPanel;
 	onTab: (tab: SidebarTab) => void;
-	/** The tabs the sidebar shows, in order. */
+	/** The tabs the sidebar shows across both groups, in order. */
 	tabs: readonly SidebarTab[];
+	/** The group whose tabs the bar draws. */
+	group: TabGroup;
 	/** The server has sent the session lists. */
 	listed: boolean;
 	userTodos: UserTodoList | null;
@@ -54,6 +56,7 @@ export const AppSidebar = memo(function AppSidebar({
 	tab,
 	onTab,
 	tabs,
+	group,
 	listed,
 	userTodos,
 	userNotes,
@@ -98,6 +101,7 @@ export const AppSidebar = memo(function AppSidebar({
 			newSessionOpen={page?.kind === "new"}
 			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
 			tabs={tabs}
+			group={group}
 			tab={tab}
 			onTab={onTab}
 			userTodos={userTodos}
