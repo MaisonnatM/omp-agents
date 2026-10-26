@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, and the dashboard's own update.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, and the dashboard's own build and update.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import type { Server } from "bun";
@@ -66,6 +66,7 @@ import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
 import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
+import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
 
@@ -118,8 +119,9 @@ export interface FileRoutesEnv {
 /** What the todo routes read and write: the Todo page's list. */
 export type TodoRoutesEnv = Omit<TodoTicketEnv, "createTicket">;
 
-/** What the dashboard update routes read: where the server stands, and **Update dashboard** itself. */
+/** What the dashboard routes read: what the server serves, where it stands, and **Update dashboard** itself. */
 export interface DashboardRoutesEnv {
+	build: ServedBuild;
 	status(): Promise<DashboardUpdateStatus>;
 	update(): Promise<DashboardUpdateOutcome>;
 }
@@ -925,12 +927,14 @@ function providerRoutes({ get, write }: RouteKit): Routes {
 }
 
 /**
+ * `GET /api/dashboard/build` answers the `ServedBuild`: the checkout the server read at startup and the page it built from it.
  * **Update dashboard**: `GET /api/dashboard/update` answers `DashboardUpdateStatus` without asking origin; `PUT` with any
  * JSON body fast-forwards the server's checkout, installs when `bun.lock` changed, and answers `DashboardUpdateOutcome`
  * before the server restarts, or 409 with why the checkout stays as it was.
  */
 function dashboardRoutes({ get, write }: RouteKit, env: DashboardRoutesEnv): Routes {
 	return {
+		"/api/dashboard/build": { GET: get(() => Response.json(env.build)) },
 		"/api/dashboard/update": {
 			GET: get(() => answer(() => env.status())),
 			PUT: write(() => null, () => env.update(), err => (err instanceof UpdateRefused ? fail(409, err.message) : null)),
