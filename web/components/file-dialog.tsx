@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { MAX_TEXT_FILE_BYTES, mediaUrl, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { mediaSrc } from "../api";
 import { linkedFile } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
@@ -31,7 +32,7 @@ function MediaDialog({ path, video, onClose }: { path: string; video: boolean; o
 	const { copied, copy } = useCopy();
 	const [failed, setFailed] = useState(false);
 	const name = path.slice(path.lastIndexOf("/") + 1);
-	const src = mediaUrl(path);
+	const src = mediaSrc(mediaUrl(path));
 	return (
 		<ViewerDialog
 			title={name}

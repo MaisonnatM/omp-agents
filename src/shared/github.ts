@@ -16,8 +16,11 @@ export interface PullRequest extends Repo {
 	number: number;
 }
 
-/** GitHub's owner, repository, and login names. */
-export const GITHUB_NAME = /^[\w.-]+$/;
+/**
+ * GitHub's owner, repository, and login names: never `.` or `..`, which would climb a `repos/<owner>/<repo>` API
+ * path, and never a leading `-`, which `gh` would read as a flag. A leading `.`, as in `.github`, is a real name.
+ */
+export const GITHUB_NAME = /^(?!\.\.?$)(?!-)[\w.-]+$/;
 
 /** A pull request named by an owner, repository, and number, as the routes and a new session's work item carry one. */
 export function parsePullRequest(owner: unknown, repo: unknown, number: unknown): Parsed<PullRequest> {

@@ -47,12 +47,10 @@ test("lookalike hosts and ordinary links keep their original labels without serv
 	}
 });
 
-test("external favicons disclose only the hostname, never the link path or credentials", () => {
-	const html = renderToStaticMarkup(<MessageMarkdown text="[Private report](https://user:secret@example.com/private?token=sensitive)" />);
-	expect(html).toContain('src="https://www.google.com/s2/favicons?domain=example.com&amp;sz=32"');
-	expect(html).toContain('referrerPolicy="no-referrer"');
-	expect(html).not.toContain('src="https://user');
-	expect(renderToStaticMarkup(<MessageMarkdown text="[Mail](mailto:person@example.com)" />)).not.toContain("/s2/favicons");
+test("an ordinary link loads nothing from its host, so a hostname that carries data reaches no one until clicked", () => {
+	const html = renderToStaticMarkup(<MessageMarkdown text="See https://c2VjcmV0.attacker.example/ and [Private report](https://user:secret@example.com/private?token=sensitive)" />);
+	expect(html).not.toContain("<img");
+	expect(html).toContain('<span class="font-semibold underline">Private report</span>');
 });
 
 test("unfinished streaming fences remain code blocks", () => {

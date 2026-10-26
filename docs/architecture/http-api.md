@@ -35,4 +35,4 @@ Every response from these endpoints is JSON.
 An error is `{ error, conflict? }` with the HTTP status.
 Any other `/api/` path answers a JSON 404.
 The page reports a response that is not JSON with its status and text.
-Every endpoint needs the access token's cookie; see [SECURITY.md](../../SECURITY.md).
+Every endpoint needs the access token as `Authorization: Bearer <token>`, and the routes that an image, a video, or a frame loads also take the media key as `?key=`; see [SECURITY.md](../../SECURITY.md).

@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
+import { SignedIn } from "./components/signed-in";
 import { Toaster } from "./components/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { startScrollFade } from "./scroll-fade";
@@ -12,7 +13,9 @@ const root = document.getElementById("root");
 if (!root) throw new Error("index.html is missing #root");
 createRoot(root).render(
 	<TooltipProvider>
-		<App />
+		<SignedIn>
+			<App />
+		</SignedIn>
 		<Toaster />
 	</TooltipProvider>,
 );

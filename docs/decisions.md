@@ -134,3 +134,11 @@ omp writes a session file only after its first reply, so the session starts with
 The fetched head can only fast-forward the local branch, so a branch with commits of its own is refused rather than overwritten, and a linked worktree that already has the branch is reused without moving it; the toast says when that leaves it off the pull request's head.
 **In this repository** runs `gh pr checkout`, as T3 does, so gh owns fork remotes and upstreams there.
 See [Pull request details](usage/pull-request-details.md) and [HTTP API: pull requests](architecture/http-api-pull-requests.md).
+
+## The page keeps the token in localStorage, not a cookie
+
+The sign-in address keeps the token in the dashboard origin's `localStorage`, and the page sends it as `Authorization: Bearer`, or as the socket's `bearer.<token>` subprotocol.
+Browsers send a cookie for `127.0.0.1` to every port of that host, so any program listening on another port could log it; `localStorage` belongs to one port.
+An image, a video, or the mail frame cannot send a header, so their addresses carry a media key, an HMAC of the token that opens only those routes.
+The desktop shell checks a nonce's HMAC from `/api/hello` before it sends the token to whatever answers on the port.
+See [SECURITY.md](../SECURITY.md) and [Desktop shell](architecture/desktop-shell.md).

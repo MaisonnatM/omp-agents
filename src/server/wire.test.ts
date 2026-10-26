@@ -612,8 +612,13 @@ describe("parseMergeQueueChange", () => {
 describe("parseRepoQuery", () => {
 	test("names a repository by owner and name, each without a slash or space", () => {
 		expect(parseRepoQuery(new URLSearchParams("owner=anthropics&repo=omp.agents"))?.ok).toEqual({ owner: "anthropics", repo: "omp.agents" });
+		expect(parseRepoQuery(new URLSearchParams("owner=anthropics&repo=.github"))?.ok).toEqual({ owner: "anthropics", repo: ".github" });
 		expect(parseRepoQuery(new URLSearchParams("owner=a/b&repo=c"))).toBeNull();
 		expect(parseRepoQuery(new URLSearchParams("owner=a"))).toBeNull();
+	});
+
+	test("refuses a name that would climb a REST path or read as a flag", () => {
+		for (const query of ["owner=..&repo=users", "owner=a&repo=.", "owner=a&repo=..", "owner=-R&repo=x"]) expect(parseRepoQuery(new URLSearchParams(query))).toBeNull();
 	});
 });
 

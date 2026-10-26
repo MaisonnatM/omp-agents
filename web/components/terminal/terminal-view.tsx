@@ -2,7 +2,7 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { type ITheme, Terminal } from "@xterm/xterm";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
-import { socketUrl } from "../../api";
+import { openSocket } from "../../api";
 import { type TerminalClientMsg, type TerminalInfo, type TerminalServerMsg, terminalSocketPath } from "../../../src/shared/terminals";
 import { IS_MAC, pressesChord, SHORTCUTS } from "../../shortcuts";
 import { terminalSender } from "./terminal-socket";
@@ -95,7 +95,7 @@ export function TerminalView({ target, active, onOpened, onClosed, ref }: Termin
 		if (element.clientWidth > 0) fit.fit();
 
 		const encoder = new TextEncoder();
-		const ws = new WebSocket(socketUrl(terminalSocketPath("id" in target ? target : { cwd: target.cwd, cols: terminal.cols, rows: terminal.rows })));
+		const ws = openSocket(terminalSocketPath("id" in target ? target : { cwd: target.cwd, cols: terminal.cols, rows: terminal.rows }));
 		ws.binaryType = "arraybuffer";
 		const send = terminalSender(ws);
 		xterm.current = { terminal, fit, send };

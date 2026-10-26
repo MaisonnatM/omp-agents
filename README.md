@@ -102,7 +102,7 @@ bun start
 ```
 
 On start, the server prints a sign-in address, `http://127.0.0.1:4317/?token=<token>`.
-Open it once: it signs the browser in with a cookie, and from then on <http://127.0.0.1:4317> works in that browser.
+Open it once: it keeps the token in that browser's storage for this address, and from then on <http://127.0.0.1:4317> works in that browser.
 Sessions that the dashboard starts appear right away, and terminal sessions once they start after the `collab.autoStart` change; see [Show terminal sessions](#show-terminal-sessions).
 
 [Getting started](docs/getting-started.md) walks through a first session and each integration's setup.

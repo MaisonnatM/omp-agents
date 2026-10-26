@@ -1,6 +1,7 @@
-/** The page itself: built once at startup, or read prebuilt in a packaged app, and served only to a browser that holds the access token. */
+/** The page itself: built once at startup, or read prebuilt in a packaged app, and the page that signs a browser in. */
 import { join } from "node:path";
-import { fetchSiteAllowed, loginCookie } from "./auth";
+import { MEDIA_KEY_STORAGE_KEY, TOKEN_STORAGE_KEY } from "../shared/access";
+import { fetchSiteAllowed, mediaKey } from "./auth";
 import type { Guards } from "./http";
 import { prebuiltPageDir } from "./resources";
 
@@ -41,42 +42,46 @@ export const pageBuild = async (page: Page): Promise<string> => Bun.hash(await (
 
 const NO_STORE = { "cache-control": "no-store" };
 
-const html = (status: number, body: string): Response =>
-	new Response(`<!doctype html><meta charset="utf-8"><title>omp agents</title>${body}`, { status, headers: { "content-type": "text/html;charset=utf-8", ...NO_STORE } });
+/** Removes the cookie that older servers signed browsers in with: every port of the host was sent it, so it must not linger. */
+const FORGET_COOKIE = { "set-cookie": "omp-agents-token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict" };
 
-/**
- * A link on another site (a pull request's session link) arrives without the `Strict` cookie. This page, being
- * the dashboard's own, sends the browser on to `/` as a same-origin navigation that carries the cookie, and keeps
- * the `#session/<id>` hash. The empty `?` makes it a real navigation: `/` with a new hash alone would not reload.
- */
-const BOUNCE = '<script>location.replace("/?" + location.hash)</script>';
+const html = (status: number, body: string, headers: Record<string, string> = {}): Response =>
+	new Response(`<!doctype html><meta charset="utf-8"><title>omp agents</title>${body}`, { status, headers: { "content-type": "text/html;charset=utf-8", ...NO_STORE, ...headers } });
 
 const SIGN_IN = `<body style="font:16px system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem">
 <h1>Not signed in</h1>
-<p>Open the address that the omp-agents server printed in its terminal when it started. It ends in <code>/?token=…</code>, and signs this browser in.</p>`;
+<p>This address does not hold this server's token. Open the address that the omp-agents server printed in its terminal when it started. It ends in <code>/?token=…</code>, and signs this browser in.</p>`;
 
 /**
- * The answer to a request that is not for the API or the socket. `/` needs the login cookie; the printed URL's
- * `?token=` sets it and redirects to `/`, which keeps the hash. Assets need the cookie as well.
+ * The page the printed URL answers with: it keeps the token from its own address and the media key in this origin's
+ * localStorage, then replaces itself with `/`, keeping the hash, so the token leaves the address bar and history.
+ * It sends no referrer and runs only its own script.
+ */
+function signInPage(token: string): Response {
+	const script = `localStorage.setItem(${JSON.stringify(TOKEN_STORAGE_KEY)},new URLSearchParams(location.search).get("token"));localStorage.setItem(${JSON.stringify(MEDIA_KEY_STORAGE_KEY)},${JSON.stringify(mediaKey(token))});location.replace("/"+location.hash)`;
+	return html(200, `<script>${script}</script>`, {
+		...FORGET_COOKIE,
+		"referrer-policy": "no-referrer",
+		"content-security-policy": `default-src 'none'; script-src 'sha256-${new Bun.CryptoHasher("sha256").update(script).digest("base64")}'`,
+	});
+}
+
+/**
+ * The answer to a request that is not for the API or the socket. The page's code is no secret: what it reads, it
+ * reads through the API with the token from localStorage, so `/` and its assets need no token. A `?token=` on `/`
+ * signs the browser in. `/` is also any link's landing, such as a pull request's session link from another site.
  */
 export function servePage(req: Request, guards: Guards, token: string, page: ReadonlyMap<string, Blob>): Response {
-	const { pathname } = new URL(req.url);
-	if (pathname !== "/") {
-		const refused = guards.admit(req);
-		const asset = page.get(pathname);
-		return refused ?? (asset ? new Response(asset) : new Response("not found", { status: 404 }));
-	}
+	const url = new URL(req.url);
 	if (!guards.allowedHost(req)) return new Response("forbidden host", { status: 403 });
 	const site = req.headers.get("sec-fetch-site");
-	const navigation = req.headers.get("sec-fetch-mode") === "navigate" && req.headers.get("sec-fetch-dest") === "document";
-	if (site === "cross-site" && navigation) return html(200, BOUNCE);
-	if (!fetchSiteAllowed(site, true)) return new Response("forbidden origin", { status: 403 });
-	switch (guards.credential(req)) {
-		case "login":
-			return new Response(null, { status: 302, headers: { location: "/", "set-cookie": loginCookie(token), ...NO_STORE } });
-		case "cookie":
-			return new Response(page.get("/index.html"), { headers: { "content-type": "text/html;charset=utf-8", ...NO_STORE } });
-		case null:
-			return html(401, SIGN_IN);
+	if (url.pathname !== "/") {
+		const asset = page.get(url.pathname);
+		if (!fetchSiteAllowed(site, false)) return new Response("forbidden origin", { status: 403 });
+		return asset ? new Response(asset) : new Response("not found", { status: 404 });
 	}
+	if (url.searchParams.has("token")) return guards.login(req) && fetchSiteAllowed(site, true) ? signInPage(token) : html(401, SIGN_IN);
+	const navigation = req.headers.get("sec-fetch-mode") === "navigate" && req.headers.get("sec-fetch-dest") === "document";
+	if (!navigation && !fetchSiteAllowed(site, true)) return new Response("forbidden origin", { status: 403 });
+	return new Response(page.get("/index.html"), { headers: { "content-type": "text/html;charset=utf-8", ...NO_STORE, ...FORGET_COOKIE } });
 }

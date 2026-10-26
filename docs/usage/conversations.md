@@ -68,9 +68,9 @@
   Explicit Markdown labels and link titles stay as written.
   While a PR title loads, or if GitHub cannot read it, its repository and number stay visible; other bare service links use an issue identifier or **Slack message**.
   The link still opens its original address in a new tab.
-  Other HTTP and HTTPS links show their favicon beside their original label.
+  Other HTTP and HTTPS links keep their original label, with no icon.
   Link labels are semibold (font weight 600) and underlined beside their icons, without underlining the icons.
-  Favicons load lazily through Google's favicon service, sharing only the destination hostname, not its path, query, credentials, or the dashboard's address.
+  A link loads nothing before you click it: a favicon fetched from the link's host, or from a favicon service, would send that hostname out the moment the text rendered, and a prompt-injected agent can write a secret into a hostname.
 - A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.
   An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the linked worktree the session works in, else the session's directory.
   A `:line` suffix, as in `docs/usage.md:12`, is dropped; hover the path to read the file it opens.

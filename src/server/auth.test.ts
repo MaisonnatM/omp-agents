@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { COOKIE, cookieValue, fetchSiteAllowed, loadToken, loginCookie, tokenMatches } from "./auth";
+import { MEDIA_KEY_STORAGE_KEY, TOKEN_STORAGE_KEY } from "../shared/access";
+import { bearerToken, fetchSiteAllowed, helloProof, loadToken, mediaKey, tokenMatches } from "./auth";
 import { guardsFor } from "./http";
 import { servePage } from "./page";
 
@@ -11,7 +12,8 @@ const page = new Map([["/index.html", new Blob(["<p>app</p>"])]]);
 const guards = guardsFor(4317, TOKEN);
 const request = (path: string, headers: Record<string, string> = {}): Request =>
 	new Request(`http://127.0.0.1:4317${path}`, { headers: { host: "127.0.0.1:4317", ...headers } });
-const signedIn = { cookie: `other=1; ${COOKIE}=${TOKEN}` };
+const signedIn = { authorization: `Bearer ${TOKEN}` };
+const sameOrigin = { origin: "http://127.0.0.1:4317" };
 
 describe("the token file", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-token-"));
@@ -25,15 +27,15 @@ describe("the token file", () => {
 		expect(loadToken(file)).toBe(token);
 	});
 
-	test("a file others could read is tightened, and one that is not a token is replaced", () => {
+	test("a file others could read is replaced, as is one that is not a token", () => {
 		const token = loadToken(file);
 		chmodSync(file, 0o644);
-		expect(loadToken(file)).toBe(token);
-		expect(statSync(file).mode & 0o777).toBe(0o600);
-		writeFileSync(file, "short\n");
 		const replaced = loadToken(file);
 		expect(replaced).not.toBe(token);
 		expect(replaced).toMatch(/^[A-Za-z0-9_-]{43}$/);
+		expect(statSync(file).mode & 0o777).toBe(0o600);
+		writeFileSync(file, "short\n", { mode: 0o600 });
+		expect(loadToken(file)).not.toBe(replaced);
 	});
 
 	test("deleting the file rotates the token", () => {
@@ -54,15 +56,6 @@ describe("tokenMatches", () => {
 	});
 });
 
-describe("cookieValue", () => {
-	test("finds a cookie among others, and not by suffix", () => {
-		expect(cookieValue(`a=1; ${COOKIE}=abc; b=2`, COOKIE)).toBe("abc");
-		expect(cookieValue(`x${COOKIE}=abc`, COOKIE)).toBeNull();
-		expect(cookieValue("a=1", COOKIE)).toBeNull();
-		expect(cookieValue(null, COOKIE)).toBeNull();
-	});
-});
-
 describe("Sec-Fetch-Site", () => {
 	test("only same-origin passes, plus none for a page, and no header for non-browsers", () => {
 		expect(fetchSiteAllowed(null, false)).toBe(true);
@@ -74,73 +67,130 @@ describe("Sec-Fetch-Site", () => {
 	});
 });
 
+describe("bearerToken", () => {
+	test("reads the Bearer scheme only", () => {
+		expect(bearerToken(`Bearer ${TOKEN}`)).toBe(TOKEN);
+		expect(bearerToken(`bearer ${TOKEN}`)).toBe(TOKEN);
+		expect(bearerToken(`Basic ${TOKEN}`)).toBeNull();
+		expect(bearerToken(null)).toBeNull();
+	});
+});
+
 describe("API and socket guards", () => {
-	test("without the cookie the request is 401, with it admitted", () => {
+	test("without the Bearer token the request is 401, with it admitted", () => {
 		expect(guards.admit(request("/api/settings"))?.status).toBe(401);
-		expect(guards.admit(request("/api/settings", { cookie: `${COOKIE}=wrong` }))?.status).toBe(401);
+		expect(guards.admit(request("/api/settings", { authorization: "Bearer wrong" }))?.status).toBe(401);
 		expect(guards.admit(request(`/api/settings?token=${TOKEN}`))?.status).toBe(401);
+		// The cookie that older servers set reached every port of the host, so it signs nothing in.
+		expect(guards.admit(request("/api/settings", { cookie: `omp-agents-token=${TOKEN}` }))?.status).toBe(401);
 		expect(guards.admit(request("/api/settings", signedIn))).toBeNull();
-		// A stray `?token=` beside the cookie, as the desktop shell's probe carries, is no reason to refuse.
-		expect(guards.admit(request(`/api/settings?token=${TOKEN}`, signedIn))).toBeNull();
 	});
 
-	test("a cross-site GET is refused even with the cookie, and a foreign Host first", () => {
+	test("a cross-site GET is refused even with the token, and a foreign Host first", () => {
 		expect(guards.admit(request("/api/pull-requests", { ...signedIn, "sec-fetch-site": "cross-site" }))?.status).toBe(403);
 		expect(guards.admit(request("/api/pull-requests", { ...signedIn, "sec-fetch-site": "same-site" }))?.status).toBe(403);
 		expect(guards.admit(request("/api/pull-requests", { ...signedIn, "sec-fetch-site": "same-origin" }))).toBeNull();
 		expect(guards.admit(request("/api/pull-requests", { ...signedIn, host: "evil.test:4317" }))?.status).toBe(403);
 	});
 
-	test("the socket also needs an Origin that matches the Host", () => {
-		expect(guards.admitSocket(request("/ws", signedIn))?.status).toBe(403);
-		expect(guards.admitSocket(request("/ws", { ...signedIn, origin: "http://evil.test" }))?.status).toBe(403);
-		expect(guards.admitSocket(request("/ws", { origin: "http://127.0.0.1:4317" }))?.status).toBe(401);
-		expect(guards.admitSocket(request("/ws", { ...signedIn, origin: "http://127.0.0.1:4317" }))).toBeNull();
+	test("the media key opens media routes only, and only from this origin", () => {
+		const key = mediaKey(TOKEN);
+		expect(key).not.toContain(TOKEN);
+		expect(guards.admitMedia(request(`/api/media?path=a.png&key=${key}`))).toBeNull();
+		expect(guards.admitMedia(request("/api/media?path=a.png", signedIn))).toBeNull();
+		expect(guards.admitMedia(request("/api/media?path=a.png&key=wrong"))?.status).toBe(401);
+		expect(guards.admitMedia(request(`/api/media?path=a.png&key=${TOKEN}`))?.status).toBe(401);
+		expect(guards.admitMedia(request(`/api/media?path=a.png&key=${key}`, { "sec-fetch-site": "cross-site" }))?.status).toBe(403);
+		expect(guards.admit(request(`/api/settings?key=${key}`))?.status).toBe(401);
 	});
 
-	test("a write without the cookie is 401 before its body is read", async () => {
-		const write = request("/api/settings/routing", { origin: "http://127.0.0.1:4317", "content-type": "application/json" });
+	test("the socket needs an Origin that matches the Host, and takes the token as a subprotocol", () => {
+		const protocol = { "sec-websocket-protocol": `omp-agents, bearer.${TOKEN}` };
+		expect(guards.admitSocket(request("/ws", signedIn))?.status).toBe(403);
+		expect(guards.admitSocket(request("/ws", { ...protocol, origin: "http://evil.test" }))?.status).toBe(403);
+		expect(guards.admitSocket(request("/ws", sameOrigin))?.status).toBe(401);
+		expect(guards.admitSocket(request("/ws", { ...sameOrigin, "sec-websocket-protocol": "omp-agents, bearer.wrong" }))?.status).toBe(401);
+		expect(guards.admitSocket(request("/ws", { ...sameOrigin, ...signedIn }))).toBeNull();
+		expect(guards.admitSocket(request("/ws", { ...sameOrigin, ...protocol }))).toBeNull();
+	});
+
+	test("the socket's answer never echoes the offered token", () => {
+		const offered = request("/ws", { "sec-websocket-protocol": `bearer.${TOKEN}, omp-agents` });
+		expect(guards.socketHeaders(offered)).toEqual({ "sec-websocket-protocol": "omp-agents" });
+		expect(guards.socketHeaders(request("/ws"))).toEqual({});
+	});
+
+	test("a write without the token is 401 before its body is read", async () => {
+		const write = request("/api/settings/routing", { ...sameOrigin, "content-type": "application/json" });
 		const refused = await guards.writeBody(new Request(write, { method: "PUT", body: "{}" }));
 		expect(refused).toBeInstanceOf(Response);
 		expect((refused as Response).status).toBe(401);
 	});
 });
 
+describe("hello", () => {
+	test("proves the token for the port and nonce without naming it", async () => {
+		const nonce = "n".repeat(32);
+		const response = guards.hello(request(`/api/hello?nonce=${nonce}`));
+		expect(response.status).toBe(200);
+		const text = await response.text();
+		expect(text).not.toContain(TOKEN);
+		expect(JSON.parse(text)).toEqual({ proof: helloProof(TOKEN, 4317, nonce) });
+		// Another port's server answers for itself, so a program on this port cannot pass on its proof.
+		expect(helloProof(TOKEN, 4318, nonce)).not.toBe(helloProof(TOKEN, 4317, nonce));
+	});
+
+	test("refuses a short or odd nonce, a foreign Host, and another site", () => {
+		expect(guards.hello(request("/api/hello?nonce=short")).status).toBe(400);
+		expect(guards.hello(request(`/api/hello?nonce=${"n".repeat(31)}%20`)).status).toBe(400);
+		expect(guards.hello(request(`/api/hello?nonce=${"n".repeat(32)}`, { host: "evil.test:4317" })).status).toBe(403);
+		expect(guards.hello(request(`/api/hello?nonce=${"n".repeat(32)}`, { "sec-fetch-site": "cross-site" })).status).toBe(403);
+	});
+});
+
 describe("the page", () => {
 	const serve = (path: string, headers?: Record<string, string>): Response => servePage(request(path, headers), guards, TOKEN, page);
+	const forgetsCookie = (response: Response): void => expect(response.headers.get("set-cookie")).toMatch(/^omp-agents-token=; Max-Age=0;/);
 
-	test("without a credential `/` is a 401 page that names no token", async () => {
-		const response = serve("/");
-		expect(response.status).toBe(401);
-		expect(await response.text()).not.toContain(TOKEN);
-		expect(serve(`/?token=${"B".repeat(43)}`).status).toBe(401);
-		expect(serve("/chunk.js").status).toBe(401);
-	});
-
-	test("the printed URL sets an HttpOnly Strict cookie and redirects to `/`", () => {
-		const response = serve(`/?token=${TOKEN}`, { "sec-fetch-site": "none" });
-		expect(response.status).toBe(302);
-		expect(response.headers.get("location")).toBe("/");
-		expect(response.headers.get("set-cookie")).toBe(loginCookie(TOKEN));
-		expect(loginCookie(TOKEN)).toMatch(/; HttpOnly; SameSite=Strict; Path=\/; Max-Age=\d{7,}$/);
-		// A browser already signed in still gets the redirect, so the token leaves its address bar and history.
-		expect(serve(`/?token=${TOKEN}`, { ...signedIn, "sec-fetch-site": "none" }).status).toBe(302);
-	});
-
-	test("with the cookie `/` serves the app, and assets come from the build", async () => {
-		const response = serve("/", { ...signedIn, "sec-fetch-site": "same-origin" });
+	test("`/` and its assets are served without a token, and drop the old cookie", async () => {
+		const response = serve("/", { "sec-fetch-site": "none" });
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe("<p>app</p>");
-		expect(serve("/index.html", signedIn).status).toBe(200);
-		expect(serve("/missing.js", signedIn).status).toBe(404);
+		forgetsCookie(response);
+		expect(serve("/index.html", { "sec-fetch-site": "same-origin" }).status).toBe(200);
+		expect(serve("/missing.js").status).toBe(404);
+		expect(serve("/", { host: "evil.test:4317" }).status).toBe(403);
 	});
 
-	test("a cross-site request never logs in, but a link click bounces to `/` with its hash", async () => {
-		expect(serve(`/?token=${TOKEN}`, { "sec-fetch-site": "cross-site" }).status).toBe(403);
-		expect(serve("/", { ...signedIn, "sec-fetch-site": "cross-site" }).status).toBe(403);
+	test("a wrong token is a 401 page that names no token", async () => {
+		const response = serve(`/?token=${"B".repeat(43)}`, { "sec-fetch-site": "none" });
+		expect(response.status).toBe(401);
+		expect(await response.text()).not.toContain(TOKEN);
+	});
+
+	test("the printed URL keeps the token in localStorage and leaves for `/` with its hash", async () => {
+		const response = serve(`/?token=${TOKEN}`, { "sec-fetch-site": "none" });
+		expect(response.status).toBe(200);
+		expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+		expect(response.headers.get("cache-control")).toBe("no-store");
+		forgetsCookie(response);
+		const body = await response.text();
+		expect(body).not.toContain(TOKEN);
+		const script = body.match(/<script>(.*)<\/script>/s)?.[1] ?? "";
+		const hash = new Bun.CryptoHasher("sha256").update(script).digest("base64");
+		expect(response.headers.get("content-security-policy")).toBe(`default-src 'none'; script-src 'sha256-${hash}'`);
+		const stored = new Map<string, string>();
+		const location = { search: `?token=${TOKEN}`, hash: "#session/abc", replace: (to: string) => stored.set("replaced", to) };
+		new Function("localStorage", "location", script)({ setItem: (key: string, value: string) => stored.set(key, value) }, location);
+		expect(Object.fromEntries(stored)).toEqual({ [TOKEN_STORAGE_KEY]: TOKEN, [MEDIA_KEY_STORAGE_KEY]: mediaKey(TOKEN), replaced: "/#session/abc" });
+	});
+
+	test("another site cannot sign in or fetch the page, but a link click lands on the app", async () => {
+		expect(serve(`/?token=${TOKEN}`, { "sec-fetch-site": "cross-site" }).status).toBe(401);
+		expect(serve("/", { "sec-fetch-site": "cross-site" }).status).toBe(403);
+		expect(serve("/index.html", { "sec-fetch-site": "cross-site" }).status).toBe(403);
 		const click = serve("/", { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" });
 		expect(click.status).toBe(200);
-		expect(click.headers.get("set-cookie")).toBeNull();
-		expect(await click.text()).not.toContain("app");
+		expect(await click.text()).toBe("<p>app</p>");
 	});
 });

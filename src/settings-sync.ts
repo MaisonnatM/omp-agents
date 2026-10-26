@@ -4,7 +4,7 @@
  */
 import { lstat, mkdir, readdir, readFile, realpath, rm, rmdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteText, JsonFile } from "./fs";
 import { errorText, isObject, parseJson } from "./json";
 import { SerialLane } from "./serial-lane";
@@ -229,6 +229,8 @@ export async function applyLocal(items: readonly SyncItem[], changes: ReadonlyMa
 		}
 		const top = await topOf(item.source.path, places);
 		const target = item.source.kind === "omp-file" ? top : join(top, path.slice(item.path.length + 1));
+		const inside = relative(top, target);
+		if (item.source.kind === "omp-tree" && (inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside))) throw new Error(`${path} names a file outside ${item.path}`);
 		if (file) {
 			await mkdir(dirname(target), { recursive: true });
 			await atomicWriteText(target, file.text, file.executable ? 0o755 : 0o644);

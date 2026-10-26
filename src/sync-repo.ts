@@ -25,8 +25,12 @@ const quiet = (): Record<string, string> => ({
 
 const failure = (stderr: string, what: string): Error => new Error(stderr.split("\n").findLast(line => line.trim())?.trim() || `${what} failed`);
 
-/** Paths git's fast-import would need quoted; sync leaves such files where they are. */
-export const plainPath = (path: string): boolean => !/["\\\n\r\t]/.test(path) && !path.startsWith(" ");
+/**
+ * Paths sync carries: none that git's fast-import would need quoted, and none with an empty, `.`, or `..` segment,
+ * which would write outside the directory its item names. Sync leaves any other file where it is.
+ */
+export const plainPath = (path: string): boolean =>
+	!/["\\\n\r\t]/.test(path) && !path.startsWith(" ") && path.split("/").every(segment => segment !== "" && segment !== "." && segment !== "..");
 
 export class SyncRepo {
 	readonly #dir: string;
@@ -52,7 +56,8 @@ export class SyncRepo {
 		const listed = await run(["git", "--git-dir", this.#dir, "ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${branch}`], { env: quiet(), timeoutMs: NETWORK_TIMEOUT_MS });
 		if (listed.code === 2) return null;
 		if (listed.code !== 0) throw failure(listed.stderr, "git ls-remote");
-		await this.#git(["fetch", "--quiet", "--no-tags", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`], { timeoutMs: NETWORK_TIMEOUT_MS });
+		// A remote that someone else controls must not hand this repository a tree that names `..` or `.git`.
+		await this.#git(["-c", "fetch.fsckObjects=true", "fetch", "--quiet", "--no-tags", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`], { timeoutMs: NETWORK_TIMEOUT_MS });
 		return (await this.#git(["rev-parse", "--verify", `refs/remotes/origin/${branch}^{commit}`])).trim();
 	}
 

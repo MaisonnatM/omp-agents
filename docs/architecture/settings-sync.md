@@ -7,7 +7,9 @@ What is portable is data, `SYNC_ITEMS` in `src/shared/settings-sync.ts`: omp's `
 Routines and todos stay out of the registry: a routine synced to two machines would run on both, and todos name this machine's sessions.
 
 The machine keeps a bare repository, `settings-sync.git` in the data directory, and runs every git command with `GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`, and, unless you set your own, `GIT_SSH_COMMAND="ssh -o BatchMode=yes"`, so git uses the machine's keys and credential helper and fails rather than prompt.
-`SyncRepo` in `src/sync-repo.ts` wraps those commands: it points `origin` at the remote, fetches the branch, reads a commit's text files, builds a commit from a parent and a set of changes with `git fast-import`, and pushes without force.
+`SyncRepo` in `src/sync-repo.ts` wraps those commands: it points `origin` at the remote, fetches the branch with `fetch.fsckObjects` on, so git refuses a tree that names `..` or `.git`, reads a commit's text files, builds a commit from a parent and a set of changes with `git fast-import`, and pushes without force.
+`plainPath` leaves out any path that fast-import would need quoted, or that has an empty, `.`, or `..` segment, so the plan never names a file outside its item's directory.
+`applyLocal` checks again where each file of a tree lands, and fails the sync on a path that resolves outside the tree, since a remote is someone else's to write.
 A ref under `refs/omp-agents/base/`, keyed by a hash of the remote and the branch, holds the commit this machine last applied, so changing either starts again from no base.
 
 A sync runs one at a time, in these steps.

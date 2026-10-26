@@ -1,8 +1,8 @@
 /** Reads the files that a path in agent text names: text for the page's file dialog (`GET /api/file`), images and videos for `GET /api/media`. */
 import { realpath, stat } from "node:fs/promises";
-import { dirname, extname, isAbsolute, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
 import { agentDir } from "./omp/config";
-import { expandHome, tokenFile } from "./paths";
+import { expandHome, HOME, tokenFile } from "./paths";
 import { MAX_TEXT_FILE_BYTES, MEDIA_FILE_EXTENSIONS, TEXT_FILE_EXTENSIONS, type TextFile } from "./shared/transcript";
 
 type Refusal = { ok: false; status: 400 | 403 | 404 | 415; error: string };
@@ -16,15 +16,20 @@ export interface DeniedDir {
 	opens: readonly string[];
 }
 
+const userConfig = process.env.XDG_CONFIG_HOME || join(HOME, ".config");
+
 /**
  * Where sign-in material and config live, so a script that got into the page cannot read them through this server:
  * omp-agents' own directory, with its access token, and omp's agent directory, with its credential store, its MCP
  * config and the headers that config sends, and `config.yml`. omp's instructions there, `AGENTS.md` and skills, are
  * Markdown, and the images and videos its sessions keep are media; neither holds credentials, so both still open.
+ * The CLIs that agents run keep their tokens in the rest, many in files a text extension names, such as `gh`'s
+ * `hosts.yml` or Docker's `config.json`.
  */
 export const DENIED_DIRS: readonly DeniedDir[] = [
 	{ dir: dirname(tokenFile), opens: [] },
 	{ dir: agentDir, opens: ["md", "markdown", ...MEDIA_FILE_EXTENSIONS] },
+	...[join(userConfig, "gh"), join(userConfig, "gcloud"), join(HOME, ".aws"), join(HOME, ".docker"), join(HOME, ".kube"), join(HOME, ".ssh"), join(HOME, ".gnupg")].map(dir => ({ dir, opens: [] })),
 ];
 
 const refuse = (status: Refusal["status"], error: string): Refusal => ({ ok: false, status, error });

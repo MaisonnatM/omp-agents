@@ -55,6 +55,6 @@ A `ResizeObserver` then grows the frame as images arrive.
 The document's response carries the policy `sandbox allow-same-origin; default-src 'none'; img-src https: data:; style-src 'unsafe-inline' https:; font-src https: data:`, so a message loads images, styles, and fonts and nothing else.
 Its `sandbox` directive keeps scripts off even when the address opens in a tab of its own.
 The response also sends `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`, and the document's head, which comes before the message's markup, holds `<meta name="referrer" content="no-referrer">` too.
-The frame's request is a same-origin GET with the login cookie, so it passes the API's guards like any other read.
+The frame sends no header, so its address carries the media key that `mediaSrc` in `web/api.ts` adds, and the route admits it as it does an image.
 Remote images still load, so a sender who tracks opens with them sees the dashboard's request, without a referrer.
 The frame sits on white in both themes, since mail is written for white.
