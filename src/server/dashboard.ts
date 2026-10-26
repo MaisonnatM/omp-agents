@@ -26,6 +26,7 @@ import { findMcpServers } from "../omp/mcp";
 import { ompDaemons } from "../omp/daemons";
 import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
+import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, processesFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
@@ -519,6 +520,14 @@ export class Dashboard {
 			},
 			dismissInterrupted(sessionId) {
 				if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
+			},
+			renamePast: async (sessionId, title) => {
+				const saved = files.savedOf(sessionId);
+				if (!saved) throw new Error("This session's file is gone.");
+				if (saved.source !== "omp") throw new Error("Only omp sessions can be renamed here.");
+				await renameSessionFile(saved.path, title);
+				files.touch(saved.path);
+				if (await files.refresh()) this.#onFilesChanged();
 			},
 			markRead(instanceId) {
 				if (sessions.markRead(instanceId)) broadcasts.rosterChanged();

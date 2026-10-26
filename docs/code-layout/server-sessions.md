@@ -1,6 +1,7 @@
 # Server: sessions and transcripts
 
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes; `reattach` opens one a previous server started, and `dispose` hangs up without stopping omp.
+  `rename` gives a running session the user's title over omp's `set_session_name`, through the turn gate, and stops the automatic `/rename` from replacing it.
   `withSessionVisuals` adds `src/omp/session-visuals-extension.ts` to every launch but a replay's, whose requests must match the original's.
   `src/keeper.ts` is the session keeper, the detached process that holds one session's omp, lends its stdio frame by frame to one server at a time over a Unix socket, so the session outlives the server, and stops every process omp started when the session ends; `src/keeper-link.ts` is the server's side, which starts, lists, and connects to keepers, and `reattachAll` in `src/server/start.ts` attaches to them at startup.
   `src/keeper-wire.ts` holds the greeting, the stop line, the pid file's name, and `KeeperMeta`, the only words the two sides share, so the keeper's bundle holds none of the server; `src/process-census.ts` is the keeper's `ProcessCensus`, which notes the processes under omp with `ps` and stops the noted ones when the session ends, and `stopTree`, with which the server stops a stuck keeper's tree.
@@ -17,7 +18,7 @@
   The first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
 - `src/session-formats.ts`: the registry of agents whose session files the dashboard lists, `SESSION_FORMATS`, each a `SessionFormat` with its root, its `fileOf`, `list`, and `read`, its line `decode`, and the `messageLine` conversation search parses.
   Formats other than omp also name the usage-file patterns and per-file folds for Analytics.
-  `ompFormat` wraps omp's own listing in `src/omp/sessions.ts`, which also holds `sessionFileOf`; `formatOf` names the format of a file by the root that holds it, else omp's.
+  `ompFormat` wraps omp's own listing in `src/omp/sessions.ts`, which also holds `sessionFileOf` and `renameSessionFile`, which retitles a saved omp session through omp's `SessionManager`; `formatOf` names the format of a file by the root that holds it, else omp's.
 - `src/foreign/claude-code.ts` and `src/foreign/codex.ts`: the read-only readers of Claude Code's sessions under `CLAUDE_CONFIG_DIR` (else `~/.claude`) `/projects` and Codex's under `CODEX_HOME` (else `~/.codex`) `/sessions`.
   Each decodes one line into the omp entries the transcript already folds, preserving recognized blocks alongside one unread-line entry for unknown or malformed content.
   Codex titles a renamed session from `session_index.jsonl`.

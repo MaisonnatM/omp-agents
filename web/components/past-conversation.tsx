@@ -11,6 +11,7 @@ import { AskAboutSelection } from "./ask-about-selection";
 import { ChangesCard } from "./changes-card";
 import { Header } from "./page-header";
 import { SessionIdCopy, SessionMeta } from "./session-meta";
+import { SessionTitle } from "./session-title";
 import { Trajectory } from "./trajectory";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
@@ -40,7 +41,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
 				<Header
-					title={title}
+					title={session && !foreign ? <SessionTitle sessionId={sessionId} title={title} /> : title}
 					trailing={
 						<>
 							<SessionIdCopy id={sessionId} />

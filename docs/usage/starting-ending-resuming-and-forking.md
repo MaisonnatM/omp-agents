@@ -50,6 +50,10 @@
   Until the title arrives, the sidebar and the header show the workspace's name.
   A conversation of greetings or acknowledgements only, such as `hi`, stays untitled until a later message.
   omp counts that title as one that you set, as it counts a `/rename` in a terminal.
+- Click a session's title in its pane header to rename it, while the dashboard runs it or once it is a past omp session.
+  Enter, or clicking away, saves the title; Escape keeps the old one, and an empty or unchanged title changes nothing.
+  omp keeps the title as one that you set, so its automatic title never replaces it.
+  A session running in a terminal takes `/rename` there, and a Claude Code or Codex session keeps its own title.
 - A running session shows **End session** in its header, unless its room is read-only.
   **End session** stops its omp process: one that the dashboard started stops with every process it started, its background jobs, kernels, and subagents included, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
   A session the dashboard started that exits on its own takes those processes with it too.

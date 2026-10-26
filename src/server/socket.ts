@@ -25,6 +25,8 @@ export interface SocketEnv {
 	end(instanceId: string): Promise<void>;
 	/** Move interrupted session `sessionId` to the past sessions. */
 	dismissInterrupted(sessionId: string): void;
+	/** Retitle saved session `sessionId`, which no omp runs, as the user's own title. */
+	renamePast(sessionId: string, title: string): Promise<void>;
 	/** You looked at live session `instanceId`, so the turn it ended is no longer unread. */
 	markRead(instanceId: string): void;
 	/** Whether interrupted session `sessionId` stopped while its turn ran. */
@@ -128,6 +130,13 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 		});
 	},
 	"dismiss-interrupted": ({ dismissInterrupted }, _peer, { sessionId }) => dismissInterrupted(sessionId),
+	async "rename-session"({ sessions, renamePast }, _peer, { sessionId, title }) {
+		const live = sessions.bySessionId(sessionId);
+		if (!live) return renamePast(sessionId, title);
+		const session = sessions.started(live.instanceId);
+		if (!session) throw new Error("Only sessions started from this dashboard can be renamed while they run. Use /rename in its terminal.");
+		await session.rename(title);
+	},
 	end: ({ end }, _peer, { instanceId }) => end(instanceId),
 	read: ({ markRead }, _peer, { instanceId }) => markRead(instanceId),
 	async "list-models"({ sessions }, peer, { instanceId }) {

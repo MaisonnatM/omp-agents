@@ -102,6 +102,8 @@ export type ClientMsg =
 	| { t: "resume-all"; reqId: number; sessionIds: string[] }
 	/** Move an interrupted session to the past sessions. */
 	| { t: "dismiss-interrupted"; sessionId: string }
+	/** Retitle session `sessionId` as the user's own title: through its omp while this dashboard runs it, else in its saved omp file. */
+	| { t: "rename-session"; sessionId: string; title: string }
 	/** Models a session this dashboard started can switch to. */
 	| { t: "list-models"; instanceId: string }
 	/** Switch a session this dashboard started to another model and, when `thinking` names one, thinking level, as picking a model role does. */
