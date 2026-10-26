@@ -219,6 +219,7 @@ export const ACTION_MESSAGES: Record<ClientMsg["t"], boolean> = {
 	routine: true,
 	schedule: true,
 	pin: true,
+	preference: true,
 	"review-draft": true,
 	notice: false,
 	discuss: true,

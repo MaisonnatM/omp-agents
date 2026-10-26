@@ -23,7 +23,7 @@ import {
 	viewForSession,
 } from "./routing";
 import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
-import { storedNumber, storeOrRemove } from "./stored-state";
+import { adoptPreferences, sendPreferencesThrough, storedNumber, storedPreferences, storeOrRemove } from "./stored-state";
 import { flushActivity, installActivity, record, recordAction, viewOf } from "./activity";
 
 const NO_VIEWS: View[] = [];
@@ -142,6 +142,7 @@ export function useDashboard(): Dashboard {
 	}, []);
 
 	useEffect(() => installActivity({ connected: () => socketRef.current?.readyState === WebSocket.OPEN, send: batch => request(batch) }), [request]);
+	useEffect(() => sendPreferencesThrough(change => send({ t: "preference", change })), [send]);
 	const view = viewOf(state.cover, state.layout);
 	useEffect(() => record("view", view), [view]);
 
@@ -259,6 +260,11 @@ export function useDashboard(): Dashboard {
 					case "pins":
 						dispatch(msg);
 						sendStoredPins(ws);
+						return;
+					case "preferences":
+						// A server that keeps none yet, as after an upgrade, takes what this browser kept; the first page to seed wins.
+						if (msg.values === null) ws.send(JSON.stringify({ t: "preference", change: { op: "seed", values: storedPreferences() } } satisfies ClientMsg));
+						else adoptPreferences(msg.values);
 						return;
 					default: {
 						const never: never = msg;

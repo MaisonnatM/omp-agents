@@ -8,6 +8,7 @@ import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
+import type { PagePreferences, PreferenceChange } from "./preferences";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
@@ -54,6 +55,8 @@ export type ServerMsg =
 	| { t: "workspaces"; list: WorkspaceList<Workspace> }
 	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
 	| { t: "pins"; sessionIds: string[] }
+	/** The page's portable preferences, whole, sent when a socket opens and after every change; `null` until a page seeds them. */
+	| { t: "preferences"; values: PagePreferences | null }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
 	| { t: "notices"; list: Notice[] }
 	/** Every merge the server waits to make until GitHub allows it, whole, sent when a socket opens and after every change. */
@@ -122,6 +125,8 @@ export type ClientMsg =
 	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
 	| { t: "pin"; change: PinChange }
+	/** Set or remove one portable preference, or seed them all while the server keeps none; every socket then gets the preferences as they are after. */
+	| { t: "preference"; change: PreferenceChange }
 	/** Change a review draft's verdict, summary, or findings, or discard it; every socket then gets the drafts as they are after. */
 	| { t: "review-draft"; change: ReviewDraftEdit }
 	/** Update notices `ids`, mark them seen or read, or clear them. */

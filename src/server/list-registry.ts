@@ -1,6 +1,7 @@
 /** Whole-list snapshots and edits: one registration owns each message builder and its store's reducer. */
 import type { RoutineChange } from "../routines";
 import type { PinChange } from "../shared/pins";
+import type { PreferenceChange } from "../shared/preferences";
 import type { ServerMsg } from "../shared/protocol";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
 import type { ScheduledChange } from "../shared/scheduled";
@@ -17,6 +18,7 @@ interface ListChanges {
 	workspaces: WorkspaceChange;
 	pins: PinChange;
 	"review-drafts": ReviewDraftEdit;
+	preferences: PreferenceChange;
 }
 
 /** The lists only the server changes, through actions of their own: the bell's notices, and the queued merges. */

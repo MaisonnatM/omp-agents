@@ -58,6 +58,7 @@ import {
 } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
+import { isPortablePreference, parsePagePreferences, type PreferenceChange } from "../shared/preferences";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
@@ -152,6 +153,18 @@ function parsePinChange(value: unknown): Parsed<PinChange> {
 	const { op, sessionIds } = value;
 	if (op !== "pin" && op !== "unpin") return null;
 	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { ok: { op, sessionIds } } : null;
+}
+
+/** A portable preference set to a string or removed with `null`, or a page's whole set of them to seed. */
+function parsePreferenceChange(value: unknown): Parsed<PreferenceChange> {
+	if (!isObject(value)) return null;
+	if (value.op === "seed") {
+		const values = parsePagePreferences(value.values);
+		return values && { ok: { op: "seed", values } };
+	}
+	const { op, key } = value;
+	const raw = value.value;
+	return op === "set" && typeof key === "string" && isPortablePreference(key) && (raw === null || typeof raw === "string") ? { ok: { op, key, value: raw } } : null;
 }
 
 /** A finding id as the draft numbers them. */
@@ -374,6 +387,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	pin(value) {
 		const change = parsePinChange(value.change);
 		return change && { ok: { t: "pin", change: change.ok } };
+	},
+	preference(value) {
+		const change = parsePreferenceChange(value.change);
+		return change && { ok: { t: "preference", change: change.ok } };
 	},
 	"review-draft"(value) {
 		const change = parseReviewDraftEdit(value.change);

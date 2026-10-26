@@ -8,6 +8,7 @@ import type { PastSession, RosterHost } from "../shared/sessions";
 import { Broadcasts } from "./broadcasts";
 import { ListRegistry } from "./list-registry";
 import { PinsFile } from "./pins-file";
+import { PreferencesFile } from "./preferences-file";
 import { RequestLedger } from "./request-ledger";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutinesFile } from "./routines-file";
@@ -42,6 +43,7 @@ function setup(initial: PastSession[]) {
 	const scheduled = new ScheduledFile(join(dir, "scheduled.json"));
 	const workspaces = new WorkspacesFile(join(dir, "workspaces.json"));
 	const pins = new PinsFile(join(dir, "pins.json"));
+	const preferences = new PreferencesFile(join(dir, "preferences.json"));
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
@@ -59,6 +61,7 @@ function setup(initial: PastSession[]) {
 			apply: change => workspaces.apply(change),
 		},
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
+		preferences: { msg: () => ({ t: "preferences", values: preferences.value }), apply: change => preferences.apply(change) },
 		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change.op === "add-finding" ? { ...change, at: 0 } : change) },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
@@ -184,6 +187,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);
 		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
+		expect(lists.apply("preferences", { op: "set", key: "omp-agents.split-columns", value: "0.4" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
 		expect(published).toEqual([]);

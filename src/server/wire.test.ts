@@ -236,6 +236,18 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "pin", sessionIds: "s1" })).toBeNull();
 	});
 
+	test("preference sets a portable key to a string or null, or seeds portable strings, and refuses any other key or value", () => {
+		const change = (value: unknown) => msg({ t: "preference", change: value });
+		expect(change({ op: "set", key: "omp-agents.theme", value: "dark", extra: 1 })).toEqual({ t: "preference", change: { op: "set", key: "omp-agents.theme", value: "dark" } });
+		expect(change({ op: "set", key: "omp-agents.theme", value: null })).toEqual({ t: "preference", change: { op: "set", key: "omp-agents.theme", value: null } });
+		expect(change({ op: "seed", values: { "omp-agents.hide-thinking": "true" } })).toEqual({ t: "preference", change: { op: "seed", values: { "omp-agents.hide-thinking": "true" } } });
+		expect(change({ op: "set", key: "omp-agents.split-columns", value: "0.4" })).toBeNull();
+		expect(change({ op: "set", key: "omp-agents.theme", value: 1 })).toBeNull();
+		expect(change({ op: "set", key: "omp-agents.theme" })).toBeNull();
+		expect(change({ op: "seed", values: { "omp-agents.pr-file-tree": "false" } })).toBeNull();
+		expect(change({ op: "reset" })).toBeNull();
+	});
+
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
 		const png = { data: "aGVsbG8=", mimeType: "image/png" };
 		const prompt = (images: unknown) => msg({ t: "prompt", view: live, text: "", images, delivery: "steer" });
