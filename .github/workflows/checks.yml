@@ -18,7 +18,7 @@ jobs:
         with:
           bun-version: 1.4.2
       # The server and most tests import omp's own modules from its installed package.
-      - run: bun install -g @oh-my-pi/pi-coding-agent@18.12.3
+      - run: bun install -g @oh-my-pi/pi-coding-agent@18.12.6
       - run: bun install --frozen-lockfile
       - run: bun test
       - run: bun run typecheck

@@ -20,7 +20,7 @@ body:
     attributes:
       label: omp version
       description: The output of `omp --version`.
-      placeholder: "18.12.3"
+      placeholder: "18.12.6"
     validations:
       required: true
   - type: dropdown
