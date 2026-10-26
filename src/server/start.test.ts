@@ -191,7 +191,7 @@ test("a failed spawn releases its claim, while distinct explicit tasks may inten
 	}
 });
 
-test("resuming a saved ticket claims the same task and refuses a different active owner before spawning", async () => {
+test("resuming a saved ticket claims the same task and refuses another session's claim before spawning", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-resume-");
 	try {
 		const file = join(dir, "saved.jsonl");

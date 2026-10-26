@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isRunning, OwnerLock } from "../templates/omp/agent/extensions/github/owner-lock";
 import { atomicWriteTextSync } from "./fs";
-import { isObject } from "./json";
+import { arrayOf, fields, type Guard, isObject, isSafeInteger, isString, nullable, recordOf } from "./json";
 import { keepersDir, taskClaimsFile } from "./paths";
 import { portFromEnv } from "./server/address";
 import type { PullRequest } from "./shared/github";
@@ -18,9 +18,20 @@ export interface TaskClaim {
 	pid: number;
 	keeperPidFile: string;
 	port: number;
-	/** Inactive records retain a saved session's explicit identity without retaining ownership. */
-	active: boolean;
 }
+
+/** Live ownership, plus the explicit identity each ended session keeps for its resume, by session id. */
+interface ClaimsFile {
+	claims: TaskClaim[];
+	saved: Record<string, string>;
+}
+
+const isPositiveInteger: Guard<number> = (value): value is number => isSafeInteger(value) && value > 0;
+
+const isClaimsFile = fields<ClaimsFile>({
+	claims: arrayOf(fields<TaskClaim>({ repository: isString, identity: isString, instanceId: isString, sessionId: nullable(isString), cwd: isString, pid: isPositiveInteger, keeperPidFile: isString, port: isSafeInteger })),
+	saved: recordOf(isString),
+});
 
 /** The claim identity of Linear issue `id`. */
 export const ticketTask = (id: string): string => `ticket:${id.toUpperCase()}`;
@@ -46,16 +57,6 @@ export function taskIdentity(request: NewSessionRequest): string | null {
 	return pr ? pullRequestTask({ owner: pr[1]!, repo: pr[2]!, number: Number(pr[3]) }) : null;
 }
 
-function parseOwners(value: unknown): TaskClaim[] | null {
-	if (!Array.isArray(value)) return null;
-	const owners: TaskClaim[] = [];
-	for (const owner of value) {
-		if (!isObject(owner) || typeof owner.repository !== "string" || typeof owner.identity !== "string" || typeof owner.instanceId !== "string" || (owner.sessionId !== null && typeof owner.sessionId !== "string") || typeof owner.cwd !== "string" || typeof owner.keeperPidFile !== "string" || typeof owner.pid !== "number" || !Number.isSafeInteger(owner.pid) || owner.pid <= 0 || typeof owner.port !== "number" || !Number.isSafeInteger(owner.port) || typeof owner.active !== "boolean") return null;
-		owners.push({ repository: owner.repository, identity: owner.identity, instanceId: owner.instanceId, sessionId: owner.sessionId, cwd: owner.cwd, keeperPidFile: owner.keeperPidFile, pid: owner.pid, port: owner.port, active: owner.active });
-	}
-	return owners;
-}
-
 export class TaskClaims {
 	readonly #file: string;
 	readonly #lock: OwnerLock;
@@ -70,10 +71,15 @@ export class TaskClaims {
 	/** Reserves before checkout or spawn. A surviving keeper holds ownership even if its launching server crashed. */
 	claim(repository: string, identity: string, instanceId: string, cwd: string): TaskClaim | null {
 		let conflict: TaskClaim | null = null;
-		this.#change(owners => {
-			const kept = owners.flatMap(owner => owner.active === false || this.#alive(owner) ? [owner] : owner.sessionId ? [{ ...owner, active: false }] : []);
-			conflict = kept.find(owner => owner.active !== false && owner.repository === repository && owner.identity === identity) ?? null;
-			return conflict ? kept : [...kept, { repository, identity, instanceId, sessionId: null, cwd, pid: process.pid, keeperPidFile: join(keepersDir, `${instanceId}.pid`), port: portFromEnv(), active: true }];
+		this.#change(({ claims, saved }) => {
+			const kept: ClaimsFile = { claims: [], saved: { ...saved } };
+			for (const claim of claims) {
+				if (this.#alive(claim)) kept.claims.push(claim);
+				else if (claim.sessionId) kept.saved[claim.sessionId] = claim.identity;
+			}
+			conflict = kept.claims.find(claim => claim.repository === repository && claim.identity === identity) ?? null;
+			if (!conflict) kept.claims.push({ repository, identity, instanceId, sessionId: null, cwd, pid: process.pid, keeperPidFile: join(keepersDir, `${instanceId}.pid`), port: portFromEnv() });
+			return kept;
 		});
 		return conflict;
 	}
@@ -81,51 +87,60 @@ export class TaskClaims {
 	/** Once spawned, the session process, not the dashboard process, owns the task across dashboard restarts. */
 	bind(instanceId: string, pid: number, sessionId: string, cwd: string): void {
 		if (!existsSync(this.#file)) return;
-		this.#change(owners => owners.some(owner => owner.instanceId === instanceId && owner.active)
-			? owners.filter(owner => owner.active || owner.sessionId !== sessionId).map(owner => owner.instanceId === instanceId ? { ...owner, pid, sessionId, cwd } : owner)
-			: owners);
+		this.#change(file => {
+			if (!file.claims.some(claim => claim.instanceId === instanceId)) return file;
+			const { [sessionId]: _, ...saved } = file.saved;
+			return { claims: file.claims.map(claim => claim.instanceId === instanceId ? { ...claim, pid, sessionId, cwd } : claim), saved };
+		});
 	}
 
+	/** Releases a failed launch or an ended session, which keeps its identity for a later resume. */
 	release(instanceId: string): void {
 		if (!existsSync(this.#file)) return;
-		this.#change(owners => owners.some(owner => owner.instanceId === instanceId && owner.active !== false)
-			? owners.flatMap(owner => owner.instanceId !== instanceId || owner.active === false ? [owner] : owner.sessionId ? [{ ...owner, active: false }] : [])
-			: owners);
+		this.#change(file => {
+			const released = file.claims.find(claim => claim.instanceId === instanceId);
+			if (!released) return file;
+			return {
+				claims: file.claims.filter(claim => claim !== released),
+				saved: released.sessionId ? { ...file.saved, [released.sessionId]: released.identity } : file.saved,
+			};
+		});
 	}
 
 	/** A saved session keeps its explicit independent or review identity when ended and later resumed. */
 	identityForSession(sessionId: string): string | null {
-		return this.#read().findLast(owner => owner.sessionId === sessionId)?.identity ?? null;
+		const { claims, saved } = this.#read();
+		return claims.find(claim => claim.sessionId === sessionId)?.identity ?? saved[sessionId] ?? null;
 	}
 
 	/** A reattached session's subject must not override its explicit independent or review identity. */
 	identityForInstance(instanceId: string): string | null {
-		return this.#read().findLast(owner => owner.instanceId === instanceId)?.identity ?? null;
+		return this.#read().claims.find(claim => claim.instanceId === instanceId)?.identity ?? null;
 	}
 
 	/** Unlike editable lists, an unreadable claim file is never ignored or replaced: that could admit a second writer. */
-	#change(next: (owners: TaskClaim[]) => TaskClaim[]): void {
+	#change(next: (file: ClaimsFile) => ClaimsFile): void {
 		this.#lock.wait();
 		try {
-			const owners = this.#read();
-			const changed = next(owners);
-			if (changed !== owners) atomicWriteTextSync(this.#file, `${JSON.stringify(changed)}\n`, 0o600);
+			const file = this.#read();
+			const changed = next(file);
+			if (changed !== file) atomicWriteTextSync(this.#file, `${JSON.stringify(changed)}\n`, 0o600);
 		} finally {
 			this.#lock.release();
 		}
 	}
 
-	#read(): TaskClaim[] {
+	#read(): ClaimsFile {
 		let text: string;
 		try {
 			text = readFileSync(this.#file, "utf8");
 		} catch (error) {
 			if (!isObject(error) || error.code !== "ENOENT") throw error;
-			return [];
+			return { claims: [], saved: {} };
 		}
-		const owners = parseOwners(JSON.parse(text));
-		if (!owners) throw new Error(`Cannot read active task owners in ${this.#file}.`);
-		return owners;
+		const file: unknown = JSON.parse(text);
+		if (!isClaimsFile(file)) throw new Error(`Cannot read task claims in ${this.#file}.`);
+		return file;
 	}
 
 	#alive(owner: TaskClaim): boolean {

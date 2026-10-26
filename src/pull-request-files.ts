@@ -99,8 +99,8 @@ function listed(pr: PullRequest, fresh = false, commit?: string) {
 		async () => {
 			const read = filesRead(pr, commit);
 			const [pull, pages] = await Promise.all([
-				ghRest(`repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`, false, fresh),
-				ghRest(read.url, true, fresh),
+				ghRest(`repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`),
+				ghRest(read.url, true),
 				commit === undefined ? null : requireCommit(pr, commit),
 			]);
 			return { pull: parsePullAnswer(pull), files: orderPullRequestFiles(read.parse(pages)) };
@@ -111,7 +111,7 @@ function listed(pr: PullRequest, fresh = false, commit?: string) {
 
 /** The pull request's changes, or one of its commits, with the viewer's viewed states, refreshed for the file reads that follow. */
 export async function listPullRequestChanges(pr: PullRequest, commit?: string): Promise<PullRequestChanges> {
-	const [{ pull, files }, viewed] = await Promise.all([listed(pr, true, commit), ghGraphql(VIEWED_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }, true, true)]);
+	const [{ pull, files }, viewed] = await Promise.all([listed(pr, true, commit), ghGraphql(VIEWED_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }, true)]);
 	const states = parseViewedAnswer(viewed);
 	return {
 		...pull,

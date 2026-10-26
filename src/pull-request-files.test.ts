@@ -129,6 +129,7 @@ describe("commit-scoped changes", () => {
 		expect((await readPullRequestFile(pr, "same.ts", second))?.rows).toEqual([{ sign: "+", old: null, new: 1, text: "second" }]);
 		expect(await readPullRequestFile(pr, "extra.ts", first)).toBeNull();
 		expect(gh.mock.calls.flatMap(([argv]) => argv.filter(arg => arg.startsWith("oid=")))).toEqual(["oid=first-blob", "oid=second-blob"]);
+		expect(gh.mock.calls.filter(([argv]) => argv.some(arg => arg.includes("/pulls/102/commits")))).toHaveLength(2);
 	});
 
 	test("rejects a commit that is not the pull request's", async () => {

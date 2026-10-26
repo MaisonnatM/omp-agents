@@ -1,4 +1,5 @@
 /** One place that runs a subprocess to completion and reads its output. */
+import { CommandError, parsedAnswer } from "../templates/omp/agent/extensions/github/command";
 
 /**
  * What the server sets for itself: a dev server an agent or a terminal starts would take the dashboard's `PORT`, and
@@ -117,26 +118,17 @@ export async function runChecked(argv: string[], opts?: RunOptions): Promise<str
 	return stdout;
 }
 
-/** A command that exited non-zero; `answer` is its stdout parsed as JSON, when it parses, such as `gh api`'s error answer. */
-export class JsonCommandError extends Error {
-	constructor(message: string, readonly stdout: string, readonly answer: unknown) {
-		super(message);
-	}
-}
-
 /**
  * Runs `argv` and parses stdout as JSON.
- * @throws JsonCommandError when the command exits non-zero, even beside parseable stdout, so a caller never mistakes a failed read's partial output for an answer; Error as {@link runChecked} does when stdout does not parse.
+ * @throws CommandError when the command exits non-zero, even beside parseable stdout, so a caller never mistakes a failed read's partial output for an answer; its `answer` is that stdout parsed, when it parses. Error as {@link runChecked} does when a successful command's stdout does not parse.
  */
 export async function runJson(argv: string[], opts?: RunOptions): Promise<unknown> {
 	const { stdout, stderr, code } = await run(argv, opts);
 	const failure = stderr.split("\n").findLast(line => line.trim())?.trim() || `${argv[0]} exited ${code}`;
-	let answer: unknown;
+	if (code !== 0) throw new CommandError(failure, parsedAnswer(stdout));
 	try {
-		answer = JSON.parse(stdout);
+		return JSON.parse(stdout);
 	} catch {
-		throw code === 0 ? new Error(failure) : new JsonCommandError(failure, stdout, undefined);
+		throw new Error(failure);
 	}
-	if (code !== 0) throw new JsonCommandError(failure, stdout, answer);
-	return answer;
 }

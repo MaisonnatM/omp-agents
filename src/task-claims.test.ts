@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, mock, test } from "bun:test";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,6 +10,7 @@ import { LiveSessions } from "./server/live-sessions";
 import type { LiveSession } from "./live-session";
 
 const dirs: string[] = [];
+afterEach(() => mock.restore());
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 const claimsPath = (): string => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-task-"));
@@ -88,7 +89,7 @@ test("a surviving session or keeper retains its task across server restart; dead
 	if (!conflict) throw new Error("The surviving owner must retain its claim.");
 	const keeperPidFile = join(path, "..", "keeper.pid");
 	writeFileSync(keeperPidFile, "54321");
-	writeFileSync(path, JSON.stringify([{ ...conflict, keeperPidFile }]));
+	writeFileSync(path, JSON.stringify({ claims: [{ ...conflict, keeperPidFile }], saved: {} }));
 	live.delete(12345);
 	live.add(54321);
 	expect(restarted.claim("/repo/.git", "ticket:ENG-2650", "duplicate", "/repo")?.instanceId).toBe("owner");

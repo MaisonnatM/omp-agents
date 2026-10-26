@@ -7,6 +7,7 @@ import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { commands } from "./shell/commands";
 import { GitHubAccess, quotaExhausted, quotaReset } from "./github/access";
+import { type Gh, ghJson, ghText } from "./github/command";
 
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
@@ -287,22 +288,14 @@ export default function ship(pi: ExtensionAPI) {
 	let refreshFailure: string | undefined;
 	const access = new GitHubAccess();
 
-	const gh = async (ghArgs: string[], cwd: string, fresh = false) => {
-		const execute = async () => {
-			const result = await pi.exec("gh", ghArgs, { cwd, timeout: 20_000 });
-			if (result.code !== 0) throw Object.assign(new Error(result.stderr.trim() || result.stdout.trim() || `gh exited ${result.code}`), { stdout: result.stdout });
-			return result;
-		};
+	const gh = async (ghArgs: string[], cwd: string) => {
 		if (ghArgs[0] === "auth") return pi.exec("gh", ghArgs, { cwd, timeout: 20_000 });
+		const run: Gh = args => pi.exec("gh", args, { cwd, timeout: 20_000 });
 		const budget = ghArgs[0] === "api" && ghArgs[1] !== "graphql" ? "rest" : "graphql";
 		try {
-			const key = ghArgs[0] === "api" ? ["command", "gh", ...ghArgs] : ["command", cwd, ...ghArgs];
-			return await access.read(budget, JSON.stringify(key), execute, async () => {
-				const result = await pi.exec("gh", ["api", "rate_limit"], { cwd, timeout: 20_000 });
-				return result.code === 0 ? quotaReset(JSON.parse(result.stdout), budget) : undefined;
-			}, fresh);
+			return { code: 0, stdout: await access.request(budget, () => ghText(run, ghArgs), async () => quotaReset(await ghJson(run, ["api", "rate_limit"]), budget)), stderr: "" };
 		} catch (error) {
-			return { code: 1, stdout: "", stderr: error instanceof Error ? error.message : String(error), killed: false };
+			return { code: 1, stdout: "", stderr: error instanceof Error ? error.message : String(error) };
 		}
 	};
 	const authSchema = z.object({
@@ -353,8 +346,8 @@ export default function ship(pi: ExtensionAPI) {
 
 	/** One poll at a time: the interval, a turn's end, and a command can all ask while `gh` still answers an earlier one. */
 	let polling: Promise<void> | undefined;
-	function refresh(ctx: ExtensionContext, fresh = false): Promise<void> {
-		polling ??= pollPr(ctx, fresh).finally(() => {
+	function refresh(ctx: ExtensionContext): Promise<void> {
+		polling ??= pollPr(ctx).finally(() => {
 			polling = undefined;
 		});
 		return polling;
@@ -363,14 +356,14 @@ export default function ship(pi: ExtensionAPI) {
 	/** A poll that starts after this call, so it reads a PR body edited just before; `refresh` can hand back a poll already under way. */
 	async function refreshNow(ctx: ExtensionContext): Promise<void> {
 		await polling?.catch(() => undefined);
-		return refresh(ctx, true);
+		return refresh(ctx);
 	}
 
-	async function pollPr(ctx: ExtensionContext, fresh = false) {
+	async function pollPr(ctx: ExtensionContext) {
 		lastRefresh = Date.now();
 		if (!state?.pr || !state.repo || state.stage === "merged") return render(ctx);
 		const [owner, name] = state.repo.split("/");
-		const r = await gh(["api", "graphql", "-f", `query=${PR_QUERY}`, "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `n=${state.pr}`], ctx.cwd, fresh);
+		const r = await gh(["api", "graphql", "-f", `query=${PR_QUERY}`, "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `n=${state.pr}`], ctx.cwd);
 		if (r.code !== 0) {
 			refreshFailure = r.stderr.trim() || "GitHub status read failed.";
 			return render(ctx);
@@ -404,7 +397,7 @@ export default function ship(pi: ExtensionAPI) {
 	}
 
 	async function publishCheck(selector: string[], cwd: string, sessionDir: string): Promise<string | undefined> {
-		const r = await gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd, true);
+		const r = await gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd);
 		if (r.code !== 0) {
 			const error = r.stderr.trim() || r.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {

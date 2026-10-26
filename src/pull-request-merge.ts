@@ -65,7 +65,7 @@ export function parseMergeStatus(answer: unknown, pr: PullRequest): MergeStatus 
 }
 
 export async function readMergeStatus(pr: PullRequest): Promise<MergeStatus> {
-	return parseMergeStatus(await ghGraphql(STATUS_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }, false, true), pr);
+	return parseMergeStatus(await ghGraphql(STATUS_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr);
 }
 
 const MERGE_MUTATION = `mutation($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
@@ -125,7 +125,7 @@ export async function readPullRequestStates(prs: readonly PullRequest[]): Promis
 		const [{ owner, repo }] = group as [PullRequest];
 		const numbers = [...new Set(group.map(pr => pr.number))];
 		const fields = numbers.map(number => `p${number}: pullRequest(number: ${number}) { state headRefName headRefOid }`).join("\n");
-		const data = dataOf(await ghGraphql(`query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { ${fields} } }`, { owner, repo }, false, true));
+		const data = dataOf(await ghGraphql(`query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { ${fields} } }`, { owner, repo }));
 		const repository = isObject(data.repository) ? data.repository : {};
 		for (const number of numbers) {
 			const node = repository[`p${number}`];

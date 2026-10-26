@@ -46,7 +46,7 @@
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
 - `src/task-claims.ts`: atomic ownership for one explicit task per repository before checkout/spawn, shared across dashboards through private `task-claims.json` beside the access token.
-  `LiveSessions` binds the owner to its running session and releases it on removal; surviving keepers keep ownership after a dashboard crash, and dead unbound launches are reclaimed.
+  `start.ts` binds the owner to the session it spawned, `LiveSessions` releases it on removal, and a released or dead bound owner moves to `saved` by session id; surviving keepers keep ownership after a dashboard crash, and dead unbound launches are reclaimed.
   Inactive session-bound records preserve the identity for resume without retaining ownership, including intentional `taskId` slices and the separate PR-review role.
   A corrupt claim file refuses a launch rather than admitting a second writer.
 - `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, activity, pull, dashboard check, and process loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.

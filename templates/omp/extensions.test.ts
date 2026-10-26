@@ -107,6 +107,15 @@ function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-
 	return JSON.parse(child.stdout.toString());
 }
 
+const quotaConfigs: string[] = [];
+afterAll(() => { for (const dir of quotaConfigs) rmSync(dir, { recursive: true, force: true }); });
+/** A config directory of the test's own, so the GitHub quota cooldown it records on disk reaches no other test. */
+function quotaConfig(): Record<string, string> {
+	const dir = mkdtempSync(join(tmpdir(), "github-quota-"));
+	quotaConfigs.push(dir);
+	return { XDG_CONFIG_HOME: dir };
+}
+
 describe("ship publication gate", () => {
 	test("a branch without a PR is blocked with draft-first recovery", () => {
 		const { result } = exercise("ship", {
@@ -224,7 +233,7 @@ describe("checked PR description CLI", () => {
 				{ code: 1, stdout: "", stderr: "API rate limit exceeded" },
 				{ code: 0, stdout: JSON.stringify({ resources: { core: { reset: Math.floor(Date.now() / 1000) + 3600 } } }), stderr: "" },
 			],
-		});
+		}, quotaConfig());
 		expect(result.run.isError).toBe(true);
 		expect(result.text).toContain("REST quota exhausted");
 		expect(result.text).not.toContain("auth login");
@@ -271,7 +280,7 @@ describe("ship_stage ready gate", () => {
 				{ code: 1, stdout: JSON.stringify({ data: { repository: null }, errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }] }), stderr: "" },
 				{ code: 0, stdout: JSON.stringify({ resources: { graphql: { remaining: 0, reset: Math.floor(Date.now() / 1000) + 3600 } } }), stderr: "" },
 			],
-		});
+		}, quotaConfig());
 		expect(result.run.isError).toBe(true);
 		expect(result.text).toContain("stale GitHub status");
 		expect(result.text).toContain("GraphQL quota exhausted");

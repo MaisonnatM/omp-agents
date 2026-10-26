@@ -104,7 +104,7 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 		case "body": {
 			const path = `${base}/pulls/${pr.number}`;
 			await editDescription(`${pr.owner}-${pr.repo}-${pr.number}`, { kind: "replace", original: change.original, body: change.body, allowEmpty: change.allowEmpty }, {
-				read: async () => descriptionSnapshot(await ghRest(path, false, true)),
+				read: async () => descriptionSnapshot(await ghRest(path)),
 				write: body => ghRestWrite("PATCH", path, [["body", body]]),
 			});
 			break;

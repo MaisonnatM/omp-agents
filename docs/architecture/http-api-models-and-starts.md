@@ -34,7 +34,8 @@ Another start for that identity fails with the owning session link, dashboard po
 Set a distinct nonblank `taskId` only for intentional independent work; unrelated task identities remain concurrent.
 Ownership is shared across dashboards, survives a dashboard restart while its keeper lives, and releases when the session ends or its launch fails.
 PR review drafts use a separate review identity, so read-only review and implementation can coexist without admitting duplicate launches within either role.
-`task-claims.json` retains inactive saved-session identity metadata after ownership releases, so resume preserves an independent `taskId` or review role across restarts.
+One helper in `src/server/start.ts` owns the claim for `new` and `resume`: it reserves the identity, runs the launch, binds the claim to the spawned session's process and id, and releases it whenever the launch started no session; a server restart binds each reattached session again.
+`task-claims.json` holds `{ claims, saved }`: `claims` are live owners, and `saved` maps an ended session's id to its explicit identity, so resume preserves an independent `taskId` or review role across restarts.
 
 A `start` of kind `new` carries a `branch`, `null` for the directory as it is.
 For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`.

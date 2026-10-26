@@ -104,6 +104,11 @@ export class LiveSessions {
 		return this.#taskClaims.identityForSession(sessionId);
 	}
 
+	/** Hands claim `instanceId` to its spawned session's process, which then owns it across dashboard restarts. */
+	bindTask({ instanceId, pid, sessionId, cwd }: { instanceId: string; pid: number; sessionId: string; cwd: string }): void {
+		this.#taskClaims.bind(instanceId, pid, sessionId, cwd);
+	}
+
 	/** Releases a failed launch as well as an ended session. */
 	releaseTask(instanceId: string): void {
 		this.#taskClaims.release(instanceId);
@@ -122,7 +127,6 @@ export class LiveSessions {
 	/** Lists `session`; `false` when it already finished, as a process that exited between its spawn and now, which would stay listed with no one to remove it. */
 	add(session: LiveSession, subject: WorkItem | null): boolean {
 		if (session.finished(Date.now())) return false;
-		if (session instanceof DashboardSession) this.#taskClaims.bind(session.instanceId, session.pid, session.sessionId, session.cwd);
 		this.#sessions.set(session.instanceId, session);
 		if (subject) this.#subjects.set(session.instanceId, subject);
 		this.#reindex();

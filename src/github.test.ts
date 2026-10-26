@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import { dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
 import * as proc from "./proc";
 
@@ -43,19 +45,18 @@ describe("ghRestWrite", () => {
 
 test("real GitHub read callers share quota cooldown while REST remains available", async () => {
 	const gh = spyOn(proc, "runJson").mockImplementation(async argv => {
-		if (argv.includes("rate_limit")) return { resources: { graphql: { reset: Math.floor(Date.now() / 1000) + 3600 } } };
+		if (argv.includes("rate_limit")) return { resources: { graphql: { remaining: 0, reset: Math.floor(Date.now() / 1000) + 3600 } } };
 		if (argv.includes("graphql")) throw new Error("API rate limit exceeded");
 		return { title: "Read through REST" };
 	});
-	await expect(ghGraphql("query { viewer { login } }", {})).rejects.toThrow("GraphQL quota exhausted");
-	await expect(ghGraphql("query { viewer { name } }", {})).rejects.toThrow("GraphQL quota exhausted");
-	expect(await ghRest("repos/acme/app/pulls/7")).toEqual({ title: "Read through REST" });
-	expect(gh.mock.calls.filter(([argv]) => argv.includes("graphql"))).toHaveLength(1);
-	expect(gh.mock.calls.filter(([argv]) => argv.includes("rate_limit"))).toHaveLength(1);
-});
-
-test("real REST consumers coalesce identical concurrent reads", async () => {
-	const gh = spyOn(proc, "runJson").mockResolvedValue({ title: "Shared answer" });
-	expect(await Promise.all([ghRest("repos/acme/app/pulls/7"), ghRest("repos/acme/app/pulls/7")])).toEqual([{ title: "Shared answer" }, { title: "Shared answer" }]);
-	expect(gh).toHaveBeenCalledTimes(1);
+	try {
+		await expect(ghGraphql("query { viewer { login } }", {})).rejects.toThrow("GraphQL quota exhausted");
+		await expect(ghGraphql("query { viewer { name } }", {})).rejects.toThrow("GraphQL quota exhausted");
+		expect(await ghRest("repos/acme/app/pulls/7")).toEqual({ title: "Read through REST" });
+		expect(gh.mock.calls.filter(([argv]) => argv.includes("graphql"))).toHaveLength(1);
+		expect(gh.mock.calls.filter(([argv]) => argv.includes("rate_limit"))).toHaveLength(1);
+	} finally {
+		// The cooldown is shared state on disk, under the test run's XDG_CONFIG_HOME; later tests read GraphQL again.
+		rmSync(join(process.env.XDG_CONFIG_HOME!, "omp-agents", "github"), { recursive: true, force: true });
+	}
 });

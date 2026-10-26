@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { CommandError } from "../templates/omp/agent/extensions/github/command";
 import * as proc from "./proc";
 import { parseMergeStatus, readPullRequestStates } from "./pull-request-merge";
 
@@ -39,7 +40,7 @@ describe("parseMergeStatus", () => {
 
 test("a batched state read keeps the answered pull requests when gh exits non-zero for another's error", async () => {
 	const answer = { data: { repository: { p1: { state: "MERGED", headRefName: "one", headRefOid: "a1" }, p2: null } }, errors: [{ type: "NOT_FOUND", message: "Could not resolve to a PullRequest with the number of 2." }] };
-	spyOn(proc, "runJson").mockRejectedValue(new proc.JsonCommandError("gh: Could not resolve to a PullRequest with the number of 2.", JSON.stringify(answer), answer));
+	spyOn(proc, "runJson").mockRejectedValue(new CommandError("gh: Could not resolve to a PullRequest with the number of 2.", answer));
 	const states = await readPullRequestStates([{ owner: "batch", repo: "states", number: 1 }, { owner: "batch", repo: "states", number: 2 }]);
 	expect([...states]).toEqual([["batch/states#1", { state: "merged", branch: "one", head: "a1" }]]);
 });
