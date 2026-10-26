@@ -89,7 +89,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Tickets | view | `tickets`, `tickets/item` |
 | Pages: Todo | view | `todo`, `todo/item` |
 | Pages: Notes | view | `notes`, `notes/item` |
-| Pages: Calendar | view | `calendar` |
+| Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
 | Pages: Inbox | view | `inbox`, `inbox/new`, `inbox/item` |
 | Pages: Routines | view | `routines`, `routines/item` |
 | Pages: Settings | view | `settings/<section>` |

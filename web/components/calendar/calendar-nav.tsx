@@ -7,8 +7,10 @@ import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
+import { activityControl } from "../../activity";
 import { calendarEventsStore, googleStore, monthSpan, useGoogleCalendars } from "../../reads";
 import { hashForCalendar, hashForRoutines } from "../../routing";
+import { useCalendarRoutines } from "../../use-calendar-display";
 
 /** The page under the Calendar tab that is open: the calendar, or the Routines page on a routine or, `null`, the list; `null` for another page. */
 export type CalendarTabPage = { kind: "calendar" } | { kind: "routines"; target: string | null } | null;
@@ -119,6 +121,7 @@ function GoogleCalendarGroups({ workspace }: { workspace: string | null }) {
  * routine, then each one by name, a paused one muted.
  */
 export function CalendarNav({ routines, current, workspace }: { routines: Routine[]; current: CalendarTabPage; workspace: string | null }) {
+	const [showRoutines, setShowRoutines] = useCalendarRoutines();
 	const link = (href: string, active: boolean, name: string, muted = false) => (
 		<SidebarMenuButton asChild isActive={active}>
 			<a href={href} aria-current={active ? "page" : undefined}>
@@ -138,6 +141,20 @@ export function CalendarNav({ routines, current, workspace }: { routines: Routin
 			<SidebarGroup>
 				<SidebarGroupLabel>Routines</SidebarGroupLabel>
 				<SidebarMenu aria-label="Routines">
+					<SidebarMenuItem>
+						<SidebarMenuButton asChild>
+							<label>
+								<input
+									type="checkbox"
+									checked={showRoutines}
+									onChange={event => setShowRoutines(event.target.checked)}
+									className="size-3.5 shrink-0 accent-primary"
+									{...activityControl("calendar.routines.toggle")}
+								/>
+								<span>Show routines</span>
+							</label>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
 					<SidebarMenuItem>{link(hashForRoutines(null), routine === null, "All")}</SidebarMenuItem>
 					{routines.map(({ id, name, enabled }) => (
 						<SidebarMenuItem key={id}>{link(hashForRoutines(id), routine === id, name, !enabled)}</SidebarMenuItem>

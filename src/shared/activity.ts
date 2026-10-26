@@ -93,6 +93,7 @@ export const CONTROLS = [
 	{ id: "sidebar.workspace", label: "Sidebar workspace picker", area: "Sidebar" },
 	{ id: "shortcuts.open", label: "Keyboard shortcuts button", area: "Sidebar" },
 	{ id: "shortcuts.tab", label: "Keyboard shortcuts category tab", area: "Sidebar" },
+	{ id: "calendar.routines.toggle", label: "Calendar routine visibility", area: "Calendar" },
 	{ id: "header.command-menu", label: "Command menu button", area: "Header" },
 	{ id: "notices.open", label: "Notification bell", area: "Notifications" },
 	{ id: "notices.filter", label: "Notifications source filter", area: "Notifications" },

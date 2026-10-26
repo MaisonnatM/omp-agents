@@ -28,6 +28,7 @@ import { hashForOpenTodo, hashForRoutines, hashForTickets } from "../../routing"
 import { scheduleWords, timeWords } from "../../routines-model";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useMinute } from "../../use-minute";
+import { useCalendarRoutines } from "../../use-calendar-display";
 import { PageFrame } from "../list-page";
 import { NewEventDialog } from "./new-event";
 
@@ -322,6 +323,7 @@ interface CalendarPageProps {
 /** A month of Google events of the accounts `workspace` shows and events kept on this computer, routine runs, and due todos and Linear tickets, with one day's list beside it. */
 export function CalendarPage({ routines, todos, ticketsShown, workspace }: CalendarPageProps) {
 	const now = useMinute();
+	const [showRoutines] = useCalendarRoutines();
 	const [month, setMonth] = useCalendarMonth();
 	const [year, setYear] = useCalendarYear();
 	const [selected, setSelected] = useState<Date | null>(() => new Date(now));
@@ -341,13 +343,13 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 	const localEvents = localRead.read?.data.events ?? null;
 	const byDay = useMemo(() => {
 		const days = new Map<string, CalendarEntry[]>();
-		for (const entry of calendarEntries({ routines, todos, tickets: ticketsShown ? tickets : null, events, localEvents }, year, month, now)) {
+		for (const entry of calendarEntries({ routines: showRoutines ? routines : [], todos, tickets: ticketsShown ? tickets : null, events, localEvents }, year, month, now)) {
 			const day = days.get(entry.day);
 			if (day) day.push(entry);
 			else days.set(entry.day, [entry]);
 		}
 		return days;
-	}, [routines, todos, tickets, ticketsShown, events, localEvents, year, month, now]);
+	}, [routines, showRoutines, todos, tickets, ticketsShown, events, localEvents, year, month, now]);
 	const days = useMemo(() => gridDays(year, month), [year, month]);
 	const shownDay = selected !== null && selected.getFullYear() === year && selected.getMonth() === month ? localDay(selected) : null;
 	const today = new Date(now);
@@ -397,7 +399,7 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 	if (localRead.error) failures.push(`Cannot read the events on this computer: ${localRead.error}`);
 	if (deleteError) failures.push(deleteError);
 	return (
-		<PageFrame title="Calendar" meta={["Routine runs", connected && "Google events", "events on this computer", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
+		<PageFrame title="Calendar" meta={[showRoutines && "Routine runs", connected && "Google events", "events on this computer", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
 			{failures.map(failure => (
 				<p key={failure} role="alert" className="px-6 pt-4 text-sm text-red-600 dark:text-red-400">
 					{failure}
