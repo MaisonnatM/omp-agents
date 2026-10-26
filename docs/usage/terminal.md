@@ -14,4 +14,4 @@
   The close button spins until the tab closes, and closing a tab that still shows **Starting shell…** ends the shell the server opens for it.
   A tab whose server stopped reads **(disconnected)** until you close it.
 - Drag the panel's top edge, or focus it and press ↑ or ↓, to change its height; double-click the edge to reset it.
-  Its height, and whether it shows, is saved in the browser's localStorage.
+  Its height, and whether it shows, is saved in the app.

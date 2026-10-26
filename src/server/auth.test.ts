@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MEDIA_KEY_STORAGE_KEY, TOKEN_STORAGE_KEY } from "../shared/access";
-import { bearerToken, fetchSiteAllowed, helloProof, loadToken, mediaKey, tokenMatches } from "./auth";
+import { bearerToken, fetchSiteAllowed, helloProof, loadToken, mediaKey, pageAccess, tokenMatches } from "./auth";
 import { guardsFor } from "./http";
 import { servePage } from "./page";
 
@@ -131,6 +131,15 @@ describe("API and socket guards", () => {
 	});
 });
 
+describe("pageAccess", () => {
+	test("names the entries the page reads, and they sign in to the API and the media routes", () => {
+		const access = pageAccess(TOKEN);
+		expect(access).toEqual({ [TOKEN_STORAGE_KEY]: TOKEN, [MEDIA_KEY_STORAGE_KEY]: mediaKey(TOKEN) });
+		expect(guards.admit(request("/api/settings", { authorization: `Bearer ${access[TOKEN_STORAGE_KEY]}` }))).toBeNull();
+		expect(guards.admitMedia(request(`/api/media?path=a.png&key=${access[MEDIA_KEY_STORAGE_KEY]}`))).toBeNull();
+	});
+});
+
 describe("hello", () => {
 	test("proves the token for the port and nonce without naming it", async () => {
 		const nonce = "n".repeat(32);
@@ -152,7 +161,7 @@ describe("hello", () => {
 });
 
 describe("the page", () => {
-	const serve = (path: string, headers?: Record<string, string>): Response => servePage(request(path, headers), guards, TOKEN, page);
+	const serve = (path: string, headers?: Record<string, string>): Response => servePage(request(path, headers), guards, page);
 	const forgetsCookie = (response: Response): void => expect(response.headers.get("set-cookie")).toMatch(/^omp-agents-token=; Max-Age=0;/);
 
 	test("`/` and its assets are served without a token, and drop the old cookie", async () => {
@@ -165,27 +174,12 @@ describe("the page", () => {
 		expect(serve("/", { host: "evil.test:4317" }).status).toBe(403);
 	});
 
-	test("a wrong token is a 401 page that names no token", async () => {
-		const response = serve(`/?token=${"B".repeat(43)}`, { "sec-fetch-site": "none" });
-		expect(response.status).toBe(401);
-		expect(await response.text()).not.toContain(TOKEN);
-	});
-
-	test("the printed URL keeps the token in localStorage and leaves for `/` with its hash", async () => {
+	test("`/?token=` signs nothing in: it answers the page itself, which holds no token", async () => {
 		const response = serve(`/?token=${TOKEN}`, { "sec-fetch-site": "none" });
 		expect(response.status).toBe(200);
-		expect(response.headers.get("referrer-policy")).toBe("no-referrer");
-		expect(response.headers.get("cache-control")).toBe("no-store");
-		forgetsCookie(response);
 		const body = await response.text();
+		expect(body).toBe("<p>app</p>");
 		expect(body).not.toContain(TOKEN);
-		const script = body.match(/<script>(.*)<\/script>/s)?.[1] ?? "";
-		const hash = new Bun.CryptoHasher("sha256").update(script).digest("base64");
-		expect(response.headers.get("content-security-policy")).toBe(`default-src 'none'; script-src 'sha256-${hash}'`);
-		const stored = new Map<string, string>();
-		const location = { search: `?token=${TOKEN}`, hash: "#session/abc", replace: (to: string) => stored.set("replaced", to) };
-		new Function("localStorage", "location", script)({ setItem: (key: string, value: string) => stored.set(key, value) }, location);
-		expect(Object.fromEntries(stored)).toEqual({ [TOKEN_STORAGE_KEY]: TOKEN, [MEDIA_KEY_STORAGE_KEY]: mediaKey(TOKEN), replaced: "/#session/abc" });
 	});
 
 	test("a browser keeps an asset, which its content names, but never `index.html`, which names the assets of the build", () => {
@@ -196,8 +190,7 @@ describe("the page", () => {
 		expect(serve("/", { "sec-fetch-site": "same-origin" }).headers.get("cache-control")).toBe("no-store");
 	});
 
-	test("another site cannot sign in or fetch the page, but a link click lands on the app", async () => {
-		expect(serve(`/?token=${TOKEN}`, { "sec-fetch-site": "cross-site" }).status).toBe(401);
+	test("another site cannot fetch the page, but a link click lands on the app", async () => {
 		expect(serve("/", { "sec-fetch-site": "cross-site" }).status).toBe(403);
 		expect(serve("/index.html", { "sec-fetch-site": "cross-site" }).status).toBe(403);
 		const click = serve("/", { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" });

@@ -1,7 +1,6 @@
-/** The page itself: built once at startup, or read prebuilt in a packaged app, and the page that signs a browser in. */
+/** The page itself: built once at startup, or read prebuilt in a packaged app. */
 import { join } from "node:path";
-import { MEDIA_KEY_STORAGE_KEY, TOKEN_STORAGE_KEY } from "../shared/access";
-import { fetchSiteAllowed, mediaKey } from "./auth";
+import { fetchSiteAllowed } from "./auth";
 import type { Guards } from "./http";
 import { prebuiltPageDir } from "./resources";
 
@@ -47,33 +46,13 @@ const IMMUTABLE = { "cache-control": "private, max-age=31536000, immutable" };
 /** Removes the cookie that older servers signed browsers in with: every port of the host was sent it, so it must not linger. */
 const FORGET_COOKIE = { "set-cookie": "omp-agents-token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict" };
 
-const html = (status: number, body: string, headers: Record<string, string> = {}): Response =>
-	new Response(`<!doctype html><meta charset="utf-8"><title>omp agents</title>${body}`, { status, headers: { "content-type": "text/html;charset=utf-8", ...NO_STORE, ...headers } });
-
-const SIGN_IN = `<body style="font:16px system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem">
-<h1>Not signed in</h1>
-<p>This address does not hold this server's token. Open the address that the omp-agents server printed in its terminal when it started. It ends in <code>/?token=…</code>, and signs this browser in.</p>`;
-
-/**
- * The page the printed URL answers with: it keeps the token from its own address and the media key in this origin's
- * localStorage, then replaces itself with `/`, keeping the hash, so the token leaves the address bar and history.
- * It sends no referrer and runs only its own script.
- */
-function signInPage(token: string): Response {
-	const script = `localStorage.setItem(${JSON.stringify(TOKEN_STORAGE_KEY)},new URLSearchParams(location.search).get("token"));localStorage.setItem(${JSON.stringify(MEDIA_KEY_STORAGE_KEY)},${JSON.stringify(mediaKey(token))});location.replace("/"+location.hash)`;
-	return html(200, `<script>${script}</script>`, {
-		...FORGET_COOKIE,
-		"referrer-policy": "no-referrer",
-		"content-security-policy": `default-src 'none'; script-src 'sha256-${new Bun.CryptoHasher("sha256").update(script).digest("base64")}'`,
-	});
-}
-
 /**
  * The answer to a request that is not for the API or the socket. The page's code is no secret: what it reads, it
- * reads through the API with the token from localStorage, so `/` and its assets need no token. A `?token=` on `/`
- * signs the browser in. `/` is also any link's landing, such as a pull request's session link from another site.
+ * reads through the API with the token that the desktop window's preload keeps in localStorage, so `/` and its assets
+ * need no token, and a query on `/` changes nothing. `/` is also any link's landing, such as a pull request's session
+ * link from another site.
  */
-export function servePage(req: Request, guards: Guards, token: string, page: ReadonlyMap<string, Blob>): Response {
+export function servePage(req: Request, guards: Guards, page: ReadonlyMap<string, Blob>): Response {
 	const url = new URL(req.url);
 	if (!guards.allowedHost(req)) return new Response("forbidden host", { status: 403 });
 	const site = req.headers.get("sec-fetch-site");
@@ -83,7 +62,6 @@ export function servePage(req: Request, guards: Guards, token: string, page: Rea
 		if (!asset) return new Response("not found", { status: 404 });
 		return new Response(asset, { headers: url.pathname === "/index.html" ? NO_STORE : IMMUTABLE });
 	}
-	if (url.searchParams.has("token")) return guards.login(req) && fetchSiteAllowed(site, true) ? signInPage(token) : html(401, SIGN_IN);
 	const navigation = req.headers.get("sec-fetch-mode") === "navigate" && req.headers.get("sec-fetch-dest") === "document";
 	if (!navigation && !fetchSiteAllowed(site, true)) return new Response("forbidden origin", { status: 403 });
 	return new Response(page.get("/index.html"), { headers: { "content-type": "text/html;charset=utf-8", ...NO_STORE, ...FORGET_COOKIE } });

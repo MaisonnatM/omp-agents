@@ -19,13 +19,13 @@
   Error responses are narrowed from unknown JSON and retain HTTP context when their body is malformed.
   The page and server share `errorText` from `src/json.ts`.
   `settingsUrl` names a settings route for one workspace, or for the user's own files, and `releaseWorktree` asks the server to remove the linked worktree that has a branch checked out.
-  `web/components/signed-in.tsx` holds `SignedIn`, which `web/main.tsx` wraps the app in, so a page without a token shows how to sign in, and asks the desktop shell to sign its window in again.
+  `web/components/signed-in.tsx` holds `SignedIn`, which `web/main.tsx` wraps the app in, so a page without a token says to open the omp agents app, and asks the desktop shell to sign its window in again.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as a pull request's stack, the settings page's model catalog, or the new-session draft's model list.
   A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.
   A URL change never returns the previous URL's answer.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per workspace, one for the tickets, with one entry, since Linear is not per workspace, one for the MCP integrations, one for the Google calendars shown, one for the Calendar page's Google events, with one entry per month, one for its events kept on this computer, with one entry, and one for the Gmail inbox, with one entry.
-  A tick while the browser tab is hidden reads nothing, and each scope that skipped one reads once when the tab shows again.
+  A tick while the page is hidden reads nothing, and each scope that skipped one reads once when the page shows again.
   Each kept store reads its localStorage back through its `cache.decode` and drops a read the decoder refuses, so a record kept by an older version, or damaged, reads the server again instead of reaching a component.
   `mcpServersStore`, for Settings › MCP servers, and `providersStore` are polled stores kept in memory only.
   So is `sessionProcessesStore`, one entry holding every live session's processes, which only the open CPU card polls, every 5 seconds rather than every minute.
@@ -70,7 +70,7 @@
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the sidebar's tab layout, the session details tab, the sidebar's workspace, the pinned skill, the pull request list's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the Pull requests and tickets pages' folded sections.
   It keeps one stored string per key in a `keyedStore`, which each component decodes, so every component that holds the same key sees a change at once, and the Pull requests page and its sidebar index share their folds and order.
-  A `storage` event carries a change made in another tab to the same store.
+  A `storage` event carries a change made in another page of the same origin to the same store.
   The page state owns the split ratios rather than a component, so `web/use-dashboard.ts` reads and stores them through the same file's `storedNumber` and `storeOrRemove`.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
   `waitsOnYou` there tells a live session that waits on you, for the waiting count.

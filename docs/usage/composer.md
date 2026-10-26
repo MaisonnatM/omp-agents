@@ -10,7 +10,7 @@
   A prompt, answer, or start sent just before the connection drops reaches the session once when the page reconnects, never twice.
   If the server restarted, or the page stayed disconnected for over an hour, before the server answered, the page says so, and the session's transcript shows whether the prompt took effect.
 - Each session and subagent keeps its own unsent text when you switch to another one or to a page, and when you reload, as chat apps keep a draft per conversation.
-  The text is kept in this browser and goes once you send it or empty the composer.
+  The text is kept in the app and goes once you send it or empty the composer.
   The new-session draft keeps its text the same way, one for the plain draft and one for each todo it starts from, until the session it starts opens.
   Attached files and images are not kept.
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**, as Cursor lists its queue.

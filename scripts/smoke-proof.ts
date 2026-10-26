@@ -1,7 +1,8 @@
 /**
  * Proves what a browser smoke check saw on a running dashboard: first that the server serves this checkout as it is
  * now, then that the tab ran the page the server built, then whether each expected text shows or stays away, with a
- * screenshot and a report in `tmp/smoke/<run>/`. It starts no server: `--omp` is a running dashboard's sign-in address.
+ * screenshot and a report in `tmp/smoke/<run>/`. It starts no server: `--omp` is a running dashboard's origin, and
+ * `--token` its token, by default the one in the token file.
  */
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -9,9 +10,9 @@ import { parseArgs } from "node:util";
 import { chromium, type Locator, type Page } from "playwright-core";
 import { describeServed, describeSource, type Provenance, type ServedBuild, type SourceIdentity } from "../src/served-build";
 import { pageBuild } from "../src/server/page";
-import { checkServed, defaultRun, provenanceProblem } from "./served";
+import { checkServed, defaultRun, provenanceProblem, scriptToken, signIn } from "./served";
 
-const USAGE = `Usage: bun scripts/smoke-proof.ts --omp <url with ?token=> [--route <hash>] [--expect <text>]... [--expect-absent <text>]... [--timeout <seconds, default 15>] [--checkout <dir>] [--run <name>]`;
+const USAGE = `Usage: bun scripts/smoke-proof.ts --omp http://127.0.0.1:<port> [--token <token>] [--route <hash>] [--expect <text>]... [--expect-absent <text>]... [--timeout <seconds, default 15>] [--checkout <dir>] [--run <name>]`;
 
 const VIEWPORT = { width: 1920, height: 1080 };
 const LOAD_TIMEOUT_MS = 60_000;
@@ -36,7 +37,7 @@ interface PageCheck {
 interface Report {
 	run: string;
 	at: string;
-	/** The sign-in address without its token. */
+	/** The dashboard's origin. */
 	url: string;
 	route: string | null;
 	local: SourceIdentity;
@@ -99,6 +100,7 @@ async function main(): Promise<void> {
 	const { values } = parseArgs({
 		options: {
 			omp: { type: "string" },
+			token: { type: "string" },
 			route: { type: "string" },
 			expect: { type: "string", multiple: true, default: [] },
 			"expect-absent": { type: "string", multiple: true, default: [] },
@@ -115,7 +117,8 @@ async function main(): Promise<void> {
 	if (!(timeoutMs > 0)) throw new Error(`--timeout takes a number of seconds, not ${values.timeout}`);
 	const route = values.route?.replace(/^#/, "") ?? null;
 
-	const check = await checkServed(values.omp, values.checkout === undefined ? undefined : resolve(values.checkout));
+	const token = scriptToken(values.token);
+	const check = await checkServed(values.omp, token, values.checkout === undefined ? undefined : resolve(values.checkout));
 	const run = values.run ?? defaultRun(check.local);
 	const root = join(import.meta.dir, "..", "tmp", "smoke", run);
 	await mkdir(root, { recursive: true });
@@ -146,17 +149,15 @@ async function main(): Promise<void> {
 
 	const browser = await chromium.launch();
 	try {
-		const tab = await (await browser.newContext({ viewport: VIEWPORT })).newPage();
+		const context = await browser.newContext({ viewport: VIEWPORT });
+		await signIn(context, token);
+		const tab = await context.newPage();
 		const roster = rosterHeard(tab);
-		// The sign-in page replaces itself with `/`, keeping the hash; that answer is the served `index.html`.
-		const index = tab.waitForResponse(answer => {
-			const url = new URL(answer.url());
-			return url.pathname === "/" && !url.searchParams.has("token");
-		}, { timeout: LOAD_TIMEOUT_MS });
 		const url = new URL(values.omp);
 		url.hash = route ?? "";
-		await tab.goto(url.href, { waitUntil: "domcontentloaded", timeout: LOAD_TIMEOUT_MS });
-		const loaded = await pageBuild(new Map([["/index.html", new Blob([await (await index).text()])]]));
+		const index = await tab.goto(url.href, { waitUntil: "domcontentloaded", timeout: LOAD_TIMEOUT_MS });
+		if (!index) throw new Error(`${url.origin} sent no answer for /`);
+		const loaded = await pageBuild(new Map([["/index.html", new Blob([await index.text()])]]));
 		report.page = { served: check.served.page, loaded, matches: loaded === check.served.page };
 
 		await Promise.race([roster, Bun.sleep(LOAD_TIMEOUT_MS).then(() => Promise.reject(new Error(`The dashboard's socket sent no roster within ${LOAD_TIMEOUT_MS} ms`)))]);

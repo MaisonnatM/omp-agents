@@ -5,7 +5,7 @@
   The section reads omp's credentials every minute while it is open, so a `/login` from a terminal shows there too, and **Refresh** reads them at once.
 - **Connect** runs the provider's `/login` flow on the dashboard's server and saves the credential in omp's credential store, so every new omp session can use the provider's models.
   A provider with more than one way to sign in, such as ChatGPT's device-code sign-in or Z.AI's GLM Coding Plan, offers the others in its **⋯** menu.
-  A sign-in that needs your browser shows the provider's instructions and **Open sign-in page**, which opens the provider's page in a new tab; a device-code sign-in shows the code to enter there.
+  A sign-in that needs your browser shows the provider's instructions and **Open sign-in page**, which opens the provider's page in your default browser; a device-code sign-in shows the code to enter there.
   When the provider asks a question, such as an API key or the authorization code from its page, a field below the instructions takes the answer, masked when the provider marks it secret, and **Continue** sends it.
   For many providers omp checks an API key against the provider before it saves it, so a wrong key fails at once.
   When the browser cannot reach the dashboard's computer, paste the final redirect address or the authorization code into the field instead.

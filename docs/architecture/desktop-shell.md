@@ -16,17 +16,22 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
   The server calls its `shutdown()` when that pipe ends, which it does however the shell exits, `SIGKILL` included, so no server outlives the app and holds the port.
   On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to write its stores and let go of its sessions.
   Quitting leaves the sessions the server started running, as a restart or a crash does: the server cannot tell a quit from a restart, **Restart to Install** quits too, and the next launch shows them live again, while **End session** stays the one way to stop a session.
-- **Update dashboard** runs the server again inside the same process ([Updating the dashboard](updating-the-dashboard.md)), so the shell keeps its child, its pipes, and the window; the page in the window reloads itself once its socket hears a new build, as a browser tab's does.
-- The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `servePage` answers it with the sign-in page, as it does the printed address in a browser, and the socket's `Origin` matches its `Host`.
+- **Update dashboard** runs the server again inside the same process ([Updating the dashboard](updating-the-dashboard.md)), so the shell keeps its child, its pipes, and the window; the page in the window reloads itself once its socket hears a new build.
+- The window loads `http://127.0.0.1:<port>/`, a navigation that sends `Sec-Fetch-Site: none`, so `servePage` answers it with the page, and the socket's `Origin` matches its `Host`.
   A custom scheme for the page would fail that check.
-- `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
-  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the MCP sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
+- No address carries the token.
+  The preload, before the page's scripts run, asks the main process over the synchronous `ACCESS_CHANNEL`, and writes each entry of the answer into the page's `localStorage`.
+  The main process answers `pageAccess(token)`, the token and the media key, only when the message comes from the window's own dashboard frame, and `null` otherwise, so the shell's own notice pages get nothing.
+- `setWindowOpenHandler` denies every new window: it loads the dashboard's own page, with the address's hash, in the window itself, and hands other `http:` and `https:` addresses, `/api/` media links included, to `shell.openExternal`; `will-navigate` hands any address outside the dashboard's origin to `shell.openExternal` too.
+  An empty `window.open`, which a page opens before it knows the address, returns `null`, so the MCP sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
 - The page runs with context isolation and the sandbox on, and gets no Node or Electron API.
   Its preload, `desktop/preload.ts`, hands it only `window.ompDesktop`, the `DesktopBridge` of `src/shared/desktop-bridge.ts`, whose `badge` and `alert` send one IPC message each; see [Session notifications](notifications.md#session-notifications).
   Its `onTargetURL`, absent in an app built before it, receives the address of the link under the pointer or keyboard focus from the window's `update-target-url` event, and an empty string when the window blurs or navigates.
-  Its `signIn` asks the shell to load the sign-in address again, with the page's hash, when the page holds no token, such as a window that an older server signed in with a cookie.
+  Its `signIn`, which the page calls when it holds no token, asks the shell to load the dashboard again with the page's hash, so the preload writes the current token.
+  The main process reloads only when the token file now holds a token other than the one it last handed out, as after a rotation; otherwise a reload would loop, and the page stays on its notice that the server holds another token.
   The main process takes each one only from the window's own dashboard frame.
-- The session's permission handlers grant only notifications, clipboard writes, and full screen, and only to the dashboard's own page; every other request is refused.
+- The session's permission handlers grant only clipboard writes and full screen, and only to the dashboard's own page; every other request is refused.
+  Session notifications come from the main process, so the page needs no notification permission.
 - The app keeps its data, its localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
 - The packaged app, launched by Finder or at login, gets no shell environment, so `desktop/shell-env.ts` runs the login shell (`$SHELL -ilc`) once at startup and merges its environment into `process.env` before the server starts; omp, `gh`, and `git` are then found as in a terminal.

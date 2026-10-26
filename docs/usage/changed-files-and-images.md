@@ -3,7 +3,7 @@
 - A changes card sits directly above each live session's or subagent's composer, and below a past session's transcript.
   It has separate **Files** and **Images** sections, each shown only when it has items.
   Click a section's header to fold or unfold it.
-  Both start open, and the browser's localStorage keeps each choice across sessions and reloads.
+  Both start open, and the app keeps each choice across sessions and reloads.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows a file-type icon, the file's name, and its lines added and removed, which the header totals.
   When files share a name, muted parent folders distinguish them.
@@ -29,7 +29,7 @@
   Images you attached to your own prompts are left out, since the transcript shows them.
   Each thumbnail's tooltip names the agent and tool, the image's age, and its file path when it has one.
   Click one to see it large, with the tool, its file's name, and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
-  **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
+  **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in your default browser.
   New images show up while the agents run.
   Hover or focus a thumbnail to show its checkbox; once one image is selected, every checkbox shows and a click on a thumbnail selects it instead of opening it.
   The bar above the images counts the selection and sends it, in the order you selected it.

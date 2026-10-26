@@ -29,20 +29,14 @@ export function useSignIn(signIn: SignInState, refresh: () => Promise<void>, sta
 	}, [refresh, waitingUrl]);
 
 	const connect = async (): Promise<void> => {
-		// Opened during the click, so the browser lets it open; it goes to the provider once the server names the address.
-		// No tab (a blocked popup, or the desktop app, which denies empty windows): open the address itself instead.
-		const tab = window.open("", "_blank");
-		if (tab) tab.opener = null;
 		setStarting(true);
 		setStartError(null);
 		try {
 			const next = await start();
-			if (next?.phase !== "waiting") tab?.close();
-			else if (tab) tab.location.replace(next.url);
-			else window.open(next.url, "_blank", "noopener");
+			// The desktop app opens the address in the default browser.
+			if (next?.phase === "waiting") window.open(next.url, "_blank", "noopener");
 			await refresh();
 		} catch (err) {
-			tab?.close();
 			setStartError(errorText(err));
 		} finally {
 			setStarting(false);

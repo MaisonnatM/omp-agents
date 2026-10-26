@@ -13,7 +13,7 @@
   Each file shows its lines added and removed, a blue dot when the session's own calls changed it, and a letter for what git says happened: **A** added, **U** untracked, **M** modified, **D** deleted, and **S** for a file only the session's calls name, outside the checkout or no different from the base.
   A file outside the checkout shows under a `~` or `/` folder.
   ↓ and ↑ move to the next and previous file in the explorer's order, outside text fields, and open the folders above it; the explorer marks the file at the top of the diffs as you scroll them.
-  Drag the line between the explorer and the editor, or focus it and use the left and right arrow keys, to size the explorer between 180 and 560 px; double-click it to reset, and the browser's localStorage keeps the width.
+  Drag the line between the explorer and the editor, or focus it and use the left and right arrow keys, to size the explorer between 180 and 560 px; double-click it to reset, and the app keeps the width.
 - The editor shows the open file's path above it, with **Diff** and **File** to choose how; the choice is remembered.
   **Diff**, the default, lists every file's changes in one scroll, as GitHub does, each under a header that stays on top while its diff scrolls under it; click a file in the explorer to jump to it, and the chevron on its header to hide or show its diff.
   Each diff shows both line numbers, removed lines red and added lines green, and three unchanged lines around each change; click **Show N unchanged lines** to unfold a run.

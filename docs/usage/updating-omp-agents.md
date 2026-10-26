@@ -1,6 +1,6 @@
 # Updating omp-agents
 
-**Update dashboard**, from the bell's omp-agents notice, its toast, or the command menu, loads new commits into a dashboard that runs from a git checkout, in a browser tab, from `bun start`, or in `bun run desktop`.
+**Update dashboard**, from the bell's omp-agents notice, its toast, or the command menu, loads new commits into a dashboard that runs from a git checkout, from `bun start` or in `bun run desktop`.
 
 - It fast-forwards the checkout's branch to its branch on origin, and runs `bun install --frozen-lockfile` when `bun.lock` changed.
 - It never stashes, resets, or merges: a checkout on another branch than the server started on, with changes to tracked files, or with commits origin lacks stays as it was, and the notice or a toast says why.

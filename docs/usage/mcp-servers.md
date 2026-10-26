@@ -8,13 +8,13 @@
   A local server, which runs a command, says **Not checked**, as only an omp session starts it.
   A server whose config lives in another tool's file says **From** that tool, and the section does not change it.
   Linear, Slack, Google Calendar, and Gmail show the status that [Integrations](integrations.md) reads, and **Open** goes there to sign in or out.
-- **Connect** and **Reconnect** sign in the way omp's `/mcp reauth` does, in a new tab, and the row waits for you there as an integration's does.
+- **Connect** and **Reconnect** sign in the way omp's `/mcp reauth` does, in your default browser, and the row waits for you there as an integration's does.
   The **⋯** menu holds **Reconnect** and **Sign out** for a server omp holds a sign-in for, and **Disable** and **Remove** for a server in omp's own file.
   **Disable** keeps the server in `mcp.json` but stops new omp sessions loading it, as `/mcp disable` does, and **Enable** turns it back on.
   **Remove** asks first, then deletes the server from `mcp.json`, as `/mcp remove` does; omp keeps its sign-in.
 - **Discover** lists vetted remote servers, each its vendor's own, by category, with **Search** to filter them.
   Each card says whether the server signs in with OAuth or needs no sign-in.
-  **Add** writes the server to `mcp.json` under the card's name, such as `sentry`, or `sentry-2` when that name is taken; for an OAuth server it opens the vendor's sign-in in a new tab at once.
+  **Add** writes the server to `mcp.json` under the card's name, such as `sentry`, or `sentry-2` when that name is taken; for an OAuth server it opens the vendor's sign-in in your default browser at once.
   A card whose server is already installed, matched by its host, says **Added as** with the server's name instead.
 - **Add server** adds a remote server by its name and address, over streamable HTTP or the older SSE transport.
   The address must be `https://`, or `http://` on this computer.

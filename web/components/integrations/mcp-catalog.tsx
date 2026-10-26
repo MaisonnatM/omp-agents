@@ -22,7 +22,7 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 		await refresh();
 		return row;
 	};
-	// An OAuth entry opens its vendor's sign-in during the click, as Connect does; an open one is just added.
+	// An OAuth entry opens its vendor's sign-in once the server names it, as Connect does; an open one is just added.
 	const { starting, waitingUrl, failure, connect } = useSignIn(added?.signIn ?? null, refresh, async () => (await add()).signIn);
 
 	const addOpen = async (): Promise<void> => {

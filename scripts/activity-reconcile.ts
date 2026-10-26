@@ -4,20 +4,21 @@
  * `GET /api/activity?range=today` before and after and compares the difference with what the script did.
  * With `--agent` it keeps the browser's automation flags and checks that nothing was recorded.
  * It starts no server; point it at one you started, such as a smoke server.
- * Usage: `bun scripts/activity-reconcile.ts --url http://127.0.0.1:<port> --token <token> [--agent]`.
+ * Usage: `bun scripts/activity-reconcile.ts --url http://127.0.0.1:<port> [--token <token>] [--agent]`; the token
+ * defaults to the one in the token file.
  */
 import { parseArgs } from "node:util";
 import { chromium, type Page } from "playwright-core";
 import { decodeActivity, type ActivityRead, featureId } from "../src/shared/activity";
-import { TOKEN_STORAGE_KEY } from "../src/shared/access";
+import { scriptToken, signIn } from "./served";
 
 const { values } = parseArgs({ options: { url: { type: "string" }, token: { type: "string" }, agent: { type: "boolean", default: false } } });
-if (!values.url || !values.token) {
-	console.error("usage: bun scripts/activity-reconcile.ts --url http://127.0.0.1:<port> --token <token> [--agent]");
+if (!values.url) {
+	console.error("usage: bun scripts/activity-reconcile.ts --url http://127.0.0.1:<port> [--token <token>] [--agent]");
 	process.exit(2);
 }
 const base = values.url.replace(/\/$/, "");
-const token = values.token;
+const token = scriptToken(values.token);
 /** Longer than the recorder's 10-second flush. */
 const FLUSH_WAIT_MS = 12_000;
 
@@ -96,7 +97,7 @@ const before = await readActivity();
 const browser = await chromium.launch(values.agent ? {} : { ignoreDefaultArgs: ["--enable-automation"], args: ["--disable-blink-features=AutomationControlled"] });
 try {
 	const context = await browser.newContext();
-	await context.addInitScript(([key, value]) => localStorage.setItem(key!, value!), [TOKEN_STORAGE_KEY, token]);
+	await signIn(context, token);
 	await script(await context.newPage());
 } finally {
 	await browser.close();

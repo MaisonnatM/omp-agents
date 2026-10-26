@@ -1,7 +1,7 @@
 # User notes
 
 `UserNoteList` holds notes with a title, Markdown body, optional top-level todo id, optional source session id, and creation and update timestamps.
-`applyUserNote` is the pure reducer shared by the browser's optimistic state and the server's file.
+`applyUserNote` is the pure reducer shared by the page's optimistic state and the server's file.
 Title and body edits move a note first and update its timestamp.
 Linking a todo with `set-todo` does not change content order or timestamps.
 Removal and indexed restore support the page's Undo toast.
@@ -11,7 +11,7 @@ Removal and indexed restore support the page's Undo toast.
 `parseNoteChange` validates changes at the socket and inbox boundaries.
 An unreadable file moves aside rather than being overwritten.
 The `ListRegistry` connects `user-note` client changes to `user-notes` snapshots on the roster topic.
-Every browser receives the same persisted list.
+Every page receives the same persisted list.
 
 The `user_note` extension reads the file but never writes it.
 It atomically renames each add or append request into `note-inbox/`.
