@@ -1,6 +1,6 @@
 /** The git checkout a directory is in, and the worktree a new session's branch runs in. */
 import { existsSync } from "node:fs";
-import { realpath } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { run, runChecked } from "./proc";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "./shared/git";
@@ -75,6 +75,8 @@ export interface WorktreeAt {
 	top: string;
 	/** The git directory every worktree of the repository shares. */
 	common: string;
+	/** The worktree's own git directory, `common` in the main checkout. */
+	gitDir: string;
 	/** Whether it is a linked worktree rather than the repository's main checkout. */
 	linked: boolean;
 	/** The branch it has checked out, `null` when HEAD is detached. */
@@ -87,10 +89,10 @@ export async function worktreeAt(dir: string): Promise<WorktreeAt | null> {
 		run(["git", "-C", dir, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir", "--git-dir"]),
 		run(["git", "-C", dir, "symbolic-ref", "--quiet", "HEAD"]),
 	]);
-	const [top, common, own] = stdout.trim().split("\n");
-	if (code !== 0 || !top || !common || !own) return null;
+	const [top, common, gitDir] = stdout.trim().split("\n");
+	if (code !== 0 || !top || !common || !gitDir) return null;
 	const ref = head.stdout.trim();
-	return { top, common, linked: own !== common, branch: head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null };
+	return { top, common, gitDir, linked: gitDir !== common, branch: head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null };
 }
 
 /** What a worktree has checked out now, and the checkouts its HEAD reflog records, newest first. */
@@ -135,6 +137,72 @@ export async function defaultBranchOf(dir: string): Promise<string | null> {
 	const { code, stdout } = await run(["git", "-C", dir, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
 	const ref = stdout.trim();
 	return code === 0 && ref.startsWith("origin/") ? ref.slice("origin/".length) : null;
+}
+
+/** What git says of the checkouts directories are in, as `worktreeAt`, `headHistory`, and `defaultBranchOf` answer. */
+export interface CheckoutReads {
+	worktreeAt(dir: string): Promise<WorktreeAt | null>;
+	headHistory(dir: string): Promise<HeadHistory | null>;
+	defaultBranchOf(dir: string): Promise<string | null>;
+}
+
+/** The reftable backend keeps every ref, HEAD and the reflog included, in the tables this file lists. */
+const REFTABLE = join("reftable", "tables.list");
+
+/** Each file's path, inode, modification time, and size, `-` for one that is missing: git replaces a ref file whole and appends to a reflog. */
+async function stampOf(paths: readonly string[]): Promise<string> {
+	const stamps = await Promise.all(paths.map(path => stat(path, { bigint: true }).then(s => `${path}=${s.ino}:${s.mtimeNs}:${s.size}`, () => `${path}=-`)));
+	return stamps.join("\n");
+}
+
+interface Kept<T> {
+	/** `stampOf` of the files git read, taken before it answered; `null` when none was, so the next ask asks git again. */
+	stamp: string | null;
+	answer: T;
+}
+
+const headFiles = (at: WorktreeAt): string[] => [join(at.gitDir, "HEAD"), join(at.gitDir, REFTABLE)];
+
+/**
+ * `CheckoutReads` for directories asked about again and again: each answer is reused while the files git read for it
+ * are unchanged, so a refresh costs a few `stat`s and no `git` process until a checkout, a commit, or a `remote set-head`.
+ * A directory outside git is asked again every time, since no file tells when it joins a repository.
+ */
+export class CachedCheckouts implements CheckoutReads {
+	readonly #worktrees = new Map<string, Kept<WorktreeAt>>();
+	readonly #histories = new Map<string, Kept<HeadHistory | null>>();
+	readonly #defaults = new Map<string, Kept<string | null>>();
+
+	worktreeAt = async (dir: string): Promise<WorktreeAt | null> => {
+		const kept = this.#worktrees.get(dir);
+		const stamp = kept ? await stampOf(headFiles(kept.answer)) : null;
+		if (kept && stamp === kept.stamp) return kept.answer;
+		const at = await worktreeAt(dir);
+		if (at) this.#worktrees.set(dir, { stamp, answer: at });
+		else this.#worktrees.delete(dir);
+		return at;
+	};
+
+	headHistory = (dir: string): Promise<HeadHistory | null> =>
+		this.#follow(this.#histories, dir, at => [...headFiles(at), join(at.gitDir, "logs", "HEAD")], headHistory);
+
+	defaultBranchOf = (dir: string): Promise<string | null> =>
+		this.#follow(this.#defaults, dir, at => [join(at.common, "refs", "remotes", "origin", "HEAD"), join(at.common, REFTABLE)], defaultBranchOf);
+
+	/** `ask(dir)`, reused while the files `filesOf` names in `dir`'s checkout are unchanged; `null` outside git. */
+	async #follow<T>(kept: Map<string, Kept<T | null>>, dir: string, filesOf: (at: WorktreeAt) => string[], ask: (dir: string) => Promise<T | null>): Promise<T | null> {
+		const at = this.#worktrees.get(dir)?.answer ?? (await this.worktreeAt(dir));
+		if (!at) {
+			kept.delete(dir);
+			return null;
+		}
+		const stamp = await stampOf(filesOf(at));
+		const entry = kept.get(dir);
+		if (entry?.stamp === stamp) return entry.answer;
+		const answer = await ask(dir);
+		kept.set(dir, { stamp, answer });
+		return answer;
+	}
 }
 
 /** The checkout `cwd` is in, `null` when it is in none. */

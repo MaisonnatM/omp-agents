@@ -1,9 +1,28 @@
 /** Syntax colors, line by line, from the `lowlight` grammars, for a file shown in the changes view and a fenced code block in a message. */
-import type { RootContent } from "hast";
-import { common, createLowlight } from "lowlight";
+import type { Root, RootContent } from "hast";
 import type { DiffRow } from "../src/shared/changes";
+import { loadedOnce, useLoaded } from "./loaded-once";
 
-const lowlight = createLowlight(common);
+/** What highlighting reads of a `lowlight` instance. */
+interface Grammars {
+	registered(name: string): boolean;
+	highlight(language: string, value: string): Root;
+}
+
+const NO_GRAMMARS: Grammars = { registered: () => false, highlight: () => ({ type: "root", children: [] }) };
+
+/** The grammars, a chunk of their own: until they land, every text highlights as uncolored lines. */
+const grammars = loadedOnce<Grammars>(() =>
+	import("lowlight").then(
+		({ common, createLowlight }) => createLowlight(common),
+		() => NO_GRAMMARS,
+	),
+);
+
+export const loadGrammars = (): Promise<unknown> => grammars.load();
+
+/** Whether the grammars have loaded, starting their load; a component that highlights reads it, so it renders again in color once they land. */
+export const useGrammars = (): boolean => useLoaded(grammars) !== null;
 
 /** Names no grammar registers as an alias: file extensions, which a fence also uses. */
 const LANGUAGE_OF: Record<string, string> = { tsx: "typescript", mts: "typescript", cts: "typescript", jsx: "javascript", mjs: "javascript", cjs: "javascript", jsonl: "json" };
@@ -20,9 +39,11 @@ export interface Token {
  * gets uncolored lines.
  */
 export function highlightLines(text: string, language: string): Token[][] {
+	const lowlight = grammars.value ?? NO_GRAMMARS;
 	const name = language.toLowerCase();
 	// A file named `x.constructor` must not reach the object's prototype.
-	const grammar = Object.hasOwn(LANGUAGE_OF, name) ? LANGUAGE_OF[name]! : lowlight.registered(name) ? name : null;
+	const alias = Object.hasOwn(LANGUAGE_OF, name) ? LANGUAGE_OF[name]! : name;
+	const grammar = lowlight.registered(alias) ? alias : null;
 	const lines: Token[][] = [[]];
 	const add = (className: string, value: string) => {
 		value.split("\n").forEach((part, index) => {

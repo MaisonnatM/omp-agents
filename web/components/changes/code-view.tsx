@@ -3,7 +3,7 @@ import { Fragment, useMemo, useRef, useState } from "react";
 import type { ChangedFileText, DiffRow } from "../../../src/shared/changes";
 import type { DiffSide } from "../../../src/shared/review-drafts";
 import { type ChangeBlock, changeBlocks, type FileLine, fileLines, foldDiff } from "../../changes-model";
-import { highlightRows, type Token } from "../../code-highlight";
+import { highlightRows, type Token, useGrammars } from "../../code-highlight";
 import { useRead } from "../../reads";
 import { withoutWhitespaceChanges } from "../../diff-options";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,8 @@ function useHighlightedRead({ url, version }: CodeViewProps, ignoreWhitespace = 
 	// Keyed on the rows' text, so a read that brings the same text again keeps its colors instead of highlighting anew.
 	const text = rows?.map(row => `${row.sign}${row.text}`).join("\n") ?? null;
 	const path = file?.path ?? "";
-	const tokens = useMemo(() => (rows ? highlightRows(rows, path) : []), [text, path]);
+	const grammars = useGrammars();
+	const tokens = useMemo(() => (rows ? highlightRows(rows, path) : []), [text, path, grammars]);
 	const notice = error ?? (!file ? "Reading…" : !file.rows ? file.note : file.rows.length === 0 ? "No difference from the base." : null);
 	return { rows: notice === null ? rows : null, tokens, notice, failed: error !== null };
 }

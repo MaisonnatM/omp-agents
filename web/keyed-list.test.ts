@@ -14,6 +14,11 @@ describe("applyDelta", () => {
 		expect(next[1]).not.toBe(c);
 	});
 
+	test("a key both removed and changed moves to the end, in the order the change lists it", () => {
+		const a = row("a", 1);
+		expect(applyDelta([a, row("b", 1), row("c", 1)], false, [row("x", 1), row("b", 1), row("c", 1)], key, ["b", "c"])).toEqual([a, row("x", 1), row("b", 1), row("c", 1)]);
+	});
+
 	test("reset replaces the list", () => {
 		expect(applyDelta([row("a", 1)], true, [row("b", 1)], key, [])).toEqual([row("b", 1)]);
 	});

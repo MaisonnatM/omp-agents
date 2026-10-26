@@ -20,6 +20,8 @@
 - `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the `Authorization: Bearer` token, the socket's `bearer.<token>` subprotocol, and the media key), `refuseUntil`, which holds the dashboard socket back until the sessions are reattached, and the JSON answer helpers.
   A `?token=` is no credential on `/api/` or the socket; only `/` reads it, to answer the sign-in page that keeps the token in the page's `localStorage`.
   `src/server/auth.ts` keeps the token file and derives the media key and the desktop shell's `/api/hello` proof from the token, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it and the sign-in page.
+  `index.html` is `no-store`, and every other file of the build, which Bun names by the hash of its content, `private, max-age=31536000, immutable`, so a reload reads only `index.html` and a new build's renamed chunks.
+  The server sends the files uncompressed, since it listens only on `127.0.0.1`.
   `src/shared/access.ts` holds the storage keys and socket subprotocol that the page and the server share.
 - `src/server/routes.ts`: the `/api/` endpoints, in groups (sessions, integrations, providers, calendar, Gmail, pull requests, files, todos, the dashboard's own update, settings sync, and session processes), each handed only its part of `RouteEnv`.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.

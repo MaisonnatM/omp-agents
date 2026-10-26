@@ -19,7 +19,7 @@
  */
 import { access } from "node:fs/promises";
 import { resolve } from "node:path";
-import { branchAt, defaultBranchOf, type HeadHistory, type WorktreeAt } from "./git";
+import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
@@ -487,28 +487,26 @@ export class SessionFactsIndex {
 	/** Each directory's default branch as `origin/HEAD` last named it, read again whenever a session working there writes; `null` while git names none. */
 	readonly #defaultBranches = new Map<string, string | null>();
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
-	readonly #worktreeAt: (dir: string) => Promise<WorktreeAt | null>;
-	readonly #headHistory: (dir: string) => Promise<HeadHistory | null>;
+	readonly #git: CheckoutReads;
 	readonly #ownFileFolds: readonly OwnFileFolds[];
 	readonly #branchPullRequest: (repo: Repo, branch: string) => Promise<PullRequest | null>;
 	#chain: Promise<unknown> = Promise.resolve();
+	/** The refresh queued behind the running one, which a later call hands its newer list to instead of queueing another. */
+	#queued: { sessions: readonly ListedSession[]; run: Promise<boolean> } | null = null;
 
 	/**
-	 * `repoOf`: the GitHub repository `origin` names in a working directory. `worktreeAt`: the git worktree a directory is in.
-	 * `headHistory`: the branch and HEAD reflog checkouts of the worktree a directory is in.
+	 * `repoOf`: the GitHub repository `origin` names in a working directory. `git`: what git says of the checkout a directory is in.
 	 * `ownFileFolds`: other folds of each session's own file, fed from the index's read of it.
 	 * `branchPullRequest`: the newest open or merged PR whose head is a branch, as GitHub has it now; none when omitted.
 	 */
 	constructor(
 		repoOf: (cwd: string) => Promise<Repo | null>,
-		worktreeAt: (dir: string) => Promise<WorktreeAt | null>,
-		headHistory: (dir: string) => Promise<HeadHistory | null>,
+		git: CheckoutReads,
 		ownFileFolds: readonly OwnFileFolds[] = [],
 		branchPullRequest: (repo: Repo, branch: string) => Promise<PullRequest | null> = async () => null,
 	) {
 		this.#repoOf = repoOf;
-		this.#worktreeAt = worktreeAt;
-		this.#headHistory = headHistory;
+		this.#git = git;
 		this.#ownFileFolds = ownFileFolds;
 		this.#branchPullRequest = branchPullRequest;
 	}
@@ -532,12 +530,22 @@ export class SessionFactsIndex {
 
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
-	 * Resolves whether any session's pull requests, Linear issues, /ship stage, worktree, or branch changed. Refreshes run one at a time.
+	 * Resolves whether any session's pull requests, Linear issues, /ship stage, worktree, or branch changed.
+	 * Refreshes run one at a time, and the calls made while one runs share a single next refresh of the newest list.
 	 */
 	refresh(sessions: readonly ListedSession[]): Promise<boolean> {
-		const run = this.#chain.then(() => this.#refresh(sessions));
-		this.#chain = run.catch(() => {});
-		return run;
+		if (this.#queued) {
+			this.#queued.sessions = sessions;
+			return this.#queued.run;
+		}
+		const queued: { sessions: readonly ListedSession[]; run: Promise<boolean> } = { sessions, run: Promise.resolve(false) };
+		queued.run = this.#chain.then(() => {
+			this.#queued = null;
+			return this.#refresh(queued.sessions);
+		});
+		this.#queued = queued;
+		this.#chain = queued.run.catch(() => {});
+		return queued.run;
 	}
 
 	/** Which branch heads which PR in `repo`, from the pull request list's PRs of it. Returns whether any session's pull requests, or the PR its branch heads, changed. */
@@ -611,23 +619,23 @@ export class SessionFactsIndex {
 		/** Sessions whose bash calls named a new `cwd`, or whose worktree is gone: the others keep theirs without asking git. */
 		const moved = scans.filter(scan => scan.moved).map(scan => scan.session);
 		// Sessions share directories, so each is asked about once per refresh, and a few `git` calls run at a time.
-		const worktreeAt = once(this.#worktreeAt);
+		const worktreeAt = once(dir => this.#git.worktreeAt(dir));
 		const repoOf = once(this.#repoOf);
-		const historyOf = once(this.#headHistory);
+		const historyOf = once(dir => this.#git.headHistory(dir));
 		const worktrees = await mapLimit(moved, SCAN_PARALLEL, session => workingWorktree(session.cwd, session.workDirs, worktreeAt));
 		moved.forEach((session, i) => {
 			if (worktrees[i] === session.worktree) return;
 			session.worktree = worktrees[i]!;
 			changed = true;
 		});
-		// A session that wrote to its transcript may have switched branch since: two `git` calls per writing session's directory per refresh, and two more for a main checkout's HEAD reflog.
+		// A session that wrote to its transcript may have switched branch since: `git` reads its directory's HEAD again, and a main checkout's HEAD reflog, once a checkout changed either.
 		// The answers stay here until `#resolve` publishes each branch whole, since a roster push can read `branch` during the awaits below.
 		const reads = await mapLimit(scans, SCAN_PARALLEL, ({ session, writtenAt }) => gitBranch(workDirOf(session), writtenAt, worktreeAt, historyOf));
 		const branches = new Map(scans.map(({ session }, i) => [session, reads[i]!]));
 		const gitOf = (session: SessionScan): GitBranch | null => (branches.has(session) ? branches.get(session)! : session.branch);
-		// `origin/HEAD` may have moved too: one more `git` call per writing session's directory with a branch.
+		// `origin/HEAD` may have moved too, which `git` reads again for each writing session's directory with a branch once it changed.
 		const dirs = [...new Set(touched.flatMap(session => (gitOf(session) ? [workDirOf(session)] : [])))];
-		const defaults = await mapLimit(dirs, SCAN_PARALLEL, defaultBranchOf);
+		const defaults = await mapLimit(dirs, SCAN_PARALLEL, dir => this.#git.defaultBranchOf(dir));
 		const redirected = new Set<string>();
 		dirs.forEach((dir, i) => {
 			if ((this.#defaultBranches.get(dir) ?? null) === defaults[i]) return;

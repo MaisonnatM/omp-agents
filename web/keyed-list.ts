@@ -1,7 +1,7 @@
 /**
- * Applies a list message from the server: `reset` replaces the list with `changed`; otherwise each of `changed`
- * replaces the entry with its key in place or joins at the end, and the entries keyed in `removed` leave. Entries that
- * did not change stay the same objects, so what renders from them can skip the update.
+ * Applies a list message from the server: `reset` replaces the list with `changed`; otherwise the entries keyed in
+ * `removed` leave first, then each of `changed` replaces the entry with its key in place or joins at the end, so a key
+ * in both moves to the end. Entries that did not change stay the same objects, so what renders from them can skip the update.
  */
 export function applyDelta<T>(prev: readonly T[], reset: boolean, changed: readonly T[], keyOf: (entry: T) => string, removed: readonly string[]): T[] {
 	if (reset) return [...changed];

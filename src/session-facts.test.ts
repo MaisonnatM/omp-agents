@@ -2,9 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { headHistory, worktreeAt } from "./git";
+import { CachedCheckouts, type CheckoutReads } from "./git";
 import { runChecked } from "./proc";
 import { parseShipProgress, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
+
+/** No checkout anywhere, for tests that need no git. */
+const NO_GIT: CheckoutReads = { worktreeAt: async () => null, headHistory: async () => null, defaultBranchOf: async () => null };
 
 const toolCall = (id: string, name: string, args: object) =>
 	JSON.stringify({
@@ -221,7 +224,7 @@ describe("SessionFactsIndex", () => {
 		mkdirSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child"), { recursive: true });
 		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child", "Grandchild.jsonl"), `${line(2)}\n`);
 
-		const index = new SessionFactsIndex(async () => null, async () => null, async () => null);
+		const index = new SessionFactsIndex(async () => null, NO_GIT);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 		expect(await index.refresh(listed(1))).toBe(true);
 		expect(index.factsOf(session).pullRequests.map(pr => pr.number)).toEqual([1, 2]);
@@ -246,7 +249,7 @@ describe("SessionFactsIndex", () => {
 		const child = join(dir, "2026-10-01T00-00-00-000Z_ship", "Child");
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "sub.jsonl"), `${state("merged")}\n`);
-		const index = new SessionFactsIndex(async () => null, async () => null, async () => null);
+		const index = new SessionFactsIndex(async () => null, NO_GIT);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -267,7 +270,7 @@ describe("SessionFactsIndex", () => {
 		const child = join(dir, "2026-10-01T00-00-00-000Z_tickets");
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "Sub.jsonl"), `${read("ENG-2")}\n${read("ENG-1")}\n`);
-		const index = new SessionFactsIndex(async () => null, async () => null, async () => null);
+		const index = new SessionFactsIndex(async () => null, NO_GIT);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -291,8 +294,7 @@ describe("SessionFactsIndex", () => {
 				asked.push(cwd);
 				return { owner: "acme", repo: "webapp" };
 			},
-			async () => null,
-			async () => null,
+			NO_GIT,
 		);
 
 		expect(
@@ -328,7 +330,7 @@ describe("SessionFactsIndex", () => {
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "sub.jsonl"), `${ran(join(parent, "app-done"))}\n`);
 		writeFileSync(session, `${ran("../../app-done")}\n${ran("../../app-wip")}\n`);
-		const index = new SessionFactsIndex(async () => null, worktreeAt, headHistory);
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
 		const listed = (modifiedAt: number) => [{ path: session, cwd: join(main, "src"), modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -365,7 +367,7 @@ describe("SessionFactsIndex", () => {
 		];
 		const heads = ["wip", "done", "main", "next"].map((head, i) => ({ ...repo, number: i + 1, head }));
 		const linked = (number: number) => [{ ...repo, number, link: "worked" as const }];
-		const index = new SessionFactsIndex(async () => repo, worktreeAt, headHistory);
+		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts());
 
 		await index.refresh(listed(1));
 		expect(index.factsOf(inWorktree).branch).toEqual({ name: "wip", linked: true, defaultBranch: "main", pullRequest: null });
@@ -391,7 +393,7 @@ describe("SessionFactsIndex", () => {
 			null,
 		]);
 
-		const offGitHub = new SessionFactsIndex(async () => null, worktreeAt, headHistory);
+		const offGitHub = new SessionFactsIndex(async () => null, new CachedCheckouts());
 		await offGitHub.refresh(listed(1));
 		offGitHub.learnHeads(repo, heads);
 		expect(offGitHub.factsOf(inWorktree).pullRequests).toEqual([]);
@@ -411,7 +413,7 @@ describe("SessionFactsIndex", () => {
 		const repo = { owner: "acme", repo: "webapp" };
 		let heading: { owner: string; repo: string; number: number } | null = null;
 		const asked: string[] = [];
-		const index = new SessionFactsIndex(async () => repo, worktreeAt, headHistory, [], async (at, branch) => {
+		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts(), [], async (at, branch) => {
 			asked.push(`${at.owner}/${at.repo}:${branch}`);
 			return heading;
 		});
@@ -456,8 +458,7 @@ describe("SessionFactsIndex", () => {
 				asked.push(cwd);
 				return repo;
 			},
-			worktreeAt,
-			headHistory,
+			new CachedCheckouts(),
 		);
 
 		await switchAt(10, "-c", "feature");
@@ -528,8 +529,7 @@ describe("SessionFactsIndex", () => {
 				asked.resolve();
 				return gate.promise;
 			},
-			worktreeAt,
-			headHistory,
+			new CachedCheckouts(),
 		);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: join(parent, "app-wip"), modifiedAt }];
 
@@ -572,7 +572,7 @@ describe("SessionFactsIndex", () => {
 			].join("\n")}\n`,
 		);
 		const repo = { owner: "acme", repo: "webapp" };
-		const index = new SessionFactsIndex(async () => repo, worktreeAt, headHistory);
+		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts());
 
 		await index.refresh([{ path: session, cwd: main, modifiedAt: 1 }]);
 		index.learnHeads(repo, ["feature", "wip", "main", "done"].map((head, i) => ({ ...repo, number: i + 1, head })));

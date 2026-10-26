@@ -161,7 +161,8 @@ export class Transcript {
 	#latest = 0;
 	/** The latest time a file message got. The file holds messages in the order the agent took them. */
 	#fileLatest = 0;
-	#reordered = false;
+	/** Where the first item that went ahead of items already there landed since the last {@link takeDisplaced}; `null` for none. */
+	#displacedFrom: number | null = null;
 	#starting: UserItem | null = null;
 	#removed: string[] = [];
 
@@ -171,14 +172,14 @@ export class Transcript {
 	}
 
 	/**
-	 * Whether an item had to go ahead of items already returned since the last call,
-	 * so upserts alone would misplace it. omp writes a fresh session's first prompt
-	 * only together with the first reply, after that reply has streamed.
+	 * The items from the first one that had to go ahead of items already there, since the last call, to the end, the
+	 * starting prompt included; none when every item joined at the end. Upserts alone would misplace them: omp writes a
+	 * fresh session's first prompt only together with the first reply, after that reply has streamed.
 	 */
-	takeReordered(): boolean {
-		const reordered = this.#reordered;
-		this.#reordered = false;
-		return reordered;
+	takeDisplaced(): Item[] {
+		const from = this.#displacedFrom;
+		this.#displacedFrom = null;
+		return from === null ? [] : this.items().slice(from);
 	}
 
 	/** The ids of the items gone since the last call. */
@@ -288,7 +289,7 @@ export class Transcript {
 
 	/**
 	 * Tool results reach the file as soon as they exist; prompts and replies may not (see
-	 * {@link takeReordered}). Collab prompts stay file-only: their file entry carries no
+	 * {@link takeDisplaced}). Collab prompts stay file-only: their file entry carries no
 	 * message timestamp to merge on.
 	 */
 	#applyLive(message: unknown, streaming: boolean): Item[] {
@@ -399,17 +400,22 @@ export class Transcript {
 	#upsert(item: Item): Item[] {
 		const prev = this.#items.get(item.id);
 		if (prev && sameItem(prev, item)) return [];
-		this.#items.set(item.id, item);
+		if (prev || this.#now >= this.#latest) this.#items.set(item.id, item);
+		else this.#insert(item);
 		if (!prev) {
 			this.#times.set(item.id, this.#now);
-			if (this.#now < this.#latest) {
-				this.#reordered = true;
-				const times = this.#times;
-				// Stable: items with the same time keep their first-seen order.
-				this.#items = new Map([...this.#items].sort(([a], [b]) => (times.get(a) ?? 0) - (times.get(b) ?? 0)));
-			}
 			this.#latest = Math.max(this.#latest, this.#now);
 		}
 		return [item];
+	}
+
+	/** Put a new item older than the latest after the last item at or before its time, so items with the same time keep their first-seen order. */
+	#insert(item: Item): void {
+		const entries = [...this.#items];
+		let at = entries.length;
+		while (at > 0 && (this.#times.get(entries[at - 1]![0]) ?? 0) > this.#now) at--;
+		entries.splice(at, 0, [item.id, item]);
+		this.#items = new Map(entries);
+		this.#displacedFrom = Math.min(this.#displacedFrom ?? at, at);
 	}
 }

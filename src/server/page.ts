@@ -41,6 +41,8 @@ export const loadPage = async (): Promise<Page> => (prebuiltPageDir ? readPage(p
 export const pageBuild = async (page: Page): Promise<string> => Bun.hash(await (page.get("/index.html")?.text() ?? "")).toString(36);
 
 const NO_STORE = { "cache-control": "no-store" };
+/** Bun names every file of the build but `index.html` by the hash of its content, so a browser keeps one until a build renames it. */
+const IMMUTABLE = { "cache-control": "private, max-age=31536000, immutable" };
 
 /** Removes the cookie that older servers signed browsers in with: every port of the host was sent it, so it must not linger. */
 const FORGET_COOKIE = { "set-cookie": "omp-agents-token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict" };
@@ -78,7 +80,8 @@ export function servePage(req: Request, guards: Guards, token: string, page: Rea
 	if (url.pathname !== "/") {
 		const asset = page.get(url.pathname);
 		if (!fetchSiteAllowed(site, false)) return new Response("forbidden origin", { status: 403 });
-		return asset ? new Response(asset) : new Response("not found", { status: 404 });
+		if (!asset) return new Response("not found", { status: 404 });
+		return new Response(asset, { headers: url.pathname === "/index.html" ? NO_STORE : IMMUTABLE });
 	}
 	if (url.searchParams.has("token")) return guards.login(req) && fetchSiteAllowed(site, true) ? signInPage(token) : html(401, SIGN_IN);
 	const navigation = req.headers.get("sec-fetch-mode") === "navigate" && req.headers.get("sec-fetch-dest") === "document";

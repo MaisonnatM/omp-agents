@@ -12,7 +12,7 @@
   Choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range; **Today** starts at local midnight.
   Each range's last result is cached in your browser, so switching back, reopening the page, or reloading shows it while a fresh read runs.
   A failed refresh keeps the cached result and shows the error.
-  Refreshes run only while **Analytics** is open, every two seconds during indexing and every 30 seconds otherwise.
+  Refreshes run only while **Analytics** is open, every five seconds during indexing and every 30 seconds otherwise.
   While a range with no cached result loads, the previous range's numbers remain visible but dimmed.
   It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
   The cost is omp's API-equivalent list price, not what your subscription bills.

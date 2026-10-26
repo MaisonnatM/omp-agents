@@ -8,7 +8,10 @@ import { guardsFor } from "./http";
 import { servePage } from "./page";
 
 const TOKEN = "A".repeat(43);
-const page = new Map([["/index.html", new Blob(["<p>app</p>"])]]);
+const page = new Map([
+	["/index.html", new Blob(["<p>app</p>"])],
+	["/chunk-abc123.js", new Blob(["app()"], { type: "text/javascript;charset=utf-8" })],
+]);
 const guards = guardsFor(4317, TOKEN);
 const request = (path: string, headers: Record<string, string> = {}): Request =>
 	new Request(`http://127.0.0.1:4317${path}`, { headers: { host: "127.0.0.1:4317", ...headers } });
@@ -183,6 +186,14 @@ describe("the page", () => {
 		const location = { search: `?token=${TOKEN}`, hash: "#session/abc", replace: (to: string) => stored.set("replaced", to) };
 		new Function("localStorage", "location", script)({ setItem: (key: string, value: string) => stored.set(key, value) }, location);
 		expect(Object.fromEntries(stored)).toEqual({ [TOKEN_STORAGE_KEY]: TOKEN, [MEDIA_KEY_STORAGE_KEY]: mediaKey(TOKEN), replaced: "/#session/abc" });
+	});
+
+	test("a browser keeps an asset, which its content names, but never `index.html`, which names the assets of the build", () => {
+		const asset = serve("/chunk-abc123.js", { "sec-fetch-site": "same-origin" });
+		expect(asset.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+		expect(asset.headers.get("content-type")).toBe("text/javascript;charset=utf-8");
+		expect(serve("/index.html", { "sec-fetch-site": "same-origin" }).headers.get("cache-control")).toBe("no-store");
+		expect(serve("/", { "sec-fetch-site": "same-origin" }).headers.get("cache-control")).toBe("no-store");
 	});
 
 	test("another site cannot sign in or fetch the page, but a link click lands on the app", async () => {
