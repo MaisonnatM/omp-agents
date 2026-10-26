@@ -4,7 +4,7 @@ import type { Server, ServerWebSocket } from "bun";
 import { errorText } from "./json";
 import { ompVersion } from "./omp/install";
 import { displayPath, tokenFile } from "./paths";
-import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
+import { HOSTNAME, listeningLine, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Dashboard } from "./server/dashboard";
 import { fail, guardsFor, refuseUntil } from "./server/http";
@@ -75,7 +75,7 @@ try {
 			if (pathname === "/ws/terminal") return upgradeTerminal(req, srv);
 			if (pathname === "/api/hello") return guards.hello(req);
 			if (pathname.startsWith("/api/")) return guards.admit(req) ?? fail(404, `No ${req.method} ${pathname}`);
-			return servePage(req, guards, token, page);
+			return servePage(req, guards, page);
 		},
 		websocket: {
 			// A prompt's images travel as base64 in one message: MAX_PROMPT_IMAGE_BYTES of them, a third more as base64.
@@ -106,7 +106,6 @@ process.on("exit", () => dashboard.exited());
 await dashboard.start(server);
 console.log(listeningLine(PORT, ompVersion));
 console.log(`Serving ${describeServed(served)}`);
-console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
 
 /**

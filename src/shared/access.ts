@@ -4,7 +4,7 @@
  * the host is sent.
  */
 
-/** Where the page keeps the access token, which `/?token=` stores; `src/server/page.ts` writes the script that does. */
+/** Where the page keeps the access token, which the desktop window's preload stores from `pageAccess` in `src/server/auth.ts`. */
 export const TOKEN_STORAGE_KEY = "omp-agents.token";
 
 /** Where the page keeps the media key, which tags that load from `/api/` send as `?key=`, since they send no header. */
