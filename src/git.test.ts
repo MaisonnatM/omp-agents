@@ -28,6 +28,20 @@ async function repo(): Promise<{ parent: string; main: string }> {
 	return { parent, main };
 }
 
+test("a test's git ignores the developer's own git config, so a commit neither signs through their gpg-agent nor takes their name", () => {
+	const dir = realpathSync(mkdtempSync(join(tmpdir(), "omp-agents-git-")));
+	dirs.push(dir);
+	const sync = (...args: string[]): string => {
+		const result = Bun.spawnSync(["git", ...args], { cwd: dir });
+		expect(result.stderr.toString()).toBe("");
+		return result.stdout.toString();
+	};
+	sync("init", "-q", "-b", "main");
+	sync("commit", "-q", "--allow-empty", "-m", "one");
+	expect(sync("log", "-1", "--format=%G?|%an")).toBe("N|omp-agents tests\n");
+	expect(sync("config", "--list", "--show-scope")).not.toMatch(/^(global|system)\t/m);
+});
+
 describe("worktreeAt", () => {
 	test("tells a linked worktree from the main checkout, with the branch each has checked out, none while HEAD is detached", async () => {
 		const { parent, main } = await repo();
