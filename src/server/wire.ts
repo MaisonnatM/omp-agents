@@ -356,6 +356,8 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		return sessionIds.every(isNonEmpty) ? { ok: { t: "resume-all", reqId, sessionIds: [...new Set(sessionIds)] } } : null;
 	},
 	"dismiss-interrupted": ({ sessionId }) => (isNonEmpty(sessionId) ? { ok: { t: "dismiss-interrupted", sessionId } } : null),
+	"rename-session": ({ sessionId, title }) =>
+		isNonEmpty(sessionId) && typeof title === "string" && title.trim() ? { ok: { t: "rename-session", sessionId, title: title.trim() } } : null,
 	end: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "end", instanceId } } : null),
 	read: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "read", instanceId } } : null),
 	"list-models": ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "list-models", instanceId } } : null),

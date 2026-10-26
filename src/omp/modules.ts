@@ -717,6 +717,8 @@ export interface OmpSessionManager {
 	appendCustomMessageEntry(customType: string, content: string, display: boolean, details?: unknown, attribution?: "user" | "agent"): string;
 	moveTo(cwd: string): Promise<void>;
 	setAdditionalDirectories(directories: string[]): Promise<void>;
+	/** `false` when omp keeps the old title: a `"user"` title outranks an `"auto"` one, and a title of only whitespace is none. */
+	setSessionName(name: string, source: "auto" | "user"): Promise<boolean>;
 	getSessionFile(): string | undefined;
 	putBlobSync(data: Buffer): { ref: string };
 	flush(): Promise<void>;

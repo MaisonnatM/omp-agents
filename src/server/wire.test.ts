@@ -371,6 +371,12 @@ describe("parseClientMsg", () => {
 		expect(msg({ ...edit, text: "  \n" })).toBeNull();
 	});
 
+	test("rename-session needs a session and a title other than spaces, which it trims", () => {
+		expect(msg({ t: "rename-session", sessionId: "s1", title: "  Billing migration \n" })).toEqual({ t: "rename-session", sessionId: "s1", title: "Billing migration" });
+		expect(msg({ t: "rename-session", sessionId: "s1", title: " \n " })).toBeNull();
+		expect(msg({ t: "rename-session", sessionId: "", title: "Billing" })).toBeNull();
+	});
+
 	test("discuss needs a counter id and a passage, its source, and a question within their lengths", () => {
 		const request = { source: "session “Fix login”", quote: "ttl: 0", turns: [{ question: "What is ttl?", answer: "How long a token stays cached." }], question: "Why zero?" };
 		const ask = { t: "discuss" as const, id: 2, request };

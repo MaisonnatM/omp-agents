@@ -23,6 +23,8 @@ const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastMo
 /** An omp RPC client whose methods answer at once, records what the session sends omp, and lets a test play omp's events. */
 class FakeClient implements RpcClient {
 	calls: string[] = [];
+	/** Frames the session wrote to omp's stdin past the client. */
+	writes: object[] = [];
 	#listeners: ((event: Frame) => void)[] = [];
 	#resultListeners: ((result: { id?: string }) => void)[] = [];
 	#requests = 0;
@@ -88,7 +90,7 @@ async function settle(): Promise<void> {
 
 /** An omp process that never exits, driven through `client`; `startRpc` hands `onFrame` to the session. */
 function fakeOmp(client: FakeClient) {
-	const child: RpcChild = { client, pid: 4242, exited: Promise.withResolvers<"detach" | "exit">().promise, write: () => {}, meta: { startedAt: 1, cwd: "/tmp/project" }, detach: () => {} };
+	const child: RpcChild = { client, pid: 4242, exited: Promise.withResolvers<"detach" | "exit">().promise, write: frame => client.writes.push(frame), meta: { startedAt: 1, cwd: "/tmp/project" }, detach: () => {} };
 	const omp = { onFrame: (_frame: Record<string, unknown>) => {} };
 	spyOn(rpc, "startRpc").mockImplementation(async (_instanceId, _cwd, onFrame) => {
 		omp.onFrame = onFrame;
@@ -228,6 +230,18 @@ describe("DashboardSession turns", () => {
 		client.fire({ type: "message_end", message: { role: "user", content: "Migrate billing." } });
 		await settle();
 		expect(client.calls).toEqual(["prompt /rename"]);
+	});
+
+	test("a title the user gives reaches omp as theirs, and a prompt that lands before omp's state is read asks omp for no title", async () => {
+		const { session, client } = await startSession();
+		client.getState = async () => ({ ...STATE, sessionName: "Billing migration" });
+		const opened = client.writes.length;
+		await session.rename("Billing migration");
+		client.fire({ type: "message_end", message: { role: "user", content: "Migrate billing." } });
+		await settle();
+		expect(client.writes.slice(opened)).toEqual([{ type: "set_session_name", name: "Billing migration" }]);
+		expect(client.calls).toEqual([]);
+		expect(session.sessionName).toBe("Billing migration");
 	});
 
 	test("an agent_end that is not terminal hands over to a queued follow-up, so the session keeps working", async () => {

@@ -572,6 +572,16 @@ export class DashboardSession implements LiveSession {
 		await this.#noting("Cancel failed", () => this.#child.client.cancelSubagent(agentId), agentId);
 	}
 
+	/**
+	 * Give the session `title` as the user's own. It takes the turn gate, so an automatic `/rename` already queued lands
+	 * before it, and none starts after. omp answers `set_session_name` with no event, so a state read shows the title.
+	 */
+	async rename(title: string): Promise<void> {
+		this.#titled = true;
+		await this.#turn.run(async () => this.#child.write({ type: "set_session_name", name: title }));
+		this.#refresh();
+	}
+
 	/** The models omp offers this session, from the providers you are connected to. */
 	async models(): Promise<ModelEntry[]> {
 		const [models, connected, config] = await Promise.all([this.#child.client.getAvailableModels(), connectedProviders(), loadOmpConfig(this.cwd)]);

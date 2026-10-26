@@ -1,9 +1,9 @@
-/** omp's session files: listing them and reading whether a process left one mid-turn. */
+/** omp's session files: listing them, renaming one, and reading whether a process left one mid-turn. */
 import { basename, dirname, join } from "node:path";
 import { oneLine } from "../session-entries";
 import type { SessionSource } from "../shared/sessions";
 import { isDashboardPrompt } from "../shared/transcript";
-import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, sessionEntries, storage } from "./modules";
+import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, sessionEntries, sessionManager, storage } from "./modules";
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
 export const sessionsDir: string = dirs.getSessionsDir();
@@ -73,6 +73,16 @@ class OneFileStorage extends storage.FileSessionStorage {
 export async function readSessionFile(path: string): Promise<SavedSession | null> {
 	const [session] = await listing.listSessionsReadOnly(dirname(path), new OneFileStorage(path));
 	return session ? saved(session) : null;
+}
+
+/** Give the saved session at `path`, which no omp runs, `title` as the user's own, as omp's `/rename` does. */
+export async function renameSessionFile(path: string, title: string): Promise<void> {
+	const session = await sessionManager.SessionManager.open(path, undefined, undefined, { suppressBreadcrumb: true, throwIfMissing: true });
+	try {
+		if (!(await session.setSessionName(title, "user"))) throw new Error("omp kept the old title: a title needs a character other than spaces.");
+	} finally {
+		await session.close();
+	}
 }
 
 /**

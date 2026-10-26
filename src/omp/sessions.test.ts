@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { endsMidTurn, readSessionFile, sessionFileOf } from "./sessions";
+import { endsMidTurn, readSessionFile, renameSessionFile, sessionFileOf } from "./sessions";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -44,6 +44,22 @@ describe("readSessionFile", () => {
 		expect((await readSessionFile(sessionFile([header, prompt, reply])))?.title).toBe("run it");
 		const update = { ...prompt, message: { ...prompt.message, content: "[omp-agents] Project update.\n- w1 stopped." } };
 		expect((await readSessionFile(sessionFile([header, update, reply])))?.title).toBeNull();
+	});
+});
+
+describe("renameSessionFile", () => {
+	test("a saved session reads with the title it was given, again after a second rename", async () => {
+		const path = sessionFile([header, prompt]);
+		await renameSessionFile(path, "Billing migration");
+		expect((await readSessionFile(path))?.title).toBe("Billing migration");
+		await renameSessionFile(path, "Billing cutover");
+		expect((await readSessionFile(path))?.title).toBe("Billing cutover");
+	});
+
+	test("a title of only spaces is refused, and the session keeps its title", async () => {
+		const path = sessionFile([header, prompt]);
+		await expect(renameSessionFile(path, "   ")).rejects.toThrow("omp kept the old title");
+		expect((await readSessionFile(path))?.title).toBe("run it");
 	});
 });
 
