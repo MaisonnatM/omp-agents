@@ -49,7 +49,7 @@ function useScheduledEdit(restore: (text: string) => void): Action<[id: string, 
 }
 
 interface ScheduleButtonProps {
-	/** The composer's text; a blank one or a `!` or `$` command disables the button. */
+	/** The composer's text; the button shows only once it holds some, and a `!` or `$` command disables it. */
 	draft: string;
 	/** How many files the draft carries; a send keeps text only. */
 	files: number;
@@ -59,8 +59,10 @@ interface ScheduleButtonProps {
 	onSchedule: (when: ScheduleWhen) => void;
 }
 
-/** Send later: when a plan window resets, in an hour, tomorrow morning, or at a time picked by hand. */
-export function ScheduleButton({ draft, files, disabled, pending, onSchedule }: ScheduleButtonProps) {
+/** Send later: when a plan window resets, in an hour, tomorrow morning, or at a time picked by hand. Hidden while the draft is blank, which also closes its menu. */
+export const ScheduleButton = (props: ScheduleButtonProps) => (props.draft.trim() === "" && !props.pending ? null : <ScheduleMenu {...props} />);
+
+function ScheduleMenu({ draft, files, disabled, pending, onSchedule }: ScheduleButtonProps) {
 	const [open, setOpen] = useState(false);
 	const plans = useContext(Plans);
 	const now = useMinute();
@@ -85,7 +87,7 @@ export function ScheduleButton({ draft, files, disabled, pending, onSchedule }: 
 							variant="ghost"
 							size="icon-sm"
 							aria-label="Send later"
-							disabled={disabled || draft.trim() === "" || blocked !== null}
+							disabled={disabled || blocked !== null}
 							loading={pending}
 							data-state={open ? "open" : "closed"}
 							active={open}

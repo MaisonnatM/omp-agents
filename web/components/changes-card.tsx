@@ -91,7 +91,7 @@ export const ChangesCard = memo(function ChangesCard({ view, sessionId, cwd, wor
 							)
 						}
 					>
-						<div className="max-h-[min(40vh,15rem)] overflow-y-auto">
+						<div className="max-h-[min(30vh,11.5rem)] overflow-y-auto">
 							<ChangedFileList files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
 						</div>
 					</CardSection>

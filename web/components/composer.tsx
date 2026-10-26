@@ -1,4 +1,4 @@
-/** Shared parts of the composer: its tray, directory label, empty-conversation view, and the check that holds back `!` and `$` drafts. */
+/** Shared parts of the composer: its directory label, empty-conversation view, and the check that holds back `!` and `$` drafts. */
 import { Folder, MessageCircle } from "lucide-react";
 import { createContext, type ReactNode, type RefObject } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -24,17 +24,6 @@ export const ComposerNote = ({ text }: { text: string }) => (
 	<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">
 		{text}
 	</p>
-);
-
-/** The class that lifts the composer's frame over the {@link ComposerTray} tucked under its bottom edge. */
-export const OVER_TRAY = "relative z-10";
-
-/** The strip tucked under the composer's frame: where the session works on the left, its context counter on the right. */
-export const ComposerTray = ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
-	<div className="mx-3 -mt-4 flex min-h-12 items-center justify-between gap-2 rounded-b-xl bg-muted px-1.5 pt-5 pb-1">
-		<div className="flex min-w-0 items-center gap-1">{start}</div>
-		{end && <div className="flex shrink-0 items-center gap-1">{end}</div>}
-	</div>
 );
 
 /** A directory the session cannot move from, by its folder name; the tooltip holds the whole path. */

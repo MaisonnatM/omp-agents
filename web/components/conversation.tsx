@@ -20,7 +20,7 @@ import type { ScheduleWhen } from "../scheduled-model";
 import { AskAboutSelection } from "./ask-about-selection";
 import { useCompletion } from "./completion-popup";
 import { ChangesCard } from "./changes-card";
-import { blockedShortcut, ComposerEditor, ComposerNote, ComposerTray, DirectoryLabel, EmptyConversation, OVER_TRAY } from "./composer";
+import { blockedShortcut, ComposerEditor, ComposerNote, DirectoryLabel, EmptyConversation } from "./composer";
 import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
@@ -310,16 +310,33 @@ function LiveConversation({
 						}}
 						onSend={sendText}
 						leftSlot={
-							<ModelSlot
-								subject={subject}
-								models={models}
-								open={modelsOpen}
-								onOpenChange={openModels}
-								switching={switching}
-								onSetModel={modelChange.run}
-								onSetThinking={thinkingChange.run}
-								onSetFast={fastChange.run}
-							/>
+							<>
+								{shown &&
+									(switchable ? (
+										<DirectoryPicker
+											cwd={shown.cwdDisplay}
+											workspaces={workspaces}
+											disabled={!movable}
+											tooltip={movable ? shown.cwdDisplay : `${shown.cwdDisplay} · Move the session once the turn ends`}
+											shortcut="directory"
+											open={directoriesOpen}
+											onOpenChange={setDirectoriesOpen}
+											onPick={dir => send({ t: "prompt", view, text: `/move ${dir}`, images: [], delivery: "steer" })}
+										/>
+									) : (
+										<DirectoryLabel cwd={shown.cwdDisplay} />
+									))}
+								<ModelSlot
+									subject={subject}
+									models={models}
+									open={modelsOpen}
+									onOpenChange={openModels}
+									switching={switching}
+									onSetModel={modelChange.run}
+									onSetThinking={thinkingChange.run}
+									onSetFast={fastChange.run}
+								/>
+							</>
 						}
 						files={writable ? attachments.files : undefined}
 						onFilesChange={writable ? attachments.onFilesChange : undefined}
@@ -333,6 +350,7 @@ function LiveConversation({
 										</Button>
 									</Tooltip>
 								)}
+								{session && shown?.context && <ContextRing context={shown.context} />}
 								{sessionId !== null && writable && (
 									<ScheduleButton draft={draft} files={attachments.files.length} disabled={!connected} pending={schedule.pending} onSchedule={schedule.run} />
 								)}
@@ -342,7 +360,6 @@ function LiveConversation({
 						)}
 						placeholder={placeholderOf(subject)}
 						disabled={!writable}
-						className={OVER_TRAY}
 						status={working ? "streaming" : "idle"}
 						onStop={session ? interrupt : undefined}
 						stopping={stop.pending}
@@ -363,27 +380,6 @@ function LiveConversation({
 						}
 						afterActions={suggestions.list}
 					/>
-					{shown && (
-						<ComposerTray
-							start={
-								switchable ? (
-									<DirectoryPicker
-										cwd={shown.cwdDisplay}
-										workspaces={workspaces}
-										disabled={!movable}
-										tooltip={movable ? shown.cwdDisplay : `${shown.cwdDisplay} · Move the session once the turn ends`}
-										shortcut="directory"
-										open={directoriesOpen}
-										onOpenChange={setDirectoriesOpen}
-										onPick={dir => send({ t: "prompt", view, text: `/move ${dir}`, images: [], delivery: "steer" })}
-									/>
-								) : (
-									<DirectoryLabel cwd={shown.cwdDisplay} />
-								)
-							}
-							end={session && shown.context && <ContextRing context={shown.context} />}
-						/>
-					)}
 				</ComposerEditor>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{writable && attachments.note && <ComposerNote text={attachments.note} />}

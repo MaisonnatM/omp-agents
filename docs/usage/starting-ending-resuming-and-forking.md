@@ -1,7 +1,7 @@
 # Starting, ending, resuming, and forking
 
 - To start a session, click **New session** at the top of the **Sessions** tab.
-  The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker under the composer shows the directory that omp will run in.
+  The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker in the composer, left of the model menu, shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   Above the composer, under **Start a session**, a board lists up to four items in each of three columns.
   **Todos for agents** lists the open todos by status, as the Todo page orders them; clicking one starts a draft from it, as **Start** on the Todo page does.
@@ -10,7 +10,7 @@
   **All** opens the Todo page or the Pull requests page.
   A scheduled start shows no board.
   The directory is the selected workspace's, else the open session's, else the newest live session's, else the newest past session's.
-  To start in another directory, under **All workspaces** or not, pick it in the directory picker in the strip under the composer, or press Cmd+Alt+P.
+  To start in another directory, under **All workspaces** or not, pick it in the composer's directory picker, or press Cmd+Alt+P.
   It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
@@ -18,7 +18,7 @@
   When omp is ready, the dashboard opens the session in the focused pane.
   The draft is in the URL hash, `#new` or `#new/<encoded directory>`, and leaves the panes behind it, as **Settings** does.
   A session that you start or fork in another directory than the selected workspace switches the workspace picker to that directory, so the sidebar lists it.
-- A session that the dashboard started has the directory picker in the strip under its composer too; other sessions show their directory's name there.
+- A session that the dashboard started has the directory picker in its composer too; other sessions show their directory's name there.
   Picking a directory moves the session there, as omp's `/move` does: the transcript stays, and the header and the session's tools follow the new directory.
   The sidebar's workspace picker switches to the new directory, as for a session you start there, unless it shows all workspaces.
   The picker is disabled while a turn runs or waits on a question, since omp moves only an idle session.
@@ -37,7 +37,7 @@
   Click it to start this one session without the skill.
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
   A first message that starts with `/` keeps its own command and skips the pinned skill.
-- When the directory is in a git checkout, a branch picker sits after the directory picker in the strip.
+- When the directory is in a git checkout, a branch picker sits after the directory picker in the composer.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
   Picking another branch runs omp in the worktree that has it checked out, or adds a worktree for it when none has.

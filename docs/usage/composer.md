@@ -62,7 +62,7 @@
   A change that fails shows its error, and the picker takes another.
   Terminal sessions show their model and thinking level in the same place, but Collab has no frame that changes them, so make those changes in the terminal.
   Subagents have no pickers.
-- A strip tucked under the composer shows where the session works on the left and its context counter on the right.
+- The composer's bottom row starts with where the session works, left of the model menu, and shows its context counter on the right, before the clock button.
   The counter is a ring that fills clockwise beside the percent of the session's context window used.
   It turns amber at 70% and red at 90%.
   Hover or focus it to see the token count and the window size, for example `Context 10% full: 95.6k of 1m tokens`.

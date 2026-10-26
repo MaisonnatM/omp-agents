@@ -1,6 +1,6 @@
 # Send later
 
-- The clock button beside the attach button sends the composer's message later instead of now, in a live session or in the new-session draft.
+- The clock button beside the attach button sends the composer's message later instead of now, in a live session or in the new-session draft; it shows only once the composer holds text.
   Its menu offers each plan window that resets later, such as **When Anthropic 5h resets**, used-up windows first, then **In 1 hour**, **Tomorrow morning** at 9:00, and a date and time field with **Schedule**.
   A reset sends one minute after the window resets, so the provider counts the new window when the message arrives.
   The plans are the ones the status bar shows; see [Plan quota](../architecture/plan-quota.md).
