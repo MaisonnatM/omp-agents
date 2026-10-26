@@ -24,6 +24,7 @@
   `discussion.ts` holds `answerDiscussion`, one streamed model call on omp's `smol` role, else `default`, that answers **Ask about this** outside every session.
   `session-visuals-extension.ts` is the omp extension, loaded with `-e`, that appends the two visual fence formats to the system prompt of a session the dashboard starts, resumes, or forks; `sessionVisualsExtension` in `src/server/resources.ts` names its file, a bundle beside `server.js` in the packaged app.
   `replay-fork.ts` owns native replay prompt reading, ancestry and request correlation, original evidence blobs, repairs, and fork writes; it returns plain replay data and narrow fork and close operations.
+- `src/activity.ts`: `foldActivity`, which folds the stored activity rows into Settings › Activity's uses, last uses, moves between views, time on each view, and days; `src/shared/activity.ts` holds the event kinds, the key pattern, `CONTROLS`, `ACTION_MESSAGES`, and the answer's decoder.
 - `src/analytics.ts`: merges Claude Code's and Codex's requests into omp-stats' `StatsRead` with `withForeignUsage`, then folds per-file rows into sessions and workspaces.
   It joins each saved session's `SessionSummary`, its title and working directory, without reading transcripts.
 - `src/context-sources.ts`: splits a request's input by source, from its context messages and a subagent's recorded system prompt, and folds the index's rows into the Analytics tab's context-source report.

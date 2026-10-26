@@ -5,6 +5,7 @@
  */
 import type { Server } from "bun";
 import { join } from "node:path";
+import { foldActivity } from "../activity";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
 import { readGithubMedia } from "../github-media";
@@ -67,6 +68,8 @@ import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/da
 import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
+import type { ActivityRead } from "../shared/activity";
+import type { ActivityStore } from "./activity-store";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
@@ -140,6 +143,8 @@ export interface RouteEnv {
 	pullRequests: PullRequestRoutesEnv;
 	dashboard: DashboardRoutesEnv;
 	sync: SyncRoutesEnv;
+	/** The page's activity events, for Settings › Activity. */
+	activity: Pick<ActivityStore, "rows">;
 	processes: ProcessRoutesEnv;
 }
 
@@ -949,10 +954,27 @@ function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes 
 	};
 }
 
+/** `GET /api/activity?range=`: the page's activity over the range, defaulting to `30d`, with every other route's `PUT` key for the inventory of actions. */
+function activityRoutes({ get }: RouteKit, store: RouteEnv["activity"], others: Routes): Routes {
+	const serverActions = Object.keys(others).filter(path => others[path]!.PUT);
+	return {
+		"/api/activity": {
+			GET: get(params => {
+				const range = params.get("range") ?? "30d";
+				if (!isAnalyticsRange(range)) return fail(400, "Unknown activity range");
+				return answer(async (): Promise<ActivityRead> => {
+					const now = Date.now();
+					return { range, ...foldActivity(store.rows(null), windowOf(range, now).cutoff, now), serverActions };
+				});
+			}),
+		},
+	};
+}
+
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
-	return {
+	const routes: Routes = {
 		...sessionRoutes(kit, env.sessions),
 		...integrationRoutes(kit, env.integrations),
 		...providerRoutes(kit),
@@ -965,4 +987,5 @@ export function createRoutes(env: RouteEnv): Routes {
 		...syncRoutes(kit, env.sync),
 		...processRoutes(kit, env.processes),
 	};
+	return { ...routes, ...activityRoutes(kit, env.activity, routes) };
 }

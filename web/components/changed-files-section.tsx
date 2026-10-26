@@ -17,6 +17,7 @@ import {
 import type { ReactNode } from "react";
 import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals } from "../../src/shared/transcript";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { shortPaths } from "../changes-model";
 import { age, readTime } from "../labels";
 import { FileDiff } from "./file-diff";
@@ -144,6 +145,7 @@ export function ChangedFileList({ files, onOpen }: { files: ChangedFile[]; onOpe
 					<li key={file.path}>
 						<Tooltip content={`${file.path} · ${summary}`} side="left">
 							<button
+								{...activityControl("changes-card.file")}
 								type="button"
 								aria-haspopup="dialog"
 								onClick={() => onOpen(file.path)}

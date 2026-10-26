@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 
 interface ImageViewerProps {
@@ -65,7 +66,7 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 						<div className="flex shrink-0 items-center gap-1">
 							{actions}
 							<Tooltip content="Open the image in a new tab">
-								<Button variant="ghost" size="icon-compact" aria-label="Open the image in a new tab" asChild>
+								<Button {...activityControl("media-viewer.new-tab")} variant="ghost" size="icon-compact" aria-label="Open the image in a new tab" asChild>
 									<a href={mediaSrc(src)} target="_blank" rel="noopener noreferrer">
 										<ExternalLink />
 									</a>
@@ -82,13 +83,13 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 					</div>
 					<div className="flex min-h-0 flex-1 items-center gap-2">
 						<Tooltip content={previousLabel} shortcut={["←"]} disabled={index === 0}>
-							<Button variant="ghost" size="icon-compact" aria-label={previousLabel} disabled={index === 0} onClick={() => step(-1)}>
+							<Button {...activityControl("media-viewer.step")} variant="ghost" size="icon-compact" aria-label={previousLabel} disabled={index === 0} onClick={() => step(-1)}>
 								<ChevronLeft />
 							</Button>
 						</Tooltip>
 						<img src={mediaSrc(src)} alt={caption} className="min-h-0 min-w-0 flex-1 max-h-[calc(100vh-9rem)] object-contain" />
 						<Tooltip content={nextLabel} shortcut={["→"]} disabled={index === count - 1}>
-							<Button variant="ghost" size="icon-compact" aria-label={nextLabel} disabled={index === count - 1} onClick={() => step(1)}>
+							<Button {...activityControl("media-viewer.step")} variant="ghost" size="icon-compact" aria-label={nextLabel} disabled={index === count - 1} onClick={() => step(1)}>
 								<ChevronRight />
 							</Button>
 						</Tooltip>

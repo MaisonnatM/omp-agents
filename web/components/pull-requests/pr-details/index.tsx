@@ -7,6 +7,7 @@ import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../../../activity";
 import { commentCount } from "../../../pull-requests-model";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { actionFacts } from "../../../../src/shared/moves";
@@ -118,13 +119,13 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
 					<SegmentedTabsList aria-label="Pull request details">
 						{([
-							{ value: "summary", label: "Summary", Icon: FileText, name: "Summary" },
-							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${comments} comments` },
-							{ value: "code", label: "Code", Icon: FileDiff, name: "Code" },
-							...(draft ? [{ value: "review", label: "Review draft", Icon: ClipboardPen, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}` }] : []),
-						]).map(({ value, label, Icon, name }) => (
+							{ value: "summary", label: "Summary", Icon: FileText, name: "Summary", control: "pr-details.tab.summary" as const },
+							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${comments} comments`, control: "pr-details.tab.timeline" as const },
+							{ value: "code", label: "Code", Icon: FileDiff, name: "Code", control: "pr-details.tab.code" as const },
+							...(draft ? [{ value: "review", label: "Review draft", Icon: ClipboardPen, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}`, control: "pr-details.tab.review" as const }] : []),
+						]).map(({ value, label, Icon, name, control }) => (
 							<Tooltip key={value} content={name} side="bottom">
-								<SegmentedTab value={value} className={TAB_CLASS} aria-label={name}>
+								<SegmentedTab {...activityControl(control)} value={value} className={TAB_CLASS} aria-label={name}>
 									<Icon aria-hidden className="size-3.5" />
 									<span className={LABEL_CLASS}>{label}</span>
 								</SegmentedTab>

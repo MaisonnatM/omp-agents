@@ -22,6 +22,8 @@ const PULL_MS = 5 * 60_000;
 const DASHBOARD_CHECK_MS = 5 * 60_000;
 /** Each process sample runs `ps` once and asks every daemon broker for its services. */
 const PROCESS_SAMPLE_MS = 15_000;
+/** Activity rows older than the kept days are pruned once a day. */
+const DAY_MS = 24 * 60 * 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -46,6 +48,8 @@ export interface LoopHandlers {
 	onDashboardTick(): Promise<void>;
 	/** Every {@link PROCESS_SAMPLE_MS}, listener or not. */
 	onProcessTick(): Promise<void>;
+	/** Every {@link DAY_MS}, listener or not; the server's start does the first run's work itself. */
+	onDailyTick(): Promise<void>;
 }
 
 /**
@@ -121,6 +125,7 @@ export class Loops {
 			repeat("pull", this.#on.onPullTick, PULL_MS, 0),
 			repeat("dashboard check", this.#on.onDashboardTick, DASHBOARD_CHECK_MS, 0),
 			repeat("processes", this.#on.onProcessTick, PROCESS_SAMPLE_MS),
+			repeat("daily", this.#on.onDailyTick, DAY_MS),
 		];
 	}
 

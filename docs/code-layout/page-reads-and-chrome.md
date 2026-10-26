@@ -13,6 +13,8 @@
   `web/components/quick-actions.tsx` holds the tickets' row menu, the buttons on a pull request's, an issue's, or a todo's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
   `web/components/status-dot.tsx` draws that dot for each session status.
+- `web/activity.ts`: the activity recorder, its outbox, `viewOf`, `commandKey`, `activityControl`, and the one click listener for tagged controls; see [Activity](../architecture/activity.md).
+  `web/activity-report.ts` builds Settings › Activity's inventory from the page's registries and splits it by use.
 - `web/api.ts`: the page's HTTP client, which sends the token from localStorage as `Authorization: Bearer` and marks the page signed out on a 401, `openSocket`, which opens the dashboard's or a terminal's WebSocket with the token as its subprotocol, `wss:` when the page is on HTTPS, and `mediaSrc`, which adds the media key to an `/api/` address that an image, a video, or a frame loads.
   Error responses are narrowed from unknown JSON and retain HTTP context when their body is malformed.
   The page and server share `errorText` from `src/json.ts`.

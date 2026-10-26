@@ -39,7 +39,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 /** `wide` keeps a many-column table legible by scrolling it sideways on narrow screens; the first `textColumns` align to the start. */
-function Table({ label, columns, textColumns = 1, wide = false, children }: { label: string; columns: string[]; textColumns?: number; wide?: boolean; children: ReactNode }) {
+export function Table({ label, columns, textColumns = 1, wide = false, children }: { label: string; columns: string[]; textColumns?: number; wide?: boolean; children: ReactNode }) {
 	return (
 		<div className="overflow-x-auto">
 			<table className={`w-full text-sm ${wide ? "min-w-[40rem]" : ""}`}>
@@ -53,7 +53,7 @@ function Table({ label, columns, textColumns = 1, wide = false, children }: { la
 	);
 }
 
-function Count({ children, title }: { children: ReactNode; title?: string }) {
+export function Count({ children, title }: { children: ReactNode; title?: string }) {
 	return <td className="whitespace-nowrap border-t border-border py-2 ps-4 text-end tabular-nums" title={title}>{children}</td>;
 }
 

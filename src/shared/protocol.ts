@@ -2,6 +2,7 @@
 import type { Routine, RoutineChange } from "../routines";
 import type { UserNoteChange, UserNoteList } from "../user-notes-shared";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
+import type { ActivityEvent } from "./activity";
 import type { DiscussionEvent, DiscussionRequest } from "./discussions";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
@@ -128,7 +129,9 @@ export type ClientMsg =
 	/** Ask about selected text apart from every session, answered on this socket with `discussion` events for `id`, counted per page. */
 	| { t: "discuss"; id: number; request: DiscussionRequest }
 	/** Stop the answer to this socket's `discuss` with `id`, which then ends with no error. */
-	| { t: "discuss-stop"; id: number };
+	| { t: "discuss-stop"; id: number }
+	/** Page load `client`'s activity events, numbered from `first`; only the server holding `server.lock` stores them, and a batch sent again changes nothing. */
+	| { t: "activity"; client: string; first: number; events: ActivityEvent[] };
 
 /** A {@link ClientMsg} the page waits on: `ack`, counted per page, asks for a `done` once the server has handled it, and `floor` is the lowest `ack` the page still waits on. */
 export type AckedFrame = ClientMsg & { ack: number; floor: number };

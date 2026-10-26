@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { type NoticeAction as Action, type NoticeFace, type NoticeSource, presentNotice } from "../notice-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
@@ -189,7 +190,7 @@ function NoticeAction({ id, action, send, onDone }: { id: string; action: Action
 			return null;
 		case "update":
 			return (
-				<Button variant="secondary" size="compact" disabled={!connected || !action.ready} onClick={() => send({ t: "notice", ids: [id], op: "update" })}>
+				<Button {...activityControl("notices.update")} variant="secondary" size="compact" disabled={!connected || !action.ready} onClick={() => send({ t: "notice", ids: [id], op: "update" })}>
 					{action.label}
 				</Button>
 			);
@@ -259,6 +260,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">
 			{link ? (
 				<a
+					{...activityControl("notices.item")}
 					href={link.href}
 					target={link.external ? "_blank" : undefined}
 					rel={link.external ? "noreferrer" : undefined}
@@ -270,7 +272,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 					}}
 				/>
 			) : (
-				<button type="button" aria-label={notice.read ? headline : `Mark read: ${headline}`} className="absolute inset-0 rounded-lg focus-visible:outline-none" onClick={read} />
+				<button {...activityControl("notices.item")} type="button" aria-label={notice.read ? headline : `Mark read: ${headline}`} className="absolute inset-0 rounded-lg focus-visible:outline-none" onClick={read} />
 			)}
 			{!notice.read && <span aria-hidden className="absolute top-[22px] left-1 size-1.5 rounded-full bg-blue-500" />}
 			<Face face={face} />
@@ -288,6 +290,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 			</div>
 			<Tooltip content="Clear">
 				<Button
+					{...activityControl("notices.clear")}
 					variant="ghost"
 					size="icon-compact"
 					aria-label={`Clear: ${headline}`}
@@ -330,6 +333,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 			<Tooltip content="Notifications" side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
 					<Button
+						{...activityControl("notices.open")}
 						variant="ghost"
 						size="icon-compact"
 						className="shrink-0 text-muted-foreground"
@@ -358,7 +362,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 				<header className="flex items-center gap-2 border-b px-3 pt-3 pb-2">
 					<h2 className="flex-1 text-sm font-semibold">Notifications</h2>
 					<Tooltip content="Mark all as read">
-						<Button variant="ghost" size="icon-compact" aria-label="Mark all as read" disabled={!connected || shownUnread.length === 0} onClick={() => send({ t: "notice", ids: shownUnread.map(({ id }) => id), op: "read" })}>
+						<Button {...activityControl("notices.read-all")} variant="ghost" size="icon-compact" aria-label="Mark all as read" disabled={!connected || shownUnread.length === 0} onClick={() => send({ t: "notice", ids: shownUnread.map(({ id }) => id), op: "read" })}>
 							<CheckCheck />
 						</Button>
 					</Tooltip>
@@ -368,6 +372,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 						const count = unread.filter(notice => id === "all" || presentNotice(notice, now).source === id).length;
 						return (
 							<button
+								{...activityControl("notices.filter")}
 								key={id}
 								type="button"
 								aria-pressed={filter === id}

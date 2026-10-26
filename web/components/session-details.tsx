@@ -39,12 +39,13 @@ export function SessionDetails({ view, working, cwd, pullRequests, tickets, work
 					value: "pull-requests",
 					icon: GitPullRequest,
 					name: "PRs",
+					control: "session-details.tab.pull-requests",
 					count: pullRequests.length,
 					scrollsItself: true,
 					content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={view.kind === "live" ? view.instanceId : null} />,
 				},
 				...(tickets.length > 0
-					? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", count: tickets.length, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
+					? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
 					: []),
 			]}
 		/>

@@ -6,6 +6,7 @@ import { MEDIA_KEY_PARAM, MEDIA_KEY_STORAGE_KEY, SOCKET_PROTOCOL, SOCKET_TOKEN_P
 import type { BranchRelease } from "../src/shared/git";
 import { isObject } from "../src/json";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
+import { record } from "./activity";
 
 export class ApiError extends Error {
 	constructor(
@@ -41,8 +42,9 @@ function signOut(): void {
 	for (const listener of signOutListeners) listener();
 }
 
-/** `fetch` with the access token, which signs the page out when the server refuses it. */
+/** `fetch` with the access token, which signs the page out when the server refuses it. A write counts as the user's action, keyed by its route. */
 export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+	if (init.method !== undefined && init.method !== "GET") record("action", `${init.method.toLowerCase()} ${url.split("?", 1)[0]}`);
 	const token = stored(TOKEN_STORAGE_KEY);
 	const headers = new Headers(init.headers);
 	if (token !== null) headers.set("authorization", `Bearer ${token}`);

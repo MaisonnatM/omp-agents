@@ -2,6 +2,7 @@
 import { ChevronRight } from "lucide-react";
 import { type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { completionTrigger, type MentionToken } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
@@ -38,6 +39,7 @@ export function CompletionPopup({ id, sections, active, onPick, error }: {
 							const Icon = option.icon;
 							return (
 								<div
+									{...activityControl("completion.pick")}
 									key={optionIndex}
 									id={`${id}-${optionIndex}`}
 									role="option"

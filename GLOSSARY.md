@@ -75,6 +75,10 @@ _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 A Markdown entry on the Notes page, optionally linked to a top-level todo.
 It is separate from a todo's notes field.
 
+**Activity**:
+What the page records of how its user uses the dashboard, by registry id only, which Settings › Activity reports.
+_Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
+
 ## Unattended work
 
 **Routine**:

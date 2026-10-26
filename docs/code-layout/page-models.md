@@ -39,6 +39,8 @@
   `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each and which merged, and removes them one by one or, through **Remove merged**, every merged one nothing blocks, previewing and removing in batches of `MAX_WORKTREE_BATCH`.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table, loaded with `React.lazy` so `recharts` is a chunk of its own; `analytics-format.ts` shares number and cost formatting across the section; `context-sources.tsx` renders the context-source table with its workspace and session filters.
+- `web/components/settings/activity-tab.tsx`: the Settings section for how the dashboard is used, with time-range buttons, the features not or rarely used, the most used, navigation, and active time; it reads only while it shows.
+  `activity-chart.tsx` draws the active minutes per day, loaded with `React.lazy` so `recharts` stays a chunk of its own; the tab borrows `Table` and `Count` from `analytics-tab.tsx`.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
   `web/components/org-icon.tsx` draws a model maker's logo, such as Anthropic's, from svgl.

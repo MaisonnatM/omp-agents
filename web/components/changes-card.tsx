@@ -1,11 +1,13 @@
 /** The changes card on top of the composer: the files the view's agent changed and the images its tools took, each in a section that folds. */
 import { ChevronDown } from "lucide-react";
 import { memo, type ReactNode, useState } from "react";
+import type { ControlId } from "../../src/shared/activity";
 import type { SessionFacts, View } from "../../src/shared/sessions";
 import { lineTotals } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { useChangedFiles, useMedia } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
 import { ChangedFileList, FileChangesDialog } from "./changed-files-section";
@@ -23,16 +25,21 @@ interface CardSectionProps {
 	title: ReactNode;
 	open: boolean;
 	onToggle: () => void;
+	/** The Activity control a click on the folding header records. */
+	fold: ControlId;
 	/** A control at the right of the header, outside the button that folds the section. */
 	action?: ReactNode;
 	children: ReactNode;
 }
 
-function CardSection({ title, open, onToggle, action, children }: CardSectionProps) {
+function CardSection({ title, open, onToggle, fold, action, children }: CardSectionProps) {
 	return (
 		<Collapsible open={open} onOpenChange={onToggle}>
 			<div className="flex h-8 items-center gap-2 pr-1.5 pl-1">
-				<CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded-md px-1.5 text-left text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+				<CollapsibleTrigger
+					{...activityControl(fold)}
+					className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded-md px-1.5 text-left text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+				>
 					<ChevronDown aria-hidden className={cn("size-3.5 shrink-0 transition-transform duration-150 motion-reduce:transition-none", !open && "-rotate-90")} />
 					{title}
 				</CollapsibleTrigger>
@@ -83,9 +90,10 @@ export const ChangesCard = memo(function ChangesCard({ view, sessionId, cwd, wor
 						}
 						open={!closed.has("files")}
 						onToggle={() => toggle("files")}
+						fold="changes-card.files.fold"
 						action={
 							sessionId !== null && (
-								<Button variant="ghost" size="xs" aria-haspopup="dialog" onClick={() => setShown({ kind: "changes", path: files[0]!.path })}>
+								<Button {...activityControl("changes-card.review")} variant="ghost" size="xs" aria-haspopup="dialog" onClick={() => setShown({ kind: "changes", path: files[0]!.path })}>
 									Review
 								</Button>
 							)
@@ -97,7 +105,7 @@ export const ChangesCard = memo(function ChangesCard({ view, sessionId, cwd, wor
 					</CardSection>
 				)}
 				{media && media.length > 0 && (
-					<CardSection title={media.length === 1 ? "1 Image" : `${media.length} Images`} open={!closed.has("images")} onToggle={() => toggle("images")}>
+					<CardSection title={media.length === 1 ? "1 Image" : `${media.length} Images`} open={!closed.has("images")} onToggle={() => toggle("images")} fold="changes-card.images.fold">
 						<MediaStrip media={media} view={view} pullRequests={facts?.pullRequests ?? []} tickets={facts?.tickets ?? []} />
 					</CardSection>
 				)}

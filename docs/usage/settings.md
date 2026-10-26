@@ -3,8 +3,8 @@
 - **Settings** is the last sidebar tab by default, after **Calendar** and, once Gmail is connected, **Inbox**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists eleven sections in two groups.
-  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, **Workspaces**, and **Sync**, which are the same whatever the workspace.
+  The sidebar lists twelve sections in two groups.
+  **General** holds **Analytics**, **Activity**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, **Workspaces**, and **Sync**, which are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
@@ -39,6 +39,14 @@
   A main session's transcript records neither its system prompt nor its tool definitions, so their tokens show together as **System prompt and tool definitions**, under **Not in transcript**; a subagent's transcript records its system prompt, so its files, skills, rules, and MCP servers show by name, and only **Tool definitions** stay unrecorded.
   Tokens come from omp's tokenizer for each model, or about four characters a token for a model omp has none for.
   The report reads every session file once, then only the files that changed, and shows how far it has read while it catches up.
+- **Activity** shows how you use the dashboard over the last 30 days; choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
+  It counts the pages and settings sections you open, the shortcuts and command palette commands you run, the changes you send, and clicks on a few controls that change nothing else, by name only, never what they show or what you typed.
+  **Not used** lists every feature with no use in the range and when you last used it, or **Never**; features used once or twice follow.
+  Pages whose service omp is not signed in to, such as **Inbox** without Gmail, are listed apart and not counted.
+  **Most used** lists the top 20 features, with how many days you used each and, for a command, how often you ran it by its keys and from the palette.
+  **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
+  **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
+  Only the server that runs the unattended work keeps activity, in `activity.db` in its data directory; a browser under automation records nothing.
 - **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
   A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.
   Each row shows the branch, the path below the repository's parent folder with the full path on hover, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.

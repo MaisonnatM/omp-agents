@@ -65,6 +65,7 @@ import { Kbd } from "../kbd";
 import { StatusDot } from "../status-dot";
 import { ActionPanel } from "./action-panel";
 import { PaletteFooter } from "./palette-footer";
+import { commandKey, record } from "../../activity";
 
 const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	newSession: Plus,
@@ -234,7 +235,10 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 					accessories: [{ kind: "keys", labels: tabShortcutLabels(id, tabs) }],
 					kind: "Command",
 					// A command runs as its shortcut's first key does.
-					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => void handlers[id]?.(0) } }]],
+					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => {
+						record("command", commandKey(id), "palette");
+						void handlers[id]?.(0);
+					} } }]],
 				}),
 			),
 			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
