@@ -1,7 +1,7 @@
 /**
  * What the bell lists: a newer omp, routed model, or omp-agents build, a pull request whose next move is yours, a Slack message that
  * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), a calendar
- * event that starts soon, a project that needs you, and the dashboard sessions that stopped mid-turn.
+ * event that starts soon, and the dashboard sessions that stopped mid-turn.
  */
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
@@ -100,20 +100,6 @@ export interface EventSubject {
 	url: string | null;
 }
 
-/**
- * A project that needs you: a worker asks a question its coordinator left unanswered, a worker stopped without End
- * session, or every worker is done and nothing waits for the coordinator.
- */
-export interface ProjectSubject {
-	kind: "project";
-	projectId: string;
-	project: string;
-	about: "asks" | "stopped" | "done";
-	/** The worker's id and title, `null` for `done`. */
-	worker: { id: string; title: string } | null;
-	text: string;
-}
-
 /** An interrupted dashboard session that stopped while its turn ran, with its listed file's title and `cwdDisplay`, each `null` while no listed file gives one. */
 export interface StoppedSession {
 	sessionId: string;
@@ -130,7 +116,7 @@ export interface StoppedSubject {
 /** How long before an event starts its notice comes. */
 export const EVENT_LEAD_MS = 10 * 60_000;
 
-export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | ProjectSubject | StoppedSubject;
+export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | StoppedSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -146,7 +132,6 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| SlackSubject
 	| ProviderSubject
 	| EventSubject
-	| ProjectSubject
 	| StoppedSubject
 );
 

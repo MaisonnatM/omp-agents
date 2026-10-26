@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { applyPins } from "../shared/pins";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
-import { occupiedBy } from "./project-runner";
+import { occupiedBy } from "./auto-continue";
 import { RoutineRunner, SESSION_START_DEADLINE_MS } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 
@@ -71,9 +71,6 @@ function harness(file: RoutinesFile, sessions = new Map<string, FakeSession>()) 
 		pins: [] as string[],
 		/** Each pin change and session end, in order. */
 		log: [] as string[],
-		/** What reached projects, and the error a project answers with, by id. */
-		notified: [] as string[],
-		projectErrors: new Map<string, string>(),
 	};
 	const runner = new RoutineRunner({
 		file,
@@ -107,11 +104,6 @@ function harness(file: RoutinesFile, sessions = new Map<string, FakeSession>()) 
 		changePins(change) {
 			fake.pins = applyPins(fake.pins, change);
 			fake.log.push(`${change.op} ${change.sessionIds.join(",")}`);
-		},
-		notifyProject(projectId, { source, title, text }) {
-			const error = fake.projectErrors.get(projectId) ?? null;
-			if (error === null) fake.notified.push(`${projectId}: ${source}: ${title}: ${text}`);
-			return error;
 		},
 	});
 	return { runner, fake };
@@ -160,21 +152,6 @@ describe("RoutineRunner", () => {
 				{ skill: "ship" },
 			),
 		]);
-	});
-
-	test("a project routine sends its prompt to the coordinator, starts no session, and records why a project refuses", async () => {
-		const file = fileWith(routinesPath(), { kind: "project", projectId: "p1", prompt: "Check #billing-bugs." });
-		addPrompts(file, 4);
-		const { runner, fake } = harness(file);
-		await runner.tick();
-		expect(fake.notified).toEqual(["p1: Routine: Notes: Check #billing-bugs."]);
-		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "project", projectId: "p1" });
-		// It takes no session slot: all three prompt routines started.
-		expect(fake.requests).toHaveLength(3);
-		fake.projectErrors.set("p1", "project Billing is archived.");
-		fake.now += HOUR;
-		await runner.tick();
-		expect(file.value[0]?.runs[0]?.errors).toEqual(["Notes: project Billing is archived."]);
 	});
 
 	test("a start that fails records the error, and the next run tries again", async () => {

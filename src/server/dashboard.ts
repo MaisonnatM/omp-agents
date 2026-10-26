@@ -10,12 +10,10 @@ import { rmSync } from "node:fs";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
-import { gitCheckout } from "../git";
 import { GmailAccounts, GmailClient } from "../gmail";
 import { accountClients, createGoogleAccounts } from "../google-accounts";
 import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
-import { loadPullRequestDetail, loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
-import { loadTickets } from "../tickets";
+import { loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
@@ -28,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, pinsFile, processesFile, projectNotesDir, projectsFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -59,23 +57,19 @@ import { GoogleAccountsFile } from "./google-accounts-file";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops, repeat } from "./loops";
-import { cleanupEnds, MergeCleanup } from "./merge-cleanup";
+import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROJECT_KINDS, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../owner-lock";
 import { PinsFile } from "./pins-file";
 import { ProcessSettingsFile } from "./process-settings-file";
 import { readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
-import { moveOldNotes, seedNotes, seedUserNotes, writeInboxEvent } from "./project-notes";
-import { occupiedBy, ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
-import { ProjectWatch } from "./project-watch";
-import { ProjectsFile } from "./projects-file";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
-import { AutoContinue } from "./auto-continue";
+import { AutoContinue, occupiedBy } from "./auto-continue";
 import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
 import type { SelfUpdate } from "./self-update";
@@ -84,7 +78,7 @@ import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
-import { createStarter, reattachAll, type Starter, type StartEnv } from "./start";
+import { createStarter, reattachAll } from "./start";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { UserNotesFile } from "./user-notes-file";
@@ -112,7 +106,6 @@ export class Dashboard {
 	readonly #routines = new RoutinesFile(routinesFile);
 	readonly #scheduled = new ScheduledFile(scheduledFile);
 	readonly #workspaces: WorkspacesFile;
-	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #processSettings = new ProcessSettingsFile(processesFile);
 	readonly #reviewDrafts = new ReviewDrafts({
@@ -143,9 +136,6 @@ export class Dashboard {
 	readonly #todoInbox: TodoInbox;
 	readonly #noteInbox: NoteInbox;
 	readonly #worktrees: Worktrees;
-	readonly #sessionJoins: StartEnv["projects"] = {
-		launchFor: (request, project) => this.#reviewDrafts.join(request, this.#projectRunner.launchFor(request, project)),
-	};
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
 	/** What each live session runs besides omp, which it stops on request, when idle, and once the session left. */
@@ -156,8 +146,6 @@ export class Dashboard {
 	readonly #runner: RoutineRunner;
 	readonly #scheduledRunner: ScheduledRunner;
 	readonly #autoContinue: AutoContinue;
-	readonly #projectRunner: ProjectRunner;
-	readonly #projectWatch: ProjectWatch;
 	readonly #mergeQueue: MergeQueue;
 	readonly #mergeCleanup: MergeCleanup;
 	/** Stops the merge queue's loop, which {@link start} starts. */
@@ -179,10 +167,9 @@ export class Dashboard {
 	/** `selfUpdate` is **Update dashboard**, which pulls the checkout the server runs from and restarts the server. */
 	constructor(port: number, selfUpdate: SelfUpdate) {
 		this.#selfUpdate = selfUpdate;
-		// An older version kept the workspace list in `projects.json`, so it moves before the projects load from that name.
-		adoptOldWorkspaces(projectsFile, workspacesFile);
+		// An older version kept the workspace list in `projects.json`, so it moves first.
+		adoptOldWorkspaces(oldWorkspacesFile, workspacesFile);
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
-		const projects = (this.#projects = new ProjectsFile(projectsFile));
 		const files = this.#files;
 		const todos = this.#todos;
 		const notes = this.#notes;
@@ -235,7 +222,6 @@ export class Dashboard {
 										when.allDay ? [] : [{ ref: `google/${account}/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url }],
 									),
 					})),
-				projects: () => this.#projectRunner.noticeFacts(),
 				stoppedSessions: () =>
 					interrupted.midTurn().map(sessionId => {
 						const saved = files.savedOf(sessionId);
@@ -258,14 +244,6 @@ export class Dashboard {
 				apply: change => workspaces.apply(change),
 			},
 			pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
-			projects: {
-				msg: () => ({ t: "projects", projects: projects.value }),
-				apply: change => {
-					const changed = projects.apply(change);
-					if (changed) this.#projectRunner.settle(change.id);
-					return changed;
-				},
-			},
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
@@ -296,7 +274,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			projects: this.#sessionJoins,
+			joinFor: request => this.#reviewDrafts.join(request),
 		});
 		const worktrees = (this.#worktrees = new Worktrees({
 			knownCwds: () => this.knownCwds(),
@@ -323,8 +301,7 @@ export class Dashboard {
 				return this.#processSettings.value.stopIdleAfterMinutes;
 			},
 		});
-		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "replay" || request.kind === "new" && request.branch !== null);
-		const startSession = (this.#startSession = request => startWith(request, null));
+		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "replay" || request.kind === "new" && request.branch !== null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
 		const reach = async (sessionId: string): Promise<LiveSession> => {
 			const live = sessions.bySessionId(sessionId);
@@ -344,11 +321,6 @@ export class Dashboard {
 				return true;
 			},
 		});
-		/** The branch checked out in `cwd`, or `null` outside git or on a detached head. */
-		const checkedOut = async (cwd: string): Promise<string | null> => {
-			const dir = await directoryOf(cwd);
-			return dir ? gitCheckout(dir).then(checkout => checkout?.branch ?? null, () => null) : null;
-		};
 		const stopping = this.#stopping.signal;
 		const runner = (this.#runner = new RoutineRunner({
 			file: routines,
@@ -367,7 +339,6 @@ export class Dashboard {
 			},
 			onChange: () => broadcasts.pushList("routines"),
 			changePins: change => void lists.apply("pins", change),
-			notifyProject: (projectId, event) => this.#projectRunner.notify(projectId, event),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -385,72 +356,25 @@ export class Dashboard {
 			},
 			now: Date.now,
 			onChange: () => this.#publishScheduled(),
-			released: (sessionId, reply) => {
+			released: sessionId => {
 				const session = sessions.bySessionId(sessionId);
-				if (!session) return;
-				// A continue that went left the session working; one canceled or dismissed leaves the turn ended where the failure stopped it.
-				if (session.row().status === "idle") projectRunner.turnEnded(session.instanceId, reply);
-				runner.observe(session.instanceId);
-				projectRunner.observe(session.instanceId);
+				if (session) runner.observe(session.instanceId);
 			},
 		}));
-		const runnerSession = (session: LiveSession): RunnerSession => {
-			const { status, requests } = session.row();
-			return {
-				sessionId: session.sessionId,
-				status,
-				occupied: occupiedBy(status, autoContinue.held(session.sessionId)),
-				requests,
-				prompt: text => session.prompt(null, text, [], "followUp"),
-				answer: (requestId, answer) => session.answer(requestId, answer),
-			};
-		};
-		const liveRunner = (session: LiveSession | undefined): RunnerSession | null => (session ? runnerSession(session) : null);
-		const projectRunner = (this.#projectRunner = new ProjectRunner({
-			file: projects,
-			start: startWith,
-			session: instanceId => liveRunner(sessions.get(instanceId)),
-			bySessionId: sessionId => liveRunner(sessions.bySessionId(sessionId)),
-			reach: async sessionId => runnerSession(await reach(sessionId)),
-			end: async sessionId => {
-				const session = sessions.bySessionId(sessionId);
-				if (session) await this.#endLive(session);
-			},
-			interrupted: sessionId => interrupted.has(sessionId),
-			stoppedWithServer: sessionId => interrupted.stoppedWithServer(sessionId),
-			checkedOut,
-			extensionArgs: projectsExtensionArgs,
-			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),
-			writeInbox: (id, event, at) => writeInboxEvent(projectNotesDir(id), event, at),
-			now: Date.now,
-			newId: randomUUID,
-			onChange: () => broadcasts.pushList("projects"),
-		}));
-		this.#projectWatch = new ProjectWatch({
-			projects: () => projects.value,
-			pullRequestsOf: sessionId => files.factsOf(sessionId).pullRequests,
-			detail: pr => loadPullRequestDetail(pr, true),
-			tickets: async () => (await loadTickets(true)).tickets,
-			notify: (projectId, event) => projectRunner.notify(projectId, event),
-		});
 		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
 		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
 			sessions: () =>
-				sessions.rows(files.factsOf).flatMap(host => {
-					const role = projects.roleOf(host.sessionId);
-					const project = role ? projects.get(role.projectId) : undefined;
-					const watches = project !== undefined && !project.archived && project.watch.pullRequests;
-					const ends = cleanupEnds({ startedHere: sessions.started(host.instanceId) !== undefined, project: role && { role: role.role, watches } }, this.#sourceControl.cleanUp);
-					return ends ? [{ sessionId: host.sessionId, idle: host.status === "idle", occupied: occupiedBy(host.status, autoContinue.held(host.sessionId)), pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }] : [];
-				}),
+				sessions.rows(files.factsOf).flatMap(host =>
+					sessions.started(host.instanceId) !== undefined && this.#sourceControl.cleanUp
+						? [{ sessionId: host.sessionId, idle: host.status === "idle", occupied: occupiedBy(host.status, autoContinue.held(host.sessionId)), pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }]
+						: [],
+				),
 			states: readPullRequestStates,
 			checkout: async dir => {
 				const at = await worktreeAt(dir).catch(() => null);
 				return at && { gitDir: at.common, repo: await repoOf(dir) };
 			},
 			end: async sessionId => {
-				const role = projects.roleOf(sessionId);
-				if (role?.role === "worker") return projectRunner.endFinished(role.projectId, role.workerId);
 				const session = sessions.bySessionId(sessionId);
 				if (!session) throw new Error("It does not run.");
 				await this.#endLive(session);
@@ -484,14 +408,13 @@ export class Dashboard {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
 				this.#publishScheduled();
-				await notices.check([...EVENT_KINDS, ...PROJECT_KINDS, ...STOPPED_KINDS]);
+				await notices.check([...EVENT_KINDS, ...STOPPED_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
 				// It reads every sandbox's checkout, which takes minutes, so the routines and sends after it do not wait for it.
 				void this.#isolationSweep.tick();
 				await scheduledRunner.tick();
 				await runner.tick();
-				await this.#projectWatch.tick();
 				await this.#mergeCleanup.tick();
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
@@ -512,7 +435,6 @@ export class Dashboard {
 			sessions,
 			views,
 			start: startSession,
-			createProject: spec => projectRunner.create(spec),
 			lists,
 			end: async instanceId => {
 				const session = sessions.get(instanceId);
@@ -565,8 +487,6 @@ export class Dashboard {
 				learnHeads(repo, pullRequests) {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
-				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
-				userNotesDir,
 				replayDetail: async (view, turnId) => {
 					const file = this.#pathFor(view);
 					if (!file) throw new Error("The source session file is unavailable.");
@@ -625,24 +545,20 @@ export class Dashboard {
 	}
 
 	/**
-	 * Starts following omp: attaches to the sessions the last server left running, seeds the user's notes and moves each
-	 * project's older notes to their places now, watches the session files and the inboxes, takes the owner lock when it
-	 * is free, lists the files, checks for the sessions that stopped mid-turn, lists the registry, and starts the loops;
-	 * `publisher` is the server now listening.
+	 * Starts following omp: attaches to the sessions the last server left running, watches the session files and the
+	 * inboxes, takes the owner lock when it is free, lists the files, checks for the sessions that stopped mid-turn, lists
+	 * the registry, and starts the loops; `publisher` is the server now listening.
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, this.#sessionJoins, survived => this.#interrupted.recover(survived));
+		await reattachAll(this.#sessions, request => this.#reviewDrafts.join(request), survived => this.#interrupted.recover(survived));
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
-		seedUserNotes(userNotesDir);
-		for (const project of this.#projects.value) moveOldNotes(projectNotesDir(project.id));
 		this.#loops.watch();
 		if (this.#ownerLock.acquire()) {
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
-			this.#projectRunner.recover();
 		} else {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo and note inboxes; this one takes over when it exits.`);
@@ -669,7 +585,6 @@ export class Dashboard {
 	async stop(): Promise<void> {
 		this.#loops.stop();
 		this.#stopMergeQueue();
-		this.#projectRunner.stop();
 		this.#todoInbox.stop();
 		this.#noteInbox.stop();
 		this.#endInbox.stop();
@@ -720,12 +635,11 @@ export class Dashboard {
 		return [...new Set([...this.knownCwds(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 
-	/** Where every live session's update goes: the views, the broadcasts, the routines, the projects, and the loops. */
+	/** Where every live session's update goes: the views, the broadcasts, the routines, and the loops. */
 	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 		switch (update.kind) {
 			case "roster":
 				this.#runner.observe(instanceId);
-				this.#projectRunner.observe(instanceId);
 				this.#broadcasts.rosterChanged();
 				return;
 			case "event":
@@ -741,7 +655,6 @@ export class Dashboard {
 				// Only a session this dashboard started reports its exit.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
-				this.#projectRunner.exited(instanceId);
 				this.#reviewDrafts.exited(instanceId);
 				this.#sessions.remove(instanceId);
 				this.#broadcasts.syncRoster();
@@ -755,7 +668,6 @@ export class Dashboard {
 				// Before the edited prompt's events, so they land in the new file's transcript.
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
-				this.#projectRunner.switched(instanceId);
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#reviewDrafts.switched(instanceId, sessionId);
 				return;
@@ -769,9 +681,9 @@ export class Dashboard {
 			}
 			case "turn-ended": {
 				this.#sessions.markUnread(instanceId, update.reply);
-				// A session started here that a usage limit or a transient fault stopped is held for its continue; its project hears of the turn only if the continue never goes.
+				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
-				if (!sessionId || !this.#autoContinue.turnEnded(sessionId, update.failure, update.reply)) this.#projectRunner.turnEnded(instanceId, update.reply);
+				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
 				return;
 			}
@@ -807,11 +719,9 @@ export class Dashboard {
 			this.#routines.reload();
 			this.#todos.reload();
 			this.#notes.reload();
-			this.#projects.reload();
 			this.#broadcasts.pushList("routines");
 			this.#broadcasts.pushList("user-todos");
 			this.#broadcasts.pushList("user-notes");
-			this.#broadcasts.pushList("projects");
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
 			void this.#todoInbox.drain();

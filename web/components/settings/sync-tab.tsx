@@ -218,7 +218,7 @@ export function SyncTab({ active }: { active: boolean }) {
 						<li key={rule.what}>{rule.what}</li>
 					))}
 					<li>Links, binary files, files over 1 MB, and files with text shaped like a token or a private key</li>
-					<li>Routines, todos, pins, workspaces, projects, calendars, and notices, which hold this machine's sessions and runs</li>
+					<li>Routines, todos, pins, workspaces, calendars, and notices, which hold this machine's sessions and runs</li>
 				</ul>
 			</Section>
 		</>

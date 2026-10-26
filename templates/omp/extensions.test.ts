@@ -15,7 +15,7 @@ let gate;
 let agentStart;
 let tool;
 let confirmations = 0;
-const sessionManager = { getSessionId: () => input.sessionId ?? "session", getSessionFile: () => input.sessionFile };
+const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
 extension({
 	// Importing omp's exports takes about a second, so only a test that reads them asks for them.
 	pi: input.omp ? await import(process.argv[2]) : undefined,
@@ -36,14 +36,13 @@ if (input.command) {
 		ui: { async confirm() { confirmations++; return input.approve; } },
 	});
 	console.log(JSON.stringify({ result: result ?? null, confirmations }));
-} else if (input.write || input.edit) {
-	const call = input.edit ? { toolName: "edit", input: input.edit } : { toolName: "write", input: { path: input.write } };
+} else if (input.write) {
 	// attempts repeats the call, as an agent retrying after a block does; the last answer counts.
 	let result;
-	for (let i = 0; i < (input.attempts ?? 1); i++) result = await gate(call, { cwd: process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
+	for (let i = 0; i < (input.attempts ?? 1); i++) result = await gate({ toolName: "write", input: { path: input.write } }, { cwd: process.cwd(), sessionManager, agent: { kind: "main" } });
 	console.log(JSON.stringify({ result: result ?? null }));
 } else if (input.agentStart) {
-	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
+	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false, sessionManager });
@@ -54,7 +53,7 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "projects" | "google-accounts", input: object, env: Record<string, string> = {}): {
+function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-accounts", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
@@ -204,16 +203,7 @@ describe("user_note", () => {
 		}),
 	);
 	writeFileSync(join(config, "todos.json"), JSON.stringify({ todos: [{ id: "t1", text: "Ship the release" }] }));
-	writeFileSync(
-		join(config, "projects.json"),
-		JSON.stringify({
-			projects: [
-				{ id: "p1", name: "Billing", archived: false, coordinator: { sessionId: "coord" }, workers: [{ id: "w", title: "Ledger", sessionId: "w1" }] },
-				{ id: "p2", name: "Search", archived: true, coordinator: { sessionId: "old" }, workers: [] },
-			],
-		}),
-	);
-	const call = (params: object, sessionId = "s1", sessionFile?: string) => exercise("notes", { run: true, params, sessionId, sessionFile }, env);
+	const call = (params: object, sessionId = "s1") => exercise("notes", { run: true, params, sessionId }, env);
 	const left = () => readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
 
 	test("list keeps the notes holding every word of the query, in any case, and names the todo each belongs to", () => {
@@ -228,7 +218,7 @@ describe("user_note", () => {
 		const [added] = left();
 		expect(first.text).toBe(`Added to the user's notes (id ${added.note.id}).`);
 		expect(again.text).toContain(`already added it (id ${added.note.id})`);
-		expect(added.note).toMatchObject({ title: "Findings", body: "The cache misses.", todoId: null, projectId: null, addedBy: "s1" });
+		expect(added.note).toMatchObject({ title: "Findings", body: "The cache misses.", todoId: null, addedBy: "s1" });
 		call({ action: "add", title: "Findings" }, "s2");
 		expect(left()).toHaveLength(2);
 		expect(call({ action: "list", query: "cache" }).text).toContain(`Findings (id ${added.note.id}`);
@@ -241,81 +231,6 @@ describe("user_note", () => {
 		expect(call({ action: "read", id: "n1" }).text).toBe("Deploy checklist\n\nRun the staging smoke first.");
 		expect(call({ action: "read", id: "n2" }).text).toBe("Reading list\n\nDesigning Data-Intensive Applications\n\nThinking in Systems");
 		expect(call({ action: "list", query: "thinking systems" }).text).toContain("Reading list (id n2");
-	});
-
-	test("a note added from a project's session belongs to that project unless project_id names another, and list keeps one project's notes", () => {
-		expect(call({ action: "add", title: "Elsewhere", project_id: "gone" }, "coord").run.isError).toBe(true);
-		expect(call({ action: "add", title: "Ledger rounding" }, "w1").text).toEndWith(`, project "Billing").`);
-		call({ action: "add", title: "Ranking idea", project_id: "p2" }, "coord");
-		expect(left().slice(-2).map(change => change.note.projectId)).toEqual(["p1", "p2"]);
-		expect(call({ action: "list", project_id: "p1" }).text?.split("\n")).toEqual([expect.stringMatching(/^- Ledger rounding \(id \S+, updated \S+, project p1 "Billing"\)$/)]);
-		expect(call({ action: "list", project_id: "gone" }).run.isError).toBe(true);
-	});
-
-	test("a task subagent's note belongs to the project of the session it runs under", () => {
-		const sessions = join(root, "sessions");
-		mkdirSync(join(sessions, "2026-10-05T09-00-00_coord"), { recursive: true });
-		writeFileSync(join(sessions, "2026-10-05T09-00-00_coord.jsonl"), "");
-		const subagent = join(sessions, "2026-10-05T09-00-00_coord", "Explore.jsonl");
-		expect(call({ action: "add", title: "Subagent finding" }, "sub", subagent).text).toEndWith(`, project "Billing").`);
-	});
-});
-
-describe("projects", () => {
-	const root = mkdtempSync(join(tmpdir(), "projects-extension-"));
-	afterAll(() => rmSync(root, { recursive: true, force: true }));
-	const env = { XDG_CONFIG_HOME: join(root, "config"), XDG_DATA_HOME: join(root, "data") };
-	const notes = join(root, "data", "omp-agents", "projects", "p1");
-	const user = join(root, "data", "omp-agents", "user");
-	mkdirSync(join(root, "config", "omp-agents"), { recursive: true });
-	writeFileSync(
-		join(root, "config", "omp-agents", "projects.json"),
-		JSON.stringify({ projects: [{ id: "p1", name: "Billing", coordinator: { sessionId: "s-c" }, workers: [{ id: "w2", title: "Schema", sessionId: "s-w2" }] }] }),
-	);
-
-	test("the coordinator and each worker are told their role and the notes, a subagent in the session too; other sessions are told nothing", () => {
-		const coordinator = exercise("projects", { agentStart: true, sessionId: "s-c" }, env).prompt;
-		expect(coordinator?.[0]).toBe("base");
-		expect(coordinator?.[1]).toStartWith('You are the coordinator of the omp-agents project "Billing".');
-		expect(coordinator?.[1]).toContain(`Read ${join(notes, "notes.md")} first:`);
-		expect(coordinator?.[1]).toContain(`Read ${join(user, "preferences.md")}`);
-		expect(coordinator?.[1]).toContain("[omp-agents]");
-		const worker = exercise("projects", { agentStart: true, sessionId: "s-w2" }, env).prompt;
-		expect(worker?.[1]).toStartWith('You are worker w2 ("Schema") of the omp-agents project "Billing"');
-		expect(worker?.[1]).toContain(notes);
-		expect(exercise("projects", { agentStart: true, sessionId: "s-other" }, env).prompt).toBeNull();
-		expect(exercise("projects", { agentStart: true, sessionId: "s-c", agentKind: "sub" }, env).prompt?.[1]).toStartWith("You are the coordinator");
-	});
-
-	test.each([
-		["s-c", join(root, "repo", "src", "app.ts"), true],
-		["s-c", join(notes, "docs", "testing.md"), false],
-		["s-c", join(user, "preferences.md"), false],
-		["s-c", join(user, "workflows", "new-feature.md"), false],
-		["s-c", `${user}-other/x.md`, true],
-		["s-c", `${notes}-other/x.md`, true],
-		["s-c", "local://plan.md", false],
-		["s-c", "artifact://12", false],
-		["s-c", `file://${join(notes, "docs", "testing.md")}`, true],
-		["s-w2", join(root, "repo", "src", "app.ts"), false],
-		["s-other", join(root, "repo", "src", "app.ts"), false],
-	])("session %s writing %s is blocked: %s", (sessionId, path, blocked) => {
-		const { result } = exercise("projects", { write: path, sessionId }, env);
-		expect(result?.block ?? false).toBe(blocked);
-		if (blocked) expect(result?.reason).toContain("start_worker");
-	});
-
-	test("a subagent in the coordinator's session is held to its limit as the coordinator is", () => {
-		expect(exercise("projects", { write: join(root, "repo", "a.ts"), sessionId: "s-c", agentKind: "sub" }, env).result?.block).toBe(true);
-		expect(exercise("projects", { write: join(notes, "a.md"), sessionId: "s-c", agentKind: "sub" }, env).result).toBeNull();
-	});
-
-	test("a coordinator's hashline edit is checked file by file, and an edit naming no file it can read is refused", () => {
-		const edit = (input: object) => exercise("projects", { edit: input, sessionId: "s-c" }, env).result;
-		expect(edit({ input: `[${join(notes, "notes.md")}#1A2B]\nPUT 1.=1:\n+x\n[${join(user, "preferences.md")}#3C4D]\nPUT 1.=1:\n+y` })).toBeNull();
-		expect(edit({ input: `[${join(notes, "notes.md")}#1A2B]\nPUT 1.=1:\n+x\n[${join(root, "repo", "a.ts")}#3C4D]\nPUT 1.=1:\n+y` })?.block).toBe(true);
-		expect(edit({ input: "*** Begin Patch\n*** Update File: src/a.ts" })?.reason).toContain("names no file");
-		expect(exercise("projects", { edit: { input: "anything" }, sessionId: "s-w2" }, env).result).toBeNull();
 	});
 });
 

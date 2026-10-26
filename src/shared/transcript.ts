@@ -41,7 +41,7 @@ export const mediaExtension = (type: string): string | null => MEDIA_FILE_EXTENS
 /** The address of the image or video at absolute or `~/` path `path`, `GET /api/media`. */
 export const mediaUrl = (path: string): string => `/api/media?${new URLSearchParams({ path })}`;
 
-/** How a prompt the dashboard sends in the user's place starts; the agent reads it, the user never sees it as theirs. */
+/** How a prompt the dashboard sent in the user's place starts, as an older version's project updates did; the agent read it, the user never sees it as theirs. */
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
 
 /** Whether prompt `text` is one the dashboard sent in the user's place. */
@@ -57,7 +57,7 @@ export type Item =
 	 */
 	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[]; files?: string[]; pending?: true }
 	/**
-	 * A prompt the dashboard sent in the user's place, such as a project's update, which {@link isDashboardPrompt} tells.
+	 * A prompt the dashboard sent in the user's place, which {@link isDashboardPrompt} tells.
 	 * The page shows nothing for it, but it opens a turn as a prompt does. `entryId` as a prompt's.
 	 */
 	| { id: string; kind: "dashboard"; text: string; entryId: string | null }

@@ -10,7 +10,6 @@ import type { ForkPoint } from "./transcript-view";
  * quick action keeps its subject, the pull request, Linear issue, or todo with the action, which its page shows progress
  * and failure for; the server links its session to that subject. A **Resume all** resumes each of the
  * sidebar's interrupted sessions.
- * A project starts its coordinator on `prompt`; an empty `name` reads as New project.
  */
 export type StartOp =
 	| {
@@ -31,8 +30,7 @@ export type StartOp =
 	| { kind: "resume"; sessionId: string }
 	/** `skill`: the skill pinned in the settings, `null` for none. */
 	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject; skill: string | null }
-	| { kind: "resume-all"; sessionIds: string[] }
-	| { kind: "project"; name: string; cwd: string; prompt: string; model: ModelOption | null; thinking: string | null };
+	| { kind: "resume-all"; sessionIds: string[] };
 
 export type NewOp = Extract<StartOp, { kind: "new" }>;
 
@@ -63,8 +61,6 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 			return { t: "start", reqId, kind: "resume", sessionId: op.sessionId };
 		case "resume-all":
 			return { t: "resume-all", reqId, sessionIds: op.sessionIds };
-		case "project":
-			return { t: "project-create", reqId, name: op.name, cwd: op.cwd, prompt: op.prompt, model: op.model, thinking: op.thinking };
 		default: {
 			const never: never = op;
 			return never;

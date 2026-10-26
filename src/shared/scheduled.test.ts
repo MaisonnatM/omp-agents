@@ -24,8 +24,8 @@ describe("parseScheduledSpec", () => {
 	test("a continue saved without a cause followed a usage limit; one with a transient cause keeps it, and an unknown cause is dropped", () => {
 		const continued = (cause?: unknown) => parseScheduledSpec({ id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", reply: null, cause } });
 		expect([continued(), continued("transient"), continued("outage")]).toEqual([
-			{ ok: { id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit", reply: null } } },
-			{ ok: { id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "transient", reply: null } } },
+			{ ok: { id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit" } } },
+			{ ok: { id: "c", at: 10, reset: null, target: { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "transient" } } },
 			null,
 		]);
 	});

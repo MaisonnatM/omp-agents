@@ -33,7 +33,6 @@ Alt is Option on macOS.
 | G then N | Outside text fields | Go to your notes |
 | G then I | Outside text fields | Go to your Gmail inbox, when connected |
 | G then R | Outside text fields | Go to your routines |
-| G then P | Outside text fields | Go to your projects |
 | G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
 | ↑ | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
@@ -119,7 +118,7 @@ Alt is Option on macOS.
   Both stay as you set them in this browser.
 - The number of the **Pull requests** tab opens the Pull requests page, and that of **Tickets** opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
   The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the inbox, the routines, Settings, or the new-session draft to the panes.
-  The numbers of **Todo** and **Calendar** open those pages, G then I or the Inbox's number the **Inbox** page when connected to Gmail, G then R the **Routines** page, and G then P the **Projects** page.
+  The numbers of **Todo** and **Calendar** open those pages, G then I or the Inbox's number the **Inbox** page when connected to Gmail, and G then R the **Routines** page.
   The number of **Settings** opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

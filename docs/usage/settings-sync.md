@@ -19,5 +19,5 @@
 - **Never synced** lists what stays on each machine whatever the remote holds.
   That covers omp's `agent.db` and other databases, `mcp.json`, which can hold OAuth client secrets, `secrets.yml`, key files such as `.env` or `*.pem`, session files, lock files, and the dashboard's access token, interrupted sessions, and merges.
   Inside a synced directory, links, binary files, files over 1 MB, and files with text shaped like a token or a private key stay too, and the sync names each one it left.
-  Routines, todos, pins, workspaces, projects, and calendars do not sync, since they name this machine's sessions and runs, and a routine on two machines would run twice.
+  Routines, todos, pins, workspaces, and calendars do not sync, since they name this machine's sessions and runs, and a routine on two machines would run twice.
 - A path under your home directory is written as `~` on the remote: `/Users/ann/notes` in `AGENTS.md` arrives as `~/notes`, and a repository's pull choice moves to the same path under the other machine's home.

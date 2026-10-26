@@ -42,7 +42,6 @@ Notes live in `notes.json`, not individual Markdown files.
 The server remains the only writer, while agents submit adds and appends through `note-inbox/`.
 This follows the todo list's reducer, optimistic socket updates, and owner-lock model.
 The tradeoff is that each note is not a greppable Markdown file.
-The Projects page's project and user notes directories remain separate.
 
 ## A session's processes are its process groups and the broker daemons it owns
 

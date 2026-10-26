@@ -37,7 +37,6 @@ import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequest, type PullRequestCheckout, type PullRequestRebase, prKey, type RebasedPullRequest, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
-import type { ProjectNotesAnswer } from "../shared/projects";
 import { type LiveSessionProcesses, parseProcessSettings, type ProcessSettings, type ProcessStop } from "../shared/processes";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
@@ -54,7 +53,6 @@ import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
 import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
-import { listNotes } from "./project-notes";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
 	MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
@@ -88,10 +86,6 @@ export interface SessionRoutesEnv {
 	placeOf(sessionId: string): SessionPlace | null;
 	/** The pull request list loaded `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
-	/** The notes directory of project `id`, or `null` when there is no such project. */
-	projectNotesDir(id: string): string | null;
-	/** The user's notes directory, which every project shares. */
-	userNotesDir: string;
 	/** The saved conversations whose prompts or replies hold every word of `query`, the file changed last first. */
 	searchConversations(query: string): Promise<ConversationHit[]>;
 	sourceControl(): Promise<SourceControlAnswer>;
@@ -364,17 +358,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return file ? Response.json(file) : fail(404, `The session changed no file ${path}`);
 	});
 
-	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the user's, with the Markdown files in each, which the file dialog opens. */
-	const projectNotes = get(params => {
-		const id = params.get("id") ?? "";
-		const dir = env.projectNotesDir(id);
-		if (dir === null) return fail(404, `No project ${id}`);
-		return answer(async (): Promise<ProjectNotesAnswer> => {
-			const [notes, userNotes] = await Promise.all([listNotes(dir), listNotes(env.userNotesDir)]);
-			return { dir, notes, userDir: env.userNotesDir, userNotes };
-		});
-	});
-
 	/** `GET /api/conversations?q=<words>`: the saved conversations whose prompts or replies hold every word, each by its latest such message. */
 	const conversations = get(params => {
 		const query = params.get("q")?.trim() ?? "";
@@ -398,7 +381,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/source-control": { GET: sourceControl, PUT: sourceControlChange },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
-		"/api/project-notes": { GET: projectNotes },
 		"/api/conversations": { GET: conversations },
 	};
 }

@@ -5,7 +5,6 @@ import type { Notice } from "../src/shared/notices";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import { applyPins, type PinChange } from "../src/shared/pins";
-import type { Project } from "../src/shared/projects";
 import type { ScheduledSend } from "../src/shared/scheduled";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
@@ -57,8 +56,6 @@ export interface DashboardState extends PaneNavigation {
 	workspaceList: WorkspaceList<Workspace>;
 	/** The pinned sessions' ids, empty until the server first sends them; a change shows here before the server answers. */
 	pins: string[];
-	/** Every project, archived ones too, empty until the server first sends them. */
-	projects: Project[];
 	/** What the bell lists, empty until the server first sends it. */
 	notices: Notice[];
 	/** The merges the server waits to make until GitHub allows them, empty until the server first sends them. */
@@ -70,7 +67,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "scheduled" | "workspaces" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -221,8 +218,6 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, workspaceList: action.list };
 		case "pins":
 			return { ...state, pins: action.sessionIds };
-		case "projects":
-			return { ...state, projects: action.projects };
 		case "notices":
 			return { ...state, notices: action.list };
 		case "merges":
@@ -268,7 +263,6 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		pins: [],
-		projects: [],
 		notices: [],
 		merges: [],
 		reviewDrafts: [],

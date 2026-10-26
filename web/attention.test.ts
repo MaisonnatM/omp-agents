@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Project } from "../src/shared/projects";
 import type { HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
-import { type Attention, attend, needsYou, unreadShown, yourSessions } from "./attention";
+import { type Attention, attend, needsYou, unreadShown } from "./attention";
 
 const host = (instanceId: string, status: HostStatus, { unread = null, requests = [], sessionName = `Session ${instanceId}` }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null } = {}) =>
 	({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests }) as RosterHost;
@@ -17,13 +16,6 @@ describe("needsYou", () => {
 			host("unknown", "unknown"),
 		];
 		expect(hosts.filter(needsYou).map(row => row.instanceId)).toEqual(["asks", "done"]);
-	});
-});
-
-describe("yourSessions", () => {
-	test("leaves out a project's workers, which answer to its coordinator, and keeps the coordinator", () => {
-		const projects = [{ coordinator: { sessionId: "s-coordinator" }, workers: [{ sessionId: "s-worker" }] }] as Project[];
-		expect(yourSessions([host("coordinator", "idle"), host("worker", "idle"), host("mine", "idle")], projects).map(row => row.instanceId)).toEqual(["coordinator", "mine"]);
 	});
 });
 

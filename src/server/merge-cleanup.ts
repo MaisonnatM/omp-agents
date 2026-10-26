@@ -38,7 +38,7 @@ export interface CleanupCheckout {
 }
 
 export interface MergeCleanupDeps {
-	/** The live sessions a merge may end: those {@link cleanupEnds} lets it end. */
+	/** The live sessions a merge may end: those this dashboard started, while **Clean up after a merge** is on. */
 	sessions(): CleanupSession[];
 	/** Where each of `prs` stands, by {@link prKey}. */
 	states(prs: readonly PullRequest[]): Promise<Map<string, PullRequestState>>;
@@ -48,23 +48,6 @@ export interface MergeCleanupDeps {
 	end(sessionId: string): Promise<void>;
 	/** Deletes `branch` of `gitDir` while it still points at `head` and no worktree holds it. */
 	deleteBranch(gitDir: string, branch: string, head: string): Promise<boolean>;
-}
-
-/** A live session as the settings see it: whether this dashboard started it, and its place in a project, `watches` when that project watches its pull requests. */
-export interface CleanupHost {
-	startedHere: boolean;
-	project: { role: "coordinator" | "worker"; watches: boolean } | null;
-}
-
-/**
- * Whether the cleanup may end `host`: only a session this dashboard started, never one in a terminal or one another
- * dashboard owns; a project's worker while its project watches its pull requests, never a coordinator, and any other
- * session while `cleanUp` is on.
- */
-export function cleanupEnds(host: CleanupHost, cleanUp: boolean): boolean {
-	if (!host.startedHere) return false;
-	if (host.project) return host.project.role === "worker" && host.project.watches;
-	return cleanUp;
 }
 
 export class MergeCleanup {

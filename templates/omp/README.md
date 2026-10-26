@@ -58,9 +58,6 @@ Files, in `agent/`:
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
   When you linked addresses to the session's workspace in the dashboard's Settings › Integrations, it also tells the session to use those for the workspace's mail and calendar unless you name another account.
   A session in a linked worktree outside every linked workspace takes the links of its repository's main checkout, and no tool is blocked.
-- `extensions/projects.ts`: tells a session that belongs to an omp-agents project its role, coordinator or worker, and where the project's shared notes are, at every prompt.
-  A coordinator's `edit` and `write` calls outside the notes are blocked, so it delegates every code change to a worker.
-  The dashboard loads this file from the repository with `-e` while it is not installed, so projects work before you run `bun run omp-template`.
 - `extensions/request-log.ts`: records every request omp sends to a model provider, so any turn can be rebuilt and checked against its hash.
   Each request adds one `omp-request-log.record` entry to the session file with the model, the thinking level, the session's leaf entry, and the hashes of the system prompt, the tools, the other parameters, and the messages.
   Those parts go to omp's blob store in `~/.omp/agent/blobs/`, written once per distinct content, and the messages are stored as edits against the session's previous request, so a turn costs about what it adds.
@@ -73,7 +70,6 @@ Files, in `agent/`:
   On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
 - `extensions/notes.ts`: `user_note` lists and reads the dashboard's notes and queues add/append changes.
   An empty parameter reads as left out, and a session that adds a title it already added gets that note's id back.
-  A note a project's session adds belongs to that project unless `project_id` names another, and `list` takes `project_id` to keep one project's notes.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.
 

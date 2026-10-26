@@ -58,7 +58,6 @@ import {
 } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
-import { isMaxWorkers, MAX_REVIEW_CADENCE, parseWatch, type ProjectEdit } from "../shared/projects";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
@@ -77,8 +76,6 @@ import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequ
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
-/** The longest project name the server keeps. */
-const MAX_PROJECT_NAME = 200;
 
 /** The variant of {@link ClientMsg} that `t` names. */
 export type MsgOf<T extends ClientMsg["t"]> = Extract<ClientMsg, { t: T }>;
@@ -205,20 +202,6 @@ export function parseReviewDraftEdit(value: unknown): Parsed<ReviewDraftEdit> {
 	}
 }
 
-/** A rename or an archive of a project; the server makes every other change. */
-function parseProjectEdit(value: unknown): Parsed<ProjectEdit> {
-	if (!isObject(value) || !isNonEmpty(value.id)) return null;
-	const { op, id, name } = value;
-	if (op === "archive" || op === "unarchive") return { ok: { op, id } };
-	if (op === "watch") {
-		const watch = parseWatch(value.watch);
-		return watch && { ok: { op, id, watch } };
-	}
-	if (op === "review-cadence") return typeof value.cadence === "string" && value.cadence.length <= MAX_REVIEW_CADENCE ? { ok: { op, id, cadence: value.cadence } } : null;
-	if (op === "max-workers") return isMaxWorkers(value.max) ? { ok: { op, id, max: value.max } } : null;
-	return op === "rename" && typeof name === "string" && name.length <= MAX_PROJECT_NAME ? { ok: { op, id, name } } : null;
-}
-
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
 	switch (value.kind) {
 		case "new":
@@ -343,14 +326,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const request = parseStartRequest(value);
 		return isCounter(reqId) && request ? { ok: { t: "start", reqId, ...request.ok } } : null;
 	},
-	"project-create"(value) {
-		const { reqId, name, cwd, prompt } = value;
-		// `null` starts the coordinator on omp's default model.
-		const model = value.model === null ? { ok: null } : parseModel(value.model);
-		const thinking = parseThinking(value.thinking);
-		if (!isCounter(reqId) || typeof name !== "string" || name.length > MAX_PROJECT_NAME || !isNonEmpty(cwd) || !isNonEmpty(prompt) || !model || !thinking) return null;
-		return { ok: { t: "project-create", reqId, name, cwd, prompt, model: model.ok, thinking: thinking.ok } };
-	},
 	"resume-all"({ reqId, sessionIds }) {
 		if (!isCounter(reqId) || !Array.isArray(sessionIds) || sessionIds.length === 0) return null;
 		return sessionIds.every(isNonEmpty) ? { ok: { t: "resume-all", reqId, sessionIds: [...new Set(sessionIds)] } } : null;
@@ -395,10 +370,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	pin(value) {
 		const change = parsePinChange(value.change);
 		return change && { ok: { t: "pin", change: change.ok } };
-	},
-	project(value) {
-		const change = parseProjectEdit(value.change);
-		return change && { ok: { t: "project", change: change.ok } };
 	},
 	"review-draft"(value) {
 		const change = parseReviewDraftEdit(value.change);

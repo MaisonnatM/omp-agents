@@ -181,14 +181,4 @@ describe("editor form", () => {
 		const saved = routine({ task: { kind: "command", command: "git worktree prune" } });
 		expect(specOf(draftOf(saved))).toMatchObject({ ok: { task: { kind: "command", command: "git worktree prune" } } });
 	});
-
-	test("a project form needs a project and a prompt, saves no skill, and reads back the same", () => {
-		const draft = { ...newDraft("r4", "~/code", "poteto-mode"), name: "Bugs", task: "project" as const, prompt: " Check #bugs. " };
-		expect(specOf(draft)).toEqual({ fix: "Pick the project its prompt goes to." });
-		expect(specOf({ ...draft, projectId: "p1", prompt: "" })).toEqual({ fix: "Write the prompt the coordinator gets." });
-		const spec = specOf({ ...draft, projectId: "p1" });
-		expect(spec).toMatchObject({ ok: { skill: null, task: { kind: "project", projectId: "p1", prompt: "Check #bugs." } } });
-		expect(taskWords({ kind: "project", projectId: "p1", prompt: "Check #bugs." })).toBe("To project: Check #bugs.");
-		expect(specOf(draftOf(routine({ task: { kind: "project", projectId: "p1", prompt: "Check #bugs." } })))).toMatchObject({ ok: { task: { kind: "project", projectId: "p1" } } });
-	});
 });

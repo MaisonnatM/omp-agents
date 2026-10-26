@@ -30,5 +30,5 @@ The packaged app, or `bun run desktop` from a checkout, shows the dashboard in i
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
 - Alt+Shift+Cmd+T, from any app, brings the window up with the command menu's **Create todo** open, so you can type a title and press Enter to create a todo.
   When another app holds the keys, the app logs so and the shortcut does nothing.
-- The Dock icon's badge counts the sessions waiting on you: each that asks you something, or finished a turn you have not looked at since, a project's workers left out, and goes away at none.
+- The Dock icon's badge counts the sessions waiting on you: each that asks you something, or finished a turn you have not looked at since, and goes away at none.
   The **Todo** page's header still counts the open todos.

@@ -1,11 +1,11 @@
-# Page: sidebar, Todo, Notes, Routines, Projects, Calendar, and Inbox
+# Page: sidebar, Todo, Notes, Routines, Calendar, and Inbox
 
 - `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the workspace picker; `web/components/pull-requests/pull-requests-nav.tsx` is its Pull requests tab, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
-  `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more, and `web/components/project-group.tsx` the group of one project in it, each worker's row named by the title its coordinator gave it.
+  `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
   `web/components/sidebar-search.tsx` is the Sessions tab's search field; given a shortcut, as the Sessions tab gives Cmd+F, the key puts the cursor in it and the empty field shows the key on its right.
   `web/components/kbd.tsx` holds `Kbd`, the key chip the command palette draws, and `ShortcutChip`, the smaller chip with a shortcut's first key that **New session** and that search field show on their right.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed.
-  Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace or role badge.
+  Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace badge.
   The row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.
   `web/components/inbox/inbox-nav.tsx` is its Inbox tab: the Gmail address over one **Inbox** row with its unread count.
@@ -14,7 +14,7 @@
   `web/components/use-notice-toasts.tsx` holds `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once under its `NoticeOrigin`, even with the sidebar hidden.
   Both draw each notice from `presentNotice` in `web/notice-model.ts`, the one place that tells notice kinds apart: its source, headline, preview, link, face, action, and toast policy.
   `web/use-attention.ts` holds `useAttention`, which `web/app.tsx` calls too: it sends the desktop app's Dock badge, raises a session notification through the desktop bridge or the browser's Notifications API, and sends `read` for the unread sessions the panes show in a focused window; `useSessionNotifications` there is the **Settings › Preferences** switch.
-  `web/attention.ts` holds its rules: `yourSessions`, which leaves out a project's workers, `needsYou`, `attend`, which keeps an episode per live session and raises each question and turn once, none for what waited when the page first saw the session, and `unreadShown`.
+  `web/attention.ts` holds its rules: `needsYou`, `attend`, which keeps an episode per live session and raises each question and turn once, none for what waited when the page first saw the session, and `unreadShown`.
   The command palette's **Update dashboard** runs `updateDashboard` in `web/dashboard-update.ts`.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
@@ -28,17 +28,14 @@
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, `TODO_STATUS`, each status's label and the Linear state type whose icon it takes, each category's badge color, how a due day reads, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, and the keys also step the open todo and open its pickers.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
   `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title, in the page's new todos and in the command palette's **Create todo**.
-- `web/components/notes/page.tsx`: the Notes page's searchable list and Markdown detail, todo and project pickers, deletion with Undo, and keyboard navigation.
-  `web/components/notes/nav.tsx` draws its sidebar's **All** and **From agents** lists and one list per unarchived project from `web/notes-views.ts`.
+- `web/components/notes/page.tsx`: the Notes page's searchable list and Markdown detail, todo picker, deletion with Undo, and keyboard navigation.
+  `web/components/notes/nav.tsx` draws its sidebar's **All** and **From agents** lists from `web/notes-views.ts`.
   A top-level todo's `detail.tsx` lists linked notes and creates a note with its todo id.
   `web/palette-records.ts` includes note titles and bodies in command-menu search.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
   It, the Calendar page, and the session rows read the time through `web/use-minute.ts`, one timer renewed each minute for every component that reads it.
   The session rows, the pull request rows, and the bell's notices show how long ago something was with `Age` from `web/components/age.tsx`, which words it with `age` from `web/labels.ts` and counts up on that timer.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
-- `web/components/projects/projects-page.tsx`: the Projects page, its list, its **New project** form at `#projects/new`, which sends `project-create` with the model and effort, and one project's page: its coordinator, its workers with their phases and last replies, its waiting updates, and its notes from `GET /api/project-notes`, which open in the file dialog, its queue, **At most**, **Subscriptions** and the review cadence, with **Rename**, **Archive**, and **Unarchive**.
-  `web/components/projects/project-parts.tsx` holds what the page shares with the coordinator's sidebar: `PHASE_LABEL`, the fields' `FIELD` look, and `ProjectNotesList`, which lists the project's Notes page notes before its notes trees.
-  `web/components/projects/project-settings.tsx` holds a project's settings: `MaxWorkersField` and `ProjectSubscriptions`, whose Linear filter and review cadence are `SavedField`s.
 - `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it, including Google events and the events kept on this computer read with `web/reads.ts`, and the delete button of each event in the day's list that is kept on this computer or in a Google calendar you may write to.
   It draws the month's grid and each day's hover card itself, and takes the month and year menus and arrows from Kibo UI's calendar, `web/components/kibo-ui/calendar/index.tsx`, whose month and year live in jotai atoms, so the page keeps its month while you leave and come back.
   `web/components/calendar/new-event.tsx` holds `NewEventDialog`, which **New event** and C open: a title, all day or a start and end time, and the calendar, one of `calendarChoices` in `web/calendar-model.ts`, the last one used kept in localStorage; it sends the event and hands the page what the server answered.

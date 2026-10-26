@@ -41,7 +41,7 @@ test("a run from before `outcome` reads its command result, and a malformed or m
 	]);
 });
 
-test("an older file keeps its other routines, reads one schedule as a list, and a run's queue and started sessions as an outcome, and drops a pull request routine", () => {
+test("an older file keeps its other routines, reads one schedule as a list, and a run's queue and started sessions as an outcome, and drops a pull request or project routine", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -69,7 +69,14 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 		name: "Reviews",
 		task: { kind: "pull-requests", action: "review" },
 	};
-	writeFileSync(path, JSON.stringify({ routines: [reviews, command, { ...reviews, name: "" }] }));
+	const updates = {
+		...command,
+		id: "r3",
+		name: "Updates",
+		task: { kind: "project", projectId: "p1", prompt: "Check #billing-bugs." },
+		runs: [{ at: 1, outcome: { kind: "project", projectId: "p1" }, errors: [] }],
+	};
+	writeFileSync(path, JSON.stringify({ routines: [reviews, command, { ...reviews, name: "" }, updates] }));
 	const file = new RoutinesFile(path);
 	const { schedule, done: _done, runs: _runs, ...kept } = command;
 	expect(file.value).toEqual([

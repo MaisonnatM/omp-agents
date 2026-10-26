@@ -10,7 +10,12 @@ import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
 import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
-import type { ProjectJoin, ProjectLaunch } from "./project-runner";
+
+/** How a start joins the server: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
+export interface SessionJoin {
+	rpc: RpcLaunch;
+	attach(session: { instanceId: string; sessionId: string; cwd: string }): void;
+}
 
 interface Started {
 	session: DashboardSession;
@@ -33,13 +38,12 @@ export interface StartEnv {
 	onStarted(): void;
 	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
 	linkTodo(todoId: string, sessionId: string): void;
-	/** How a start joins a project: the one `project` names, else the one a resumed session belongs to, else none. */
-	projects: { launchFor(request: StartRequest, project: ProjectLaunch | null): ProjectJoin };
+	/** How a start, or the resume of an attached session, joins the server. */
+	joinFor(request: StartRequest): SessionJoin;
 	mayDiscardReplay(cwd: string): Promise<string | null>;
 }
 
-/** Starts `request`; `project` is the project runner's reason for it, which a page's start never has. */
-export type Starter = (request: StartRequest, project: ProjectLaunch | null) => Promise<StartResult>;
+export type Starter = (request: StartRequest) => Promise<StartResult>;
 
 /** Runs `start` requests; one ready session per success, none on failure. */
 export function createStarter(env: StartEnv): Starter {
@@ -56,7 +60,7 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its project's extensions and host tools. */
+	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools. */
 	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<{ started: Started } | { error: string }> {
 		switch (request.kind) {
 			case "new": {
@@ -121,8 +125,8 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	return async (request, project) => {
-		const join = env.projects.launchFor(request, project);
+	return async request => {
+		const join = env.joinFor(request);
 		const outcome = await spawnFor(request, join.rpc);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
@@ -131,7 +135,7 @@ export function createStarter(env: StartEnv): Starter {
 			const cleanup = await Promise.resolve(outcome.started.discard?.()).then(() => "", error => `; ${errorText(error)}`);
 			return { ok: false, error: `omp exited as the session started.${cleanup}` };
 		}
-		// The todo and the project link first, so the session's first turn already knows the todo it works on and its role.
+		// The todo links first, so the session's first turn already knows the todo it works on.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		join.attach(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
@@ -149,12 +153,12 @@ interface Attached {
 }
 
 /** Attaches to session `instanceId`; `null` when it cannot, which leaves its omp running for the next server. */
-async function attach(sessions: LiveSessions, projects: StartEnv["projects"], instanceId: string): Promise<Attached | null> {
+async function attach(sessions: LiveSessions, joinFor: StartEnv["joinFor"], instanceId: string): Promise<Attached | null> {
 	const { emit } = sessions.allocate(instanceId);
 	const held: DashboardUpdate[] = [];
 	let report = (update: DashboardUpdate): void => void held.push(update);
 	try {
-		const session = await DashboardSession.reattach(instanceId, sessionId => projects.launchFor({ kind: "resume", sessionId }, null).rpc.tools, update => report(update));
+		const session = await DashboardSession.reattach(instanceId, sessionId => joinFor({ kind: "resume", sessionId }).rpc.tools, update => report(update));
 		return {
 			session,
 			publish: () => {
@@ -170,18 +174,18 @@ async function attach(sessions: LiveSessions, projects: StartEnv["projects"], in
 
 /**
  * Attaches to every session a previous server started whose omp still runs, and hands `recover` the session ids of
- * those that survived. Only then does it list each again in its project, under the instance id it had, and pass on what
- * it reported, so no report reaches the server before it knows which sessions survived. One it reaches but cannot
- * attach to runs on unlisted, and the next server tries again.
+ * those that survived. Only then does it list each again, under the instance id it had, and pass on what it reported,
+ * so no report reaches the server before it knows which sessions survived. One it reaches but cannot attach to runs on
+ * unlisted, and the next server tries again.
  */
-export async function reattachAll(sessions: LiveSessions, projects: StartEnv["projects"], recover: (survived: ReadonlySet<string>) => void): Promise<void> {
-	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, projects, instanceId)))).filter(
+export async function reattachAll(sessions: LiveSessions, joinFor: StartEnv["joinFor"], recover: (survived: ReadonlySet<string>) => void): Promise<void> {
+	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, joinFor, instanceId)))).filter(
 		(kept): kept is Attached => kept !== null && !kept.session.finished(),
 	);
 	recover(new Set(attached.map(({ session }) => session.sessionId)));
 	for (const { session, publish } of attached) {
 		sessions.add(session, null);
-		projects.launchFor({ kind: "resume", sessionId: session.sessionId }, null).attach(session);
+		joinFor({ kind: "resume", sessionId: session.sessionId }).attach(session);
 		publish();
 	}
 }

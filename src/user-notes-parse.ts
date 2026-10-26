@@ -23,12 +23,12 @@ interface Fields {
 const STORED: Fields = { id: isString, title: isString, body: isString };
 const SENT: Fields = { id: isTodoId, title: isTitle, body: isBody };
 
-/** A note; one with no body, todo, project, author, or update time reads as having none, updated when it was added. */
+/** A note; one with no body, todo, author, or update time reads as having none, updated when it was added. Other fields drop. */
 function parseNote(value: unknown, fields: Fields): UserNote | null {
 	if (!isObject(value)) return null;
-	const { id, title, body = "", todoId = null, projectId = null, addedBy = null, createdAt, updatedAt = createdAt } = value;
-	if (!fields.id(id) || !fields.title(title) || !fields.body(body) || !isOptionalId(todoId) || !isOptionalId(projectId) || !isOptionalId(addedBy)) return null;
-	return isTime(createdAt) && isTime(updatedAt) ? { id, title, body, todoId, projectId, addedBy, createdAt, updatedAt } : null;
+	const { id, title, body = "", todoId = null, addedBy = null, createdAt, updatedAt = createdAt } = value;
+	if (!fields.id(id) || !fields.title(title) || !fields.body(body) || !isOptionalId(todoId) || !isOptionalId(addedBy)) return null;
+	return isTime(createdAt) && isTime(updatedAt) ? { id, title, body, todoId, addedBy, createdAt, updatedAt } : null;
 }
 
 /** The list `notes.json` holds, the most recently updated first, `null` when it holds none. */
@@ -66,8 +66,6 @@ export function parseNoteChange(value: unknown): UserNoteChange | null {
 			return isBody(value.text) && isTime(at) ? { op, id, text: value.text, at } : null;
 		case "set-todo":
 			return isOptionalId(value.todoId) ? { op, id, todoId: value.todoId } : null;
-		case "set-project":
-			return isOptionalId(value.projectId) ? { op, id, projectId: value.projectId } : null;
 		case "remove":
 			return { op, id };
 		default:

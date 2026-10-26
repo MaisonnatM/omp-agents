@@ -65,7 +65,7 @@ The same `turn-started` cancels a continue the session waits on, and only a `tur
 `turn-ended` sets the turn with `markUnread` and always pushes the roster; `turn-started` clears it with `markRead` and pushes the roster only when a turn was unread.
 A page sends `{ t: "read", instanceId }` while a pane shows the session's main agent in a focused window, which `LiveSessions.markRead` clears for every page.
 
-`useAttention` in `web/use-attention.ts`, over the pure rules in `web/attention.ts`, leaves out a project's workers, which answer to their coordinator, and counts the rest that need you for the desktop's badge.
+`useAttention` in `web/use-attention.ts`, over the pure rules in `web/attention.ts`, counts the live sessions that need you for the desktop's badge.
 Each session raises at most one alert at a time, for what it waits on: its oldest open question, else a wait with no question relayed, else its unread turn.
 `attend` keeps an episode per live session: the first roster that shows a session hears its wait and raises nothing, so neither a page that loads nor a terminal session that joins after the socket's first roster raises what already waited.
 A wait with no question raises only when it starts after the page saw the session not need you, and a question that follows it in the same wait is the question the host replays after a guest's welcome, so it raises nothing.

@@ -30,7 +30,6 @@
   The selected workspace applies to the group too.
   The server keeps the pins in `pins.json` beside its access token, by session id, so every browser tab and the desktop app show the same ones.
   Pins that a browser kept before then move to the server the first time its page connects.
-- Each project lists its coordinator and workers in a group of its own at the top of the list, above **Pinned**, even when they run in `/tmp`; see [Projects](projects.md).
 - A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
   A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
   The group shows only while it has a row.

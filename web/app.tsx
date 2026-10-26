@@ -21,7 +21,6 @@ import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
-import { ProjectDetails } from "./components/project-details";
 import { ScheduledSends } from "./components/scheduled";
 import { SessionDetails } from "./components/session-details";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
@@ -65,9 +64,7 @@ export function App() {
 	const scope = useWorkspaceScope(state);
 	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds } = scope;
 	const focused = useFocusedSession(state, page, scope);
-	// Every session, `/tmp` and hidden directories too: a project lists its sessions wherever they run.
-	const projectSources = useMemo(() => ({ projects: state.projects, hosts: state.hosts, past: state.past }), [state.projects, state.hosts, state.past]);
-	const sessions = useSessionLists(scope, projectSources, state.pins, changePins);
+	const sessions = useSessionLists(scope, state.pins, changePins);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
@@ -84,8 +81,6 @@ export function App() {
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
-	/** The project the focused session coordinates, whose sidebar replaces the session's, since a coordinator changes no code; a subagent's view has no `sessionId` and keeps the session's. */
-	const coordinated = focused.sessionId === null ? undefined : state.projects.find(project => project.coordinator.sessionId === focused.sessionId);
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
@@ -213,7 +208,6 @@ export function App() {
 											userTodos={state.userTodos}
 											userNotes={state.userNotes}
 											notesView={notesView}
-											projects={state.projects}
 											hosts={state.hosts}
 											notices={state.notices}
 											past={state.past}
@@ -245,7 +239,6 @@ export function App() {
 																userTodos={state.userTodos}
 																userNotes={state.userNotes}
 																routines={state.routines}
-																projects={state.projects}
 																workspaceList={state.workspaceList}
 																pins={state.pins}
 																newSessionCompletions={state.newSessionCompletions}
@@ -253,7 +246,6 @@ export function App() {
 																listed={state.listed}
 																rosterError={state.rosterError}
 																newStart={startOf(state.starts, "new")}
-																projectStart={startOf(state.starts, "project")}
 																scope={scope}
 																defaultWorkspace={defaultWorkspace}
 																sectionTarget={sectionTarget}
@@ -278,29 +270,16 @@ export function App() {
 									</SidebarInset>
 									{detailsView && (
 										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-											{coordinated ? (
-												<ProjectDetails
-													key={hashForView(detailsView)}
-													project={coordinated}
-													working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-													cwd={focused.cwd ?? null}
-													workspace={workspace}
-													hosts={state.hosts}
-													past={state.past}
-													current={detailsView.kind === "live" ? detailsView.instanceId : null}
-												/>
-											) : (
-												<SessionDetails
-													key={hashForView(detailsView)}
-													view={detailsView}
-													working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-													cwd={focused.cwd ?? null}
-													pullRequests={focused.row?.pullRequests ?? []}
-													tickets={focused.row?.tickets ?? []}
-													workspace={workspace}
-													hosts={visible.hosts}
-												/>
-											)}
+											<SessionDetails
+												key={hashForView(detailsView)}
+												view={detailsView}
+												working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+												cwd={focused.cwd ?? null}
+												pullRequests={focused.row?.pullRequests ?? []}
+												tickets={focused.row?.tickets ?? []}
+												workspace={workspace}
+												hosts={visible.hosts}
+											/>
 										</DashboardSidebar>
 									)}
 									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
@@ -325,7 +304,6 @@ export function App() {
 										todos={mentionLists.todos}
 										notes={state.userNotes?.notes ?? null}
 										linearConnected={linearCallable}
-										projects={state.projects}
 										onCreateTicket={setNewTicket}
 									/>
 								</SidebarProvider>

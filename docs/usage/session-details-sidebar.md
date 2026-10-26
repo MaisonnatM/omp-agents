@@ -8,8 +8,6 @@
   The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
   A saved choice of the former **Files**, **Media**, or **Processes** tab falls back to **PRs**.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
-- A project's coordinator, which changes no code itself, gets other tabs instead: **Workers**, **Notes**, and **PRs**; see [Projects](projects.md).
-  It remembers its own tab, **Workers** at first, apart from a session's.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A pull request the session only read shows only when the session's own prompt names it, as `#7049` or `PR 7049`; see [Pull requests](pull-requests.md).
   The first one shows until you pick another from the header's **N/M** stack menu, the same popover as the session header's pull request button, or from its **Also on this session** list, which says whether the session submitted or worked on each pull request.

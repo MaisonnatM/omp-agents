@@ -135,9 +135,9 @@ test("Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", 
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then N, R, P, W, or I goes to a page only right after a plain G, and P alone picks a todo's priority", () => {
+test("G then N, R, W, or I goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	// R alone replies on an open conversation, so after a G both match, as G then P does below.
+	// R alone replies on an open conversation, so after a G both match.
 	expect(after("g", "r")).toEqual(["routines", "inboxReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "i")).toEqual(["inbox"]);
@@ -147,8 +147,7 @@ test("G then N, R, P, W, or I goes to a page only right after a plain G, and P a
 	expect(after(null, "w")).toEqual([]);
 	expect(after("h", "w")).toEqual([]);
 	expect(after("g", "W", { shift: true })).toEqual([]);
-	// P alone is the Todo page's priority key, so after a G both match; the test below decides between them.
-	expect(after("g", "p")).toEqual(["projects", "todoPriority"]);
+	expect(after("g", "p")).toEqual(["todoPriority"]);
 	expect(after(null, "p")).toEqual(["todoPriority"]);
 	expect(after("g", "i", { ctrl: true })).toEqual(["focusComposer"]);
 	expect(shortcutsFor(keyEvent("w", "KeyW"), "g", false)).toEqual([{ id: "workspace", scope: "outside-fields", key: 0 }]);
@@ -173,19 +172,6 @@ test("1 to 9 outside text fields answer the open question, and its handler learn
 	stack.dispatch(declined, true, null);
 	expect(picked).toEqual([1]);
 	expect(declined.defaultPrevented).toBe(false);
-});
-
-test("G then P picks the priority while a todo is focused or open, and opens Projects otherwise, the Todo page included", () => {
-	const stack = createShortcutStack();
-	const calls: string[] = [];
-	let todoFocused = true;
-	stack.add(1, () => ({ projects: () => void calls.push("projects") }));
-	// A page outranks the App, and the Todo page's P declines while no todo is focused or open.
-	stack.add(2, () => ({ todoPriority: () => (todoFocused ? void calls.push("priority") : false) }));
-	stack.dispatch(pressed("p", "KeyP"), true, "g");
-	todoFocused = false;
-	stack.dispatch(pressed("p", "KeyP"), true, "g");
-	expect(calls).toEqual(["priority", "projects"]);
 });
 
 test("a pair forms from a plain key outside text fields, within a second and a half", () => {

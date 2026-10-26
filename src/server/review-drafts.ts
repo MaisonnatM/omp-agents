@@ -1,9 +1,10 @@
 /**
  * The review drafts on the server: the `save_review_draft` tool a Review session gets, bound to its pull request and
- * served over omp's RPC like a project's tools; the page's edits; and the post of a draft as one GitHub review, at most
+ * served over omp's RPC; the page's edits; and the post of a draft as one GitHub review, at most
  * once, however often it is asked.
  */
 import type { RpcHostTool } from "../omp/modules";
+import { PLAIN_LAUNCH } from "../omp/rpc";
 import { MAX_COMMENT_BODY, type PullRequest, prKey, pullRequestName } from "../shared/github";
 import {
 	postRefusal,
@@ -23,8 +24,8 @@ import {
 } from "../shared/review-drafts";
 import type { StartRequest } from "../shared/sessions";
 import type { ReviewTarget, SubmittedComment, SubmittedReview } from "../pull-request-review";
-import type { ProjectJoin } from "./project-runner";
 import type { ReviewDraftsFile } from "./review-drafts-file";
+import type { SessionJoin } from "./start";
 
 /** What posting asks of GitHub. */
 export interface ReviewGitHub {
@@ -72,16 +73,16 @@ export class ReviewDrafts {
 	}
 
 	/**
-	 * `join` with the review tool added for a Review start, or the resume of a session that reviews: the tool is bound to
-	 * the pull request, which the session cannot change, and the session is remembered as its reviewer once it is live.
+	 * How `request` joins the server: with the review tool for a Review start, or the resume of a session that reviews;
+	 * the tool is bound to the pull request, which the session cannot change, and the session is remembered as its
+	 * reviewer once it is live. Any other start launches plain.
 	 */
-	join(request: StartRequest, join: ProjectJoin): ProjectJoin {
+	join(request: StartRequest): SessionJoin {
 		const pr = this.#reviewedBy(request);
-		if (!pr) return join;
+		if (!pr) return { rpc: PLAIN_LAUNCH, attach() {} };
 		return {
-			rpc: { ...join.rpc, tools: [...join.rpc.tools, this.#tool(pr)] },
+			rpc: { ...PLAIN_LAUNCH, tools: [this.#tool(pr)] },
 			attach: session => {
-				join.attach(session);
 				this.#live.set(session.instanceId, session.sessionId);
 				this.#deps.file.apply({ op: "bind", reviewer: { sessionId: session.sessionId, pr } });
 			},

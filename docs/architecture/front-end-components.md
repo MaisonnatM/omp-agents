@@ -26,7 +26,7 @@ Both share Base UI's menu items, so each row builds one item list and both menus
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
 It leaves a right-click inside a popup the row portals out, such as a picker's search field, to the browser, since React passes that event up to the row.
 
-A session's or project's PRs sidebar holds the PR it shows and its detail tab in `SessionPullRequestsTab`'s component state, keyed by the session or project, so nothing is stored.
+A session's PRs sidebar holds the PR it shows and its detail tab in `SessionPullRequestsTab`'s component state, keyed by the session, so nothing is stored.
 Only the main PR detail registers the copy-number and copy-link shortcuts.
 
 Every fixed list of choices uses shadcn's Base UI `select`, vendored as `web/components/ui/select.tsx` with the menu's popup and row look, in place of the browser's `<select>`.

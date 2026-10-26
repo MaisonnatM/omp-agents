@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalSto
 import type { DesktopBridge, SessionAlert } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
-import { type Attention, attend, needsYou, unreadShown, yourSessions } from "./attention";
+import { type Attention, attend, needsYou, unreadShown } from "./attention";
 import type { DashboardState } from "./dashboard-state";
 import type { Page } from "./routing";
 import { useStoredState } from "./stored-state";
@@ -93,11 +93,10 @@ const NO_VIEWS: View[] = [];
 
 /** Keeps the Dock badge, the notifications, and the read turns in step with the roster. */
 export function useAttention(state: DashboardState, page: Page | null, send: (msg: ClientMsg) => void): void {
-	const { hosts, projects, connected, layout } = state;
+	const { hosts, connected, layout } = state;
 	const { on } = useSessionNotifications();
 	const focused = useSyncExternalStore(subscribeFocus, () => document.hasFocus());
-	const yours = useMemo(() => yourSessions(hosts, projects), [hosts, projects]);
-	const count = connected ? yours.filter(needsYou).length : 0;
+	const count = connected ? hosts.filter(needsYou).length : 0;
 	useEffect(() => desktop?.badge(count), [count]);
 
 	const attention = useRef<Attention>(new Map());
@@ -105,10 +104,10 @@ export function useAttention(state: DashboardState, page: Page | null, send: (ms
 	// The desktop shell asks its window instead, which knows whether the app is in front.
 	raising.current = on && (desktop !== undefined || !focused);
 	useEffect(() => {
-		const { raise: fresh, attention: next } = attend(attention.current, yours);
+		const { raise: fresh, attention: next } = attend(attention.current, hosts);
 		attention.current = next;
 		if (raising.current) for (const alert of fresh) raise(alert);
-	}, [yours]);
+	}, [hosts]);
 
 	// A maximized pane hides the others, and a page hides them all.
 	const shown = useMemo(() => (page ? NO_VIEWS : layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes), [page, layout]);

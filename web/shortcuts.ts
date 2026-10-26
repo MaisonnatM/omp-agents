@@ -40,7 +40,6 @@ export type ShortcutId =
 	| "calendar"
 	| "inbox"
 	| "routines"
-	| "projects"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -236,8 +235,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "inbox", category: "general", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
 	// After a G, R is also the Inbox page's `inboxReply`: the page outranks the App, so G then R replies while a conversation is open.
 	{ id: "routines", category: "general", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
-	// After a G, P is also the Todo page's `todoPriority`: the page outranks the App, so the priority wins while a todo is focused or open, and its handler declines otherwise.
-	{ id: "projects", category: "general", label: "Go to your projects", command: "Go to projects", keys: [{ goTo: "p" }] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

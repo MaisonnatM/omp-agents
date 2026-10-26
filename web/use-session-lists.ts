@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { latestSession, listedViews, type ProjectSources, searchSessions, type SidebarSessions, sidebarSessions, waitingCount } from "./sessions";
+import { latestSession, listedViews, searchSessions, type SidebarSessions, sidebarSessions, waitingCount } from "./sessions";
 import type { PinChange } from "../src/shared/pins";
 import type { View } from "../src/shared/sessions";
 import type { WorkspaceScope } from "./use-workspace-scope";
@@ -23,10 +23,9 @@ export interface SessionLists {
 	latest: View | null;
 }
 
-/** The sidebar's session lists for the selected workspace, its search, and the server's pins, which `changePins` changes; `sources` lists the projects' sessions wherever they run. */
+/** The sidebar's session lists for the selected workspace, its search, and the server's pins, which `changePins` changes. */
 export function useSessionLists(
 	{ visible, workspace }: Pick<WorkspaceScope, "visible" | "workspace">,
-	sources: ProjectSources,
 	pins: string[],
 	changePins: (change: PinChange) => void,
 ): SessionLists {
@@ -38,7 +37,7 @@ export function useSessionLists(
 		[changePins],
 	);
 	const [query, setQuery] = useState("");
-	const workspaceLists = useMemo(() => sidebarSessions(visible.hosts, visible.past, workspace, pinned, sources), [visible, workspace, pinned, sources]);
+	const workspaceLists = useMemo(() => sidebarSessions(visible.hosts, visible.past, workspace, pinned), [visible, workspace, pinned]);
 	const lists = useMemo(() => searchSessions(workspaceLists, query), [workspaceLists, query]);
 	const listed = useMemo(() => listedViews(lists), [lists]);
 	const waiting = useMemo(() => waitingCount(workspaceLists), [workspaceLists]);

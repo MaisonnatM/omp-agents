@@ -1,7 +1,7 @@
 /**
  * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a queued run is on disk before the runner starts anything from it.
- * A routine whose task was pull requests is dropped on load. The rest of the file stays.
+ * A routine whose task was pull requests or a project's prompt is dropped on load. The rest of the file stays.
  * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
  */
 import { ReducerFile } from "../fs";
@@ -40,7 +40,6 @@ function parseRun(value: unknown): RoutineRun | null {
 		let parsed: RoutineOutcome | null = null;
 		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = { kind: "pending", queued: outcome.queued };
 		if (outcome.kind === "session" && typeof outcome.instanceId === "string" && typeof outcome.sessionId === "string") parsed = { kind: "session", instanceId: outcome.instanceId, sessionId: outcome.sessionId };
-		if (outcome.kind === "project" && typeof outcome.projectId === "string") parsed = { kind: "project", projectId: outcome.projectId };
 		if (outcome.kind === "command") {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
@@ -57,10 +56,15 @@ function parseRun(value: unknown): RoutineRun | null {
 	return { at: value.at, outcome, errors: value.errors };
 }
 
-const isPullRequestRoutine = (value: unknown): boolean => isObject(value) && isObject(value.task) && value.task.kind === "pull-requests";
+/** What a routine of each task kind routines no longer run did, by kind; such a routine is dropped on load. */
+const DROPPED_TASKS = new Map([
+	["pull-requests", "reviewed pull requests"],
+	["project", "sent its prompt to a project"],
+]);
 
-function parseRoutine(value: unknown): Routine | "drop" | null {
-	if (isPullRequestRoutine(value)) return "drop";
+function parseRoutine(value: unknown): Routine | { dropped: string } | null {
+	const dropped = isObject(value) && isObject(value.task) && typeof value.task.kind === "string" ? DROPPED_TASKS.get(value.task.kind) : undefined;
+	if (dropped) return { dropped };
 	if (!isObject(value)) return null;
 	const { task } = value;
 	const spec = parseRoutineSpec({
@@ -80,9 +84,9 @@ function parseRoutines(value: unknown): Routine[] | null {
 	for (const entry of value.routines) {
 		const routine = parseRoutine(entry);
 		if (routine === null) return null;
-		if (routine === "drop") {
+		if ("dropped" in routine) {
 			const name = isObject(entry) && typeof entry.name === "string" && entry.name ? entry.name : "unnamed";
-			console.error(`omp-agents: dropped routine "${name}", which reviewed pull requests`);
+			console.error(`omp-agents: dropped routine "${name}", which ${routine.dropped}`);
 			continue;
 		}
 		routines.push(routine);
@@ -116,11 +120,6 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 	/** Records the command of the run at `at` as it launches and again as it ends. */
 	command(id: string, at: number, command: CommandRun): void {
 		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "command", run: command } }));
-	}
-
-	/** The run at `at` sent its prompt to project `projectId`. */
-	notified(id: string, at: number, projectId: string): void {
-		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "project", projectId } }));
 	}
 
 	/** Records why the run at `at` could not start something; the same error twice in a row records once, so a retry each tick does not pile up. */

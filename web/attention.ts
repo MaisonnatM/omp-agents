@@ -1,14 +1,7 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
-import type { Project } from "../src/shared/projects";
 import { hashForSession, type RosterHost, type View } from "../src/shared/sessions";
 import { hostLabel } from "./labels";
-
-/** The live sessions that answer to you: a project's workers answer to its coordinator, which hears when they finish or ask. */
-export function yourSessions(hosts: readonly RosterHost[], projects: readonly Project[]): RosterHost[] {
-	const workers = new Set(projects.flatMap(project => project.workers.map(worker => worker.sessionId)));
-	return hosts.filter(host => !workers.has(host.sessionId));
-}
 
 /** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since. */
 export const needsYou = (host: RosterHost): boolean => host.status === "needs-input" || host.unread !== null;

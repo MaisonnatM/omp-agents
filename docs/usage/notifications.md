@@ -1,7 +1,7 @@
 # Notifications
 
 - The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
-- Seven sources feed it.
+- Six sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
@@ -22,10 +22,9 @@
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
   - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
     All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
-  - **Projects**: a project that needs you, checked every minute: a worker's question its coordinator left unanswered once the coordinator is idle or stopped, a worker that stopped without **End session**, and a project whose workers are all done with nothing left for its coordinator.
   - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **End session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
     They are the interrupted sessions of the sessions sidebar whose turn ran, checked as the dashboard starts, every minute, and each time one stops, resumes, or moves to past.
-- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, **Projects**, **Sessions**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
+- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, **Sessions**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
@@ -56,7 +55,7 @@
   Its title is the session's, and its text is the question, or the first line of the turn's last reply.
   Clicking it brings the window up on that session.
 - Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before; a session that asks while its turn is unread notifies the question.
-  A session that already waited when the page loads, or when the page reconnects, raises none, and neither do a project's workers, whose coordinator hears when they finish or ask.
+  A session that already waited when the page loads, or when the page reconnects, raises none.
 - A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window and tab agrees.
 - The desktop app shows them unless **Settings › Preferences › Notifications** turns them off.
   A browser shows them only once you turn that switch on and allow the dashboard's notifications when the browser asks; when it blocks them, the switch says so.
