@@ -32,15 +32,20 @@ extension({
 if (input.command) {
 	if (!gate) throw new Error("No command gate registered");
 	const result = await gate({ toolName: "bash", input: { command: input.command } }, {
-		cwd: process.cwd(), hasUI: true,
+		cwd: input.cwd ?? process.cwd(), hasUI: true,
 		ui: { async confirm() { confirmations++; return input.approve; } },
 	});
 	console.log(JSON.stringify({ result: result ?? null, confirmations }));
 } else if (input.write) {
 	// attempts repeats the call, as an agent retrying after a block does; the last answer counts.
+	// A session with a UI answers a confirmation with input.approve; without input.approve the session has no UI.
+	const ctx = {
+		cwd: process.cwd(), sessionManager, agent: { kind: "main" }, hasUI: input.approve !== undefined,
+		ui: { async confirm() { confirmations++; return input.approve; } },
+	};
 	let result;
-	for (let i = 0; i < (input.attempts ?? 1); i++) result = await gate({ toolName: "write", input: { path: input.write } }, { cwd: process.cwd(), sessionManager, agent: { kind: "main" } });
-	console.log(JSON.stringify({ result: result ?? null }));
+	for (let i = 0; i < (input.attempts ?? 1); i++) result = await gate({ toolName: "write", input: { path: input.write } }, ctx);
+	console.log(JSON.stringify({ result: result ?? null, confirmations }));
 } else if (input.agentStart) {
 	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
@@ -129,6 +134,42 @@ describe("ship publication gate", () => {
 		expect(result?.block ?? false).toBe(gated);
 		expect(confirmations).toBe(0);
 	});
+
+	test("a publish run through `env` is gated", () => {
+		const { result, confirmations } = exercise("ship", {
+			command: "env -u GITHUB_TOKEN gt submit --publish", approve: true,
+			response: { code: 0, stdout: "Unreviewed PR", stderr: "" },
+		});
+		expect(result?.block).toBe(true);
+		expect(confirmations).toBe(0);
+	});
+
+	// gh reads GITHUB_TOKEN ahead of its keyring login; Bun loads it into omp from the project's `.env` unless the launch environment already set it.
+	test.each([["the token", true], ["ghp_launchValue", false]])("a rejected GITHUB_TOKEN with %s in the project's .env blames that file: %p", (fileValue, blamed) => {
+		const project = mkdtempSync(join(tmpdir(), "ship-auth-"));
+		const token = "ghp_rejectedTokenForTest0000000000000000";
+		writeFileSync(join(project, ".env"), `GITHUB_TOKEN=${fileValue === "the token" ? token : fileValue}\n`);
+		const hosts = {
+			"github.com": [
+				{ state: "error", error: "non-200 OK status code: 401 Unauthorized", active: true, host: "github.com", login: "", tokenSource: "GITHUB_TOKEN", gitProtocol: "ssh" },
+				{ state: "success", active: false, host: "github.com", login: "octocat", tokenSource: "keyring", scopes: "repo", gitProtocol: "ssh" },
+			],
+		};
+		const { result } = exercise("ship", {
+			command: "gt submit --publish", cwd: project,
+			responses: {
+				"pr view": { code: 1, stdout: "", stderr: "HTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login -h github.com" },
+				"auth status": { code: 0, stdout: JSON.stringify({ hosts }), stderr: "" },
+			},
+		}, { GITHUB_TOKEN: token });
+		rmSync(project, { recursive: true, force: true });
+		expect(result?.block).toBe(true);
+		expect(result?.reason).toContain("`GITHUB_TOKEN`");
+		expect(result?.reason).toContain("octocat");
+		expect(result?.reason.includes(join(project, ".env"))).toBe(blamed);
+		expect(result?.reason).not.toContain("gh auth login");
+		expect(result?.reason).not.toContain(token);
+	});
 });
 
 describe("ship_stage ready gate", () => {
@@ -159,6 +200,9 @@ describe("worktree guard", () => {
 	writeFileSync(join(root, "isolated", ".omp-isolation-owner.json"), "{}");
 	git("clone", "-q", "main", "isolated/m");
 	git("clone", "-q", "main", "plain");
+	writeFileSync(join(root, "main", ".gitignore"), ".env\nforced.txt\n");
+	writeFileSync(join(root, "main", "forced.txt"), "");
+	git("-C", "main", "add", "-f", "forced.txt");
 	afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 	test.each([["main", true], ["plain", true], ["feature", false], ["isolated/m", false]])("a first write in the %s clone", (checkout, blocked) => {
@@ -170,6 +214,25 @@ describe("worktree guard", () => {
 	test.each([["main", true], ["downstream", true], ["feature", false]])("a retried write in the %s checkout is blocked: %s", (checkout, blocked) => {
 		const { result } = exercise("worktree-guard", { write: join(root, checkout, "file.txt"), attempts: 2 });
 		expect(result?.block ?? false).toBe(blocked);
+	});
+
+	// No worktree has an ignored file such as `.env`, so only the user's approval lets the agent edit it in the main checkout.
+	test.each([[true, false], [false, true]])("an ignored file in the main checkout, approved %p, is blocked: %p", (approve, blocked) => {
+		const { result, confirmations } = exercise("worktree-guard", { write: join(root, "main", ".env"), approve });
+		expect(result?.block ?? false).toBe(blocked);
+		expect(confirmations).toBe(1);
+	});
+
+	test("an ignored file in a session that cannot ask stays blocked without sending the agent to a worktree", () => {
+		const { result } = exercise("worktree-guard", { write: join(root, "main", ".env") });
+		expect(result?.block).toBe(true);
+		expect(result?.reason).not.toContain("git worktree add");
+	});
+
+	test.each(["file.txt", "forced.txt"])("%s, which git does not ignore, is blocked without asking", file => {
+		const { result, confirmations } = exercise("worktree-guard", { write: join(root, "main", file), approve: true });
+		expect(result?.block).toBe(true);
+		expect(confirmations).toBe(0);
 	});
 });
 
