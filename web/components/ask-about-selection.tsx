@@ -3,6 +3,7 @@ import { MessageCircleQuestion } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { activityControl } from "../activity";
 import { type DiscussionOrigin, openDiscussion, quoteOf } from "../discussions";
 import { useDashboardActions } from "./dashboard-context";
 import { rememberFocus } from "./discussion-panel";
@@ -70,6 +71,7 @@ export function AskAboutSelection({ origin, children }: { origin: Omit<Discussio
 				createPortal(
 					<div className="fixed z-50" style={{ top: anchor.top, left: anchor.left }}>
 						<Button
+							{...activityControl("ask-about.open")}
 							variant="secondary"
 							size="compact"
 							leadingIcon={MessageCircleQuestion}

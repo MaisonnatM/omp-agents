@@ -36,6 +36,13 @@ Servers on different ports share `~/.config/omp-agents`, so `server.lock` names 
 Two servers running them would start every routine twice.
 See [One server runs the unattended work](architecture/routines.md#one-server-runs-the-unattended-work).
 
+## Record activity by registry id, on the owner only
+
+Settings › Activity keys every event by an id from a registry the code already has: the page kinds, `SETTINGS_SECTIONS`, `SHORTCUTS`, socket message types, `PUT` routes, and `CONTROLS`.
+No key holds what the user sees or types, so the history is safe to keep and a feature with no use shows up by comparing the registries with the counts.
+Only the server holding `server.lock` stores events, so a smoke server on the same state never counts as use.
+See [Activity](architecture/activity.md).
+
 ## Keep Notes page entries in one server-owned JSON file
 
 Notes live in `notes.json`, not individual Markdown files.
@@ -147,8 +154,17 @@ See [Pull request details](usage/pull-request-details.md) and [HTTP API: pull re
 
 ## The page keeps the token in localStorage, not a cookie
 
-The sign-in address keeps the token in the dashboard origin's `localStorage`, and the page sends it as `Authorization: Bearer`, or as the socket's `bearer.<token>` subprotocol.
+The desktop window's preload writes the token into the dashboard origin's `localStorage`, and the page sends it as `Authorization: Bearer`, or as the socket's `bearer.<token>` subprotocol.
 Browsers send a cookie for `127.0.0.1` to every port of that host, so any program listening on another port could log it; `localStorage` belongs to one port.
 An image, a video, or the mail frame cannot send a header, so their addresses carry a media key, an HMAC of the token that opens only those routes.
 The desktop shell checks a nonce's HMAC from `/api/hello` before it sends the token to whatever answers on the port.
 See [SECURITY.md](../SECURITY.md) and [Desktop shell](architecture/desktop-shell.md).
+
+## The dashboard runs only in the desktop app
+
+The desktop window is the one place the dashboard runs, so the page, its shortcuts, and its notifications answer to one surface instead of a window and every browser.
+No address carries the token: the server prints no sign-in address, `/?token=` signs nothing in, and the shell's main process hands `pageAccess` only to its own window's dashboard frame.
+A browser tab on the dashboard's address gets the page with no token, which says to open the app.
+The browser-only paths went with it: the sign-in page, and the Web `Notification` the page raised outside the app.
+Automation needs no sign-in address either: the agent smoke checks and the scripts in `scripts/` write `pageAccess(token)` into the page's `localStorage` themselves.
+See [SECURITY.md](../SECURITY.md), [Desktop shell](architecture/desktop-shell.md), and [Agent smoke checks](agent-smoke.md).

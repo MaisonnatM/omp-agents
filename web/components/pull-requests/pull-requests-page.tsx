@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../../activity";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { useRebasing } from "../../pull-request-rebases";
@@ -212,8 +213,8 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 							<RebaseBehindButton pulls={pulls} />
 							<SegmentedTabs value={view} onValueChange={next => onView(next as PullRequestsView)} activationMode="manual">
 								<SegmentedTabsList aria-label="View">
-									<SegmentedTab value="list">List</SegmentedTab>
-									<SegmentedTab value="board">Board</SegmentedTab>
+									<SegmentedTab {...activityControl("pull-requests.view.list")} value="list">List</SegmentedTab>
+									<SegmentedTab {...activityControl("pull-requests.view.board")} value="board">Board</SegmentedTab>
 								</SegmentedTabsList>
 							</SegmentedTabs>
 							<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />

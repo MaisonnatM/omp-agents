@@ -64,6 +64,8 @@ export const reviewDraftsFile = join(configDir, "review-drafts.json");
 export const settingsSyncFile = join(configDir, "settings-sync.json");
 /** The bare Git repository settings sync fetches into and commits from, in the dashboard's data directory. */
 export const settingsSyncRepo = join(dataDir, "settings-sync.git");
+/** The page's activity events, which Settings › Activity reports, in the dashboard's data directory; a machine file settings sync never carries. */
+export const activityDb = join(dataDir, "activity.db");
 /** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */
 export const oldGoogleFile = join(configDir, "google.json");
 /** Names the server that runs routines and applies the todo inbox, which servers side by side share, beside {@link tokenFile}. */

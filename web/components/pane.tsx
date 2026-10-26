@@ -5,6 +5,7 @@ import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import type { ModelList } from "../reads";
 import { hashForView } from "../routing";
 import { shortcutLabels } from "../shortcuts";
@@ -12,6 +13,7 @@ import type { ForkPoint } from "../transcript-view";
 import { Conversation } from "./conversation";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
+import { HeaderControlsContext, useHeaderControls } from "./header-controls";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { ReplayCompareDialog } from "./replay-compare";
@@ -24,7 +26,10 @@ interface PaneProps {
 	count: number;
 	focused: boolean;
 	maximized: boolean;
+	/** The pane in the grid's top right corner, which ends its header with the command menu and the bell. */
 	topRight: boolean;
+	/** The right sidebar shows the focused session's details, so the top right pane carries its toggle. */
+	hasDetails: boolean;
 	host: RosterHost | null;
 	lastHost: RosterHost | null;
 	session: PastSession | null;
@@ -42,9 +47,10 @@ const paneArea = (index: number, count: number): string =>
 
 /** It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed token never asks this pane to render. */
 export const Pane = memo(function Pane({
-	view, index, count, focused, maximized, topRight, host, lastHost, session, models, workspaces, onLayout, toggleRight, rightOpen,
+	view, index, count, focused, maximized, topRight, hasDetails, host, lastHost, session, models, workspaces, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
 	const { send, request, start, focus, open, end } = useDashboardActions();
+	const controls = useHeaderControls();
 	const { fork, resume } = useDashboardStatus().starts;
 	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const agents = host?.agents;
@@ -70,6 +76,7 @@ export const Pane = memo(function Pane({
 	const trajectoryToggle = (
 		<Tooltip content={trajectory ? "Show the transcript" : "Show the trajectory: each turn's injected context, model requests, tool calls, and token usage"} side="bottom">
 			<Button
+				{...activityControl("trajectory.toggle")}
 				variant="ghost"
 				size="icon-compact"
 				aria-label="Trajectory"
@@ -83,7 +90,7 @@ export const Pane = memo(function Pane({
 	);
 	const actions = (
 		<>
-			{replay && <Button size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
+			{replay && <Button {...activityControl("replay-compare.open")} size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
 			{count > 1 && (
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
@@ -98,7 +105,8 @@ export const Pane = memo(function Pane({
 					</Tooltip>
 				</>
 			)}
-			{topRight && <SidebarToggle side="right" open={rightOpen} onToggle={toggleRight} />}
+			{topRight && controls}
+			{topRight && hasDetails && <SidebarToggle side="right" open={rightOpen} onToggle={toggleRight} />}
 		</>
 	);
 	const content = view.kind === "past" ? (
@@ -132,14 +140,16 @@ export const Pane = memo(function Pane({
 			style={{ gridArea: maximized && focused ? "1 / 1 / -1 / -1" : paneArea(index, count) }}
 			className={cn("relative flex min-h-0 min-w-0 flex-col bg-background outline-none", maximized && (focused ? "z-10" : "invisible"))}
 		>
-			<SubagentLinks.Provider value={links}>
-				<FileBaseContext.Provider value={fileBase(view.kind === "past" ? session : (host ?? lastHost))}>
-					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
-						{content}
-						{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
-					</RenderBoundary>
-				</FileBaseContext.Provider>
-			</SubagentLinks.Provider>
+			<HeaderControlsContext.Provider value={null}>
+				<SubagentLinks.Provider value={links}>
+					<FileBaseContext.Provider value={fileBase(view.kind === "past" ? session : (host ?? lastHost))}>
+						<RenderBoundary resetKey={hashForView(view)} actions={actions}>
+							{content}
+							{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
+						</RenderBoundary>
+					</FileBaseContext.Provider>
+				</SubagentLinks.Provider>
+			</HeaderControlsContext.Provider>
 		</section>
 	);
 });

@@ -10,6 +10,7 @@ import { useShape } from "@/lib/shape-context";
 import { useSize } from "@/lib/size-context";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { modHeld } from "../shortcuts";
 
 const NONE: ReadonlySet<string> = new Set();
@@ -128,6 +129,7 @@ function SuggestionRow({ text, index, active, marked, optionId, registerItem, on
 
 	return (
 		<Row
+			{...activityControl("composer-suggestions.pick")}
 			ref={ref}
 			id={optionId}
 			role="option"
@@ -274,6 +276,7 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 						option, and the hover's gap click would send the nearest prompt instead. */}
 						{prompts.length > 1 && (
 							<Row
+								{...activityControl("composer-suggestions.send-all")}
 								aria-hidden="true"
 								onClick={sendAll}
 								sendKey={0}

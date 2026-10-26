@@ -1,12 +1,12 @@
 # omp-agents
 
-A local web dashboard for every [omp](https://omp.sh) session and subagent on your machine.
+A desktop app for every [omp](https://omp.sh) session and subagent on your machine: an Electron window over a local server.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Bun](https://img.shields.io/badge/bun-%E2%89%A51.4-black?logo=bun)](https://bun.sh)
 [![omp](https://img.shields.io/badge/omp-tested%2018.12.6-informational)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
 
-omp-agents lists the sessions that run in your terminals and the ones it starts itself, streams each conversation as it happens, and lets you message, steer, interrupt, resume, or fork any of them from one browser tab.
+omp-agents lists the sessions that run in your terminals and the ones it starts itself, streams each conversation as it happens, and lets you message, steer, interrupt, resume, or fork any of them from one window.
 It reads omp's own session files and speaks omp's own protocols through omp's installed modules, so it stays in step with the omp version you run.
 
 ![The dashboard: the session list on the left, a conversation in the middle, and the session's outline on the right](docs/images/dashboard.png)
@@ -93,29 +93,26 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 
 ## Quick start
 
-```sh
-git clone https://github.com/MaisonnatM/omp-agents.git
-cd omp-agents
-bun install --frozen-lockfile
-omp config set collab.autoStart control   # show the sessions you start in a terminal
-bun start
-```
-
-On start, the server prints a sign-in address, `http://127.0.0.1:4317/?token=<token>`.
-Open it once: it keeps the token in that browser's storage for this address, and from then on <http://127.0.0.1:4317> works in that browser.
-Sessions that the dashboard starts appear right away, and terminal sessions once they start after the `collab.autoStart` change; see [Show terminal sessions](#show-terminal-sessions).
-
-[Getting started](docs/getting-started.md) walks through a first session and each integration's setup.
-
-### Desktop app
-
 Download the DMG for your Mac (Apple silicon `arm64` or Intel `x64`) from the [latest release](https://github.com/MaisonnatM/omp-agents/releases/latest) and drag **omp agents** to Applications.
 The app ships its own Bun and server; it still needs omp installed, and finds it, `gh`, and `git` through your login shell's `PATH`.
 It checks GitHub Releases for updates and installs them when you quit or pick **Restart to Install**; until releases are signed with a Developer ID, macOS asks you to allow the app in System Settings › Privacy & Security, and updates download but do not install.
 
-To run it from the clone instead:
+To show the sessions you start in a terminal, have omp publish them:
 
 ```sh
+omp config set collab.autoStart control
+```
+
+Sessions that the dashboard starts appear right away, and terminal sessions once they start after the `collab.autoStart` change; see [Show terminal sessions](#show-terminal-sessions).
+
+[Getting started](docs/getting-started.md) walks through a first session and each integration's setup.
+
+### Run it from the clone
+
+```sh
+git clone https://github.com/MaisonnatM/omp-agents.git
+cd omp-agents
+bun install --frozen-lockfile
 bun run desktop
 ```
 
@@ -123,14 +120,13 @@ The first run downloads Electron into `desktop/node_modules`, about 100 MB; a `g
 `bun scripts/build-desktop-artifact.ts` builds the packaged app into `desktop/release`.
 The window signs itself in, so it needs no token from you.
 
-- If an omp-agents server already listens on the port, for example a `bun start` in another terminal, the window uses that server and leaves it running when you quit.
+- If an omp-agents server already listens on the port, for example a headless `bun start` in another terminal, the window uses that server and leaves it running when you quit.
   Otherwise the app starts the server and stops it, with every session that the dashboard started, when you quit.
 - On macOS, closing the window (Cmd+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again.
   Cmd+Q quits.
 - In the packaged app, **Open at Login** in the app menu starts the app, and with it your routines, when you log in, and **Install omp Starter Kit…** installs the starter kit.
 - Links to GitHub, Graphite, Linear, and every other site open in your default browser.
-- `PORT` works as for `bun start`.
-  A browser tab on the same address keeps working alongside the window.
+- `PORT` sets the port for `bun run desktop` and `bun start` alike.
 
 ## Configuration
 
@@ -155,7 +151,7 @@ With `view` instead of `control`, the dashboard shows those sessions read-only.
 | `OMP_PACKAGE_DIR` | resolved from `omp` on `PATH` | The installed `@oh-my-pi/pi-coding-agent` directory. Set it when `omp` is not on your `PATH`, or resolves to a build that does not ship its sources. |
 
 ```sh
-PORT=5000 bun start
+PORT=5000 bun run desktop
 ```
 
 ### omp starter kit
@@ -200,7 +196,7 @@ See [docs/usage.md](docs/usage.md) for the full interface reference, including e
 
 ```mermaid
 flowchart LR
-  page[Browser page] <-->|WebSocket + JSON API| server[omp-agents server]
+  window[Desktop window] <-->|WebSocket + JSON API| server[omp-agents server]
   server -->|watches| files[(omp session files)]
   server <-->|Collab guest| terminal[Terminal omp sessions]
   server <-->|RPC over stdio| child[Dashboard-started omp children]
@@ -222,7 +218,8 @@ See [docs/architecture.md](docs/architecture.md) for the design and the HTTP API
 > [!WARNING]
 > The agents run tools on your machine. The access token stops web pages and other user accounts, not a program that runs as you: it can read the token file. Run the dashboard only on a machine that you alone use, and never expose its port through a tunnel or a proxy.
 
-The server listens on `127.0.0.1` only, keeps Collab links and room keys in memory, and requires an access token, kept in `~/.config/omp-agents/token` with mode `0600`, for the page, the WebSocket, and every `/api/` route.
+The server listens on `127.0.0.1` only, keeps Collab links and room keys in memory, and requires an access token, kept in `~/.config/omp-agents/token` with mode `0600`, for the WebSocket and every `/api/` route.
+Only the desktop window receives the token: the app writes it into the window's own storage, and no address carries it.
 Delete the file and restart to rotate it.
 See [SECURITY.md](SECURITY.md) for the full threat model and how to report a vulnerability.
 

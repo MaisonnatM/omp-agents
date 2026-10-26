@@ -60,6 +60,7 @@ function SwitchableModelSlot({ model, thinking, models, open, onOpenChange, onSe
 				if (!switching) onSetModel(picked, null);
 			}}
 			pending={switching}
+			control="composer.model"
 			effort={{
 				current: thinking,
 				levels: switchable.thinkingLevels,

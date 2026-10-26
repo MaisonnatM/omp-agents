@@ -11,14 +11,14 @@
   The session counts then count that directory's sessions only, such as `2 running` and `9 past`.
   Picking a workspace also opens its most recently started running session in the focused pane, unless that pane already shows a session from the workspace or a page such as a pull request, Settings, or the new-session draft covers the panes.
   Choose **All workspaces** to list every session again.
-  The choice is saved in the browser's localStorage.
+  The app keeps the choice.
   If no session from the saved directory is left, the sidebar lists every session.
 - **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
   It shows its key, Cmd+N, on its right.
 - The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
   While empty, it shows its key, Cmd+F, on its right.
-  Cmd+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, the browser's Find keeps Cmd+F.
+  Cmd+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, Cmd+F does nothing.
   Cmd+K opens the command menu, which searches every workspace instead.
 - Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.
@@ -28,13 +28,13 @@
   The group lists pinned running sessions first, then pinned past ones, interrupted ones first, and shows only while it has a row.
   A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
   The selected workspace applies to the group too.
-  The server keeps the pins in `pins.json` beside its access token, by session id, so every browser tab and the desktop app show the same ones.
-  Pins that a browser kept before then move to the server the first time its page connects.
+  The server keeps the pins in `pins.json` beside its access token, by session id, so every window of the app shows the same ones.
+  Pins that an older version kept in the page move to the server the first time its page connects.
 - A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
   A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
   The group shows only while it has a row.
 - Click the **Pinned**, **Idle**, **Running**, **Interrupted**, or **Past** group label to collapse or expand its rows.
-  The browser's localStorage keeps each group's choice across tabs, workspaces, navigation, and reloads, even while the group has no rows.
+  The app keeps each group's choice across workspaces, navigation, and reloads, even while the group has no rows.
 - The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
@@ -68,7 +68,7 @@
   Both sidebars slide open and shut in about a quarter second, or at once when the system asks for reduced motion.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
-  Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
+  Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
 - A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
   Hover the logo to see the plan's name and account, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.

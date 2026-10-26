@@ -1,10 +1,10 @@
 /**
  * The sessions that need you, outside the page: the desktop app's Dock badge counts them, and each moment one asks or
- * ends a turn raises a system notification while the window is not focused, through the desktop shell or else the
- * browser's Notifications API. Showing a session in a focused window reads its turn.
+ * ends a turn raises a system notification through the desktop shell, which shows it while the window is not in front.
+ * Showing a session in a focused window reads its turn.
  */
-import { useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalStore } from "react";
-import type { DesktopBridge, SessionAlert } from "../src/shared/desktop-bridge";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import type { DesktopBridge } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import { type Attention, attend, needsYou, unreadShown } from "./attention";
@@ -14,7 +14,7 @@ import { useStoredState } from "./stored-state";
 
 declare global {
 	interface Window {
-		/** The desktop shell's bridge, from `desktop/preload.ts`; absent in a browser. */
+		/** The desktop shell's bridge, from `desktop/preload.ts`; absent in a page no desktop window loaded, such as an automated browser's. */
 		ompDesktop?: DesktopBridge;
 	}
 }
@@ -23,44 +23,19 @@ const desktop: DesktopBridge | undefined = typeof window === "undefined" ? undef
 
 const NOTIFICATIONS_KEY = "omp-agents.session-notifications";
 
-/** On in the desktop app until you turn it off; off in a browser until you turn it on there. */
-const decodeOn = (raw: string | null): boolean => (raw === null ? desktop !== undefined : raw === "on");
-
-/** The browser's permission to notify; the desktop app needs none. */
-const browserPermission = (): NotificationPermission | "unsupported" => (typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+/** On until you turn it off. */
+const decodeOn = (raw: string | null): boolean => raw !== "off";
 
 export interface SessionNotifications {
-	/** Whether a session that needs you raises a system notification while the window is not focused. */
+	/** Whether a session that needs you raises a system notification while the window is not in front. */
 	on: boolean;
-	/** Why the browser shows none, or `null`. */
-	blocked: string | null;
-	/** Turning them on in a browser first asks it for the permission, and stays off without it. */
 	set(on: boolean): void;
 }
 
-/** The Settings › Preferences switch for session notifications, kept in this browser. */
+/** The Settings › Preferences switch for session notifications, kept in this app. */
 export function useSessionNotifications(): SessionNotifications {
-	const [stored, store] = useStoredState(NOTIFICATIONS_KEY, decodeOn, on => (on ? "on" : "off"));
-	// The permission is read on each render; an answer to the request renders again to show it.
-	const [, answered] = useReducer((count: number) => count + 1, 0);
-	const permission = desktop ? "granted" : browserPermission();
-	const set = useCallback(
-		(on: boolean) => {
-			if (!on || desktop || browserPermission() === "granted") {
-				store(on);
-				return;
-			}
-			if (browserPermission() === "unsupported") return;
-			void Notification.requestPermission().then(answer => {
-				if (answer === "granted") store(true);
-				answered();
-			});
-		},
-		[store],
-	);
-	const blocked =
-		permission === "unsupported" ? "This browser shows no notifications." : permission === "denied" ? "This browser blocks notifications from the dashboard: allow them in its site settings." : null;
-	return { on: stored && permission === "granted", blocked, set };
+	const [on, set] = useStoredState(NOTIFICATIONS_KEY, decodeOn, value => (value ? "on" : "off"));
+	return { on, set };
 }
 
 function subscribeFocus(change: () => void): () => void {
@@ -71,21 +46,6 @@ function subscribeFocus(change: () => void): () => void {
 		window.removeEventListener("focus", change);
 		window.removeEventListener("blur", change);
 		document.removeEventListener("visibilitychange", change);
-	};
-}
-
-function raise(alert: SessionAlert): void {
-	if (desktop) {
-		desktop.alert(alert);
-		return;
-	}
-	if (browserPermission() !== "granted") return;
-	// One notification per session: a newer one replaces the one before.
-	const notification = new Notification(alert.title, { body: alert.body, tag: alert.hash });
-	notification.onclick = () => {
-		window.focus();
-		location.hash = alert.hash;
-		notification.close();
 	};
 }
 
@@ -101,12 +61,11 @@ export function useAttention(state: DashboardState, page: Page | null, send: (ms
 
 	const attention = useRef<Attention>(new Map());
 	const raising = useRef(false);
-	// The desktop shell asks its window instead, which knows whether the app is in front.
-	raising.current = on && (desktop !== undefined || !focused);
+	raising.current = on;
 	useEffect(() => {
-		const { raise: fresh, attention: next } = attend(attention.current, hosts);
+		const { raise, attention: next } = attend(attention.current, hosts);
 		attention.current = next;
-		if (raising.current) for (const alert of fresh) raise(alert);
+		if (raising.current) for (const alert of raise) desktop?.alert(alert);
 	}, [hosts]);
 
 	// A maximized pane hides the others, and a page hides them all.

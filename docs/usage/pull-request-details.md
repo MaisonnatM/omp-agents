@@ -62,7 +62,7 @@
   Descriptions and comments render GitHub alerts, issue-number and full-commit autolinks, inline-code chips, attachment cards, and authenticated GitHub images and videos.
   Session transcripts keep their existing Markdown rendering.
 - **Comments** inside **Summary** mixes review threads, comments, and review verdicts in cards, newest first, showing ten conversations at a time.
-  **Filter comments** toggles **Bot comments** and **Resolved or dismissed**, both hidden by default and remembered in this browser.
+  **Filter comments** toggles **Bot comments** and **Resolved or dismissed**, both hidden by default and remembered in the app.
   Images in the description and comments load through the app from GitHub's hosts; an image from any other host, or one that fails to load, shows as a link.
   **Newest first** flips to **Oldest first** within the recent conversations shown; **Show older conversations** adds ten more.
   Resolved threads and dismissed reviews start folded.
@@ -83,12 +83,12 @@
   Review threads include resolved ones, with resolved and dismissed threads folded initially and outdated threads marked.
   The file and line link to the **Code** tab, and **more replies** reveals the loaded replies in place.
   When a thread has more than the 20 comments loaded, **View on GitHub** opens the rest there.
-  A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
+  A red **New** line sits under what happened since you last opened the pull request's timeline, which the app keeps for 30 days.
   Above the rail are the comment count the tab shows, the commit count, and the count of reviewers whose latest verdict approves the newest commit, and **Newest first**, which flips the order without reversing replies within a thread.
 - **Code** shows every changed file with omp's diff renderer and a T3-style toolbar, on the page and in the sidebar.
   **All commits** selects the whole pull request or one commit.
   The toolbar counts **N of M viewed** and offers **Hide whitespace changes**, **Stacked diff view**, **Split diff view**, **Wrap lines**, **Collapse all files**, **Expand all files**, and the file tree toggle.
-  View preferences persist in this browser; narrow panels put layout, wrapping, and whitespace under **Diff options**.
+  View preferences persist in the app; narrow panels put layout, wrapping, and whitespace under **Diff options**.
   Files read in source dependency order, then tests in their sources' order, then generated files.
   The tree stays alphabetical, and ↓ and ↑ follow the diff's reading order.
   Each file's **Viewed** checkbox reads and writes your GitHub viewed state; marking it collapses its diff.

@@ -37,5 +37,5 @@
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
 - When more than one dashboard runs, such as a second one on another port, only one runs the routines and takes the todos that agents add; it is the first one started, and the server on another port says so in its log when it starts.
   If that one quits, another takes over within a minute.
-- The server keeps the routines in `routines.json` beside its access token, so every browser tab and the desktop app show the same ones.
+- The server keeps the routines in `routines.json` beside its access token, so every window of the app shows the same ones.
   While the page has lost the server, the routines cannot be changed.

@@ -9,6 +9,7 @@ import { SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
+import { ActivityTab } from "./activity-tab";
 import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
@@ -128,6 +129,7 @@ export function SettingsPage({
 	const panels: Record<SettingsSection, ReactNode> = {
 		...ompPanels(settings, cwd, editing),
 		analytics: <AnalyticsTab active={section === "analytics"} />,
+		activity: <ActivityTab active={section === "activity"} />,
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		integrations: <IntegrationsTab active={section === "integrations"} workspaces={workspaces} />,

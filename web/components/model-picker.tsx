@@ -1,6 +1,7 @@
 /** The model menu: a model's logo and name, the grouped searchable model list, and Fast, Context, and Effort controls. */
 import { type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from "../../src/shared/models";
 import type { FastMode } from "../../src/shared/sessions";
+import type { ControlId } from "../../src/shared/activity";
 import { ChevronDown } from "lucide-react";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 	MenuSwitchItem,
 } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
 import { contextVariants, levelLabel, modelMatch, providerQuota } from "../model-menu";
 import type { ModelList } from "../reads";
@@ -159,6 +161,8 @@ interface ModelPickerProps {
 	effort: EffortChoices;
 	/** omp's `/fast` for a live session, `state` `null` while its model has no fast tier; the draft has no row. */
 	fast?: { state: FastMode | null; onChange: (enabled: boolean) => void };
+	/** The Activity control a click on the button records; none when omitted. */
+	control?: ControlId;
 }
 
 /** `Default` among the effort choices; omp's own levels are never empty. */
@@ -172,7 +176,7 @@ const BACK_TO_MENU: Record<string, true> = { "trigger-hover": true, "sibling-ope
 const tokens = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
 /** Cursor's model menu: Fast, Context, and Effort for the current model, then Model, which searches every connected model. */
-export function ModelPicker({ current, unset = "Choose model", list, open, onOpenChange, onPick, disabled, pending = false, effort, fast }: ModelPickerProps) {
+export function ModelPicker({ current, unset = "Choose model", list, open, onOpenChange, onPick, disabled, pending = false, effort, fast, control }: ModelPickerProps) {
 	const models = list.data?.models ?? [];
 	const variants = contextVariants(models, current);
 	const contextWindow = variants.find(model => selectorOf(model) === current)?.contextWindow ?? null;
@@ -191,6 +195,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 		<DropdownMenu open={open !== null} onOpenChange={next => onOpenChange(next ? "menu" : null)} onOpenChangeComplete={setMenuShown}>
 			<Tooltip content={current ?? unset} shortcut={shortcutLabels("model")} side="top" forceOpen={open !== null ? false : undefined} disabled={disabled}>
 				<DropdownMenuTrigger
+					{...(control ? activityControl(control) : {})}
 					disabled={disabled || pending}
 					render={
 						<Button

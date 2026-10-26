@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { CommandPalette } from "./components/command-palette/command-palette";
+import { DESKTOP_TITLE_BAR, DesktopTitleBar, HeaderControls, HeaderControlsContext } from "./components/header-controls";
 import {
 	type DashboardActions,
 	DashboardActionsContext,
@@ -186,6 +187,8 @@ export function App() {
 	/** The routine the Routines page shows; one another window deleted shows the list. */
 	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
+	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
+	const headerControls = useMemo(() => <HeaderControls notices={state.notices} onShowSearch={showSearch} />, [state.notices, showSearch]);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -194,6 +197,7 @@ export function App() {
 					<UserTodosContext.Provider value={state.userTodos}>
 						<UserNotesContext.Provider value={state.userNotes}>
 							<div className="flex h-svh flex-col">
+								{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} controls={headerControls} />}
 								<SidebarProvider className="min-h-0 flex-1">
 									<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
 										<AppSidebar
@@ -209,7 +213,6 @@ export function App() {
 											userNotes={state.userNotes}
 											notesView={notesView}
 											hosts={state.hosts}
-											notices={state.notices}
 											past={state.past}
 											routines={state.routines}
 											todoView={todoView}
@@ -218,54 +221,55 @@ export function App() {
 											sectionTarget={sectionTarget}
 											onSectionTarget={setSectionTarget}
 											onPickWorkspace={switchWorkspace}
-											dispatchPalette={dispatchPalette}
 											setShortcutsOpen={setShortcutsOpen}
 										/>
 									</DashboardSidebar>
 									<SidebarInset>
-										<Plans value={state.usage?.plans ?? NO_PLANS}>
-											<ActivityVisibility.Provider value={display.activityVisibility}>
-												<ToolsExpanded value={display.toolsExpanded}>
-													<MentionListsContext.Provider value={mentionLists}>
-														<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
-															<PageSwitch
-																page={page}
-																hosts={state.hosts}
-																past={state.past}
-																lastHosts={state.lastHosts}
-																layout={layout}
-																splits={state.splits}
-																models={state.models}
-																userTodos={state.userTodos}
-																userNotes={state.userNotes}
-																routines={state.routines}
-																workspaceList={state.workspaceList}
-																pins={state.pins}
-																newSessionCompletions={state.newSessionCompletions}
-																connected={state.connected}
-																listed={state.listed}
-																rosterError={state.rosterError}
-																newStart={startOf(state.starts, "new")}
-																scope={scope}
-																defaultWorkspace={defaultWorkspace}
-																sectionTarget={sectionTarget}
-																todoView={todoView}
-																routinesTarget={routinesTarget}
-																linear={linear}
-																linearCallable={linearCallable}
-																maximized={maximized}
-																hasDetails={detailsView !== null}
-																rightOpen={sidebars.panels.right.open}
-																show={show}
-																close={close}
-																resize={resize}
-																toggleSidebar={toggleSidebar}
-															/>
-														</RenderBoundary>
-													</MentionListsContext.Provider>
-												</ToolsExpanded>
-											</ActivityVisibility.Provider>
-										</Plans>
+										<HeaderControlsContext.Provider value={DESKTOP_TITLE_BAR ? null : headerControls}>
+											<Plans value={state.usage?.plans ?? NO_PLANS}>
+												<ActivityVisibility.Provider value={display.activityVisibility}>
+													<ToolsExpanded value={display.toolsExpanded}>
+														<MentionListsContext.Provider value={mentionLists}>
+															<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
+																<PageSwitch
+																	page={page}
+																	hosts={state.hosts}
+																	past={state.past}
+																	lastHosts={state.lastHosts}
+																	layout={layout}
+																	splits={state.splits}
+																	models={state.models}
+																	userTodos={state.userTodos}
+																	userNotes={state.userNotes}
+																	routines={state.routines}
+																	workspaceList={state.workspaceList}
+																	pins={state.pins}
+																	newSessionCompletions={state.newSessionCompletions}
+																	connected={state.connected}
+																	listed={state.listed}
+																	rosterError={state.rosterError}
+																	newStart={startOf(state.starts, "new")}
+																	scope={scope}
+																	defaultWorkspace={defaultWorkspace}
+																	sectionTarget={sectionTarget}
+																	todoView={todoView}
+																	routinesTarget={routinesTarget}
+																	linear={linear}
+																	linearCallable={linearCallable}
+																	maximized={maximized}
+																	hasDetails={detailsView !== null}
+																	rightOpen={sidebars.panels.right.open}
+																	show={show}
+																	close={close}
+																	resize={resize}
+																	toggleSidebar={toggleSidebar}
+																/>
+															</RenderBoundary>
+														</MentionListsContext.Provider>
+													</ToolsExpanded>
+												</ActivityVisibility.Provider>
+											</Plans>
+										</HeaderControlsContext.Provider>
 										<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 									</SidebarInset>
 									{detailsView && (

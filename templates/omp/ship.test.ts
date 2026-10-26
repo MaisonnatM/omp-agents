@@ -9,10 +9,11 @@ const extension: {
 	selectorOwner(selector: string[]): string | undefined;
 	otherOwner(owner: string | undefined, repo: string | undefined): boolean;
 	publishBlocker(body: string): string | undefined;
+	authDiagnosis(credentials: { host: string; state: string; active: boolean; login: string; tokenSource: string }[], dotenvFiles: Record<string, string>): string | undefined;
 	CHECKBOX: string;
 	PROOF_BOX: string;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
-const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, CHECKBOX, PROOF_BOX } = extension;
+const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, authDiagnosis, CHECKBOX, PROOF_BOX } = extension;
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
 function readySelectors(line: string): string[][] {
@@ -33,6 +34,8 @@ describe("ship command parsing", () => {
 		["gh pr ready --repo=a/b feature-branch &>/dev/null", [["feature-branch", "--repo", "a/b"]]],
 		["GH_DEBUG=1 gh pr ready 8 | cat; echo 'gh pr ready 9'", [["8"]]],
 		["(cd x; gh pr ready)", [[]]],
+		["env -u GITHUB_TOKEN gh pr ready 51", [["51"]]],
+		["A=1 env -i --unset GH_TOKEN -C /tmp B=2 gh pr ready 6", [["6"]]],
 	])("%s", (line, selectors) => {
 		expect(readySelectors(line)).toEqual(selectors);
 	});
@@ -81,5 +84,24 @@ describe("publish gate", () => {
 
 	test.each(["- [x] Browser proof", "- [X] Browser proof (UI changes)"])("a reviewed PR with %j goes live", box => {
 		expect(publishBlocker(`${reviewed}\n${box}`)).toBeUndefined();
+	});
+});
+
+describe("GitHub auth diagnosis", () => {
+	const keyring = { host: "github.com", state: "success", active: false, login: "octocat", tokenSource: "keyring" };
+	const token = { host: "github.com", state: "error", active: true, login: "", tokenSource: "GITHUB_TOKEN" };
+
+	test.each(["success", "timeout"])("an active credential in state %s is not diagnosed as rejected", state => {
+		expect(authDiagnosis([{ ...keyring, active: true, state }], {})).toBeUndefined();
+	});
+
+	test("a rejected keyring login asks for a new login", () => {
+		expect(authDiagnosis([{ ...keyring, active: true, state: "error" }], {})).toContain("gh auth login -h github.com");
+	});
+
+	test("a rejected token with no working login to fall back to needs a replacement or a new login", () => {
+		const diagnosis = authDiagnosis([token], { GITHUB_TOKEN: "/repo/.env" });
+		expect(diagnosis).toContain("/repo/.env");
+		expect(diagnosis).toContain("gh auth login");
 	});
 });

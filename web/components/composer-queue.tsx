@@ -1,6 +1,7 @@
 /** The messages queued above the composer while a turn runs, steering and follow-up, which ↑ takes back to edit. */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
+import type { ControlId } from "../../src/shared/activity";
 import { promptLabel } from "../../src/shared/prompt-files";
 import type { MessageQueue, WithdrawnMessage } from "../../src/shared/sessions";
 import { isDashboardPrompt } from "../../src/shared/transcript";
@@ -12,6 +13,7 @@ import { type IconName, useIcon } from "@/lib/icon-context";
 import { useSize } from "@/lib/size-context";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { shortcutLabels, shortcutsFor } from "../shortcuts";
 
 /** omp's queues, in the order ↑ takes them back, with the tag each queued row shows. */
@@ -78,6 +80,7 @@ interface RowAction {
 	label: string;
 	shortcut?: readonly string[];
 	run: () => void;
+	control: ControlId;
 }
 
 function RowActionButton({ action, text, isTouch }: { action: RowAction; text: string; isTouch: boolean }) {
@@ -85,6 +88,7 @@ function RowActionButton({ action, text, isTouch }: { action: RowAction; text: s
 	return (
 		<Tooltip content={action.label} shortcut={action.shortcut} side="top">
 			<button
+				{...activityControl(action.control)}
 				type="button"
 				onClick={event => {
 					event.stopPropagation();
@@ -123,9 +127,9 @@ function QueuedRow({ item, index, total, reduceMotion, isTouch, onSendNow, onEdi
 	const kind = `${item.tag.toLowerCase()} `;
 	const label = promptLabel(item.text);
 	const actions: RowAction[] = [
-		{ icon: "arrow-up", label: "Send now", shortcut: shortcutLabels("steer"), run: onSendNow },
-		{ icon: "pencil", label: "Edit", shortcut: ["Enter"], run: onEdit },
-		{ icon: "x", label: "Remove", run: onRemove },
+		{ icon: "arrow-up", label: "Send now", shortcut: shortcutLabels("steer"), run: onSendNow, control: "composer-queue.send-now" },
+		{ icon: "pencil", label: "Edit", shortcut: ["Enter"], run: onEdit, control: "composer-queue.edit" },
+		{ icon: "x", label: "Remove", run: onRemove, control: "composer-queue.remove" },
 	];
 
 	return (

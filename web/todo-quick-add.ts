@@ -1,6 +1,6 @@
 import { addTodo } from "../src/user-todos";
 import type { TodoStatus, UserTodoCategory, UserTodoChange } from "../src/user-todos-shared";
-import { localDay } from "./days";
+import { localDay } from "../src/shared/days";
 
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const FULL_WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];

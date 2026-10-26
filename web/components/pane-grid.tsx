@@ -65,7 +65,8 @@ export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts,
 					count={layout.panes.length}
 					focused={index === layout.focus}
 					maximized={maximized}
-					topRight={index === topRightPane && hasDetails}
+					topRight={index === topRightPane}
+					hasDetails={hasDetails}
 					host={pane.kind === "live" ? hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
 					lastHost={pane.kind === "live" ? lastHosts.get(pane.instanceId) ?? null : null}
 					session={pane.kind === "past" ? past.find(s => s.sessionId === pane.sessionId) ?? null : null}

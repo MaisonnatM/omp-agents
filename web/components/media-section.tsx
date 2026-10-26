@@ -1,6 +1,7 @@
 /** The changes card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
 import { ChevronDown, GitPullRequest, type LucideIcon, MessageSquare, Paperclip } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import type { ControlId } from "../../src/shared/activity";
 import { type LinkedPullRequest, type PullRequestDetail, pullRequestName } from "../../src/shared/github";
 import type { View } from "../../src/shared/sessions";
 import { type AgentMedia, mediaExtension, mediaUrl } from "../../src/shared/transcript";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { errorText } from "../../src/json";
+import { activityControl } from "../activity";
 import { apiFetch, mediaSrc, putJson } from "../api";
 import { age } from "../labels";
 import { useRead } from "../reads";
@@ -114,11 +116,13 @@ interface TargetMenuProps {
 	none: string | null;
 	loading: boolean;
 	disabled: boolean;
+	/** The Activity control a click on the menu's button records. */
+	control: ControlId;
 	children: ReactNode;
 }
 
 /** A button that opens a menu of targets, or a disabled one that says why there are none. */
-function TargetMenu({ label, icon, none, loading, disabled, children }: TargetMenuProps) {
+function TargetMenu({ label, icon, none, loading, disabled, control, children }: TargetMenuProps) {
 	if (none !== null) {
 		return (
 			<Tooltip content={none} disabled>
@@ -130,7 +134,7 @@ function TargetMenu({ label, icon, none, loading, disabled, children }: TargetMe
 	}
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={icon} trailingIcon={ChevronDown} loading={loading} disabled={disabled} />}>{label}</DropdownMenuTrigger>
+			<DropdownMenuTrigger {...activityControl(control)} render={<Button variant="secondary" size="compact" leadingIcon={icon} trailingIcon={ChevronDown} loading={loading} disabled={disabled} />}>{label}</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">{children}</DropdownMenuContent>
 		</DropdownMenu>
 	);
@@ -170,19 +174,19 @@ function MediaActions({ picked, pullRequests, tickets, onSent, onClear }: MediaA
 			<span className="mr-auto text-xs text-muted-foreground tabular-nums" aria-live="polite">
 				{picked.length} selected
 			</span>
-			<TargetMenu label="Add to PR description" icon={GitPullRequest} none={pullRequests.length === 0 ? "This session has no pull request yet" : null} loading={toPullRequest.pending} disabled={pending}>
+			<TargetMenu label="Add to PR description" icon={GitPullRequest} none={pullRequests.length === 0 ? "This session has no pull request yet" : null} loading={toPullRequest.pending} disabled={pending} control="changes-card.image.to-pull-request">
 				{pullRequests.map(pr => (
 					<PullRequestItem key={pullRequestName(pr)} pr={pr} onPick={() => toPullRequest.run(pr)} />
 				))}
 			</TargetMenu>
-			<TargetMenu label="Attach to Linear issue" icon={Paperclip} none={tickets.length === 0 ? "This session has no Linear issue yet" : null} loading={toTicket.pending} disabled={pending}>
+			<TargetMenu label="Attach to Linear issue" icon={Paperclip} none={tickets.length === 0 ? "This session has no Linear issue yet" : null} loading={toTicket.pending} disabled={pending} control="changes-card.image.to-ticket">
 				{tickets.map(issue => (
 					<MenuItem key={issue} onClick={() => toTicket.run(issue)}>
 						{issue}
 					</MenuItem>
 				))}
 			</TargetMenu>
-			<Button variant="ghost" size="compact" disabled={pending} onClick={onClear}>
+			<Button {...activityControl("changes-card.image.clear")} variant="ghost" size="compact" disabled={pending} onClick={onClear}>
 				Clear
 			</Button>
 		</div>
@@ -230,6 +234,7 @@ export function MediaStrip({ media, view, pullRequests, tickets }: MediaStripPro
 								}
 							>
 								<button
+									{...activityControl(picked.length > 0 ? "changes-card.image.select" : "media-viewer.open")}
 									type="button"
 									onClick={() => (picked.length > 0 ? toggle(key) : setShown(key))}
 									aria-pressed={picked.length > 0 ? checked : undefined}
@@ -239,6 +244,7 @@ export function MediaStrip({ media, view, pullRequests, tickets }: MediaStripPro
 								</button>
 							</Tooltip>
 							<input
+								{...activityControl("changes-card.image.select")}
 								type="checkbox"
 								checked={checked}
 								onChange={() => toggle(key)}

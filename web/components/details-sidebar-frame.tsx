@@ -1,10 +1,12 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a header of counted tabs, and each tab's panel. */
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import type { ControlId } from "../../src/shared/activity";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
+import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
 import { FileBaseContext } from "./file-link";
 
@@ -22,6 +24,8 @@ export interface DetailsTab<T extends string> {
 	value: T;
 	icon: LucideIcon;
 	name: string;
+	/** The Activity control a click on the tab records. */
+	control: ControlId;
 	/** Shown as a badge, which screen readers hear through the tab's name; zero shows none. */
 	count: number;
 	/** The content scrolls itself inside the panel's full height, as a pull request's details do below their header and tabs. */
@@ -76,6 +80,7 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 						<TabsList aria-label={label}>
 							{tabs.map(each => (
 								<TabItem
+									{...activityControl(each.control)}
 									key={each.value}
 									value={each.value}
 									icon={each.icon}

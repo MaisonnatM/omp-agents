@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { activityDb, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -34,6 +34,7 @@ import { rebasePullRequest } from "../pull-request-rebase";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
+import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
 import { SettingsSync, sourceControlStore } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
@@ -76,6 +77,8 @@ import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
+import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
+import { DAY_MS } from "../shared/days";
 import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
 import { createStarter, reattachAll } from "./start";
@@ -153,6 +156,7 @@ export class Dashboard {
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
 	readonly #discussions = new Discussions(answerDiscussion);
+	readonly #activity = new ActivityStore(activityDb);
 	readonly #selfUpdate: SelfUpdate;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
 	#publisher: Publisher | null = null;
@@ -430,6 +434,9 @@ export class Dashboard {
 			onProcessTick: async () => {
 				if (ownerLock.held) await this.#processWatch.tick();
 			},
+			onDailyTick: async () => {
+				if (ownerLock.held) this.#pruneActivity();
+			},
 		});
 		this.#requests = new RequestLedger(createClientHandler({
 			sessions,
@@ -460,13 +467,14 @@ export class Dashboard {
 			runRoutine: id => runner.runNow(id),
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			discussions: this.#discussions,
+			activity: { owner: () => ownerLock.held, store: this.#activity },
 			}),
 			(t, error) => console.error(`omp-agents: ${t} failed: ${errorText(error)}`),
 		);
 	}
 
-	/** The HTTP API over this dashboard, admitted by `guards`. */
-	routes(guards: Guards): Routes {
+	/** The HTTP API over this dashboard, admitted by `guards`; `build` is what the server serves. */
+	routes(guards: Guards, build: ServedBuild): Routes {
 		const files = this.#files;
 		const sessions = this.#sessions;
 		const broadcasts = this.#broadcasts;
@@ -522,8 +530,9 @@ export class Dashboard {
 				checkOutPullRequest: checkout => checkOutPullRequest(checkout, this.#startSession),
 				rebasePullRequest,
 			},
-			dashboard: this.#selfUpdate,
+			dashboard: { build, status: () => this.#selfUpdate.status(), update: () => this.#selfUpdate.update() },
 			sync: this.#settingsSync,
+			activity: this.#activity,
 			processes: {
 				list: () => this.#processWatch.list(),
 				stop: ({ instanceId, id }) => this.#processWatch.stop(instanceId, id),
@@ -572,7 +581,10 @@ export class Dashboard {
 		const [calendarServer] = await findMcpServers(MCP_SERVICES["google-calendar"].host);
 		if (calendarServer) this.#calendars.adopt(calendarServer.name);
 		await this.#listRegistry();
-		if (this.#ownerLock.held) this.#clearOldDone();
+		if (this.#ownerLock.held) {
+			this.#clearOldDone();
+			this.#pruneActivity();
+		}
 		this.#loops.start();
 		this.#stopMergeQueue = repeat("merge queue", () => this.#mergeQueue.tick(), MERGE_QUEUE_TICK_MS, 0);
 	}
@@ -591,6 +603,7 @@ export class Dashboard {
 		await this.#sessions.dispose();
 		this.terminals.dispose();
 		stopStats();
+		this.#activity.close();
 		flushJsonFiles();
 		// Last, right before exit, so a stopped command's result is not saved as one stopped at its time limit.
 		this.#stopping.abort();
@@ -697,6 +710,11 @@ export class Dashboard {
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
 	#clearOldDone(): void {
 		this.#lists.apply("user-todos", { op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
+	}
+
+	/** Deletes the activity rows older than {@link ACTIVITY_KEPT_DAYS}. */
+	#pruneActivity(): void {
+		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
 	/**

@@ -1,5 +1,5 @@
 /** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, notes, and more, under the workspace picker. */
-import { Folder, Keyboard, Search } from "lucide-react";
+import { Folder, Keyboard } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -13,6 +13,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
+import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
 import { folderName } from "../labels";
 import { pullRequestsStore, ticketsStore } from "../reads";
@@ -55,6 +56,7 @@ function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspac
 		<CommandPicker
 			trigger={<span className="truncate">{label}</span>}
 			icon={Folder}
+			control="sidebar.workspace"
 			tooltip={selected?.cwdDisplay ?? "All workspaces"}
 			shortcut="workspace"
 			ariaLabel={`Show sessions from: ${label}`}
@@ -198,10 +200,7 @@ interface RosterProps {
 	/** The selected workspace's `cwd`, or `null` for all workspaces. */
 	workspace: string | null;
 	onPickWorkspace: (cwd: string | null) => void;
-	onShowSearch: () => void;
 	onShowShortcuts: () => void;
-	/** The notices' bell, between the command menu and the shortcuts. */
-	bell: ReactNode;
 }
 
 export function Roster({
@@ -231,9 +230,7 @@ export function Roster({
 	hosts,
 	workspace,
 	onPickWorkspace,
-	onShowSearch,
 	onShowShortcuts,
-	bell,
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
@@ -251,14 +248,8 @@ export function Roster({
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">
 				<h1 className="sr-only">omp sessions</h1>
 				<SidebarWorkspacePicker workspaces={workspaces} current={workspace} onPick={onPickWorkspace} />
-				<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
-					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
-						<Search />
-					</Button>
-				</Tooltip>
-				{bell}
 				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
-					<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
+					<Button {...activityControl("shortcuts.open")} variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 						<Keyboard />
 					</Button>
 				</Tooltip>

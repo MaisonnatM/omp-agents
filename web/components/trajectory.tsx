@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { addUsage, NO_USAGE, type Turn, type TurnStep } from "../../src/shared/trajectory";
 import { cn } from "@/lib/utils";
+import { activityControl } from "../activity";
 import { formatBytes, skillLabel } from "../labels";
 import { useShowTrajectory, useTurns } from "../pane-store";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ export function Trajectory({ view }: { view: View }) {
 				const isOpen = open.has(turn.id);
 				return (
 					<div key={turn.id} className="border-b border-border/60" data-turn={turn.id}>
-						<button type="button" aria-expanded={isOpen} onClick={() => toggle(turn.id)} className={cn(GRID, "w-full px-2 py-2 text-left hover:bg-muted/60")}>
+						<button {...activityControl("trajectory.turn")} type="button" aria-expanded={isOpen} onClick={() => toggle(turn.id)} className={cn(GRID, "w-full px-2 py-2 text-left hover:bg-muted/60")}>
 							<span className="flex items-center gap-0.5 text-muted-foreground"><Chevron open={isOpen} />{turn.index}</span>
 							<span className="flex min-w-0 items-center gap-1.5">
 								<SkillChip skill={skill} />
@@ -80,7 +81,7 @@ export function Trajectory({ view }: { view: View }) {
 						</button>
 						{turn.id !== "start" && turn.steps.some(step => step.kind === "prompt") && (view.kind === "past" || view.agentId === null) && (
 							<div className="flex justify-end px-2 pb-1">
-								<Button size="compact" variant="ghost" onClick={() => setReplayTurn(turn.id)}>Replay from here</Button>
+								<Button {...activityControl("replay.open")} size="compact" variant="ghost" onClick={() => setReplayTurn(turn.id)}>Replay from here</Button>
 							</div>
 						)}
 						{isOpen && (
@@ -131,7 +132,7 @@ function StepRow({ step }: { step: TurnStep }) {
 	if (!body) return <div className={rowClass}>{line}</div>;
 	return (
 		<>
-			<button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={cn(rowClass, "hover:bg-muted/60")}>
+			<button {...activityControl("trajectory.step")} type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={cn(rowClass, "hover:bg-muted/60")}>
 				{line}
 			</button>
 			{open && (

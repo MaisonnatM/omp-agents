@@ -17,7 +17,7 @@
   On a narrow page the chips that do not fit drop out first, from the project back, then the opening day, so the title keeps its room.
   Each label's dot has the color Linear gives that label.
   Hover an icon to read what it means.
-  Click a state's heading to fold it; the browser's localStorage keeps folded ones folded across reloads.
+  Click a state's heading to fold it; the app keeps folded ones folded across reloads.
 - Click a row to replace the tickets list with the issue's details in the main content.
   The page header then names the issue: its identifier, with its title under it, after a back arrow.
   The back arrow, **Back to tickets**, stays in the header while the details scroll, and returns to the list with its folded states preserved.
@@ -67,5 +67,5 @@
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
   Until omp is signed in to that server, the sidebar has no **Tickets** tab, which then takes no number, so the tabs after it move up one, and a `#tickets` address shows Linear's integration row instead of the issues.
 - To connect, open **Settings › Integrations** and choose **Connect** on Linear's row; see [Integrations](integrations.md).
-  A new browser tab opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
+  Your default browser opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
   When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.

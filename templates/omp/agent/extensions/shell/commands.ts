@@ -1,6 +1,7 @@
 /**
  * The commands of a bash line, each as its words: split on `&&`, `||`, `;`, `|`, `&`, parentheses, and newlines outside quotes,
- * with quotes removed and leading `NAME=value` assignments dropped, so `cd x && gh pr ready 4` is two commands and `rg "gh pr ready" f` one `rg`.
+ * with quotes removed and leading `NAME=value` assignments and `env` prefixes dropped, so `cd x && gh pr ready 4` is two commands,
+ * `env -u GITHUB_TOKEN gt submit` runs `gt submit`, and `rg "gh pr ready" f` is one `rg`.
  */
 export function commands(line: string): string[][] {
 	const out: string[][] = [];
@@ -44,7 +45,17 @@ export function commands(line: string): string[][] {
 	}
 	endCommand();
 	return out.flatMap(w => {
-		const start = w.findIndex(x => !/^[A-Za-z_]\w*=/.test(x));
-		return start < 0 ? [] : [w.slice(start)];
+		let i = 0;
+		for (;;) {
+			if (/^[A-Za-z_]\w*=/.test(w[i] ?? "")) {
+				i++;
+			} else if (w[i] === "env") {
+				// `-u`, `-C`, and `-P` take the next word as their operand.
+				for (i++; w[i]?.startsWith("-"); i++) if (/^(-[uCP]|--unset|--chdir)$/.test(w[i])) i++;
+			} else {
+				break;
+			}
+		}
+		return i < w.length ? [w.slice(i)] : [];
 	});
 }

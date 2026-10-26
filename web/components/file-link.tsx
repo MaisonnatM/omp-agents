@@ -1,6 +1,7 @@
 /** A file path in agent text that opens the file dialog, and the context giving the directory relative paths resolve against. */
 import { createContext, type ReactNode, useContext } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { absoluteFilePath } from "../file-paths";
 import { DashboardActionsContext } from "./dashboard-context";
 
@@ -16,6 +17,7 @@ export function FileLink({ path, children }: { path: string; children: ReactNode
 	return (
 		<Tooltip content={target}>
 			<span
+				{...activityControl("file-dialog.open")}
 				role="button"
 				tabIndex={0}
 				className="file-link"

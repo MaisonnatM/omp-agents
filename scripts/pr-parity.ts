@@ -1,7 +1,8 @@
 /**
  * Screenshots omp's pull request panel, and T3 Code's when `--t3` names a running T3 Code, in the same states at one
  * viewport and panel width, then writes each pair side by side with a pixelmatch diff and a report of the diff ratios.
- * It starts no server: `--omp` is a running dashboard's sign-in address.
+ * It starts no server: `--omp` is a running dashboard's origin, which must serve this checkout as it is now, and
+ * `--token` its token, by default the one in the token file.
  */
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,8 +10,10 @@ import { parseArgs } from "node:util";
 import pixelmatch from "pixelmatch";
 import { type BrowserContext, chromium, type Locator, type Page, type Request } from "playwright-core";
 import { PNG } from "pngjs";
+import { describeServed, type ServedBuild } from "../src/served-build";
+import { checkServed, defaultRun, provenanceProblem, scriptToken, signIn } from "./served";
 
-const USAGE = `Usage: bun scripts/pr-parity.ts --omp <url with ?token=> [--t3 <url>] [--pr owner/repo#N] [--draft N] [--merged N] [--closed N] [--theme light|dark|both] [--page <hash>]... [--run <name>]`;
+const USAGE = `Usage: bun scripts/pr-parity.ts --omp http://127.0.0.1:<port> [--token <token>] [--t3 <url>] [--pr owner/repo#N] [--draft N] [--merged N] [--closed N] [--theme light|dark|both] [--page <hash>]... [--run <name>]`;
 
 const VIEWPORT = { width: 1440, height: 900 };
 const PANEL_WIDTH = 720;
@@ -39,7 +42,8 @@ interface PullRequestRef {
 interface App {
 	side: Side;
 	url(pr: PullRequestRef): string;
-	pin(context: BrowserContext): Promise<unknown>;
+	/** Readies a fresh context: pins the panel's width, and signs omp's page in. */
+	prepare(context: BrowserContext): Promise<unknown>;
 	panel(page: Page): Locator;
 	tab(panel: Locator, tab: Tab): Locator;
 	control(panel: Locator, control: Control): Locator;
@@ -69,21 +73,23 @@ const STATE_PULL_REQUEST_STATES = STATES.filter(state => state.name === "summary
 const TAB_LABEL: Record<Tab, string> = { summary: "Summary", timeline: "Timeline", code: "Code" };
 const COMPOSER_LABEL = /^(Comment on|Review) pull request/;
 
-const omp = (base: string): App => ({
+const omp = (base: string, token: string): App => ({
 	side: "omp",
 	url: pr => {
 		const url = new URL(base);
 		url.hash = `pull-requests/${pr.owner}/${pr.repo}/${pr.number}`;
 		return url.href;
 	},
-	pin: context =>
-		context.addInitScript(width => {
+	prepare: async context => {
+		await signIn(context, token);
+		await context.addInitScript(width => {
 			document.addEventListener("DOMContentLoaded", () => {
 				const style = document.createElement("style");
 				style.textContent = `[class~="@container/pr"] { width: ${width}px; flex: none; }`;
 				document.head.append(style);
 			});
-		}, PANEL_WIDTH),
+		}, PANEL_WIDTH);
+	},
 	panel: page => page.locator('[class~="@container/pr"]'),
 	tab: (panel, tab) => panel.getByRole("tab", { name: new RegExp(`^${TAB_LABEL[tab]}`) }),
 	control: (panel, control) => {
@@ -104,7 +110,7 @@ const t3 = (base: string): App => ({
 		url.searchParams.set("number", String(pr.number));
 		return url.href;
 	},
-	pin: context => context.addInitScript(width => localStorage.setItem("t3code:pull-request-panel-width", String(width)), PANEL_WIDTH),
+	prepare: context => context.addInitScript(width => localStorage.setItem("t3code:pull-request-panel-width", String(width)), PANEL_WIDTH),
 	panel: page => page.locator("div.flex-col.bg-background", { has: page.locator('nav[aria-label="Pull request tabs"]') }).last(),
 	tab: (panel, tab) => panel.locator('nav[aria-label="Pull request tabs"]').getByText(TAB_LABEL[tab], { exact: true }),
 	control: (panel, control) => {
@@ -235,11 +241,11 @@ interface Row {
 
 const cell = (captured: boolean | null): string => (captured === null ? "not run" : captured ? "captured" : "absent");
 
-function report(run: string, commit: string, rows: Row[], pages: string[]): string {
+function report(run: string, served: ServedBuild, rows: Row[], pages: string[]): string {
 	const lines = [
 		`# Parity run ${run}`,
 		"",
-		`Commit ${commit}, viewport ${VIEWPORT.width}×${VIEWPORT.height}, panel ${PANEL_WIDTH}px, masked in ${MASK_COLOR}.`,
+		`Served ${describeServed(served)}; viewport ${VIEWPORT.width}×${VIEWPORT.height}, panel ${PANEL_WIDTH}px, masked in ${MASK_COLOR}.`,
 		"",
 		"| Theme | Pull request | State | omp | T3 | Diff |",
 		"| --- | --- | --- | --- | --- | --- |",
@@ -253,6 +259,7 @@ async function main(): Promise<void> {
 	const { values } = parseArgs({
 		options: {
 			omp: { type: "string" },
+			token: { type: "string" },
 			t3: { type: "string" },
 			pr: { type: "string", default: "yampa-ai/yampa#6833" },
 			draft: { type: "string" },
@@ -272,11 +279,17 @@ async function main(): Promise<void> {
 	const target = parsePullRequest(values.pr);
 	const others = [values.draft, values.merged, values.closed].filter(number => number !== undefined).map(number => ({ ...target, number: Number(number) }));
 	const targets = [{ pr: target, states: STATES }, ...others.map(pr => ({ pr, states: STATE_PULL_REQUEST_STATES }))];
-	const apps = [omp(values.omp), ...(values.t3 ? [t3(values.t3)] : [])];
+	const token = scriptToken(values.token);
+	const apps = [omp(values.omp, token), ...(values.t3 ? [t3(values.t3)] : [])];
 	const pages = values.page.map(hash => hash.replace(/^#/, ""));
 
-	const commit = (await Bun.$`git rev-parse --short HEAD`.quiet().text()).trim();
-	const run = values.run ?? `${commit}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+	const check = await checkServed(values.omp, token);
+	const problem = provenanceProblem(check.provenance);
+	if (problem) {
+		console.error(problem);
+		process.exit(1);
+	}
+	const run = values.run ?? defaultRun(check.local);
 	const root = join(import.meta.dir, "..", "tmp", "parity", run);
 
 	const browser = await chromium.launch();
@@ -288,7 +301,7 @@ async function main(): Promise<void> {
 			const captured = new Map<string, Record<Side, boolean | null>>();
 			for (const app of apps) {
 				const context = await browser.newContext({ viewport: VIEWPORT, colorScheme: theme, reducedMotion: "reduce" });
-				await app.pin(context);
+				await app.prepare(context);
 				for (const { pr, states } of targets) {
 					for (const state of states) {
 						const name = `${pr.number}-${state.name}`;
@@ -312,7 +325,7 @@ async function main(): Promise<void> {
 	} finally {
 		await browser.close();
 	}
-	await Bun.write(join(root, "report.md"), report(run, commit, rows, pages));
+	await Bun.write(join(root, "report.md"), report(run, check.served, rows, pages));
 	console.log(root);
 }
 

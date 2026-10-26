@@ -53,7 +53,7 @@ function SidebarTabs() {
 	return (
 		<Section
 			title="Sidebar tabs"
-			meta={`The tabs the sidebar shows, in order, and ${shortcutKeys("tab1")} goes to the first one shown. A hidden tab's page, command, and links still work. Saved in this browser.`}
+			meta={`The tabs the sidebar shows, in order, and ${shortcutKeys("tab1")} goes to the first one shown. A hidden tab's page, command, and links still work. Saved in this app.`}
 		>
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
@@ -97,7 +97,7 @@ function PinnedSkill({ cwd, workspace }: { cwd: string | null; workspace: string
 	return (
 		<Section
 			title="New sessions"
-			meta={`The first message of every session you start here, a quick action's included, goes through the pinned skill. Saved in this browser. ${listed}`}
+			meta={`The first message of every session you start here, a quick action's included, goes through the pinned skill. Saved in this app. ${listed}`}
 		>
 			<SkillPicker label="Pinned skill" skills={skills} value={pinned} onPick={pin} />
 			{pinned !== null && skills.error === null && skills.data && !skills.data.skills.some(skill => skill.name === pinned) && (
@@ -109,17 +109,16 @@ function PinnedSkill({ cwd, workspace }: { cwd: string | null; workspace: string
 
 /** The system notifications of sessions that ask you something or end a turn, while the window is not focused. */
 function SessionNotifications() {
-	const { on, blocked, set } = useSessionNotifications();
+	const { on, set } = useSessionNotifications();
 	return (
 		<Section
 			title="Notifications"
-			meta="A system notification when a session asks you something or finishes a turn while this window is not focused; clicking it opens the session. Saved in this browser."
+			meta="A system notification when a session asks you something or finishes a turn while this window is not focused; clicking it opens the session. Saved in this app."
 		>
 			<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-				<PreferenceSwitch checked={on} onCheckedChange={set} disabled={blocked !== null && !on} />
+				<PreferenceSwitch checked={on} onCheckedChange={set} />
 				Notify me when a session needs me
 			</label>
-			{blocked && <p className="text-xs text-muted-foreground">{blocked}</p>}
 		</Section>
 	);
 }
@@ -160,13 +159,13 @@ function IdleProcessStop() {
 	);
 }
 
-/** The dashboard's own choices, most kept in this browser rather than in omp's files. `workspace` names `cwd` for the skill list. */
+/** The dashboard's own choices, most kept in this app rather than in omp's files. `workspace` names `cwd` for the skill list. */
 export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspace: string | null }) {
 	const [theme, setTheme] = useTheme();
 	const { hideTools, hideThinking, toggleTools, toggleThinking } = useContext(ActivityVisibility);
 	return (
 		<>
-			<Section title="Theme" meta="System follows your computer's light or dark setting. Saved in this browser.">
+			<Section title="Theme" meta="System follows your computer's light or dark setting. Saved in this app.">
 				<RadioGroup
 					aria-label="Theme"
 					value={theme}
@@ -188,7 +187,7 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 					})}
 				</RadioGroup>
 			</Section>
-			<Section title="Transcript" meta="What each activity group shows under its heading, in every pane. Saved in this browser.">
+			<Section title="Transcript" meta="What each activity group shows under its heading, in every pane. Saved in this app.">
 				<div className="space-y-2">
 					<ActivitySwitch label="Show tool calls" shortcut="hideTools" checked={!hideTools} onToggle={toggleTools} />
 					<ActivitySwitch label="Show thinking" shortcut="hideThinking" checked={!hideThinking} onToggle={toggleThinking} />

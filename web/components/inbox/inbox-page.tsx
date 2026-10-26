@@ -1,7 +1,8 @@
-import { Mail, SquarePen } from "lucide-react";
+import { ExternalLink, Mail, SquareArrowOutUpRight, SquarePen, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { errorText } from "../../../src/json";
 import { type AccountId, anyCallable, callable, type GoogleAccount } from "../../../src/shared/accounts";
-import type { MailThread } from "../../../src/shared/gmail";
+import type { MailThread, MailTrash } from "../../../src/shared/gmail";
 import { threadUrl, type MailSend } from "../../../src/shared/gmail";
 import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ import { DisconnectedPage } from "../integrations/disconnected-page";
 import { focusRow, PolledPageFrame, PolledContent, stepRows, useReturnFocus } from "../list-page";
 import { ListSplit } from "../list-split";
 import { Button } from "@/components/ui/button";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MailEditor } from "./mail-editor";
@@ -30,40 +32,58 @@ const accountLabel = (account: GoogleAccount): string => account.address ?? acco
 /**
  * A conversation as Superhuman lists one, on three lines: who sent its last message, how many it holds, and when it
  * arrived; its subject; and its snippet, after the address of its inbox when the list holds several. Its link opens it
- * beside the list.
+ * beside the list; right-click offers **Open**, **Open in Gmail**, and **Delete**.
  */
-function ThreadRow({ thread, open, inbox }: { thread: MailThread; open: boolean; inbox: string | null }) {
+function ThreadRow({ thread, open, inbox, onTrash }: { thread: MailThread; open: boolean; inbox: string | null; onTrash: (thread: MailThread) => void }) {
+	const href = hashForInbox({ account: thread.account, thread: thread.id });
 	return (
-		<li id={rowId(thread)}>
-			<a
-				href={hashForInbox({ account: thread.account, thread: thread.id })}
-				aria-current={open ? "true" : undefined}
-				className={cn(
-					"relative block min-w-0 space-y-0.5 rounded-md px-3 py-2.5 text-sm outline-none",
-					// The open row looks selected, so its focus needs no ring of its own.
-					open
-						? "bg-accent before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
-						: "hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-				)}
-			>
-				<span className="flex items-center gap-2">
-					<span aria-hidden className={cn("size-2 shrink-0 rounded-full", thread.unread && "bg-blue-500")} />
-					{thread.unread && <span className="sr-only">Unread:</span>}
-					<span className={cn("min-w-0 flex-1 truncate", thread.unread ? "font-semibold" : "text-foreground/75")}>{thread.from}</span>
-					{thread.count > 1 && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{thread.count}</span>}
-					<MailTime at={thread.at} />
-				</span>
-				<span className={cn("block truncate pl-4", thread.unread && "font-semibold")}>{thread.subject || "(no subject)"}</span>
-				<span className="flex items-baseline gap-2 pl-4 text-muted-foreground">
-					{inbox && (
-						<span className="max-w-[45%] shrink-0 truncate rounded bg-muted px-1.5 text-xs" title={`In ${inbox}`}>
-							{inbox}
-						</span>
+		<ContextMenu>
+			<ContextMenuTrigger render={<li id={rowId(thread)} />}>
+				<a
+					href={href}
+					aria-current={open ? "true" : undefined}
+					className={cn(
+						"relative block min-w-0 space-y-0.5 rounded-md px-3 py-2.5 text-sm outline-none",
+						// The open row looks selected, so its focus needs no ring of its own.
+						open
+							? "bg-accent before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
+							: "hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
 					)}
-					<span className="min-w-0 flex-1 truncate">{thread.snippet}</span>
-				</span>
-			</a>
-		</li>
+				>
+					<span className="flex items-center gap-2">
+						<span aria-hidden className={cn("size-2 shrink-0 rounded-full", thread.unread && "bg-blue-500")} />
+						{thread.unread && <span className="sr-only">Unread:</span>}
+						<span className={cn("min-w-0 flex-1 truncate", thread.unread ? "font-semibold" : "text-foreground/75")}>{thread.from}</span>
+						{thread.count > 1 && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{thread.count}</span>}
+						<MailTime at={thread.at} />
+					</span>
+					<span className={cn("block truncate pl-4", thread.unread && "font-semibold")}>{thread.subject || "(no subject)"}</span>
+					<span className="flex items-baseline gap-2 pl-4 text-muted-foreground">
+						{inbox && (
+							<span className="max-w-[45%] shrink-0 truncate rounded bg-muted px-1.5 text-xs" title={`In ${inbox}`}>
+								{inbox}
+							</span>
+						)}
+						<span className="min-w-0 flex-1 truncate">{thread.snippet}</span>
+					</span>
+				</a>
+			</ContextMenuTrigger>
+			<ContextMenuContent className="min-w-48">
+				<MenuLinkItem href={href}>
+					<SquareArrowOutUpRight />
+					Open
+				</MenuLinkItem>
+				<MenuLinkItem href={thread.url} target="_blank" rel="noreferrer">
+					<ExternalLink />
+					Open in Gmail
+				</MenuLinkItem>
+				<MenuSeparator />
+				<MenuItem variant="destructive" onClick={() => onTrash(thread)}>
+					<Trash2 />
+					Delete
+				</MenuItem>
+			</ContextMenuContent>
+		</ContextMenu>
 	);
 }
 
@@ -175,6 +195,23 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 		const neighbour = at >= 0 ? threads[at + by] : threads[by === 1 ? 0 : threads.length - 1];
 		if (neighbour) openThread(neighbour);
 	};
+	// Deleting the open conversation opens the one after it, or the one before when it was last.
+	const leaveOpen = (): void => {
+		const after = next ?? previous;
+		if (after) openThread(after);
+		else location.hash = hashForInbox(null);
+	};
+	const [trashError, setTrashError] = useState<string | null>(null);
+	const trashRow = async (thread: MailThread): Promise<void> => {
+		setTrashError(null);
+		try {
+			await putJson<object>("/api/gmail/trash", { account: thread.account, thread: thread.id } satisfies MailTrash);
+			if (open !== null && thread.account === open.account && thread.id === open.thread) leaveOpen();
+			void gmailStore.refresh(null, { fresh: true });
+		} catch (err) {
+			setTrashError(`Cannot delete the conversation: ${errorText(err)}`);
+		}
+	};
 	const step = (by: 1 | -1): boolean => {
 		if (open === null && target !== "new") return stepRows(threads, rowOf, by);
 		openBy(by);
@@ -230,6 +267,11 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 								Cannot read {addressOf(account.account) ?? account.account}: {account.error}
 							</p>
 						))}
+						{trashError && (
+							<p role="alert" className="px-3 text-xs text-red-600 dark:text-red-400">
+								{trashError}
+							</p>
+						)}
 						<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={inbox}>
 							{() =>
 								threads.length === 0 ? (
@@ -242,6 +284,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 												thread={thread}
 												open={open !== null && thread.account === open.account && thread.id === open.thread}
 												inbox={tagged ? (addressOf(thread.account) ?? thread.account) : null}
+												onTrash={thread => void trashRow(thread)}
 											/>
 										))}
 									</ul>
@@ -262,11 +305,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 							onPrevious={previous ? () => openThread(previous) : undefined}
 							onNext={next ? () => openThread(next) : undefined}
 							address={openAddress}
-							onTrashed={() => {
-								const after = next ?? previous;
-								if (after) openThread(after);
-								else location.hash = hashForInbox(null);
-							}}
+							onTrashed={leaveOpen}
 						/>
 					)
 				}

@@ -48,6 +48,8 @@ Files, in `agent/`:
 - `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, thermonuclear review, and live review.
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
+  When GitHub rejects the credential gh uses, the gate also names it, such as `GITHUB_TOKEN`, the project `.env` file omp read it from at startup, and the working login it overrides, never the token itself.
+  A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
   `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the thermonuclear gate.
   A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live; the extension checks the box, not a screenshot.
 - `extensions/cache-tail.ts`: Anthropic caches the tools and system prompt for an hour and the conversation for five minutes.
@@ -69,6 +71,7 @@ Files, in `agent/`:
   The omp process that last changed a checkout, a session with its subagents, owns it, and `omp-checkout-owner.json` in the checkout's git dir names its pid.
   While the owner runs and the checkout holds uncommitted changes to tracked files or an unfinished merge or rebase, another session's `edit`, `write`, and git, gt, or `gh pr checkout` commands that change or switch the checkout are blocked, and that session works in a worktree of its own.
   The guard reads commands behind `env` and similar wrappers and inside `bash -c`, and `git worktree remove` or `move` counts as a change to the worktree it names.
+  A file git ignores, such as `.env`, is in no worktree, so its edit there asks the user and goes ahead once approved; a declined edit, or one in a session that cannot ask, stays blocked.
   A clean checkout passes to the next session that changes it, and a session that ends gives up its claims.
   When HEAD is no longer where a session left it, because another process switched the branch, that session's changes there are blocked until a switch it runs as its own command succeeds, back or to the new branch.
   Reads, files outside git, and the clones omp makes for `isolated: true` subagents pass, and a change in a directory that a variable names is blocked until the command writes the directory out.

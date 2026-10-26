@@ -13,7 +13,7 @@ describe("the listening line the desktop shell waits for", () => {
 	});
 
 	test("rejects the other lines the server prints", () => {
-		expect(isListeningLine("Sign in at http://127.0.0.1:4317/?token=abc", 4317)).toBe(false);
+		expect(isListeningLine("The access token is in ~/.config/omp-agents/token; delete the file and restart to rotate it.", 4317)).toBe(false);
 		expect(isListeningLine("omp-agents: cannot listen on 127.0.0.1:4317: in use", 4317)).toBe(false);
 	});
 });

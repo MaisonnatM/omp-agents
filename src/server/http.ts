@@ -29,16 +29,14 @@ export function refuseUntil(settled: Promise<unknown>, why: string): () => Respo
 	return () => (open ? null : fail(503, why));
 }
 
-const NOT_SIGNED_IN = "Not signed in: open the URL that the server printed, or send Authorization: Bearer <token>";
+const NOT_SIGNED_IN = "Not signed in: send Authorization: Bearer <token>, with the token from the server's token file";
 
 export interface Guards {
 	/** Whether the request names a host this server answers to. DNS rebinding cannot pass it. */
 	allowedHost(req: Request): boolean;
-	/** Whether the request's `?token=` is the token: the printed URL, which signs a browser in. */
-	login(req: Request): boolean;
 	/**
 	 * The response refusing an API request, or `null` to answer it: the Host check, then `Sec-Fetch-Site` (403), then
-	 * the `Authorization: Bearer` header (401). A `?token=` is no credential here.
+	 * the `Authorization: Bearer` header (401). A token in the query is no credential.
 	 */
 	admit(req: Request): Response | null;
 	/** `admit` that also takes the media key as `?key=`, for the routes that an image, a video, or a mail frame loads. */
@@ -79,7 +77,6 @@ export function guardsFor(port: number, token: string): Guards {
 	const admit = (req: Request): Response | null => outside(req) ?? (bearer(req) ? null : fail(401, NOT_SIGNED_IN));
 	return {
 		allowedHost,
-		login: req => tokenMatches(token, new URL(req.url).searchParams.get("token")),
 		admit,
 		admitMedia: req => outside(req) ?? (bearer(req) || tokenMatches(media, new URL(req.url).searchParams.get(MEDIA_KEY_PARAM)) ? null : fail(401, NOT_SIGNED_IN)),
 		admitSocket(req) {

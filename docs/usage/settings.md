@@ -3,14 +3,14 @@
 - **Settings** is the last sidebar tab by default, after **Calendar** and, once Gmail is connected, **Inbox**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists eleven sections in two groups.
-  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, **Workspaces**, and **Sync**, which are the same whatever the workspace.
+  The sidebar lists twelve sections in two groups.
+  **General** holds **Analytics**, **Activity**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, **Workspaces**, and **Sync**, which are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
   Choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range; **Today** starts at local midnight.
-  Each range's last result is cached in your browser, so switching back, reopening the page, or reloading shows it while a fresh read runs.
+  Each range's last result is cached in the app, so switching back, reopening the page, or reloading shows it while a fresh read runs.
   A failed refresh keeps the cached result and shows the error.
   Refreshes run only while **Analytics** is open, every five seconds during indexing and every 30 seconds otherwise.
   While a range with no cached result loads, the previous range's numbers remain visible but dimmed.
@@ -39,11 +39,22 @@
   A main session's transcript records neither its system prompt nor its tool definitions, so their tokens show together as **System prompt and tool definitions**, under **Not in transcript**; a subagent's transcript records its system prompt, so its files, skills, rules, and MCP servers show by name, and only **Tool definitions** stay unrecorded.
   Tokens come from omp's tokenizer for each model, or about four characters a token for a model omp has none for.
   The report reads every session file once, then only the files that changed, and shows how far it has read while it catches up.
-- **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
+- **Activity** shows how you use the dashboard over the last 30 days; choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
+  It counts the pages and settings sections you open, the shortcuts and command palette commands you run, the changes you send, and clicks on a few controls that change nothing else, by name only, never what they show or what you typed.
+  **Not used** lists every feature with no use in the range and when you last used it, or **Never**; features used once or twice follow.
+  The pages, commands, and changes of a service omp is not signed in to, such as **Inbox** and its commands without Gmail, are listed apart and not counted.
+  **Most used** lists the top 20 features, with how many days you used each and, for a command, how often you ran it by its keys and from the palette.
+  **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
+  **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
+  Only the server that runs the unattended work keeps activity, in `activity.db` in its data directory; a browser under automation records nothing.
+- **Worktrees** lists every Git worktree in repositories where a session ran; **Show another repository**, below the list, lists one more.
   A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.
+  Above the list, the tab counts the worktrees, their disk use measured so far, and the merged ones with their size; **All**, **Merged**, and **Removable** filter the rows.
   Each row shows the branch, the path below the repository's parent folder with the full path on hover, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
   No omp session reads as no omp session, not as unused.
-  The status column stays empty for a checkout you can delete and names what blocks one you cannot; each repository's header checkbox selects every deletable row.
+  Rows keep their order while sizes are measured and sort again once every size is in or you change the sort.
+  A badge after the branch names what blocks deleting a checkout, with the full reason on hover; each repository's header checkbox selects every deletable row.
+  Selected rows show a bar at the bottom of the page with their count, size, **Clear**, and **Delete**.
   **Delete** asks before it removes a linked worktree or forgets a registration whose directory is already gone.
   It keeps the branch and session transcripts.
   It refuses the main checkout, a locked checkout, unsaved changes, a nested repository, a checkout this dashboard or a live session is using, and a checkout whose subagent locations are unknown.
@@ -53,8 +64,8 @@
   Disk use is approximate, and removing a checkout may free less than the number shown.
   A row whose work has merged says **Merged** after its branch, with the pull request's number when GitHub's newest pull request from that branch merged.
   A worktree counts as merged when `origin`'s default branch contains its commit, which also covers a detached checkout, or when its branch's newest pull request merged and the branch has no commit made after the merge, which covers squash merges such as Graphite's.
-  The main checkout is never flagged, and a repository GitHub cannot answer for says so above the list, while the default branch still flags what it contains.
-  **Remove merged** previews every merged row the search shows and lists the ones it will remove and the ones it keeps, each with the reason.
+  The main checkout is never flagged, and repositories GitHub cannot answer for share one warning above the list, while the default branch still flags what it contains.
+  **Remove merged** previews every merged row the search and filter show, says about how much disk it frees, and lists the ones it will remove and, folded, the ones it keeps, each with the reason.
   It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses.
   Confirming removes only the worktrees it listed for removal, keeps their branches, and reports how many it removed, kept, and failed to remove.
   Nothing is removed until you confirm.
@@ -77,7 +88,7 @@
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
   If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
-- **Preferences** holds the dashboard's own choices, saved in the browser's localStorage, not in omp's files, except **Stop idle processes**, which the server keeps.
+- **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files, except **Stop idle processes**, which the server keeps.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
   **Sidebar tabs** lists the seven sidebar tabs in the order the sidebar shows them, each with the Cmd+number it takes now, a switch that shows or hides it, and buttons that move it up or down.
@@ -104,12 +115,12 @@
   The dashboard sees a merge it made at once, and one made elsewhere within two minutes; a merge made before the dashboard started, or before the session linked the pull request, ends nothing.
   A session still working when its pull request merges, or waiting to continue after a usage limit or a connection error, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
-  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in this browser, and a method the repository does not allow falls back to the first one it does.
+  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in the app, and a method the repository does not allow falls back to the first one it does.
 - **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
-  The server keeps the list in `workspaces.json` beside its access token, so every browser tab and the desktop app show the same workspaces.
+  The server keeps the list in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
   With **All workspaces**, **Models**, **Files**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.

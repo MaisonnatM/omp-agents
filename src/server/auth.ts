@@ -2,6 +2,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { MEDIA_KEY_STORAGE_KEY, TOKEN_STORAGE_KEY } from "../shared/access";
 
 /** 32 random bytes as base64url. */
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
@@ -60,6 +61,9 @@ const keyed = (token: string, purpose: string): string => createHmac("sha256", t
  * routes that such tags load, and the token cannot be worked back from it.
  */
 export const mediaKey = (token: string): string => keyed(token, "omp-agents media key");
+
+/** The localStorage entries that sign the page in: the desktop window's preload writes them, as does a script that drives the page. */
+export const pageAccess = (token: string): Record<string, string> => ({ [TOKEN_STORAGE_KEY]: token, [MEDIA_KEY_STORAGE_KEY]: mediaKey(token) });
 
 /**
  * What `GET /api/hello?nonce=` answers: proof that the server on `port` holds `token`, which tells nothing about the

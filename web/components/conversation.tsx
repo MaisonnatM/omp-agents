@@ -322,6 +322,7 @@ function LiveConversation({
 											open={directoriesOpen}
 											onOpenChange={setDirectoriesOpen}
 											onPick={dir => send({ t: "prompt", view, text: `/move ${dir}`, images: [], delivery: "steer" })}
+											control="composer.directory"
 										/>
 									) : (
 										<DirectoryLabel cwd={shown.cwdDisplay} />

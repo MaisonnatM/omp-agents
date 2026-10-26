@@ -29,10 +29,10 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
-import { helloProof, loadToken } from "../src/server/auth";
+import { helloProof, loadToken, pageAccess } from "../src/server/auth";
 import { showAttention } from "./attention";
 import { startUpdates, type Updates } from "./updates";
 
@@ -89,8 +89,8 @@ function isDashboard(url: string): boolean {
 	return parsed?.protocol === "http:" && dashboardHosts(PORT).includes(parsed.host);
 }
 
-/** What the dashboard's own page may use: its alerts, its Copy buttons, and a video's full screen. */
-const DASHBOARD_PERMISSIONS: ReadonlySet<string> = new Set(["notifications", "clipboard-sanitized-write", "fullscreen"]);
+/** What the dashboard's own page may use: its Copy buttons and a video's full screen. */
+const DASHBOARD_PERMISSIONS: ReadonlySet<string> = new Set(["clipboard-sanitized-write", "fullscreen"]);
 
 /** Whether `contents` may use `permission`: only the dashboard, and only what {@link DASHBOARD_PERMISSIONS} names. */
 const permitted = (contents: WebContents | null, permission: string): boolean => contents !== null && DASHBOARD_PERMISSIONS.has(permission) && isDashboard(contents.getURL());
@@ -165,14 +165,12 @@ function showError(win: BrowserWindow, title: string, detail: string): void {
 	void win.loadURL(notice(title, `<p>${escapeHtml(detail)}</p>${log}<p><a href="${RETRY_URL}">Retry</a></p>`));
 }
 
-/** Uses the server on the port, or starts one, then signs the window in with the token. */
+/** Uses the server on the port, or starts one, then loads the dashboard, which the preload signs in with the token. */
 async function connect(win: BrowserWindow): Promise<void> {
 	void win.loadURL(notice("Starting omp agents…"));
-	let token: string;
 	try {
 		// The same call the server makes: whichever runs first creates the token, and both read the same one.
-		token = loadToken(tokenFile);
-		const found = await probe(token);
+		const found = await probe(loadToken(tokenFile));
 		if (found === "taken") {
 			showError(
 				win,
@@ -194,13 +192,19 @@ async function connect(win: BrowserWindow): Promise<void> {
 		return;
 	}
 	// A failed load reaches `did-fail-load`, which shows it.
-	win.loadURL(`${ORIGIN}/?token=${token}`).catch(() => {});
+	win.loadURL(`${ORIGIN}/`).catch(() => {});
 }
 
 /** Opens a web address in the default browser; any other scheme goes nowhere. */
 function openOutside(url: string): void {
 	const protocol = URL.parse(url)?.protocol;
 	if (protocol === "http:" || protocol === "https:") void shell.openExternal(url);
+}
+
+/** `url` as the window loads it when it names the dashboard's page, `${ORIGIN}/` with any hash, else `null`. */
+function dashboardPage(url: string): string | null {
+	const parsed = URL.parse(url);
+	return parsed?.origin === ORIGIN && parsed.pathname === "/" ? `${ORIGIN}/${parsed.hash}` : null;
 }
 
 /** The bounds the window had when it last hid or closed; only the size when no display shows its top-left corner any more. */
@@ -244,6 +248,8 @@ function createWindow(): BrowserWindow {
 		...savedBounds(),
 		show: false,
 		title: "omp agents",
+		// On macOS the page draws the title bar, `DesktopTitleBar`, with the command menu and the bell; the buttons sit centered in its 36px.
+		...(IS_MAC ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 14, y: 12 } } : {}),
 		// macOS takes the app's icon from the Dock instead.
 		icon: ICON,
 		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD },
@@ -259,9 +265,11 @@ function createWindow(): BrowserWindow {
 		if (details.isMainFrame) sendTargetURL("");
 	});
 	win.on("blur", () => sendTargetURL(""));
+	// A browser cannot sign in, so a session link opened as a new window, such as by a middle-click, opens here instead.
 	contents.setWindowOpenHandler(({ url }) => {
-		// An empty address is a tab the page means to send somewhere later; the page opens the address itself instead.
-		if (url && url !== "about:blank") openOutside(url);
+		const page = dashboardPage(url);
+		if (page) win.loadURL(page).catch(() => {});
+		else openOutside(url);
 		return { action: "deny" };
 	});
 	contents.on("will-navigate", event => {
@@ -282,10 +290,22 @@ function createWindow(): BrowserWindow {
 		const items = contextMenuItems(params, contents);
 		if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
 	});
-	// A page that holds no token, such as one an older server signed in with a cookie, asks to be signed in again.
+	/** The token the preload last wrote into the page, so a sign-in reloads the page only for a token it has not tried. */
+	let handedOut: string | null = null;
+	ipcMain.on(ACCESS_CHANNEL, event => {
+		let access: Record<string, string> | null = null;
+		if (event.sender === contents && isDashboard(event.senderFrame?.url ?? "")) {
+			handedOut = loadToken(tokenFile);
+			access = pageAccess(handedOut);
+		}
+		event.returnValue = access;
+	});
+	// The server took no token the page holds: the token file changed since the page loaded, or the server holds another
+	// token, as one started before the file changed does. Reloading with the same token again would loop.
 	ipcMain.on(SIGN_IN_CHANNEL, event => {
 		const url = event.senderFrame?.url ?? "";
-		if (event.sender === contents && isDashboard(url)) win.loadURL(`${ORIGIN}/?token=${loadToken(tokenFile)}${URL.parse(url)?.hash ?? ""}`).catch(() => {});
+		if (event.sender !== contents || !isDashboard(url) || loadToken(tokenFile) === handedOut) return;
+		win.loadURL(`${ORIGIN}/${URL.parse(url)?.hash ?? ""}`).catch(() => {});
 	});
 
 	win.on("close", event => {

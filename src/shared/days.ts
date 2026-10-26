@@ -1,8 +1,11 @@
-/** Local days as todos, tickets, and the calendar name them: `YYYY-MM-DD`, which sorts as the days do; and the `HH:MM` of a time input. */
+/** Local days as todos, tickets, the calendar, and Settings › Activity name them: `YYYY-MM-DD`, which sorts as the days do; and the `HH:MM` of a time input. */
+
+/** A day's milliseconds, ignoring daylight saving's long and short days. */
+export const DAY_MS = 86_400_000;
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
-/** The day of `at` in the browser's time zone. */
+/** The day of `at` in the local time zone: the browser's on the page, the server's on the server. */
 export function localDay(at: number | Date = new Date()): string {
 	const date = new Date(at);
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;

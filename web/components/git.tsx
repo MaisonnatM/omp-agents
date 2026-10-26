@@ -121,6 +121,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 				</span>
 			}
 			icon={choice?.kind === "new" ? GitBranchPlus : GitBranch}
+			control="composer.branch"
 			ariaLabel={`Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}`}
 			tooltip={`Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}. Choosing another branch uses its existing worktree or creates a new worktree.`}
 			disabled={disabled}

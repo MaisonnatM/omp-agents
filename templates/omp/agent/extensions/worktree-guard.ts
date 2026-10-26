@@ -1,5 +1,6 @@
 // Guards the checkouts agents change in place.
 // - The main checkout on its default branch takes no `edit` or `write`: the agent works in a linked worktree, as AGENTS.md asks.
+//   A file git ignores, such as `.env`, is in no worktree, so its edit goes ahead there once the user approves it.
 // - A checkout belongs to the omp process that last changed it, a session and its in-process subagents. While that process
 //   lives and the checkout holds uncommitted changes to tracked files, another process's edits, writes, and git, gt, or
 //   `gh pr checkout` commands that change the checkout are blocked, and that process works in a worktree of its own.
@@ -289,15 +290,23 @@ function targets(input: Record<string, unknown>): string[] {
 }
 
 export default function worktreeGuard(pi: ExtensionAPI) {
-	pi.on("tool_call", (event, ctx) => {
+	pi.on("tool_call", async (event, ctx) => {
 		const input = event.input as Record<string, unknown>;
 		// Each checkout the call changes, judged once by the strongest change the call makes there: a write over a switch.
 		const touched = new Map<string, { c: Checkout; kind: Kind; what: string }>();
 		const touch = (c: Checkout | null, kind: Kind, what: string) => {
 			if (c && touched.get(c.gitDir)?.kind !== "write") touched.set(c.gitDir, { c, kind, what });
 		};
+		// A file git ignores, such as `.env`, is in no worktree and moves with no branch, so in a main checkout on its default branch its edit waits for the user instead.
+		const ignored: string[] = [];
 		if (event.toolName === "edit" || event.toolName === "write") {
-			for (const path of targets(input)) touch(checkoutAt(resolve(ctx.cwd, path.replace(/^~(?=\/)/, process.env.HOME ?? "~"))), "edit", `This ${event.toolName} of ${path}`);
+			for (const path of targets(input)) {
+				const file = resolve(ctx.cwd, path.replace(/^~(?=\/)/, process.env.HOME ?? "~"));
+				const c = checkoutAt(file);
+				// `git check-ignore` names an ignored path and stays silent for any other, including a tracked file an ignore rule matches.
+				if (c && defaultBranch(c) && git(c.top, ["check-ignore", "--", file]) !== "") ignored.push(file);
+				else touch(c, "edit", `This ${event.toolName} of ${path}`);
+			}
 		} else if (event.toolName === "bash" && typeof input.command === "string") {
 			for (const change of changes(input.command, typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd)) {
 				const command = `\`${change.words.join(" ")}\``;
@@ -315,6 +324,15 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 			if (reason) return { block: true, reason };
 		}
 		if (event.toolName === "bash" && touched.size > 0) family().before.set(event.toolCallId, [...touched.values()].map(({ c }) => c));
+		if (ignored.length === 0) return;
+		const ignoredHere = `git ignores ${ignored.map(file => `\`${file}\``).join(", ")}, so no worktree has it, and its main checkout is on the default branch.`;
+		if (ctx.hasUI && (await ctx.ui.confirm("Edit an ignored file on the default branch?", `${ignoredHere} Allow this edit there?`))) return;
+		return {
+			block: true,
+			reason: ctx.hasUI
+				? `${ignoredHere} The user declined this edit. Ask the user how to proceed, and do not edit the file through the shell.`
+				: `${ignoredHere} Editing it there needs the user's approval, which this session cannot ask for. Ask the user to make the change, and do not edit the file through the shell.`,
+		};
 	});
 
 	// Adopts the HEAD the owner's own command left once it succeeded or moved HEAD, as `git switch x && false` does; a switch git refused keeps the drift block.

@@ -42,6 +42,24 @@ describe("parseClientMsg", () => {
 		expect(parseClientMsg(JSON.stringify({ t: "resume" }))).toBeNull();
 	});
 
+	test("activity takes a page load's numbered events and rejects an unknown kind, a via off a command, a key that could hold content, and an oversized batch", () => {
+		const client = "aaaaaaaa-0000-4000-8000-000000000000";
+		const view = { kind: "view", key: "settings/sync", via: null, at: 1 };
+		const command = { kind: "command", key: "help", via: "palette", at: 2 };
+		const batch = (events: unknown[], first: unknown = 0): unknown => msg({ t: "activity", client, first, events });
+		expect(batch([view, command], 3)).toEqual({ t: "activity", client, first: 3, events: [view, command] });
+		expect(batch([{ ...view, kind: "click" }])).toBeNull();
+		expect(batch([{ ...view, via: "keyboard" }])).toBeNull();
+		expect(batch([{ ...command, via: null }])).toBeNull();
+		expect(batch([{ ...view, key: "Settings" }])).toBeNull();
+		expect(batch([{ ...view, key: "a".repeat(80) }])).not.toBeNull();
+		expect(batch([{ ...view, key: "a".repeat(90) }])).toBeNull();
+		expect(batch(Array.from({ length: 500 }, () => view))).not.toBeNull();
+		expect(batch(Array.from({ length: 501 }, () => view))).toBeNull();
+		expect(batch([])).toBeNull();
+		expect(msg({ t: "activity", client: "not-a-uuid", first: 0, events: [view] })).toBeNull();
+	});
+
 	test("watch takes only well-formed views and trajectories, and one bad view rejects the whole set", () => {
 		expect(msg({ t: "watch", views: [live, { kind: "past", sessionId: "s1" }], trajectories: [{ kind: "past", sessionId: "s1" }] })).toEqual({
 			t: "watch",

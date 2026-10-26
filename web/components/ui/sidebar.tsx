@@ -20,7 +20,7 @@ const Sidebar = forwardRef<HTMLDivElement, SidebarProps>(
       data-slot="sidebar"
       data-side={side}
       className={cn(
-        "sticky top-0 flex h-svh shrink-0 flex-col",
+        "sticky top-0 flex h-full shrink-0 flex-col",
         side === "right" && "order-last",
         className
       )}

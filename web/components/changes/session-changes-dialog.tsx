@@ -2,6 +2,7 @@ import { RotateCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { SessionChanges } from "../../../src/shared/changes";
 import type { ChangedFile } from "../../../src/shared/transcript";
+import { activityControl } from "../../activity";
 import { changesPathOf } from "../../changes-model";
 import { useRead } from "../../reads";
 import { Button } from "@/components/ui/button";
@@ -61,13 +62,13 @@ export function SessionChangesDialog({ sessionId, cwd, path, work, working, onCl
 			<SizeProvider size="compact">
 				<Tabs value={scope} onValueChange={value => setScope(value as Scope)}>
 					<TabsList aria-label="Which changes">
-						<TabItem value="all" label="All changes" badge={changes?.files.length || undefined} />
-						<TabItem value="session" label="This session" badge={sessionCount || undefined} tooltip="The files this session's own edit and write calls changed" />
+						<TabItem {...activityControl("changes-dialog.scope.all")} value="all" label="All changes" badge={changes?.files.length || undefined} />
+						<TabItem {...activityControl("changes-dialog.scope.session")} value="session" label="This session" badge={sessionCount || undefined} tooltip="The files this session's own edit and write calls changed" />
 					</TabsList>
 				</Tabs>
 			</SizeProvider>
 			<Tooltip content="Read the changes again" side="bottom">
-				<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Read the changes again" loading={list.refreshing} onClick={() => setReads(count => count + 1)}>
+				<Button {...activityControl("changes-dialog.refresh")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Read the changes again" loading={list.refreshing} onClick={() => setReads(count => count + 1)}>
 					<RotateCw />
 				</Button>
 			</Tooltip>

@@ -4,12 +4,14 @@ import type { Server, ServerWebSocket } from "bun";
 import { errorText } from "./json";
 import { ompVersion } from "./omp/install";
 import { displayPath, tokenFile } from "./paths";
-import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
+import { HOSTNAME, listeningLine, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Dashboard } from "./server/dashboard";
 import { fail, guardsFor, refuseUntil } from "./server/http";
 import { loadPage, pageBuild, servePage } from "./server/page";
+import { prebuiltPageDir, sourceDir } from "./server/resources";
 import { SelfUpdate } from "./server/self-update";
+import { describeServed, readSourceIdentity, type ServedBuild } from "./served-build";
 import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSocket } from "./server/terminal-socket";
 import type { Socket, SocketData } from "./server/views";
 import type { ServerMsg } from "./shared/protocol";
@@ -18,8 +20,17 @@ import { parsePageId } from "./server/wire";
 const PORT = portFromEnv();
 const token = loadToken(tokenFile);
 const guards = guardsFor(PORT, token);
+// Read before the page builds, so an edit landing during the build leaves the record older than the page, which reads as stale, never newer.
+const startedAt = new Date().toISOString();
+const source = prebuiltPageDir
+	? null
+	: await readSourceIdentity(sourceDir).catch(err => {
+			console.error(`omp-agents: cannot tell which code this server serves: ${errorText(err)}`);
+			return null;
+		});
 const page = await loadPage();
-const buildMsg = JSON.stringify({ t: "build", id: await pageBuild(page) } satisfies ServerMsg);
+const served: ServedBuild = { source, page: await pageBuild(page), pid: process.pid, startedAt };
+const buildMsg = JSON.stringify({ t: "build", id: served.page } satisfies ServerMsg);
 const dashboard = new Dashboard(PORT, await SelfUpdate.forServer(restart));
 // The port is bound before the sessions are attached, so a taken port fails before any keeper is joined, but no page
 // may start or resume a session until the server knows which ones survived.
@@ -57,14 +68,14 @@ try {
 		hostname: HOSTNAME,
 		port: PORT,
 		development: false,
-		routes: dashboard.routes(guards),
+		routes: dashboard.routes(guards, served),
 		fetch(req, srv) {
 			const { pathname } = new URL(req.url);
 			if (pathname === "/ws") return upgrade(req, srv);
 			if (pathname === "/ws/terminal") return upgradeTerminal(req, srv);
 			if (pathname === "/api/hello") return guards.hello(req);
 			if (pathname.startsWith("/api/")) return guards.admit(req) ?? fail(404, `No ${req.method} ${pathname}`);
-			return servePage(req, guards, token, page);
+			return servePage(req, guards, page);
 		},
 		websocket: {
 			// A prompt's images travel as base64 in one message: MAX_PROMPT_IMAGE_BYTES of them, a third more as base64.
@@ -94,7 +105,7 @@ try {
 process.on("exit", () => dashboard.exited());
 await dashboard.start(server);
 console.log(listeningLine(PORT, ompVersion));
-console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);
+console.log(`Serving ${describeServed(served)}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
 
 /**

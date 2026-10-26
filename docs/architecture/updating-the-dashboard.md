@@ -20,8 +20,10 @@ An update never stashes, resets, or merges:
 - Every later update until then answers the same `restarting`.
 
 The desktop shell's own code in `desktop/` loads only when the app starts again.
-Every socket's first message is `{ t: "build", id }`, a hash of the served `index.html`, which names each chunk by its content's hash; the page keeps the first id it heard and reloads when a later socket brings another, so a browser tab or the desktop window follows a restart to the new page.
+Every socket's first message is `{ t: "build", id }`, a hash of the served `index.html`, which names each chunk by its content's hash; the page keeps the first id it heard and reloads when a later socket brings another, so the desktop window follows a restart to the new page.
 
 `GET /api/dashboard/update` answers `DashboardUpdateStatus` from `src/shared/dashboard-update.ts` without asking origin: `unavailable` with its reason, or the branch, the running commit, and `behind`, the commits `origin/<branch>` held past it at the last fetch.
 `PUT /api/dashboard/update` with any JSON body runs `SelfUpdate.update` and answers `{ kind: "current" }` or `{ kind: "restarting", from, to, installed }`, or 409 with the refusal.
 An agent reaches both with `curl`, with the token as `Authorization: Bearer` and, for the `PUT`, an `Origin` that matches the host; the starter kit's `AGENTS.md` tells agents to load new commits this way, never by killing its processes.
+`GET /api/dashboard/build` answers what the server serves, `ServedBuild` from `src/served-build.ts`: its checkout, branch, commit, and working tree as the server read them before it built the page, the page's build, its pid, and when it started, or no checkout for a prebuilt page.
+It changes nothing, and the server prints the same at startup as `Serving ...`; `scripts/smoke-proof.ts` and `scripts/pr-parity.ts` compare it with the checkout they run from, so a smoke check refuses a server started before the last edit or from another checkout.

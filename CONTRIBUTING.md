@@ -16,10 +16,11 @@ Install the [requirements](README.md#requirements), then:
 git clone https://github.com/MaisonnatM/omp-agents.git
 cd omp-agents
 bun install --frozen-lockfile
-bun start
+bun run desktop
 ```
 
-The server does not reload on change; restart `bun start` after editing `src/` or `web/`.
+The server does not reload on change; after editing `src/` or `web/`, quit the app with Cmd+Q and run `bun run desktop` again.
+When an omp-agents server already listens on the port, the app uses it instead of starting its own, so restart that server too.
 `bun install` also installs a pre-push hook that runs the CI checks.
 
 ## Pull requests

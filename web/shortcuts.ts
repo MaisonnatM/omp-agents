@@ -1,4 +1,5 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { commandKey, record } from "./activity";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the sidebar shows, whichever it is. */
 export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7", "tab8"] as const;
@@ -407,6 +408,7 @@ function dispatch(event: HandledEvent, handlers: ShortcutHandlers, inScope: (sco
 		const handler = handlers[id];
 		if (handler && inScope(scope) && handler(key) !== false) {
 			event.preventDefault();
+			record("command", commandKey(id), "keyboard");
 			return;
 		}
 	}

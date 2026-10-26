@@ -1,6 +1,7 @@
 /** The workspace picker: the searchable directory list for the roster and the new session's directory. */
 import { Folder } from "lucide-react";
 import { useState } from "react";
+import type { ControlId } from "../../src/shared/activity";
 import type { Workspace } from "../../src/shared/workspaces";
 import { folderName } from "../labels";
 import type { ShortcutId } from "../shortcuts";
@@ -36,10 +37,12 @@ interface DirectoryPickerProps {
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
 	onPick: (cwd: string) => void;
+	/** The Activity control a click on the trigger records; none when omitted. */
+	control?: ControlId;
 }
 
 /** A working directory: a workspace the dashboard lists, or any directory typed into the search field. */
-export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick }: DirectoryPickerProps) {
+export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick, control }: DirectoryPickerProps) {
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
 	const pick = (next: string): void => {
@@ -49,6 +52,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 		<CommandPicker
 			trigger={<span className="truncate">{folderName(cwd) ?? cwd}</span>}
 			icon={Folder}
+			control={control}
 			ariaLabel={`Working directory: ${cwd}`}
 			tooltip={tooltip}
 			shortcut={shortcut}
