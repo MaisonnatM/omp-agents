@@ -56,8 +56,10 @@ export function RowLine({ dot, badge, label, facts, end }: RowLineProps) {
 					{facts.text}
 				</span>
 			)}
-			{badge && <span className="ml-auto flex shrink-0 self-center">{badge}</span>}
-			{end}
+			<span className="ml-auto flex shrink-0 items-baseline gap-2">
+				{badge && <span className="flex shrink-0 self-center">{badge}</span>}
+				{end}
+			</span>
 		</span>
 	);
 }
