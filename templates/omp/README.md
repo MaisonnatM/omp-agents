@@ -69,8 +69,8 @@ Files, in `agent/`:
   The blobs hold what the provider received, including your `AGENTS.md` files, environment details, and any secret that reached the conversation, so keep `~/.omp/agent/blobs/` as private as the session files.
 - `extensions/worktree-guard.ts`: blocks every `edit` or `write` in a repository's main checkout while it is on its default branch (`origin/HEAD`, else `main` or `master`), and tells the agent to work in a linked worktree.
   On any other branch the main checkout is edited in place, as `AGENTS.md` asks, and the clones omp makes for `isolated: true` subagents pass too.
-- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add/check changes.
-  An omitted or empty `due` value means no due date; a nonempty value must use `YYYY-MM-DD`.
+- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, and delete changes; `add` and `edit` take the name of an existing section.
+  On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
 - `extensions/notes.ts`: `user_note` lists and reads the dashboard's notes and queues add/append changes.
   An empty parameter reads as left out, and a session that adds a title it already added gets that note's id back.
   A note a project's session adds belongs to that project unless `project_id` names another, and `list` takes `project_id` to keep one project's notes.

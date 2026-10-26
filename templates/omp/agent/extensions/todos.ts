@@ -1,6 +1,7 @@
 // The `user_todo` tool: lets an agent read the omp-agents dashboard's Todo list, add a todo for a step outside the
-// session that only the user can take, and check one off. A session is told at each prompt which open todo links to it
-// and which open todos it added, so it checks them off once done and does not add them twice.
+// session that only the user can take, check one off, edit one's title, notes, due day, or section, and delete one.
+// A session is told at each prompt which open todo links to it and which open todos it added, so it checks them off
+// once done and does not add them twice.
 // Changes go to the dashboard's todo inbox, one file each, which the dashboard server applies and deletes, so it
 // stays the only writer of todos.json and a todo filed while it is down waits for it.
 import { randomUUID } from "node:crypto";
@@ -75,14 +76,41 @@ function leave(change: Record<string, unknown>): void {
 	renameSync(temp, join(INBOX_DIR, `${name}.json`));
 }
 
+/** Top-level todo or todo under one `id`, from the list or none: a change to an id the list lacks would apply to nothing. */
+function findTodo(list: List, id: string): { todo: Leaf; topLevel: boolean } | undefined {
+	for (const todo of list.todos ?? []) {
+		if (todo.id === id) return { todo, topLevel: true };
+		const child = todo.children?.find(leaf => leaf.id === id);
+		if (child) return { todo: child, topLevel: false };
+	}
+	return undefined;
+}
+
+/** The section named `name`, matched case-insensitively, or the error naming the ones that exist. */
+function sectionNamed(list: List, name: string): { id: string } | { error: string } {
+	const category = list.categories?.find(category => category.name.toLowerCase() === name.toLowerCase());
+	if (category) return category;
+	const names = (list.categories ?? []).map(category => category.name).join(", ") || "none";
+	return { error: `No section named ${JSON.stringify(name)}; the sections are: ${names}.` };
+}
+
+const reply = (text: string, isError = false) => ({ content: [{ type: "text" as const, text }], isError });
+
 export default function todos(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const params = z.object({
-		action: z.enum(["list", "add", "check"]).describe("list the todos left, add one, or check one off"),
-		text: z.string().max(2000).optional().describe("add: the todo's title, one line, an action the user takes"),
-		notes: z.string().max(100_000).optional().describe("add: markdown notes, such as the PR or command it needs"),
-		due: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).optional().describe("add: the day it is due, YYYY-MM-DD"),
-		id: z.string().max(64).optional().describe("check: the todo's id, from list"),
+		action: z
+			.enum(["list", "add", "check", "edit", "delete"])
+			.describe("list the todos left, add one, check one off, edit one, or delete one"),
+		text: z.string().max(2000).optional().describe("add, edit: the todo's title, one line, an action the user takes"),
+		notes: z.string().max(100_000).optional().describe("add, edit: markdown notes, such as the PR or command it needs; edit replaces them"),
+		due: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).optional().describe("add, edit: the day it is due, YYYY-MM-DD; edit: empty clears it"),
+		section: z
+			.string()
+			.max(200)
+			.optional()
+			.describe("add, edit: the name of an existing Todo page section to file it in; omit for none; edit: empty moves it out of its section"),
+		id: z.string().max(64).optional().describe("check, edit, delete: the todo's id, from list"),
 	});
 	pi.registerTool({
 		loadMode: "essential",
@@ -93,40 +121,74 @@ export default function todos(pi: ExtensionAPI) {
 			"Use add only for a step outside this conversation that only the user can take, such as setting up an account, a console, or a credential, running something on their machine, or reviewing a pull request.",
 			"Never add a todo to ask for an approval, an answer, or a reply in this session; ask in your reply instead.",
 			"Never add your own work items; use your todo tool for those.",
-			"When you finish the work a todo asks for, or the user has done the step it names, check it off. You cannot remove or edit todos.",
+			"When you finish the work a todo asks for, or the user has done the step it names, check it off.",
+			"Edit or delete a todo only when the user asks, or to fix or drop one this session added; prefer check over delete for a step that was done.",
+			"Sections must already exist; you cannot create, rename, or remove one.",
 		].join(" "),
 		parameters: params,
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
 			const parsed = params.safeParse(raw);
-			if (!parsed.success) return { content: [{ type: "text", text: "Invalid user_todo input." }], isError: true };
-			const { action, text, notes, due, id } = parsed.data;
+			if (!parsed.success) return reply("Invalid user_todo input.", true);
+			const { action, text, notes, due, section, id } = parsed.data;
+			const title = text?.replace(/\s+/g, " ").trim();
+			const sectionName = section?.trim();
 			switch (action) {
 				case "list":
-					return { content: [{ type: "text", text: listText(readList()) }] };
+					return reply(listText(readList()));
 				case "add": {
-					const title = text?.replace(/\s+/g, " ").trim();
-					if (!title) return { content: [{ type: "text", text: "add needs text." }], isError: true };
+					if (!title) return reply("add needs text.", true);
+					const list = readList();
+					const category = sectionName ? sectionNamed(list, sectionName) : undefined;
+					if (category && "error" in category) return reply(category.error, true);
 					const sessionId = ctx.sessionManager.getSessionId();
-					const same = todosOf(readList(), sessionId).added.find(todo => todo.text === title);
-					if (same) return { content: [{ type: "text", text: `This session already added it (id ${same.id}).` }] };
+					const same = todosOf(list, sessionId).added.find(todo => todo.text === title);
+					if (same) return reply(`This session already added it (id ${same.id}).`);
 					const todoId = randomUUID();
 					leave({
 						op: "add",
 						id: todoId,
 						parentId: null,
 						afterId: null,
-						categoryId: null,
+						categoryId: category?.id ?? null,
 						text: title,
 						body: notes ?? "",
 						due: due || null,
 						addedBy: sessionId,
 					});
-					return { content: [{ type: "text", text: `Added to the user's todo list (id ${todoId}).` }] };
+					return reply(`Added to the user's todo list (id ${todoId}).`);
 				}
 				case "check": {
-					if (!id) return { content: [{ type: "text", text: "check needs the todo's id." }], isError: true };
+					if (!id) return reply("check needs the todo's id.", true);
 					leave({ op: "toggle", id, doneAt: new Date().toISOString() });
-					return { content: [{ type: "text", text: `Checked todo ${id}.` }] };
+					return reply(`Checked todo ${id}.`);
+				}
+				case "edit": {
+					if (!id) return reply("edit needs the todo's id.", true);
+					if (text !== undefined && !title) return reply("edit cannot clear a todo's title.", true);
+					if (text === undefined && notes === undefined && due === undefined && section === undefined)
+						return reply("edit needs text, notes, due, or section.", true);
+					const list = readList();
+					const found = findTodo(list, id);
+					if (!found) return reply(`No todo with id ${id} in the list.`, true);
+					let categoryId: string | null | undefined;
+					if (section !== undefined) {
+						if (!found.topLevel) return reply("Only a top-level todo has a section.", true);
+						const category = sectionName ? sectionNamed(list, sectionName) : undefined;
+						if (category && "error" in category) return reply(category.error, true);
+						categoryId = category?.id ?? null;
+					}
+					if (title) leave({ op: "edit", id, text: title });
+					if (notes !== undefined) leave({ op: "edit-body", id, body: notes });
+					if (due !== undefined) leave({ op: "set-due", id, due: due || null });
+					if (categoryId !== undefined) leave({ op: "categorize", id, categoryId });
+					return reply(`Edited todo ${id}.`);
+				}
+				case "delete": {
+					if (!id) return reply("delete needs the todo's id.", true);
+					const found = findTodo(readList(), id);
+					if (!found) return reply(`No todo with id ${id} in the list.`, true);
+					leave({ op: "remove", id });
+					return reply(`Deleted todo ${id}: ${found.todo.text}`);
 				}
 			}
 		},

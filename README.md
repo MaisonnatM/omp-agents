@@ -61,7 +61,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   omp sessions are told, through the starter kit's `google-accounts` extension, which account each MCP server signs in as and which one their workspace links.
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
-  A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool and check off a todo once they finish its work.
+  A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool, check off a todo once they finish its work, and edit or delete one when you ask.
   The desktop app captures a todo from any app and badges the Dock with what is left.
 - **Notes.**
   Markdown notes with search, optional todo links and projects, and Undo, shared with agent sessions through the starter kit's `user_note` tool.

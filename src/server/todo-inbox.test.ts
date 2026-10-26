@@ -18,7 +18,7 @@ function inboxDir(): string {
 }
 
 describe("TodoInbox", () => {
-	test("applies an agent's adds as Todo and its checks as Done, oldest first, and sets aside an uncheck, a removal, or a file that is not a change", async () => {
+	test("applies an agent's adds as Todo, its checks as Done, and its edits and deletions, oldest first, and sets aside an uncheck, another status, a move, a change to the sections, or a file that is not a change", async () => {
 		const dir = inboxDir();
 		const add = { op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "Approve the migration", addedBy: "s1", status: "canceled", priority: 1, assignee: "user" };
 		writeFileSync(join(dir, "2-x.json"), JSON.stringify({ op: "toggle", id: "a", doneAt: "2026-10-05T09:00:00.000Z" }));
@@ -28,12 +28,16 @@ describe("TodoInbox", () => {
 		writeFileSync(join(dir, "5-x.json"), JSON.stringify({ op: "toggle", id: "mine", doneAt: null }));
 		writeFileSync(join(dir, "6-x.tmp"), JSON.stringify(add));
 		writeFileSync(join(dir, "7-x.json"), JSON.stringify({ op: "set-status", id: "mine", status: "canceled", at: "2026-10-05T09:00:00.000Z" }));
+		writeFileSync(join(dir, "8-x.json"), JSON.stringify({ op: "edit", id: "a", text: "Approve the new migration" }));
+		writeFileSync(join(dir, "9-x.json"), JSON.stringify({ op: "categorize", id: "a", categoryId: "omp" }));
+		writeFileSync(join(dir, "91-x.json"), JSON.stringify({ op: "move", id: "mine", afterId: null, categoryId: null }));
+		writeFileSync(join(dir, "92-x.json"), JSON.stringify({ op: "remove-category", id: "omp" }));
 		const applied: UserTodoChange[] = [];
 		await new TodoInbox(dir, change => applied.push(change)).drain();
-		expect(applied.map(change => change.op)).toEqual(["add", "set-status"]);
+		expect(applied.map(change => change.op)).toEqual(["add", "set-status", "remove", "edit", "categorize"]);
 		expect(applied[0]).toMatchObject({ text: "Approve the migration", addedBy: "s1", status: "todo", priority: 0, assignee: null });
 		expect(applied[1]).toEqual({ op: "set-status", id: "a", status: "done", at: "2026-10-05T09:00:00.000Z" });
-		expect(readdirSync(dir).sort()).toEqual(["3-x.json.invalid", "4-x.json.invalid", "5-x.json.invalid", "6-x.tmp", "7-x.json.invalid"]);
+		expect(readdirSync(dir).sort()).toEqual(["4-x.json.invalid", "5-x.json.invalid", "6-x.tmp", "7-x.json.invalid", "91-x.json.invalid", "92-x.json.invalid"]);
 	});
 
 	test("a directory that does not exist drains nothing", async () => {
