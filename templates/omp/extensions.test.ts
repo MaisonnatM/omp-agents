@@ -38,7 +38,6 @@ if (input.command) {
 	console.log(JSON.stringify({ result: result ?? null, confirmations }));
 } else if (input.write) {
 	// attempts repeats the call, as an agent retrying after a block does; the last answer counts.
-	// A session with a UI answers a confirmation with input.approve; without input.approve the session has no UI.
 	const ctx = {
 		cwd: process.cwd(), sessionManager, agent: { kind: "main" }, hasUI: input.approve !== undefined,
 		ui: { async confirm() { confirmations++; return input.approve; } },
@@ -144,7 +143,6 @@ describe("ship publication gate", () => {
 		expect(confirmations).toBe(0);
 	});
 
-	// gh reads GITHUB_TOKEN ahead of its keyring login; Bun loads it into omp from the project's `.env` unless the launch environment already set it.
 	test.each([["the token", true], ["ghp_launchValue", false]])("a rejected GITHUB_TOKEN with %s in the project's .env blames that file: %p", (fileValue, blamed) => {
 		const project = mkdtempSync(join(tmpdir(), "ship-auth-"));
 		const token = "ghp_rejectedTokenForTest0000000000000000";
@@ -216,7 +214,6 @@ describe("worktree guard", () => {
 		expect(result?.block ?? false).toBe(blocked);
 	});
 
-	// No worktree has an ignored file such as `.env`, so only the user's approval lets the agent edit it in the main checkout.
 	test.each([[true, false], [false, true]])("an ignored file in the main checkout, approved %p, is blocked: %p", (approve, blocked) => {
 		const { result, confirmations } = exercise("worktree-guard", { write: join(root, "main", ".env"), approve });
 		expect(result?.block ?? false).toBe(blocked);
