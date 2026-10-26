@@ -11,7 +11,7 @@ Alt is Option on macOS.
 | Shift+Tab | Composer | Cycle the thinking level |
 | ↑ | Empty composer | Move the last queued message back into the composer |
 | Cmd+K | Anywhere | Open the command menu |
-| Cmd+N / S | Anywhere / outside text fields | Start a new session |
+| Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
 | Cmd+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+Shift+X | Anywhere | End the focused session |
 | Cmd+[ | Anywhere | Open the previous session in the sidebar |
@@ -106,7 +106,7 @@ Alt is Option on macOS.
   Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑ do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
-- Cmd+N opens the new-session draft, as **New session** at the top of the session list does.
+- Cmd+N opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
   Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
   It does nothing in a subagent, a read-only room, or a past session.

@@ -18,7 +18,7 @@
 - **Tickets** shows the Linear issues the session and its subagents worked on, as its header lists them, the session's own first.
   An issue the session only read, or that its prompt or its branch names, shows once two of those agree; see [Pull requests](pull-requests.md).
   The first one shows until you click another identifier above it, or the issue's **Sub-issue of** link or one of its **Sub-issues**, which show it in place.
-  The issue shows as on the tickets page, stacked in one column: its title, its status, priority, assignee, due date, labels, and project, which you can edit there, then its **Sub-issues**, its branch, its links, who opened it, **Open in Linear**, its description, and its comments.
+  The issue shows as on the tickets page: its header with the team, the identifier linking to Linear, the title, who opened it, and its branch, then its status, priority, assignee, due date, labels, and project, which you can edit there, then its **Description**, **Sub-issues**, **Links**, and **Comments** as sections that fold.
   **Sub-issues** draws them as a pull request's **Stack** draws its pull requests, on a rail in a box, under how many are done of those not canceled: each row shows the state, identifier, title, and priority, and the rail ends at the issue's own identifier, as a stack's ends at its base branch.
   Opening the tab, picking another issue, and each start and end of the view's turn read it from Linear.
 - A tab with nothing to show says so.

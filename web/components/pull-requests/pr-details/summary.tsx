@@ -1,28 +1,17 @@
 /** The Summary tab: reviewers and labels, the description and its editor, the checks, and the comments. */
-import { type LucideIcon, Pencil, Tag, Users } from "lucide-react";
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { Pencil, Tag, Users } from "lucide-react";
+import { type CSSProperties, useState } from "react";
 import { MAX_PULL_REQUEST_BODY, type PullRequestDetail } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { useAction } from "../../../use-action";
 import { LabelsField, ReviewersField, type PullRequestOptionsRead, type SavePullRequest, type SendPullRequest } from "../pr-fields";
 import { Reviewers } from "../avatars";
 import { PullRequestMarkdown } from "../pr-markdown";
+import { MetaRow } from "../../sheet-details";
 import { presentChecks } from "../../../pull-request-checks";
 import { Checks } from "./checks";
 import { Comments } from "./comments";
 import { SummarySection } from "./section";
-
-function MetaRow({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
-	return (
-		<div className="grid min-h-7 min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 text-xs sm:min-h-6">
-			<span className="flex items-center gap-1.5 text-muted-foreground">
-				<Icon aria-hidden className="size-3.5" />
-				{label}
-			</span>
-			<div className="min-w-0 text-foreground">{children}</div>
-		</div>
-	);
-}
 
 function LabelChips({ labels }: { labels: PullRequestDetail["labels"] }) {
 	if (labels.length === 0) return <span className="text-muted-foreground">None</span>;

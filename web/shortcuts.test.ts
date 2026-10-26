@@ -22,8 +22,8 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("b", "KeyB", { ctrl: true, alt: true })).toEqual(["detailsSidebar"]);
 	expect(pressOn(true, "b", "KeyB", { meta: true, alt: true })).toEqual(["detailsSidebar"]);
 	expect(press("B", "KeyB", { ctrl: true, shift: true })).toEqual([]);
-	expect(press("n", "KeyN", { ctrl: true })).toEqual(["newSession"]);
-	expect(pressOn(true, "n", "KeyN", { meta: true })).toEqual(["newSession"]);
+	expect(press("n", "KeyN", { ctrl: true })).toEqual(["newSession", "ticketsNew"]);
+	expect(pressOn(true, "n", "KeyN", { meta: true })).toEqual(["newSession", "ticketsNew"]);
 	expect(pressOn(true, "n", "KeyN", { ctrl: true })).toEqual([]);
 	expect(press("f", "KeyF", { ctrl: true })).toEqual(["sessionSearch"]);
 	expect(pressOn(true, "f", "KeyF", { meta: true })).toEqual(["sessionSearch"]);
