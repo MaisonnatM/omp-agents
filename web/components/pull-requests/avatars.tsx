@@ -30,20 +30,36 @@ interface AvatarProps {
 	className?: string;
 }
 
+const PICTURE = "relative inline-flex shrink-0 rounded-full bg-muted";
+
+/** The person's picture, or the first letter of their login when GitHub has none. */
+function Picture({ person }: { person: Person }) {
+	return person.avatarUrl ? (
+		<img src={person.avatarUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full rounded-full object-cover" />
+	) : (
+		<span aria-hidden className="m-auto text-[10px] font-medium uppercase text-muted-foreground">
+			{person.login[0]}
+		</span>
+	);
+}
+
 export function Avatar({ person, label, dot, className }: AvatarProps) {
 	return (
 		<Tooltip content={label}>
-			<span role="img" aria-label={label} className={cn("relative inline-flex size-5 shrink-0 rounded-full bg-muted ring-2 ring-background", className)}>
-				{person.avatarUrl ? (
-					<img src={person.avatarUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full rounded-full object-cover" />
-				) : (
-					<span aria-hidden className="m-auto text-[10px] font-medium uppercase text-muted-foreground">
-						{person.login[0]}
-					</span>
-				)}
+			<span role="img" aria-label={label} className={cn(PICTURE, "size-5 ring-2 ring-background", className)}>
+				<Picture person={person} />
 				{dot && <span aria-hidden className={cn("absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-background", dot)} />}
 			</span>
 		</Tooltip>
+	);
+}
+
+/** A person's picture beside their name, as a picker's choices show them; the name says who, so screen readers skip it. */
+export function PersonPicture({ person }: { person: Person }) {
+	return (
+		<span aria-hidden className={cn(PICTURE, "size-4")}>
+			<Picture person={person} />
+		</span>
 	);
 }
 

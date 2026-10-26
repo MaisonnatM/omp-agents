@@ -3,12 +3,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { createCache } from "./cache";
-import { dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
+import { AVATAR, dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
 import { runChecked } from "./proc";
 import { loadPullRequestDetail } from "./pull-requests";
 import { GITHUB_MERGES } from "./pull-request-merge";
 import { isObject, str } from "./json";
-import { type Person, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, type PullRequestViewedEdit, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
+import { type Assignee, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, type PullRequestViewedEdit, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
 import { REVIEW_EVENTS } from "./shared/review-drafts";
 import { MEDIA_FILE_TYPES, mediaExtension } from "./shared/transcript";
 
@@ -21,19 +21,37 @@ const options = createCache<PullRequestOptions>(OPTIONS_TTL_MS);
 /** The items of every page that `ghRest(path, true)` answered. */
 const itemsOf = (pages: unknown): unknown[] => (Array.isArray(pages) ? pages.flatMap(page => (Array.isArray(page) ? page : [])) : []);
 
-/** `repo`'s labels by name and the people its reviews can be asked of by login, as GitHub lists them. */
+const ASSIGNEES_QUERY = `query($owner: String!, $repo: String!, $endCursor: String) {
+	repository(owner: $owner, name: $repo) { assignableUsers(first: 100, after: $endCursor) {
+		nodes { login name ${AVATAR} }
+		pageInfo { hasNextPage endCursor }
+	} }
+}`;
+
+/** The people in `gh api graphql --paginate --slurp`'s answer to `ASSIGNEES_QUERY`, one answer per page, sorted by the name the pickers show: the profile name, else the login. */
+export function parseAssigneesAnswer(answer: unknown): Assignee[] {
+	return (Array.isArray(answer) ? answer : [answer])
+		.flatMap(page => {
+			const repository = dataOf(page).repository;
+			const connection = isObject(repository) ? repository.assignableUsers : null;
+			return isObject(connection) && Array.isArray(connection.nodes) ? connection.nodes : [];
+		})
+		.flatMap((node): Assignee[] => {
+			const person = parsePerson(node);
+			return person && isObject(node) ? [{ ...person, name: str(node.name) || null }] : [];
+		})
+		.toSorted((a, b) => (a.name ?? a.login).localeCompare(b.name ?? b.login, undefined, { sensitivity: "base" }));
+}
+
+/** `repo`'s labels by name and the people its reviews can be asked of, as GitHub lists them. */
 export function loadPullRequestOptions(repo: Repo): Promise<PullRequestOptions> {
-	const base = `repos/${repo.owner}/${repo.repo}`;
 	return options.get(repoKey(repo), async () => {
-		const [labels, assignees] = await Promise.all([ghRest(`${base}/labels?per_page=100`, true), ghRest(`${base}/assignees?per_page=100`, true)]);
+		const [labels, assignees] = await Promise.all([ghRest(`repos/${repo.owner}/${repo.repo}/labels?per_page=100`, true), ghGraphql(ASSIGNEES_QUERY, { owner: repo.owner, repo: repo.repo }, true)]);
 		return {
 			labels: itemsOf(labels)
 				.flatMap((label): PullRequestLabel[] => (isObject(label) && typeof label.name === "string" ? [{ name: label.name, color: str(label.color) ?? "888888" }] : []))
 				.toSorted((a, b) => a.name.localeCompare(b.name)),
-			reviewers: itemsOf(assignees)
-				.map(user => (isObject(user) ? parsePerson({ login: user.login, avatarUrl: user.avatar_url }) : null))
-				.filter((person): person is Person => person !== null)
-				.toSorted((a, b) => a.login.localeCompare(b.login)),
+			reviewers: parseAssigneesAnswer(assignees),
 		};
 	});
 }

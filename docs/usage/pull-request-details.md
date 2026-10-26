@@ -46,7 +46,8 @@
   In a narrow panel the checks label hides, but the status icon's accessible name keeps the summary.
 - **Summary** starts with the pull request's reviewers and labels.
   **Reviewers** shows overlapping avatars, each with the dot the pull request list marks a review's outcome with, or **None**.
-  Click the row for the people who can review on the repository, with the author left out.
+  Click the row for the people who can review on the repository, with the author left out, each shown with their picture and GitHub profile name, then their login; someone with no profile name shows only their login.
+  Type part of a name or a login to filter them.
   Picking a person requests a review, again when they reviewed already, and picking someone already requested withdraws the request.
   **Labels** shows the labels in their GitHub colors; click them for the repository's labels, and pick one to add or remove it.
   The lists of reviewers and labels come from GitHub on the first click of either picker, and the server keeps them for 5 minutes.

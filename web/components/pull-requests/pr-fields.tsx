@@ -3,6 +3,7 @@ import { type PullRequest, type PullRequestChange, type PullRequestDetail, type 
 import { withReviewer } from "../../pull-requests-model";
 import { type ReadState, useRead } from "../../reads";
 import { FieldPicker } from "../field-picker";
+import { PersonPicture } from "./avatars";
 
 /** A pick's change, sent to GitHub, and what the details show until GitHub answers. */
 export type SavePullRequest = (change: PullRequestChange, shown: Partial<PullRequestDetail>) => void;
@@ -66,7 +67,7 @@ export function ReviewersField({ pr, options, onChange, className = ROW_FIELD, c
 			current={names || "none"}
 			className={className}
 			trigger={children}
-			choices={people?.map(person => ({ value: person.login, label: person.login })) ?? null}
+			choices={people?.map(person => ({ value: person.login, label: person.name ?? person.login, detail: person.name ? person.login : undefined, icon: <PersonPicture person={person} /> })) ?? null}
 			error={options.error}
 			selected={requested}
 			multi
