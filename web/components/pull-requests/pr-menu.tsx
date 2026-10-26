@@ -14,6 +14,7 @@ import { useCopy } from "../../use-copy";
 import { useInlineConfirm } from "../../use-inline-confirm";
 import { OrgIcon } from "../org-icon";
 import type { QuickActionsProps } from "../quick-actions";
+import { PersonPicture } from "./avatars";
 import { type PullRequestOptionsRead, type ReviewerChange, requestedLogins, reviewerChoices } from "./pr-fields";
 
 export interface HeaderMergeMenu {
@@ -83,7 +84,9 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 					const on = requested.includes(person.login);
 					return (
 						<MenuItem key={person.login} closeOnClick={false} onClick={() => onChange({ field: "reviewer", login: person.login, on: !on })}>
-							<span className="truncate">{person.login}</span>
+							<PersonPicture person={person} />
+							<span className="truncate">{person.name ?? person.login}</span>
+							{person.name && <span className="flex-1 truncate text-muted-foreground">{person.login}</span>}
 							{on && <span className="sr-only">, review requested</span>}
 							<Check aria-hidden className={cn("ml-auto", on ? "opacity-100" : "opacity-0")} />
 						</MenuItem>

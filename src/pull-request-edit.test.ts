@@ -2,9 +2,21 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import * as proc from "./proc";
-import { attachToPullRequest, markPullRequestFileViewed, savePullRequest, stateSteps } from "./pull-request-edit";
+import { attachToPullRequest, markPullRequestFileViewed, parseAssigneesAnswer, savePullRequest, stateSteps } from "./pull-request-edit";
 
 afterEach(() => mock.restore());
+
+test("the people a review can be asked of join every page, keep their profile name or none, and sort by the name the pickers show", () => {
+	const page = (...nodes: unknown[]) => ({ data: { repository: { assignableUsers: { nodes } } } });
+	expect(parseAssigneesAnswer([
+		page({ login: "zoe", name: "Abel Zoé", avatarUrl: "https://avatars.example/zoe" }, { login: "bo", name: "", avatarUrl: null }),
+		page({ login: "Ana", name: null, avatarUrl: null }, { name: "No login" }),
+	])).toEqual([
+		{ login: "zoe", name: "Abel Zoé", avatarUrl: "https://avatars.example/zoe" },
+		{ login: "Ana", name: null, avatarUrl: null },
+		{ login: "bo", name: null, avatarUrl: null },
+	]);
+});
 
 test("a title edit patches GitHub and returns the refreshed title", async () => {
 	const write = spyOn(proc, "runChecked").mockResolvedValue("");

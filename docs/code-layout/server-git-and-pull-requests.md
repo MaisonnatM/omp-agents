@@ -29,7 +29,7 @@
   `src/pull-request-order.ts` orders the list: sources after the files they import, then tests in their sources' order, then generated files.
   `src/pull-request-stack.ts` reads the stack for `GET /api/pull-request/stack`.
   `src/pull-request-edit.ts` saves titles, descriptions, labels, review requests, states, branch updates, and conversation changes for `PUT /api/pull-request`, and viewed files for `PUT /api/pull-request/viewed`.
-  It also lists picker choices for `GET /api/pull-request/options` and appends images with `attachToPullRequest`.
+  It also lists picker choices for `GET /api/pull-request/options`, the reviewers with their profile names through `parseAssigneesAnswer`, and appends images with `attachToPullRequest`.
   `src/pull-request-checkout.ts` checks out a pull request for `PUT /api/pull-request/checkout`: with `gh pr checkout` in a checkout, or on its head branch in a worktree with a new session that the route's starter opens there.
   `src/pull-request-rebase.ts` rebases a pull request's branch onto its base for `PUT /api/pull-request/rebase`, in the worktree that has the branch or a temporary one, and force-pushes it with a lease through the repository's pre-push hook, one repository at a time.
   Both read the pull request's head and base branches through `headOf` in `src/pull-request-head.ts`, and refuse a workspace of another repository through `assertWorkspaceOf` there.

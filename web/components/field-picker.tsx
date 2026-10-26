@@ -22,6 +22,8 @@ const pickerButton = (look: PickerLook, className: string | undefined): { varian
 export interface Choice {
 	value: string;
 	label: string;
+	/** Muted text after the label, such as a person's login after their name. */
+	detail?: string;
 	icon?: ReactNode;
 }
 
@@ -112,6 +114,7 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 										<CommandItem key={choice.value} value={choice.value || choice.label} keywords={[choice.label]} onSelect={() => pick(choice.value)}>
 											{choice.icon}
 											<span className="truncate">{choice.label}</span>
+											{choice.detail && <span className="flex-1 truncate text-muted-foreground">{choice.detail}</span>}
 											<Check aria-hidden className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
 											{firstKey !== undefined && <kbd className="text-xs text-muted-foreground tabular-nums">{firstKey + index}</kbd>}
 										</CommandItem>

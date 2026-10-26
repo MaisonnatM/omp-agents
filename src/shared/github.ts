@@ -463,9 +463,14 @@ export interface PullRequestRebase extends PullRequest {
  */
 export type RebasedPullRequest = { branch: string; onto: string } & ({ kind: "rebased" } | { kind: "current" } | { kind: "conflict"; files: string[] });
 
+/** Someone GitHub lets a repository assign, and so ask for a review; `name` is their profile name, `null` when they set none. */
+export interface Assignee extends Person {
+	name: string | null;
+}
+
 /** What the details' Labels and Reviewers pickers offer for a repository. */
 export interface PullRequestOptions {
 	labels: PullRequestLabel[];
 	/** The people a review can be asked of: those GitHub lets the repository assign. */
-	reviewers: Person[];
+	reviewers: Assignee[];
 }
