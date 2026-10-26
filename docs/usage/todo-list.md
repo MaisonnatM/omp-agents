@@ -45,7 +45,7 @@
   The page's header counts the open top-level todos, and **Clear done** moves every Done and Canceled todo it lists to **Archive** at once, a closed todo under an open one as a todo of its own.
   The server does the same by itself for a todo closed over 24 hours ago, when it starts and every minute after.
 - **Archive** lists the cleared todos, latest first, with the day each was closed.
-  Hover one to put it back last in the list, in its category if that still exists, or to delete it for good; **Empty** deletes them all, after you confirm.
+  Hover one to put it back last in the list, in its category if that still exists, or to delete it for good, or right-click it for **Open**, **Put back in the list**, and **Delete for good**; **Empty** deletes them all, after you confirm.
   The todo keys step through its rows as through any list's, and Enter opens the focused one.
 - Click a todo to open its details on the right of the list, as in Linear, and double-click it to rename it in the list.
   Arriving at a list, from the **Todo** tab, its number, or a list in the sidebar, opens the todo on its top row.
@@ -57,6 +57,7 @@
   A search keeps the open todo on the right even when it hides its row.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
+- Right-click a todo, or focus it and press the context-menu key or Shift+F10, for **Open**, **Rename**, **Add a todo under it** on a top-level todo, and **Delete**.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
   Outside a text field, ↓ and ↑ focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
   While a todo is open, ↓ and ↑ open the next and previous one instead, and Esc closes it.

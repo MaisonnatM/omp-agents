@@ -1,7 +1,8 @@
 /** The Todo page's rows: a todo's row, an archived todo's row, and a new todo's draft row. */
-import { Archive, GripVertical, NotebookText, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Archive, GripVertical, NotebookText, Pencil, Plus, RotateCcw, SquareArrowOutUpRight, Trash2, X } from "lucide-react";
 import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf } from "../../../src/user-todos-shared";
 import { Badge } from "@/components/ui/badge";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { DAY_FORMAT, dayLabel } from "../../labels";
@@ -47,101 +48,127 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 	const rowProps = drag.rowProps(entry, siblings);
 	const pickerOf = (field: TodoField) => ({ open: picker === field, onOpenChange: (next: boolean) => onPicker(next ? field : null) });
 	return (
-		<li
-			data-todo-id={todo.id}
-			{...rowProps}
-			draggable={rowProps.draggable && !isEditing}
-			className={cn(
-				"group/todo relative flex h-8 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-accent/50",
-				!top && "ml-6",
-				open && "bg-accent",
-				drag.draggingId === todo.id && "opacity-50",
-				over === "before" && "shadow-[0_-2px_0_0_var(--ring)]",
-				over === "after" && "shadow-[0_2px_0_0_var(--ring)]",
-			)}
-		>
-			{rowProps.draggable && !isEditing && (
-				<GripVertical aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
-			)}
-			<TodoPriorityPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("priority")} onChange={onChange} />
-			<TodoStatusPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("status")} onChange={onChange} />
-			{isEditing ? (
-				<TodoInput
-					initial={todo.text}
-					label="Todo"
-					onKey={(key, text) => editing.editKey(todo, entry.parent?.id ?? null, section.categoryId, key, text)}
-					onLeave={text => editing.leaveEdit(todo, text)}
-				/>
-			) : (
-				<button
-					type="button"
-					data-todo-row
-					onClick={() => onOpen(todo.id)}
-					onDoubleClick={() => {
-						if (!disabled) editing.edit(todo.id);
-					}}
-					onKeyDown={event => {
-						if (event.key === "Escape") event.currentTarget.blur();
-					}}
-					className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					<span className={cn("truncate", closed ? "text-muted-foreground line-through" : "text-foreground")}>{todo.text}</span>
-					{children.length > 0 && (
-						<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
-							{childrenDone}/{children.length}
-						</span>
-					)}
-				</button>
-			)}
-			{top && !closed && <TodoWorkPill state={workStateOf(top, sessions)} compact />}
-			{category && (
-				<Badge variant="dot" size="compact" color={categoryColor(category.id)} className="max-w-28 shrink-0 [&>span:last-child]:truncate">
-					{category.name}
-				</Badge>
-			)}
-			<TodoDuePicker todo={todo} look="icon" day={day} disabled={disabled} {...pickerOf("due")} onChange={onChange} />
-			<TodoAssigneePicker todo={todo} look="icon" disabled={disabled} {...pickerOf("assignee")} onChange={onChange} />
-			{top?.links.filter(link => link.kind !== "session").map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} compact />)}
-			{todo.body.trim() && (
-				<Tooltip content="Has notes">
+		<ContextMenu disabled={disabled || isEditing}>
+			<ContextMenuTrigger
+				render={
+					<li
+						data-todo-id={todo.id}
+						{...rowProps}
+						draggable={rowProps.draggable && !isEditing}
+						className={cn(
+							"group/todo relative flex h-8 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-accent/50",
+							!top && "ml-6",
+							open && "bg-accent",
+							drag.draggingId === todo.id && "opacity-50",
+							over === "before" && "shadow-[0_-2px_0_0_var(--ring)]",
+							over === "after" && "shadow-[0_2px_0_0_var(--ring)]",
+						)}
+					/>
+				}
+			>
+				{rowProps.draggable && !isEditing && (
+					<GripVertical aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
+				)}
+				<TodoPriorityPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("priority")} onChange={onChange} />
+				<TodoStatusPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("status")} onChange={onChange} />
+				{isEditing ? (
+					<TodoInput
+						initial={todo.text}
+						label="Todo"
+						onKey={(key, text) => editing.editKey(todo, entry.parent?.id ?? null, section.categoryId, key, text)}
+						onLeave={text => editing.leaveEdit(todo, text)}
+					/>
+				) : (
 					<button
 						type="button"
-						aria-label={`Open the notes of ${todo.text}`}
+						data-todo-row
 						onClick={() => onOpen(todo.id)}
-						className="shrink-0 text-muted-foreground hover:text-foreground [&>svg]:size-3.5"
+						onDoubleClick={() => {
+							if (!disabled) editing.edit(todo.id);
+						}}
+						onKeyDown={event => {
+							if (event.key === "Escape") event.currentTarget.blur();
+						}}
+						className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					>
-						<NotebookText />
+						<span className={cn("truncate", closed ? "text-muted-foreground line-through" : "text-foreground")}>{todo.text}</span>
+						{children.length > 0 && (
+							<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
+								{childrenDone}/{children.length}
+							</span>
+						)}
 					</button>
-				</Tooltip>
-			)}
-			{todo.createdAt && <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">{dayLabel(todo.createdAt)}</span>}
-			{!disabled && !isEditing && (
-				<span className="pointer-events-none absolute inset-y-0 right-1 flex items-center gap-1.5 rounded-md bg-accent pl-2 pr-1 opacity-0 group-hover/todo:pointer-events-auto group-hover/todo:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 [&_svg]:size-3.5">
-					{top && (
-						<Tooltip content="Add a todo under it">
-							<button
-								type="button"
-								aria-label={`Add a todo under ${todo.text}`}
-								onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}
-								className="text-muted-foreground hover:text-foreground"
-							>
-								<Plus />
-							</button>
-						</Tooltip>
-					)}
-					<Tooltip content="Delete">
+				)}
+				{top && !closed && <TodoWorkPill state={workStateOf(top, sessions)} compact />}
+				{category && (
+					<Badge variant="dot" size="compact" color={categoryColor(category.id)} className="max-w-28 shrink-0 [&>span:last-child]:truncate">
+						{category.name}
+					</Badge>
+				)}
+				<TodoDuePicker todo={todo} look="icon" day={day} disabled={disabled} {...pickerOf("due")} onChange={onChange} />
+				<TodoAssigneePicker todo={todo} look="icon" disabled={disabled} {...pickerOf("assignee")} onChange={onChange} />
+				{top?.links.filter(link => link.kind !== "session").map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} compact />)}
+				{todo.body.trim() && (
+					<Tooltip content="Has notes">
 						<button
 							type="button"
-							aria-label={`Delete ${todo.text}`}
-							onClick={() => editing.remove(todo.id, todo.text)}
-							className="text-muted-foreground hover:text-foreground"
+							aria-label={`Open the notes of ${todo.text}`}
+							onClick={() => onOpen(todo.id)}
+							className="shrink-0 text-muted-foreground hover:text-foreground [&>svg]:size-3.5"
 						>
-							<X />
+							<NotebookText />
 						</button>
 					</Tooltip>
-				</span>
-			)}
-		</li>
+				)}
+				{todo.createdAt && <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">{dayLabel(todo.createdAt)}</span>}
+				{!disabled && !isEditing && (
+					<span className="pointer-events-none absolute inset-y-0 right-1 flex items-center gap-1.5 rounded-md bg-accent pl-2 pr-1 opacity-0 group-hover/todo:pointer-events-auto group-hover/todo:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 [&_svg]:size-3.5">
+						{top && (
+							<Tooltip content="Add a todo under it">
+								<button
+									type="button"
+									aria-label={`Add a todo under ${todo.text}`}
+									onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}
+									className="text-muted-foreground hover:text-foreground"
+								>
+									<Plus />
+								</button>
+							</Tooltip>
+						)}
+						<Tooltip content="Delete">
+							<button
+								type="button"
+								aria-label={`Delete ${todo.text}`}
+								onClick={() => editing.remove(todo.id, todo.text)}
+								className="text-muted-foreground hover:text-foreground"
+							>
+								<X />
+							</button>
+						</Tooltip>
+					</span>
+				)}
+			</ContextMenuTrigger>
+			<ContextMenuContent className="min-w-48">
+				<MenuItem onClick={() => onOpen(todo.id)}>
+					<SquareArrowOutUpRight />
+					Open
+				</MenuItem>
+				<MenuItem onClick={() => editing.edit(todo.id)}>
+					<Pencil />
+					Rename
+				</MenuItem>
+				{top && (
+					<MenuItem onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}>
+						<Plus />
+						Add a todo under it
+					</MenuItem>
+				)}
+				<MenuItem variant="destructive" onClick={() => editing.remove(todo.id, todo.text)}>
+					<X />
+					Delete
+				</MenuItem>
+			</ContextMenuContent>
+		</ContextMenu>
 	);
 }
 
@@ -157,46 +184,62 @@ interface ArchivedRowProps {
 /** An archived todo's row: when it was cleared, and the buttons that put it back or delete it for good. */
 export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: ArchivedRowProps) {
 	return (
-		<li data-todo-id={todo.id} className={cn("group/todo flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50", open && "bg-accent")}>
-			<Archive aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-			<button
-				type="button"
-				data-todo-row
-				onClick={() => onOpen(todo.id)}
-				onKeyDown={event => {
-					if (event.key === "Escape") event.currentTarget.blur();
-				}}
-				className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<span className="truncate text-muted-foreground">{todo.text}</span>
-				{todo.children.length > 0 && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{todo.children.length} under it</span>}
-			</button>
-			{todo.doneAt && <span className="shrink-0 text-xs text-muted-foreground">{DAY_FORMAT.format(new Date(todo.doneAt))}</span>}
-			{!disabled && (
-				<span className="flex shrink-0 gap-1 opacity-0 group-hover/todo:opacity-100 focus-within:opacity-100 [&_svg]:size-3.5">
-					<Tooltip content="Put back in the list">
-						<button
-							type="button"
-							aria-label={`Put ${todo.text} back`}
-							onClick={() => onChange({ op: "unarchive", id: todo.id })}
-							className="text-muted-foreground hover:text-foreground"
-						>
-							<RotateCcw />
-						</button>
-					</Tooltip>
-					<Tooltip content="Delete for good">
-						<button
-							type="button"
-							aria-label={`Delete ${todo.text} for good`}
-							onClick={() => onChange({ op: "remove", id: todo.id })}
-							className="text-muted-foreground hover:text-foreground"
-						>
-							<Trash2 />
-						</button>
-					</Tooltip>
-				</span>
-			)}
-		</li>
+		<ContextMenu disabled={disabled}>
+			<ContextMenuTrigger render={<li />} data-todo-id={todo.id} className={cn("group/todo flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50", open && "bg-accent")}>
+				<Archive aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+				<button
+					type="button"
+					data-todo-row
+					onClick={() => onOpen(todo.id)}
+					onKeyDown={event => {
+						if (event.key === "Escape") event.currentTarget.blur();
+					}}
+					className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<span className="truncate text-muted-foreground">{todo.text}</span>
+					{todo.children.length > 0 && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{todo.children.length} under it</span>}
+				</button>
+				{todo.doneAt && <span className="shrink-0 text-xs text-muted-foreground">{DAY_FORMAT.format(new Date(todo.doneAt))}</span>}
+				{!disabled && (
+					<span className="flex shrink-0 gap-1 opacity-0 group-hover/todo:opacity-100 focus-within:opacity-100 [&_svg]:size-3.5">
+						<Tooltip content="Put back in the list">
+							<button
+								type="button"
+								aria-label={`Put ${todo.text} back`}
+								onClick={() => onChange({ op: "unarchive", id: todo.id })}
+								className="text-muted-foreground hover:text-foreground"
+							>
+								<RotateCcw />
+							</button>
+						</Tooltip>
+						<Tooltip content="Delete for good">
+							<button
+								type="button"
+								aria-label={`Delete ${todo.text} for good`}
+								onClick={() => onChange({ op: "remove", id: todo.id })}
+								className="text-muted-foreground hover:text-foreground"
+							>
+								<Trash2 />
+							</button>
+						</Tooltip>
+					</span>
+				)}
+			</ContextMenuTrigger>
+			<ContextMenuContent className="min-w-48">
+				<MenuItem onClick={() => onOpen(todo.id)}>
+					<SquareArrowOutUpRight />
+					Open
+				</MenuItem>
+				<MenuItem onClick={() => onChange({ op: "unarchive", id: todo.id })}>
+					<RotateCcw />
+					Put back in the list
+				</MenuItem>
+				<MenuItem variant="destructive" onClick={() => onChange({ op: "remove", id: todo.id })}>
+					<Trash2 />
+					Delete for good
+				</MenuItem>
+			</ContextMenuContent>
+		</ContextMenu>
 	);
 }
 
