@@ -16,6 +16,7 @@ The search matches every word against the title and content, regardless of case 
 `/` focuses the search and Esc clears it.
 Outside text fields, ↑ and ↓ focus rows or open the neighboring note while a note is open.
 Enter opens a focused row, and Esc or **Close the note** closes the detail.
+Right-click a note, or focus it and press the context-menu key or Shift+F10, for **Open**, **Rename**, which opens it and focuses its title, **Open todo** when it is linked to one, and **Delete**.
 `#notes?open=<id>` addresses one note, and `#notes/agents?open=<id>` addresses it in the list of notes from agents.
 The divider resizes the list, and the browser remembers its width.
 On narrow pages, the open note replaces the list.
