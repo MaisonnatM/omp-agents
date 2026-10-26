@@ -7,13 +7,14 @@
   A stack submit lists every PR it created or updated.
   A `gt submit` or `gt ss` call is a submission too, even when it printed nothing, as with `-q`: of the branch it names with `--branch`, else of the branch checked out where it ran, at the time it ran, in the main checkout too, but not of a `--dry-run`.
   Where it ran follows the bash call's `cwd`, a `cd` earlier in the same command, and `--cwd`; when it ran picks the branch from that worktree's HEAD reflog, so a later switch leaves the link alone.
-  Work is one of the session's own tool calls: `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready` with a PR number or URL; a `git push` whose output shows that it updated a PR's head branch; or an omp `pr://` read.
+  Work is one of the session's own tool calls: `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready` with a PR number or URL; a `git push` whose output shows that it updated a PR's head branch; or an omp `pr://` read of a PR that the session's own prompt names in its repository, as `#7049`, `PR 7049`, or `PR#7049`.
+  A pull request link in the session's own prompt is work too; a subagent's prompt, its assignment, does not count.
   Work is also the branch the session works on when a PR heads it: the branch checked out in the linked worktree the session works in, its own directory or the worktree its bash calls last ran in, or in a repository's main checkout a branch other than the default one that `origin/HEAD` names; a switch to another branch links that branch's PR at the session's next write.
   A main checkout's default branch links no PR, since every session started there shares it.
   A bare number belongs to the repository that `origin` names in the session's working directory, unless the command passes `-R` or `--repo`.
-  A push, a submit, or a worktree's branch links once the Pull requests page has listed the PR that the branch heads, because only that list knows which branch heads which PR.
+  A push, a submit, or a worktree's branch links once the Pull requests page has listed the PR that the branch heads, a `gt submit` line has named it, or GitHub has answered which PR the branch heads, which the dashboard asks when the session names a new PR or finishes a `gt submit`, and else at most once a minute.
   A submit links only while the directory it ran in exists.
-  A PR the session only quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count, unless it heads the session's worktree branch.
+  A PR the session only read, quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count, unless its prompt names it or it heads the session's worktree branch.
   A PR that a session submitted counts as submitted, even when it also worked on it.
 - In a session's header, the pull request button opens a popover with one row per pull request: the row opens its details on the Pull requests page, and the GitHub and Graphite icons at its end open it there.
   When two or more of the session's open pull requests stack on each other, as a ticket's `gt submit` stack does, the button reads **Stack · 3** and the popover draws the stack on a rail, top first, down to the branch it merges into, as a pull request's **Stack** does.
@@ -23,8 +24,9 @@
   It stops at the first one that fails, with the reason, and leaves the ones above it as they are.
 - A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier, and so does the ticket button in its header.
   It opens the issue's details in the tickets page's main content (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
-  An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
-  An issue that a `list_issues` search only listed does not count.
+  An issue counts when the session or one of its subagents changed or opened it (`save_issue`) or commented on it (`save_comment`), when the session names it in its `/ship` step, or when a Linear link to it is in the session's own prompt.
+  Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
+  So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
 - Sessions that use `/ship` show their current workflow step in the sidebar, for example `6/7 · Rebase`.
   Hover the badge to see the Linear issue.
   The steps are ticket, implementation, draft PR, thermonuclear review, ready gate, live review, and merged.

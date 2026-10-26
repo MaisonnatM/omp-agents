@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,12 +31,17 @@ const gtLine = (n: number) => `me/b${n}: https://app.graphite.com/github/pr/o/r/
 const pushed = (branch: string) => `To github.com:acme/webapp.git\n   1a2b3c4d..5e6f7a8b  HEAD -> ${branch}\n`;
 const submitted = (owner: string, repo: string, number: number) => ({ kind: "pr", link: "submitted", owner, repo, number }) as const;
 const worked = (owner: string, repo: string, number: number) => ({ kind: "pr", link: "worked", owner, repo, number }) as const;
+const prompt = (text: string) => JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text }] } });
+const skillPrompt = (args: string) =>
+	JSON.stringify({ type: "custom_message", customType: "skill-prompt", attribution: "user", content: "[IMPORTANT: User invoked the \"ship\" skill.] ENG-1 #1", details: { name: "ship", args } });
+const linear = (id: string, tool: string, args: object) => toolCall(id, `mcp__linear_${tool}`, args);
 
-const scanned = (lines: string[]) => {
-	const scan = new SessionFactsScan();
+const scanOf = (lines: string[], prompts = true) => {
+	const scan = new SessionFactsScan(prompts);
 	for (const line of lines) scan.applyLine(line);
-	return [...scan.found.values()];
+	return scan;
 };
+const scanned = (lines: string[]) => [...scanOf(lines).found.values()];
 
 describe("SessionFactsScan", () => {
 	test("every branch a gt submit created or updated, once each", () => {
@@ -96,7 +101,7 @@ describe("SessionFactsScan", () => {
 		).toEqual([{ kind: "number", number: 6601 }, worked("acme", "webapp", 6602), worked("acme", "api", 7), worked("acme", "api", 8)]);
 	});
 
-	test("an omp pr:// read names its PR, with or without its repository", () => {
+	test("an omp pr:// read is a read of its PR, with or without its repository", () => {
 		expect(
 			scanned([
 				toolCall("r1", "read", { path: "pr://6605/diff/all" }),
@@ -104,7 +109,22 @@ describe("SessionFactsScan", () => {
 				toolCall("r3", "read", { path: "pr://" }),
 				toolCall("r4", "read", { path: "issue://6606" }),
 			]),
-		).toEqual([{ kind: "number", number: 6605 }, worked("acme", "api", 9)]);
+		).toEqual([
+			{ kind: "read", repository: null, number: 6605 },
+			{ kind: "read", repository: { owner: "acme", repo: "api" }, number: 9 },
+		]);
+	});
+
+	test("the session's own prompts link the PRs their GitHub URLs name and name the numbers they write as #N or PR N; a subagent's prompt does neither", () => {
+		const lines = [
+			prompt("Fix https://github.com/acme/api/pull/5 and #12, PR 13, pr#14, not acme/webapp#15, &#16; or issue 18"),
+			skillPrompt("review PR #17"),
+			prompt("[omp-agents] Project update. #19"),
+		];
+		const own = scanOf(lines);
+		expect([[...own.found.values()], [...own.named]]).toEqual([[worked("acme", "api", 5)], [12, 13, 14, 17]]);
+		const subagent = scanOf(lines, false);
+		expect([[...subagent.found.values()], [...subagent.named]]).toEqual([[], []]);
 	});
 
 	test("the branches a git push updated, but not a rejected push or push output another command prints", () => {
@@ -138,12 +158,12 @@ describe("SessionFactsScan", () => {
 		).toEqual([submitted("o", "r", 1), worked("o", "r", 2)]);
 	});
 
-	test("the Linear issues a session read, changed, opened, or commented on, but not one a search listed", () => {
+	test("what names each Linear issue: work on it, a read, or the session's own prompt, but not a search's listing or a subagent's prompt", () => {
 		const device = (id: string, tool: string, args: object) => toolCall(id, "write", { path: `xd://mcp__linear_${tool}`, content: JSON.stringify(args) });
 		const answered = (toolCallId: string, text: string, isError = false) =>
 			JSON.stringify({ type: "message", message: { role: "toolResult", toolCallId, toolName: "write", isError, content: [{ type: "text", text }] } });
-		const scan = new SessionFactsScan();
-		for (const line of [
+		const lines = [
+			prompt("Do https://linear.app/acme/issue/ENG-7/some-title, see ENG-8"),
 			toolCall("a", "mcp__linear_list_issues", { query: "ENG-1" }),
 			toolCall("b", "mcp__linear_get_issue", { id: "eng-2" }),
 			toolCall("c", "mcp__linear_get_issue", { id: "c07eebf1-444b-449f-b31d-a43d2b62504a" }),
@@ -154,8 +174,25 @@ describe("SessionFactsScan", () => {
 			answered("f", JSON.stringify({ id: "ENG-5" }), true),
 			toolCall("g", "xd_mcp__linear_list_comments", { issueId: "ENG-2" }),
 			JSON.stringify({ type: "custom", customType: "omp-ship.state", data: { stage: "ticket", issue: "ENG-6" } }),
-		]) scan.applyLine(line);
-		expect([...scan.tickets]).toEqual(["ENG-2", "ENG-3", "ENG-4", "ENG-6"]);
+			linear("h", "get_issue", { id: "ENG-8" }),
+			linear("i", "save_issue", { id: "ENG-2", title: "Renamed" }),
+		];
+		const evidence = (prompts: boolean) => [...scanOf(lines, prompts).tickets].map(([id, kinds]) => [id, [...kinds]]);
+		expect(evidence(true)).toEqual([
+			["ENG-7", ["worked", "named"]],
+			["ENG-8", ["named", "read"]],
+			["ENG-2", ["read", "worked"]],
+			["ENG-3", ["worked"]],
+			["ENG-4", ["worked"]],
+			["ENG-6", ["worked"]],
+		]);
+		expect(evidence(false)).toEqual([
+			["ENG-2", ["read", "worked"]],
+			["ENG-3", ["worked"]],
+			["ENG-4", ["worked"]],
+			["ENG-6", ["worked"]],
+			["ENG-8", ["read"]],
+		]);
 	});
 });
 
@@ -262,31 +299,72 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).ship?.work).toBe("rebase");
 	});
 
-	test("lists the session's Linear issues before its subagents', each once, and reports a new one on append", async () => {
+	test("lists the Linear issues the session and its subagents worked on, the session's own first, each once, and reports a new one on append", async () => {
 		const dir = sessionDir();
 		const session = join(dir, "2026-10-01T00-00-00-000Z_tickets.jsonl");
-		const read = (id: string) => toolCall(`get-${id}`, "mcp__linear_get_issue", { id });
-		writeFileSync(session, `${read("ENG-1")}\n`);
+		const comment = (id: string) => linear(`c-${id}`, "save_comment", { issueId: id, body: "Done" });
+		writeFileSync(session, `${comment("ENG-1")}\n`);
 		const child = join(dir, "2026-10-01T00-00-00-000Z_tickets");
 		mkdirSync(child, { recursive: true });
-		writeFileSync(join(child, "Sub.jsonl"), `${read("ENG-2")}\n${read("ENG-1")}\n`);
+		writeFileSync(join(child, "Sub.jsonl"), `${comment("ENG-2")}\n${comment("ENG-1")}\n`);
 		const index = new SessionFactsIndex(async () => null, NO_GIT);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
 		expect(index.factsOf(session).tickets).toEqual(["ENG-1", "ENG-2"]);
-		appendFileSync(session, `${read("ENG-1")}\n`);
+		appendFileSync(session, `${comment("ENG-1")}\n`);
 		expect(await index.refresh(listed(2))).toBe(false);
-		appendFileSync(session, `${read("ENG-3")}\n`);
+		appendFileSync(session, `${comment("ENG-3")}\n`);
 		expect(await index.refresh(listed(3))).toBe(true);
 		expect(index.factsOf(session).tickets).toEqual(["ENG-1", "ENG-3", "ENG-2"]);
+	});
+
+	test("links a Linear issue it only read, or that its own prompt or its branch names, once two of those agree; a subagent's prompt does not count", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		await git(main, "worktree", "add", "-q", "-b", "mma/eng-9-fix", join(parent, "app-eng-9"));
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		const read = (id: string) => linear(`get-${id}`, "get_issue", { id });
+		writeFileSync(session, `${[prompt("Pick up ENG-8 and ENG-9, with ENG-12"), read("ENG-8"), read("ENG-10"), read("ENG-11")].join("\n")}\n`);
+		const child = join(parent, "2026-10-01T00-00-00-000Z_s1", "Sub");
+		mkdirSync(child, { recursive: true });
+		writeFileSync(join(child, "sub.jsonl"), `${[prompt("Context: ENG-13 and ENG-10"), read("ENG-13"), read("ENG-12")].join("\n")}\n`);
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
+
+		expect(await index.refresh([{ path: session, cwd: join(parent, "app-eng-9"), modifiedAt: 1 }])).toBe(true);
+		expect(index.factsOf(session).tickets).toEqual(["ENG-8", "ENG-9", "ENG-12"]);
+		await git(join(parent, "app-eng-9"), "switch", "-q", "-c", "eng-11");
+		appendFileSync(session, `${bashCall("b", "bun test")}\n`);
+		expect(await index.refresh([{ path: session, cwd: join(parent, "app-eng-9"), modifiedAt: 2 }])).toBe(true);
+		expect(index.factsOf(session).tickets).toEqual(["ENG-8", "ENG-12", "ENG-11"]);
+	});
+
+	test("links a pr:// read only of a PR the session's own prompt names in its repository, and the PR its prompt links", async () => {
+		const dir = sessionDir();
+		const session = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		const read = (path: string) => toolCall(`r-${path}`, "read", { path });
+		writeFileSync(
+			session,
+			`${[prompt("Review #12 and PR 13 against https://github.com/acme/api/pull/5"), read("pr://14"), read("pr://12"), read("pr://acme/api/13"), read("pr://Acme/WebApp/13/diff/all")].join("\n")}\n`,
+		);
+		const child = join(dir, "2026-10-01T00-00-00-000Z_s1", "Audit");
+		mkdirSync(child, { recursive: true });
+		writeFileSync(join(child, "audit.jsonl"), `${[prompt("Audit #15"), read("pr://15"), read("pr://12")].join("\n")}\n`);
+		const index = new SessionFactsIndex(async () => ({ owner: "acme", repo: "webapp" }), NO_GIT);
+
+		expect(await index.refresh([{ path: session, cwd: dir, modifiedAt: 1 }])).toBe(true);
+		expect(index.factsOf(session).pullRequests).toEqual([
+			{ owner: "acme", repo: "api", number: 5, link: "worked" },
+			{ owner: "acme", repo: "webapp", number: 12, link: "worked" },
+			{ owner: "Acme", repo: "WebApp", number: 13, link: "worked" },
+		]);
 	});
 
 	test("asks for the repository only of sessions that name a bare number, and links pushes once the pull request list names their PR", async () => {
 		const dir = sessionDir();
 		const reader = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");
 		const pusher = join(dir, "2026-10-01T00-00-00-000Z_s2.jsonl");
-		writeFileSync(reader, `${toolCall("r", "read", { path: "pr://6611" })}\n`);
+		writeFileSync(reader, `${bashCall("r", "gh pr checkout 6611")}\n`);
 		writeFileSync(pusher, `${bashCall("p", "git push")}\n${result("p", pushed("me/feature"))}\n`);
 		const asked: string[] = [];
 		const index = new SessionFactsIndex(
@@ -409,7 +487,7 @@ describe("SessionFactsIndex", () => {
 		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
 		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
 		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
-		writeFileSync(session, `${toolCall("r", "read", { path: "pr://10" })}\n`);
+		writeFileSync(session, `${bashCall("b", "bun test")}\n`);
 		const repo = { owner: "acme", repo: "webapp" };
 		let heading: { owner: string; repo: string; number: number } | null = null;
 		const asked: string[] = [];
@@ -435,6 +513,124 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 11 });
 		expect(index.learnHeads(repo, [])).toBe(true);
 		expect(index.factsOf(session).branch?.pullRequest).toBeNull();
+	});
+
+	test("the PR a gt submit printed for the session's branch heads it at once, and through list reads that do not name the branch, until one does", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(session, `${bashCall("s", "gt submit --no-edit")}\n${result("s", "wip: https://app.graphite.com/github/pr/acme/webapp/9 (created)")}\n`);
+		const repo = { owner: "acme", repo: "webapp" };
+		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts(), [], async () => ({ ...repo, number: 9 }));
+
+		await index.refresh([{ path: session, cwd: join(parent, "app-wip"), modifiedAt: 1 }]);
+		expect(index.factsOf(session).branch).toEqual({ name: "wip", linked: true, defaultBranch: "main", pullRequest: { ...repo, number: 9 } });
+		expect(index.factsOf(session).pullRequests).toEqual([{ ...repo, number: 9, link: "submitted" }]);
+		expect(index.learnHeads(repo, [])).toBe(false);
+		expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 9 });
+		expect(index.learnHeads(repo, [{ ...repo, number: 11, head: "wip" }])).toBe(true);
+		expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 11 });
+	});
+
+	test("GitHub's answer replaces the PR a gt submit printed for the session's branch, or removes it when the branch heads no open or merged PR, and a later write does not bring the printed one back", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(session, `${bashCall("s", "gt submit --no-edit")}\n${result("s", "wip: https://app.graphite.com/github/pr/acme/webapp/9 (created)")}\n`);
+		const repo = { owner: "acme", repo: "webapp" };
+		let heading: { owner: string; repo: string; number: number } | null = null;
+		const asked: string[] = [];
+		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts(), [], async (_, branch) => {
+			asked.push(branch);
+			return heading;
+		});
+		const start = Date.now();
+		const writeAt = async (seconds: number) => {
+			setSystemTime(new Date(start + seconds * 1000));
+			appendFileSync(session, `${bashCall("t", "bun test")}\n`);
+			await index.refresh([{ path: session, cwd: join(parent, "app-wip"), modifiedAt: seconds + 1 }]);
+		};
+
+		try {
+			setSystemTime(new Date(start));
+			await index.refresh([{ path: session, cwd: join(parent, "app-wip"), modifiedAt: 0 }]);
+			expect(asked).toEqual(["wip"]);
+			expect(index.factsOf(session).branch?.pullRequest).toBeNull();
+			expect(index.factsOf(session).pullRequests).toEqual([{ ...repo, number: 9, link: "submitted" }]);
+			await writeAt(10);
+			expect(asked).toEqual(["wip"]);
+			expect(index.factsOf(session).branch?.pullRequest).toBeNull();
+			heading = { ...repo, number: 12 };
+			await writeAt(70);
+			expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 12 });
+			heading = null;
+			await writeAt(100);
+			expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 12 });
+			await writeAt(140);
+			expect(asked).toEqual(["wip", "wip", "wip"]);
+			expect(index.factsOf(session).branch?.pullRequest).toBeNull();
+		} finally {
+			setSystemTime();
+		}
+	});
+
+	test("asks GitHub which PR a branch the list names none for heads once per branch, again a minute after the last ask even when it failed or answered, and when a gt submit finishes", async () => {
+		const parent = realpathSync(sessionDir());
+		await repoWithWorktrees(parent);
+		const first = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		const second = join(parent, "2026-10-01T00-00-00-000Z_s2.jsonl");
+		writeFileSync(first, `${bashCall("b", "bun test")}\n`);
+		writeFileSync(second, `${bashCall("b", "bun test")}\n`);
+		const repo = { owner: "acme", repo: "webapp" };
+		let answer = async (): Promise<{ owner: string; repo: string; number: number } | null> => null;
+		const asked: string[] = [];
+		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts(), [], async (_, branch) => {
+			asked.push(branch);
+			return answer();
+		});
+		const start = Date.now();
+		const writeAt = async (seconds: number, line: string) => {
+			setSystemTime(new Date(start + seconds * 1000));
+			appendFileSync(first, `${line}\n`);
+			await index.refresh([
+				{ path: first, cwd: join(parent, "app-wip"), modifiedAt: seconds + 1 },
+				{ path: second, cwd: join(parent, "app-wip"), modifiedAt: 0 },
+			]);
+		};
+
+		try {
+			setSystemTime(new Date(start));
+			await index.refresh([
+				{ path: first, cwd: join(parent, "app-wip"), modifiedAt: 0 },
+				{ path: second, cwd: join(parent, "app-wip"), modifiedAt: 0 },
+			]);
+			expect(asked).toEqual(["wip"]);
+			await writeAt(30, bashCall("t", "bun test"));
+			expect(asked).toEqual(["wip"]);
+			answer = async () => {
+				throw new Error("API rate limit exceeded");
+			};
+			await writeAt(60, bashCall("t", "bun test"));
+			expect(asked).toEqual(["wip", "wip"]);
+			answer = async () => ({ ...repo, number: 9 });
+			await writeAt(70, bashCall("s", "gt submit --no-edit -q"));
+			expect(asked).toEqual(["wip", "wip"]);
+			await writeAt(80, result("s", ""));
+			expect(asked).toEqual(["wip", "wip", "wip"]);
+			expect(index.factsOf(first).branch?.pullRequest).toEqual({ ...repo, number: 9 });
+			expect(index.factsOf(second).branch?.pullRequest).toEqual({ ...repo, number: 9 });
+			await writeAt(100, bashCall("t", "bun test"));
+			expect(asked).toEqual(["wip", "wip", "wip"]);
+			await writeAt(200, bashCall("t", "bun test"));
+			expect(asked).toEqual(["wip", "wip", "wip", "wip"]);
+			expect(index.factsOf(first).branch?.pullRequest).toEqual({ ...repo, number: 9 });
+		} finally {
+			setSystemTime();
+		}
 	});
 
 	test("names the branch a main checkout had checked out when the session last wrote, links the PR a non-default one heads as origin/HEAD moves, keeps it through later checkouts, and none on a detached HEAD", async () => {

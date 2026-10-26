@@ -1,7 +1,7 @@
 # Server: git, worktrees, pull requests, merges, and sync
 
 - `src/pull-requests.ts`: maps each workspace to its GitHub repository, reads the pull request list with one `gh api graphql` call per repository, and reads one pull request's details with one more.
-  `branchPullRequest` asks one `gh api graphql` call, outside GitHub's search, for the newest open or merged pull request a branch heads, for `src/session-facts.ts`.
+  `branchPullRequest` asks one `gh api` REST call, outside GitHub's search and the GraphQL budget, for the newest open or merged pull request a branch heads, for `src/session-facts.ts`.
   `mergedPullRequests` asks one `gh api graphql` call for the newest pull request from each of a repository's branches, with one alias per branch, and keeps the merged ones with their merge time, for `src/worktrees.ts`.
   `loadPullRequestTitle` reads only a linked PR's title through a separate 30-second cache, without loading its details.
   `src/github.ts`'s `repoOf` keeps each workspace's repository, or its lack of one, for ten minutes in a `createCache` from `src/cache.ts`, and runs at most eight `git remote` lookups at once through a `limit` gate from `src/map-limit.ts`.

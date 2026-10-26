@@ -2,7 +2,7 @@ import { describe, expect, setSystemTime, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadPullRequests, parseBranchAnswer, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, readBehindBy, repoOf } from "./pull-requests";
+import { branchPullRequest, loadPullRequests, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, readBehindBy, repoOf } from "./pull-requests";
 import { runChecked } from "./proc";
 import * as proc from "./proc";
 
@@ -64,9 +64,18 @@ describe("parseMergedAnswer", () => {
 	});
 });
 
-test("parseBranchAnswer names the pull request the branch heads in its repository, and none when it heads none", () => {
-	const heads = (nodes: unknown[]) => parseBranchAnswer({ data: { repository: { pullRequests: { nodes } } } }, repo);
-	expect([heads([{ number: 9 }]), heads([])]).toEqual([{ owner: "acme", repo: "webapp", number: 9 }, null]);
+test("branchPullRequest asks GitHub's REST API for the branch's pull requests and names the newest open or merged one, and none when it heads none", async () => {
+	const pr = (number: number, state: string, merged_at: string | null = null) => ({ number, state, merged_at });
+	const read = spyOn(proc, "runJson")
+		.mockResolvedValueOnce([pr(12, "closed"), pr(10, "open"), pr(11, "closed", "2026-10-01T00:00:00Z")])
+		.mockResolvedValueOnce([pr(13, "closed")]);
+	try {
+		expect(await branchPullRequest(repo, "me/feature")).toEqual({ owner: "acme", repo: "webapp", number: 11 });
+		expect(read.mock.calls[0]?.[0]).toEqual(["gh", "api", "repos/acme/webapp/pulls?head=acme%3Ame%2Ffeature&state=all&per_page=10"]);
+		expect(await branchPullRequest(repo, "me/abandoned")).toBeNull();
+	} finally {
+		read.mockRestore();
+	}
 });
 
 test("a workspace without a GitHub origin is retried after its negative cache expires", async () => {

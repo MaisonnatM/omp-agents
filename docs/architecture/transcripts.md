@@ -77,13 +77,16 @@ Every transcript comes from the session files on this machine, not from a networ
   Like an open transcript, each file reads only the bytes appended since its last scan.
   The first scan reads every session file, 16 sessions at a time.
   On 641 MB across 464 sessions it takes under a second, and the sidebar shows before it finishes.
-  A session that names a PR by number alone, or works on a branch, costs one `git remote get-url origin` in its working directory.
+  A session that names a PR by number alone, reads by number one its own prompt names, or works on a branch, costs one `git remote get-url origin` in its working directory.
   A `gt submit` call costs, once per directory it ran in, one `git remote get-url origin` and a `git reflog show HEAD` with a `git symbolic-ref HEAD`, which place the branch checked out at the call's time; the server keeps each call's branch for as long as it lists the session.
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
 - The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
   `get_issue` and `save_issue` name the issue in `id`, `list_comments` and `save_comment` in `issueId`; a `save_issue` with no `id` opens one, whose identifier its result's JSON `id` names.
   A UUID is left out, since the tickets page opens an issue by identifier.
-  The `/ship` state's `issue` counts too.
+  A `save_issue`, a `save_comment`, the `/ship` state's `issue`, and a Linear issue link in the session's own prompts each link the issue on their own.
+  A read (`get_issue`, `list_comments`), the identifier in the session's own prompts, and the session's branch naming it, in a `/`-separated segment that starts with it as `eng-123-fix` or `me/eng-123` do, are weaker: an issue with only these links once two different kinds agree, so a subagent that reads its parent's issue for context does not link it.
+  The session's own prompts are the user prompts in its own file, a skill's arguments without the skill's text, and no dashboard prompt; a subagent's prompt is its assignment, so it names nothing.
+  `#resolve` in `src/session-facts.ts` decides which issues link, since the branch is known only once git answers.
   Session rows carry them as `tickets`, the session's own first.
 - The same scan reads the branch each session that wrote works on, in its worktree else its directory, through `worktreeAt` in `src/git.ts`.
   In a linked worktree that is the branch checked out now; in a repository's main checkout it is the branch `headHistory` and `branchAt` in `src/git.ts` find checked out at the session file's last write, from the HEAD reflog.
@@ -93,6 +96,9 @@ Every transcript comes from the session files on this machine, not from a networ
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
   It also sets the `pullRequest` of each such session's `branch`, the PR it heads, and so links the PR of a main checkout's branch other than the default one too; the header's **Open PR** shows only while it is `null`.
-- The list names a new PR only at the page's next read, up to a minute after the session opened it, and only once GitHub's search has indexed it, some seconds after.
-  So when a session's transcripts name a PR it did not link before, such as the URL `gh pr create` prints, while its branch heads none yet, the server asks GitHub at once which PR that branch heads, through one `gh api graphql` call outside the search (`branchPullRequest` in `src/pull-requests.ts`), and sets `pullRequest` from the answer.
-  The answer outlives later reads of the list, which search may still leave without the PR, until one names that branch, whose PR then takes its place.
+- A `gt submit` line names a branch with its PR, so the server takes that PR as the branch's once, when it reads the line, unless the list names one for the branch.
+- The list names a new PR only at the page's next read, up to a minute after the session opened it, only once GitHub's search has indexed it, some seconds after, and not at all while the list's GraphQL budget is spent.
+  So while the list names no PR for a session's branch, the server asks GitHub which PR that branch heads, through one `gh api` REST call outside the search and the GraphQL budget (`branchPullRequest` in `src/pull-requests.ts`), and sets `pullRequest` from the newest open or merged one, or `null` when there is none.
+  It asks at once when the session's transcripts name a PR it did not link before, such as the URL `gh pr create` prints, or finish a `gt submit` call, which may open one without printing it (`-q`).
+  Otherwise it asks at most once a minute per branch, at a write of a session on it, so a failed ask is tried again, and a printed or answered PR that closed since is dropped.
+  A printed or answered PR outlives later reads of the list, which search may still leave without it, until one names that branch, whose PR then takes its place and ends the asks.

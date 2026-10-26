@@ -68,7 +68,10 @@ export interface SessionBranch {
 	linked: boolean;
 	/** The repository's default branch, as `origin/HEAD` names it, which a pull request from this branch merges into; `null` when git has not recorded one. */
 	defaultBranch: string | null;
-	/** The pull request this branch heads, open or merged, as the pull request list says or GitHub answered when the session named a new PR; `null` while neither names one. */
+	/**
+	 * The pull request this branch heads, open or merged, as the pull request list says, a `gt submit` printed, or GitHub answered when asked
+	 * about the branch; `null` while none names one.
+	 */
 	pullRequest: PullRequest | null;
 }
 
@@ -76,7 +79,10 @@ export interface SessionBranch {
 export interface SessionFacts {
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
-	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
+	/**
+	 * The Linear issues the session and its subagents changed, opened, or commented on, its /ship run's, and the one a Linear link in its own
+	 * prompt names, by identifier; an issue read or named only links once two of a read, the session's own prompt, and its branch agree. The session's own first.
+	 */
 	tickets: string[];
 	ship: ShipProgress | null;
 	/**
