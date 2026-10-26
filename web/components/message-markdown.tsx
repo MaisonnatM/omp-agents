@@ -1,13 +1,12 @@
 import type { Element, ElementContent } from "hast";
 import { type ComponentProps, memo, useContext, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
-import { highlightLines } from "../code-highlight";
+import { highlightLines, useGrammars } from "../code-highlight";
+import { loadedOnce, useLoaded } from "../loaded-once";
 import { githubMediaPath, pullRequestOfUrl, type PullRequestDetail } from "../../src/shared/github";
 import { hashForSession } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
@@ -223,6 +222,7 @@ function fenceOf(node: Element | undefined): { language: string | null; text: st
 }
 
 function CodeLines({ text, language }: { text: string; language: string | null }) {
+	useGrammars();
 	return highlightLines(text, language ?? "").map((tokens, index) => (
 		<CodeBlockLine key={index}>
 			{tokens.map((token, at) => (token.className ? <span key={at} className={token.className}>{token.text}</span> : token.text))}
@@ -265,13 +265,6 @@ const SESSION_AGENT_COMPONENTS: Components = { ...AGENT_COMPONENTS, pre: session
 const SESSION_PROMPT_COMPONENTS: Components = { ...PROMPT_COMPONENTS, pre: sessionCodeBlock };
 const GITHUB_COMPONENTS: Components = { a: link, img: githubImg, video, pre: codeBlock };
 
-/** GitHub's schema, plus the `<video>` a Linear issue's recording or a GitHub upload becomes, with its `<source>`. */
-const SANITIZE_SCHEMA = {
-	...defaultSchema,
-	tagNames: [...(defaultSchema.tagNames ?? []), "video", "source"],
-	attributes: { ...defaultSchema.attributes, video: ["src"], source: ["src"] },
-};
-
 /** react-markdown drops `data:` URLs; the images the page allows inline are the exception. */
 const urlTransform = (url: string, key: string): string => (key === "src" && inlineImage(url) ? url : defaultUrlTransform(url));
 
@@ -288,19 +281,33 @@ const agentUrlTransform = (url: string, key: string): string => {
 	}
 };
 
+type Plugins = NonNullable<Options["rehypePlugins"]>;
+
 /** The plugins, components, and URL filter that one kind of text renders with. */
 export interface MarkdownPreset {
 	remark: NonNullable<Options["remarkPlugins"]>;
-	rehype: NonNullable<Options["rehypePlugins"]>;
+	/** Whether the text's raw HTML renders, sanitized to GitHub's schema, through `RAW_HTML`, which runs before `rehype`. */
+	rawHtml: boolean;
+	rehype: Plugins;
 	components: Components;
 	urlTransform: UrlTransform;
 }
+
+/** `RAW_HTML`, or, should its chunk fail to load, no plugins, which leaves the raw HTML as escaped text. */
+const rawHtmlPlugins = loadedOnce<Plugins>(() =>
+	import("./raw-html").then(
+		({ RAW_HTML }) => RAW_HTML,
+		() => [],
+	),
+);
+
+export const loadRawHtml = (): Promise<unknown> => rawHtmlPlugins.load();
 
 /**
  * Agent text: the path of a file opens it in the file dialog, a relative one against `FileBaseContext`; an image or
  * video on this computer shows in place when the text writes it as an image, and under the text when it only names it.
  */
-export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform };
+export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform };
 
 /** A user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips. */
 export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
@@ -316,18 +323,21 @@ export const SESSION_PROMPT_PRESET: MarkdownPreset = { ...PROMPT_PRESET, compone
  * follows GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts and from this
  * server's route for a Linear issue's files, which also plays its videos.
  */
-export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rehype: [rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA]], components: GITHUB_COMPONENTS, urlTransform };
+export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform };
 
 /**
  * Markdown text is untrusted. react-markdown escapes raw HTML and filters unsafe link schemes, and images load only
  * inline (`data:`) or from where the preset allows.
  *
  * Parsing and highlighting a long reply is the page's costliest render, so the same text never renders twice.
+ * Text whose raw HTML renders shows nothing until its plugins load, rather than its HTML as escaped text.
  */
 export const MessageMarkdown = memo(function MessageMarkdown({ text, preset = AGENT_PRESET }: { text: string; preset?: MarkdownPreset }) {
+	const rawHtml = useLoaded(rawHtmlPlugins, preset.rawHtml);
+	if (preset.rawHtml && !rawHtml) return null;
 	return (
 		<div className="message-markdown max-w-full whitespace-normal break-words">
-			<ReactMarkdown remarkPlugins={preset.remark} rehypePlugins={preset.rehype} components={preset.components} urlTransform={preset.urlTransform}>
+			<ReactMarkdown remarkPlugins={preset.remark} rehypePlugins={rawHtml && preset.rawHtml ? [...rawHtml, ...preset.rehype] : preset.rehype} components={preset.components} urlTransform={preset.urlTransform}>
 				{text}
 			</ReactMarkdown>
 		</div>

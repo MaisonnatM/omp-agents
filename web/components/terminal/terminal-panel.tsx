@@ -1,6 +1,6 @@
 /** `TerminalPanel`: the resizable panel under the panes holding the terminal tabs, and its shown/height state. */
 import { ChevronDown, LoaderIcon, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -11,7 +11,10 @@ import { useStoredState } from "../../stored-state";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { LOADING_TABS, readTerminalTabs, type TerminalTabs } from "./terminal-inventory";
 import { closeEndsShell, newTab, nextTabState, type Tab, type TabEvent, tabTerminal } from "./terminal-tab";
-import { type TerminalHandle, TerminalView } from "./terminal-view";
+import type { TerminalHandle } from "./terminal-view";
+
+// xterm is a chunk of its own, loaded when the panel first opens.
+const TerminalView = lazy(() => import("./terminal-view").then(module => ({ default: module.TerminalView })));
 
 const OPEN_KEY = "omp-agents.terminal-open";
 const HEIGHT_KEY = "omp-agents.terminal-height";
@@ -181,19 +184,21 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 					</Button>
 				</div>
 			)}
-			{tabs.map(tab => (
-				<TerminalView
-					key={tab.key}
-					ref={view => {
-						if (view) views.current.set(tab.key, view);
-						else views.current.delete(tab.key);
-					}}
-					target={tab.target}
-					active={open && tab === shown}
-					onOpened={terminal => dispatch(tab.key, { t: "opened", terminal })}
-					onClosed={exited => dispatch(tab.key, { t: "closed", exited })}
-				/>
-			))}
+			<Suspense>
+				{tabs.map(tab => (
+					<TerminalView
+						key={tab.key}
+						ref={view => {
+							if (view) views.current.set(tab.key, view);
+							else views.current.delete(tab.key);
+						}}
+						target={tab.target}
+						active={open && tab === shown}
+						onOpened={terminal => dispatch(tab.key, { t: "opened", terminal })}
+						onClosed={exited => dispatch(tab.key, { t: "closed", exited })}
+					/>
+				))}
+			</Suspense>
 			{shown?.state.phase === "starting" && (
 				<p role="status" aria-busy className="pointer-events-none absolute inset-x-0 top-8 bg-background px-2 pt-1 font-mono text-xs text-muted-foreground">
 					Starting shell…

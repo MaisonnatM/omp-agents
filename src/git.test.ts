@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkoutDir, gitCheckout, worktreeAt } from "./git";
+import { CachedCheckouts, checkoutDir, defaultBranchOf, gitCheckout, headHistory, worktreeAt } from "./git";
 import { runChecked } from "./proc";
 
 const dirs: string[] = [];
@@ -33,12 +33,44 @@ describe("worktreeAt", () => {
 		const { parent, main } = await repo();
 		mkdirSync(join(main, "src"));
 		const common = join(main, ".git");
-		expect(await worktreeAt(join(main, "src"))).toEqual({ top: main, common, linked: false, branch: "main" });
-		expect(await worktreeAt(join(parent, "app-wip"))).toEqual({ top: join(parent, "app-wip"), common, linked: true, branch: "wip" });
+		expect(await worktreeAt(join(main, "src"))).toEqual({ top: main, common, gitDir: common, linked: false, branch: "main" });
+		expect(await worktreeAt(join(parent, "app-wip"))).toEqual({ top: join(parent, "app-wip"), common, gitDir: join(common, "worktrees", "app-wip"), linked: true, branch: "wip" });
 		await git(main, "update-ref", "refs/tags/wip", "HEAD");
 		expect((await worktreeAt(join(parent, "app-wip")))?.branch).toBe("wip");
 		await git(main, "switch", "-q", "--detach", "old");
 		expect((await worktreeAt(main))?.branch).toBeNull();
+	});
+});
+
+describe("CachedCheckouts", () => {
+	test("answers as git does through switches, a detach, and origin/HEAD moving, and keeps its answers while none of that happens", async () => {
+		const { parent, main } = await repo();
+		const wip = join(parent, "app-wip");
+		const cached = new CachedCheckouts();
+		const read = (dir: string) => Promise.all([cached.worktreeAt(dir), cached.headHistory(dir), cached.defaultBranchOf(dir)]);
+		const truth = (dir: string) => Promise.all([worktreeAt(dir), headHistory(dir), defaultBranchOf(dir)]);
+		const agree = async () => {
+			for (const dir of [main, wip]) expect(await read(dir)).toEqual(await truth(dir));
+		};
+
+		await agree();
+		const kept = await read(main);
+		const again = await read(main);
+		kept.forEach((answer, i) => expect(again[i]).toBe(answer));
+
+		await git(main, "switch", "-q", "old");
+		await agree();
+		await git(wip, "switch", "-q", "-c", "next");
+		await agree();
+		await git(main, "switch", "-q", "--detach", "main");
+		await agree();
+		await git(main, "update-ref", "refs/remotes/origin/main", "main");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		await agree();
+		await git(main, "update-ref", "refs/remotes/origin/old", "old");
+		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/old");
+		await agree();
+		expect(await cached.defaultBranchOf(wip)).toBe("old");
 	});
 });
 

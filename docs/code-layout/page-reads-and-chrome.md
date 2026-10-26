@@ -5,7 +5,7 @@
 - `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, and `useTerminalPanel`, which saves the last two in localStorage.
   `terminal-tab.ts` holds the tab shape and its lifecycle, `TerminalTabState`, `starting`, `connected`, `closing`, or `disconnected`, which `nextTabState` moves through the socket's `opened` and close and the user's close; closing a starting or connected tab asks its shell to exit through the view and keeps the tab until its socket closes.
   `terminal-inventory.ts` holds `readTerminalTabs`, which turns `GET /api/terminals` into the panel's loading, failed, or ready tabs: a tab per running shell, or one new shell only when the read succeeds and lists none.
-  `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes the toggle chord, and every Cmd chord on macOS, to the page's shortcuts.
+  `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes the toggle chord, and every Cmd chord on macOS, to the page's shortcuts; the panel loads it with `React.lazy`, so xterm.js is a chunk of its own that loads when the panel first opens.
   `terminal-socket.ts` sends its commands and retains a kill requested while the socket connects, sending it when the socket opens.
 - `web/quick-actions.ts`: the quick actions of the Pull requests page, the tickets page, and the open todo, which pull requests, issues, and todos each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   Tickets and todos share the **Work on it** and **Plan it** labels and descriptions in `WORK_ACTIONS`, and each keeps its own rules, which of its items an action applies to and the prompt it sends.
@@ -20,6 +20,7 @@
   A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.
   A URL change never returns the previous URL's answer.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per workspace, one for the tickets, with one entry, since Linear is not per workspace, one for the MCP integrations, one for the Google calendars shown, one for the Calendar page's Google events, with one entry per month, one for its events kept on this computer, with one entry, and one for the Gmail inbox, with one entry.
+  A tick while the browser tab is hidden reads nothing, and each scope that skipped one reads once when the tab shows again.
   Each kept store reads its localStorage back through its `cache.decode` and drops a read the decoder refuses, so a record kept by an older version, or damaged, reads the server again instead of reaching a component.
   `mcpServersStore`, for Settings › MCP servers, and `providersStore` are polled stores kept in memory only.
   So is `sessionProcessesStore`, one entry holding every live session's processes, which only the open CPU card polls, every 5 seconds rather than every minute.

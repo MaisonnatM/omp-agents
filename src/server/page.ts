@@ -40,6 +40,8 @@ export const loadPage = async (): Promise<Page> => (prebuiltPageDir ? readPage(p
 export const pageBuild = async (page: Page): Promise<string> => Bun.hash(await (page.get("/index.html")?.text() ?? "")).toString(36);
 
 const NO_STORE = { "cache-control": "no-store" };
+/** Bun names every file of the build but `index.html` by the hash of its content, so a browser keeps one until a build renames it. */
+const IMMUTABLE = { "cache-control": "private, max-age=31536000, immutable" };
 
 const html = (status: number, body: string): Response =>
 	new Response(`<!doctype html><meta charset="utf-8"><title>omp agents</title>${body}`, { status, headers: { "content-type": "text/html;charset=utf-8", ...NO_STORE } });
@@ -64,7 +66,8 @@ export function servePage(req: Request, guards: Guards, token: string, page: Rea
 	if (pathname !== "/") {
 		const refused = guards.admit(req);
 		const asset = page.get(pathname);
-		return refused ?? (asset ? new Response(asset) : new Response("not found", { status: 404 }));
+		if (refused || !asset) return refused ?? new Response("not found", { status: 404 });
+		return new Response(asset, { headers: pathname === "/index.html" ? NO_STORE : IMMUTABLE });
 	}
 	if (!guards.allowedHost(req)) return new Response("forbidden host", { status: 403 });
 	const site = req.headers.get("sec-fetch-site");

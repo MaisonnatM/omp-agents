@@ -1,7 +1,7 @@
 import { type CSSProperties, Fragment, type ReactNode, useMemo } from "react";
 import type { DiffRow } from "../../src/shared/changes";
 import { editHunks } from "../../src/shared/transcript";
-import { highlightRows, type Token } from "../code-highlight";
+import { highlightRows, type Token, useGrammars } from "../code-highlight";
 import { Code } from "./changes/code-view";
 import { cn } from "@/lib/utils";
 
@@ -46,11 +46,12 @@ function GapRow() {
 
 /** The edit's caption and highlighted hunks, with gaps for omitted context. */
 export function FileDiff({ path, diff, caption }: { path: string; diff: string; caption: ReactNode }) {
+	const grammars = useGrammars();
 	const { hunks, width } = useMemo(() => {
 		const hunks = editHunks(diff);
 		const widest = Math.max(0, ...hunks.flat().map(row => Math.max(row.old ?? 0, row.new ?? 0)));
 		return { hunks: hunks.map(hunk => ({ rows: hunk, tokens: highlightRows(hunk, path) })), width: `${String(widest).length}ch` };
-	}, [diff, path]);
+	}, [diff, path, grammars]);
 
 	return (
 		<figure className="overflow-hidden rounded-xl border bg-card text-card-foreground">

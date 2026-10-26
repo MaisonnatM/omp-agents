@@ -1,9 +1,13 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { UserTodo, UserTodoList } from "../../src/user-todos-shared";
+import { loadGrammars } from "../code-highlight";
 import { DashboardActionsContext, type DashboardActions, UserTodosContext } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
-import { AGENT_PRESET, GITHUB_PRESET, MessageMarkdown, PROMPT_PRESET } from "./message-markdown";
+import { AGENT_PRESET, GITHUB_PRESET, loadRawHtml, MessageMarkdown, PROMPT_PRESET } from "./message-markdown";
+
+// A static render reads the grammars and the raw HTML plugins as they stand, so they load first, as in a page that showed code and GitHub text before.
+await Promise.all([loadGrammars(), loadRawHtml()]);
 
 test("messages render GFM and refuse executable markup", () => {
 	const html = renderToStaticMarkup(

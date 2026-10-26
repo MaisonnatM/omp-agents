@@ -27,12 +27,15 @@ Every transcript comes from the session files on this machine, not from a networ
   A `/skill:` prompt is a `custom` message of type `skill-prompt`, and omp writes its `custom_message` entry with the message's timestamp, so it merges on that.
   A queued steer or follow-up keeps the time it was sent, though the agent takes it later.
   So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
+  A message that arrives older than items already shown, such as a prompt that reaches the file only after its streamed reply, goes after the last item at or before its time.
+  Its `items` message lists it and every item after it, in order, and lists those it displaced in `removed` too, so the page drops them and appends them again in one update rather than taking the whole list.
 - A reply that streams and a tool call that runs change with every token.
   Each open transcript sends those changes to the page at most every 50 ms; a message that finishes, a tool call that ends, a prompt, or a notice goes out at once, together with what was held back.
+  A live event waits for a read of the file first, so the file's copy of a message it settled wins, but asks for a read at most once per 50 ms; the events in between wait for that read, and the watcher reads each later write.
 - A dashboard session's view shows a prompt that omp admitted while the main agent was idle as a pending user item, after every other item, until the turn's live user message replaces it ([Dashboard sessions](dashboard-sessions.md)).
   It renders as that message will: a `/skill:` prompt as the skill and its arguments, attached files by name, images inline.
   Its id is `starting:<request id>`, and the `items` message that brings the live user message lists that id in `removed`, so the page drops it and appends the real prompt in one update.
-  A pending prompt is the only item that leaves a transcript, so `removed` is empty in every other `items` message.
+  Besides a pending prompt, only the items a message displaced are in `removed`, and the same message brings them back, so `removed` is empty in every other `items` message.
 - A user message whose text starts with `[omp-agents]` (`DASHBOARD_PROMPT_PREFIX` in `src/shared/transcript.ts`), such as a project's update, is a prompt the dashboard sent in the user's place.
   The transcript folds it into a `dashboard` item, never a pending one, which the page renders as nothing but counts as a turn's prompt: the reply before it keeps its copy and fork buttons, the user's prompt before it is no longer the editable last prompt, and a reply before it suggests nothing.
   `messageItemsOf` leaves it out, so the conversation search skips it and the trajectory folds it as an `omp-agents` injection into the turn before it; it titles no session, neither through the `/rename` a dashboard session sends after its first prompt nor as a past session's first prompt, and the composer's queued rows leave it out.
@@ -85,6 +88,7 @@ Every transcript comes from the session files on this machine, not from a networ
 - The same scan reads the branch each session that wrote works on, in its worktree else its directory, through `worktreeAt` in `src/git.ts`.
   In a linked worktree that is the branch checked out now; in a repository's main checkout it is the branch `headHistory` and `branchAt` in `src/git.ts` find checked out at the session file's last write, from the HEAD reflog.
   `defaultBranchOf` there reads the repository's default branch from `origin/HEAD` with one `git symbolic-ref` per directory of a session that wrote, so a moved `origin/HEAD` updates the `defaultBranch` of every session in that directory.
+  Each of the three asks `git` again only once a file it read changed, the worktree's `HEAD`, its HEAD reflog, or `origin/HEAD` (`CachedCheckouts` in `src/git.ts`), so a refresh with no checkout moved starts no `git`.
   Session rows carry it as `branch`, a `SessionBranch` `{ name, linked, defaultBranch, pullRequest }` from `src/shared/sessions.ts`, `null` on a detached HEAD, outside git, or once the directory is gone, and a branch switch changes the row at the session's next write.
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.

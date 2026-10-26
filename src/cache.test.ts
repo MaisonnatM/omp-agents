@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, jest, test } from "bun:test";
 import { createCache } from "./cache";
 
 describe("createCache", () => {
@@ -11,6 +11,24 @@ describe("createCache", () => {
 		expect(await cache.get("a", load, true)).toBe(2);
 		cache.drop("a");
 		expect(await cache.get("a", load)).toBe(3);
+	});
+
+	test("an answer expires after its time to live, and a fresh one replaces it for a whole time to live", async () => {
+		jest.useFakeTimers();
+		try {
+			const cache = createCache<number>(40);
+			let loads = 0;
+			const load = async () => ++loads;
+			expect(await cache.get("a", load)).toBe(1);
+			jest.advanceTimersByTime(40);
+			expect(await cache.get("a", load)).toBe(2);
+			jest.advanceTimersByTime(25);
+			expect(await cache.get("a", load, true)).toBe(3);
+			jest.advanceTimersByTime(25);
+			expect(await cache.get("a", load)).toBe(3);
+		} finally {
+			jest.useRealTimers();
+		}
 	});
 
 	test("a failed load is not kept, so the next caller asks again", async () => {

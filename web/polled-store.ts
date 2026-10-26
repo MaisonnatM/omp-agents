@@ -28,6 +28,14 @@ interface PolledStoreOptions<T> {
 	pollMs?: number;
 }
 
+/** One polled scope's timer, how many mounted components share it, and whether a tick fell while the page was hidden. */
+interface Poller {
+	scope: string | null;
+	callers: number;
+	missed: boolean;
+	timer: ReturnType<typeof setInterval>;
+}
+
 /**
  * A store of server reads by scope that the sidebar and a page share, optionally kept in localStorage and re-read
  * while a page that uses it is open. The scope names what the read is about, such as a workspace; it is `null`
@@ -58,8 +66,8 @@ export function createPolledStore<T>({ url, cache, pollMs = POLL_MS }: PolledSto
 	for (const [key, read] of cached) entries.set(key, { ...empty, read });
 	/** The read of each scope in flight, by key. */
 	const inflight = new Map<string, AbortController>();
-	/** The timer of each scope that a mounted component polls, and how many components share it. */
-	const pollers = new Map<string, { callers: number; timer: ReturnType<typeof setInterval> }>();
+	/** Each polled scope's poller, by key. */
+	const pollers = new Map<string, Poller>();
 
 	function update(key: string, patch: Partial<PolledEntry<T>>): void {
 		entries.set(key, { ...entries.get(key), ...patch });
@@ -116,9 +124,20 @@ export function createPolledStore<T>({ url, cache, pollMs = POLL_MS }: PolledSto
 		persist();
 	}
 
+	/** Reads each polled scope whose tick the hidden page skipped, once the page shows again. */
+	function resume(): void {
+		if (document.hidden) return;
+		for (const poller of pollers.values()) {
+			if (!poller.missed) continue;
+			poller.missed = false;
+			void refresh(poller.scope);
+		}
+	}
+
 	/**
 	 * Reads `scope` now and every `pollMs` until the returned function is called. Callers of the same scope share
-	 * one timer: the first starts it, and the last to stop clears it.
+	 * one timer: the first starts it, and the last to stop clears it. A tick while the page is hidden reads nothing,
+	 * and the page reads that scope once when it shows again.
 	 */
 	function poll(scope: string | null = null): () => void {
 		const key = scope ?? "";
@@ -127,13 +146,19 @@ export function createPolledStore<T>({ url, cache, pollMs = POLL_MS }: PolledSto
 			running.callers += 1;
 		} else {
 			void refresh(scope);
-			pollers.set(key, { callers: 1, timer: setInterval(() => void refresh(scope), pollMs) });
+			if (pollers.size === 0) document.addEventListener("visibilitychange", resume);
+			const poller: Poller = { scope, callers: 1, missed: false, timer: setInterval(() => {
+				if (document.hidden) poller.missed = true;
+				else void refresh(scope);
+			}, pollMs) };
+			pollers.set(key, poller);
 		}
 		return () => {
 			const poller = pollers.get(key);
 			if (!poller || --poller.callers > 0) return;
 			clearInterval(poller.timer);
 			pollers.delete(key);
+			if (pollers.size === 0) document.removeEventListener("visibilitychange", resume);
 		};
 	}
 

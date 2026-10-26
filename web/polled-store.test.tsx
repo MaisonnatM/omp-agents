@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, jest, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { decoder, fields, isNumber } from "../src/json";
 import { createPolledStore, type PolledEntry } from "./polled-store";
@@ -42,7 +42,16 @@ function text(polled: { use(scope: string | null): PolledEntry<{ n: number }> },
 	return renderToStaticMarkup(<Read />);
 }
 
+/** The page's visibility, which a polled store reads on each tick. */
+const page = Object.assign(new EventTarget(), { hidden: false });
+
+beforeEach(() => {
+	page.hidden = false;
+	Object.assign(globalThis, { document: page });
+});
+
 afterEach(() => {
+	Reflect.deleteProperty(globalThis, "document");
 	for (const key of keys) localStorage.removeItem(key);
 	keys.length = 0;
 });
@@ -163,6 +172,37 @@ describe("polled store", () => {
 			expect(requested.length).toBe(6);
 			polled.poll("a")();
 			expect(requested.length).toBe(7);
+		} finally {
+			jest.useRealTimers();
+		}
+	});
+
+	test("a hidden page reads nothing on its ticks, and reads each skipped scope once when it shows again", () => {
+		jest.useFakeTimers();
+		try {
+			const polled = store();
+			const requested: string[] = [];
+			globalThis.fetch = (async (url: string) => {
+				requested.push(url);
+				return new Response(JSON.stringify({ n: 1 }), { status: 200 });
+			}) as unknown as typeof fetch;
+			const stop = polled.poll("a");
+			expect(requested).toEqual(["/polled/a"]);
+			page.hidden = true;
+			jest.advanceTimersByTime(180_000);
+			expect(requested).toEqual(["/polled/a"]);
+			page.hidden = false;
+			page.dispatchEvent(new Event("visibilitychange"));
+			page.dispatchEvent(new Event("visibilitychange"));
+			expect(requested).toEqual(["/polled/a", "/polled/a"]);
+			jest.advanceTimersByTime(60_000);
+			expect(requested.length).toBe(3);
+			stop();
+			page.hidden = true;
+			jest.advanceTimersByTime(60_000);
+			page.hidden = false;
+			page.dispatchEvent(new Event("visibilitychange"));
+			expect(requested.length).toBe(3);
 		} finally {
 			jest.useRealTimers();
 		}

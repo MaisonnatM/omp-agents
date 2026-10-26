@@ -49,9 +49,10 @@ export class FileTail {
 	readonly #reads = new ReadQueue(() => this.#read());
 	/** Changes held back for the window, by item id; a later version of an item replaces the earlier one in place. */
 	#pending = new Map<string, Item>();
-	#pendingReset = false;
 	#window: Timer | undefined;
 	#closed = false;
+	/** When {@link live} last asked for a read, from `performance.now()`. */
+	#livePokedAt = -Infinity;
 	readonly #emit: (reset: boolean, items: Item[], removed: string[]) => void;
 	readonly #emitWork: (reset: boolean, files: ChangedFile[]) => void;
 
@@ -89,43 +90,52 @@ export class FileTail {
 	}
 
 	/**
-	 * Apply live state (an agent event, a note) once the file is read up to now, so a
-	 * message the file already settled is never overwritten by its stale live copy.
+	 * Apply live state (an agent event, a note) once the file is read up to now, so a message the file already settled
+	 * is never overwritten by its stale live copy. Within the publish window of the last read it asked for, a later event,
+	 * such as the next streamed token, waits for that read and asks for none: a message reaches the file only once it
+	 * ends, the watcher pokes for that write, and the file's copy replaces the live one.
 	 */
 	live(apply: (transcript: Transcript) => Item[]): void {
 		if (this.#closed) return;
-		this.poke();
+		const now = performance.now();
+		if (now - this.#livePokedAt >= PUBLISH_WINDOW_MS) {
+			this.#livePokedAt = now;
+			this.poke();
+		}
 		this.#reads.after(() => this.#publish(apply(this.transcript)));
 	}
 
 	/**
 	 * Publish what `changed`, and whatever it held back before, unless only items still in flux changed: those wait out
 	 * the window. A message that finishes, a tool that ends, a prompt, a notice, or an item that leaves publishes at once
-	 * with them, so the final state is never delayed.
+	 * with them, so the final state is never delayed. Items an older one went ahead of publish at once as well: a delta
+	 * replaces an item in place and appends a new one, so they leave and come back after it, in their new order.
 	 */
 	#publish(changed: Item[]): void {
 		if (this.#closed) return;
-		if (this.transcript.takeReordered()) this.#pendingReset = true;
+		const displaced = this.transcript.takeDisplaced();
 		const removed = this.transcript.takeRemoved();
 		for (const id of removed) this.#pending.delete(id);
 		for (const item of changed) this.#pending.set(item.id, item);
-		if (!this.#pendingReset && this.#pending.size === 0 && removed.length === 0) return;
-		if (!this.#pendingReset && removed.length === 0 && changed.every(inFlux)) this.#window ??= setTimeout(() => this.#flush([]), PUBLISH_WINDOW_MS);
-		else this.#flush(removed);
+		if (displaced.length > 0) {
+			for (const item of displaced) this.#pending.delete(item.id);
+			this.#flush([...removed, ...displaced.map(item => item.id)], displaced);
+		} else if (this.#pending.size === 0 && removed.length === 0) return;
+		else if (removed.length === 0 && changed.every(inFlux)) this.#window ??= setTimeout(() => this.#flush([], []), PUBLISH_WINDOW_MS);
+		else this.#flush(removed, []);
 	}
 
-	#flush(removed: string[]): void {
-		const reset = this.#pendingReset;
-		const items = reset ? this.transcript.items() : [...this.#pending.values()];
+	/** Publish what the window held back, then `displaced` in order, and the ids in `removed`, which the page drops first. */
+	#flush(removed: string[], displaced: Item[]): void {
+		const items = [...this.#pending.values(), ...displaced];
 		this.#discardPending();
-		this.#emit(reset, items, reset ? [] : removed);
+		this.#emit(false, items, removed);
 	}
 
 	#discardPending(): void {
 		clearTimeout(this.#window);
 		this.#window = undefined;
 		this.#pending.clear();
-		this.#pendingReset = false;
 	}
 
 	async #read(): Promise<void> {
@@ -143,7 +153,7 @@ export class FileTail {
 		if (!this.#loaded) {
 			this.#loaded = true;
 			this.#discardPending();
-			this.transcript.takeReordered();
+			this.transcript.takeDisplaced();
 			this.transcript.takeRemoved();
 			this.#emit(true, this.transcript.items(), []);
 			this.#emitWork(true, this.files);

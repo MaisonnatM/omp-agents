@@ -20,6 +20,8 @@
 - `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie), `refuseUntil`, which holds the dashboard socket back until the sessions are reattached, and the JSON answer helpers.
   `/api/` requests and sockets are admitted by the cookie alone, so a stray `?token=` on a signed-in request changes nothing; only `/` reads `?token=`, to set the cookie.
   `src/server/auth.ts` keeps the token file and parses the cookie, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
+  `index.html` is `no-store`, and every other file of the build, which Bun names by the hash of its content, `private, max-age=31536000, immutable`, so a reload reads only `index.html` and a new build's renamed chunks.
+  The server sends the files uncompressed, since it listens only on `127.0.0.1`.
 - `src/server/routes.ts`: the `/api/` endpoints, in groups (sessions, integrations, providers, calendar, Gmail, pull requests, files, todos, the dashboard's own update, settings sync, and session processes), each handed only its part of `RouteEnv`.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   `src/server/wire.ts` parses every socket message and request body into typed values; every parser returns a `Parsed<T>` from `src/json.ts`, `{ ok }` or `null`, and the two OAuth client parsers `{ error }` in place of `null`, a reason the page shows.

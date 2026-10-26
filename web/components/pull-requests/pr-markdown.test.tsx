@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MessageMarkdown } from "../message-markdown";
+import { loadRawHtml, MessageMarkdown } from "../message-markdown";
 import { PullRequestMarkdown } from "./pr-markdown";
+
+// A static render reads the raw HTML plugins as they stand, so they load first.
+await loadRawHtml();
 
 const render = (text: string) => renderToStaticMarkup(<PullRequestMarkdown text={text} repo={{ owner: "acme", repo: "app" }} />);
 

@@ -48,12 +48,14 @@ Its own queue, history recall, and suggested prompts are removed, since those sl
 
 Markdown uses `react-markdown` and `remark-gfm` (`web/components/message-markdown.tsx`).
 A fenced code block renders as a `CodeBlock`, colored line by line by `highlightLines` in `web/code-highlight.ts`, the `lowlight` grammars the changes view uses, rather than shadcn's `shiki` hook, so the page bundles one highlighter.
+The grammars are a chunk of their own, which the first code the page shows loads through `loadedOnce` in `web/loaded-once.ts`; until it lands, code shows uncolored, and each highlighting component renders again in color once it does.
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL or a path to an image or video on this computer, which `LocalMedia` in `web/components/local-media.tsx` shows through `GET /api/media`.
 In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text, image, or video file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
 It then ends the text with a `figure` naming the images and videos those links name, each once, but for those an image already shows; `MediaStrip` draws it as thumbnails, each dropping out when its file does not load.
 A `file://` address whose escapes do not decode renders as a link with no address, and text from GitHub keeps no `file://` path, since it renders through the default filter.
 A relative path resolves against `FileBaseContext`: the pane's session worktree, from `SessionFacts.worktree`, else its directory, or the directory of the file the dialog shows.
 Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` and its `<source>`, each with only a `src`.
+Those two plugins are `RAW_HTML` in `web/components/raw-html.ts`, a chunk of its own that `MessageMarkdown` loads for the first such text, which renders nothing until it lands, so its HTML never shows as escaped text; should the chunk fail to load, the text renders with its HTML escaped.
 It shows GitHub's avatars and images from the route for a Linear issue's files, and shows images and plays videos uploaded to GitHub through `GET /api/github-media`; a video from anywhere else, and any other image, renders as a link.
 `web/index.html` sets the page's `Content-Security-Policy`.
 
@@ -65,6 +67,7 @@ In those two presets a `mermaid` or `chart` fence renders as `SessionVisual` fro
 `src/shared/session-visuals.ts` holds the rules both sides share: `mermaidKind` reads a diagram's first line as beautiful-mermaid's `detectDiagramType` does and accepts only flowcharts, sequence, state, class, and ER diagrams, in at most `MAX_MERMAID_SOURCE` characters, and `parseChartSpec` turns a chart's JSON into a `ChartSpec` or the first rule it breaks.
 A chart's keys must be letters, digits, `_`, and `-`, since `ChartStyle` in `web/components/ui/chart.tsx`, shadcn's chart, writes each series key into a CSS custom property, `--color-<key>`.
 A chart renders through that component and `recharts`, its series colored `var(--chart-1)` to `var(--chart-5)` from `web/globals.css`.
+`ChartView` lives in `web/components/session-chart.tsx`, which `SessionVisual` loads with `React.lazy`, so `recharts` loads with the first chart, as it does for the Analytics tab's `ProviderTrend`.
 A diagram renders with `renderMermaidSVGAsync` from `beautiful-mermaid`, which the page imports on first use; `buildPage` in `src/server/page.ts` builds with `splitting`, so the library and its ELK layout are a chunk of their own.
 The SVG never enters the page's DOM: it shows as an `<img>` whose source is a blob URL, revoked when the source or theme changes or the block unmounts, so its markup cannot script the page, and the CSP already allows `blob:` images.
 An image cannot read the page's CSS variables, so the diagram takes the concrete colors of `--background`, `--foreground`, and `--muted-foreground` where the `.dark` class stands, read through a probe element, and renders again when `useDarkClass` in `web/theme.ts` sees the class change.

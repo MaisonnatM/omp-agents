@@ -1,5 +1,5 @@
 /** The settings tab for omp's request usage by time, model, workspace, agent, tool, and session, and the context sources that fill it. */
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
 import { hashForSession } from "../../../src/shared/sessions";
@@ -11,7 +11,9 @@ import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
 import { compact, dollars, full } from "./analytics-format";
 import { ContextSources } from "./context-sources";
-import { ProviderTrend } from "./provider-trend";
+
+// `recharts` is a chunk of its own, loaded when the tab first draws its chart.
+const ProviderTrend = lazy(() => import("./provider-trend").then(module => ({ default: module.ProviderTrend })));
 
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
 const rangeLabel: Record<AnalyticsRange, string> = { today: "Today", "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", all: "All" };
@@ -112,7 +114,9 @@ function UsageBody({ data }: { data: Analytics }) {
 				<Stat label="Requests" value={full.format(totals.requests)} hint={`${full.format(totals.failed)} failed`} />
 				<Stat label="Cache hit rate" value={percent.format(totals.cacheRate)} hint={`${compact.format(totals.tokens.cacheRead)} read · ${compact.format(totals.tokens.cacheWrite)} written`} />
 			</div>
-			<ProviderTrend series={series} providers={providers} range={range} />
+			<Suspense fallback={<p role="status" className="flex h-[23rem] items-center justify-center text-xs text-muted-foreground">Drawing the chart…</p>}>
+				<ProviderTrend series={series} providers={providers} range={range} />
+			</Suspense>
 			<div className="grid gap-9 xl:grid-cols-2">
 				<section className="space-y-3" aria-labelledby="analytics-models">
 					<h3 id="analytics-models" className="text-sm font-semibold">Models</h3>
@@ -181,7 +185,7 @@ export function AnalyticsTab({ active }: { active: boolean }) {
 	}, [active, range]);
 	useEffect(() => {
 		if (!active) return;
-		const timer = setInterval(() => void analyticsStore.refresh(range), data?.sync.phase === "syncing" ? 2_000 : 30_000);
+		const timer = setInterval(() => void analyticsStore.refresh(range), data?.sync.phase === "syncing" ? 5_000 : 30_000);
 		return () => clearInterval(timer);
 	}, [active, range, data?.sync.phase]);
 	return (

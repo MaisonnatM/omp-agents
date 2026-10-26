@@ -571,19 +571,20 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 			throw error;
 		}
 	}, "Could not resend the message");
+	// Reads the blocks through `shown`, so a streamed token keeps the callback, and the memoized rows, as they are.
 	const beginEditing = useCallback((item: Extract<Item, { kind: "user" }>, entryId: string) => {
 		const save = onEdit;
 		if (!save) return;
 		setEditing(current => current ?? {
 			item,
-			position: blocks.findIndex(block => block.kind === "item" && block.item.id === item.id),
+			position: shown.current.findIndex(block => block.kind === "item" && block.item.id === item.id),
 			entryId,
 			text: item.text,
 			submitted: null,
 			error: null,
 			save,
 		});
-	}, [blocks, onEdit]);
+	}, [onEdit]);
 	const visibleBlocks = useMemo(() => withEditedPrompt(blocks, editing), [blocks, editing]);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;

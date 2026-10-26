@@ -1,5 +1,5 @@
 import { Conversations } from "../conversation-search";
-import { headHistory, worktreeAt } from "../git";
+import { CachedCheckouts } from "../git";
 import { repoOf } from "../github";
 import type { SavedSession } from "../omp/sessions";
 import { displayPath } from "../paths";
@@ -10,6 +10,9 @@ import type { ConversationHit, PastSession, SessionFacts } from "../shared/sessi
 
 const sameSession = (a: SavedSession, b: SavedSession): boolean =>
 	a.id === b.id && a.cwd === b.cwd && a.title === b.title && a.modifiedAt === b.modifiedAt && a.empty === b.empty;
+
+/** The list's order: the file changed last first, then by path. */
+const newestFirst = (a: SavedSession, b: SavedSession): number => b.modifiedAt - a.modifiedAt || b.path.localeCompare(a.path);
 
 /** Whether two answers of `factsOf` are the same facts: each field keeps its identity until it changes. */
 const sameFacts = (a: SessionFacts, b: SessionFacts): boolean =>
@@ -43,7 +46,7 @@ export class SessionFiles {
 	constructor(formats: readonly SessionFormat[] = SESSION_FORMATS) {
 		this.#formats = formats;
 		this.#conversations = new Conversations(formats);
-		this.facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory, [this.#conversations], branchPullRequest);
+		this.facts = new SessionFactsIndex(repoOf, new CachedCheckouts(), [this.#conversations], branchPullRequest);
 	}
 
 	/** The file of session `sessionId`, or `null` while it is not listed. */
@@ -97,20 +100,15 @@ export class SessionFiles {
 		return this.#queue(async () => {
 			const paths = [...this.#touched];
 			this.#touched.clear();
-			const next = new Map(this.#byPath);
-			let changed = false;
+			const changes = new Map<string, SavedSession | null>();
 			for (const path of paths) {
 				const session = await formatOf(path, this.#formats).read(path);
-				const known = next.get(path);
-				if (!session) {
-					if (next.delete(path)) changed = true;
-				} else if (!known || !sameSession(known, session)) {
-					next.set(path, session);
-					changed = true;
-				}
+				const known = this.#byPath.get(path);
+				if (session ? !known || !sameSession(known, session) : known) changes.set(path, session);
 			}
-			if (changed) this.#adopt(next);
-			return changed;
+			if (changes.size === 0) return false;
+			this.#place(changes);
+			return true;
 		});
 	}
 
@@ -127,9 +125,33 @@ export class SessionFiles {
 
 	#adopt(byPath: Map<string, SavedSession>): void {
 		this.#byPath = byPath;
-		this.#files = [...byPath.values()].sort((a, b) => b.modifiedAt - a.modifiedAt || b.path.localeCompare(a.path));
+		this.#files = [...byPath.values()].sort(newestFirst);
 		this.#byId = new Map(this.#files.map(file => [file.id, file]));
 		for (const path of this.#rows.keys()) if (!byPath.has(path)) this.#rows.delete(path);
+	}
+
+	/** Move each changed file to its place in the list, add each new one, and drop each gone one, without sorting the rest again. */
+	#place(changes: ReadonlyMap<string, SavedSession | null>): void {
+		const files = this.#files.filter(file => !changes.has(file.path));
+		for (const [path, session] of changes) {
+			if (!session) {
+				this.#byPath.delete(path);
+				this.#rows.delete(path);
+				continue;
+			}
+			this.#byPath.set(path, session);
+			// A write makes its file the newest, so the search ends at the front in a few steps.
+			let low = 0;
+			let high = files.length;
+			while (low < high) {
+				const mid = (low + high) >>> 1;
+				if (newestFirst(files[mid]!, session) <= 0) low = mid + 1;
+				else high = mid;
+			}
+			files.splice(low, 0, session);
+		}
+		this.#files = files;
+		this.#byId = new Map(files.map(file => [file.id, file]));
 	}
 
 	/** Read the transcripts for what they link to; whether any session's pull requests, Linear issues, or /ship stage changed. The first read covers every transcript. */

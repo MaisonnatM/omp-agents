@@ -117,7 +117,7 @@ describe("Transcript", () => {
 		const prompt = { role: "user", timestamp: 600, content: "say pong" };
 		t.applyEvent({ type: "message_end", message: prompt });
 		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(610, [text("po")]) } });
-		expect(t.takeReordered()).toBe(false);
+		expect(t.takeDisplaced()).toEqual([]);
 
 		// omp writes the prompt to a new session file only together with the finished reply.
 		const reply = assistant(610, [text("pong")], { stopReason: "stop" });
@@ -143,7 +143,7 @@ describe("Transcript", () => {
 		t.applyEntry({ type: "message", id: "e2", message: assistant(610, [text("pong")], { stopReason: "stop" }) });
 		t.applyEvent({ type: "message_end", message: prompt });
 
-		expect(t.takeReordered()).toBe(false);
+		expect(t.takeDisplaced()).toEqual([]);
 		expect(t.items().map(item => item.id)).toEqual(["m600", "m610:0"]);
 	});
 
@@ -158,16 +158,17 @@ describe("Transcript", () => {
 		]);
 	});
 
-	test("a prompt that reaches the file after its streamed reply moves ahead of it and asks for a reset", () => {
+	test("a prompt that reaches the file after its streamed reply moves ahead of it and hands back what it displaced", () => {
 		const t = new Transcript();
+		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(600, [text("hi")]) } });
 		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(610, [text("po")]) } });
-		expect(t.takeReordered()).toBe(false);
+		expect(t.takeDisplaced()).toEqual([]);
 
-		t.applyEntry({ type: "custom_message", id: "e1", customType: "collab-prompt", content: "say pong", timestamp: new Date(600).toISOString() });
+		t.applyEntry({ type: "custom_message", id: "e1", customType: "collab-prompt", content: "say pong", timestamp: new Date(605).toISOString() });
 
-		expect(t.takeReordered()).toBe(true);
-		expect(t.takeReordered()).toBe(false);
-		expect(t.items().map(item => item.id)).toEqual(["e1", "m610:0"]);
+		expect(t.takeDisplaced().map(item => item.id)).toEqual(["e1", "m610:0"]);
+		expect(t.takeDisplaced()).toEqual([]);
+		expect(t.items().map(item => item.id)).toEqual(["m600:0", "e1", "m610:0"]);
 	});
 
 	test("a tool call merges its content block, execution events, and result; a late start cannot reopen it", () => {
@@ -291,7 +292,7 @@ describe("Transcript", () => {
 		const t = new Transcript();
 		t.applyEvent({ type: "message_end", message: assistant(111, [text("DONE")], { stopReason: "stop" }) });
 		t.applyEvent({ type: "message_start", message: { role: "user", timestamp: 103, content: "follow-up: say banana" } });
-		expect(t.takeReordered()).toBe(false);
+		expect(t.takeDisplaced()).toEqual([]);
 		expect(t.items().map(item => item.id)).toEqual(["m111:0", "m103"]);
 	});
 

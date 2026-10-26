@@ -129,6 +129,32 @@ describe("Views", () => {
 		expect(items.filter(item => item.id === "m600")).toHaveLength(1);
 	});
 
+	test("a prompt the file holds only after its streamed reply goes ahead of it in a delta, not a reset", async () => {
+		const { root, paths, views, untilPublished, itemsOf, published } = setup();
+		const file = join(root, "fresh.jsonl");
+		paths.set("a:", file);
+		views.watch(socket().ws, [main("a")], []);
+		await untilPublished(1);
+
+		views.applyEvent("a", streamed(610, "po"));
+		await untilPublished(2);
+		expect(itemsOf(1).items.map(item => item.id)).toEqual(["m610:0"]);
+
+		writeFileSync(file, userEntry("e1", 600, "say pong") + replyEntry("e2", assistant(610, [text("pong")], { stopReason: "stop" })));
+		views.poke(file);
+		await untilPublished(3);
+		expect(published[2]?.msg).toEqual({
+			t: "items",
+			view: main("a"),
+			reset: false,
+			items: [
+				{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
+				{ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] },
+			],
+			removed: ["m600", "m610:0"],
+		});
+	});
+
 	test("a session's starting prompt shows last in its view, also to a socket that joins later, and its live user message takes its place in one message", async () => {
 		const { root, paths, starting, views, untilPublished, itemsOf, published } = setup();
 		const file = join(root, "session.jsonl");
