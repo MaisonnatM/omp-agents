@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { mediaSrc } from "../../api";
 import type { InboxThread } from "../../routing";
 
 const WEB_LINK = /^(?:https?|mailto):/i;
@@ -48,7 +49,7 @@ export function MailFrame({ thread, id, title }: { thread: InboxThread; id: stri
 	const frame = useRef<HTMLIFrameElement>(null);
 	const check = useRef<() => void>(() => {});
 	const [height, setHeight] = useState(0);
-	const src = `/api/gmail/message?${new URLSearchParams({ account: thread.account, thread: thread.thread, id })}`;
+	const src = mediaSrc(`/api/gmail/message?${new URLSearchParams({ account: thread.account, thread: thread.thread, id })}`);
 
 	useEffect(() => {
 		let attached: Document | null = null;

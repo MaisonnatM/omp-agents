@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
+import { mediaSrc } from "../api";
 import { highlightLines } from "../code-highlight";
 import { githubMediaPath, pullRequestOfUrl, type PullRequestDetail } from "../../src/shared/github";
 import { hashForSession } from "../../src/shared/sessions";
@@ -43,7 +44,7 @@ const imageFrom =
 	({ node: _node, ...props }: ComponentProps<"img"> & { node?: unknown }) => {
 		const { src, alt } = props;
 		if (typeof src !== "string" || src === "") return <>{alt}</>;
-		if (allowed(src)) return <img {...props} />;
+		if (allowed(src)) return <img {...props} src={mediaSrc(src)} />;
 		const file = local ? linkedFile(src) : null;
 		if (file && file.kind !== "text") return <LocalMedia path={file.path} alt={alt ?? ""} />;
 		return (
@@ -61,7 +62,7 @@ function GitHubUpload({ url, path, alt, ...props }: ComponentProps<"img"> & { ur
 			{alt || url}
 		</a>
 	) : (
-		<img {...props} src={path} alt={alt ?? ""} loading="lazy" onError={() => setFailed(true)} className={cn("max-w-full rounded-lg", props.className)} />
+		<img {...props} src={mediaSrc(path)} alt={alt ?? ""} loading="lazy" onError={() => setFailed(true)} className={cn("max-w-full rounded-lg", props.className)} />
 	);
 }
 
@@ -84,14 +85,14 @@ const mediaFigure: Components["figure"] = ({ node }) => {
 function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	let service: "linear" | "github" | "graphite" | "slack" | null = null;
 	let label = "";
-	let favicon: string | null = null;
+	let web = false;
 	let titleUrl: string | null = null;
 	const bare = children === href || children === href?.replace(/^https?:\/\//, "");
 	try {
 		const url = new URL(href ?? "");
 		if (url.protocol === "https:" || url.protocol === "http:") {
 			const host = url.hostname;
-			favicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`;
+			web = true;
 			if (host === "linear.app") {
 				service = "linear";
 				label = url.pathname.match(/\/issue\/([^/]+)/)?.[1] ?? "Linear";
@@ -117,15 +118,13 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	const title = useRead<Pick<PullRequestDetail, "title">>(bare && !props.title ? titleUrl : null);
 	return (
 		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
-			{favicon ? (
+			{web ? (
 				<>
 					{service === "linear" || service === "slack" ? (
 						<BrandMark logo={service === "linear" ? LINEAR_LOGO : SLACK_LOGO} className="mr-1 inline-flex size-3 align-middle" />
 					) : service ? (
 						<OrgIcon org={service} className="mr-1 inline-block align-middle" />
-					) : (
-						<img src={favicon} alt="" className="mr-1 inline-block size-3 align-middle" loading="lazy" referrerPolicy="no-referrer" />
-					)}
+					) : null}
 					<span className="font-semibold underline">{service && bare ? props.title || title.data?.title || label : children}</span>
 				</>
 			) : children}
@@ -149,7 +148,7 @@ const video: Components["video"] = ({ node, src: own }) => {
 		);
 	}
 	return (
-		<video controls preload="metadata" src={playable} className="max-h-[70vh] w-full rounded-md bg-black">
+		<video controls preload="metadata" src={mediaSrc(playable)} className="max-h-[70vh] w-full rounded-md bg-black">
 			<a href={src} target="_blank" rel="noopener noreferrer">
 				Download the video
 			</a>

@@ -10,7 +10,7 @@
 `GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
 The path is absolute or starts with `~`, which `expandHome` in `src/paths.ts` reads as the home directory; the page resolves a relative one against the session's worktree or directory first.
 The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
-It must also lie outside the directories that hold sign-ins and config, `DENIED_DIRS` in `src/local-file.ts`, compared by their real paths, or the route answers 403: omp-agents' own directory, which holds the access token, and omp's agent directory, but for its Markdown, such as `AGENTS.md` and skills, and its images and videos.
+It must also lie outside the directories that hold sign-ins and config, `DENIED_DIRS` in `src/local-file.ts`, compared by their real paths, or the route answers 403: omp-agents' own directory, which holds the access token, omp's agent directory, but for its Markdown, such as `AGENTS.md` and skills, and its images and videos, and the sign-in directories of the CLIs agents run, `~/.config/gh`, `~/.config/gcloud`, `~/.aws`, `~/.docker`, `~/.kube`, `~/.ssh`, and `~/.gnupg`.
 It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes are not UTF-8.
 `GET /api/media?path=<absolute path>` serves an image or video that agent text names, as the type `MEDIA_FILE_TYPES` in `src/shared/transcript.ts` gives its extension, with the same path, real-path extension, and `DENIED_DIRS` checks as `GET /api/file`.
 Bun answers a `Range` request with a 206 and that part, so a video seeks.

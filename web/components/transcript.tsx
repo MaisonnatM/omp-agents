@@ -60,7 +60,7 @@ import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigg
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { errorText } from "../api";
+import { errorText, mediaSrc } from "../api";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
@@ -240,7 +240,7 @@ function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: stri
 					onClick={() => openImage(id, index)}
 					className="cursor-zoom-in overflow-hidden rounded-md outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
 				>
-					<img src={src} alt={label(index)} loading="lazy" className="h-32 max-w-60 object-contain" />
+					<img src={mediaSrc(src)} alt={label(index)} loading="lazy" className="h-32 max-w-60 object-contain" />
 				</button>
 			))}
 		</span>
@@ -488,7 +488,7 @@ const MessageRow = memo(function MessageRow({
 				from={item.kind}
 				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
 				files={item.kind === "user" ? item.files : undefined}
-				images={item.kind === "user" ? item.images : undefined}
+				images={item.kind === "user" ? item.images?.map(mediaSrc) : undefined}
 				actions={
 					editor ? undefined : copyable || point || edit ? (
 						<>

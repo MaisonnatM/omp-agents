@@ -15,7 +15,7 @@ The user's own dashboard runs routines and takes the todos agents add, so a smok
 It takes them over only when that dashboard is not running, so a smoke run that must not run routines should not start with the user's dashboard stopped.
 
 Every request needs the access token, stored in `~/.config/omp-agents/token` and printed at startup as `Sign in at http://127.0.0.1:<port>/?token=<token>`.
-Open that address rather than `/`; for curl, send `Cookie: omp-agents-token=<token>` and a matching `Host` header.
+Open that address rather than `/`; for curl, send `Authorization: Bearer <token>` and a matching `Host` header.
 The server does not reload and serves the page bundle built at startup.
 Restart it after editing `src/` or `web/`.
 

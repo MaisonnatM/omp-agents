@@ -6,6 +6,7 @@
 // First: a packaged app takes the login shell's environment before `src/paths.ts` reads it.
 import "./shell-env";
 import { type ChildProcess, execFile, spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -17,19 +18,21 @@ import {
 	type ContextMenuParams,
 	dialog,
 	globalShortcut,
+	ipcMain,
 	Menu,
 	type MenuItem,
 	type MenuItemConstructorOptions,
 	type Rectangle,
 	screen,
+	session,
 	shell,
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
-import { loadToken } from "../src/server/auth";
+import { helloProof, loadToken } from "../src/server/auth";
 import { showAttention } from "./attention";
 import { startUpdates, type Updates } from "./updates";
 
@@ -71,7 +74,7 @@ const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
 /** Brings the window up with the command palette open on Create todo, from any app. */
 const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
 
-// Each port is its own server, so each gets its own cookie, localStorage, window bounds, and single-instance lock.
+// Each port is its own server, so each gets its own localStorage, window bounds, and single-instance lock.
 app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
 const BOUNDS_FILE = join(app.getPath("userData"), "window.json");
 
@@ -86,15 +89,23 @@ function isDashboard(url: string): boolean {
 	return parsed?.protocol === "http:" && dashboardHosts(PORT).includes(parsed.host);
 }
 
+/** What the dashboard's own page may use: its alerts, its Copy buttons, and a video's full screen. */
+const DASHBOARD_PERMISSIONS: ReadonlySet<string> = new Set(["notifications", "clipboard-sanitized-write", "fullscreen"]);
+
+/** Whether `contents` may use `permission`: only the dashboard, and only what {@link DASHBOARD_PERMISSIONS} names. */
+const permitted = (contents: WebContents | null, permission: string): boolean => contents !== null && DASHBOARD_PERMISSIONS.has(permission) && isDashboard(contents.getURL());
+
 /**
- * Who answers on the port. `ours`: an omp-agents server that holds this token, since only it answers `?token=` with
- * the cookie. `free`: nothing listens. `taken`: anything else.
+ * Who answers on the port. `ours`: an omp-agents server that holds this token, since only it can answer
+ * `/api/hello` with {@link helloProof} for a fresh nonce. `free`: nothing listens. `taken`: anything else. The probe
+ * sends no token, so a program that took the port learns nothing from it.
  */
 async function probe(token: string): Promise<"ours" | "free" | "taken"> {
+	const nonce = randomBytes(24).toString("base64url");
 	try {
-		const res = await fetch(`${ORIGIN}/?token=${token}`, { redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-		await res.body?.cancel();
-		return res.status === 302 && res.headers.has("set-cookie") ? "ours" : "taken";
+		const res = await fetch(`${ORIGIN}/api/hello?nonce=${nonce}`, { redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+		const body: unknown = await res.json().catch(() => null);
+		return res.ok && isObject(body) && body.proof === helloProof(token, PORT, nonce) ? "ours" : "taken";
 	} catch (err) {
 		const cause = isObject(err) && isObject(err.cause) ? err.cause : undefined;
 		return cause?.code === "ECONNREFUSED" ? "free" : "taken";
@@ -166,7 +177,7 @@ async function connect(win: BrowserWindow): Promise<void> {
 			showError(
 				win,
 				`Port ${PORT} is taken`,
-				`Something other than omp-agents answers on ${ORIGIN}, or an omp-agents server that started before ${tokenFile} changed. Stop it, or start the app with another PORT.`,
+				`Something other than omp-agents answers on ${ORIGIN}, or an omp-agents server that is older than this app or started before ${tokenFile} changed. Stop it, or start the app with another PORT.`,
 			);
 			return;
 		}
@@ -270,6 +281,11 @@ function createWindow(): BrowserWindow {
 	contents.on("context-menu", (_event, params) => {
 		const items = contextMenuItems(params, contents);
 		if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
+	});
+	// A page that holds no token, such as one an older server signed in with a cookie, asks to be signed in again.
+	ipcMain.on(SIGN_IN_CHANNEL, event => {
+		const url = event.senderFrame?.url ?? "";
+		if (event.sender === contents && isDashboard(url)) win.loadURL(`${ORIGIN}/?token=${loadToken(tokenFile)}${URL.parse(url)?.hash ?? ""}`).catch(() => {});
 	});
 
 	win.on("close", event => {
@@ -389,6 +405,8 @@ if (!app.requestSingleInstanceLock()) {
 
 	void app.whenReady().then(() => {
 		Menu.setApplicationMenu(applicationMenu());
+		session.defaultSession.setPermissionRequestHandler((contents, permission, grant) => grant(permitted(contents, permission)));
+		session.defaultSession.setPermissionCheckHandler((contents, permission) => permitted(contents, permission));
 		removeOldLoginAgents();
 		if (app.isPackaged) updates = startUpdates(() => Menu.setApplicationMenu(applicationMenu()));
 		// The app runs from Electron's own bundle, so without this the Dock shows Electron's icon.

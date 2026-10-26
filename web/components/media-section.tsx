@@ -7,7 +7,7 @@ import { type AgentMedia, mediaExtension, mediaUrl } from "../../src/shared/tran
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { errorText, putJson } from "../api";
+import { apiFetch, errorText, mediaSrc, putJson } from "../api";
 import { age } from "../labels";
 import { useRead } from "../reads";
 import { useAction } from "../use-action";
@@ -32,10 +32,10 @@ const images = (count: number): string => (count === 1 ? "1 image" : `${count} i
 /** Its file's bytes when it has one that still loads, since a `read` returns a re-encoded copy; else the image as shown. */
 async function imageBlob(media: AgentMedia): Promise<Blob> {
 	if (media.path && media.src !== mediaUrl(media.path)) {
-		const original = await fetch(mediaUrl(media.path)).catch(() => null);
+		const original = await apiFetch(mediaUrl(media.path)).catch(() => null);
 		if (original?.ok) return original.blob();
 	}
-	const response = await fetch(media.src);
+	const response = await apiFetch(media.src);
 	if (!response.ok) throw new Error(`The image did not load (HTTP ${response.status})`);
 	return response.blob();
 }
@@ -234,7 +234,7 @@ export function MediaStrip({ media, view, pullRequests, tickets }: MediaStripPro
 									aria-pressed={picked.length > 0 ? checked : undefined}
 									className="block rounded-md p-0.5 outline-none hover:bg-background/70 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-background aria-pressed:ring-2 aria-pressed:ring-ring"
 								>
-									<img src={item.src} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="h-14 w-24 rounded-sm border border-border bg-muted object-cover object-top" />
+									<img src={mediaSrc(item.src)} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="h-14 w-24 rounded-sm border border-border bg-muted object-cover object-top" />
 								</button>
 							</Tooltip>
 							<input

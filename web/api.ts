@@ -1,4 +1,8 @@
-/** The page's HTTP client. Whatever the server answers, a failure is an `ApiError` with a readable message. */
+/**
+ * The page's HTTP client. Whatever the server answers, a failure is an `ApiError` with a readable message. Every request
+ * carries the access token that the sign-in page kept in localStorage; a 401 signs the page out.
+ */
+import { MEDIA_KEY_PARAM, MEDIA_KEY_STORAGE_KEY, SOCKET_PROTOCOL, SOCKET_TOKEN_PREFIX, TOKEN_STORAGE_KEY } from "../src/shared/access";
 import type { BranchRelease } from "../src/shared/git";
 import type { SettingsError } from "../src/shared/models";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
@@ -16,8 +20,55 @@ export class ApiError extends Error {
 /** What a failure says to the person reading the page. */
 export const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
-/** The address of this server's socket at `path`, `wss:` when the page loaded over https, so a TLS proxy serves the sockets as it serves `fetch`. */
-export const socketUrl = (path: string): string => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${path}`;
+/** What localStorage keeps under `key`, `null` where there is no localStorage, as in tests. */
+const stored = (key: string): string | null => globalThis.localStorage?.getItem(key) ?? null;
+
+const signOutListeners = new Set<() => void>();
+let signedOut = typeof window !== "undefined" && stored(TOKEN_STORAGE_KEY) === null;
+
+/** Whether the page holds no token the server takes: none was stored, or the server answered 401. */
+export const isSignedOut = (): boolean => signedOut;
+
+/** Calls `listener` when the page signs out; answers the unsubscribe, as `useSyncExternalStore` takes it. */
+export function onSignOut(listener: () => void): () => void {
+	signOutListeners.add(listener);
+	return () => signOutListeners.delete(listener);
+}
+
+/** Forgets a token the server refused, so a reload shows the sign-in screen too. */
+function signOut(): void {
+	if (signedOut) return;
+	signedOut = true;
+	globalThis.localStorage?.removeItem(TOKEN_STORAGE_KEY);
+	globalThis.localStorage?.removeItem(MEDIA_KEY_STORAGE_KEY);
+	for (const listener of signOutListeners) listener();
+}
+
+/** `fetch` with the access token, which signs the page out when the server refuses it. */
+export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+	const token = stored(TOKEN_STORAGE_KEY);
+	const headers = new Headers(init.headers);
+	if (token !== null) headers.set("authorization", `Bearer ${token}`);
+	const response = await fetch(url, { ...init, headers });
+	if (response.status === 401) signOut();
+	return response;
+}
+
+/**
+ * A socket to this server at `path`, `wss:` when the page loaded over https, so a TLS proxy serves the sockets as it
+ * serves `fetch`. A browser's socket sends no header, so the token rides as the subprotocol `bearer.<token>`.
+ */
+export function openSocket(path: string): WebSocket {
+	const token = stored(TOKEN_STORAGE_KEY);
+	const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${path}`;
+	return new WebSocket(url, token === null ? [SOCKET_PROTOCOL] : [SOCKET_PROTOCOL, `${SOCKET_TOKEN_PREFIX}${token}`]);
+}
+
+/** `src` as an image, a video, or a frame loads it: one of this server's routes carries the media key, since a tag sends no header. */
+export function mediaSrc(src: string): string {
+	const key = src.startsWith("/api/") ? stored(MEDIA_KEY_STORAGE_KEY) : null;
+	return key === null ? src : `${src}${src.includes("?") ? "&" : "?"}${MEDIA_KEY_PARAM}=${encodeURIComponent(key)}`;
+}
 
 /** The JSON body of a successful response. A body that is not JSON, from a proxy or an older server, reports its status and text. */
 export async function readJson<T>(response: Response): Promise<T> {
@@ -37,12 +88,12 @@ export async function readJson<T>(response: Response): Promise<T> {
 }
 
 export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-	return readJson<T>(await fetch(url, { signal }));
+	return readJson<T>(await apiFetch(url, { signal }));
 }
 
 export async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
 	return readJson<T>(
-		await fetch(url, {
+		await apiFetch(url, {
 			method: "PUT",
 			headers: { "content-type": "application/json" },
 			body: JSON.stringify(body),

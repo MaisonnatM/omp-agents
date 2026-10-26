@@ -176,10 +176,12 @@ type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) => Promi
 /** HTTP handlers by path and method, as `Bun.serve` takes them. */
 export type Routes = Record<string, Partial<Record<"GET" | "PUT", Handler>>>;
 
-/** The two ways a route answers: a read of its query, and a write of its JSON body. */
+/** The ways a route answers: a read of its query, a read that a tag loads, and a write of its JSON body. */
 interface RouteKit {
 	/** A read: admitted like every other, then handed the request's query. */
 	get(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
+	/** `get` for a file that an image, a video, or a frame loads, which sends no header: it also takes the media key as `?key=`. */
+	media(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
 	/**
 	 * A write: admitted with its JSON body (origin, content type, size), `parse`d with the request's query into an input or the
 	 * response refusing it, then `run`; `refuse` answers an error `run` throws, and any other is a 500 with its text.
@@ -190,6 +192,7 @@ interface RouteKit {
 function routeKit(guards: Guards): RouteKit {
 	return {
 		get: handle => async req => guards.admit(req) ?? handle(new URL(req.url).searchParams, req),
+		media: handle => async req => guards.admitMedia(req) ?? handle(new URL(req.url).searchParams, req),
 		write: (parse, run, refuse) => async req => {
 			const guarded = await guards.writeBody(req);
 			if (guarded instanceof Response) return guarded;
@@ -401,7 +404,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 }
 
 /** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
-function integrationRoutes({ get, write }: RouteKit, integrations: Integrations): Routes {
+function integrationRoutes({ get, media, write }: RouteKit, integrations: Integrations): Routes {
 	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server or accounts, and the sign-in the page last started. */
 	const loaded = get(params => answer(() => integrations.load(params.has("fresh"))));
 
@@ -488,7 +491,7 @@ function integrationRoutes({ get, write }: RouteKit, integrations: Integrations)
 	});
 
 	/** `GET /api/ticket/media?issue=<identifier>&path=<upload path>`: a file that the issue or its comments embed, from Linear. */
-	const ticketMedia = get(async (params, req) => {
+	const ticketMedia = media(async (params, req) => {
 		const issue = params.get("issue") ?? "";
 		const path = params.get("path") ?? "";
 		if (!TICKET_ID.test(issue) || !isUploadPath(path)) return fail(400, "Expected ?issue= naming a Linear issue and ?path= naming one of its files");
@@ -609,7 +612,7 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 }
 
 /** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Inbox page sends. */
-function gmailRoutes({ get, write }: RouteKit, gmail: GmailAccounts): Routes {
+function gmailRoutes({ get, media, write }: RouteKit, gmail: GmailAccounts): Routes {
 	/** `GET /api/gmail/inbox[?fresh]`: each signed-in account and their inboxes' latest conversations, newest first. */
 	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
 	/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
@@ -619,7 +622,7 @@ function gmailRoutes({ get, write }: RouteKit, gmail: GmailAccounts): Routes {
 		return account && id ? answer(() => gmail.thread(account, id, params.has("fresh"))) : fail(400, "Expected ?account= and ?id= naming a Gmail conversation");
 	});
 	/** `GET /api/gmail/message?account=<account>&thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Inbox page frames. */
-	const message = get(async params => {
+	const message = media(async params => {
 		const account = params.get("account");
 		const threadId = params.get("thread");
 		const id = params.get("id");
@@ -655,7 +658,7 @@ function gmailRoutes({ get, write }: RouteKit, gmail: GmailAccounts): Routes {
 }
 
 /** GitHub pull requests in full: details, stack, options, edits, merges that wait until they are ready, review drafts' preview and post, and their changed files. */
-function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv): Routes {
+function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRoutesEnv): Routes {
 	/** A read of the pull request `?owner=&repo=&number=` names, refused with `badRequest`. */
 	const pullRequestGet = (badRequest: string, read: (pr: PullRequest, params: URLSearchParams) => Promise<Response>): Handler =>
 		get(params => {
@@ -673,7 +676,7 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 	const pullRequestStack = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestStack(pr)));
 
 	/** Images and videos hosted by GitHub; the proxy restricts hosts and keeps the GitHub token off redirected hosts. */
-	const githubMedia = get(params => readGithubMedia(params.get("url")));
+	const githubMedia = media(params => readGithubMedia(params.get("url")));
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
@@ -799,7 +802,7 @@ function pullRequestRoutes({ get, write }: RouteKit, env: PullRequestRoutesEnv):
 }
 
 /** Git checkouts and worktrees, the machine's load, the terminal panel's shells, prompt images and documents, and text files. */
-function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
+function fileRoutes({ get, media, write }: RouteKit, env: FileRoutesEnv): Routes {
 	/**
 	 * `GET /api/git?cwd=<dir>`: the git checkout of a directory, `null` outside one, for the new-session draft's branch
 	 * picker and a session's header.
@@ -847,7 +850,7 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 	 * `GET /api/image?hash=<sha256>&type=<image type>`: an image of a prompt that omp moved from its session file to its
 	 * blob store, served as `type`, one of the prompt image types, since the store keeps no type.
 	 */
-	const image = get(async params => {
+	const image = media(async params => {
 		const hash = params.get("hash") ?? "";
 		const type = params.get("type") ?? "";
 		if (!SHA256.test(hash) || !PROMPT_IMAGE_TYPES.includes(type)) return fail(400, "Expected ?hash= naming a blob and ?type= naming an image type");
@@ -875,7 +878,7 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 	 * extension's type; Bun answers a `Range` request with its part, so a video seeks. Its own sandbox policy keeps an
 	 * SVG opened at this address from running script on the page's origin.
 	 */
-	const media = get(async params => {
+	const mediaFile = media(async params => {
 		const found = await findMediaFile(params.get("path") ?? "");
 		if (!found.ok) return fail(found.status, found.error);
 		return new Response(Bun.file(found.real), {
@@ -900,7 +903,7 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		"/api/image": { GET: image },
 		"/api/attachment/document": { PUT: promptDocument },
 		"/api/file": { GET: textFile },
-		"/api/media": { GET: media },
+		"/api/media": { GET: mediaFile },
 	};
 }
 

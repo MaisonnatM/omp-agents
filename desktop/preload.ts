@@ -1,6 +1,6 @@
-/** The window's preload: hands the page `window.ompDesktop`, which reports the sessions that need you to `attention.ts`. */
+/** The window's preload: hands the page `window.ompDesktop`, which reports the sessions that need you to `attention.ts` and asks for a sign-in. */
 import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
-import { ALERT_CHANNEL, BADGE_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ALERT_CHANNEL, BADGE_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 
 const bridge: DesktopBridge = {
 	badge: count => ipcRenderer.send(BADGE_CHANNEL, count),
@@ -12,5 +12,6 @@ const bridge: DesktopBridge = {
 		ipcRenderer.on(TARGET_URL_CHANNEL, receive);
 		return () => { ipcRenderer.removeListener(TARGET_URL_CHANNEL, receive); };
 	},
+	signIn: () => ipcRenderer.send(SIGN_IN_CHANNEL),
 };
 contextBridge.exposeInMainWorld(DESKTOP_BRIDGE, bridge);

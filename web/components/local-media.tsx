@@ -2,6 +2,7 @@
 import { Play } from "lucide-react";
 import { useContext, useState } from "react";
 import { mediaUrl } from "../../src/shared/transcript";
+import { mediaSrc } from "../api";
 import { absoluteFilePath, linkedFile } from "../file-paths";
 import { DashboardActionsContext } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
@@ -21,7 +22,7 @@ export function LocalMedia({ path, alt }: { path: string; alt: string }) {
 	const openFile = useContext(DashboardActionsContext)?.openFile;
 	const [failed, setFailed] = useState(false);
 	if (media === null || failed) return <>{alt || path}</>;
-	const src = mediaUrl(media.target);
+	const src = mediaSrc(mediaUrl(media.target));
 	if (media.video) return <video controls preload="metadata" src={src} onError={() => setFailed(true)} className="max-h-[60vh] max-w-full rounded-md bg-black" />;
 	return (
 		<img
@@ -41,7 +42,7 @@ function Thumbnail({ path }: { path: string }) {
 	const openFile = useContext(DashboardActionsContext)?.openFile;
 	const [failed, setFailed] = useState(false);
 	if (media === null || failed) return null;
-	const src = mediaUrl(media.target);
+	const src = mediaSrc(mediaUrl(media.target));
 	const name = media.target.slice(media.target.lastIndexOf("/") + 1);
 	return (
 		<button

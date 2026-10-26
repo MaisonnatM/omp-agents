@@ -24,4 +24,4 @@ Every socket's first message is `{ t: "build", id }`, a hash of the served `inde
 
 `GET /api/dashboard/update` answers `DashboardUpdateStatus` from `src/shared/dashboard-update.ts` without asking origin: `unavailable` with its reason, or the branch, the running commit, and `behind`, the commits `origin/<branch>` held past it at the last fetch.
 `PUT /api/dashboard/update` with any JSON body runs `SelfUpdate.update` and answers `{ kind: "current" }` or `{ kind: "restarting", from, to, installed }`, or 409 with the refusal.
-An agent reaches both with `curl`, with the token's cookie and, for the `PUT`, an `Origin` that matches the host; the starter kit's `AGENTS.md` tells agents to load new commits this way, never by killing its processes.
+An agent reaches both with `curl`, with the token as `Authorization: Bearer` and, for the `PUT`, an `Origin` that matches the host; the starter kit's `AGENTS.md` tells agents to load new commits this way, never by killing its processes.

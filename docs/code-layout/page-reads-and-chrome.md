@@ -13,8 +13,9 @@
   `web/components/quick-actions.tsx` holds the tickets' row menu, the buttons on a pull request's, an issue's, or a todo's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
   `web/components/status-dot.tsx` draws that dot for each session status.
-- `web/api.ts`: the page's HTTP client, `errorText`, which says what any failure was, and `socketUrl`, the address of the dashboard's and a terminal's WebSocket, `wss:` when the page is on HTTPS.
+- `web/api.ts`: the page's HTTP client, which sends the token from localStorage as `Authorization: Bearer` and marks the page signed out on a 401, `errorText`, which says what any failure was, `openSocket`, which opens the dashboard's or a terminal's WebSocket with the token as its subprotocol, `wss:` when the page is on HTTPS, and `mediaSrc`, which adds the media key to an `/api/` address that an image, a video, or a frame loads.
   `settingsUrl` names a settings route for one workspace, or for the user's own files, and `releaseWorktree` asks the server to remove the linked worktree that has a branch checked out.
+  `web/components/signed-in.tsx` holds `SignedIn`, which `web/main.tsx` wraps the app in, so a page without a token shows how to sign in, and asks the desktop shell to sign its window in again.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as a pull request's stack, the settings page's model catalog, or the new-session draft's model list.
   A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.

@@ -4,7 +4,7 @@ import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/share
 import type { View } from "../src/shared/sessions";
 import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
-import { errorText, socketUrl } from "./api";
+import { errorText, openSocket } from "./api";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
@@ -181,7 +181,7 @@ export function useDashboard(): Dashboard {
 		/** The build of the server the page first reached; a later socket that reaches another build reloads the page into it. */
 		let build: string | null = null;
 		const connect = (): void => {
-			const ws = new WebSocket(socketUrl(`/ws?page=${PAGE_ID}`));
+			const ws = openSocket(`/ws?page=${PAGE_ID}`);
 			socketRef.current = ws;
 			ws.onopen = () => {
 				retryMs = 500;

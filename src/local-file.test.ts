@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { agentDir } from "./omp/config";
-import { projectNotesDir, tokenFile, userNotesDir } from "./paths";
+import { HOME, projectNotesDir, tokenFile, userNotesDir } from "./paths";
 import { DENIED_DIRS, findMediaFile, readTextFile } from "./local-file";
 import { MAX_TEXT_FILE_BYTES, MEDIA_FILE_EXTENSIONS } from "./shared/transcript";
 
@@ -42,10 +42,17 @@ test("a large file stops at the limit without splitting a character", async () =
 });
 
 test("omp-agents' directory and omp's agent directory are denied, Markdown and media in omp's still open", () => {
-	expect(DENIED_DIRS).toEqual([
+	expect(DENIED_DIRS.slice(0, 2)).toEqual([
 		{ dir: dirname(tokenFile), opens: [] },
 		{ dir: agentDir, opens: ["md", "markdown", ...MEDIA_FILE_EXTENSIONS] },
 	]);
+});
+
+test("the CLIs' sign-ins are denied whole, though their files have text extensions", () => {
+	const config = process.env.XDG_CONFIG_HOME || join(HOME, ".config");
+	for (const file of [join(config, "gh", "hosts.yml"), join(config, "gcloud", "credentials.db.json"), join(HOME, ".docker", "config.json"), join(HOME, ".kube", "config.yaml"), join(HOME, ".aws", "credentials.toml")]) {
+		expect(DENIED_DIRS.some(({ dir, opens }) => file.startsWith(dir + sep) && opens.length === 0)).toBe(true);
+	}
 });
 
 test("the project's and the user's notes lie outside every denied directory, so the file dialog opens them", () => {
