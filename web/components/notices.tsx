@@ -1,4 +1,4 @@
-/** The sidebar's notices bell: pull request, Slack, provider, calendar, stopped-session, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
+/** The header's notices bell: pull request, Slack, provider, calendar, stopped-session, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
 import { Bell, CalendarClock, CheckCheck, CircleAlert, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, ListRestart, type LucideIcon, MessageSquare, Sparkles, Wallet, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import type { PullRequestSummary } from "../../src/shared/github";
@@ -302,7 +302,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 	);
 }
 
-/** The sidebar's bell: how many notices are unread, and the list of them by source, unread first. */
+/** The header's bell: how many notices are unread, and the list of them by source, unread first. */
 export function NoticesBell({ notices }: { notices: Notice[] }) {
 	const { send } = useDashboardActions();
 	const { connected } = useDashboardStatus();
@@ -339,7 +339,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 					>
 						<Bell />
 						{unread.length > 0 && (
-							<span aria-hidden className="absolute -top-1 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold tabular-nums text-white ring-2 ring-sidebar">
+							<span aria-hidden className="absolute -top-1 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold tabular-nums text-white ring-2 ring-background">
 								{unread.length > 9 ? "9+" : unread.length}
 							</span>
 						)}
@@ -347,7 +347,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 				</PopoverTrigger>
 			</Tooltip>
 			<PopoverContent
-				align="start"
+				align="end"
 				className="flex max-h-[min(560px,80vh)] w-[380px] flex-col p-0"
 				// The list takes focus, so no header tooltip opens and the arrow keys scroll it.
 				onOpenAutoFocus={event => {

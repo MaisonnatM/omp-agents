@@ -1,6 +1,7 @@
 # Notifications
 
-- The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
+- The bell sits after the command menu button at the right of the desktop app's title bar on macOS, beside the window's title; in a browser, at the end of the page's header.
+  With split panes in a browser, only the top right pane's header shows them, before its details toggle.
 - Six sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.

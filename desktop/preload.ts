@@ -13,5 +13,6 @@ const bridge: DesktopBridge = {
 		return () => { ipcRenderer.removeListener(TARGET_URL_CHANNEL, receive); };
 	},
 	signIn: () => ipcRenderer.send(SIGN_IN_CHANNEL),
+	titleBar: process.platform === "darwin",
 };
 contextBridge.exposeInMainWorld(DESKTOP_BRIDGE, bridge);

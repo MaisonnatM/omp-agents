@@ -31,4 +31,6 @@ export interface DesktopBridge {
 	onTargetURL?(listener: (url: string) => void): () => void;
 	/** Signs the window in with the token, keeping the page's hash, when the page holds none; absent in an app built before it. */
 	signIn?(): void;
+	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
+	titleBar?: boolean;
 }

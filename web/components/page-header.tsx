@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useHeaderControls } from "./header-controls";
 
 interface HeaderProps {
 	title: ReactNode;
@@ -14,8 +15,9 @@ interface HeaderProps {
 	children?: ReactNode;
 }
 
-/** The title, an optional meta line, and controls that head a pane or a page. */
+/** The title, an optional meta line, and controls that head a pane or a page, ending with the command menu and the bell. */
 export function Header({ title, meta, status, alert = false, leading, trailing, children }: HeaderProps) {
+	const controls = useHeaderControls();
 	return (
 		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6">
 			<div className="group/title flex min-w-0 items-center gap-2">
@@ -37,6 +39,7 @@ export function Header({ title, meta, status, alert = false, leading, trailing, 
 					</span>
 				)}
 				{children}
+				{controls}
 			</div>
 		</header>
 	);
