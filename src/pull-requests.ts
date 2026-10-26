@@ -3,7 +3,8 @@
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
-import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
+import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghPolledGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
+import { GithubQuotaPaused } from "./github-quota";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
 import { type CheckRunState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
@@ -164,7 +165,7 @@ export function parseListAnswer(answer: unknown, repo: Repo): PullRequestSummary
 async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
 	const scope = `repo:${repo.owner}/${repo.repo} is:pr`;
 	const since = new Date(Date.now() - MERGED_DAYS * 86_400_000).toISOString().slice(0, 10);
-	const answer = await ghGraphql(QUERY, {
+	const answer = await ghPolledGraphql(QUERY, {
 		authored: `${scope} is:open author:@me sort:updated-desc`,
 		reviewing: `${scope} is:open review-requested:@me sort:updated-desc`,
 		merged: `${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
@@ -419,6 +420,7 @@ export async function branchPullRequest(repo: Repo, branch: string): Promise<Pul
 /**
  * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.
+ * While GitHub's quota is low it throws {@link GithubQuotaPaused} rather than answer a repository with no list, so the page keeps the list it has.
  */
 export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<PullRequestList> {
 	const byRepo = new Map<string, Repo & { cwds: string[] }>();
@@ -441,6 +443,7 @@ export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<
 				const pullRequests = await loaded.get(repoKey(entry), () => queryRepo(entry), fresh);
 				return { ...entry, pullRequests };
 			} catch (err) {
+				if (err instanceof GithubQuotaPaused) throw err;
 				return { ...entry, error: errorText(err) };
 			}
 		}),

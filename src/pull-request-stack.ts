@@ -3,7 +3,7 @@
  * chained to it by base branches, whoever opened them, not only those the Pull requests page lists.
  */
 import { createCache } from "./cache";
-import { AVATAR, authorOf, dataOf, ghGraphql, STATUS } from "./github";
+import { AVATAR, authorOf, dataOf, ghPolledGraphql, STATUS } from "./github";
 import { isObject, str } from "./json";
 import { type PullRequest, type Repo, repoKey, type StackedPullRequest, samePullRequest } from "./shared/github";
 
@@ -84,8 +84,8 @@ export function stackOf(open: StackedPullRequest[], pr: PullRequest): StackedPul
 
 const opened = createCache<StackedPullRequest[]>();
 
-/** `pr`'s stack, top first, from its repository's open pull requests, which the server keeps for 30 seconds. */
+/** `pr`'s stack, top first, from its repository's open pull requests, which the server keeps for 30 seconds and does not read while GitHub's quota is low. */
 export async function loadPullRequestStack(pr: PullRequest): Promise<StackedPullRequest[]> {
-	const open = await opened.get(repoKey(pr), async () => parseOpenAnswer(await ghGraphql(OPEN_QUERY, { owner: pr.owner, repo: pr.repo }, true), pr));
+	const open = await opened.get(repoKey(pr), async () => parseOpenAnswer(await ghPolledGraphql(OPEN_QUERY, { owner: pr.owner, repo: pr.repo }, true), pr));
 	return stackOf(open, pr);
 }

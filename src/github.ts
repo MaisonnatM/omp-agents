@@ -3,7 +3,8 @@
  * terms. The repository and pull request keys, which the page uses too, live in `shared/github.ts`.
  */
 import { createCache } from "./cache";
-import { isObject, str } from "./json";
+import { GithubQuota, parseRateLimit } from "./github-quota";
+import { errorText, isObject, str } from "./json";
 import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
@@ -41,13 +42,42 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 	);
 }
 
+/** The dashboard's share of the user's GraphQL budget, read from `gh api rate_limit`, which spends none of it. */
+export const githubQuota = new GithubQuota(async () => parseRateLimit(await runJson(["gh", "api", "rate_limit"], { timeoutMs: GH_TIMEOUT_MS })));
+
+/** GitHub's message when it refuses a call for the rate limit, in a GraphQL error or a REST answer. */
+const RATE_LIMITED = /API rate limit (?:already )?exceeded/i;
+
+/** Whether GitHub refused a `gh api graphql` call, or one page of a paginated one, for the rate limit. */
+function rateLimited(answer: unknown): boolean {
+	return (Array.isArray(answer) ? answer : [answer]).some(page => isObject(page) && RATE_LIMITED.test(`${str(page.message) ?? ""} ${errorsOf(page)}`));
+}
+
 /**
  * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}; a mutation goes through {@link ghMutation}.
  * `paginate` follows the query's `$endCursor` through every page, answering an array of the pages.
+ * It runs whatever the quota, as a user's action does; a refusal for the rate limit pauses {@link ghPolledGraphql} until GitHub resets the quota.
  */
-export function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
+export async function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
-	return runJson(["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS });
+	const answer = await runJson(["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS }).catch(async (error: unknown) => {
+		if (RATE_LIMITED.test(errorText(error))) await githubQuota.refused();
+		throw error;
+	});
+	if (rateLimited(answer)) await githubQuota.refused();
+	return answer;
+}
+
+/**
+ * {@link ghGraphql} for a read the dashboard makes on its own, such as the pull request list it polls: while
+ * {@link githubQuota} holds the budget for agents, it throws {@link GithubQuotaPaused} naming when reads resume, without asking GitHub.
+ */
+export async function ghPolledGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
+	await githubQuota.admit();
+	const answer = await ghGraphql(query, vars, paginate);
+	// The refusal just paused the dashboard's own reads, so this throws the pause.
+	if (rateLimited(answer)) await githubQuota.admit();
+	return answer;
 }
 
 /** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */

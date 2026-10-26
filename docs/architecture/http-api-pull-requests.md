@@ -63,6 +63,13 @@ One change goes per call, so two changes made at once each keep the other.
 The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
 Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.
 
+The reads the dashboard makes on its own go through `ghPolledGraphql` in `src/github.ts`: the pull request list of `GET /api/pull-requests`, which the page polls every minute and the notices check, the stack of `GET /api/pull-request/stack`, every open pull request of the repository, which a session's header and **PRs** sidebar read again as the session works, and the merge cleanup's look at the live sessions' pull requests.
+They share the user's `gh` token, and its 5000 GraphQL points an hour, with every agent's `gh` and `gt`, so `githubQuota`, a `GithubQuota` from `src/github-quota.ts`, reads `gh api rate_limit`, which costs no points, at most every 30 seconds.
+While fewer than `GRAPHQL_RESERVE` (1000) points are left, those reads ask GitHub nothing until the quota's `reset`, and throw `GithubQuotaPaused` with `GitHub quota low, refreshing paused until HH:MM` in the server's local time.
+A GraphQL answer GitHub refuses for its rate limit, through `ghGraphql` or `ghPolledGraphql`, pauses those reads the same way until the reset it then reads, or for 15 minutes when it cannot read one, rather than retrying them sooner.
+`loadPullRequests` throws the pause for the whole list rather than answering a repository with an error, so the page keeps the list it has and shows the pause as **Cannot refresh pull requests:**, as for any failed refresh.
+Everything a click asks for, a pull request's details, files, pickers, and title, each change and its mutations, and the merge queue's reads for a merge the user queued, runs through `ghGraphql` whatever the quota.
+
 `GET /api/github-media?url=<HTTPS URL>` reads GitHub images and videos through `src/github-media.ts`.
 The allowlist is `github.com/user-attachments/`, `private-user-images.githubusercontent.com`, `user-images.githubusercontent.com`, and `camo.githubusercontent.com`; credentials, alternate ports, and every other host or scheme are rejected.
 `githubMediaUrl` in `src/shared/github.ts` holds it, and the page loads every such image or video written on GitHub through this route, so the page's CSP allows only GitHub's avatars directly.

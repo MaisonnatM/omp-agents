@@ -5,6 +5,7 @@
   `mergedPullRequests` asks one `gh api graphql` call for the newest pull request from each of a repository's branches, with one alias per branch, and keeps the merged ones with their merge time, for `src/worktrees.ts`.
   `loadPullRequestTitle` reads only a linked PR's title through a separate 30-second cache, without loading its details.
   `src/github.ts`'s `repoOf` keeps each workspace's repository, or its lack of one, for ten minutes in a `createCache` from `src/cache.ts`, and runs at most eight `git remote` lookups at once through a `limit` gate from `src/map-limit.ts`.
+  The list's query, the stack's, and the merge cleanup's state reads go through `ghPolledGraphql` in `src/github.ts`, which asks `githubQuota` first; `src/github-quota.ts` holds `GithubQuota`, which pauses them while fewer than `GRAPHQL_RESERVE` GraphQL points are left or after GitHub refuses a call for its rate limit, until the quota resets, and `GithubQuotaPaused`, the error that names when.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
   The list leaves out a pull request whose own state says closed, which the open searches still return for up to a minute after a close, since GitHub's search index lags it.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either; the details count `unresolved` from the threads they keep, so their counts and threads agree.
