@@ -1,6 +1,6 @@
 /** Names the page gives things: sessions, models, providers, file kinds, and the click gestures that open rows. */
 import type { MouseEvent } from "react";
-import type { PullRequest, PullRequestLink } from "../src/shared/github";
+import type { PullRequestLink } from "../src/shared/github";
 import type { OmpFile, OmpFileKind } from "../src/shared/models";
 import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
 import { IS_MAC, modHeld } from "./shortcuts";
