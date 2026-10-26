@@ -6,7 +6,7 @@ import type { RoutineSpec, Schedule } from "../routines";
 import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } from "../shared/discussions";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES } from "../shared/github";
+import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
 import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
@@ -474,13 +474,20 @@ describe("parsePullRequestEdit", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "a".repeat(257) } })).toBeNull();
 	});
 
-	test("takes an empty or untrimmed description within GitHub's limit and rejects oversized or non-string descriptions", () => {
-		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "" } })?.ok).toEqual({ ...pr, change: { field: "body", body: "" } });
-		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "  ## Summary\n\nWords.\n" } })?.ok).toEqual({ ...pr, change: { field: "body", body: "  ## Summary\n\nWords.\n" } });
-		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "a".repeat(65_536) } })?.ok.change.field).toBe("body");
-		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: "a".repeat(65_537) } })).toBeNull();
-		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: null } })).toBeNull();
-		expect(parsePullRequestEdit({ ...pr, change: { field: "body", body: 7 } })).toBeNull();
+	test("description writes require the original and bound both versions before reaching GitHub", () => {
+		const change = { field: "body", original: "Existing description", body: "  ## Summary\n\nWords.\n" } satisfies PullRequestChange;
+		expect(parsePullRequestEdit({ ...pr, change })?.ok).toEqual({ ...pr, change });
+		expect(parsePullRequestEdit({ ...pr, change: { ...change, body: "", allowEmpty: true } })?.ok.change).toEqual({ ...change, body: "", allowEmpty: true });
+		expect(parsePullRequestEdit({ ...pr, change: { ...change, body: "a".repeat(65_536), original: "b".repeat(65_536) } })?.ok.change.field).toBe("body");
+		for (const invalid of [
+			{ field: "body", body: "replacement" },
+			{ ...change, original: null },
+			{ ...change, original: "b".repeat(65_537) },
+			{ ...change, body: "a".repeat(65_537) },
+			{ ...change, body: null },
+			{ ...change, body: 7 },
+			{ ...change, allowEmpty: "true" },
+		]) expect(parsePullRequestEdit({ ...pr, change: invalid })).toBeNull();
 	});
 
 	test("rejects the merged state, a merge, which goes through the merge queue, an empty label, a login with a slash, a change without its direction, and no pull request", () => {

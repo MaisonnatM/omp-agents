@@ -117,15 +117,26 @@ export async function runChecked(argv: string[], opts?: RunOptions): Promise<str
 	return stdout;
 }
 
+/** A command that exited non-zero; `answer` is its stdout parsed as JSON, when it parses, such as `gh api`'s error answer. */
+export class JsonCommandError extends Error {
+	constructor(message: string, readonly stdout: string, readonly answer: unknown) {
+		super(message);
+	}
+}
+
 /**
- * Runs `argv` and parses stdout as JSON. The exit code does not matter when stdout parses, as with `gh api graphql`
- * answering errors in JSON; otherwise @throws Error as {@link runChecked} does.
+ * Runs `argv` and parses stdout as JSON.
+ * @throws JsonCommandError when the command exits non-zero, even beside parseable stdout, so a caller never mistakes a failed read's partial output for an answer; Error as {@link runChecked} does when stdout does not parse.
  */
 export async function runJson(argv: string[], opts?: RunOptions): Promise<unknown> {
 	const { stdout, stderr, code } = await run(argv, opts);
+	const failure = stderr.split("\n").findLast(line => line.trim())?.trim() || `${argv[0]} exited ${code}`;
+	let answer: unknown;
 	try {
-		return JSON.parse(stdout);
+		answer = JSON.parse(stdout);
 	} catch {
-		throw new Error(stderr.split("\n").findLast(line => line.trim())?.trim() || `${argv[0]} exited ${code}`);
+		throw code === 0 ? new Error(failure) : new JsonCommandError(failure, stdout, undefined);
 	}
+	if (code !== 0) throw new JsonCommandError(failure, stdout, answer);
+	return answer;
 }

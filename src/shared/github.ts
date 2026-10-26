@@ -413,7 +413,7 @@ export const MAX_PULL_REQUEST_BODY = 65_536;
 /** One change the details make to a pull request. */
 export type PullRequestChange =
 	| { field: "title"; title: string }
-	| { field: "body"; body: string }
+	| { field: "body"; body: string; original: string; allowEmpty?: boolean }
 	| { field: "label"; name: string; on: boolean }
 	| { field: "reviewer"; login: string; on: boolean }
 	| { field: "state"; state: SettableState }

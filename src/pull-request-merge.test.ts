@@ -1,5 +1,8 @@
-import { describe, expect, test } from "bun:test";
-import { parseMergeStatus } from "./pull-request-merge";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import * as proc from "./proc";
+import { parseMergeStatus, readPullRequestStates } from "./pull-request-merge";
+
+afterEach(() => mock.restore());
 
 const PR = { owner: "o", repo: "r", number: 12 };
 
@@ -32,4 +35,11 @@ describe("parseMergeStatus", () => {
 		expect(parseMergeStatus({ data: { repository: { pullRequest: node } } }, PR)).toMatchObject({ state: "merged", mergeState: "unknown", checks: "none", autoArmed: false, autoAllowed: false });
 		expect(() => parseMergeStatus({ data: { repository: { pullRequest: null } } }, PR)).toThrow("GitHub has no pull request o/r#12");
 	});
+});
+
+test("a batched state read keeps the answered pull requests when gh exits non-zero for another's error", async () => {
+	const answer = { data: { repository: { p1: { state: "MERGED", headRefName: "one", headRefOid: "a1" }, p2: null } }, errors: [{ type: "NOT_FOUND", message: "Could not resolve to a PullRequest with the number of 2." }] };
+	spyOn(proc, "runJson").mockRejectedValue(new proc.JsonCommandError("gh: Could not resolve to a PullRequest with the number of 2.", JSON.stringify(answer), answer));
+	const states = await readPullRequestStates([{ owner: "batch", repo: "states", number: 1 }, { owner: "batch", repo: "states", number: 2 }]);
+	expect([...states]).toEqual([["batch/states#1", { state: "merged", branch: "one", head: "a1" }]]);
 });

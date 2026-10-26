@@ -16,6 +16,7 @@ const input = JSON.parse(process.argv[4]);
 const pi = input.omp ? await import(process.argv[2]) : undefined;
 let tool;
 let confirmations = 0;
+const executed = [];
 const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
 // Loads an extension as one omp session does and returns its handlers by event name.
 function load(extension) {
@@ -27,7 +28,10 @@ function load(extension) {
 		registerTool(registered) { tool = registered; },
 		appendEntry() {},
 		// input.responses answers by subcommand, such as "pr view" or "repo view"; input.response answers the rest.
-		async exec(_command, args) { return input.responses?.[args.slice(0, 2).join(" ")] ?? input.response; },
+		async exec(_command, args) {
+			executed.push(args);
+			return input.sequence?.shift() ?? input.responses?.[args.slice(0, 2).join(" ")] ?? input.response;
+		},
 	});
 	return hooks;
 }
@@ -78,14 +82,14 @@ if (input.command) {
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false, sessionManager });
-	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null }));
+	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null, executed }));
 } else {
 	if (!tool) throw new Error("No tool schema registered");
 	console.log(JSON.stringify({ valid: tool.parameters.safeParse(input.params).success }));
 }
 `;
 
-function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-accounts", input: object, env: Record<string, string> = {}): {
+function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-accounts" | "pr-description", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
@@ -93,6 +97,7 @@ function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-
 	text: string | null;
 	prompt: string[] | null;
 	results: (string | null)[];
+	executed: string[][];
 } {
 	const child = Bun.spawnSync([
 		process.execPath, "run", "-", packageDir,
@@ -199,6 +204,50 @@ describe("ship publication gate", () => {
 	});
 });
 
+describe("checked PR description CLI", () => {
+	test.each([
+		"gh pr edit 7 -R acme/app --body-file /tmp/body",
+		"env -u GITHUB_TOKEN gh pr edit 7 --body=''",
+		"gh api -X PATCH repos/acme/app/pulls/7 -f body=",
+		"gh api repos/acme/app/pulls/7 --input /tmp/request.json",
+	])("blocks unchecked description write: %s", command => {
+		const { result } = exercise("pr-description", { command });
+		expect(result?.block).toBe(true);
+		expect(result?.reason).toContain("pr_description");
+	});
+
+	test("a nonzero read with empty stdout never sends a PATCH", () => {
+		const result = exercise("pr-description", {
+			run: true,
+			params: { repo: "acme/app", pr: 7, change: { kind: "append", text: "- [x] Reviewed" } },
+			sequence: [
+				{ code: 1, stdout: "", stderr: "API rate limit exceeded" },
+				{ code: 0, stdout: JSON.stringify({ resources: { core: { reset: Math.floor(Date.now() / 1000) + 3600 } } }), stderr: "" },
+			],
+		});
+		expect(result.run.isError).toBe(true);
+		expect(result.text).toContain("REST quota exhausted");
+		expect(result.text).not.toContain("auth login");
+		expect(result.executed).toEqual([["api", "repos/acme/app/pulls/7"], ["api", "rate_limit"]]);
+	});
+
+	test("the registered tool preserves original text, rechecks, then patches", () => {
+		const response = { code: 0, stdout: JSON.stringify({ body: "Original summary.\n- [ ] Reviewed\n", updated_at: "2026-10-26T12:00:00Z" }), stderr: "" };
+		const result = exercise("pr-description", {
+			run: true,
+			params: { repo: "acme/app", pr: 7, change: { kind: "replace-text", oldText: "- [ ] Reviewed", newText: "- [x] Reviewed" } },
+			sequence: [response, response, { code: 0, stdout: "{}", stderr: "" }],
+		});
+		expect(result.run.isError).toBe(false);
+		expect(result.text).toContain("Original description preserved");
+		expect(result.executed).toEqual([
+			["api", "repos/acme/app/pulls/7"],
+			["api", "repos/acme/app/pulls/7"],
+			["api", "-X", "PATCH", "repos/acme/app/pulls/7", "-f", "body=Original summary.\n- [x] Reviewed\n"],
+		]);
+	});
+});
+
 describe("ship_stage ready gate", () => {
 	test.each([["- [x] Thermo-nuclear code quality review", false], ["Unreviewed PR", true]])("the first call naming the PR reads its body (%s)", (body, isError) => {
 		const pullRequest = {
@@ -212,6 +261,22 @@ describe("ship_stage ready gate", () => {
 			response: { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) },
 		});
 		expect(run).toEqual({ isError, stage: isError ? null : "ready_gate" });
+	});
+
+	test("quota exhaustion exposes stale status and cannot advance the ready gate", () => {
+		const result = exercise("ship", {
+			run: true,
+			params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			sequence: [
+				{ code: 1, stdout: JSON.stringify({ data: { repository: null }, errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }] }), stderr: "" },
+				{ code: 0, stdout: JSON.stringify({ resources: { graphql: { remaining: 0, reset: Math.floor(Date.now() / 1000) + 3600 } } }), stderr: "" },
+			],
+		});
+		expect(result.run.isError).toBe(true);
+		expect(result.text).toContain("stale GitHub status");
+		expect(result.text).toContain("GraphQL quota exhausted");
+		expect(result.executed).toHaveLength(2);
+		expect(result.executed[1]).toEqual(["api", "rate_limit"]);
 	});
 });
 

@@ -161,14 +161,14 @@ export function parseListAnswer(answer: unknown, repo: Repo): PullRequestSummary
 	return [...found.values()];
 }
 
-async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
+async function queryRepo(repo: Repo, fresh: boolean): Promise<PullRequestSummary[]> {
 	const scope = `repo:${repo.owner}/${repo.repo} is:pr`;
 	const since = new Date(Date.now() - MERGED_DAYS * 86_400_000).toISOString().slice(0, 10);
 	const answer = await ghGraphql(QUERY, {
 		authored: `${scope} is:open author:@me sort:updated-desc`,
 		reviewing: `${scope} is:open review-requested:@me sort:updated-desc`,
 		merged: `${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
-	});
+	}, false, fresh);
 	return parseListAnswer(answer, repo);
 }
 
@@ -335,15 +335,15 @@ const details = createCache<PullRequestDetail>();
 /** One pull request in full, live from `gh`; `fresh` skips the kept answer, as after a change. */
 export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<PullRequestDetail> {
 	return details.get(prKey(pr), async () => {
-		const detail = parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr);
-		if (detail.state === "open" || detail.state === "draft") detail.behindBy = await readBehindBy(pr, detail.base, detail.headOid);
+		const detail = parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }, false, fresh), pr);
+		if (detail.state === "open" || detail.state === "draft") detail.behindBy = await readBehindBy(pr, detail.base, detail.headOid, fresh);
 		return detail;
 	}, fresh);
 }
 
-export async function readBehindBy(pr: PullRequest, base: string, head: string): Promise<number | null> {
+export async function readBehindBy(pr: PullRequest, base: string, head: string, fresh = false): Promise<number | null> {
 	try {
-		const comparison = await ghRest(`repos/${pr.owner}/${pr.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=1`);
+		const comparison = await ghRest(`repos/${pr.owner}/${pr.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=1`, false, fresh);
 		return isObject(comparison) ? num(comparison.behind_by) ?? null : null;
 	} catch {
 		return null;
@@ -409,7 +409,7 @@ export async function mergedPullRequests(cwd: string, branches: string[]): Promi
  * which indexes a new one seconds late, and outside GraphQL's budget, which the pull request list can use up.
  */
 export async function branchPullRequest(repo: Repo, branch: string): Promise<PullRequest | null> {
-	const answer = await ghRest(`repos/${repo.owner}/${repo.repo}/pulls?head=${encodeURIComponent(`${repo.owner}:${branch}`)}&state=all&per_page=10`);
+	const answer = await ghRest(`repos/${repo.owner}/${repo.repo}/pulls?head=${encodeURIComponent(`${repo.owner}:${branch}`)}&state=all&per_page=10`, false, true);
 	const numbers = (Array.isArray(answer) ? answer : []).flatMap(pr =>
 		isObject(pr) && typeof pr.number === "number" && (pr.state === "open" || typeof pr.merged_at === "string") ? [pr.number] : [],
 	);
@@ -438,7 +438,7 @@ export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<
 	const repos = await Promise.all(
 		[...byRepo.values()].map(async (entry): Promise<RepoPullRequests> => {
 			try {
-				const pullRequests = await loaded.get(repoKey(entry), () => queryRepo(entry), fresh);
+				const pullRequests = await loaded.get(repoKey(entry), () => queryRepo(entry, fresh), fresh);
 				return { ...entry, pullRequests };
 			} catch (err) {
 				return { ...entry, error: errorText(err) };

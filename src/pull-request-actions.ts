@@ -81,7 +81,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		applies: pr => pr.state !== "merged",
 		prompt: pr =>
 			pr.role === "author"
-				? `${pullRequestContext(pr)} ${thermonuclear(pr)} Apply the valid findings in a git worktree on the PR's branch, run the project's checks, then commit and push to the PR's branch. Only once the fixes are pushed, add the line \`- [x] Thermo-nuclear code quality review\` to the PR's description (\`gh pr edit ${pr.number} -R ${pr.owner}/${pr.repo} --body-file\` from its current body, never a blind overwrite), unless it is already there. Report each finding and what you did with it.`
+				? `${pullRequestContext(pr)} ${thermonuclear(pr)} Apply the valid findings in a git worktree on the PR's branch, run the project's checks, then commit and push to the PR's branch. Only once the fixes are pushed, read the PR's description with \`pr_description({repo:"${pr.owner}/${pr.repo}",pr:${pr.number},change:{kind:"read"}})\`. Unless the line \`- [x] Thermo-nuclear code quality review\` is already there, append it with the same tool and \`change:{kind:"append",text:"- [x] Thermo-nuclear code quality review"}\`. The tool preserves the original and refuses failed reads or concurrent changes; never use an unchecked body overwrite. Report each finding and what you did with it.`
 				: `${pullRequestContext(pr)} ${pr.author.login} asked you to review it. ${thermonuclear(pr)} Report its findings here with file and line references. Do not change the PR's branch or post anything on GitHub.`,
 	},
 };

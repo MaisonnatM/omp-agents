@@ -2,11 +2,14 @@
 import { forgetSession } from "../commands";
 import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashboard-session";
 import { SessionGuest } from "../guest";
+import { repositoryAt } from "../git";
 import type { LiveSession, LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
 import { oneLine } from "../session-entries";
 import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
+import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
+import { portFromEnv } from "./address";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
@@ -34,9 +37,11 @@ export class LiveSessions {
 	 */
 	#bySessionId = new Map<string, LiveSession>();
 	readonly #onUpdate: (instanceId: string, update: SessionUpdate) => void;
+	readonly #taskClaims: TaskClaims;
 
-	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void) {
+	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void, taskClaims = new TaskClaims()) {
 		this.#onUpdate = onUpdate;
+		this.#taskClaims = taskClaims;
 	}
 
 	get(instanceId: string): LiveSession | undefined {
@@ -68,6 +73,42 @@ export class LiveSessions {
 		};
 	}
 
+	/**
+	 * Reserves task `identity` in `cwd`'s repository for `instanceId` before any checkout or process can write, and answers
+	 * the claim of whoever already works on it, a running session that predates claims included, or `null` once reserved.
+	 */
+	async reserveTask(identity: string, instanceId: string, cwd: string, factsOf: (sessionId: string) => SessionFacts) {
+		const repository = await repositoryAt(cwd) ?? cwd;
+		return await this.#runningTask(repository, identity, factsOf) ?? this.#taskClaims.claim(repository, identity, instanceId, cwd);
+	}
+
+	/** Includes terminal and pre-claim dashboard sessions already known by the running-session registry. */
+	async #runningTask(repository: string, identity: string, factsOf: (sessionId: string) => SessionFacts) {
+		for (const session of this.#sessions.values()) {
+			if (session.finished(Date.now())) continue;
+			const savedIdentity = this.#taskClaims.identityForInstance(session.instanceId);
+			let matches = savedIdentity === identity;
+			if (!savedIdentity) {
+				const facts = withSubject(factsOf(session.sessionId), this.#subjects.get(session.instanceId));
+				matches = facts.tickets.some(id => identity === ticketTask(id)) || facts.pullRequests.some(pr => identity === pullRequestTask(pr));
+			}
+			if (matches && (await repositoryAt(session.cwd) ?? session.cwd) === repository) {
+				return { identity, instanceId: session.instanceId, sessionId: session.sessionId, cwd: session.cwd, port: portFromEnv() };
+			}
+		}
+		return null;
+	}
+
+	/** The explicit startup identity retained by a saved session, before its inferred links. */
+	savedTask(sessionId: string): string | null {
+		return this.#taskClaims.identityForSession(sessionId);
+	}
+
+	/** Releases a failed launch as well as an ended session. */
+	releaseTask(instanceId: string): void {
+		this.#taskClaims.release(instanceId);
+	}
+
 	/** Session `instanceId` ended a turn with `reply`, which stays unread until a look or its next turn reads it. */
 	markUnread(instanceId: string, reply: string | null): void {
 		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(reply) });
@@ -81,6 +122,7 @@ export class LiveSessions {
 	/** Lists `session`; `false` when it already finished, as a process that exited between its spawn and now, which would stay listed with no one to remove it. */
 	add(session: LiveSession, subject: WorkItem | null): boolean {
 		if (session.finished(Date.now())) return false;
+		if (session instanceof DashboardSession) this.#taskClaims.bind(session.instanceId, session.pid, session.sessionId, session.cwd);
 		this.#sessions.set(session.instanceId, session);
 		if (subject) this.#subjects.set(session.instanceId, subject);
 		this.#reindex();
@@ -88,6 +130,7 @@ export class LiveSessions {
 	}
 
 	remove(instanceId: string): void {
+		this.releaseTask(instanceId);
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
 		this.#unread.delete(instanceId);
