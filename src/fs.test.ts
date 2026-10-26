@@ -1,13 +1,15 @@
 /** Tests for `JsonFile`'s coalesced saves and `flushJsonFiles`, and `ReducerFile`'s changes. */
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles, JsonFile, ReducerFile } from "./fs";
 import { isObject } from "./json";
+import { ScheduledFile } from "./server/scheduled-file";
 
 const dirs: string[] = [];
 afterEach(() => {
+	flushJsonFiles();
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -80,4 +82,92 @@ test("a shared file reads what another store saved before it applies a change; a
 	second.apply(2);
 	first.apply(3);
 	expect(first.value).toEqual([3]);
+});
+
+test("a failed JSON write keeps its dirty value for a later flush", () => {
+	const { path, file } = numbersIn();
+	mkdirSync(path);
+	file.save([7]);
+	expect(file.flush()).toBe(false);
+	rmSync(path, { recursive: true });
+	flushJsonFiles();
+	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual([7]);
+	expect(file.flush()).toBe(true);
+});
+
+async function compete(script: string, path: string): Promise<string[]> {
+	const children = [1, 2].map(id => Bun.spawn([process.execPath, "--eval", script], {
+		env: { ...process.env, SHARED_PATH: path, WRITER_ID: String(id) },
+		stdin: "pipe", stdout: "pipe", stderr: "pipe",
+	}));
+	const readers = children.map(child => child.stdout.getReader());
+	try {
+		await Promise.all(readers.map(async reader => {
+			const ready = await reader.read();
+			expect(new TextDecoder().decode(ready.value)).toBe("ready\n");
+		}));
+		for (const child of children) {
+			child.stdin.write("go");
+			child.stdin.end();
+		}
+		return await Promise.all(children.map(async (child, index) => {
+			const output: Uint8Array[] = [];
+			for (;;) {
+				const chunk = await readers[index]!.read();
+				if (chunk.done) break;
+				output.push(chunk.value);
+			}
+			expect(await new Response(child.stderr).text()).toBe("");
+			expect(await child.exited).toBe(0);
+			return Buffer.concat(output).toString().trim();
+		}));
+	} finally {
+		for (const child of children) child.kill();
+	}
+}
+
+test.each([false, true])("independent processes preserve both shared reducer edits (dead owner: %s)", async stale => {
+	const { path, open } = countsIn(true);
+	if (stale) writeFileSync(`${path}.lock`, JSON.stringify({ pid: 2 ** 22 + 12345, port: 0 }));
+	const script = `
+		import { ReducerFile } from ${JSON.stringify(new URL("./fs.ts", import.meta.url).pathname)};
+		const file = new ReducerFile(process.env.SHARED_PATH, {
+			parse: json => json.counts, toJson: counts => ({ counts }),
+			holds: "counts", empty: [], shared: true,
+			reduce(counts, id) {
+				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+				return [...counts, id];
+			},
+		});
+		console.log("ready");
+		await Bun.stdin.text();
+		file.apply(Number(process.env.WRITER_ID));
+		console.log("saved");
+	`;
+	expect(await compete(script, path)).toEqual(["saved", "saved"]);
+	expect(open().value.toSorted()).toEqual([1, 2]);
+});
+
+test.each([false, true])("independent processes grant only one scheduled-send claim (dead owner: %s)", async stale => {
+	const { path } = countsIn(true);
+	const file = new ScheduledFile(path);
+	file.apply({ op: "add", send: { id: "send", at: 1, reset: null, target: { kind: "message", sessionId: "session", text: "once" } } }, 0);
+	if (stale) writeFileSync(`${path}.lock`, JSON.stringify({ pid: 2 ** 22 + 12345, port: 0 }));
+	const script = `
+		import { ScheduledFile } from ${JSON.stringify(new URL("./server/scheduled-file.ts", import.meta.url).pathname)};
+		class SlowFile extends ScheduledFile {
+			update(next) {
+				return super.update(value => {
+					Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+					return next(value);
+				});
+			}
+		}
+		const file = new SlowFile(process.env.SHARED_PATH);
+		console.log("ready");
+		await Bun.stdin.text();
+		console.log(file.claim("send") ? "claimed" : "already claimed");
+	`;
+	expect((await compete(script, path)).toSorted()).toEqual(["already claimed", "claimed"]);
+	expect(new ScheduledFile(path).value.map(send => send.state)).toEqual([{ phase: "sending" }]);
 });

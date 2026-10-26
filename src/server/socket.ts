@@ -48,7 +48,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 		try {
 			await sessions.get(view.instanceId)?.prompt(view.agentId, text, images, delivery);
 		} catch (error) {
-			if (error instanceof PromptRefused) return;
+			if (error instanceof PromptRefused) throw error;
 			peer.reply(view.instanceId, {
 				t: "items",
 				view,
@@ -56,6 +56,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 				items: [{ id: `error:${Date.now()}`, kind: "notice", level: "error", text: `Could not prepare prompt: ${errorText(error)}` }],
 				removed: [],
 			});
+			throw error;
 		}
 	},
 	async dequeue({ sessions }, peer, { view, reqId, queue, text }) {

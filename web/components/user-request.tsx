@@ -3,7 +3,7 @@ import { type Question, type QuestionAnswer, QuestionCard } from "@/components/q
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AskReply, UserAnswer, UserRequest } from "../../src/shared/sessions";
-import { errorText } from "../api";
+import { errorText } from "../../src/json";
 import { useShortcuts } from "../shortcuts";
 import { toasts } from "./toaster";
 

@@ -13,6 +13,10 @@ A send's `state` is `waiting`, `sending` from its claim until it reaches omp, or
 Its `tick` runs on the minute tick, before the routine runner's, only on the server that owns the unattended work, and sends each due waiting send in turn.
 `sendNow` sends one at once on whichever server the page talks to, a failed one too.
 Either way the runner first claims the send and writes `sending` to the file at once, so a second tick or another server never sends it twice.
+Claiming holds the shared file's ownership lock across the read, state change, and successful replacement.
+A persistence failure rejects `sendNow` before it reaches a session or starts one.
+The failed write stays dirty and keeps its lock until a later flush succeeds.
+Such a claim is not delivered after a retrying flush, and remains `sending` for recovery rather than risking a duplicate.
 A message goes through `reach`, which `Dashboard` builds once for this runner and the project runner: the live session with that session id, else that session resumed through the same `start` the page uses.
 The runner sends it through its `prompt` as a `followUp`, a follow-up while its turn runs and a prompt otherwise, as a project's updates go.
 A start goes through `start` as the page's would, so the todo it names is linked the same way.

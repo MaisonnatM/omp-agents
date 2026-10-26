@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { isObject } from "../src/json";
-import { errorText, getJson } from "./api";
+import { errorText } from "../src/json";
+import { getJson } from "./api";
 import { keyedStore } from "./keyed-store";
 
 /** How often an open page asks again by default; the server answers from its cache in between. */

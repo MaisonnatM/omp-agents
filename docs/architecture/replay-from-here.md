@@ -6,9 +6,12 @@ The dashboard resolves that authorized main-session view to its known file, then
 Revalidating the token rejects a replaced or edited source without rejecting later appended responses. No browser-supplied source path is opened.
 
 `src/omp/replay-fork.ts` uses the installed `SessionManager` to branch through the prompt's parent with artifacts copied. A null parent uses `newSession`.
+The adapter exposes plain prompt data, the ancestry fingerprint, recorded settings, repair status, and narrow operations to freeze original evidence, fork, and close.
+It owns native entry and branch reads, request correlation, blob persistence and loading, and interrupted-tool repair inspection.
 `userTurnDraft` restores ordinary stored text or a skill invocation, and blob-aware `imageContent` restores images in order. Required missing images are errors.
 The new prefix receives only omp's synthetic unresolved-tool results, never execution of inherited calls. The fork moves to the detached checkout, clears inherited additional write directories, and flushes and closes before RPC opens it.
-The source is never RPC-opened. The accepted original turn and its verified complete first request body are frozen in omp's native blob store.
+The source is never RPC-opened.
+The adapter freezes the accepted original turn and its verified complete first request body in omp's native blob store.
 
 The checkout uses only the source cwd's current Git repository and canonical common-directory identity. A surviving HEAD reflog commit at the prompt's time is preferred; otherwise current HEAD is explicit provenance.
 Neither route reconstructs historical dirty state. `Worktrees.start` serializes this checkout creation with removal, and a failed launch removes only its recorded owned root after the existing preview permits it.

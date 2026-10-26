@@ -7,7 +7,7 @@ import { checkReplayRequest } from "../templates/omp/agent/extensions/replay/rep
 import { isObject } from "./json";
 import { loader, sessionManager } from "./omp/modules";
 import type { OmpSessionManager } from "./omp/modules";
-import { openPromptCut, writePromptFork } from "./omp/replay-fork";
+import { openPromptCut } from "./omp/replay-fork";
 import { REPLAY_CHECK, REPLAY_MARKER } from "./shared/replay";
 import { prepareReplay, replayComparison, replayDetail, ReplayFold } from "./replay";
 import type { PreparedReplay } from "./replay";
@@ -71,8 +71,7 @@ describe("native prompt replay fork", () => {
 		const bytes = readFileSync(input.file);
 		const cut = await openPromptCut(input.file, input.id);
 		expect(cut.text).toBe("selected");
-		expect(cut.before).toEqual([]);
-		const fork = await writePromptFork(cut.manager, null, temp(), { test: "marker" });
+		const fork = await cut.fork(temp(), { test: "marker" });
 		const entries = await loader.loadEntriesFromFile(fork.file);
 		expect(entries.filter(entry => entry.type === "message")).toEqual([]);
 		expect(entries.some(entry => entry.customType === REPLAY_MARKER)).toBe(true);
@@ -86,8 +85,9 @@ describe("native prompt replay fork", () => {
 		const input = await source("deep");
 		const bytes = readFileSync(input.file);
 		const cut = await openPromptCut(input.file, input.id);
-		const ids = cut.before.map(entry => entry.id);
-		const fork = await writePromptFork(cut.manager, cut.prompt.parentId ?? null, temp(), { test: "marker" });
+		const ancestors = await loader.loadEntriesFromFile(input.file);
+		const ids = ancestors.slice(0, ancestors.findIndex(entry => entry.id === input.id)).filter(entry => entry.type !== "session").map(entry => entry.id);
+		const fork = await cut.fork(temp(), { test: "marker" });
 		const entries = await loader.loadEntriesFromFile(fork.file);
 		expect(entries.filter(entry => entry.type !== "session").slice(0, ids.length).map(entry => entry.id)).toEqual(ids);
 		expect(entries.some(entry => entry.id === input.id)).toBe(false);
@@ -98,7 +98,7 @@ describe("native prompt replay fork", () => {
 		const input = await source("mid");
 		const bytes = readFileSync(input.file);
 		const cut = await openPromptCut(input.file, input.id);
-		const fork = await writePromptFork(cut.manager, cut.prompt.parentId ?? null, temp(), { test: "marker" });
+		const fork = await cut.fork(temp(), { test: "marker" });
 		expect(fork.repaired).toBe(true);
 		const entries = await loader.loadEntriesFromFile(fork.file);
 		const result = entries.map(entry => entry.message).find(message => isObject(message) && message.role === "toolResult");
@@ -110,7 +110,7 @@ describe("native prompt replay fork", () => {
 		const cut = await openPromptCut(input.file, input.id);
 		expect(cut.text).toBe("selected");
 		expect(cut.images).toEqual(input.images);
-		await cut.manager.close();
+		await cut.close();
 	});
 	test("a missing required image fails instead of silently dropping it", async () => {
 		const input = await source("missing-image");

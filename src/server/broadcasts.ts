@@ -1,8 +1,7 @@
 /**
- * What every socket hears on the `roster` topic: the roster, the past-session list, plan usage, the Todo page's list,
- * the routines, the scheduled sends, the workspaces, the pins, the projects, the notices, the queued merges, and the review drafts. Each push publishes only what changed since the last one: the roster and
- * the past list as the rows that changed, joined, or left, the rest whole. Roster and past pushes wait for a listener; a
- * socket that subscribes gets all twelve at once, the two lists whole.
+ * What every socket hears on the `roster` topic: the roster, the past-session list, plan usage, and every list registered
+ * in ListRegistry. Each push publishes only what changed: roster and past rows as deltas, registered lists whole.
+ * A socket that subscribes gets the current roster and past list whole, usage, and every registered list.
  */
 import { errorText } from "../json";
 import type { ServerMsg } from "../shared/protocol";
@@ -33,7 +32,7 @@ export interface BroadcastDeps {
 
 export class Broadcasts {
 	readonly #deps: BroadcastDeps;
-	/** The last message of each kind published, empty for usage until `omp usage` first answers, and for the todos, routines, scheduled sends, workspaces, pins, projects, notices, queued merges, and review drafts until they first change. */
+	/** The last published message of each kind, absent until it first publishes. */
 	readonly #last = new Map<Broadcast["t"], string>();
 	/** The roster as the listeners last heard it, and its registry error. */
 	readonly #roster = new HeardList<RosterHost>(host => host.instanceId);
@@ -51,7 +50,7 @@ export class Broadcasts {
 		return this.#deps.subscriberCount(TOPIC) > 0;
 	}
 
-	/** Subscribe `ws` and send it the current roster, past list, usage, todos, routines, scheduled sends, workspaces, pins, projects, notices, queued merges, and review drafts. */
+	/** Subscribe `ws` and send the current roster, past list, usage, and every registered list. */
 	open(ws: Socket): void {
 		// The sockets that listen already hear what changed first, so the lists `ws` starts from are theirs too.
 		const roster = this.#syncRoster();

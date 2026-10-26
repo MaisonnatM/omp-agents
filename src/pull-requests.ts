@@ -6,7 +6,7 @@ import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
-import { type CheckRunState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
+import { type CheckRunState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
 import { MERGE_METHODS, type MergeMethod } from "./shared/source-control";
 
 export { parseRemote, repoOf } from "./github";

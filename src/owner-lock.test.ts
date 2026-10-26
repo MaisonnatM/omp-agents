@@ -59,6 +59,19 @@ describe("OwnerLock", () => {
 		expect(first.holder()).toEqual({ pid: 100, port: 4000 });
 	});
 
+	test("a crashed stale-lock reclaimer can itself be reclaimed", () => {
+		const file = lockFile();
+		const first = server(file, 4000, 100, [100]);
+		first.acquire();
+		writeFileSync(`${file}.reap`, JSON.stringify({ pid: 200, port: 5000 }));
+		const replacement = server(file, 6000, 300, [300]);
+		expect(replacement.acquire()).toBe(true);
+		expect(replacement.holder()).toEqual({ pid: 300, port: 6000 });
+		expect(readdirSync(join(file, ".."))).toEqual(["server.lock"]);
+		replacement.release();
+		expect(readdirSync(join(file, ".."))).toEqual([]);
+	});
+
 	test("a server whose lock was taken behind its back stops owning the work, and does not delete the new owner's lock on release", () => {
 		const file = lockFile();
 		const alive = [100, 200];

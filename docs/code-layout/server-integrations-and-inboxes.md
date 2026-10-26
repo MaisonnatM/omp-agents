@@ -57,7 +57,7 @@
   A drain lists and reads through `node:fs/promises`, so a burst of requests never blocks the event loop, reads the files it claimed at once, and applies them in name order.
   Overlapping drains never apply a file twice, a drain never rejects, `watch()` creates the directory and drains when it changes, and `stop()` closes the watcher.
   An inbox may take an `active` check; while it is false every file stays untouched, invalid ones included.
-- `src/server/owner-lock.ts`: `OwnerLock`, the `server.lock` that picks the server that runs routines and the todo and note inboxes; see [One server runs the unattended work](../architecture/routines.md#one-server-runs-the-unattended-work).
+- `src/owner-lock.ts`: `OwnerLock`, the `server.lock` that picks the server that runs unattended work and the per-file ownership for shared reducer writes; see [One server runs the unattended work](../architecture/routines.md#one-server-runs-the-unattended-work).
 - `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed, and drains only on the server that owns the lock.
   `parseAgentChange` reads each file in the extension's own format: an `add` becomes a `todo` of no priority added at that time, and a `toggle` that checks becomes `set-status` `done` at its time.
   The inbox takes `add`, and `set-status` `done`, deletes each file it applies, and moves any other to `<name>.invalid` with a logged reason, so the server stays the only writer of `todos.json` and an agent cannot undo what you did.

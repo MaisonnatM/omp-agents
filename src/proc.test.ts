@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run, runShell } from "./proc";
@@ -32,6 +32,19 @@ describe("runShell", () => {
 		const running = runShell("sleep 5", tmpdir(), { ...limits, signal: stopping.signal });
 		stopping.abort();
 		expect(await running).toEqual({ exitCode: null, output: "" });
+	});
+
+	test("a pre-aborted command rejects before it can create a file", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-agents-pre-abort-"));
+		const stopping = new AbortController();
+		stopping.abort(new Error("dashboard stopped"));
+		try {
+			await expect(runShell("touch started", dir, { ...limits, signal: stopping.signal })).rejects.toThrow("dashboard stopped");
+			expect(existsSync(join(dir, "started"))).toBe(false);
+			expect(await runShell("printf running", dir, limits)).toEqual({ exitCode: 0, output: "running" });
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 
 	test("rejects when it cannot start in its directory", async () => {

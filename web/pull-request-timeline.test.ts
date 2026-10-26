@@ -3,7 +3,6 @@ import type { Person, PullRequestComment, PullRequestCommit, PullRequestDetail, 
 import { approvalCount, timelineRows, type TimelineRow } from "./pull-request-timeline";
 
 const ann: Person = { login: "ann", avatarUrl: null };
-const bob: Person = { login: "bob", avatarUrl: null };
 
 const detail = (fields: Partial<PullRequestDetail> = {}): PullRequestDetail => ({
 	owner: "acme",

@@ -5,7 +5,8 @@ import { type ReactNode, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ApiError, errorText } from "../../api";
+import { errorText } from "../../../src/json";
+import { ApiError } from "../../api";
 import type { Editable } from "../../editable-read";
 import type { ReadState } from "../../reads";
 

@@ -23,7 +23,7 @@ import { useDashboardStatus } from "../dashboard-context";
 import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
 import { MergePopover, useMergeTarget } from "./merge-popover";
-import { errorText } from "../../api";
+import { errorText } from "../../../src/json";
 import { toasts } from "../toaster";
 import { type PullRequestOptionsRead, type ReviewerChange, ReviewersField, usePullRequestOptions } from "./pr-fields";
 import { PullRequestMenu, PullRequestMenuItems, type PullRequestMenuItemsProps } from "./pr-menu";

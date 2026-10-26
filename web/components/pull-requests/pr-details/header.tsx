@@ -1,5 +1,5 @@
 import { ArrowLeft, ExternalLink, FileDiff, GitMerge, GitPullRequest, Layers, MessageSquare, Pencil, TriangleAlert } from "lucide-react";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, prKey, MAX_PULL_REQUEST_TITLE, samePullRequest, type StackedPullRequest, type UpdateMethod } from "../../../../src/shared/github";
 import type { RosterHost } from "../../../../src/shared/sessions";
 import { primaryControl } from "../../../../src/shared/moves";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { errorText } from "./api";
+import { errorText } from "../src/json";
 import { toasts } from "./components/toaster";
 
 /** A control's server work, and whether it is running. */

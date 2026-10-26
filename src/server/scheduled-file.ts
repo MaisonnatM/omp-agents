@@ -1,7 +1,6 @@
 /**
  * The scheduled sends, kept in `scheduled.json` as `{ sends }`, soonest first.
- * Servers on different ports share the file, and a send added on any of them must reach the one that sends it, so every
- * change reads the file again before it applies, as `projects.json` does.
+ * Servers on different ports share the file, so each change holds its ownership lock through reload and persistence.
  */
 import { ReducerFile } from "../fs";
 import { isObject, isSafeInteger, parseAll } from "../json";
@@ -35,17 +34,7 @@ export class ScheduledFile extends ReducerFile<ScheduledSend[], [change: FileCha
 		});
 	}
 
-	/**
-	 * Applies `change` at time `now` and saves; whether it changed anything. A refused take throws and saves nothing.
-	 * A take writes at once, as a claim does, so a server that claims next reads the send gone before the page restores its text.
-	 */
-	override apply(change: FileChange, now: number): boolean {
-		const changed = super.apply(change, now);
-		if (change.op === "take") this.flush();
-		return changed;
-	}
-
-	/** Marks send `id` as sending and saves, before anything sends it; the send, or `null` when it is gone or already sending. */
+	/** Persists `sending` before returning the send, or `null` if gone or already claimed; a failed write throws. */
 	claim(id: string): ScheduledSend | null {
 		const claims = this.update(sends => {
 			const index = sends.findIndex(send => send.id === id);
@@ -53,7 +42,6 @@ export class ScheduledFile extends ReducerFile<ScheduledSend[], [change: FileCha
 			return !send || send.state.phase === "sending" ? sends : sends.with(index, { ...send, state: { phase: "sending" } });
 		});
 		if (!claims) return null;
-		this.flush();
 		return this.value.find(send => send.id === id)!;
 	}
 

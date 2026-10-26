@@ -4,7 +4,8 @@
  */
 import { useSyncExternalStore } from "react";
 import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest, repoKey } from "../src/shared/github";
-import { errorText, putJson } from "./api";
+import { errorText } from "../src/json";
+import { putJson } from "./api";
 import { toasts } from "./components/toaster";
 
 /** A pull request to rebase, from `cwd`, the workspace a session on it starts in. */

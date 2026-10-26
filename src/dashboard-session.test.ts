@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { fromPartial } from "@total-typescript/shoehorn";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -526,6 +527,35 @@ describe("DashboardSession prompts", () => {
 });
 
 describe("DashboardSession action failures", () => {
+	test("prompt refusals and preparation failures return failed acknowledgments without duplicate notices", async () => {
+		const { session, client, updates } = await startSession();
+		const sessions = new LiveSessions(() => {});
+		sessions.add(session, null);
+		const sent: ServerMsg[] = [];
+		const view = { kind: "live", instanceId: "inst-1", agentId: null } as const;
+		const ws = fromPartial<Socket>({
+			data: { views: new Map([["live:inst-1:", view]]), trajectories: new Map(), pageId: "prompt-page" },
+			send: (raw: string) => { sent.push(JSON.parse(raw)); return 1; },
+		});
+		const failures: string[] = [];
+		const ledger = new RequestLedger(createClientHandler(fromPartial<SocketEnv>({ sessions })), (_t, error) => failures.push(errorText(error)));
+		ledger.open(ws);
+		await ledger.handle(ws, { t: "resume", frames: [] });
+		const images = [{ mimeType: "image/png", data: "aGk=" }];
+		client.prompt = async () => { throw new Error("provider refused"); };
+		await ledger.handle(ws, { t: "prompt", view, text: "keep my draft", images, delivery: "steer", ack: 1, floor: 1 });
+		expect(sent).toEqual([{ t: "done", ack: 1, error: "provider refused" }]);
+		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual(["Prompt failed: provider refused"]);
+		await ledger.handle(ws, { t: "prompt", view, text: "!echo hello", images, delivery: "steer", ack: 2, floor: 1 });
+		expect(sent.filter(msg => msg.t === "done")).toEqual([
+			{ t: "done", ack: 1, error: "provider refused" },
+			{ t: "done", ack: 2, error: "A ! command takes no images." },
+		]);
+		const notes = sent.flatMap(msg => msg.t === "items" ? msg.items : []);
+		expect(notes).toMatchObject([{ kind: "notice", level: "error", text: "Could not prepare prompt: A ! command takes no images." }]);
+		expect(failures).toEqual(["provider refused", "A ! command takes no images."]);
+	});
+
 	test("socket acknowledgments report failed interruption and termination through the real session paths", async () => {
 		const client = new FakeClient();
 		fakeOmp(client);

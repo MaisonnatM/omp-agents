@@ -60,7 +60,8 @@ import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigg
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { errorText, mediaSrc } from "../api";
+import { errorText } from "../../src/json";
+import { mediaSrc } from "../api";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";

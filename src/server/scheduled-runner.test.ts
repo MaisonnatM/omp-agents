@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { flushJsonFiles } from "../fs";
 import type { ScheduledTarget } from "../shared/scheduled";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { ScheduledFile } from "./scheduled-file";
@@ -24,8 +25,8 @@ function scheduledPath(): string {
 const message = (sessionId: string, text: string): ScheduledTarget => ({ kind: "message", sessionId, text });
 
 /** A runner over a fresh file with a fake clock, starter, and live sessions keyed by session id. */
-function harness() {
-	const file = new ScheduledFile(scheduledPath());
+function harness(path = scheduledPath()) {
+	const file = new ScheduledFile(path);
 	const fake = {
 		now: T0,
 		/** Live sessions by session id, with what each received. */
@@ -141,6 +142,31 @@ describe("ScheduledRunner", () => {
 		await runner.tick();
 		expect(fake.live.get("s1")).toEqual([]);
 		expect(file.value.map(send => send.state)).toEqual([{ phase: "failed", error: STOPPED_WHILE_SENDING, at: T0 + MINUTE }]);
+	});
+
+	test("a claim that cannot persist delivers nothing and remains dirty until storage recovers", async () => {
+		const path = scheduledPath();
+		const { file, fake, runner, add } = harness(path);
+		fake.live.set("s1", []);
+		add("m", T0, message("s1", "once"));
+		renameSync(path, `${path}.saved`);
+		mkdirSync(path);
+		try {
+			await expect(runner.sendNow("m")).rejects.toThrow("Cannot persist the shared-file change.");
+			expect(fake.live.get("s1")).toEqual([]);
+			expect(fake.changes).toBe(0);
+		} finally {
+			rmSync(path, { recursive: true });
+			renameSync(`${path}.saved`, path);
+		}
+		flushJsonFiles();
+		expect(new ScheduledFile(path).value.map(send => send.state)).toEqual([{ phase: "sending" }]);
+		await runner.tick();
+		expect(fake.live.get("s1")).toEqual([]);
+		runner.recover();
+		await runner.sendNow("m");
+		expect(fake.live.get("s1")).toEqual(["once"]);
+		expect(file.value).toEqual([]);
 	});
 });
 

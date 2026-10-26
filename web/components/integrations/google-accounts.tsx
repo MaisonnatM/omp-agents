@@ -14,7 +14,8 @@ import {
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { errorText, putJson } from "../../api";
+import { errorText } from "../../../src/json";
+import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { CommandPicker } from "../command-picker";

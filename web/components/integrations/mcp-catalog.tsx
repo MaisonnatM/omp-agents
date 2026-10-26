@@ -4,7 +4,8 @@ import { MCP_CATALOG, MCP_CATEGORIES, type McpCatalogEntry, type McpCategory } f
 import type { McpServerRow } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { errorText, putJson } from "../../api";
+import { errorText } from "../../../src/json";
+import { putJson } from "../../api";
 import { mcpServersStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MarkTile } from "./integration-row";

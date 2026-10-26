@@ -1,7 +1,7 @@
 import { GitPullRequest, NotebookText, Users } from "lucide-react";
 import { type LinkedPullRequest, samePullRequest } from "../../src/shared/github";
 import type { Project } from "../../src/shared/projects";
-import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
+import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { projectSession } from "../sessions";
 import { DetailsEmpty, DetailsSidebarFrame } from "./details-sidebar-frame";

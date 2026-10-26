@@ -11,7 +11,7 @@ import { shortcutKeys } from "../../shortcuts";
 import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
-import { type OpenPicker, type TodoField, useTodoKeys } from "../../use-todo-keys";
+import { type OpenPicker, useTodoKeys } from "../../use-todo-keys";
 import { FoldButton, useFolds } from "../fold";
 import { PageFrame } from "../list-page";
 import { ListSplit } from "../list-split";

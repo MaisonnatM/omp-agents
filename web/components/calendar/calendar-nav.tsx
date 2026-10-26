@@ -5,7 +5,8 @@ import type { Routine } from "../../../src/routines";
 import { type CalendarShownInput, calendarKey, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/calendar";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { errorText, putJson } from "../../api";
+import { errorText } from "../../../src/json";
+import { putJson } from "../../api";
 import { calendarEventsStore, googleStore, monthSpan, useGoogleCalendars } from "../../reads";
 import { hashForCalendar, hashForRoutines } from "../../routing";
 

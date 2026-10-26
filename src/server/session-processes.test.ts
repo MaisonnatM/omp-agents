@@ -10,7 +10,6 @@ const OMP_A = "  100     1   100  51200   2.0 Fri Oct  3 09:00:00 2026     omp";
 const MCP_A = "  101   100   100  20480   0.5 Fri Oct  3 09:00:00 2026     node mcp.js";
 const DEV = "  110   100   110   4096   1.0 Fri Oct  3 09:00:00 2026     bun run dev";
 const VITE = "  111   110   110  10240  30.0 Fri Oct  3 09:00:00 2026     node vite.js";
-const SLEEP = "  120   100   120   1024   0.0 Fri Oct  3 09:20:00 2026     sleep 600";
 const OMP_B = "  200     1   200  51200   4.0 Fri Oct  3 09:00:00 2026     omp";
 const BROWSER = "  300     1   300   2048   6.5 Fri Oct  3 09:00:00 2026     chromium --headless";
 const PS = [OMP_A, MCP_A, DEV, VITE, OMP_B, BROWSER];

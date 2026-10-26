@@ -2,7 +2,7 @@
  * Settings › Sync on the server: reads the portable files of {@link SYNC_ITEMS} on this machine, merges them three ways
  * with the remote's against the last commit this machine applied, pushes the result, and writes what changed here.
  */
-import { lstat, mkdir, readdir, readFile, realpath, rm, rmdir, stat } from "node:fs/promises";
+import { mkdir, readdir, readFile, realpath, rm, rmdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteText, JsonFile } from "./fs";

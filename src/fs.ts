@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node
 import { open, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { errorText, isObject } from "./json";
+import { OwnerLock } from "./owner-lock";
 
 /** Where a replacement of `path` is staged: beside it, so the rename that publishes it stays on one file system. */
 const stagingFor = (path: string): string => join(dirname(path), `.${basename(path)}.${randomBytes(8).toString("hex")}.tmp`);
@@ -53,10 +54,12 @@ interface JsonFileOptions<T> {
 	indent?: string;
 	/** The file's permissions, `0o600` for one that holds a secret; a directory it creates is then `0o700`. */
 	mode?: number;
+	/** Releases ownership only after the saved value reaches disk. */
+	written?: () => void;
 }
 
 /** Files with a value {@link JsonFile.save} has not written yet, by path. */
-const pending = new Map<string, { flush(): void }>();
+const pending = new Map<string, { flush(): boolean }>();
 
 /** Writes every value saved and not yet written, as the server stops: a value saved in its last tick still reaches its file. */
 export function flushJsonFiles(): void {
@@ -64,8 +67,8 @@ export function flushJsonFiles(): void {
 }
 
 /**
- * A file holding one JSON value, which the server reads when it starts and replaces whole on every change. A failure to
- * read or write is reported and never thrown: what the server keeps in memory stays right, and only the next start loses it.
+ * A file holding one JSON value, which the server reads when it starts and replaces whole on every change. Read and write
+ * failures are reported, not thrown. A failed write stays dirty for a later flush rather than being mistaken for persistence.
  * Saves within one tick write once, at the end of it, with the last value; {@link flushJsonFiles} writes them sooner.
  */
 export class JsonFile<T> {
@@ -84,7 +87,7 @@ export class JsonFile<T> {
 	 * `JsonFile` of this path saved and has not written yet is written first.
 	 */
 	load(): T | null {
-		pending.get(this.#path)?.flush();
+		if (pending.get(this.#path)?.flush() === false) return this.#unwritten?.value ?? null;
 		const path = this.#path;
 		let text: string;
 		try {
@@ -123,19 +126,22 @@ export class JsonFile<T> {
 		this.#unwritten = { value };
 	}
 
-	/** Writes the value saved and not yet written, if any, now. */
-	flush(): void {
+	/** Whether the dirty value reached disk; a failed write stays pending for a later flush. */
+	flush(): boolean {
 		const unwritten = this.#unwritten;
-		if (!unwritten) return;
-		this.#unwritten = null;
-		if (pending.get(this.#path) === this) pending.delete(this.#path);
+		if (!unwritten) return true;
 		const { indent, mode, toJson } = this.#options;
 		try {
 			mkdirSync(dirname(this.#path), { recursive: true, mode: mode === undefined ? undefined : 0o700 });
 			atomicWriteTextSync(this.#path, `${JSON.stringify(toJson ? toJson(unwritten.value) : unwritten.value, null, indent)}\n`, mode);
 		} catch (err) {
 			console.error(`omp-agents: cannot write ${this.#path}: ${errorText(err)}`);
+			return false;
 		}
+		this.#unwritten = null;
+		if (pending.get(this.#path) === this) pending.delete(this.#path);
+		this.#options.written?.();
+		return true;
 	}
 }
 
@@ -144,7 +150,7 @@ interface ReducerFileOptions<S, A extends unknown[]> extends Pick<JsonFileOption
 	empty: S;
 	/** `value` after a change, or `value` itself when the change changes nothing. */
 	reduce: (value: S, ...change: A) => S;
-	/** Servers on other ports write the file too, so every change reads it again first and keeps what they saved. */
+	/** Holds interprocess ownership through reload, reduction, and an immediate successful write. */
 	shared?: boolean;
 }
 
@@ -156,13 +162,15 @@ interface ReducerFileOptions<S, A extends unknown[]> extends Pick<JsonFileOption
 export class ReducerFile<S, A extends unknown[]> {
 	readonly #file: JsonFile<S>;
 	readonly #reduce: (value: S, ...change: A) => S;
-	readonly #shared: boolean;
+	readonly #lock: OwnerLock | null;
+	readonly #path: string;
 	#value: S;
 
 	constructor(path: string, { parse, toJson, holds, empty, reduce, shared = false }: ReducerFileOptions<S, A>) {
-		this.#file = new JsonFile(path, { parse, toJson, holds, onInvalid: "aside", indent: "\t" });
+		this.#path = path;
+		this.#lock = shared ? new OwnerLock(`${path}.lock`, 0) : null;
+		this.#file = new JsonFile(path, { parse, toJson, holds, onInvalid: "aside", indent: "\t", written: () => this.#lock?.release() });
 		this.#reduce = reduce;
-		this.#shared = shared;
 		this.#value = this.#file.load() ?? empty;
 	}
 
@@ -175,14 +183,31 @@ export class ReducerFile<S, A extends unknown[]> {
 		return this.update(value => this.#reduce(value, ...change));
 	}
 
-	/** Passes the value through `next` and saves; whether it changed anything. A shared file is read again first. */
+	/** Passes the value through `next` and saves; a shared change holds ownership until its write succeeds. */
 	update(next: (value: S) => S): boolean {
-		if (this.#shared) this.reload();
-		const current = this.#value;
-		const changed = next(current);
-		if (changed === current) return false;
-		this.#value = changed;
-		this.#file.save(changed);
+		if (!this.#lock) {
+			const changed = next(this.#value);
+			if (changed === this.#value) return false;
+			this.#value = changed;
+			this.#file.save(changed);
+			return true;
+		}
+		if (pending.get(this.#path)?.flush() === false) throw new Error("Cannot persist the previous shared-file change.");
+		this.#lock.wait();
+		try {
+			this.#value = this.#file.load() ?? this.#value;
+			const changed = next(this.#value);
+			if (changed === this.#value) {
+				this.#lock.release();
+				return false;
+			}
+			this.#value = changed;
+			this.#file.save(changed);
+		} catch (error) {
+			this.#lock.release();
+			throw error;
+		}
+		if (!this.#file.flush()) throw new Error("Cannot persist the shared-file change.");
 		return true;
 	}
 
@@ -192,7 +217,7 @@ export class ReducerFile<S, A extends unknown[]> {
 	}
 
 	/** Writes what {@link update} saved now, for a reader of the file that cannot wait for the end of this tick. */
-	flush(): void {
-		this.#file.flush();
+	flush(): boolean {
+		return this.#file.flush();
 	}
 }

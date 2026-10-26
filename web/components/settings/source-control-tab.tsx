@@ -14,7 +14,8 @@ import {
 	type SourceControlChange,
 	type SourceControlProvider,
 } from "../../../src/shared/source-control";
-import { errorText, putJson } from "../../api";
+import { errorText } from "../../../src/json";
+import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { age, folderName } from "../../labels";
 import { useMergeMethodChoice } from "../../merge-method";

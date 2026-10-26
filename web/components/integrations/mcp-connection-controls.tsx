@@ -10,7 +10,7 @@ import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
-import { errorText } from "../../api";
+import { errorText } from "../../../src/json";
 import type { SignInControls } from "../../use-sign-in";
 import { Callout } from "./integration-row";
 

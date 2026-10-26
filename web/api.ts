@@ -4,7 +4,7 @@
  */
 import { MEDIA_KEY_PARAM, MEDIA_KEY_STORAGE_KEY, SOCKET_PROTOCOL, SOCKET_TOKEN_PREFIX, TOKEN_STORAGE_KEY } from "../src/shared/access";
 import type { BranchRelease } from "../src/shared/git";
-import type { SettingsError } from "../src/shared/models";
+import { isObject } from "../src/json";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
 
 export class ApiError extends Error {
@@ -16,9 +16,6 @@ export class ApiError extends Error {
 		super(message);
 	}
 }
-
-/** What a failure says to the person reading the page. */
-export const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** What localStorage keeps under `key`, `null` where there is no localStorage, as in tests. */
 const stored = (key: string): string | null => globalThis.localStorage?.getItem(key) ?? null;
@@ -81,8 +78,9 @@ export async function readJson<T>(response: Response): Promise<T> {
 		throw new ApiError(text.trim() ? `${status}: ${text.trim().slice(0, 200)}` : status);
 	}
 	if (!response.ok) {
-		const { error, conflict } = body as Partial<SettingsError>;
-		throw new ApiError(typeof error === "string" ? error : `HTTP ${response.status}`, conflict === true);
+		const error = isObject(body) ? body.error : null;
+		const conflict = isObject(body) && body.conflict === true;
+		throw new ApiError(typeof error === "string" ? error : `HTTP ${response.status}`, conflict);
 	}
 	return body as T;
 }

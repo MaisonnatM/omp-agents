@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Play, Plus, Ticket } from "lucide-react";
+import { ChevronRight, Play, Plus, Ticket } from "lucide-react";
 import { useContext, useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
@@ -15,7 +15,6 @@ import { dayLabel } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type QuickItem, quickOn, todoActions, todoStart, type WorkActionId } from "../../quick-actions";
 import { hashForNewSession, hashForNotes } from "../../routing";
-import { shortcutLabels } from "../../shortcuts";
 import { categoryColor, TODO_STATUS, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoField } from "../../use-todo-keys";

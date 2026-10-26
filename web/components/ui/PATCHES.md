@@ -78,6 +78,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/select.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/select.json`).
   Its icons are lucide's, its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.
   `SelectGroup`, `SelectLabel`, `SelectSeparator`, and the exported scroll buttons and trigger `size` are removed, since nothing uses them; the popup keeps its scroll arrows.
+  Its unused React namespace import is removed.
 - `ui/empty.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/empty.json`).
   It imports `cn` from `@/lib/utils`, `EmptyContent` is removed, since nothing uses it, and `EmptyTitle` drops the registry's `cn-font-heading` hook, which this app's CSS does not define.
 - `ui/collapsible.tsx`, `ui/trace.tsx`, and `ui/code-block.tsx` come from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/<name>.json`).

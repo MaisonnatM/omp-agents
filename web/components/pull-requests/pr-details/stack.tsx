@@ -1,5 +1,5 @@
 /** A pull request's stack and its session's other pull requests: the popover that a session's header and the pull request header both open. */
-import { GitMerge, GitPullRequest, Layers } from "lucide-react";
+import { GitMerge, GitPullRequest } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { queuedMergeOf } from "../../../../src/shared/merge-queue";

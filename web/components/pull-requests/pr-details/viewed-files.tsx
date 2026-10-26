@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ChangedEntry } from "../../../../src/shared/changes";
 import type { PullRequest, PullRequestChangedEntry } from "../../../../src/shared/github";
-import { errorText } from "../../../api";
+import { errorText } from "../../../../src/json";
 import { withMember } from "../../../changes-model";
 import { writeViewedFile } from "../../../reads";
 
