@@ -40,15 +40,8 @@ export const routinesFile = join(configDir, "routines.json");
 export const scheduledFile = join(configDir, "scheduled.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
 export const workspacesFile = join(configDir, "workspaces.json");
-/**
- * The projects, their workers, and the updates waiting for their coordinators, beside {@link tokenFile}; omp's `projects` extension reads it.
- * An older version kept the {@link workspacesFile} list under this name, which the server moves away before it reads the projects.
- */
-export const projectsFile = join(configDir, "projects.json");
-/** Project `id`'s notes, which every session of the project reads and writes; outside every repository, so all worktrees share them. */
-export const projectNotesDir = (id: string): string => join(dataDir, "projects", id);
-/** The user's notes, which every project's sessions read: how the user works, and the workflows that held across projects. */
-export const userNotesDir = join(dataDir, "user");
+/** Where an older version kept the {@link workspacesFile} list, beside {@link tokenFile}; the server moves it at startup. */
+export const oldWorkspacesFile = join(configDir, "projects.json");
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
 /** When the idle stop ends a session's processes, beside {@link tokenFile}. */

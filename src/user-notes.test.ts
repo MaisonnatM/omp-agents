@@ -6,7 +6,7 @@ import type { UserNote, UserNoteChange, UserNoteList } from "./user-notes-shared
 const CREATED = "2026-10-01T08:00:00.000Z";
 const AT = "2026-10-05T09:00:00.000Z";
 
-const note = (id: string, fields: Partial<UserNote> = {}): UserNote => ({ id, title: id, body: "", todoId: null, projectId: null, addedBy: null, createdAt: CREATED, updatedAt: CREATED, ...fields });
+const note = (id: string, fields: Partial<UserNote> = {}): UserNote => ({ id, title: id, body: "", todoId: null, addedBy: null, createdAt: CREATED, updatedAt: CREATED, ...fields });
 const listOf = (...notes: UserNote[]): UserNoteList => ({ notes });
 const after = (list: UserNoteList, ...changes: UserNoteChange[]): UserNoteList => changes.reduce(applyUserNote, list);
 const ids = ({ notes }: UserNoteList): string => notes.map(entry => entry.id).join(" ");
@@ -30,7 +30,6 @@ describe("applyUserNote", () => {
 			{ op: "edit-body", id: "a", body: "x", at: AT },
 			{ op: "append", id: "a", text: "", at: AT },
 			{ op: "set-todo", id: "a", todoId: null },
-			{ op: "set-project", id: "a", projectId: null },
 			{ op: "edit-body", id: "gone", body: "y", at: AT },
 			{ op: "remove", id: "gone" },
 		] satisfies UserNoteChange[]) {
@@ -49,13 +48,6 @@ describe("applyUserNote", () => {
 		expect(list.notes[1]).toMatchObject({ todoId: "t1", updatedAt: CREATED });
 	});
 
-	test("putting a note in a project keeps its place and update time", () => {
-		const list = after(listOf(note("a"), note("b")), { op: "set-project", id: "b", projectId: "p1" });
-		expect(ids(list)).toBe("a b");
-		expect(list.notes[1]).toMatchObject({ projectId: "p1", updatedAt: CREATED });
-		expect(after(list, { op: "set-project", id: "b", projectId: null }).notes[1]?.projectId).toBeNull();
-	});
-
 	test("a restore puts a removed note back where it was", () => {
 		const list = listOf(note("a"), note("b"), note("c"));
 		const removed = after(list, { op: "remove", id: "b" });
@@ -63,16 +55,20 @@ describe("applyUserNote", () => {
 		expect(after(removed, { op: "restore", note: note("b"), index: 1 })).toEqual(list);
 	});
 
-	test("a new note is untitled, empty, and in no project unless given more", () => {
-		expect(addNote({ todoId: "t1" }).note).toMatchObject({ title: "", body: "", todoId: "t1", projectId: null, addedBy: null });
-		expect(addNote({ projectId: "p1" }).note.projectId).toBe("p1");
+	test("a new note is untitled, empty, and linked to no todo unless given more", () => {
+		expect(addNote().note).toMatchObject({ title: "", body: "", todoId: null, addedBy: null });
+		expect(addNote({ todoId: "t1" }).note.todoId).toBe("t1");
 	});
 });
 
 describe("parseUserNoteList", () => {
-	test("reads a note with only an id, a title, and an added time, as in no todo or project, most recently updated first", () => {
-		const list = parseUserNoteList({ notes: [{ id: "a", title: "A", createdAt: CREATED }, note("b", { updatedAt: AT, projectId: "p1" })] });
-		expect(list?.notes).toEqual([note("b", { updatedAt: AT, projectId: "p1" }), note("a", { title: "A" })]);
+	test("reads a note with only an id, a title, and an added time, as in no todo, most recently updated first", () => {
+		const list = parseUserNoteList({ notes: [{ id: "a", title: "A", createdAt: CREATED }, note("b", { updatedAt: AT })] });
+		expect(list?.notes).toEqual([note("b", { updatedAt: AT }), note("a", { title: "A" })]);
+	});
+
+	test("drops the project an older version saved on a note", () => {
+		expect(parseUserNoteList({ notes: [{ ...note("a"), projectId: "p1" }] })?.notes).toEqual([note("a")]);
 	});
 
 	test("holds none for a note it cannot read", () => {
@@ -89,8 +85,6 @@ describe("parseNoteChange", () => {
 			{ op: "edit-body", id: "a", body: "B", at: AT },
 			{ op: "append", id: "a", text: "more", at: AT },
 			{ op: "set-todo", id: "a", todoId: "t1" },
-			{ op: "set-project", id: "a", projectId: "p1" },
-			{ op: "set-project", id: "a", projectId: null },
 			{ op: "remove", id: "a" },
 			{ op: "restore", note: note("a"), index: 2 },
 		];
@@ -100,7 +94,6 @@ describe("parseNoteChange", () => {
 	test("refuses a title too long, a blank id, a bad time, or an unknown op", () => {
 		expect(parseNoteChange({ op: "edit-title", id: "a", title: "x".repeat(MAX_NOTE_TITLE + 1), at: AT })).toBeNull();
 		expect(parseNoteChange({ op: "add", note: note(" ") })).toBeNull();
-		expect(parseNoteChange({ op: "set-project", id: "a", projectId: " " })).toBeNull();
 		expect(parseNoteChange({ op: "append", id: "a", text: "x", at: "later" })).toBeNull();
 		expect(parseNoteChange({ op: "toggle", id: "a" })).toBeNull();
 	});

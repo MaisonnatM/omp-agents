@@ -22,7 +22,6 @@ import {
 	Wrench,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Project } from "../../../src/shared/projects";
 import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -54,7 +53,7 @@ import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
-import { hashForNotes, hashForProjects, type OpenMode, type SidebarTab } from "../../routing";
+import { hashForNotes, type OpenMode, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
@@ -86,7 +85,6 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	calendar: PAGE_ICON.calendar,
 	inbox: PAGE_ICON.inbox,
 	routines: Repeat,
-	projects: PAGE_ICON.projects,
 	terminal: SquareTerminal,
 };
 
@@ -119,14 +117,12 @@ interface CommandPaletteProps {
 	notes: readonly UserNote[] | null;
 	/** Linear answers, so a search lists the tickets assigned to you. */
 	linearConnected: boolean;
-	/** Every project; the ones not archived list as items that open their page. */
-	projects: readonly Project[];
 	/** Open the new-ticket dialog with a title, which a search offers while Linear answers. */
 	onCreateTicket: (title: string) => void;
 }
 
 /**
- * Searches running and past sessions in every workspace, projects, the page's commands, and workspaces, and for a search
+ * Searches running and past sessions in every workspace, the page's commands, and workspaces, and for a search
  * also the todos, your Linear tickets, and the sidebar workspace's pull requests; Enter runs the highlighted entry's first
  * action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props hold no closure
  * built per render, so a socket update that touches none of them skips it, and a closed palette renders and reads nothing.
@@ -135,7 +131,7 @@ export const CommandPalette = memo(function CommandPalette({ state, ...props }: 
 	return state && <OpenCommandPalette state={state} {...props} />;
 });
 
-function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, projects, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
 	const { starts, ending, pullRequestsScope, connected } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
@@ -198,24 +194,6 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		};
 		return [...hosts.map(host => sessionItem({ kind: "live", host })), ...past.map(session => sessionItem({ kind: "past", session }))];
 	}, [hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end, workspaceSettings]);
-
-	const projectItems = useMemo(
-		(): PaletteItem[] =>
-			projects
-				.filter(project => !project.archived)
-				.map(project => ({
-					id: `project:${project.id}`,
-					section: "projects",
-					title: project.name,
-					subtitle: project.cwd,
-					keywords: project.workers.map(worker => worker.title),
-					icon: PAGE_ICON.projects,
-					accessories: [],
-					kind: "Project",
-					actions: [[{ id: "open", title: "Open project", icon: PAGE_ICON.projects, run: { kind: "link", href: hashForProjects({ kind: "project", id: project.id }) } }]],
-				})),
-		[projects],
-	);
 
 	const commandItems = useMemo((): PaletteItem[] => {
 		const pushItem = (id: string, title: string, icon: LucideIcon, target: PaletteViewId, keywords: string[], keys: readonly string[]): PaletteItem => ({
@@ -350,12 +328,12 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			} } }]],
 		}] : [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...projectItems, ...records, ...conversations, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...noteItems, ...ticketItem()],
+			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...noteItems, ...ticketItem()],
 			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, projectItems, records, conversations, commandItems, workspaceItems, search, todoCategories, changeTodo, connected, notes, changeNote, linearConnected, onCreateTicket]);
+	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, changeTodo, connected, notes, changeNote, linearConnected, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;

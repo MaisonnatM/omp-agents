@@ -5,7 +5,6 @@
   `shortPaths` adds the fewest parent folders needed to tell files of one name apart in the changes card.
   `web/components/changes/file-tree.tsx` draws the explorer's tree; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines, for the changes view, recorded edit diffs, and a message's code blocks.
   `web/loaded-once.ts` holds `loadedOnce` and `useLoaded`, a value a dynamic import makes, loaded once on first need, which the grammars and `web/components/raw-html.ts`'s raw HTML plugins use.
-- `web/notes-model.ts`: `noteRows`, a notes directory's files as `folderTree` lays them out, flattened into folder and file rows with their depth, folders first then files at each level, by name; `ProjectNotesList` in `web/components/projects/project-parts.tsx` draws the project's Notes page notes, then the project's tree and the user's, on the project page and in the coordinator's sidebar.
 - `web/file-paths.ts`: which paths in agent text name a text file, an image, or a video (`linkedFile`), the absolute path each resolves to, and the `figure` that `remarkFilePaths` ends the text with, listing the images and videos it names.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-link.tsx` holds the link that opens such a path, `web/components/local-media.tsx` the image or video shown in place and the thumbnails under the text, and `web/components/file-dialog.tsx` the dialog that shows the file, an image or video large.

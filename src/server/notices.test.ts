@@ -128,7 +128,6 @@ function sources(state: State): NoticeSources {
 			if (state.googleError) throw new Error(state.googleError);
 			return [{ account: "google-calendar", events: state.googleEvents ?? [] }];
 		},
-		projects: () => [],
 		stoppedSessions: () => (state.interrupted?.midTurn() ?? []).map(sessionId => ({ sessionId, title: state.listed?.[sessionId]?.title ?? null, cwdDisplay: state.listed?.[sessionId]?.cwdDisplay ?? null })),
 	now: () => state.now ?? 0,
 	};

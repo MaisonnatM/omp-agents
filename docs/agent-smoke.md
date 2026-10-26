@@ -24,12 +24,10 @@ Open `#new/%2Ftmp` to start one in `/tmp`, use a prompt such as `Reply with just
 
 ## Isolated state
 
-A smoke server reads and writes the user's own state: `calendars.json`, `projects.json`, `token`, and the rest under `~/.config/omp-agents`, and project notes under the data directory.
-When a check changes that state, such as starting a project or hiding a calendar, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
-Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`, and its project notes are under `$XDG_DATA_HOME`.
+A smoke server reads and writes the user's own state: `calendars.json`, `token`, and the rest under `~/.config/omp-agents`, and the settings sync's repository under the data directory.
+When a check changes that state, such as hiding a calendar, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
+Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`.
 The omp sessions it starts still use the user's omp directory, so they still run with the user's models and sign-ins.
-
-A project's sessions load the installed `~/.omp/agent/extensions/projects.ts` whenever it exists, not `templates/omp/agent/extensions/projects.ts` (`projectsExtensionArgs` in `src/server/project-runner.ts`), so to test an edit of the template, install it first or check `bun run omp-template --dry-run`.
 
 The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shells, and commands it starts (`childEnv` in `src/proc.ts`), so a smoke server an agent starts takes the port it is given and does not exit when its stdin ends.
 
@@ -61,7 +59,7 @@ Besides a live session's own hash, the routes are:
 - `#tickets`, `#tickets/<identifier>`;
 - `#inbox`, `#inbox/<thread id>`;
 - `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
-- `#calendar`, `#routines`, `#routines/<id>`, `#projects`, `#projects/new`, `#projects/<id>`;
+- `#calendar`, `#routines`, `#routines/<id>`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `files`, or `worktrees`.
 

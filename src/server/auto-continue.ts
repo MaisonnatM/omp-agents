@@ -3,11 +3,12 @@
  * scheduled send that the scheduled runner delivers, for when a usage limit resets, or after a backoff that grows with
  * each transient connection or provider fault in a row. A turn the session starts first, from any prompt, cancels it,
  * and so does an edited prompt or End session. While `scheduled.json` holds the session's continue, or its limit's usage
- * read runs, the session is held: it stays on its task for its routine and its project, across a server restart too.
+ * read runs, the session is held: it stays on its task for its routine and its merge cleanup, across a server restart too.
  */
 import { randomUUID } from "node:crypto";
 import type { TurnFailure } from "../omp/turn-failure";
 import type { PlanUsage } from "../shared/models";
+import type { HostStatus } from "../shared/sessions";
 import { RESET_MARGIN_MS, resetName, type ScheduledSend, type ScheduledTarget } from "../shared/scheduled";
 import { providerName } from "../usage";
 import type { ScheduledFile } from "./scheduled-file";
@@ -19,6 +20,9 @@ export const UNKNOWN_RESET_WAIT_MS = 60 * 60_000;
 
 /** How long each retry waits after a transient fault, by how many faults in a row came before it; one more fault than it lists leaves the session idle. */
 const TRANSIENT_RETRY_WAITS_MS = [1, 2, 4, 8, 16].map(minutes => minutes * 60_000);
+
+/** Whether a session with live `status` is still on its task: a turn runs or waits on a question, or it is `held` for its usage limit's continue. */
+export const occupiedBy = (status: HostStatus, held: boolean): boolean => status === "working" || status === "needs-input" || held;
 
 /** When a continue goes, what it waits for as a scheduled send's `reset` names it, and the provider's name the page shows. */
 export interface ContinueWhen {
@@ -64,22 +68,16 @@ export interface AutoContinueDeps {
 	now(): number;
 	/** The continues changed: every socket should hear the sends, and {@link AutoContinue.sendsChanged} release the holds they end. */
 	onChange(): void;
-	/** Session `sessionId` is held no more: its continue went, left the schedule, or was canceled; `reply` is what its held turn ended on. */
-	released(sessionId: string, reply: string | null): void;
-}
-
-/** A limit whose continue waits on its usage read, with the reply the held turn ended on. */
-interface Reading {
-	hit: UsageLimit;
-	reply: string | null;
+	/** Session `sessionId` is held no more: its continue went, left the schedule, or was canceled. */
+	released(sessionId: string): void;
 }
 
 export class AutoContinue {
 	readonly #deps: AutoContinueDeps;
-	/** Each session whose continue waits on its usage read; a cancel meanwhile takes it out. */
-	readonly #reading = new Map<string, Reading>();
-	/** The held sessions as the last {@link sendsChanged} saw them, with their replies, so the next one knows which holds ended. */
-	#seen: Map<string, string | null>;
+	/** Each session whose continue waits on its usage read, with that limit; a cancel meanwhile takes it out. */
+	readonly #reading = new Map<string, UsageLimit>();
+	/** The held sessions as the last {@link sendsChanged} saw them, so the next one knows which holds ended. */
+	#seen: Set<string>;
 	/** How many transient faults in a row each session's retries followed; the count lives in memory and starts over with the server. */
 	readonly #retries = new Map<string, number>();
 
@@ -88,64 +86,62 @@ export class AutoContinue {
 		this.#seen = this.#heldNow();
 	}
 
-	/** Whether session `sessionId` waits on its continue, so its routine or project counts it as still on its task. */
+	/** Whether session `sessionId` waits on its continue, so its routine or merge cleanup counts it as still on its task. */
 	held(sessionId: string): boolean {
 		return this.#reading.has(sessionId) || this.#deps.file.value.some(send => holds(send) && send.target.sessionId === sessionId);
 	}
 
 	/**
-	 * A turn of session `sessionId`, which this server started, ended on `failure` with its last reply `reply`; whether the
-	 * session is now held for a continue. A usage limit schedules one with {@link limited}, and a transient fault one after
-	 * the next of {@link TRANSIENT_RETRY_WAITS_MS}, none past the last. A turn that ended any other way starts the retries over.
+	 * A turn of session `sessionId`, which this server started, ended on `failure`. A usage limit schedules a continue with
+	 * {@link limited}, and a transient fault one after the next of {@link TRANSIENT_RETRY_WAITS_MS}, none past the last. A turn
+	 * that ended any other way starts the retries over.
 	 */
-	turnEnded(sessionId: string, failure: TurnFailure | null, reply: string | null): boolean {
+	turnEnded(sessionId: string, failure: TurnFailure | null): void {
 		switch (failure?.kind) {
 			case "usage-limit":
-				void this.limited(sessionId, failure, reply);
-				return true;
+				void this.limited(sessionId, failure);
+				return;
 			case "transient":
-				return this.#retry(sessionId, failure.provider, reply);
+				this.#retry(sessionId, failure.provider);
+				return;
 			default:
 				this.#retries.delete(sessionId);
-				return false;
 		}
 	}
 
 	/**
-	 * A turn of session `sessionId` ended on `hit`, its last reply `reply`: holds the session at once, then schedules its
-	 * continue, in place of one it waits on, from plan usage read now. Its transient retries start over.
+	 * A turn of session `sessionId` ended on `hit`: holds the session at once, then schedules its continue, in place of one it
+	 * waits on, from plan usage read now. Its transient retries start over.
 	 */
-	async limited(sessionId: string, hit: UsageLimit, reply: string | null): Promise<void> {
+	async limited(sessionId: string, hit: UsageLimit): Promise<void> {
 		const { file, plans, now, onChange } = this.#deps;
 		this.#retries.delete(sessionId);
 		const at = now();
-		const reading = { hit, reply };
-		this.#reading.set(sessionId, reading);
+		this.#reading.set(sessionId, hit);
 		this.sendsChanged();
 		// Without a usage report the provider's own wait still counts.
 		const read = await plans().catch(() => []);
-		if (this.#reading.get(sessionId) !== reading) return;
+		if (this.#reading.get(sessionId) !== hit) return;
 		this.#reading.delete(sessionId);
 		const when = continueWhen(hit, read, at);
-		file.apply({ op: "continue", send: { id: randomUUID(), at: when.at, reset: when.reset, target: { kind: "continue", sessionId, provider: when.provider, cause: "usage-limit", reply } } }, now());
+		file.apply({ op: "continue", send: { id: randomUUID(), at: when.at, reset: when.reset, target: { kind: "continue", sessionId, provider: when.provider, cause: "usage-limit" } } }, now());
 		onChange();
 	}
 
-	/** Schedules session `sessionId`'s next retry after `provider`'s transient fault, in place of the continue it waits on; whether one was left to schedule. */
-	#retry(sessionId: string, provider: string, reply: string | null): boolean {
+	/** Schedules session `sessionId`'s next retry after `provider`'s transient fault, in place of the continue it waits on, unless none is left. */
+	#retry(sessionId: string, provider: string): void {
 		const { file, now, onChange } = this.#deps;
 		const retried = this.#retries.get(sessionId) ?? 0;
 		const wait = TRANSIENT_RETRY_WAITS_MS[retried];
 		if (wait === undefined) {
 			this.#retries.delete(sessionId);
-			return false;
+			return;
 		}
 		this.#retries.set(sessionId, retried + 1);
 		this.#reading.delete(sessionId);
 		const at = now();
-		file.apply({ op: "continue", send: { id: randomUUID(), at: at + wait, reset: null, target: { kind: "continue", sessionId, provider: providerName(provider), cause: "transient", reply } } }, at);
+		file.apply({ op: "continue", send: { id: randomUUID(), at: at + wait, reset: null, target: { kind: "continue", sessionId, provider: providerName(provider), cause: "transient" } } }, at);
 		onChange();
-		return true;
 	}
 
 	/**
@@ -167,15 +163,15 @@ export class AutoContinue {
 	/** The scheduled sends changed, here or on another server: a session held before and not now is released. */
 	sendsChanged(): void {
 		const now = this.#heldNow();
-		const ended = [...this.#seen].filter(([sessionId]) => !now.has(sessionId));
+		const ended = [...this.#seen].filter(sessionId => !now.has(sessionId));
 		this.#seen = now;
-		for (const [sessionId, reply] of ended) this.#deps.released(sessionId, reply);
+		for (const sessionId of ended) this.#deps.released(sessionId);
 	}
 
-	/** The held sessions now, each with the reply its held turn ended on: those whose usage read runs, and those whose continue waits or goes. */
-	#heldNow(): Map<string, string | null> {
-		const held = new Map([...this.#reading].map(([sessionId, { reply }]) => [sessionId, reply]));
-		for (const send of this.#deps.file.value) if (holds(send)) held.set(send.target.sessionId, send.target.reply);
+	/** The held sessions now: those whose usage read runs, and those whose continue waits or goes. */
+	#heldNow(): Set<string> {
+		const held = new Set(this.#reading.keys());
+		for (const send of this.#deps.file.value) if (holds(send)) held.add(send.target.sessionId);
 		return held;
 	}
 }

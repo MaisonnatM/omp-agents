@@ -20,7 +20,6 @@ import { NewSession } from "./new-session";
 import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
-import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
@@ -60,7 +59,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -68,8 +67,6 @@ interface PageSwitchProps extends PageState {
 	page: Page | null;
 	/** The new session under way or failed, if there is one. */
 	newStart: StartOf<"new"> | null;
-	/** The new project under way or failed, if there is one. */
-	projectStart: StartOf<"project"> | null;
 	scope: WorkspaceScope;
 	/** Where a new session starts when nothing picks a directory. */
 	defaultWorkspace: string;
@@ -103,7 +100,6 @@ export const PageSwitch = memo(function PageSwitch({
 	userTodos,
 	userNotes,
 	routines,
-	projects,
 	workspaceList,
 	pins,
 	newSessionCompletions,
@@ -111,7 +107,6 @@ export const PageSwitch = memo(function PageSwitch({
 	listed,
 	rosterError,
 	newStart,
-	projectStart,
 	scope,
 	defaultWorkspace,
 	sectionTarget,
@@ -195,36 +190,19 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		case "notes":
-			return <NotesPage list={userNotes} todos={userTodos} projects={projects} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
+			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "routines":
 			return (
 				// Keyed by its target, so leaving for another routine or the list closes the editor.
 				<RoutinesPage
 					key={routinesTarget ?? ""}
 					routines={routines}
-					projects={projects}
 					target={routinesTarget}
 					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.
 					hosts={hosts}
 					workspaces={workspaces}
 					defaultCwd={defaultWorkspace}
 					connected={connected}
-				/>
-			);
-		case "projects":
-			return (
-				// Keyed by its target, so leaving for another project or the list closes the form and the rename field.
-				<ProjectsPage
-					key={page.target.kind === "project" ? page.target.id : page.target.kind}
-					projects={projects}
-					target={page.target}
-					// Every session, since a project's workers may run in `/tmp`, which the sidebar hides.
-					hosts={hosts}
-					past={past}
-					workspaces={workspaces}
-					defaultCwd={defaultWorkspace}
-					connected={connected}
-					launch={projectStart}
 				/>
 			);
 		case "calendar":

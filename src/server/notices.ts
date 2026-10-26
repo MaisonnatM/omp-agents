@@ -10,7 +10,6 @@ import type { DashboardUpdateOutcome } from "../shared/dashboard-update";
 import type { PlanUsage } from "../shared/models";
 import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
 import { EVENT_LEAD_MS, usesClause } from "../shared/notices";
-import type { Project, Worker, WorkerPhase } from "../shared/projects";
 import type { SlackFound } from "../slack-messages";
 
 /** A timed calendar event; `ref` names it among the events: `local/<id>`, or `google/<account>/<calendar id>/<event id>`. */
@@ -20,16 +19,6 @@ export type FoundEvent = Omit<EventSubject, "kind"> & { ref: string };
 export interface AccountFoundEvents {
 	account: string;
 	events: FoundEvent[] | null;
-}
-
-/**
- * A project not archived as its notices see it: whether its coordinator is still on its task, and each worker's phase, whether it is still on
- * its task, and its open questions. A session a usage limit stopped is idle but stays on its task until its continue goes.
- */
-export interface ProjectFacts {
-	project: Project;
-	coordinatorOccupied: boolean;
-	workers: { worker: Worker; phase: WorkerPhase; occupied: boolean; questions: { id: string; title: string }[] }[];
 }
 
 export interface NoticeSources {
@@ -57,8 +46,6 @@ export interface NoticeSources {
 	localEvents(): FoundEvent[];
 	/** The timed events of each signed-in Google Calendar account's shown calendars that overlap `from` to `to`, epoch ms. */
 	googleEvents(from: number, to: number): Promise<AccountFoundEvents[]>;
-	/** Every project not archived, as its notices see it. */
-	projects(): ProjectFacts[];
 	/** The interrupted dashboard sessions that stopped while their turn ran. */
 	stoppedSessions(): StoppedSession[];
 	now(): number;
@@ -74,8 +61,6 @@ export const ACTIVITY_KINDS = ["pull-request", "slack"] as const satisfies reado
 export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly NoticeKind[];
 /** The kinds the event check looks for. */
 export const EVENT_KINDS = ["event"] as const satisfies readonly NoticeKind[];
-/** The kinds the project check looks for. */
-export const PROJECT_KINDS = ["project"] as const satisfies readonly NoticeKind[];
 /** The kinds the stopped-sessions check looks for. */
 export const STOPPED_KINDS = ["stopped"] as const satisfies readonly NoticeKind[];
 
@@ -117,7 +102,6 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	plan: "used-up plans",
 	credits: "providers out of credits",
 	event: "calendar events",
-	project: "projects that need you",
 	stopped: "sessions that stopped mid-turn",
 };
 
@@ -197,30 +181,6 @@ function eventNotices(local: FoundEvent[], google: AccountFoundEvents[] | null, 
 		scopes: new Set(["event:local", ...(google === null ? [] : ["event:google"]), ...answered.map(({ scope }) => scope)]),
 		dated: true,
 	};
-}
-
-/**
- * What each project needs of the user, each id naming its state: a worker's question the coordinator left unanswered
- * once it is idle or stopped, a worker that stopped without End session, and a project whose workers are all done with
- * nothing queued or waiting for its coordinator.
- */
-export function projectNotices(facts: ProjectFacts[], at: number): Unscoped[] {
-	return facts.flatMap(({ project, coordinatorOccupied, workers }) => {
-		const base = { at, kind: "project" as const, projectId: project.id, project: project.name };
-		const found: Unscoped[] = workers.flatMap(({ worker, phase, questions }) => {
-			const who = { id: worker.id, title: worker.title };
-			const stopped = phase === "interrupted" ? [{ ...base, id: `project:${project.id}:${worker.id}:stopped:${worker.sessionId}`, about: "stopped" as const, worker: who, text: `${worker.id} stopped without End session.` }] : [];
-			const asks = coordinatorOccupied ? [] : questions.map(request => ({ ...base, id: `project:${project.id}:${worker.id}:asks:${request.id}`, about: "asks" as const, worker: who, text: request.title }));
-			return [...stopped, ...asks];
-		});
-		const settled = workers.every(({ phase, occupied }) => !occupied && (phase === "idle" || phase === "ended"));
-		if (workers.length > 0 && settled && !coordinatorOccupied && project.queue.length === 0 && project.updates.length === 0) {
-			const last = project.workers.map(worker => worker.lastReply?.at ?? "").toSorted().at(-1) ?? "";
-			const count = `${workers.length} ${workers.length === 1 ? "worker" : "workers"}`;
-			found.push({ ...base, id: `project:${project.id}:done:${workers.length}:${last}`, about: "done", worker: null, text: `${count} done; nothing waits for the coordinator.` });
-		}
-		return found;
-	});
 }
 
 /**
@@ -380,8 +340,6 @@ export class Notices {
 				const google = await this.#sources.googleEvents(now, now + EVENT_LEAD_MS).catch(() => null);
 				return eventNotices(this.#sources.localEvents(), google, now);
 			}
-			case "project":
-				return all(projectNotices(this.#sources.projects(), this.#sources.now()), false);
 			case "stopped":
 				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
 		}

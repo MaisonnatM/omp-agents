@@ -40,7 +40,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Replay comparison: **Compare replay** in `web/components/pane.tsx` opens `ReplayCompareDialog` in `web/components/replay-compare.tsx`, with ordered tools, complete final text, request hashes and bodies, tokens, and cost.
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
-- Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts; a project's coordinator shows `web/components/project-details.tsx` instead.
+- Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts.
   Its tabs are **PRs** in `session-pull-requests-tab.tsx` and **Tickets** in `session-tickets-tab.tsx`, both in `web/components/`.
   The **Images** section and the transcript share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in a new tab, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
@@ -75,7 +75,6 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Calendar: `web/components/calendar/calendar-page.tsx`.
   - Inbox: `web/components/inbox/inbox-page.tsx`.
   - Routines: `web/components/routines/routines-page.tsx`.
-  - Projects: `web/components/projects/projects-page.tsx`; a project's **Notes page** list and **Project** and **User** notes trees are `ProjectNotesList` in `project-parts.tsx` beside it, over `noteRows` in `web/notes-model.ts`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
     Settings › Integrations' Google account lines, with **Add account**, **Remove**, and the workspace picker: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
@@ -94,7 +93,7 @@ The server lives in `src/`; its files, listed by area:
 - [Sessions and transcripts](code-layout/server-sessions.md)
 - [Git, worktrees, pull requests, merges, and sync](code-layout/server-git-and-pull-requests.md)
 - [Linear, Google, todos, shared lists, and inboxes](code-layout/server-integrations-and-inboxes.md)
-- [Routines, scheduled sends, projects, usage, settings, and tests](code-layout/server-routines-and-settings.md)
+- [Routines, scheduled sends, usage, settings, and tests](code-layout/server-routines-and-settings.md)
 
 ## Page
 
@@ -105,6 +104,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Routines, Projects, Calendar, and Inbox](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Routines, Calendar, and Inbox](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

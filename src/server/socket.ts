@@ -9,7 +9,6 @@ import type { StartRequest, StartResult } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
 import type { Discussions } from "./discussions";
 import type { ListRegistry } from "./list-registry";
-import type { ProjectSpec } from "./project-runner";
 import type { Peer, Run } from "./request-ledger";
 import type { Views } from "./views";
 import type { MsgOf } from "./wire";
@@ -18,8 +17,6 @@ export interface SocketEnv {
 	sessions: LiveSessions;
 	views: Views;
 	start(request: StartRequest): Promise<StartResult>;
-	/** Create a project in `spec.cwd` and start its coordinator on `spec.prompt`, ready once the coordinator is. */
-	createProject(spec: ProjectSpec): Promise<StartResult>;
 	lists: ListRegistry;
 	/** End live session `instanceId` as **End session** does, then remove the git worktree it worked in. */
 	end(instanceId: string): Promise<void>;
@@ -106,9 +103,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	async start({ start }, peer, msg) {
 		peer.send({ t: "started", reqId: msg.reqId, result: await start(msg) });
 	},
-	async "project-create"({ createProject }, peer, { reqId, name, cwd, prompt, model, thinking }) {
-		peer.send({ t: "started", reqId, result: await createProject({ name, cwd, prompt, model, thinking }) });
-	},
 	async "resume-all"({ sessions, start, stoppedMidTurn }, peer, { reqId, sessionIds }) {
 		const results = await Promise.all(
 			sessionIds.map(async sessionId => {
@@ -151,7 +145,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
-	project: ({ lists }, peer, { change }) => void lists.apply("projects", change, peer),
 	"review-draft": ({ lists }, peer, { change }) => void lists.apply("review-drafts", change, peer),
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),
 	discuss: ({ discussions }, peer, { id, request }) => discussions.ask(peer, id, request),

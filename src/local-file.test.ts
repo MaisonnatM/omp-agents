@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { agentDir } from "./omp/config";
-import { HOME, projectNotesDir, tokenFile, userNotesDir } from "./paths";
+import { HOME, tokenFile } from "./paths";
 import { DENIED_DIRS, findMediaFile, readTextFile } from "./local-file";
 import { MAX_TEXT_FILE_BYTES, MEDIA_FILE_EXTENSIONS } from "./shared/transcript";
 
@@ -53,10 +53,6 @@ test("the CLIs' sign-ins are denied whole, though their files have text extensio
 	for (const file of [join(config, "gh", "hosts.yml"), join(config, "gcloud", "credentials.db.json"), join(HOME, ".docker", "config.json"), join(HOME, ".kube", "config.yaml"), join(HOME, ".aws", "credentials.toml")]) {
 		expect(DENIED_DIRS.some(({ dir, opens }) => file.startsWith(dir + sep) && opens.length === 0)).toBe(true);
 	}
-});
-
-test("the project's and the user's notes lie outside every denied directory, so the file dialog opens them", () => {
-	for (const notes of [projectNotesDir("p1"), userNotesDir]) expect(DENIED_DIRS.filter(({ dir }) => notes === dir || notes.startsWith(dir + sep))).toEqual([]);
 });
 
 test("a text file in a denied directory is refused, by its real path, but for the extensions that directory opens", async () => {

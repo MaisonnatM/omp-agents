@@ -1,11 +1,11 @@
 # Routines
 
 A routine starts dashboard sessions, or runs a shell command, on one or more schedules. A schedule is every so many minutes, counted from the last run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST. The routine is due at the earliest of them. Two intervals share that last run, so the shorter one decides.
-Its task is one prompt, one command, or one `project` task, `{ projectId, prompt }`, which takes no session slot: the run hands the prompt to the project runner's `notify` as an `event` from **Routine** and ends with outcome `project`, or with the error when the project is gone or archived.
+Its task is one prompt or one command.
 The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
-A file from before `schedules` reads its `schedule` as a one-element list, and drops a routine whose task was pull requests.
+A file from before `schedules` reads its `schedule` as a one-element list, and drops, with a log line, a routine whose task was pull requests or a project, kinds an older version ran.
 A prompt task from before `pin` reads as unpinned.
 The rest of the file stays.
 The next save writes `schedules` and `pin`.
@@ -63,13 +63,12 @@ Taking over a dead or invalid owner holds a short ownership lock at `<path>.reap
 The same mechanism recovers a crashed reclaimer's lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json`, `todos.json`, and `projects.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo inbox.
+On a takeover the server logs it, reads `routines.json` and `todos.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo inbox.
 A server that exits normally deletes its lock.
 The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the todo inbox, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
-`projects.json` is the exception: every server runs its own project runner, which writes on every worker turn, so `ProjectsFile` is a `shared` `ReducerFile`.
+`scheduled.json` is the exception: `ScheduledFile` is a `shared` `ReducerFile`, so a send added on any server reaches the owner and only one process can claim it.
 Each mutation holds an `OwnerLock` at `<path>.lock` across reload, reduction, and the immediate JSON replacement, so independent server processes keep one another's changes.
-`ScheduledFile` is shared the same way, so a send added on any server reaches the owner and only one process can claim it.
 A failed shared write rejects the mutation, retains the dirty value and its lock, and releases ownership only after a later flush succeeds or the process exits.
 Other processes wait at most five seconds for a mutation lock, then reject rather than write without ownership.
 

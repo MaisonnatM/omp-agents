@@ -200,7 +200,7 @@ describe("parseClientMsg", () => {
 		expect(add({ at: "tomorrow" })).toBeNull();
 		expect(add({ reset: "" })).toBeNull();
 		expect(change({ op: "remove", id: "" })).toBeNull();
-		const continueTarget = { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit", reply: null };
+		const continueTarget = { kind: "continue", sessionId: "s1", provider: "Anthropic", cause: "usage-limit" };
 		expect(add({ target: continueTarget })).toBeNull();
 		expect(change({ op: "update", send: { ...spec, target: continueTarget } })).toBeNull();
 		expect(change({ op: "continue", send: { ...spec, target: continueTarget } })).toBeNull();
@@ -216,30 +216,6 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "pin", sessionIds: ["s1", ""] })).toBeNull();
 		expect(change({ op: "pin", sessionIds: [7] })).toBeNull();
 		expect(change({ op: "pin", sessionIds: "s1" })).toBeNull();
-	});
-
-	test("project-create takes a name, a workspace, a first message, a model or null, and a thinking level or null; project takes only a rename or an archive", () => {
-		const create = { t: "project-create" as const, reqId: 3, name: "", cwd: "~/code/app", prompt: "Migrate billing.", model: null, thinking: null };
-		expect(msg(create)).toEqual(create);
-		expect(msg({ ...create, model: { provider: "anthropic", id: "claude" }, thinking: "high" })).toEqual({ ...create, model: { provider: "anthropic", id: "claude" }, thinking: "high" });
-		expect(msg({ ...create, thinking: "" })).toBeNull();
-		expect(msg({ ...create, prompt: " " })).toBeNull();
-		expect(msg({ ...create, cwd: "" })).toBeNull();
-		expect(msg({ ...create, name: "x".repeat(201) })).toBeNull();
-		expect(msg({ ...create, reqId: -1 })).toBeNull();
-		const change = (value: unknown) => msg({ t: "project", change: value });
-		expect(change({ op: "rename", id: "p1", name: "Billing v3" })).toEqual({ t: "project", change: { op: "rename", id: "p1", name: "Billing v3" } });
-		expect(change({ op: "archive", id: "p1", name: "ignored" })).toEqual({ t: "project", change: { op: "archive", id: "p1" } });
-		expect(change({ op: "relink", from: "s1", to: "s2" })).toBeNull();
-		expect(change({ op: "archive", id: "" })).toBeNull();
-		expect(change({ op: "unarchive", id: "p1" })).toEqual({ t: "project", change: { op: "unarchive", id: "p1" } });
-		expect(change({ op: "max-workers", id: "p1", max: 5 })).toEqual({ t: "project", change: { op: "max-workers", id: "p1", max: 5 } });
-		expect(change({ op: "max-workers", id: "p1", max: 0 })).toBeNull();
-		const watch = { pullRequests: false, linear: { team: "ENG", label: null, project: null } };
-		expect(change({ op: "watch", id: "p1", watch })).toEqual({ t: "project", change: { op: "watch", id: "p1", watch } });
-		expect(change({ op: "watch", id: "p1", watch: { pullRequests: "yes", linear: null } })).toBeNull();
-		expect(change({ op: "review-cadence", id: "p1", cadence: "every 3 PRs" })).toEqual({ t: "project", change: { op: "review-cadence", id: "p1", cadence: "every 3 PRs" } });
-		expect(change({ op: "review-cadence", id: "p1", cadence: "x".repeat(201) })).toBeNull();
 	});
 
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {

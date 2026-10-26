@@ -1,7 +1,6 @@
 import { ArrowLeft, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
-import type { Project } from "../../../src/shared/projects";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -151,7 +150,6 @@ function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; h
 
 interface DetailProps {
 	routine: Routine;
-	projects: Project[];
 	hosts: RosterHost[];
 	now: number;
 	connected: boolean;
@@ -166,8 +164,6 @@ function TaskValue({ task }: { task: RoutineTask }) {
 			return <span className="whitespace-pre-wrap break-words">{task.prompt}</span>;
 		case "command":
 			return <code className="font-mono text-xs whitespace-pre-wrap break-words">{task.command}</code>;
-		case "project":
-			return <span className="whitespace-pre-wrap break-words">{task.prompt}</span>;
 		default: {
 			const unhandled: never = task;
 			return unhandled;
@@ -188,7 +184,7 @@ function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
 }
 
 /** One routine's settings, then its runs, newest first. */
-function RoutineDetail({ routine, projects, hosts, now, connected, onChange, onEdit }: DetailProps) {
+function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: DetailProps) {
 	const { task } = routine;
 	const { request } = useDashboardActions();
 	const run = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
@@ -201,7 +197,6 @@ function RoutineDetail({ routine, projects, hosts, now, connected, onChange, onE
 	if (task.kind === "prompt") {
 		settings.push(["Skill", routine.skill ?? "None"], ["Pin", task.pin ? "When it finishes, in place of the previous session" : "No"]);
 	}
-	if (task.kind === "project") settings.push(["Project", projects.find(project => project.id === task.projectId)?.name ?? "Removed, so runs fail"]);
 	return (
 		<PageFrame
 			title={routine.name}
@@ -296,8 +291,6 @@ function RoutineRow({ routine, now, connected, onChange, onEdit }: RowProps) {
 
 interface RoutinesPageProps {
 	routines: Routine[];
-	/** Every project; the editor offers the ones not archived as a project task's target. */
-	projects: Project[];
 	/** The routine whose settings and runs show, `null` for the list. */
 	target: string | null;
 	hosts: RosterHost[];
@@ -309,7 +302,7 @@ interface RoutinesPageProps {
 }
 
 /** Your routines, one routine's settings and runs, or the editor for a new one or an edit. */
-export function RoutinesPage({ routines, projects, target, hosts, workspaces, defaultCwd, connected }: RoutinesPageProps) {
+export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, connected }: RoutinesPageProps) {
 	const { send } = useDashboardActions();
 	const now = useMinute();
 	const [editing, setEditing] = useState<{ draft: RoutineDraft; isNew: boolean } | null>(null);
@@ -325,7 +318,6 @@ export function RoutinesPage({ routines, projects, target, hosts, workspaces, de
 				isNew={editing.isNew}
 				workspaces={workspaces}
 				connected={connected}
-				projects={projects.filter(project => !project.archived)}
 				onCancel={() => setEditing(null)}
 				onSave={routine => {
 					onChange({ op: "save", routine });
@@ -337,7 +329,7 @@ export function RoutinesPage({ routines, projects, target, hosts, workspaces, de
 	}
 
 	const shown = target === null ? undefined : routines.find(routine => routine.id === target);
-	if (shown) return <RoutineDetail routine={shown} projects={projects} hosts={hosts} now={now} connected={connected} onChange={onChange} onEdit={edit(shown)} />;
+	if (shown) return <RoutineDetail routine={shown} hosts={hosts} now={now} connected={connected} onChange={onChange} onEdit={edit(shown)} />;
 
 	const paused = routines.filter(routine => !routine.enabled).length;
 	const meta =

@@ -38,7 +38,7 @@
 - `src/user-notes-shared.ts`, `src/user-notes.ts`, and `src/user-notes-parse.ts` hold the Notes page's model, reducer, and boundary parsers.
   `src/server/user-notes-file.ts` keeps `notes.json` with `ReducerFile`, registered in `src/server/list-registry.ts` under `user-notes`.
   `src/server/note-inbox.ts` drains agent adds and appends from `note-inbox/` through `JsonInboxDir` while its server owns the lock.
-  `templates/omp/agent/extensions/notes.ts` registers `user_note`, reads persisted notes and pending adds, and leaves requests without writing `notes.json`; an add belongs to the project `project_id` names, else to its session's, read from `projects.json` as `projects.ts` reads a role.
+  `templates/omp/agent/extensions/notes.ts` registers `user_note`, reads persisted notes and pending adds, and leaves requests without writing `notes.json`.
   See [User notes](../architecture/user-notes.md).
 - `src/shared/workspaces.ts`: the Settings › Workspaces list, `WorkspaceList` of added and hidden directories, its `WorkspaceChange`, and `applyWorkspace`, which the server applies to its file.
   `src/server/workspaces-file.ts` keeps the list in `workspaces.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `workspaces.json.invalid`.
@@ -46,7 +46,7 @@
   The move links the new name, then unlinks the old one, so it never replaces a `workspaces.json` that a server beside it wrote, and any other failure is logged rather than stopping the server.
 - `src/shared/pins.ts`: the sidebar's pins, their `PinChange`, and `applyPins`, which the server applies to its file and the page to the pins it shows before the server answers; see [Pins](../architecture/pins.md).
   `src/server/pins-file.ts` keeps them in `pins.json` beside the access token and moves a file it cannot read to `pins.json.invalid`.
-- `src/shared/notices.ts`: the bell's `Notice`, an update (a newer omp, a `ModelUpdate`, or new commits for omp-agents itself) with its `NoticeStatus`, a pull request with your move, a Slack message, a used-up plan window, a provider out of credits, a calendar event, a project that needs you, or the dashboard sessions that stopped mid-turn, with its seen and read flags, and the socket's `NOTICE_OPS`.
+- `src/shared/notices.ts`: the bell's `Notice`, an update (a newer omp, a `ModelUpdate`, or new commits for omp-agents itself) with its `NoticeStatus`, a pull request with your move, a Slack message, a used-up plan window, a provider out of credits, a calendar event, or the dashboard sessions that stopped mid-turn, with its seen and read flags, and the socket's `NOTICE_OPS`.
   `src/server/notices.ts` checks for them and runs the updates through `src/omp/release.ts`, `src/settings.ts`, and `src/server/self-update.ts`; `src/omp/model-updates.ts` finds the newer models and the routing edits that switch to them, `src/slack-messages.ts` the Slack messages that wait on you, and `src/omp/stats.ts` the providers out of credits; see [Notifications](../architecture/notifications.md).
 - `src/shared/desktop-bridge.ts`: `DesktopBridge`, what the desktop shell's preload gives the page as `window.ompDesktop`, its IPC channels, and `SessionAlert`, one moment a session came to need you, which the page raises and the shell's main process shows.
 - `src/shared/moves.ts` holds `moveOf`, `agentOn`, `actionFacts`, `readyOnceChecksPass`, and `YOUR_MOVES`, shared by the Pull requests page and bell.

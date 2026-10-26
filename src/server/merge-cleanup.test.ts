@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { PullRequestState } from "../pull-request-merge";
 import { type PullRequest, prKey } from "../shared/github";
-import { type CleanupSession, cleanupEnds, MergeCleanup } from "./merge-cleanup";
+import { type CleanupSession, MergeCleanup } from "./merge-cleanup";
 
 const pr = (number: number, repo = "r"): PullRequest => ({ owner: "o", repo, number });
 
@@ -57,22 +57,6 @@ const session = (sessionId: string, numbers: number[], overrides: Partial<Cleanu
 	workDir: `/wt/${sessionId}`,
 	branch: "feat",
 	...overrides,
-});
-
-describe("cleanupEnds", () => {
-	test("only a session this dashboard started ends: never a terminal session or one another dashboard owns, never a coordinator, a worker by its project's watch, any other by the setting", () => {
-		const worker = (watches: boolean) => ({ role: "worker" as const, watches });
-		const cases = [
-			{ startedHere: false, project: null, cleanUp: true },
-			{ startedHere: false, project: worker(true), cleanUp: true },
-			{ startedHere: true, project: null, cleanUp: true },
-			{ startedHere: true, project: null, cleanUp: false },
-			{ startedHere: true, project: worker(true), cleanUp: false },
-			{ startedHere: true, project: worker(false), cleanUp: true },
-			{ startedHere: true, project: { role: "coordinator" as const, watches: true }, cleanUp: true },
-		];
-		expect(cases.map(({ cleanUp, ...host }) => cleanupEnds(host, cleanUp))).toEqual([false, false, true, false, true, false, false]);
-	});
 });
 
 describe("MergeCleanup", () => {

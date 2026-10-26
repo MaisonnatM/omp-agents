@@ -11,11 +11,10 @@ export type ScheduledTarget =
 	| { kind: "start"; request: NewSessionRequest }
 	/**
 	 * {@link CONTINUE_PROMPT} to session `sessionId`, sent as a message is, after `provider`'s usage limit (`cause` `usage-limit`) or a
-	 * transient connection or provider fault (`transient`) ended its turn; `provider` is the name the page shows (`Anthropic`), and `reply`
-	 * the text that turn ended on, `null` for none, which the session's project hears only if the continue never goes. The dashboard
-	 * schedules it, at most one per session, and a turn the session starts first cancels it.
+	 * transient connection or provider fault (`transient`) ended its turn; `provider` is the name the page shows (`Anthropic`). The
+	 * dashboard schedules it, at most one per session, and a turn the session starts first cancels it.
 	 */
-	| { kind: "continue"; sessionId: string; provider: string; cause: ContinueCause; reply: string | null };
+	| { kind: "continue"; sessionId: string; provider: string; cause: ContinueCause };
 
 /** What ended the turn a continue picks back up: a provider's usage limit, or a transient connection or provider fault. */
 export type ContinueCause = "usage-limit" | "transient";
@@ -88,9 +87,9 @@ function parseScheduledTarget(value: unknown): Parsed<ScheduledTarget> {
 		}
 		case "continue": {
 			// A continue saved before transient retries existed has no cause and followed a usage limit.
-			const { sessionId, provider, reply, cause = "usage-limit" } = value;
-			return isNonEmpty(sessionId) && isNonEmpty(provider) && (cause === "usage-limit" || cause === "transient") && (reply === null || typeof reply === "string")
-				? { ok: { kind: "continue", sessionId, provider, cause, reply } }
+			const { sessionId, provider, cause = "usage-limit" } = value;
+			return isNonEmpty(sessionId) && isNonEmpty(provider) && (cause === "usage-limit" || cause === "transient")
+				? { ok: { kind: "continue", sessionId, provider, cause } }
 				: null;
 		}
 		default:

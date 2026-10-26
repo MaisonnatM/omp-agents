@@ -12,8 +12,7 @@ import * as rpc from "../omp/rpc";
 import { refuseUntil } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { LiveSessions } from "./live-sessions";
-import type { ProjectJoin } from "./project-runner";
-import { createStarter, reattachAll } from "./start";
+import { createStarter, reattachAll, type SessionJoin } from "./start";
 
 afterEach(() => mock.restore());
 
@@ -32,11 +31,11 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 		onStarted: () => {},
 		linkTodo: () => {},
 		mayDiscardReplay: async () => null,
-		projects: { launchFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }) },
+		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 	});
-	expect(await start({ kind: "resume", sessionId: "c1" }, null)).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
-	expect(await start({ kind: "fork", view: { kind: "past", sessionId: "x1" }, entryId: "e1" }, null)).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
-	expect(await start({ kind: "replay", view: { kind: "past", sessionId: "x1" }, token: "t", model: null, thinking: null, prompt: null }, null)).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
+	expect(await start({ kind: "resume", sessionId: "c1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
+	expect(await start({ kind: "fork", view: { kind: "past", sessionId: "x1" }, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
+	expect(await start({ kind: "replay", view: { kind: "past", sessionId: "x1" }, token: "t", model: null, thinking: null, prompt: null })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 });
 
 test("the server learns which sessions survived before it lists or hears any, and lists none that exited as it attached", async () => {
@@ -51,9 +50,9 @@ test("the server learns which sessions survived before it lists or hears any, an
 	});
 	const heard: string[] = [];
 	const sessions: LiveSessions = new LiveSessions((instanceId, update) => heard.push(`${update.kind} ${instanceId}, listed: ${sessions.get(instanceId) !== undefined}`));
-	const projects = { launchFor: (): ProjectJoin => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`project ${session.instanceId}`); } }) };
-	await reattachAll(sessions, projects, survived => heard.push(`recover ${[...survived].join(" ")}`));
-	expect(heard).toEqual(["recover s-i-kept", "project i-kept", "roster i-kept, listed: true"]);
+	const joinFor = (): SessionJoin => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`attach ${session.instanceId}`); } });
+	await reattachAll(sessions, joinFor, survived => heard.push(`recover ${[...survived].join(" ")}`));
+	expect(heard).toEqual(["recover s-i-kept", "attach i-kept", "roster i-kept, listed: true"]);
 	expect([sessions.get("i-gone"), sessions.get("i-broken")]).toEqual([undefined, undefined]);
 	// The cleanup after a merge ends only sessions this dashboard started, which a reattached one still is.
 	expect(sessions.started("i-kept")?.sessionId).toBe("s-i-kept");
@@ -99,7 +98,7 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 		const interrupted = new InterruptedSessions(saved);
 
 		const began = Date.now();
-		const reattached = reattachAll(new LiveSessions(() => {}), { launchFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }) }, survived => interrupted.recover(survived));
+		const reattached = reattachAll(new LiveSessions(() => {}), () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), survived => interrupted.recover(survived));
 		const notReattached = refuseUntil(reattached, "Still attaching.");
 		expect(notReattached()?.status).toBe(503);
 		await reattached;

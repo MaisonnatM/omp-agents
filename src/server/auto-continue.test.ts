@@ -5,8 +5,7 @@ import { join } from "node:path";
 import type { TurnFailure } from "../omp/turn-failure";
 import type { PlanUsage, PlanWindow } from "../shared/models";
 import type { ScheduledTarget } from "../shared/scheduled";
-import { AutoContinue, continueWhen, UNKNOWN_RESET_WAIT_MS } from "./auto-continue";
-import { occupiedBy } from "./project-runner";
+import { AutoContinue, continueWhen, occupiedBy, UNKNOWN_RESET_WAIT_MS } from "./auto-continue";
 import { ScheduledFile } from "./scheduled-file";
 
 const dirs: string[] = [];
@@ -58,7 +57,7 @@ describe("continueWhen", () => {
 function harness(dir = mkdtempSync(join(tmpdir(), "omp-agents-continue-"))) {
 	dirs.push(dir);
 	const file = new ScheduledFile(join(dir, "scheduled.json"));
-	const fake = { changes: 0, plans: [] as PlanUsage[], usageError: null as string | null, gate: null as Promise<void> | null, released: [] as [string, string | null][] };
+	const fake = { changes: 0, plans: [] as PlanUsage[], usageError: null as string | null, gate: null as Promise<void> | null, released: [] as string[] };
 	const auto = new AutoContinue({
 		file,
 		async plans() {
@@ -71,7 +70,7 @@ function harness(dir = mkdtempSync(join(tmpdir(), "omp-agents-continue-"))) {
 			fake.changes++;
 			auto.sendsChanged();
 		},
-		released: (sessionId, reply) => void fake.released.push([sessionId, reply]),
+		released: sessionId => void fake.released.push(sessionId),
 	});
 	/** Usage reads wait until the returned function answers them. */
 	const holdUsage = (): (() => void) => {
@@ -84,19 +83,19 @@ function harness(dir = mkdtempSync(join(tmpdir(), "omp-agents-continue-"))) {
 }
 
 const anthropic = (retryAfterMs: number | null) => limit("anthropic", retryAfterMs);
-const continued = (sessionId: string, provider: string, reply: string | null): ScheduledTarget => ({ kind: "continue", sessionId, provider, cause: "usage-limit", reply });
+const continued = (sessionId: string, provider: string): ScheduledTarget => ({ kind: "continue", sessionId, provider, cause: "usage-limit" });
 
 describe("AutoContinue", () => {
 	test("a limit schedules one continue per session, from the usage read then, replacing the one it waited on", async () => {
 		const { fake, auto, pending } = harness();
 		fake.plans = [plan("anthropic", "Anthropic", null, [window("5h", NOW + 2 * HOUR, true)])];
-		await auto.limited("s1", anthropic(null), null);
+		await auto.limited("s1", anthropic(null));
 		fake.plans = [plan("anthropic", "Anthropic", null, [window("5h", NOW + 4 * HOUR, true)])];
-		await auto.limited("s1", anthropic(null), null);
-		await auto.limited("s2", limit("opencode-go", 30 * MINUTE), null);
+		await auto.limited("s1", anthropic(null));
+		await auto.limited("s2", limit("opencode-go", 30 * MINUTE));
 		expect(pending()).toEqual([
-			[continued("s2", "Opencode Go", null), NOW + 31 * MINUTE, "Opencode Go limit", "waiting"],
-			[continued("s1", "Anthropic", null), NOW + 4 * HOUR + MINUTE, "Anthropic 5h", "waiting"],
+			[continued("s2", "Opencode Go"), NOW + 31 * MINUTE, "Opencode Go limit", "waiting"],
+			[continued("s1", "Anthropic"), NOW + 4 * HOUR + MINUTE, "Anthropic 5h", "waiting"],
 		]);
 		expect(fake.changes).toBe(3);
 	});
@@ -104,14 +103,14 @@ describe("AutoContinue", () => {
 	test("a usage read that fails still schedules from the provider's error", async () => {
 		const { fake, auto, pending } = harness();
 		fake.usageError = "omp usage timed out";
-		await auto.limited("s1", anthropic(2 * HOUR), null);
-		expect(pending()).toEqual([[continued("s1", "Anthropic", null), NOW + 2 * HOUR + MINUTE, "Anthropic limit", "waiting"]]);
+		await auto.limited("s1", anthropic(2 * HOUR));
+		expect(pending()).toEqual([[continued("s1", "Anthropic"), NOW + 2 * HOUR + MINUTE, "Anthropic limit", "waiting"]]);
 	});
 
 	test("the session is held from the limit, before the usage read answers, until its continue goes", async () => {
 		const { file, fake, auto, holdUsage } = harness();
 		const answer = holdUsage();
-		const limited = auto.limited("s1", anthropic(HOUR), "Halfway through the migration.");
+		const limited = auto.limited("s1", anthropic(HOUR));
 		expect(auto.held("s1")).toBe(true);
 		answer();
 		await limited;
@@ -121,82 +120,82 @@ describe("AutoContinue", () => {
 		expect([auto.held("s1"), fake.released]).toEqual([true, []]);
 		file.sent(id);
 		auto.sendsChanged();
-		expect([auto.held("s1"), fake.released]).toEqual([false, [["s1", "Halfway through the migration."]]]);
+		expect([auto.held("s1"), fake.released]).toEqual([false, ["s1"]]);
 	});
 
-	test("after a restart, a session whose continue waits in the file is still held, so its routine and project count it on its task", async () => {
+	test("after a restart, a session whose continue waits in the file is still held, so its routine counts it on its task", async () => {
 		const before = harness();
-		await before.auto.limited("s1", anthropic(HOUR), "Halfway through the migration.");
+		await before.auto.limited("s1", anthropic(HOUR));
 		before.file.flush();
 
 		const after = harness(before.dir);
 		expect([after.auto.held("s1"), occupiedBy("idle", after.auto.held("s1")), after.auto.held("s2"), after.fake.released]).toEqual([true, true, false, []]);
 		after.file.apply({ op: "remove", id: after.file.value[0]!.id }, NOW);
 		after.auto.sendsChanged();
-		expect([after.auto.held("s1"), after.fake.released]).toEqual([false, [["s1", "Halfway through the migration."]]]);
+		expect([after.auto.held("s1"), after.fake.released]).toEqual([false, ["s1"]]);
 	});
 
 	test("a continue the page cancels releases the session, and so does one that fails, while one under way still holds", async () => {
 		const { file, fake, auto } = harness();
-		await auto.limited("s1", anthropic(HOUR), "one");
-		await auto.limited("s2", anthropic(HOUR), "two");
+		await auto.limited("s1", anthropic(HOUR));
+		await auto.limited("s2", anthropic(HOUR));
 		const [first, second] = file.value;
 		file.apply({ op: "remove", id: first!.id }, NOW);
 		file.claim(second!.id);
 		auto.sendsChanged();
-		expect([auto.held("s1"), auto.held("s2"), fake.released]).toEqual([false, true, [["s1", "one"]]]);
+		expect([auto.held("s1"), auto.held("s2"), fake.released]).toEqual([false, true, ["s1"]]);
 		file.failed(second!.id, "Cannot resume the session", NOW);
 		auto.sendsChanged();
-		expect([auto.held("s2"), fake.released, file.value.map(send => send.state.phase)]).toEqual([false, [["s1", "one"], ["s2", "two"]], ["failed"]]);
+		expect([auto.held("s2"), fake.released, file.value.map(send => send.state.phase)]).toEqual([false, ["s1", "s2"], ["failed"]]);
 	});
 
 	test("cancel drops that session's continue and releases it, leaving the others and plain scheduled messages", async () => {
 		const { file, fake, auto, pending } = harness();
 		file.apply({ op: "add", send: { id: "mine", at: NOW + HOUR, reset: null, target: { kind: "message", sessionId: "s1", text: "and then this" } } }, NOW);
-		await auto.limited("s1", anthropic(HOUR), "one");
-		await auto.limited("s2", anthropic(HOUR), "two");
+		await auto.limited("s1", anthropic(HOUR));
+		await auto.limited("s2", anthropic(HOUR));
 		const changes = fake.changes;
 		auto.cancel("s1");
 		auto.cancel("s3");
 		expect(pending()).toEqual([
 			[{ kind: "message", sessionId: "s1", text: "and then this" }, NOW + HOUR, null, "waiting"],
-			[continued("s2", "Anthropic", "two"), NOW + HOUR + MINUTE, "Anthropic limit", "waiting"],
+			[continued("s2", "Anthropic"), NOW + HOUR + MINUTE, "Anthropic limit", "waiting"],
 		]);
-		expect([fake.changes - changes, fake.released, auto.held("s2")]).toEqual([1, [["s1", "one"]], true]);
+		expect([fake.changes - changes, fake.released, auto.held("s2")]).toEqual([1, ["s1"], true]);
 	});
 
 	test("a cancel while the usage read runs keeps the continue from being scheduled and releases the session", async () => {
 		const { fake, auto, holdUsage, pending } = harness();
 		const answer = holdUsage();
-		const limited = auto.limited("s1", anthropic(HOUR), null);
+		const limited = auto.limited("s1", anthropic(HOUR));
 		auto.cancel("s1");
 		answer();
 		await limited;
-		expect([pending(), fake.released, auto.held("s1")]).toEqual([[], [["s1", null]], false]);
+		expect([pending(), fake.released, auto.held("s1")]).toEqual([[], ["s1"], false]);
 	});
 
 	test("a continue under way stays when the session hits the limit again, beside the new one, and a cancel leaves it", async () => {
 		const { file, auto, pending } = harness();
-		await auto.limited("s1", anthropic(HOUR), null);
+		await auto.limited("s1", anthropic(HOUR));
 		file.claim(file.value[0]!.id);
-		await auto.limited("s1", anthropic(2 * HOUR), null);
+		await auto.limited("s1", anthropic(2 * HOUR));
 		auto.cancel("s1");
-		expect([pending(), auto.held("s1")]).toEqual([[[continued("s1", "Anthropic", null), NOW + HOUR + MINUTE, "Anthropic limit", "sending"]], true]);
+		expect([pending(), auto.held("s1")]).toEqual([[[continued("s1", "Anthropic"), NOW + HOUR + MINUTE, "Anthropic limit", "sending"]], true]);
 	});
 
 	const dropped: TurnFailure = { kind: "transient", provider: "openai-codex" };
 	/** Ends a turn of `s1` on `failure`; the minutes until the continue it then waits on, or `false` when it waits on none. */
 	const endTurn = (file: ScheduledFile, auto: AutoContinue, failure: TurnFailure | null): number | false => {
-		const held = auto.turnEnded("s1", failure, "Halfway.");
+		auto.turnEnded("s1", failure);
 		const waiting = file.value.find(send => send.target.kind === "continue" && send.target.sessionId === "s1" && send.state.phase === "waiting");
-		return held && waiting ? (waiting.at - NOW) / MINUTE : false;
+		return waiting ? (waiting.at - NOW) / MINUTE : false;
 	};
 
 	test("a transient fault holds the session for a retry, and faults in a row wait 1, 2, 4, 8, then 16 minutes; the sixth leaves it idle", () => {
 		const { file, fake, auto, pending } = harness();
 		expect([endTurn(file, auto, dropped), pending(), auto.held("s1")]).toEqual([
 			1,
-			[[{ kind: "continue", sessionId: "s1", provider: "OpenAI Codex", cause: "transient", reply: "Halfway." }, NOW + MINUTE, null, "waiting"]],
+			[[{ kind: "continue", sessionId: "s1", provider: "OpenAI Codex", cause: "transient" }, NOW + MINUTE, null, "waiting"]],
 			true,
 		]);
 		const waits = [];
@@ -225,7 +224,7 @@ describe("AutoContinue", () => {
 		waits.push(endTurn(file, auto, dropped));
 		auto.cancel("s1");
 		waits.push(endTurn(file, auto, dropped));
-		await auto.limited("s1", anthropic(HOUR), null);
+		await auto.limited("s1", anthropic(HOUR));
 		auto.turnStarted("s1");
 		waits.push(endTurn(file, auto, dropped));
 		expect(waits).toEqual([1, 2, false, 1, 2, 1, 1]);

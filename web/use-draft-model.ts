@@ -25,7 +25,7 @@ export interface DraftModelSelection {
 }
 
 /**
- * The model and effort of a draft that starts omp in `cwd`: the new-session draft and a new project's coordinator.
+ * The model and effort of a draft that starts omp in `cwd`: the new-session draft and the replay dialog.
  * Until a pick, omp starts on the model its `default` role names, so the picker shows that one, and an effort holds only for
  * the model it was picked on, the default one included. `initial` is a failed start's model and level, so a retry keeps them.
  */

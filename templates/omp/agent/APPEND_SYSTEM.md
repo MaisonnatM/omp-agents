@@ -40,7 +40,7 @@ Suggestions:
 - Ask through the ask tool, never as a plain-text question: two or three options, the recommended one first with "(Recommended)" in its label.
 - Ask before you guess when a request could mean two repositories, two parts of the screen, or two features.
 - When a gate blocks a merge, make the fastest path that keeps the checks honest the first option.
-- As a project worker or a subagent, end your turn with the question instead, as a worker's role says.
+- As a subagent, end your turn with the question instead.
 
 # Before any pull request
 

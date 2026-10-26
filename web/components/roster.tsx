@@ -1,7 +1,6 @@
 /** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, notes, and more, under the workspace picker. */
 import { Folder, Keyboard, Search } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Project } from "../../src/shared/projects";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import type { Routine } from "../../src/routines";
@@ -184,8 +183,6 @@ interface RosterProps {
 	userNotes: UserNoteList | null;
 	/** The list the Notes page shows. */
 	notesView: NotesListView;
-	/** Every project, for the Notes tab's project lists. */
-	projects: Project[];
 	routines: Routine[];
 	/** The page under the Calendar tab that is open. */
 	calendarTab: CalendarTabPage;
@@ -225,7 +222,6 @@ export function Roster({
 	todoSessions,
 	userNotes,
 	notesView,
-	projects,
 	routines,
 	calendarTab,
 	settingsRoute,
@@ -326,7 +322,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="notes" asChild>
 				<SidebarContent>
-					<NotesNav list={userNotes} view={notesView} projects={projects} />
+					<NotesNav list={userNotes} view={notesView} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="calendar" asChild>

@@ -169,23 +169,19 @@ interface RowProps<T> {
 	showWorkspace: boolean;
 	/** Pin the session, or unpin it when it is pinned. */
 	onTogglePin: (sessionId: string) => void;
-	/** The session's role in the project whose group lists it, Coordinator or a worker's id; its badge replaces the workspace's. */
-	role?: string;
-	/** The title the coordinator gave the worker, which names the row in place of the session's own title. */
-	roleTitle?: string;
 }
 
-export const PastRow = memo(function PastRow({ session, pinned, open, showWorkspace, onTogglePin, role, roleTitle }: RowProps<PastSession>) {
+export const PastRow = memo(function PastRow({ session, pinned, open, showWorkspace, onTogglePin }: RowProps<PastSession>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "past", sessionId: session.sessionId };
-	const label = roleTitle ?? pastLabel(session);
+	const label = pastLabel(session);
 	return (
 		<RowMenu entry={{ kind: "past", session }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
+				badge={showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
 				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted"])}
 				when={session.modifiedAt}
 				open={open}
@@ -203,17 +199,17 @@ function HostStatus({ host }: { host: RosterHost }) {
 }
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
-export const HostRow = memo(function HostRow({ session: host, pinned, open, showWorkspace, onTogglePin, role, roleTitle }: RowProps<RosterHost>) {
+export const HostRow = memo(function HostRow({ session: host, pinned, open, showWorkspace, onTogglePin }: RowProps<RosterHost>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
-	const label = roleTitle ?? hostLabel(host);
+	const label = hostLabel(host);
 	return (
 		<RowMenu entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
 				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
+				badge={showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
 				when={host.startedAt}
 				dot={<HostStatus host={host} />}

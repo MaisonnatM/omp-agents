@@ -5,10 +5,10 @@ import { type Notice, type UpdateSubject, usesClause } from "../src/shared/notic
 import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
-import { hashForCalendar, hashForProjects, hashForPullRequests, hashForSettings } from "./routing";
+import { hashForCalendar, hashForPullRequests, hashForSettings } from "./routing";
 
 /** The bell's filters, each a source of notices. */
-export type NoticeSource = "github" | "slack" | "providers" | "calendar" | "projects" | "sessions" | "updates";
+export type NoticeSource = "github" | "slack" | "providers" | "calendar" | "sessions" | "updates";
 
 /** Where a notice leads: a dashboard hash, or a page outside the dashboard that opens in a new tab. */
 export type NoticeLink = { href: string; external: boolean };
@@ -17,7 +17,6 @@ export type NoticeLink = { href: string; external: boolean };
 export type NoticeFace =
 	| { kind: "update" }
 	| { kind: "event"; color: string | null }
-	| { kind: "project"; about: "asks" | "stopped" | "done" }
 	| { kind: "stopped" }
 	| { kind: "provider"; provider: string; window: "plan" | "credits" }
 	| { kind: "move"; move: YourMove; person: { name: string; avatarUrl: string | null } | null }
@@ -150,18 +149,6 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				face: { kind: "event", color: notice.color },
 				toast: { kind: "news", timeout: 0 },
 			};
-		case "project": {
-			const who = notice.worker ? `${notice.worker.id} ${notice.worker.title}` : notice.project;
-			const headline = notice.about === "asks" ? `${who} asks you` : notice.about === "stopped" ? `${who} stopped` : `${notice.project} is done`;
-			return {
-				...NEWS,
-				source: "projects",
-				headline,
-				preview: notice.about === "done" ? notice.text : `${notice.project}: ${notice.text}`,
-				link: { href: hashForProjects({ kind: "project", id: notice.projectId }), external: false },
-				face: { kind: "project", about: notice.about },
-			};
-		}
 		case "stopped": {
 			const count = notice.sessions.length;
 			return {

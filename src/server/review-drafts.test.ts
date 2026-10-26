@@ -3,11 +3,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles } from "../fs";
-import { PLAIN_LAUNCH } from "../omp/rpc";
 import type { SubmittedComment, SubmittedReview } from "../pull-request-review";
 import { diffLinesOf, type ReviewDraft, type ReviewPayload } from "../shared/review-drafts";
 import { newSessionRequest } from "../shared/sessions";
-import type { ProjectJoin } from "./project-runner";
 import { ReviewDrafts, type ReviewGitHub } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 
@@ -51,13 +49,11 @@ function setup(github: ReviewGitHub = fakeGitHub().github) {
 	return { drafts, path, changes: () => changes };
 }
 
-const plainJoin: ProjectJoin = { rpc: PLAIN_LAUNCH, attach() {} };
-
 const reviewStart = newSessionRequest("/tmp/app", "Review it", { subject: { kind: "pull-request", pr }, reviewDraft: true });
 
 /** The review tool a Review start of `pr` gets, run as omp runs it. */
 function saveTool(drafts: ReviewDrafts) {
-	const tool = drafts.join(reviewStart, plainJoin).rpc.tools.find(candidate => candidate.name === "save_review_draft")!;
+	const tool = drafts.join(reviewStart).rpc.tools.find(candidate => candidate.name === "save_review_draft")!;
 	return (params: Record<string, unknown>) => tool.execute(params, { toolCallId: "t1", signal: new AbortController().signal });
 }
 
@@ -66,15 +62,15 @@ const review = { commit: HEAD, verdict: "comment", summary: "Close.", findings: 
 describe("the save_review_draft tool", () => {
 	test("only a Review start of a pull request, or the resume of its session, gets it", () => {
 		const { drafts } = setup();
-		const plain = drafts.join(newSessionRequest("/tmp/app", "Hi", { subject: { kind: "pull-request", pr } }), plainJoin);
-		expect(plain).toBe(plainJoin);
-		const join = drafts.join(reviewStart, plainJoin);
+		const toolsOf = (request: Parameters<ReviewDrafts["join"]>[0]) => drafts.join(request).rpc.tools.map(tool => tool.name);
+		expect(toolsOf(newSessionRequest("/tmp/app", "Hi", { subject: { kind: "pull-request", pr } }))).toEqual([]);
+		const join = drafts.join(reviewStart);
 		expect(join.rpc.tools.map(tool => tool.name)).toEqual(["save_review_draft"]);
 		join.attach({ instanceId: "i1", sessionId: "s1", cwd: "/tmp/app" });
-		expect(drafts.join({ kind: "resume", sessionId: "s1" }, plainJoin).rpc.tools.map(tool => tool.name)).toEqual(["save_review_draft"]);
+		expect(toolsOf({ kind: "resume", sessionId: "s1" })).toEqual(["save_review_draft"]);
 		drafts.switched("i1", "s2");
-		expect(drafts.join({ kind: "resume", sessionId: "s1" }, plainJoin)).toBe(plainJoin);
-		expect(drafts.join({ kind: "resume", sessionId: "s2" }, plainJoin).rpc.tools.map(tool => tool.name)).toEqual(["save_review_draft"]);
+		expect(toolsOf({ kind: "resume", sessionId: "s1" })).toEqual([]);
+		expect(toolsOf({ kind: "resume", sessionId: "s2" })).toEqual(["save_review_draft"]);
 	});
 
 	test("saves the draft of its pull request, every finding pending, and keeps it in the file", async () => {

@@ -11,7 +11,6 @@ import {
 	hashForLayout,
 	hashForNewSession,
 	hashForPullRequestFiles,
-	hashForProjects,
 	hashForRoutines,
 	hashForSettings,
 	hashForTickets,
@@ -39,9 +38,7 @@ test("notes routes address each list and encode the open note", () => {
 	expect(hashForNotes({ kind: "agents" }, "n1")).toBe("#notes/agents?open=n1");
 	expect(routeFromHash("#notes/agents?open=n1")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "agents" }, open: "n1" } });
 	expect(routeFromHash("#notes/unknown")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: null } });
-	expect(hashForNotes({ kind: "project", id: "p/1" }, "n1")).toBe("#notes/project/p%2F1?open=n1");
-	expect(routeFromHash("#notes/project/p%2F1?open=n1")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "project", id: "p/1" }, open: "n1" } });
-	expect(routeFromHash("#notes/project/")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: null } });
+	expect(routeFromHash("#notes/project/p%2F1?open=n1")).toMatchObject({ kind: "page", page: { kind: "notes", list: { kind: "all" } } });
 });
 
 describe("layout hash", () => {
@@ -198,19 +195,6 @@ describe("layout hash", () => {
 		expect(routeFromHash("#inboxes").kind).toBe("panes");
 	});
 
-	test("the projects hash opens the list, the New project form, or one project, and round-trips an id", () => {
-		const id = "8b1e0c2a-5d3f-4a7e-9c60-2f4d1e8a7b35";
-		const list: Route = { kind: "page", page: { kind: "projects", target: { kind: "list" } } };
-		expect(hashForProjects({ kind: "list" })).toBe("#projects");
-		expect(hashForProjects({ kind: "new" })).toBe("#projects/new");
-		expect(hashForProjects({ kind: "project", id })).toBe(`#projects/${id}`);
-		expect(routeFromHash(hashForProjects({ kind: "project", id }))).toEqual({ kind: "page", page: { kind: "projects", target: { kind: "project", id } } });
-		expect(routeFromHash(hashForProjects({ kind: "new" }))).toEqual({ kind: "page", page: { kind: "projects", target: { kind: "new" } } });
-		expect(routeFromHash(hashForProjects({ kind: "list" }))).toEqual(list);
-		expect(routeFromHash("#projects/")).toEqual(list);
-		expect(routeFromHash("#projects/%zz")).toEqual(list);
-		expect(routeFromHash("#projectsx").kind).toBe("panes");
-	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
 		expect(routeFromHash(hashForSettings("files"))).toEqual({ kind: "page", page: { kind: "settings", section: "files" } });
@@ -296,7 +280,6 @@ describe("opening and closing panes", () => {
 		expect(layoutAfterStart(layout, { kind: "fork", view: a, itemId: "u1", point: { entryId: "e1", prefill: true } }, "c")).toEqual(split([a, past, c], 2));
 		expect(layoutAfterStart(layout, quick, "c")).toBeNull();
 		expect(layoutAfterStart(layout, { kind: "resume-all", sessionIds: ["s"] }, "c")).toBeNull();
-		expect(layoutAfterStart(layout, { kind: "project", name: "", cwd: "~/a", prompt: "plan", model: null, thinking: null }, "c")).toEqual(split([a, past, c], 2));
 	});
 
 	test("a Resume all shows each resumed session live in the pane of its transcript, and leaves the panes otherwise", () => {

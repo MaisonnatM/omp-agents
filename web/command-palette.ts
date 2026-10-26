@@ -51,12 +51,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "projects" | "past" | "todos" | "notes" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "createTodo" | "fallback";
+export type HomeSection = "running" | "past" | "todos" | "notes" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `note:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`, `fallback:create-note`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `todo:<id>`, `note:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`, `fallback:create-note`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -65,7 +65,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: LucideIcon;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Project`, `Todo`, `Ticket`, `PR`, `Command`, `Workspace`. */
+	/** The type label at the row's end: `Session`, `Todo`, `Ticket`, `PR`, `Command`, `Workspace`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -237,7 +237,6 @@ type Listing = "browsed" | "searched" | "found" | "typed";
 /** Each section's heading, `null` for none or for the fallback's, which names the search, and how it lists. */
 const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }> = {
 	running: { heading: "Running", listing: "browsed" },
-	projects: { heading: "Projects", listing: "browsed" },
 	past: { heading: "Past", listing: "browsed" },
 	todos: { heading: "Todos", listing: "searched" },
 	notes: { heading: "Notes", listing: "searched" },
@@ -256,7 +255,7 @@ const listingOf = (section: HomeSection): Listing => SECTIONS[section].listing;
 const ranks = (section: HomeSection): boolean => listingOf(section) === "browsed" || listingOf(section) === "searched";
 
 /** The `browsed` sections in the order an empty search lists them, after Suggestions. */
-const BROWSE_ORDER: readonly HomeSection[] = ["running", "projects", "commands", "past", "workspaces"];
+const BROWSE_ORDER: readonly HomeSection[] = ["running", "commands", "past", "workspaces"];
 const SECTION_ORDER = Object.keys(SECTIONS) as HomeSection[];
 /** The sections a search ranks by their best match; equal ones keep {@link SECTIONS}' order. */
 const RANKED_ORDER = SECTION_ORDER.filter(ranks);

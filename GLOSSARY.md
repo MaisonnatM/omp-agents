@@ -27,7 +27,7 @@ _Avoid_: Crashed session, orphan
 
 **Subagent**:
 A session that another session's `task` call spawned.
-_Avoid_: Child agent, worker (see **Worker**)
+_Avoid_: Child agent, worker
 
 **Isolation sandbox**:
 The directory under `~/.omp/wt` where omp runs a subagent's isolated task, with a marker naming the omp process that owns it.
@@ -57,7 +57,7 @@ _Avoid_: Session list, inbox
 
 **Workspace**:
 A working directory that sessions run in, which the sidebar's picker filters by.
-_Avoid_: Project (see **Project**), repo, folder
+_Avoid_: Project, repo, folder
 
 **Pin**:
 A session id the server keeps at the top of the roster in every window.
@@ -72,30 +72,18 @@ The review a **Review** session saved of one pull request, with its verdict, sum
 _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 
 **Note**:
-A Markdown entry on the Notes page, optionally linked to a top-level todo and optionally belonging to a project.
-It is separate from a todo's notes field and from the project and user Markdown directories shown on the Projects page.
+A Markdown entry on the Notes page, optionally linked to a top-level todo.
+It is separate from a todo's notes field.
 
 ## Unattended work
 
 **Routine**:
-A task the dashboard runs on one or more schedules: a prompt, a shell command, or a project task.
+A task the dashboard runs on one or more schedules: a prompt or a shell command.
 _Avoid_: Cron job, automation
 
 **Scheduled send**:
 One message to a session, or one new session's start, that waits for a time.
 _Avoid_: Delayed message, routine
-
-**Project**:
-A coordinator session that plans the work and starts worker sessions sharing one notes directory.
-_Avoid_: Workspace, repo
-
-**Coordinator**:
-The session that plans a project and starts its workers.
-_Avoid_: Lead, manager
-
-**Worker**:
-A session a project's coordinator started to do part of the work.
-_Avoid_: Subagent
 
 **Owner**:
 The one server that holds `server.lock` and runs the unattended work.
