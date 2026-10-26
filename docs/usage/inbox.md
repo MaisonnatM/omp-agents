@@ -13,6 +13,8 @@
   Closing it leaves the list with nothing open, and the panel then says how to open one.
   Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.
   With no conversation open, ↓ and ↑ outside text fields focus the next and previous row, and O opens the focused row's conversation in Gmail in a new tab, signed in as the inbox's address.
+- Right-click a row, or focus it and press the context-menu key or Shift+F10, for **Open**, **Open in Gmail**, and **Delete**.
+  **Delete** moves the conversation to Gmail's Trash, as the open conversation's **Delete** does; deleting the open one opens its neighbour.
 - An open conversation's panel has a bar along its top with where the conversation sits in the list, **3 of 50**, and icon buttons, each naming itself and its key on hover: previous and next conversation, **Reply**, **Reply all**, **Delete**, **Expand all** while a message is folded, **Refresh**, which spins while it reads, **Open in Gmail**, and **Close**.
   Under the bar come its subject in large type and, on a muted line, how many messages it holds, drafts left out, and each person who wrote in it once, `me` for your own address.
   Opening another conversation scrolls the panel back to its top.
