@@ -41,7 +41,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts; a project's coordinator shows `web/components/project-details.tsx` instead.
-  Its tabs are **PRs** in `session-pull-requests-tab.tsx`, **Tickets** in `session-tickets-tab.tsx`, and **Processes** in `session-processes-tab.tsx`, all in `web/components/`.
+  Its tabs are **PRs** in `session-pull-requests-tab.tsx` and **Tickets** in `session-tickets-tab.tsx`, both in `web/components/`.
   The **Images** section and the transcript share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in a new tab, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
   The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.
@@ -54,7 +54,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A pull request row's **Review draft** tag is `ReviewDraftTag` in `web/components/pull-requests/pr-row.tsx`.
   The same details show in two places, so reproduce a layout bug in the one the user means: the Pull requests page's `pr-page.tsx`, and the right sidebar's **PRs** tab, a much narrower column.
   The open `#N` strip above the page's details is `PullRequestTabsStrip` in `web/components/pull-requests/pr-tabs.tsx`, backed by `web/pull-request-tabs.ts`; the sidebar's **PRs** tab has none.
-- Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
+- Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`, whose CPU card lists every live session's processes with **Stop**; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
 - The three things called Files:
   - The changes card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.

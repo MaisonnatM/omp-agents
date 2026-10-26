@@ -8,7 +8,7 @@ import type { DaemonReport, DaemonScope } from "../omp/modules";
 import { run } from "../proc";
 import { descendants, parsePs, PS_ARGV, PS_ENV, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";
-import type { SessionProcess, SessionProcesses } from "../shared/processes";
+import type { LiveSessionProcesses, SessionProcess, SessionProcesses } from "../shared/processes";
 import type { HostStatus } from "../shared/sessions";
 import { errorText } from "../json";
 
@@ -58,6 +58,9 @@ interface Found {
 	items: Item[];
 }
 
+/** What a sample found, by instance id, in roster order. */
+type Sample = Map<string, Found>;
+
 /** What a session that leaves the roster is cleaned up by. */
 interface Seen {
 	/** Every omp session id it ran, since `/new` keeps the instance and changes the id its services name as owner. */
@@ -69,6 +72,7 @@ interface Seen {
 }
 
 const memoryOf = (rows: ProcessRow[]): number => rows.reduce((sum, row) => sum + row.rssKb * 1024, 0);
+const cpuOf = (rows: ProcessRow[]): number => rows.reduce((sum, row) => sum + row.cpuPercent, 0);
 
 export class SessionProcessWatch {
 	readonly #deps: SessionProcessWatchDeps;
@@ -87,21 +91,21 @@ export class SessionProcessWatch {
 		await this.#lane.run(() => this.#sample());
 	}
 
-	/** Live session `instanceId`'s processes now; `null` when it does not run. */
-	list(instanceId: string): Promise<SessionProcesses | null> {
-		return this.#lane.run(async () => answerOf((await this.#sample()).get(instanceId)));
+	/** Every live session's processes now, in roster order. */
+	list(): Promise<LiveSessionProcesses[]> {
+		return this.#lane.run(async () => answerOf(await this.#sample()));
 	}
 
-	/** Stops session `instanceId`'s process `id`, unless it no longer runs, and answers what the session runs after; `null` when the session does not run. */
-	stop(instanceId: string, id: string): Promise<SessionProcesses | null> {
+	/** Stops session `instanceId`'s process `id`, unless either no longer runs, and answers what every live session runs after. */
+	stop(instanceId: string, id: string): Promise<LiveSessionProcesses[]> {
 		return this.#lane.run(async () => {
 			const item = (await this.#sample()).get(instanceId)?.items.find(each => each.id === id);
 			if (item) await this.#stopTarget(item.target);
-			return answerOf((await this.#sample()).get(instanceId));
+			return answerOf(await this.#sample());
 		});
 	}
 
-	async #sample(): Promise<Map<string, Found>> {
+	async #sample(): Promise<Sample> {
 		const sessions = this.#deps.sessions();
 		const [table, reports, projectDirs] = await Promise.all([
 			this.#deps.readTable(),
@@ -118,7 +122,7 @@ export class SessionProcessWatch {
 
 		const previous = this.#seen;
 		this.#seen = new Map();
-		const found = new Map<string, Found>();
+		const found: Sample = new Map();
 		for (const session of sessions) {
 			const groups = sessionGroups(table, session.pid);
 			const jobs = groups ? [...groups.jobs].map(([pgid, rows]) => jobItem(session, pgid, rows)) : [];
@@ -128,7 +132,8 @@ export class SessionProcessWatch {
 				omp: ompRow ? { pid: ompRow.pid, started: ompRow.started } : null,
 				jobs: new Map(jobs.flatMap(job => (job.target.kind === "job" ? [...job.target.members] : []))),
 			});
-			found.set(session.instanceId, { omp: { memoryBytes: memoryOf(groups?.omp ?? []), processCount: groups?.omp.length ?? 0 }, items: jobs });
+			const ompRows = groups?.omp ?? [];
+			found.set(session.instanceId, { omp: { memoryBytes: memoryOf(ompRows), cpuPercent: cpuOf(ompRows), processCount: ompRows.length }, items: jobs });
 		}
 		const gone = [...previous].filter(([id]) => !live.has(id));
 		const left: Seen[] = [];
@@ -160,6 +165,7 @@ export class SessionProcessWatch {
 					shared: owned === undefined,
 					label: command ? `${snapshot.name}: ${command}` : snapshot.name,
 					memoryBytes: memoryOf(tree),
+					cpuPercent: cpuOf(tree),
 					processCount: tree.length,
 					startedAt: snapshot.startedAt,
 					stopsAt: null,
@@ -207,6 +213,7 @@ function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[]): Ite
 		shared: false,
 		label: top.command,
 		memoryBytes: memoryOf(rows),
+		cpuPercent: cpuOf(rows),
 		processCount: rows.length,
 		startedAt: Date.parse(top.started),
 		stopsAt: null,
@@ -215,8 +222,8 @@ function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[]): Ite
 	};
 }
 
-function answerOf(found: Found | undefined): SessionProcesses | null {
-	return found ? { omp: found.omp, processes: found.items.map(({ target: _target, serves: _serves, ...shown }) => shown) } : null;
+function answerOf(sample: Sample): LiveSessionProcesses[] {
+	return [...sample].map(([instanceId, found]) => ({ instanceId, omp: found.omp, processes: found.items.map(({ target: _target, serves: _serves, ...shown }) => shown) }));
 }
 
 /** Every process now, read without blocking the server; `null` when `ps` failed. */

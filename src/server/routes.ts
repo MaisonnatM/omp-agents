@@ -38,7 +38,7 @@ import { isAnalyticsRange } from "../shared/analytics";
 import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, parsePullRequest, type PullRequest, type PullRequestCheckout, type PullRequestRebase, prKey, type RebasedPullRequest, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
 import type { ProjectNotesAnswer } from "../shared/projects";
-import { parseProcessSettings, type ProcessSettings, type ProcessStop, type SessionProcesses } from "../shared/processes";
+import { type LiveSessionProcesses, parseProcessSettings, type ProcessSettings, type ProcessStop } from "../shared/processes";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
@@ -147,12 +147,12 @@ export interface RouteEnv {
 	processes: ProcessRoutesEnv;
 }
 
-/** What a live session runs besides omp, and when the idle stop ends it. */
+/** What the live sessions run besides omp, and when the idle stop ends it. */
 export interface ProcessRoutesEnv {
-	/** Live session `instanceId`'s processes; `null` when it does not run. */
-	list(instanceId: string): Promise<SessionProcesses | null>;
-	/** Stops the session's process `id`, unless it no longer runs, and answers what the session runs after; `null` when the session does not run. */
-	stop(stop: ProcessStop): Promise<SessionProcesses | null>;
+	/** Every live session's processes, in roster order. */
+	list(): Promise<LiveSessionProcesses[]>;
+	/** Stops the session's process `id`, unless either no longer runs, and answers what every live session runs after. */
+	stop(stop: ProcessStop): Promise<LiveSessionProcesses[]>;
 	settings(): ProcessSettings;
 	changeSettings(settings: ProcessSettings): ProcessSettings;
 }
@@ -946,19 +946,12 @@ function syncRoutes({ get, write }: RouteKit, env: SyncRoutesEnv): Routes {
 	};
 }
 
-class SessionNotRunning extends Error {}
-
-/** A live session's processes, the stop of one, and the idle stop's setting. */
+/** The live sessions' processes, the stop of one, and the idle stop's setting. */
 function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes {
-	const running = (found: SessionProcesses | null): SessionProcesses => {
-		if (!found) throw new SessionNotRunning();
-		return found;
-	};
-	const refuse = (err: unknown): Response | null => (err instanceof SessionNotRunning ? fail(404, "The session does not run") : null);
 	return {
-		"/api/session-processes": { GET: get(params => answer(async () => running(await env.list(params.get("instance") ?? "")), refuse)) },
+		"/api/session-processes": { GET: get(() => answer(() => env.list())) },
 		"/api/session-processes/stop": {
-			PUT: write(body => checked(parseProcessStop(body), "Expected { instanceId, id } naming a live session and one of its processes"), async stop => running(await env.stop(stop)), refuse),
+			PUT: write(body => checked(parseProcessStop(body), "Expected { instanceId, id } naming a live session and one of its processes"), stop => env.stop(stop)),
 		},
 		"/api/process-settings": {
 			GET: get(() => answer(async () => env.settings())),

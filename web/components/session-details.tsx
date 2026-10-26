@@ -1,11 +1,9 @@
-/** The right sidebar for a session: its pull requests, once it has any its Linear issues, and while it runs its processes. */
-import { Cpu, GitPullRequest } from "lucide-react";
+/** The right sidebar for a session: its pull requests and, once it has any, its Linear issues. */
+import { GitPullRequest } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { PAGE_ICON } from "../page-icons";
-import { sessionProcessesStore } from "../reads";
 import { DetailsSidebarFrame } from "./details-sidebar-frame";
-import { SessionProcessesTab } from "./session-processes-tab";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
 
@@ -27,12 +25,9 @@ interface SessionDetailsProps {
 	hosts: RosterHost[];
 }
 
-/** The right sidebar's content for the focused view: its session's pull requests, its Linear issues when it has any, and its processes while it runs. */
+/** The right sidebar's content for the focused view: its session's pull requests, and its Linear issues when it has any. */
 export function SessionDetails({ view, working, cwd, pullRequests, tickets, workspace, hosts }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(host => host.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
-	const live = view.kind === "live" ? view.instanceId : null;
-	// Polled while the sidebar shows a live session, not only on its tab, so the tab's count stays current too.
-	const processes = sessionProcessesStore.usePolling(live, live !== null).read?.data.processes.length ?? 0;
 	return (
 		<DetailsSidebarFrame
 			label="Session details"
@@ -51,7 +46,6 @@ export function SessionDetails({ view, working, cwd, pullRequests, tickets, work
 				...(tickets.length > 0
 					? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", count: tickets.length, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
 					: []),
-				...(live !== null ? [{ value: "processes", icon: Cpu, name: "Processes", count: processes, content: <SessionProcessesTab instanceId={live} /> } as const] : []),
 			]}
 		/>
 	);

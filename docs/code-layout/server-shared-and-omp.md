@@ -19,7 +19,7 @@
   `slug.ts` holds `slug`, the lower-case, dashed name segment that a worker's branch and a project's inbox file take.
   `session-visuals.ts` holds the `mermaid` and `chart` fences' rules, `mermaidKind` and `parseChartSpec` with their limits, which the page checks a fence with and the session visuals extension tells the model.
   `discussions.ts` holds **Ask about this**'s request, its events, the limits `parseDiscussionRequest` in `src/server/wire.ts` holds it to, `discussionPrompt`, the one message the model gets, and `sessionMessage`, what **Send to session** sends.
-  `processes.ts` holds a live session's `SessionProcesses`, the `ProcessStop` request, and `ProcessSettings` with its choices and `parseProcessSettings`.
+  `processes.ts` holds a live session's `SessionProcesses`, the `LiveSessionProcesses` list entry that adds its instance id, the `ProcessStop` request, and `ProcessSettings` with its choices and `parseProcessSettings`.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, `documents.ts`, `isolation.ts`, `turn-failure.ts`, and `daemons.ts`, the daemon brokers' services and the stop of one, wrap one area each.
   `context-index.ts` keeps the context-source index beside omp-stats' database: each request of each session file split by source, re-read only for files that changed.
   `discussion.ts` holds `answerDiscussion`, one streamed model call on omp's `smol` role, else `default`, that answers **Ask about this** outside every session.

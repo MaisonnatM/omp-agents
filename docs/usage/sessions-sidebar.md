@@ -81,6 +81,24 @@
   Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
-- The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
+- The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory.
   The strip reads them again every five seconds while the page is visible.
+  Hover or focus the memory for its full reading.
+  Hover or focus the disk space for that volume's percent used, a bar of it, and the space used, free, and in total.
+- Hover or click the CPU for a popover that lists what every live session runs besides omp, read again every 5 seconds while it is open.
+  Clicking the CPU while hover opened it, or pressing Enter on it, moves focus into the popover, so Tab reaches each **Stop**.
+  The busiest session comes first, by the CPU of omp and its processes together, each named by its session name or else its folder.
+  The CPU of a process is the share of one core it uses, so one process can show more than 100%; macOS reads it as an average that decays over the last minute.
+  Each session starts with the CPU, memory, and process count of omp and its MCP servers, which end with the session and have no **Stop**.
+  Below it come its jobs and services, biggest memory first.
+  A job is a process group the session started, such as a dev server or a watcher, named by its command line; a service is a daemon that omp's project broker runs for the session, named by the daemon's name and command.
+  Each row shows its CPU, its memory, how many processes it holds when more than one, **Shared with this project's sessions** for a broker daemon no session owns, such as omp's browser, and **Stops in N min** once the idle stop has a time for it.
+  A shared service shows under each session of its project, and counts toward each one's CPU.
+  **Stop** ends it at once: a job gets SIGTERM, then SIGKILL after 3 seconds, and a service is stopped through its broker.
+  A process the session ran in a Docker container does not show, since Docker runs it outside the session's processes.
+- The idle stop ends a job once its session has been idle, waiting on you or done with its turn, for the time **Stop idle processes** in [Settings](settings.md) names, 30 minutes by default, counted from when the session was last busy or from the job's start if that is later.
+  A shared service stops once every live session of its project has been idle that long.
+  Only the server that runs unattended work, the first one started, stops processes, so another server shows no **Stops in** time.
+- When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
+  A session started from the dashboard also has the rest of its processes ended when it ends, as before.
 - **Terminal**, at the start of the strip's right side, shows or hides the [terminal](terminal.md).

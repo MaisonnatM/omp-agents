@@ -14,6 +14,8 @@ export interface ProcessRow {
 	started: string;
 	/** Resident memory in KiB. */
 	rssKb: number;
+	/** `ps`'s `%cpu`: percent of one core, so a busy process can pass 100; on macOS a decaying average of recent use. */
+	cpuPercent: number;
 	/** The command line, as `ps` prints it. */
 	command: string;
 }
@@ -24,8 +26,8 @@ export type ProcessTable = Map<number, ProcessRow>;
 /** Processes by pid, each with its start time, which tells it from a later process that reuses the pid. */
 export type Processes = Map<number, string>;
 
-/** `ps` with the columns {@link parsePs} reads, and the locale that keeps `lstart` in English for `Date.parse`. */
-export const PS_ARGV = ["ps", "-A", "-o", "pid=,ppid=,pgid=,rss=,lstart=,args="];
+/** `ps` with the columns {@link parsePs} reads, and the locale that keeps `lstart` in English for `Date.parse` and `%cpu`'s decimal point a dot. */
+export const PS_ARGV = ["ps", "-A", "-o", "pid=,ppid=,pgid=,rss=,pcpu=,lstart=,args="];
 export const PS_ENV = { LC_ALL: "C" };
 
 /**
@@ -34,7 +36,7 @@ export const PS_ENV = { LC_ALL: "C" };
  */
 export const OMP_WORKER_PREFIX = "__omp_worker_";
 
-const PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s?(.*)$/;
+const PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s?(.*)$/;
 
 /** The table `ps` printed with {@link PS_ARGV}; a line it cannot read is skipped. */
 export function parsePs(text: string): ProcessTable {
@@ -42,8 +44,16 @@ export function parsePs(text: string): ProcessTable {
 	for (const line of text.split("\n")) {
 		const match = PS_LINE.exec(line);
 		if (!match) continue;
-		const [, pid, ppid, pgid, rss, started, command] = match;
-		table.set(Number(pid), { pid: Number(pid), ppid: Number(ppid), pgid: Number(pgid), started: started.split(/\s+/).join(" "), rssKb: Number(rss), command: command.trim() });
+		const [, pid, ppid, pgid, rss, cpu, started, command] = match;
+		table.set(Number(pid), {
+			pid: Number(pid),
+			ppid: Number(ppid),
+			pgid: Number(pgid),
+			started: started.split(/\s+/).join(" "),
+			rssKb: Number(rss),
+			cpuPercent: Number(cpu),
+			command: command.trim(),
+		});
 	}
 	return table;
 }

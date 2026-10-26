@@ -5,21 +5,22 @@ import { descendants, parsePs, sessionGroups, stopTree } from "./process-census"
 
 /** omp (100) with an MCP server in its process group, two jobs, and a shared worker it spawned, which has a child of its own. */
 const PS = `
-  100     1   100  51200 Fri Oct  3 09:00:00 2026     omp
-  101   100   100  20480 Fri Oct  3 09:00:01 2026     node mcp-server.js --stdio
-  110   100   110   4096 Fri Oct  3 09:10:00 2026     bun run dev
-  111   110   110 102400 Fri Oct  3 09:10:01 2026     node vite.js
-  120   100   120   1024 Fri Oct  3 09:20:00 2026     sleep 600
-  130   100   130   8192 Fri Oct  3 09:05:00 2026     /opt/bun __omp_worker_daemon_broker
-  131   130   131   8192 Fri Oct  3 09:30:00 2026     python3 -m http.server
-  200     1   200   2048 Fri Oct  3 08:00:00 2026     -zsh
+  100     1   100  51200   3.5 Fri Oct  3 09:00:00 2026     omp
+  101   100   100  20480   0.4 Fri Oct  3 09:00:01 2026     node mcp-server.js --stdio
+  110   100   110   4096   0.0 Fri Oct  3 09:10:00 2026     bun run dev
+  111   110   110 102400 112.5 Fri Oct  3 09:10:01 2026     node vite.js
+  120   100   120   1024   0.0 Fri Oct  3 09:20:00 2026     sleep 600
+  130   100   130   8192   1.0 Fri Oct  3 09:05:00 2026     /opt/bun __omp_worker_daemon_broker
+  131   130   131   8192   0.0 Fri Oct  3 09:30:00 2026     python3 -m http.server
+  200     1   200   2048   0.0 Fri Oct  3 08:00:00 2026     -zsh
 not a process line
 `;
 
-test("ps's table reads each process with its group, memory, start, and command", () => {
+test("ps's table reads each process with its group, memory, CPU, start, and command", () => {
 	const table = parsePs(PS);
 	expect(table.size).toBe(8);
-	expect(table.get(101)).toEqual({ pid: 101, ppid: 100, pgid: 100, started: "Fri Oct 3 09:00:01 2026", rssKb: 20480, command: "node mcp-server.js --stdio" });
+	expect(table.get(101)).toEqual({ pid: 101, ppid: 100, pgid: 100, started: "Fri Oct 3 09:00:01 2026", rssKb: 20480, cpuPercent: 0.4, command: "node mcp-server.js --stdio" });
+	expect(table.get(111)?.cpuPercent).toBe(112.5);
 });
 
 test("the processes under omp leave out its shared workers and what they started, so the keeper never notes them", () => {

@@ -597,7 +597,7 @@ export class Dashboard {
 			dashboard: this.#selfUpdate,
 			sync: this.#settingsSync,
 			processes: {
-				list: instanceId => this.#processWatch.list(instanceId),
+				list: () => this.#processWatch.list(),
 				stop: ({ instanceId, id }) => this.#processWatch.stop(instanceId, id),
 				settings: () => {
 					this.#processSettings.reload();

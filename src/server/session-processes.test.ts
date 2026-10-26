@@ -6,13 +6,13 @@ import { SessionProcessWatch, type WatchedSession } from "./session-processes";
 const T0 = Date.parse("Fri Oct 3 09:00:00 2026");
 const minutes = (count: number): number => T0 + count * 60_000;
 
-const OMP_A = "  100     1   100  51200 Fri Oct  3 09:00:00 2026     omp";
-const MCP_A = "  101   100   100  20480 Fri Oct  3 09:00:00 2026     node mcp.js";
-const DEV = "  110   100   110   4096 Fri Oct  3 09:00:00 2026     bun run dev";
-const VITE = "  111   110   110  10240 Fri Oct  3 09:00:00 2026     node vite.js";
-const SLEEP = "  120   100   120   1024 Fri Oct  3 09:20:00 2026     sleep 600";
-const OMP_B = "  200     1   200  51200 Fri Oct  3 09:00:00 2026     omp";
-const BROWSER = "  300     1   300   2048 Fri Oct  3 09:00:00 2026     chromium --headless";
+const OMP_A = "  100     1   100  51200   2.0 Fri Oct  3 09:00:00 2026     omp";
+const MCP_A = "  101   100   100  20480   0.5 Fri Oct  3 09:00:00 2026     node mcp.js";
+const DEV = "  110   100   110   4096   1.0 Fri Oct  3 09:00:00 2026     bun run dev";
+const VITE = "  111   110   110  10240  30.0 Fri Oct  3 09:00:00 2026     node vite.js";
+const SLEEP = "  120   100   120   1024   0.0 Fri Oct  3 09:20:00 2026     sleep 600";
+const OMP_B = "  200     1   200  51200   4.0 Fri Oct  3 09:00:00 2026     omp";
+const BROWSER = "  300     1   300   2048   6.5 Fri Oct  3 09:00:00 2026     chromium --headless";
 const PS = [OMP_A, MCP_A, DEV, VITE, OMP_B, BROWSER];
 
 const DEV_ID = JSON.stringify(["job", 110, "Fri Oct 3 09:00:00 2026"]);
@@ -59,34 +59,39 @@ function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON
 		state.now = minutes(count);
 		return watch.tick();
 	};
-	return { state, stopped, watch, tickAt };
+	/** Session `instanceId`'s processes, as the whole list has them. */
+	const processesOf = async (instanceId: string) => (await watch.list()).find(each => each.instanceId === instanceId)?.processes;
+	return { state, stopped, watch, tickAt, processesOf };
 }
 
 describe("SessionProcessWatch", () => {
-	test("lists a session's jobs and services, biggest memory first, with omp and its MCP servers apart", async () => {
+	test("lists every live session's jobs and services in roster order, biggest memory first, with omp and its MCP servers apart", async () => {
 		const { watch } = computer();
-		expect(await watch.list("a")).toEqual({
-			omp: { memoryBytes: 73_400_320, processCount: 2 },
-			processes: [
-				{ id: DEV_ID, kind: "job", shared: false, label: "bun run dev", memoryBytes: 14_680_064, processCount: 2, startedAt: T0, stopsAt: minutes(30) },
-				{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, processCount: 1, startedAt: T0, stopsAt: null },
-				{ id: API_ID, kind: "service", shared: false, label: "api: bun api.ts", memoryBytes: 0, processCount: 0, startedAt: T0, stopsAt: minutes(30) },
-			],
-		});
-		expect(await watch.list("b")).toEqual({
-			omp: { memoryBytes: 52_428_800, processCount: 1 },
-			processes: [{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, processCount: 1, startedAt: T0, stopsAt: null }],
-		});
-		expect(await watch.list("gone")).toBeNull();
+		expect(await watch.list()).toEqual([
+			{
+				instanceId: "a",
+				omp: { memoryBytes: 73_400_320, cpuPercent: 2.5, processCount: 2 },
+				processes: [
+					{ id: DEV_ID, kind: "job", shared: false, label: "bun run dev", memoryBytes: 14_680_064, cpuPercent: 31, processCount: 2, startedAt: T0, stopsAt: minutes(30) },
+					{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, startedAt: T0, stopsAt: null },
+					{ id: API_ID, kind: "service", shared: false, label: "api: bun api.ts", memoryBytes: 0, cpuPercent: 0, processCount: 0, startedAt: T0, stopsAt: minutes(30) },
+				],
+			},
+			{
+				instanceId: "b",
+				omp: { memoryBytes: 52_428_800, cpuPercent: 4, processCount: 1 },
+				processes: [{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, startedAt: T0, stopsAt: null }],
+			},
+		]);
 	});
 
 	test("a busy session's processes never stop", async () => {
-		const { state, stopped, watch, tickAt } = computer();
+		const { state, stopped, tickAt, processesOf } = computer();
 		state.sessions = [{ ...A, status: "needs-input" }, B];
 		await tickAt(0);
 		await tickAt(600);
 		expect(stopped).toEqual([]);
-		expect((await watch.list("a"))?.processes.map(item => item.stopsAt)).toEqual([null, null, null]);
+		expect((await processesOf("a"))?.map(item => item.stopsAt)).toEqual([null, null, null]);
 	});
 
 	test("an idle session's job stops exactly the setting's minutes after the session was last seen busy", async () => {
@@ -116,23 +121,23 @@ describe("SessionProcessWatch", () => {
 	});
 
 	test("a server without the owner lock lists no stop and stops nothing", async () => {
-		const { state, stopped, watch, tickAt } = computer();
+		const { state, stopped, tickAt, processesOf } = computer();
 		state.owner = false;
 		state.sessions = [A, { ...B, status: "idle" }];
 		await tickAt(0);
 		await tickAt(600);
 		expect(stopped).toEqual([]);
-		expect((await watch.list("a"))?.processes.map(item => item.stopsAt)).toEqual([null, null, null]);
+		expect((await processesOf("a"))?.map(item => item.stopsAt)).toEqual([null, null, null]);
 	});
 
 	test("with the idle stop off nothing stops", async () => {
-		const { state, stopped, watch, tickAt } = computer();
+		const { state, stopped, tickAt, processesOf } = computer();
 		state.minutes = null;
 		state.sessions = [A, { ...B, status: "idle" }];
 		await tickAt(0);
 		await tickAt(600);
 		expect(stopped).toEqual([]);
-		expect((await watch.list("b"))?.processes.map(item => item.stopsAt)).toEqual([null]);
+		expect((await processesOf("b"))?.map(item => item.stopsAt)).toEqual([null]);
 	});
 
 	test("a session that left the roster has its services and reparented jobs stopped once its omp exits, and not before", async () => {
@@ -149,14 +154,17 @@ describe("SessionProcessWatch", () => {
 		expect(stopped).toEqual(["service api g2", "job 110,111"]);
 	});
 
-	test("a stop of a process that no longer runs answers the list without stopping anything, and a stop of one that runs ends it", async () => {
+	test("a stop of a process or session that no longer runs answers the list without stopping anything, and a stop of one that runs ends it", async () => {
 		const { state, stopped, watch } = computer();
 		state.sessions = [{ ...A, status: "working" }, B];
-		const listed = await watch.list("a");
+		const listed = await watch.list();
 		expect(await watch.stop("a", JSON.stringify(["job", 110, "Fri Oct 3 08:00:00 2026"]))).toEqual(listed);
+		expect(await watch.stop("gone", DEV_ID)).toEqual(listed);
 		expect(stopped).toEqual([]);
-		expect((await watch.stop("a", DEV_ID))?.processes.map(item => item.id)).toEqual([BROWSER_ID, API_ID]);
+		expect((await watch.stop("a", DEV_ID)).map(each => [each.instanceId, each.processes.map(item => item.id)])).toEqual([
+			["a", [BROWSER_ID, API_ID]],
+			["b", [BROWSER_ID]],
+		]);
 		expect(stopped).toEqual(["job 110,111"]);
-		expect(await watch.stop("gone", DEV_ID)).toBeNull();
 	});
 });

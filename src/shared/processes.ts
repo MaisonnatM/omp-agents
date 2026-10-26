@@ -1,4 +1,4 @@
-/** What a live session runs besides omp, as the session details' Processes tab lists it, and the idle stop's setting. */
+/** What each live session runs besides omp, as the status bar's CPU card lists it, and the idle stop's setting. */
 import { isObject, type Parsed } from "../json";
 
 /** Something a live session runs besides omp itself. */
@@ -13,6 +13,8 @@ export interface SessionProcess {
 	label: string;
 	/** The summed resident memory of the job's process group, or of the daemon and what it started. */
 	memoryBytes: number;
+	/** The summed `ps` CPU percent of the same processes, each a percent of one core. */
+	cpuPercent: number;
 	processCount: number;
 	/** In ms since the epoch. */
 	startedAt: number;
@@ -22,9 +24,14 @@ export interface SessionProcess {
 
 export interface SessionProcesses {
 	/** omp and the helpers in its own process group, its MCP servers. Not stoppable here. */
-	omp: { memoryBytes: number; processCount: number };
+	omp: { memoryBytes: number; cpuPercent: number; processCount: number };
 	/** Biggest memory first. */
 	processes: SessionProcess[];
+}
+
+/** One live session's processes, as `GET /api/session-processes` lists every live session's. */
+export interface LiveSessionProcesses extends SessionProcesses {
+	instanceId: string;
 }
 
 /** The body of `PUT /api/session-processes/stop`. */

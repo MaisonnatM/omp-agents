@@ -138,7 +138,7 @@ function IdleProcessStop() {
 	return (
 		<Section
 			title="Stop idle processes"
-			meta="Dev servers, watchers, and services a session starts besides omp. A process stops once every session it serves has been idle that long; a session's Processes tab shows when. Saved on the server."
+			meta="Dev servers, watchers, and services a session starts besides omp. A process stops once every session it serves has been idle that long; hover the CPU in the status bar to see when. Saved on the server."
 		>
 			{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
 			{minutes !== undefined && (

@@ -28,7 +28,7 @@ import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/se
 import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/shared/tickets";
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
-import type { ProcessStop, SessionProcesses } from "../src/shared/processes";
+import type { LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
 import { errorText, getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 import { withPullRequestState } from "./pull-requests-model";
@@ -114,16 +114,13 @@ export async function writeMergeQueue(workspace: string | null, change: MergeQue
 	return answer;
 }
 
-/** What each live session runs besides omp, by instance id, read every 5 seconds while its Processes tab shows. */
-export const sessionProcessesStore = createPolledStore<SessionProcesses>({
-	url: instanceId => `/api/session-processes?${new URLSearchParams({ instance: instanceId ?? "" })}`,
-	pollMs: 5_000,
-});
+/** What every live session runs besides omp, in roster order, read every 5 seconds while the status bar's CPU card is open. */
+export const sessionProcessesStore = createPolledStore<LiveSessionProcesses[]>({ url: () => "/api/session-processes", pollMs: 5_000 });
 
-/** Stops live session `instanceId`'s process `id`, and shows what the session runs after. */
+/** Stops live session `instanceId`'s process `id`, and shows what every live session runs after. */
 export async function writeProcessStop(instanceId: string, id: string): Promise<void> {
-	const answer = await putJson<SessionProcesses>("/api/session-processes/stop", { instanceId, id } satisfies ProcessStop);
-	sessionProcessesStore.update(() => answer, instanceId);
+	const answer = await putJson<LiveSessionProcesses[]>("/api/session-processes/stop", { instanceId, id } satisfies ProcessStop);
+	sessionProcessesStore.update(() => answer);
 }
 
 /** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per workspace, so there is one entry. */

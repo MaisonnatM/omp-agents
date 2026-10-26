@@ -15,6 +15,7 @@
   `request` resolves or rejects on `done` and keeps waiting across a reconnect, whose `resume` hands the server every request still waiting.
   Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
 - `web/use-action.ts`: guards a control against repeated activation, exposes its pending state, and shows failures through the toast manager.
+- `web/use-hover-popover.ts`: `useHoverPopover`, the props for a popover a mouse opens by hovering its trigger without moving focus, and a click or Enter opens with focus inside, so its buttons stay reachable by keyboard; the status bar's CPU and a pull request's out-of-date base branch use it.
 - `web/use-open-latest.ts`: `useOpenLatest` opens a list's first item once you arrive at it with nothing open, replacing the list's history entry; the Todo page passes its top row, and the Inbox page its newest conversation.
 - `web/open-pull-request.tsx`: a live session's **Open PR**: its prompt, `offeredPrompt`, which sessions offer it, `pressAfter`, where a press stands, in flight until the queue or the transcript's last prompt shows the session took it, then seen until the session is next idle, `useOpenPullRequest`, which keeps the press per session id for the command menu's **Open pull request** in `web/app.tsx` and the header's `OpenPullRequestButton`, and sends with the delivery `deliveryOf` in `web/components/subject.ts` gives the composer.
 - `web/pane-store.ts`: each open view's transcript, changed files, images, turns, and completions, outside the page state.

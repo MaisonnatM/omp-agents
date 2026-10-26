@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { age, hostLabel, modeOf } from "../../../labels";
 import { useAction } from "../../../use-action";
 import { useInlineConfirm } from "../../../use-inline-confirm";
+import { useHoverPopover } from "../../../use-hover-popover";
 import { CopyableCode } from "../../copyable-code";
 import { BranchLabel, releaseBranch } from "../../git";
 import type { QuickActionsProps } from "../../quick-actions";
@@ -69,40 +70,18 @@ function TitleEditor({ detail, headingRef, placement, send }: { detail: PullRequ
 
 function BaseBranch({ detail, stacked, send }: { detail: PullRequestDetail; stacked: boolean; send: SendPullRequest }) {
 	const update = useAction(async (method: UpdateMethod) => { await send({ field: "update", method }); }, "Could not update the branch");
-	const [open, setOpen] = useState(false);
-	const hovered = useRef(false);
-	const trigger = useRef<HTMLButtonElement>(null);
-	const content = useRef<HTMLDivElement>(null);
-	const closeTimer = useRef<number | undefined>(undefined);
-	const keepOpen = () => {
-		window.clearTimeout(closeTimer.current);
-	};
-	const closeAfterHover = () => {
-		keepOpen();
-		closeTimer.current = window.setTimeout(() => {
-			if (trigger.current === document.activeElement || content.current?.contains(document.activeElement)) return;
-			setOpen(false);
-		}, 120);
-	};
-	useEffect(() => keepOpen, []);
+	const popover = useHoverPopover();
 	const behind = (detail.state === "open" || detail.state === "draft") && !detail.conflicts && detail.behindBy !== null && detail.behindBy > 0;
 	if (!behind) return <span className={cn("inline-flex min-w-0 max-w-[40%]", stacked && "text-warning-foreground")} title={stacked ? `Stacked on ${detail.base}` : detail.base}><BranchLabel name={detail.base} /></span>;
 	return (
-		<Popover open={open} onOpenChange={value => { keepOpen(); hovered.current = false; setOpen(value); }}>
+		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button ref={trigger} type="button" aria-label={`${detail.base}, behind by ${detail.behindBy} ${detail.behindBy === 1 ? "commit" : "commits"}`}
-					onPointerEnter={event => { keepOpen(); if (event.pointerType === "mouse" && !open) { hovered.current = true; setOpen(true); } }}
-					onPointerLeave={closeAfterHover}
-					onClick={event => { if (hovered.current) { event.preventDefault(); hovered.current = false; content.current?.querySelector("button")?.focus(); } }}
+				<button {...popover.trigger} type="button" aria-label={`${detail.base}, behind by ${detail.behindBy} ${detail.behindBy === 1 ? "commit" : "commits"}`}
 					className="inline-flex min-w-0 max-w-[40%] shrink-0 cursor-help items-center gap-1 rounded-sm text-warning-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
 					<BranchLabel name={detail.base} /><TriangleAlert aria-hidden className="size-3.5 shrink-0" />
 				</button>
 			</PopoverTrigger>
-			<PopoverContent ref={content} align="start" aria-label="Update base branch" className="w-80 max-w-80 space-y-3 p-3 text-xs font-sans"
-				onPointerEnter={keepOpen} onPointerLeave={closeAfterHover}
-				onOpenAutoFocus={event => { if (hovered.current) event.preventDefault(); }}
-				onCloseAutoFocus={event => { if (hovered.current) event.preventDefault(); }}
-				onEscapeKeyDown={() => { hovered.current = false; }}>
+			<PopoverContent {...popover.content} align="start" aria-label="Update base branch" className="w-80 max-w-80 space-y-3 p-3 text-xs font-sans">
 				<p>This branch is out-of-date with <code>{detail.base}</code> by {detail.behindBy} {detail.behindBy === 1 ? "commit" : "commits"}.</p>
 				<p className="text-muted-foreground">Changes can be cleanly merged.</p>
 				<div className="flex flex-wrap gap-2"><Button size="xs" variant="outline" disabled={update.pending} onClick={() => update.run("merge")}>Update branch</Button><Button size="xs" variant="outline" disabled={update.pending} onClick={() => update.run("rebase")}>Update with rebase</Button></div>
