@@ -32,10 +32,10 @@ export function parseRateLimit(answer: unknown): GraphqlQuota | null {
 	return remaining === undefined || reset === undefined ? null : { remaining, reset: reset * 1000 };
 }
 
-/** What shows where the pull request list would refresh, while the dashboard's own reads wait until `until`. */
-export const pausedText = (until: number): string => `GitHub quota low, refreshing paused until ${new Date(until).toTimeString().slice(0, 5)}`;
+/** Why a GraphQL call waits until `until`, the dashboard's own read or a user's call GitHub refused. */
+export const pausedText = (until: number): string => `GitHub quota low until ${new Date(until).toTimeString().slice(0, 5)}`;
 
-/** A read the dashboard would make on its own, refused while GitHub's quota is low; its message says until when. */
+/** A GraphQL call refused while GitHub's quota is low, by the dashboard before asking or by GitHub; its message says until when. */
 export class GithubQuotaPaused extends Error {}
 
 /** Whether the dashboard's own GraphQL reads may spend points now; `read` answers the quota, `null` when it cannot tell. */
@@ -44,6 +44,8 @@ export class GithubQuota {
 	readonly #kept = createCache<GraphqlQuota | null>(QUOTA_TTL_MS);
 	/** Until when the dashboard's own reads wait; in the past while they run. */
 	#until = 0;
+	/** The quota read a refusal started, which refusals arriving before it answers wait for rather than read again. */
+	#pausing: Promise<void> | null = null;
 
 	constructor(read: () => Promise<GraphqlQuota | null>) {
 		this.#read = read;
@@ -55,16 +57,32 @@ export class GithubQuota {
 	 */
 	async admit(): Promise<void> {
 		if (Date.now() >= this.#until) {
-			const quota = await this.#kept.get("graphql", this.#read).catch(() => null);
+			const quota = await this.#kept.get("graphql", this.#readOrNull);
 			if (quota && quota.remaining < GRAPHQL_RESERVE) this.#until = quota.reset;
 		}
 		if (Date.now() < this.#until) throw new GithubQuotaPaused(pausedText(this.#until));
 	}
 
-	/** GitHub refused a GraphQL call for its rate limit: the dashboard's own reads wait until it resets, without retrying before. */
-	async refused(): Promise<void> {
-		const quota = await this.#kept.get("graphql", this.#read, true).catch(() => null);
-		const now = Date.now();
-		this.#until = quota && quota.reset > now ? quota.reset : now + UNKNOWN_RESET_MS;
+	/**
+	 * GitHub refused a GraphQL call for its rate limit: the dashboard's own reads wait until it resets, without retrying before.
+	 * Answers the pause for the refused call to throw; refusals that come while paused, or while the first reads the reset, read nothing.
+	 */
+	async refused(): Promise<GithubQuotaPaused> {
+		if (Date.now() >= this.#until) {
+			this.#pausing ??= this.#kept
+				.get("graphql", this.#readOrNull, true)
+				.then(quota => {
+					const now = Date.now();
+					this.#until = quota && quota.reset > now ? quota.reset : now + UNKNOWN_RESET_MS;
+				})
+				.finally(() => {
+					this.#pausing = null;
+				});
+			await this.#pausing;
+		}
+		return new GithubQuotaPaused(pausedText(this.#until));
 	}
+
+	/** The quota, `null` when it cannot be read, so the cache keeps a failed read as long as an answer. */
+	readonly #readOrNull = (): Promise<GraphqlQuota | null> => this.#read().catch(() => null);
 }

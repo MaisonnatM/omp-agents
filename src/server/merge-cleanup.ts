@@ -10,6 +10,7 @@
  * again, so a look that read it open never undoes a merge. Every look settles the sessions a merge left waiting again, so
  * one whose end failed, or whose last pull request closed later, ends then.
  */
+import { GithubQuotaPaused } from "../github-quota";
 import { errorText } from "../json";
 import type { PullRequestState } from "../pull-request-merge";
 import { type PullRequest, prKey, type Repo, repoKey, samePullRequest } from "../shared/github";
@@ -88,7 +89,8 @@ export class MergeCleanup {
 		for (const session of this.#deps.sessions()) for (const pr of session.pullRequests) if (!this.#settled(pr)) unsettled.set(prKey(pr), pr);
 		if (unsettled.size === 0) return;
 		const states = await this.#deps.states([...unsettled.values()]).catch((error: unknown) => {
-			console.error(`omp-agents: cannot read the sessions' pull requests: ${errorText(error)}`);
+			// A pause is GitHub's quota running low, which the pull request list already shows; the next look after the reset reads them.
+			if (!(error instanceof GithubQuotaPaused)) console.error(`omp-agents: cannot read the sessions' pull requests: ${errorText(error)}`);
 			return null;
 		});
 		if (!states) return;

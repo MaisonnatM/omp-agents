@@ -56,28 +56,24 @@ function rateLimited(answer: unknown): boolean {
 /**
  * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}; a mutation goes through {@link ghMutation}.
  * `paginate` follows the query's `$endCursor` through every page, answering an array of the pages.
- * It runs whatever the quota, as a user's action does; a refusal for the rate limit pauses {@link ghPolledGraphql} until GitHub resets the quota.
+ * It runs whatever the quota, as a user's action does; GitHub refusing it for the rate limit throws `GithubQuotaPaused` and pauses {@link ghPolledGraphql} until the quota resets.
  */
 export async function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
 	const answer = await runJson(["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS }).catch(async (error: unknown) => {
-		if (RATE_LIMITED.test(errorText(error))) await githubQuota.refused();
-		throw error;
+		throw RATE_LIMITED.test(errorText(error)) ? await githubQuota.refused() : error;
 	});
-	if (rateLimited(answer)) await githubQuota.refused();
+	if (rateLimited(answer)) throw await githubQuota.refused();
 	return answer;
 }
 
 /**
  * {@link ghGraphql} for a read the dashboard makes on its own, such as the pull request list it polls: while
- * {@link githubQuota} holds the budget for agents, it throws {@link GithubQuotaPaused} naming when reads resume, without asking GitHub.
+ * {@link githubQuota} holds the budget for agents, it throws `GithubQuotaPaused` naming when reads resume, without asking GitHub.
  */
 export async function ghPolledGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
 	await githubQuota.admit();
-	const answer = await ghGraphql(query, vars, paginate);
-	// The refusal just paused the dashboard's own reads, so this throws the pause.
-	if (rateLimited(answer)) await githubQuota.admit();
-	return answer;
+	return ghGraphql(query, vars, paginate);
 }
 
 /** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */
