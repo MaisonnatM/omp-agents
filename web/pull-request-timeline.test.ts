@@ -24,7 +24,7 @@ const detail = (fields: Partial<PullRequestDetail> = {}): PullRequestDetail => (
 	files: [],
 	checks: "none",
 	checkRuns: [],
-	unresolved: { count: 0, exact: true },
+	unresolved: { count: 0, exact: true, bots: 0 },
 	threads: [],
 	conversation: [],
 	createdAt: 0,

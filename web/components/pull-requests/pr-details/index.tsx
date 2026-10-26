@@ -7,7 +7,6 @@ import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { PullRequestDetailTab } from "../../../pull-request-tabs";
 import { commentCount } from "../../../pull-requests-model";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { actionFacts } from "../../../../src/shared/moves";
@@ -62,6 +61,7 @@ export interface DetailContentProps {
 }
 
 export type Placement = "page" | "sidebar";
+export type PullRequestDetailTab = "summary" | "timeline" | "code" | "review";
 
 /**
  * The labels and their counts outgrow the sidebar's default width, with or without the checks beside them, so

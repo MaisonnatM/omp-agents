@@ -42,8 +42,6 @@ Alt is Option on macOS.
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
 | Space | Pull requests board, a card's title focused | Pick up the card; ← and → choose a column, Space or Enter drops it, and Escape puts it back |
 | Cmd+Shift+K / Cmd+Shift+C | Pull requests page showing a PR | Copy its `#N` / GitHub link |
-| Cmd+W | Pull requests page showing a PR | Close its PR tab; browsers may reserve this key |
-| Alt+Left / Alt+Right | Focused open PR tab's number | Move the tab left / right |
 | / | Todo page, outside text fields | Search the todos |
 | ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
 | X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |

@@ -1,9 +1,9 @@
 import { GitPullRequest } from "lucide-react";
 import { useState } from "react";
 import type { LinkedPullRequest, PullRequest } from "../../src/shared/github";
-import type { PullRequestDetailTab } from "../pull-request-tabs";
 import type { RosterHost } from "../../src/shared/sessions";
 import { DetailsEmpty } from "./details-sidebar-frame";
+import type { PullRequestDetailTab } from "./pull-requests/pr-details";
 import { PullRequestDetails } from "./pull-requests/pr-page";
 
 interface PullRequestsTabProps {

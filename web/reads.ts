@@ -31,7 +31,7 @@ import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
 import { errorText, getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
-import { withPullRequestState } from "./pull-requests-model";
+import { withPullRequestReviewers, withPullRequestState } from "./pull-requests-model";
 import { pickedInbox } from "./inbox-model";
 import { useStoredState } from "./stored-state";
 
@@ -86,12 +86,16 @@ export const pullRequestsStore = createPolledStore<PullRequestList>({
 });
 
 /**
- * Makes `change` on GitHub and answers the pull request as GitHub has it after. A state change shows in `workspace`'s
- * list at once, so the rows and the details that read it agree, and the list is read again either way.
+ * Makes `change` on GitHub and answers the pull request as GitHub has it after. A state change or a review request shows
+ * in `workspace`'s list at once, so the rows and the details that read it agree, and the list is read again either way.
  */
 export async function writePullRequest(workspace: string | null, pr: PullRequest, change: PullRequestChange): Promise<PullRequestDetail> {
 	const detail = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change } satisfies PullRequestEdit);
 	if (change.field === "state") pullRequestsStore.update(list => withPullRequestState(list, pr, change.state, Date.now()), workspace);
+	if (change.field === "reviewer") {
+		const avatarUrl = detail.reviewers.find(reviewer => reviewer.login === change.login)?.avatarUrl ?? null;
+		pullRequestsStore.update(list => withPullRequestReviewers(list, pr, change.login, change.on, avatarUrl), workspace);
+	}
 	void pullRequestsStore.refresh(workspace, { fresh: true });
 	return detail;
 }

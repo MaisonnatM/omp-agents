@@ -1,10 +1,11 @@
 /** `PullRequestDetailPage`: one pull request in the main area, with the quick actions that start a session on it. */
-import { useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 import { type PullRequestList, type LinkedPullRequest, type PullRequest, pullRequestUrl, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { pageDetailTab, type PullRequestDetailTab, pullRequestTabHash, usePagePullRequestTabs } from "../../pull-request-tabs";
 import { useShortcuts } from "../../shortcuts";
 import { useClipboard } from "../../use-copy";
 import { listedPullRequest } from "../../pull-requests-model";
@@ -14,9 +15,9 @@ import { pullRequestsStore } from "../../reads";
 import { hashForPullRequestFiles, hashForPullRequests } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
-import { PullRequestTabsStrip } from "./pr-tabs";
+import { Header } from "../page-header";
 import { QuickStartNotice } from "../quick-actions";
-import { type Placement, PullRequestDetailContent } from "./pr-details";
+import { type Placement, PullRequestDetailContent, type PullRequestDetailTab } from "./pr-details";
 import { rowId } from "./pr-row";
 
 /** Why the pull request list does not hold the PR a link named. `allWorkspaces`: the sidebar shows every workspace. */
@@ -103,34 +104,33 @@ interface PullRequestDetailPageProps extends Pick<PullRequestDetailsProps, "work
 	files: { path: string | null } | null;
 }
 
-/** A pull request from the Pull requests page in the main area, with the quick actions that start a session on it. */
+/**
+ * A pull request from the Pull requests page in the main area, with the quick actions that start a session on it.
+ * Its host keys it by the pull request, so another one starts on **Summary**; the route alone says whether it shows **Code**.
+ */
 export function PullRequestDetailPage({ files, ...props }: PullRequestDetailPageProps) {
-	const { tabs, dispatch } = usePagePullRequestTabs(props.target);
-	const tab = pageDetailTab(tabs.open, props.target, files !== null);
+	const [kept, setKept] = useState<PullRequestDetailTab>("summary");
+	const tab = files !== null ? "code" : kept;
 	const choose = (next: PullRequestDetailTab): void => {
-		dispatch({ type: "detail", pr: props.target, tab: next });
+		if (next !== "code") setKept(next);
 		if ((next === "code") !== (files !== null)) location.hash = next === "code" ? hashForPullRequestFiles(props.target) : hashForPullRequests(props.target);
 	};
 	const clipboard = useClipboard();
 	useShortcuts({
 		copyPullRequestNumber: () => clipboard.run(`#${props.target.number}`),
 		copyPullRequestLink: () => clipboard.run(pullRequestUrl(props.target)),
-		closePullRequestTab: () => dispatch({ type: "close", pr: props.target }),
 	});
-	useEffect(() => {
-		window.ompDesktop?.ownsClose?.(true);
-		return () => window.ompDesktop?.ownsClose?.(false);
-	}, []);
+	const back = (
+		<Tooltip content="Back to Pull requests" side="bottom">
+			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to Pull requests" render={<a href={hashForPullRequests(null)} />}>
+				<ArrowLeft />
+			</Button>
+		</Tooltip>
+	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<PullRequestTabsStrip
-				tabs={tabs}
-				dispatch={dispatch}
-				workspace={props.workspace}
-				hrefOf={pullRequestTabHash}
-				onAdd={() => { location.hash = hashForPullRequests(null); }}
-			/>
 			<TooltipProvider>
+				<Header title="Pull requests" meta="Your pull requests and review requests on GitHub" leading={back} />
 				<div className="flex min-h-0 flex-1 flex-col">
 					<PullRequestDetails {...props} placement="page" tab={tab} onTab={choose} path={files?.path ?? null} />
 				</div>

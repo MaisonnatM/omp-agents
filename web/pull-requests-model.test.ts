@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LinkedPullRequest, PullRequestSummary, PullRequestComment, PullRequestDetail, PullRequestThread, RepoPullRequests, StackedPullRequest } from "../src/shared/github";
+import type { LinkedPullRequest, PullRequestSummary, PullRequestComment, PullRequestDetail, PullRequestThread, RepoPullRequests, Reviewer, StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
@@ -20,7 +20,6 @@ import {
 	moveAction,
 	moveKey,
 	movesSummary,
-	openThreads,
 	orderedRepos,
 	placedManual,
 	reason,
@@ -30,6 +29,8 @@ import {
 	rebaseOrder,
 	sessionStack,
 	stepTarget,
+	threadStarters,
+	withPullRequestReviewers,
 	withPullRequestState,
 	withThreadResolved,
 	yourMoveCount,
@@ -53,7 +54,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	base: "main",
 	stackedOn: null,
 	behind: false,
-	unresolved: { count: 0, exact: true },
+	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	updatedAt: number,
 	...fields,
@@ -73,7 +74,7 @@ describe("next move", () => {
 			[pr(5, { conflicts: true, checks: "failing" }), null],
 			[pr(6, { checks: "failing", review: "changes-requested" }), null],
 			[pr(7, { review: "changes-requested" }), null],
-			[pr(8, { review: "approved", unresolved: { count: 0, exact: false } }), null],
+			[pr(8, { review: "approved", unresolved: { count: 0, exact: false, bots: 0 } }), null],
 			[pr(9, { state: "draft", checks: "failing" }), null],
 			[pr(10, { state: "draft", review: "approved" }), null],
 			[pr(11, { review: "approved" }), null],
@@ -111,8 +112,8 @@ describe("next move", () => {
 		expect([
 			reason(pr(1, { reviewers: [requested("bob"), { login: "amy", avatarUrl: null, state: "approved" }, requested("cy")] }), "in-review"),
 			reason(pr(2), "in-review"),
-			reason(pr(3, { unresolved: { count: 3, exact: false } }), "reply"),
-			reason(pr(4, { unresolved: { count: 1, exact: true }, review: "changes-requested" }), "reply"),
+			reason(pr(3, { unresolved: { count: 3, exact: false, bots: 2 } }), "reply"),
+			reason(pr(4, { unresolved: { count: 1, exact: true, bots: 0 }, review: "changes-requested" }), "reply"),
 			reason(pr(5, { review: "changes-requested" }), "reply"),
 			reason(pr(6, { stackedOn: "me/base" }), "rebase"),
 			reason(pr(7), "rebase"),
@@ -129,6 +130,13 @@ describe("next move", () => {
 			"no review needed · no checks",
 			"@teammate",
 		]);
+	});
+
+	test("a Reply's tag counts the open threads AI and people started, saying when GitHub listed only some", () => {
+		expect(threadStarters(pr(1, { unresolved: { count: 2, exact: true, bots: 1 } }), "reply")).toEqual({ ai: 1, human: 1, label: "1 open thread from AI, 1 open thread from people" });
+		expect(threadStarters(pr(2, { unresolved: { count: 100, exact: false, bots: 100 } }), "reply")).toEqual({ ai: 100, human: 0, label: "100 open threads from AI, among the threads GitHub listed" });
+		expect(threadStarters(pr(3, { unresolved: { count: 0, exact: true, bots: 0 }, review: "changes-requested" }), "reply")).toBeNull();
+		expect(threadStarters(pr(4, { unresolved: { count: 2, exact: true, bots: 1 }, checks: "failing" }), "fix-ci")).toBeNull();
 	});
 
 	test("a rebase with failing checks goes to one session that fixes both; a move whose action does not apply has none", () => {
@@ -243,7 +251,7 @@ test("your move counts what waits on you across repositories, leaving out what a
 	const list = {
 		repos: [
 			repo([pr(1, { review: "approved" }), pr(2, { review: "none" }), pr(3, { role: "reviewer", author: teammate }), pr(4, { review: "changes-requested" })]),
-			repo([pr(5, { review: "approved", unresolved: { count: 1, exact: true } }), pr(6, { state: "merged" }), pr(7, { review: "approved" }), pr(8)]),
+			repo([pr(5, { review: "approved", unresolved: { count: 1, exact: true, bots: 0 } }), pr(6, { state: "merged" }), pr(7, { review: "approved" }), pr(8)]),
 			{ owner: "acme", repo: "down", cwds: [], error: "rate limited" },
 		],
 		unmatched: [],
@@ -417,7 +425,7 @@ describe("pull request details", () => {
 		files: [],
 		checks: "none",
 		checkRuns: [],
-		unresolved: { count: 0, exact: true },
+		unresolved: { count: 0, exact: true, bots: 0 },
 		threads: [],
 		conversation: [],
 		createdAt: 0,
@@ -451,11 +459,6 @@ describe("pull request details", () => {
 
 	const thread = (id: string, resolved: boolean): PullRequestThread => ({ id, path: "a.ts", line: 1, resolved, outdated: false, dismissed: false, can: { reply: true, resolve: true, unresolve: true }, commentCount: 0, comments: [] });
 
-	test("open threads are the unresolved ones, in GitHub's order", () => {
-		const threads = [thread("PRRT_a", false), thread("PRRT_b", true), thread("PRRT_c", false)];
-		expect(openThreads(detail({ threads })).map(({ id }) => id)).toEqual(["PRRT_a", "PRRT_c"]);
-	});
-
 	test("the comment count counts every comment of every thread, resolved ones too and replies beyond those loaded, and the conversation's comments and reviews with words", () => {
 		const said: PullRequestComment = { author: { login: "ann", avatarUrl: null }, at: 0, body: "Looks off", url: "", reactions: [] };
 		const threads = [{ ...thread("PRRT_a", false), commentCount: 23, comments: [said, said] }, { ...thread("PRRT_b", true), commentCount: 1, comments: [said] }];
@@ -463,11 +466,12 @@ describe("pull request details", () => {
 		expect(commentCount(detail({ threads, conversation }))).toBe(26);
 	});
 
-	test("resolving or unresolving a thread moves the unresolved count with it, and keeps whether GitHub listed every thread", () => {
-		const before = detail({ threads: [thread("PRRT_a", false), thread("PRRT_b", false)], unresolved: { count: 2, exact: false } });
+	test("resolving or unresolving a thread moves the unresolved count and the bots' share with it, and keeps whether GitHub listed every thread", () => {
+		const bugbot: PullRequestComment = { author: { login: "cursor", avatarUrl: null, isBot: true }, at: 0, body: "Bug", url: "", reactions: [] };
+		const before = detail({ threads: [{ ...thread("PRRT_a", false), comments: [bugbot] }, thread("PRRT_b", false)], unresolved: { count: 2, exact: false, bots: 1 } });
 		const resolved = withThreadResolved(before, "PRRT_a", true);
-		expect(resolved).toEqual({ threads: [thread("PRRT_a", true), thread("PRRT_b", false)], unresolved: { count: 1, exact: false } });
-		expect(withThreadResolved({ ...before, ...resolved }, "PRRT_a", false)).toEqual({ threads: before.threads, unresolved: { count: 2, exact: false } });
+		expect(resolved).toEqual({ threads: [{ ...thread("PRRT_a", true), comments: [bugbot] }, thread("PRRT_b", false)], unresolved: { count: 1, exact: false, bots: 0 } });
+		expect(withThreadResolved({ ...before, ...resolved }, "PRRT_a", false)).toEqual({ threads: before.threads, unresolved: { count: 2, exact: false, bots: 1 } });
 	});
 });
 
@@ -523,6 +527,29 @@ describe("pull request list after a change", () => {
 		const closed = withPullRequestState(list, other, "closed", 99);
 		expect(closed.repos).toEqual([list.repos[0], repo("api", []), failed]);
 		expect(closed.repos[0]).toBe(list.repos[0]);
+	});
+
+	const amy: Reviewer = { login: "amy", avatarUrl: "amy.png", state: "approved" };
+	const bob: Reviewer = { login: "bob", avatarUrl: null, state: "requested" };
+	const reviewed = { repos: [repo("webapp", [pr(2, { reviewers: [bob, amy] })])], unmatched: [] };
+	const reviewersOf = (changed: typeof list): Reviewer[] => listedPullRequests(changed.repos)[0].reviewers;
+
+	test("a review asked of someone puts them first, waiting, and leaves every other repository and row as it was", () => {
+		const asked = withPullRequestReviewers(list, two, "cy", true, "cy.png");
+		expect(asked.repos[0]).toEqual(repo("webapp", [one, pr(2, { reviewers: [{ login: "cy", avatarUrl: "cy.png", state: "requested" }] })]));
+		expect(listedPullRequests(asked.repos)[0]).toBe(one);
+		expect(asked.repos[1]).toBe(list.repos[1]);
+		expect(asked.repos[2]).toBe(failed);
+		expect(asked.unmatched).toEqual(["/x"]);
+		expect(reviewersOf(withPullRequestReviewers(reviewed, two, "cy", true, null))).toEqual([{ login: "cy", avatarUrl: null, state: "requested" }, bob, amy]);
+	});
+
+	test("asking again of someone who reviewed puts the request in place of their review, keeping their picture", () => {
+		expect(reviewersOf(withPullRequestReviewers(reviewed, two, "amy", true, null))).toEqual([{ ...amy, state: "requested" }, bob]);
+	});
+
+	test("a withdrawn request drops the reviewer", () => {
+		expect(reviewersOf(withPullRequestReviewers(reviewed, two, "bob", false, null))).toEqual([amy]);
 	});
 });
 

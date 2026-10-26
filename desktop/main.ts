@@ -17,7 +17,6 @@ import {
 	type ContextMenuParams,
 	dialog,
 	globalShortcut,
-	ipcMain,
 	Menu,
 	type MenuItem,
 	type MenuItemConstructorOptions,
@@ -27,7 +26,7 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { OWNS_CLOSE_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
@@ -249,15 +248,6 @@ function createWindow(): BrowserWindow {
 		if (details.isMainFrame) sendTargetURL("");
 	});
 	win.on("blur", () => sendTargetURL(""));
-	let pageOwnsClose = false;
-	ipcMain.on(OWNS_CLOSE_CHANNEL, (event, owns: unknown) => {
-		if (event.sender === contents && isDashboard(event.senderFrame?.url ?? "") && typeof owns === "boolean") pageOwnsClose = owns;
-	});
-	// A page that loads afresh has not mounted the view that claimed Close yet.
-	contents.on("did-navigate", () => { pageOwnsClose = false; });
-	contents.on("before-input-event", (_event, input) => {
-		contents.setIgnoreMenuShortcuts(pageOwnsClose && input.key.toLowerCase() === "w" && (IS_MAC ? input.meta : input.control) && !input.shift && !input.alt);
-	});
 	contents.setWindowOpenHandler(({ url }) => {
 		// An empty address is a tab the page means to send somewhere later; the page opens the address itself instead.
 		if (url && url !== "about:blank") openOutside(url);
@@ -329,7 +319,7 @@ function updateItem(): MenuItemConstructorOptions[] {
 	return [ready ? { label: `Restart to Install ${ready}`, click: () => void restartToUpdate() } : { label: "Check for Updates…", click: () => updates?.checkNow() }];
 }
 
-/** Page shortcuts take precedence; the PR detail's Cmd+W bypasses the native Close accelerator. */
+/** The menu holds no shortcut the dashboard binds (web/shortcuts.ts), so every one reaches the page. */
 function applicationMenu(): Menu {
 	// A checkout's Electron is not an app macOS can open at login.
 	const openAtLogin: MenuItemConstructorOptions[] = app.isPackaged

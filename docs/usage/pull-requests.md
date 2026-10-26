@@ -83,41 +83,39 @@
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
   A pull request whose **Review** session saved a review draft you have not posted shows a violet **Review draft** tag before its number, in the sidebar and in the table.
   The table shows up to two reviewers' pictures and lists the rest under `+N`; with no reviewer, an icon shows the review state.
+  Click a table row's or a board card's reviewers to ask someone for a review, or to withdraw a request, from the repository's people, as the details' **Reviewers** field does; with no reviewer and no review state, a muted person icon stands in its place.
+  A pick shows at once and goes to GitHub after the ones before it; when GitHub refuses one, the row drops it and a toast says why.
+  A merged pull request's reviewers do not change.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
+  A **Reply** row or card also shows who started its open threads: a sparkles icon with how many a bot started, such as Cursor Bugbot, CodeRabbit, or Copilot, and a person icon with how many people started.
+  Its tooltip says so in words, and adds that it counts only the threads GitHub listed when it listed only the first 100.
   The row's `⋯` menu is always visible in the table; in the sidebar it shows while you hover or focus the row, while a session starts on it, or while a change goes to GitHub.
-  It holds the quick actions that apply, then **Convert to draft** on an open pull request or **Mark ready for review** on a draft, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change.
+  It holds the quick actions that apply, then **Convert to draft** on an open pull request or **Mark ready for review** on a draft, the **Reviewers** submenu, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change and no **Reviewers**.
+  **Reviewers** lists the repository's people, read from GitHub when it first opens, with a check on each one asked for a review; choose one to ask them or withdraw the request.
+  Right-click a row or a card, or focus its title and press the context-menu key or Shift+F10, for the same menu.
   On your own open pull request without merge conflicts whose base has commits its branch lacks, **Rebase on main**, named after its base, follows the quick actions.
   It rebases the branch on its base from the repository's most recently used workspace, runs the repository's pre-push checks, and pushes the branch with `--force-with-lease`.
   One rebase runs at a time, so the item reads **Queued to rebase** behind another one, then **Rebasing…** until the push ends, which can take minutes.
   A toast says what came of it: the rebase, a branch that already had its base, or the server's reason for refusing, such as uncommitted changes in the workspace, local commits the pull request lacks, or failed checks.
   When the rebase stops at a conflict, a toast counts the conflicting files and a **Resolve conflicts** session starts on the pull request, as its quick action does.
   The list reads GitHub again once the rebases end.
-  A state change or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
+  A state change, a review request, or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
   Click a **Merge** badge for a popover that reads the pull request from GitHub and confirms the merge; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
-  Click the row to show the pull request's details in the main area; session chips, move badges, and the `⋯` menu keep their own clicks.
+  Click the row to show the pull request's details in the main area; session chips, move badges, the reviewers, and the `⋯` menu keep their own clicks.
   The title remains a link for keyboard and modifier-click navigation.
-  The **+** in the open pull request strip above a PR's details brings the list back to pick another; the list itself shows the strip without it.
+  The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
   Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the browser's localStorage keeps the last one of each workspace.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
-- Opening a pull request adds a `#N` tab above its details; reopening it focuses the existing tab.
-  Drag tabs to reorder, or focus a tab's number and press Alt+Left or Alt+Right.
-  Each tab's glyph shows the state the pull request list last read gives it, or a plain icon when that list leaves it out, and becomes a close button on hover or keyboard focus.
-  Closing the active tab selects its right neighbour, then its left, or returns to the list when none remain.
-  Right-click a tab, or press Shift+F10 on its number, for **Copy link**, **Copy PR number**, **Close**, and **Close others**.
-  Wheel over the strip to scroll it horizontally; chevrons appear when tabs overflow.
-  The browser keeps the open tabs, their order, and each PR's selected detail tab across reloads.
-  A session's **PRs** sidebar has no strip: it shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
-  Cmd+Shift+K copies the open page PR's `#N`, Cmd+Shift+C copies its GitHub link, and Cmd+W closes its tab.
-  These keys apply only while the Pull requests page shows a PR.
-  The desktop app gives that Cmd+W to the page rather than its native window Close command.
-  A plain browser may reserve Cmd+W and close its browser tab before the page can prevent it; use the glyph or context menu there.
+  A pull request's details open on **Summary**.
+  A session's **PRs** sidebar shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
+  While the Pull requests page shows a PR, Cmd+Shift+K copies its `#N` and Cmd+Shift+C copies its GitHub link.
 - **Rebase N behind** at the top of the Pull requests page shows while N of your pull requests can rebase on their base, counting the ones stacked on them.
   The first click arms **Confirm rebase of N?**, and a second click within three seconds rebases them one at a time, as **Rebase on main** does, the bottom of each stack first.
   A pull request stacked on one whose rebase stopped at a conflict or failed is skipped, even when a **Rebase on main** click queued that one before.

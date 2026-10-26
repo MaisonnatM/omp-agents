@@ -23,7 +23,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	base: "main",
 	stackedOn: null,
 	behind: false,
-	unresolved: { count: 0, exact: true },
+	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	updatedAt: number,
 	...fields,

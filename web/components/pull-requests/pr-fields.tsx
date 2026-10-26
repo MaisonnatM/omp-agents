@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestLabel, type PullRequestOptions, type Reviewer } from "../../../src/shared/github";
+import { withReviewer } from "../../pull-requests-model";
 import { type ReadState, useRead } from "../../reads";
 import { FieldPicker } from "../field-picker";
 
@@ -15,7 +16,7 @@ const ROW_FIELD = "-mx-2 -my-1 h-auto min-h-6 w-[calc(100%+1rem)] justify-start 
 /** The repository's labels and reviewers; `open` asks GitHub for them, again after a failure. */
 export type PullRequestOptionsRead = ReadState<PullRequestOptions> & { open: () => void };
 
-/** The repository's labels and reviewers, asked of GitHub when a Summary picker first opens. */
+/** The repository's labels and reviewers, asked of GitHub when a picker first opens. */
 export function usePullRequestOptions({ owner, repo }: Pick<PullRequest, "owner" | "repo">): PullRequestOptionsRead {
 	const [opened, setOpened] = useState(false);
 	const [retry, setRetry] = useState(0);
@@ -29,10 +30,24 @@ export function usePullRequestOptions({ owner, repo }: Pick<PullRequest, "owner"
 	};
 }
 
-interface OptionsFieldProps {
-	detail: PullRequestDetail;
+/** A review asked of someone, or withdrawn. */
+export type ReviewerChange = Extract<PullRequestChange, { field: "reviewer" }>;
+
+/** The people a review can be asked of on `pr`: the repository's, without its author, whom GitHub does not let review it. */
+export const reviewerChoices = (pr: Pick<PullRequestDetail, "author">, options: PullRequestOptionsRead): PullRequestOptions["reviewers"] | null =>
+	options.data?.reviewers.filter(person => person.login !== pr.author.login) ?? null;
+
+/** The logins a review is asked of and not yet given. */
+export const requestedLogins = (reviewers: readonly Reviewer[]): string[] => reviewers.filter(reviewer => reviewer.state === "requested").map(reviewer => reviewer.login);
+
+interface ReviewersFieldProps {
+	/** The pull request, from its details or its list row. */
+	pr: Pick<PullRequestDetail, "author" | "reviewers" | "state">;
 	options: PullRequestOptionsRead;
-	save: SavePullRequest;
+	/** Sends `change`; `reviewers` is what the pull request holds once GitHub takes it. */
+	onChange: (change: ReviewerChange, reviewers: Reviewer[]) => void;
+	/** The button's classes, in place of a property row's. */
+	className?: string;
 	/** The field's value, shown on its button. */
 	children: ReactNode;
 }
@@ -41,31 +56,37 @@ interface OptionsFieldProps {
  * The review requests: a pick asks the person for a review, or withdraws the request, and asks again of someone who
  * already reviewed. A withdrawn request leaves the person's review in place.
  */
-export function ReviewersField({ detail, options, save, children }: OptionsFieldProps) {
-	const requested = detail.reviewers.filter(reviewer => reviewer.state === "requested").map(reviewer => reviewer.login);
-	const names = detail.reviewers.map(reviewer => reviewer.login).join(", ");
+export function ReviewersField({ pr, options, onChange, className = ROW_FIELD, children }: ReviewersFieldProps) {
+	const requested = requestedLogins(pr.reviewers);
+	const names = pr.reviewers.map(reviewer => reviewer.login).join(", ");
+	const people = reviewerChoices(pr, options);
 	return (
 		<FieldPicker
 			field="Reviewers"
 			current={names || "none"}
-			className={ROW_FIELD}
+			className={className}
 			trigger={children}
-			choices={options.data?.reviewers.filter(person => person.login !== detail.author.login).map(person => ({ value: person.login, label: person.login })) ?? null}
+			choices={people?.map(person => ({ value: person.login, label: person.login })) ?? null}
 			error={options.error}
 			selected={requested}
 			multi
-			disabled={detail.state === "merged"}
+			disabled={pr.state === "merged"}
 			onOpen={options.open}
 			onPick={login => {
 				const on = !requested.includes(login);
-				const person = options.data?.reviewers.find(candidate => candidate.login === login);
-				const reviewers: Reviewer[] = on
-					? [{ login, avatarUrl: person?.avatarUrl ?? null, state: "requested" }, ...detail.reviewers.filter(reviewer => reviewer.login !== login)]
-					: detail.reviewers.filter(reviewer => reviewer.login !== login);
-				save({ field: "reviewer", login, on }, { reviewers });
+				const avatarUrl = people?.find(person => person.login === login)?.avatarUrl ?? null;
+				onChange({ field: "reviewer", login, on }, withReviewer(pr.reviewers, login, on, avatarUrl));
 			}}
 		/>
 	);
+}
+
+interface OptionsFieldProps {
+	detail: PullRequestDetail;
+	options: PullRequestOptionsRead;
+	save: SavePullRequest;
+	/** The field's value, shown on its button. */
+	children: ReactNode;
 }
 
 /** The labels, each a pick that adds or removes it. */

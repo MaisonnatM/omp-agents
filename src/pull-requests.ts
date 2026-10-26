@@ -6,7 +6,7 @@ import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
-import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
+import { type CheckRunState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
 import { MERGE_METHODS, type MergeMethod } from "./shared/source-control";
 
 export { parseRemote, repoOf } from "./github";
@@ -29,7 +29,7 @@ const PR_FIELDS = `... on PullRequest {
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 	comments { totalCount }
-	reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved } }
+	reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved comments(first: 1) { nodes { author { __typename login } } } } }
 }`;
 
 const QUERY = `query($authored: String!, $reviewing: String!, $merged: String!) {
@@ -73,10 +73,16 @@ function reviewOf(decision: string | undefined, reviewers: Reviewer[]): ReviewDe
 	return review === "changes-requested" && reRequested ? "review-required" : review;
 }
 
+/** The unresolved threads among those GitHub listed, and how many a bot started: the author of a thread's first comment. */
 function parseUnresolved(threads: unknown): PullRequestSummary["unresolved"] {
 	const nodes = nodesOf(threads);
 	const total = isObject(threads) && typeof threads.totalCount === "number" ? threads.totalCount : nodes.length;
-	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
+	const open = nodes.filter(thread => isObject(thread) && thread.isResolved === false);
+	const starters = open.map(thread => {
+		const [first] = nodesOf(isObject(thread) ? thread.comments : null);
+		return isObject(first) ? parsePerson(first.author) : null;
+	});
+	return { count: open.length, exact: total <= nodes.length, bots: starters.filter(person => person !== null && isBotAuthor(person)).length };
 }
 
 /** A connection's `totalCount`, 0 when GitHub left it out. */
@@ -306,7 +312,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		changedFiles: num(node.changedFiles) ?? 0,
 		files,
 		checkRuns,
-		unresolved: { count: threads.filter(thread => !thread.resolved).length, exact: head.unresolved.exact },
+		unresolved: unresolvedOf(threads, head.unresolved.exact),
 		threads,
 		conversation: [...comments, ...reviews].toSorted((a, b) => a.at - b.at),
 		createdAt,

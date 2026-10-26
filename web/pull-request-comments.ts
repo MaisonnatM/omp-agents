@@ -1,5 +1,5 @@
 /** Summary's conversations as data: threads and top-level comments in one list, the stored filter, and the paging. */
-import type { PullRequestComment, PullRequestDetail, PullRequestEvent, PullRequestThread } from "../src/shared/github";
+import { isBotAuthor, type PullRequestComment, type PullRequestDetail, type PullRequestEvent, type PullRequestThread } from "../src/shared/github";
 
 interface CommentFilter {
 	bots: boolean;
@@ -29,7 +29,7 @@ export function filterConversations(items: ConversationItem[], filter: CommentFi
 	return items.filter(item => {
 		const finished = item.kind === "thread" ? item.thread.resolved || item.thread.dismissed : item.event.review === "dismissed";
 		if (!filter.resolved && finished) return false;
-		return filter.bots || item.comments.some(comment => !comment.author.isBot && !/\[bot\]$/i.test(comment.author.login));
+		return filter.bots || item.comments.some(comment => !isBotAuthor(comment.author));
 	});
 }
 
