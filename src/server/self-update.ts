@@ -3,11 +3,10 @@
  * when `bun.lock` changed, and has the server run again. It never stashes, resets, or merges: a checkout it cannot
  * fast-forward stays as it was, and the answer says why.
  */
-import { join } from "node:path";
 import { run, runChecked } from "../proc";
 import { SerialLane } from "../serial-lane";
 import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
-import { packagedResources } from "./resources";
+import { packagedResources, sourceDir } from "./resources";
 
 /** The checkout the server started from: its top directory, the branch it had checked out, and that branch's commit. */
 export interface RunningBuild {
@@ -24,8 +23,6 @@ const unavailable = (reason: string): Checkout => ({ kind: "unavailable", reason
 /** Why an update left the checkout as it was. */
 export class UpdateRefused extends Error {}
 
-/** The checkout that holds this file. */
-const SOURCE_DIR = join(import.meta.dir, "..", "..");
 /** Long enough for a fetch; any git call that takes longer is stuck. */
 const GIT_TIMEOUT_MS = 60_000;
 const INSTALL_TIMEOUT_MS = 5 * 60_000;
@@ -145,7 +142,7 @@ export class SelfUpdate {
 		const checkout = packagedResources
 			? unavailable("The packaged app updates itself: choose Check for Updates in its app menu.")
 			: process.execve
-				? await readBuild(SOURCE_DIR)
+				? await readBuild(sourceDir)
 				: unavailable("This system cannot run the server again in place, so restart it by hand after a pull.");
 		return new SelfUpdate(checkout, restart);
 	}

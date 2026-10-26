@@ -34,6 +34,7 @@ import { rebasePullRequest } from "../pull-request-rebase";
 import { replayComparison, replayDetail } from "../replay";
 import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
+import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
 import { SettingsSync, sourceControlStore } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
@@ -465,8 +466,8 @@ export class Dashboard {
 		);
 	}
 
-	/** The HTTP API over this dashboard, admitted by `guards`. */
-	routes(guards: Guards): Routes {
+	/** The HTTP API over this dashboard, admitted by `guards`; `build` is what the server serves. */
+	routes(guards: Guards, build: ServedBuild): Routes {
 		const files = this.#files;
 		const sessions = this.#sessions;
 		const broadcasts = this.#broadcasts;
@@ -522,7 +523,7 @@ export class Dashboard {
 				checkOutPullRequest: checkout => checkOutPullRequest(checkout, this.#startSession),
 				rebasePullRequest,
 			},
-			dashboard: this.#selfUpdate,
+			dashboard: { build, status: () => this.#selfUpdate.status(), update: () => this.#selfUpdate.update() },
 			sync: this.#settingsSync,
 			processes: {
 				list: () => this.#processWatch.list(),

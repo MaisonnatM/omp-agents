@@ -11,8 +11,11 @@ export const packagedResources: string | null = process.env.OMP_AGENTS_RESOURCES
 /** The prebuilt page of a packaged app. A checkout builds `web/index.html` at startup instead. */
 export const prebuiltPageDir: string | null = packagedResources && join(packagedResources, "page");
 
+/** The checkout that holds the server's code, which it builds the page from and **Update dashboard** fast-forwards. */
+export const sourceDir: string = join(import.meta.dir, "..", "..");
+
 /** The omp starter kit: `templates/omp` in a checkout, its copy in a packaged app. */
-export const ompTemplateDir: string = join(packagedResources ?? join(import.meta.dir, "..", ".."), "templates", "omp");
+export const ompTemplateDir: string = join(packagedResources ?? sourceDir, "templates", "omp");
 
 /** The script each session's keeper runs (`src/keeper.ts`): its bundle in a packaged app. */
 export const keeperScript: string = packagedResources ? join(packagedResources, "keeper.js") : join(import.meta.dir, "..", "keeper.ts");
