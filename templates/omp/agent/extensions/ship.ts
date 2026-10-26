@@ -1,6 +1,9 @@
 // Tracks the /ship workflow (Linear ticket -> draft PR -> thermonuclear -> live for review) per session.
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
 const ENTRY = "omp-ship.state";
@@ -156,7 +159,8 @@ function report(s: ShipState | undefined): string {
 
 /**
  * The commands of a bash line, each as its words: split on `&&`, `||`, `;`, `|`, `&`, parentheses, and newlines outside quotes,
- * with quotes removed and leading `NAME=value` assignments dropped, so `cd x && gh pr ready 4` is two commands and `rg "gh pr ready" f` one `rg`.
+ * with quotes removed and leading `NAME=value` assignments and `env` prefixes dropped, so `cd x && gh pr ready 4` is two commands,
+ * `env -u GITHUB_TOKEN gt submit` runs `gt submit`, and `rg "gh pr ready" f` is one `rg`.
  */
 export function commands(line: string): string[][] {
 	const out: string[][] = [];
@@ -200,8 +204,18 @@ export function commands(line: string): string[][] {
 	}
 	endCommand();
 	return out.flatMap(w => {
-		const start = w.findIndex(x => !/^[A-Za-z_]\w*=/.test(x));
-		return start < 0 ? [] : [w.slice(start)];
+		let i = 0;
+		for (;;) {
+			if (/^[A-Za-z_]\w*=/.test(w[i] ?? "")) {
+				i++;
+			} else if (w[i] === "env") {
+				// `-u`, `-C`, and `-P` take the next word as their operand.
+				for (i++; w[i]?.startsWith("-"); i++) if (/^(-[uCP]|--unset|--chdir)$/.test(w[i])) i++;
+			} else {
+				break;
+			}
+		}
+		return i < w.length ? [w.slice(i)] : [];
 	});
 }
 
@@ -258,6 +272,51 @@ export function publishBlocker(body: string): string | undefined {
 	return undefined;
 }
 
+/** A credential gh holds for a host, as `gh auth status --json hosts` reports it; the report carries no token. */
+export interface GhCredential {
+	host: string;
+	/** `success`, `error` when GitHub rejects it, or `timeout`. */
+	state: string;
+	/** Whether gh uses it for the host. */
+	active: boolean;
+	login: string;
+	/** The environment variable gh read it from, such as `GITHUB_TOKEN`, or the store it sits in, such as `keyring`. */
+	tokenSource: string;
+}
+
+/**
+ * Why GitHub rejects gh, or `undefined` when it accepts every credential gh uses: the credential, where it comes from, and any working login it overrides, never a token.
+ * `dotenvFiles` maps an environment variable to the project dotenv file its value came from.
+ */
+export function authDiagnosis(credentials: GhCredential[], dotenvFiles: Record<string, string>): string | undefined {
+	const rejected = credentials.find(c => c.active && c.state === "error");
+	if (!rejected) return undefined;
+	const login = `\`gh auth login -h ${rejected.host}\``;
+	if (!/^[A-Z][A-Z0-9_]*$/.test(rejected.tokenSource)) {
+		return `GitHub rejects gh's ${rejected.tokenSource} login${rejected.login ? ` for ${rejected.login}` : ""} on ${rejected.host}. Ask the user to run ${login}.`;
+	}
+	const working = credentials.find(c => c.host === rejected.host && c.state === "success");
+	const file = dotenvFiles[rejected.tokenSource];
+	return [
+		`GitHub rejects the token in \`${rejected.tokenSource}\`, which gh uses for ${rejected.host}${working ? ` ahead of the ${working.tokenSource} login for ${working.login}, which works` : ""}.`,
+		file ? `omp read it from \`${file}\` when it started.` : "It is set in the environment omp started with.",
+		`Ask the user to ${working ? "remove or replace it there" : `replace it there, or remove it and run ${login}`}, then restart the session.`,
+	].join(" ");
+}
+
+/** The dotenv file in `dir` each environment variable's current value came from: Bun loads `.env` and its variants from the directory omp starts in, except variables the launch environment already set. */
+function dotenvFiles(dir: string): Record<string, string> {
+	const files: Record<string, string> = {};
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		if (!entry.isFile() || !/^\.env(\..+)?$/.test(entry.name)) continue;
+		const file = join(dir, entry.name);
+		for (const [variable, value] of Object.entries(parseEnv(readFileSync(file, "utf8")))) {
+			if (process.env[variable] === value) files[variable] ??= file;
+		}
+	}
+	return files;
+}
+
 export default function ship(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const prSchema = z.object({
@@ -285,6 +344,21 @@ export default function ship(pi: ExtensionAPI) {
 	let lastSummary = "";
 
 	const gh = (ghArgs: string[], cwd: string) => pi.exec("gh", ghArgs, { cwd, timeout: 20_000 });
+	const authSchema = z.object({
+		hosts: z.record(z.string(), z.array(z.object({ host: z.string(), state: z.string(), active: z.boolean(), login: z.string().default(""), tokenSource: z.string() }))),
+	});
+
+	async function authProblem(sessionDir: string): Promise<string | undefined> {
+		const r = await gh(["auth", "status", "--json", "hosts"], sessionDir);
+		let report: unknown;
+		try {
+			report = JSON.parse(r.stdout);
+		} catch {
+			return undefined;
+		}
+		const parsed = authSchema.safeParse(report);
+		return parsed.success ? authDiagnosis(Object.values(parsed.data.hosts).flat(), dotenvFiles(sessionDir)) : undefined;
+	}
 
 	function render(ctx: ExtensionContext) {
 		if (!ctx.hasUI || ctx.agent?.kind === "sub") return;
@@ -359,14 +433,16 @@ export default function ship(pi: ExtensionAPI) {
 		lastSummary = summary;
 	}
 
-	async function publishCheck(selector: string[], cwd: string): Promise<string | undefined> {
+	async function publishCheck(selector: string[], cwd: string, sessionDir: string): Promise<string | undefined> {
 		const r = await gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd);
 		if (r.code !== 0) {
 			const error = r.stderr.trim() || r.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {
 				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
 			}
-			return `Could not read the PR body to check its review and proof boxes: ${error}`;
+			const auth = await authProblem(sessionDir);
+			// gh's hint after its first line, `gh auth login`, cannot replace a token an environment variable holds, and the diagnosis names the fix.
+			return `Could not read the PR body to check its review and proof boxes: ${auth ? `${error.split("\n")[0]}. ${auth}` : error}`;
 		}
 		return publishBlocker(r.stdout);
 	}
@@ -398,14 +474,14 @@ export default function ship(pi: ExtensionAPI) {
 				// A PR to someone else's repository, such as an awesome list, follows that project's process, not /ship.
 				const owner = selectorOwner(selector);
 				if (owner && otherOwner(owner, await resolveRepo(cwd))) continue;
-				const reason = await publishCheck(selector, cwd);
+				const reason = await publishCheck(selector, cwd, ctx.cwd);
 				if (reason) return { block: true, reason };
 				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The thermonuclear review is complete. Mark this draft ready for human review?"))) {
 					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
 				}
 			}
 			if (words[0] === "gt" && (words[1] === "submit" || words[1] === "ss") && words.some(a => a === "--publish" || a === "-p")) {
-				const reason = await publishCheck([], cwd);
+				const reason = await publishCheck([], cwd, ctx.cwd);
 				if (reason) return { block: true, reason };
 				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "Publish this reviewed PR for human review?"))) {
 					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };

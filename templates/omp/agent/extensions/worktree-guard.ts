@@ -1,5 +1,6 @@
 // Blocks every `edit` or `write` to a file in a repository's main checkout while it is on its default branch, so the
 // agent makes its changes in a linked worktree, as AGENTS.md asks. On any other branch the checkout is edited in place.
+// A file git ignores, such as `.env`, is in no worktree, so its edit goes ahead in the main checkout once the user approves it.
 // Files outside git, internal URLs such as `local://`, and the clones omp makes for isolated subagents pass.
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -45,11 +46,18 @@ function mainCheckout(file: string): MainCheckout | null {
 }
 
 export default function worktreeGuard(pi: ExtensionAPI) {
-	pi.on("tool_call", (event, ctx) => {
+	pi.on("tool_call", async (event, ctx) => {
 		if (event.toolName !== "edit" && event.toolName !== "write") return;
-		for (const path of targets(event.input as Record<string, unknown>)) {
-			const main = mainCheckout(resolve(ctx.cwd, path.replace(/^~(?=\/)/, process.env.HOME ?? "~")));
-			if (!main) continue;
+		const guarded = targets(event.input as Record<string, unknown>).flatMap(path => {
+			const file = resolve(ctx.cwd, path.replace(/^~(?=\/)/, process.env.HOME ?? "~"));
+			const main = mainCheckout(file);
+			return main ? [{ file, main }] : [];
+		});
+		if (guarded.length === 0) return;
+		// `git check-ignore` names an ignored path and stays silent for any other, including a tracked file an ignore rule matches.
+		const unignored = guarded.find(({ file, main }) => git(main.top, ["check-ignore", "--", file]) === "");
+		if (unignored) {
+			const { main } = unignored;
 			return {
 				block: true,
 				reason: [
@@ -60,5 +68,14 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 				].join(" "),
 			};
 		}
+		const files = guarded.map(({ file }) => `\`${file}\``).join(", ");
+		const ignoredHere = `git ignores ${files}, so no worktree has it, and its main checkout is on the default branch.`;
+		if (ctx.hasUI && (await ctx.ui.confirm("Edit an ignored file on the default branch?", `${ignoredHere} Allow this edit there?`))) return;
+		return {
+			block: true,
+			reason: ctx.hasUI
+				? `${ignoredHere} The user declined this edit. Ask the user how to proceed, and do not edit the file through the shell.`
+				: `${ignoredHere} Editing it there needs the user's approval, which this session cannot ask for. Ask the user to make the change, and do not edit the file through the shell.`,
+		};
 	});
 }
