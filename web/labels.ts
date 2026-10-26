@@ -123,9 +123,6 @@ export function age(at: number, { compact = false, now = Date.now() }: { compact
 	return `${Math.floor(minutes / (60 * 24))}d`;
 }
 
-/** A sidebar row's pull requests: the first one's number, then `+N` for the rest, which the row's tooltip and menu list. */
-export const pullRequestsLabel = ([first, ...rest]: PullRequest[]): string => (rest.length ? `#${first.number} +${rest.length}` : `#${first.number}`);
-
 /** How a session relates to a pull request it names. */
 export const LINK_VERB: Record<PullRequestLink, string> = { submitted: "submitted", worked: "worked on" };
 

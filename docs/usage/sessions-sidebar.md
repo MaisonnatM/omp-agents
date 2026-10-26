@@ -3,7 +3,7 @@
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The dot before each session shows its state.
   Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
-- Under **All workspaces**, a session row with a title starts with a badge that names its workspace, the last segment of its working directory.
+- Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of its working directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows the workspace's name as its label, with no badge.
 - The workspace picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
@@ -70,7 +70,7 @@
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
-- The left sidebar's session rows leave out the full working directory and the model; hover the workspace in the pane header to see the directory, and the composer shows the model.
+- The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
 - A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
   Hover the logo to see the plan's name and account, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
   A provider without a logo shows the plan's name instead.

@@ -12,7 +12,7 @@
   `startTarget` turns what a quick start works on into the `subject` or `todoId` its `start` message carries, and `reviewDraft`, true for **Review** alone, and `quickOn` picks the quick start that works on an item, whose failure that item's details show.
   `web/components/quick-actions.tsx` holds the tickets' row menu, the buttons on a pull request's, an issue's, or a todo's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
-  `web/components/status-dot.tsx` draws that dot for each session status, and `web/components/ship-step.tsx` a session's /ship stage, as `3/7 · Draft PR`.
+  `web/components/status-dot.tsx` draws that dot for each session status.
 - `web/api.ts`: the page's HTTP client, `errorText`, which says what any failure was, and `socketUrl`, the address of the dashboard's and a terminal's WebSocket, `wss:` when the page is on HTTPS.
   `settingsUrl` names a settings route for one workspace, or for the user's own files, and `releaseWorktree` asks the server to remove the linked worktree that has a branch checked out.
 - `web/reads.ts`: the server reads that components hold.

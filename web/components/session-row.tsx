@@ -1,28 +1,24 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
 import { Loader } from "lucide-react";
 import { Fragment, memo, type ReactElement, type ReactNode } from "react";
-import type { PullRequest } from "../../src/shared/github";
-import type { PastSession, RosterHost, ShipProgress, View } from "../../src/shared/sessions";
+import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
-import { folderName, hostLabel, modeOf, pastLabel, pullRequestsLabel, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
+import { folderName, hostLabel, modeOf, pastLabel, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 
-/** The muted facts after a session's name: the parts that apply, and a title listing its pull requests. */
-function sessionFacts(parts: (string | false)[], pullRequests: PullRequest[]): { text: string; title?: string } | null {
+/** The muted facts after a session's name: the parts that apply. */
+function sessionFacts(parts: (string | false)[]): { text: string } | null {
 	const text = parts.filter(part => part !== false).join(" · ");
-	if (!text) return null;
-	const title = pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n");
-	return { text, title: title || undefined };
+	return text ? { text } : null;
 }
 
 interface SessionButtonProps {
@@ -30,9 +26,7 @@ interface SessionButtonProps {
 	label: string;
 	title: string;
 	badge: ReactNode;
-	ship: ShipProgress | null;
-	/** Muted facts after the ship step, joined already; `title` is the fuller list, such as each pull request. */
-	facts: { text: string; title?: string } | null;
+	facts: { text: string } | null;
 	when: number;
 	dot?: ReactNode;
 	open: boolean;
@@ -43,8 +37,6 @@ interface RowLineProps {
 	dot?: ReactNode;
 	badge?: ReactNode;
 	label: string;
-	/** Shown right after the label, such as the /ship step. */
-	after?: ReactNode;
 	facts: { text: string; title?: string; alert?: boolean } | null;
 	/** Pinned to the row's right end with {@link ROW_END}, such as its age. */
 	end: ReactNode;
@@ -53,12 +45,12 @@ interface RowLineProps {
 /** The look of what ends a session row: muted, small, and pushed right. */
 export const ROW_END = "ml-auto shrink-0 text-xs tabular-nums text-muted-foreground";
 
-/** A sidebar session row's one line: its label, muted facts, then its badge, what ends it, and its dot at the right. Scheduled sends share it. */
-export function RowLine({ dot, badge, label, after, facts, end }: RowLineProps) {
+/** A sidebar session row's one line: its dot, label, and muted facts, then its badge and what ends it at the right. Scheduled sends share it. */
+export function RowLine({ dot, badge, label, facts, end }: RowLineProps) {
 	return (
 		<span className="flex min-w-0 flex-1 items-baseline gap-2">
+			{dot && <span className="flex shrink-0 self-center">{dot}</span>}
 			<span className="truncate font-medium text-foreground">{label}</span>
-			{after}
 			{facts && (
 				<span className={cn("shrink-0 text-xs", facts.alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} title={facts.title}>
 					{facts.text}
@@ -66,16 +58,15 @@ export function RowLine({ dot, badge, label, after, facts, end }: RowLineProps) 
 			)}
 			{badge && <span className="ml-auto flex shrink-0 self-center">{badge}</span>}
 			{end}
-			{dot && <span className="flex shrink-0 self-center">{dot}</span>}
 		</span>
 	);
 }
 
-function SessionButton({ view, label, title, badge, ship, facts, when, dot, open, onOpen }: SessionButtonProps) {
+function SessionButton({ view, label, title, badge, facts, when, dot, open, onOpen }: SessionButtonProps) {
 	return (
 		<Tooltip content={`${label}. ${title}. ${SPLIT_CLICK} to open in a split`} side="right">
 			<SidebarMenuButton isActive={open} onClick={event => onOpen(view, modeOf(event))}>
-				<RowLine dot={dot} badge={badge} label={label} after={<ShipStep ship={ship} />} facts={facts} end={<Age at={when} className={ROW_END} />} />
+				<RowLine dot={dot} badge={badge} label={label} facts={facts} end={<Age at={when} className={ROW_END} />} />
 			</SidebarMenuButton>
 		</Tooltip>
 	);
@@ -193,11 +184,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 				label={label}
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
 				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
-				ship={session.ship}
-				facts={sessionFacts(
-					[session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)],
-					session.pullRequests,
-				)}
+				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted"])}
 				when={session.modifiedAt}
 				open={open}
 				onOpen={onOpen}
@@ -225,8 +212,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				label={label}
 				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
 				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
-				ship={host.ship}
-				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)], host.pullRequests)}
+				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
 				when={host.startedAt}
 				dot={<HostStatus host={host} />}
 				open={open}
