@@ -118,13 +118,12 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 }
 
 /**
- * How the sidebar tabs fit its width, through container queries: labels while they fit, then icons alone sharing the row.
- * Icons alone keep each name in the tooltip and for screen readers. The width fits the larger group's four tabs, with room
- * for counts on Pull requests and Sessions and the list's margins.
+ * How the sidebar tabs fit its width, through container queries: labels while they fit, then icons alone, the row only as
+ * wide as its tabs. Icons alone keep each name in the tooltip and for screen readers. The width fits the larger group's four
+ * tabs, with room for counts on Pull requests and Sessions and the list's margins.
  */
 const SIDEBAR_TAB_FIT = {
-	list: "@max-[26rem]/sidebar:self-stretch",
-	tab: "@min-[26rem]/sidebar:[&>svg]:hidden @max-[26rem]/sidebar:flex-1 @max-[26rem]/sidebar:justify-center @max-[26rem]/sidebar:px-0.5",
+	tab: "@min-[26rem]/sidebar:[&>svg]:hidden",
 	label: "@max-[26rem]/sidebar:sr-only",
 };
 
@@ -237,7 +236,7 @@ export function Roster({
 			</SidebarHeader>
 			{barTabs.length > 0 && (
 				<SizeProvider size="compact">
-					<TabsList aria-label="Sidebar" className={cn("mx-2 mt-2 max-w-[calc(100%-1rem)] self-start", SIDEBAR_TAB_FIT.list)}>
+					<TabsList aria-label="Sidebar" className="mx-2 mt-2 max-w-[calc(100%-1rem)] self-start">
 						{barTabs.map(value => {
 							const { label, icon } = TAB_ROWS[value];
 							const counted = tabCounts[value];
