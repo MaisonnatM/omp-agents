@@ -10,14 +10,20 @@ import { dateLabel } from "../labels";
 
 /** A field's button in a side column: the row's width, its value in the text's color, and room for wrapped labels. */
 export const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
+/** A field's button laid in a property row of a pull request's or issue's details: its text lines up with the row's, and it spans the row. */
+export const ROW_BUTTON = "-mx-2 -my-1 h-auto min-h-6 w-[calc(100%+1rem)] justify-start px-2 py-1 text-xs font-normal text-foreground";
 /** A field's pill in the new-issue dialog, as Linear's own dialog draws them. */
 const CHIP_BUTTON = "max-w-56 rounded-full px-2.5 font-normal text-foreground";
 
-/** Where a picker sits: a row of a side column, or a pill in the new-issue dialog. */
-export type PickerLook = "field" | "chip";
+/** Where a picker sits: a row of a side column, a property row of the details, or a pill in the new-issue dialog. */
+export type PickerLook = "field" | "row" | "chip";
 
-const pickerButton = (look: PickerLook, className: string | undefined): { variant: "ghost" | "tertiary"; className: string } =>
-	look === "chip" ? { variant: "tertiary", className: className ?? CHIP_BUTTON } : { variant: "ghost", className: className ?? FIELD_BUTTON };
+const LOOK_BUTTON: Record<PickerLook, string> = { field: FIELD_BUTTON, row: ROW_BUTTON, chip: CHIP_BUTTON };
+
+const pickerButton = (look: PickerLook, className: string | undefined): { variant: "ghost" | "tertiary"; className: string } => ({
+	variant: look === "chip" ? "tertiary" : "ghost",
+	className: className ?? LOOK_BUTTON[look],
+});
 
 export interface Choice {
 	value: string;
@@ -157,7 +163,7 @@ export function DuePicker({ dueDate, disabled, trigger, look = "field", classNam
 							<span className="flex min-w-0 items-center gap-2">
 								{trigger ?? (
 									<>
-										<Calendar aria-hidden className="size-4 text-muted-foreground" />
+										{look !== "row" && <Calendar aria-hidden className="size-4 text-muted-foreground" />}
 										{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
 									</>
 								)}
