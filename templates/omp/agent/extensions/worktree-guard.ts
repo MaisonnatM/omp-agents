@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { commands } from "./shell/commands";
+import { program, split } from "./shell/commands";
 
 /** What a command does to the checkout it runs in: `switch` moves HEAD to a named branch or commit. */
 type Effect = "read" | "switch" | "write";
@@ -42,8 +42,8 @@ const CHANGES: Record<"git" | "gt" | "gh", Record<string, Effect | ((args: strin
 		pr: args => (args[0] === "checkout" ? "switch" : "read"),
 	},
 };
-/** Commands that run the command after their own flags and `NAME=value` settings. */
-const WRAPPERS: Record<string, true> = { builtin: true, command: true, env: true, exec: true, nice: true, nohup: true, sudo: true, time: true };
+/** Commands that run the command after their own flags and `NAME=value` settings; `program` reads `env`, whose `-C` changes directory. */
+const WRAPPERS: Record<string, true> = { builtin: true, command: true, exec: true, nice: true, nohup: true, sudo: true, time: true };
 const SHELLS: Record<string, true> = { bash: true, sh: true, zsh: true };
 
 /** The claim lives in a checkout's own git dir: `.git/` for a main checkout, `.git/worktrees/<name>/` for a linked one. */
@@ -236,12 +236,18 @@ interface Change {
 	words: string[];
 }
 
-/** The commands of a bash line run from `cwd` that change a checkout, following `cd`, `pushd`, `git -C`, `gt --cwd`, wrappers such as `env`, and `bash -c` scripts. */
+/** The commands of a bash line run from `cwd` that change a checkout, following `cd`, `pushd`, `env -C`, `git -C`, `gt --cwd`, wrappers such as `nohup`, and `bash -c` scripts. */
 function changes(line: string, cwd: string | null): Change[] {
 	const out: Change[] = [];
 	let dir = cwd;
-	for (let words of commands(line)) {
-		while (words[0] !== undefined && Object.hasOwn(WRAPPERS, words[0])) {
+	for (let words of split(line)) {
+		// The directory this command alone runs in, after any `env -C`.
+		let here = dir;
+		for (;;) {
+			const run = program(words);
+			for (const to of run.chdir) here = within(here, to);
+			words = run.words;
+			if (words[0] === undefined || !Object.hasOwn(WRAPPERS, words[0])) break;
 			let k = 1;
 			while (k < words.length && (words[k].startsWith("-") || /^[A-Za-z_]\w*=/.test(words[k]))) k++;
 			words = words.slice(k);
@@ -254,10 +260,10 @@ function changes(line: string, cwd: string | null): Change[] {
 			dir = null;
 		} else if (Object.hasOwn(SHELLS, tool)) {
 			const flag = rest.findIndex(a => /^-\w*c\w*$/.test(a));
-			if (flag !== -1 && rest[flag + 1] !== undefined) out.push(...changes(rest[flag + 1], dir));
+			if (flag !== -1 && rest[flag + 1] !== undefined) out.push(...changes(rest[flag + 1], here));
 		}
 		if (tool !== "git" && tool !== "gt" && tool !== "gh") continue;
-		let at = dir;
+		let at = here;
 		let i = 0;
 		for (; i < rest.length && rest[i].startsWith("-"); i++) {
 			const flag = rest[i];

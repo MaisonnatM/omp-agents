@@ -4,6 +4,39 @@
  * `env -u GITHUB_TOKEN gt submit` runs `gt submit`, and `rg "gh pr ready" f` is one `rg`.
  */
 export function commands(line: string): string[][] {
+	return split(line).flatMap(w => {
+		const { words } = program(w);
+		return words.length > 0 ? [words] : [];
+	});
+}
+
+/** The program a command's words run, past `NAME=value` assignments and `env` prefixes, and each directory an `env -C` there changes to, in order. */
+export function program(w: string[]): { words: string[]; chdir: string[] } {
+	const chdir: string[] = [];
+	let i = 0;
+	for (;;) {
+		if (/^[A-Za-z_]\w*=/.test(w[i] ?? "")) {
+			i++;
+		} else if (w[i] === "env") {
+			for (i++; w[i]?.startsWith("-"); i++) {
+				const flag = w[i];
+				const dir = flag.match(/^(?:--chdir=|-C)(.+)$/)?.[1];
+				if (dir !== undefined) chdir.push(dir);
+				// `-u`, `-C`, and `-P` take the next word as their operand.
+				else if (/^(-[uCP]|--unset|--chdir)$/.test(flag)) {
+					i++;
+					if (flag === "-C" || flag === "--chdir") chdir.push(w[i] ?? "");
+				}
+			}
+		} else {
+			break;
+		}
+	}
+	return { words: w.slice(i), chdir };
+}
+
+/** A bash line's commands as their words, split and unquoted as `commands` does, with nothing dropped. */
+export function split(line: string): string[][] {
 	const out: string[][] = [];
 	let words: string[] = [];
 	let word: string | undefined;
@@ -44,18 +77,5 @@ export function commands(line: string): string[][] {
 		}
 	}
 	endCommand();
-	return out.flatMap(w => {
-		let i = 0;
-		for (;;) {
-			if (/^[A-Za-z_]\w*=/.test(w[i] ?? "")) {
-				i++;
-			} else if (w[i] === "env") {
-				// `-u`, `-C`, and `-P` take the next word as their operand.
-				for (i++; w[i]?.startsWith("-"); i++) if (/^(-[uCP]|--unset|--chdir)$/.test(w[i])) i++;
-			} else {
-				break;
-			}
-		}
-		return i < w.length ? [w.slice(i)] : [];
-	});
+	return out;
 }

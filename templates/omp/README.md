@@ -70,7 +70,7 @@ Files, in `agent/`:
   It blocks every `edit` or `write` in a repository's main checkout while it is on its default branch (`origin/HEAD`, else `main` or `master`), and tells the agent to work in a linked worktree; on any other branch the main checkout is edited in place, as `AGENTS.md` asks.
   The omp process that last changed a checkout, a session with its subagents, owns it, and `omp-checkout-owner.json` in the checkout's git dir names its pid.
   While the owner runs and the checkout holds uncommitted changes to tracked files or an unfinished merge or rebase, another session's `edit`, `write`, and git, gt, or `gh pr checkout` commands that change or switch the checkout are blocked, and that session works in a worktree of its own.
-  The guard reads commands behind `env` and similar wrappers and inside `bash -c`, and `git worktree remove` or `move` counts as a change to the worktree it names.
+  The guard reads commands behind `env` and similar wrappers, in the directory an `env -C` names, and inside `bash -c`, and `git worktree remove` or `move` counts as a change to the worktree it names.
   A file git ignores, such as `.env`, is in no worktree, so its edit there asks the user and goes ahead once approved; a declined edit, or one in a session that cannot ask, stays blocked.
   A clean checkout passes to the next session that changes it, and a session that ends gives up its claims.
   When HEAD is no longer where a session left it, because another process switched the branch, that session's changes there are blocked until a switch it runs as its own command succeeds, back or to the new branch.
