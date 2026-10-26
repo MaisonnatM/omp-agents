@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { deepEquals, Glob } from "bun";
 import { atomicWriteText } from "../../src/fs";
 import { errorText, isObject } from "../../src/json";
+import { OwnerLock } from "../../src/owner-lock";
 
 type Json = Record<string, unknown>;
 
@@ -82,9 +83,7 @@ interface FilePlan {
 
 const digest = (text: string): string => new Bun.CryptoHasher("sha256").update(text).digest("hex");
 
-/** Only a per-path hash written by an earlier install authorizes replacing a differing file. */
-export function planFiles(files: KitFile[], agentDir: string, force: boolean): FilePlan {
-	const statePath = join(agentDir, ".omp-template-files.json");
+function installedHashes(statePath: string): Record<string, string> {
 	const installed: unknown = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
 	if (!isObject(installed) || Array.isArray(installed)) throw new Error(`${statePath} does not hold installed file hashes`);
 	const hashes: Record<string, string> = {};
@@ -92,6 +91,13 @@ export function planFiles(files: KitFile[], agentDir: string, force: boolean): F
 		if (typeof hash !== "string" || !/^[a-f0-9]{64}$/.test(hash)) throw new Error(`${statePath} does not hold installed file hashes`);
 		hashes[rel] = hash;
 	}
+	return hashes;
+}
+
+/** Only a per-path hash written by an earlier install authorizes replacing a differing file. */
+export function planFiles(files: KitFile[], agentDir: string, force: boolean): FilePlan {
+	const statePath = join(agentDir, ".omp-template-files.json");
+	const hashes = installedHashes(statePath);
 	return {
 		statePath,
 		installed: hashes,
@@ -106,18 +112,25 @@ export function planFiles(files: KitFile[], agentDir: string, force: boolean): F
 
 /** Record only successfully installed or already-equal files; a kept local edit never becomes the baseline. */
 export async function installFiles({ files, statePath, installed }: FilePlan): Promise<void> {
-	for (const file of files) {
-		if (file.action === "keep") continue;
-		const current = existsSync(file.dest) ? readFileSync(file.dest, "utf8") : undefined;
-		if (current !== file.current) throw new Error(`${file.dest} changed after planning; run the installer again`);
-		if (file.action === "create" || file.action === "update") {
-			mkdirSync(dirname(file.dest), { recursive: true });
-			writeFileSync(file.dest, file.text);
+	const lock = new OwnerLock(`${statePath}.lock`, 0);
+	if (!lock.acquire()) throw new Error("another omp-template install is running; run the installer again");
+	try {
+		if (!deepEquals(installedHashes(statePath), installed)) throw new Error("installed file hashes changed after planning; run the installer again");
+		for (const file of files) {
+			if (file.action === "keep") continue;
+			const current = existsSync(file.dest) ? readFileSync(file.dest, "utf8") : undefined;
+			if (current !== file.current) throw new Error(`${file.dest} changed after planning; run the installer again`);
+			if (file.action === "create" || file.action === "update") {
+				mkdirSync(dirname(file.dest), { recursive: true });
+				writeFileSync(file.dest, file.text);
+			}
+			const hash = digest(file.text);
+			if (Object.hasOwn(installed, file.rel) && installed[file.rel] === hash) continue;
+			installed[file.rel] = hash;
+			await atomicWriteText(statePath, `${JSON.stringify(installed, null, "\t")}\n`);
 		}
-		const hash = digest(file.text);
-		if (Object.hasOwn(installed, file.rel) && installed[file.rel] === hash) continue;
-		installed[file.rel] = hash;
-		await atomicWriteText(statePath, `${JSON.stringify(installed, null, "\t")}\n`);
+	} finally {
+		lock.release();
 	}
 }
 

@@ -25,6 +25,7 @@ A local edit, a differing file with no recorded hash, or a setting you already c
 An existing file that already matches the kit is recorded too, so current installations can opt into future updates without overwriting anything.
 Older differing files with no recorded hash stay protected; the installer does not infer ownership from Git history.
 `--dry-run` writes neither files nor hashes.
+File writes share a lock; rerun if another install or a local edit makes the plan stale.
 Running the installer again leaves matching content alone.
 
 Restart running omp sessions to pick up the new files and settings.

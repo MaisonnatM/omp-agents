@@ -169,4 +169,14 @@ describe("installed files", () => {
 		expect(() => planFiles(kit("new"), dir, false)).toThrow("does not hold installed file hashes");
 		expect(content(dir)).toBe("old");
 	});
+
+	test("a stale plan cannot discard file records from another completed install", async () => {
+		const dir = directory();
+		writeFileSync(join(dir, "file.txt"), "public");
+		const stale = planFiles(kit("public"), dir, false);
+		await installFiles(planFiles([...kit("public"), { rel: "maintainer.txt", text: "first" }], dir, false));
+		await expect(installFiles(stale)).rejects.toThrow("installed file hashes changed after planning");
+		await installFiles(planFiles([{ rel: "maintainer.txt", text: "next" }], dir, false));
+		expect(readFileSync(join(dir, "maintainer.txt"), "utf8")).toBe("next");
+	});
 });
