@@ -37,9 +37,9 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 	return (
 		<div className="flex shrink-0 items-center gap-1">
 			<SegmentedTabs value={group} onValueChange={value => onGroup(value as TabGroup)}>
-				<SegmentedTabsList {...activityControl("header.group")} aria-label="Sidebar tabs">
+				<SegmentedTabsList {...activityControl("header.group")} aria-label="Sidebar tabs" className="rounded-md">
 					{TAB_GROUPS.map(({ value, label }) => (
-						<SegmentedTab key={value} value={value} disabled={emptyGroups.has(value)}>
+						<SegmentedTab key={value} value={value} disabled={emptyGroups.has(value)} className="h-5 rounded-sm px-2 text-2xs">
 							{label}
 						</SegmentedTab>
 					))}
