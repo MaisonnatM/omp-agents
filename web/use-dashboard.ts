@@ -24,8 +24,7 @@ import {
 } from "./routing";
 import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
 import { storedNumber, storeOrRemove } from "./stored-state";
-import { ACTION_MESSAGES } from "../src/shared/activity";
-import { flushActivity, installActivity, record, viewOf } from "./activity";
+import { flushActivity, installActivity, record, recordAction, viewOf } from "./activity";
 
 const NO_VIEWS: View[] = [];
 
@@ -122,7 +121,7 @@ export function useDashboard(): Dashboard {
 		const ws = socketRef.current;
 		if (ws?.readyState !== WebSocket.OPEN) return;
 		ws.send(JSON.stringify(msg));
-		if (ACTION_MESSAGES[msg.t]) record("action", msg.t);
+		recordAction(msg);
 	}, []);
 
 	const outbox = useRef(new Map<number, { frame: AckedFrame; resolve: () => void; reject: (error: Error) => void }>());
@@ -138,11 +137,11 @@ export function useDashboard(): Dashboard {
 		const frame: AckedFrame = { ...msg, ack, floor: Math.min(ack, ...outbox.current.keys()) };
 		outbox.current.set(ack, { frame, resolve, reject });
 		ws.send(JSON.stringify(frame));
-		if (ACTION_MESSAGES[msg.t]) record("action", msg.t);
+		recordAction(msg);
 		return promise;
 	}, []);
 
-	useEffect(() => installActivity(batch => request(batch)), [request]);
+	useEffect(() => installActivity({ connected: () => socketRef.current?.readyState === WebSocket.OPEN, send: batch => request(batch) }), [request]);
 	const view = viewOf(state.cover, state.layout);
 	useEffect(() => record("view", view), [view]);
 

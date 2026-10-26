@@ -208,9 +208,6 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 };
 
-/** Every page's kind, in {@link PAGES}' order. */
-export const PAGE_KINDS = Object.keys(PAGES) as Page["kind"][];
-
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
 
 /** What follows `#<kind>/` in `page`'s hash; `null` for the page alone. */

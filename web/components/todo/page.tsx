@@ -5,7 +5,7 @@ import { isClosed, type TodoStatus, type UserTodo, type UserTodoChange, type Use
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
-import { localDay } from "../../days";
+import { localDay } from "../../../src/shared/days";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
 import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";

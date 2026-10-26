@@ -5,7 +5,6 @@
  */
 import type { Server } from "bun";
 import { join } from "node:path";
-import { foldActivity } from "../activity";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
 import { readGithubMedia } from "../github-media";
@@ -68,11 +67,11 @@ import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/da
 import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
-import type { ActivityRead } from "../shared/activity";
-import type { ActivityStore } from "./activity-store";
+import { DAY_MS } from "../shared/days";
+import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
-const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
+const MAX_EVENT_SPAN_MS = 62 * DAY_MS;
 
 /** What the session routes read: the directories sessions ran in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
@@ -144,7 +143,7 @@ export interface RouteEnv {
 	dashboard: DashboardRoutesEnv;
 	sync: SyncRoutesEnv;
 	/** The page's activity events, for Settings › Activity. */
-	activity: Pick<ActivityStore, "rows">;
+	activity: ActivityRoutesEnv;
 	processes: ProcessRoutesEnv;
 }
 
@@ -178,7 +177,7 @@ type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) => Promi
 export type Routes = Record<string, Partial<Record<"GET" | "PUT", Handler>>>;
 
 /** The ways a route answers: a read of its query, a read that a tag loads, and a write of its JSON body. */
-interface RouteKit {
+export interface RouteKit {
 	/** A read: admitted like every other, then handed the request's query. */
 	get(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
 	/** `get` for a file that an image, a video, or a frame loads, which sends no header: it also takes the media key as `?key=`. */
@@ -950,23 +949,6 @@ function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes 
 		"/api/process-settings": {
 			GET: get(() => answer(async () => env.settings())),
 			PUT: write(body => checked(parseProcessSettings(body), "Expected { stopIdleAfterMinutes } of null, 15, 30, 60, or 120"), async settings => env.changeSettings(settings)),
-		},
-	};
-}
-
-/** `GET /api/activity?range=`: the page's activity over the range, defaulting to `30d`, with every other route's `PUT` key for the inventory of actions. */
-function activityRoutes({ get }: RouteKit, store: RouteEnv["activity"], others: Routes): Routes {
-	const serverActions = Object.keys(others).filter(path => others[path]!.PUT);
-	return {
-		"/api/activity": {
-			GET: get(params => {
-				const range = params.get("range") ?? "30d";
-				if (!isAnalyticsRange(range)) return fail(400, "Unknown activity range");
-				return answer(async (): Promise<ActivityRead> => {
-					const now = Date.now();
-					return { range, ...foldActivity(store.rows(null), windowOf(range, now).cutoff, now), serverActions };
-				});
-			}),
 		},
 	};
 }

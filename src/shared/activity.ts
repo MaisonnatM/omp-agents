@@ -1,5 +1,5 @@
 /** What the page records of how its user uses it, by registry id only, and the Settings › Activity answer. */
-import { arrayOf, decoder, fields, isNumber, isString, oneOf } from "../json";
+import { arrayOf, decoder, fields, type Guard, isNumber, isObject, isSafeInteger, isString, oneOf } from "../json";
 import { ANALYTICS_RANGES, type AnalyticsRange } from "./analytics";
 import type { ClientMsg } from "./protocol";
 
@@ -26,6 +26,22 @@ export type Presence = "foreground" | "background";
 
 /** What a key may hold: lowercase ids, route paths, and spaces, so a title, a path under `/Users/`, or an identifier such as `ENG-12` never passes. */
 export const ACTIVITY_KEY = /^[a-z0-9][a-z0-9/._ -]{0,79}$/;
+
+const isKind = oneOf(ACTIVITY_KINDS);
+const isVia = oneOf(ACTIVITY_VIAS);
+
+/** An event the server stores: a known kind, a key {@link ACTIVITY_KEY} allows, a `via` on a command only, and a time in ms. The socket's parser and the page's kept outbox both check with it. */
+export const isActivityEvent: Guard<ActivityEvent> = (value): value is ActivityEvent =>
+	isObject(value) &&
+	isKind(value.kind) &&
+	typeof value.key === "string" &&
+	ACTIVITY_KEY.test(value.key) &&
+	isSafeInteger(value.at) &&
+	value.at >= 0 &&
+	(value.kind === "command" ? isVia(value.via) : value.via === null);
+
+/** The one id of a feature across the fold, the inventory, and the reconcile script. */
+export const featureId = (kind: ActivityKind, key: string): string => `${kind}:${key}`;
 
 /**
  * The controls only the page sees, which no view, command, or action observes, by id: lowercase and dotted, `<part>.<what>`.
@@ -134,11 +150,16 @@ export interface ActivityDay {
 	actions: number;
 }
 
-/** What {@link foldActivity} answers. */
+/** A feature's last use, whatever the range. */
+export interface ActivityLastUse {
+	kind: ActivityKind;
+	key: string;
+	at: number;
+}
+
+/** What `foldActivity` answers over the range's rows. */
 export interface ActivityFold {
 	uses: ActivityUse[];
-	/** Every feature's last use, whatever the range, so a feature unused in range still shows when it was last used. */
-	lastUsed: { kind: ActivityKind; key: string; at: number }[];
 	/** Moves from one view to the next within one page load, most first. */
 	transitions: { from: string; to: string; count: number }[];
 	/** Foreground time per view, most first. */
@@ -149,18 +170,18 @@ export interface ActivityFold {
 /** `GET /api/activity?range=`. */
 export interface ActivityRead extends ActivityFold {
 	range: AnalyticsRange;
+	/** Every feature's last use, whatever the range, so a feature unused in range still shows when it was last used. */
+	lastUsed: ActivityLastUse[];
 	/** Every `PUT` route key, for the inventory. */
 	serverActions: string[];
 }
-
-const isKind = oneOf(ACTIVITY_KINDS);
 
 /** A kept {@link ActivityRead}, or `null` for one an older version kept. */
 export const decodeActivity = decoder(
 	fields<ActivityRead>({
 		range: oneOf(ANALYTICS_RANGES),
 		uses: arrayOf(fields<ActivityUse>({ kind: isKind, key: isString, count: isNumber, days: isNumber, lastAt: isNumber, keyboard: isNumber, palette: isNumber })),
-		lastUsed: arrayOf(fields<ActivityFold["lastUsed"][number]>({ kind: isKind, key: isString, at: isNumber })),
+		lastUsed: arrayOf(fields<ActivityLastUse>({ kind: isKind, key: isString, at: isNumber })),
 		transitions: arrayOf(fields<ActivityFold["transitions"][number]>({ from: isString, to: isString, count: isNumber })),
 		dwell: arrayOf(fields<ActivityFold["dwell"][number]>({ view: isString, ms: isNumber })),
 		days: arrayOf(fields<ActivityDay>({ day: isString, activeMs: isNumber, visits: isNumber, actions: isNumber })),

@@ -8,14 +8,14 @@ A key never holds a title, a path, a session id, or anything the user typed; the
 
 `web/activity.ts` holds the recorder, which `web/use-dashboard.ts` installs once per page load under a fresh client id from `crypto.randomUUID()`.
 
-- A **view** is `viewOf(cover, layout)`: a page's kind, `settings/<section>`, `<kind>/item` when it opens one item, `pull-requests/files`, `projects/new`, or `inbox/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
-  The hook records it whenever it changes.
+- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, `projects/new`, or `inbox/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
+  `viewOf` returns a `ViewKey`, so a view missing from `VIEWS` is a type error, and the hook records it whenever it changes.
 - A **command** is a shortcut that took its key, recorded in `dispatch` in `web/shortcuts.ts` with `via: "keyboard"`, or a palette command, recorded in `web/components/command-palette/command-palette.tsx` with `via: "palette"`.
   Its key is the shortcut id in kebab case, `newSession` as `new-session`, so both channels share one key.
-- An **action** is a socket message `ACTION_MESSAGES` marks as the user's, keyed by its `t`, or a write through `apiFetch` in `web/api.ts`, keyed by its method and path without the query, such as `put /api/settings`.
+- An **action** is a socket message `ACTION_MESSAGES` marks as the user's, keyed by its `t` and recorded by `recordAction`, or a write through `putJson` in `web/api.ts`, keyed by its path without the query, such as `put /api/settings`.
   The page sends `watch`, `complete`, `read`, `list-models`, `notice`, and `activity` on its own, so they are not actions.
   Every `PUT` caller in `web/` runs from a click, a submit, or a paste, so no write is excluded.
-- A **control** is a click inside an element tagged with `activityControl(id)`, which one capture-phase listener on `document` reads from the nearest `[data-activity]` ancestor; ids come from `CONTROLS` in `src/shared/activity.ts`, so a typo is a type error.
+- A **control** is a click inside an element tagged with `activityControl(id)`, which one capture-phase listener on `document` reads through `controlOf` from the nearest `[data-activity]` ancestor; ids come from `CONTROLS` in `src/shared/activity.ts`, so a typo is a type error.
 - A **presence** event marks the tab coming to the foreground or leaving it, on `visibilitychange`, `focus`, and `blur`.
 
 A browser with `navigator.webdriver` set records nothing, so an agent's smoke run never counts as use.
@@ -23,9 +23,13 @@ The browser relay drives your own Chrome without that flag, so a relay-driven se
 
 ## Delivery
 
-The recorder keeps each event in an outbox in `localStorage` (`omp-agents.activity-outbox`), numbered within its page load, capped at 5,000 with the oldest dropped first.
+The recorder keeps each event in an outbox, numbered within its page load, capped at 5,000 with the oldest dropped first.
+It saves the outbox to `localStorage` (`omp-agents.activity-outbox`) as each flush starts, after each batch leaves it, and on `pagehide`, not on each event.
+It keeps an event only if `isActivityEvent` in `src/shared/activity.ts`, the check the server's parser uses too, passes it, and a kept outbox loads without any entry that check refuses, such as one an older version kept.
 Every 10 seconds, when the tab hides, and when the socket opens, it sends each contiguous run of at most 500 events as one acknowledged `activity` message (see [Socket requests](socket-requests.md)).
-A batch leaves the outbox only once the server answers `done`, and a page load resends what an earlier one left under that load's own client id and sequence.
+While the socket is closed, every batch stays for the next flush.
+A batch leaves the outbox once the server answers `done`: stored, or refused with an error, so a batch the server refuses never holds back the ones after it.
+A page load resends what an earlier one left under that load's own client id and sequence.
 
 ## Storage
 
@@ -36,12 +40,15 @@ Deleting `activity.db` while the server is stopped clears the history; settings 
 
 ## The report
 
-`GET /api/activity?range=<range>` (see [HTTP API](http-api.md)) folds every stored row with `foldActivity` in `src/activity.ts`.
+`GET /api/activity?range=<range>`, in `src/server/activity-routes.ts` (see [HTTP API](http-api.md)), reads the range's rows and folds them with `foldActivity` in `src/activity.ts`.
 Uses count per feature over the range, with the days used and, for a command, the keyboard and palette split.
 Each page load's time between two events counts toward the view it showed, up to five minutes a gap and only while in the foreground; a page load's last event counts up to now.
 A visit starts after 30 minutes without use or on a new local day.
-`lastUsed` covers every stored row, so a feature unused in the range still shows when it was last used.
-`web/activity-report.ts` builds the inventory from `SETTINGS_SECTIONS`, the page kinds, `SIDEBAR_TABS`, `SHORTCUTS`, `CONTROLS`, `ACTION_MESSAGES`, and the server's `PUT` routes, and splits it into used, rarely used (once or twice), never used, and not set up, for a tab whose integration omp is not signed in to.
+`lastUsed` is each feature's latest row whatever the range, which the store's `lastUsed()` answers in SQL, so a feature unused in the range still shows when it was last used.
+`web/activity-report.ts` builds the inventory from `VIEWS`, `SETTINGS_SECTIONS`, `SHORTCUTS`, `CONTROLS`, `ACTION_MESSAGES`, and the server's `PUT` routes.
+It splits it into used, rarely used (once or twice), never used, and not set up, and lists the 20 most used.
+A feature is not set up while its tab is one `useSidebarTabs` reports signed out, which is every integration tab until the integrations answer.
+The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab; the Inbox views, the Inbox commands, and the `/api/gmail/` routes go with the Inbox tab.
 
 ## Coverage
 

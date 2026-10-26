@@ -8,7 +8,7 @@
  */
 import { parseArgs } from "node:util";
 import { chromium, type Page } from "playwright-core";
-import { decodeActivity, type ActivityRead } from "../src/shared/activity";
+import { decodeActivity, type ActivityRead, featureId } from "../src/shared/activity";
 import { TOKEN_STORAGE_KEY } from "../src/shared/access";
 
 const { values } = parseArgs({ options: { url: { type: "string" }, token: { type: "string" }, agent: { type: "boolean", default: false } } });
@@ -29,14 +29,15 @@ async function readActivity(): Promise<ActivityRead> {
 	return read;
 }
 
-/** Each use's count, and a command's keyboard and palette counts, by `kind:key` and `kind:key:via`. */
+/** Each use's count by {@link featureId}, and a command's keyboard and palette counts under that id and `:keyboard` or `:palette`. */
 function counts(read: ActivityRead): Map<string, number> {
 	const result = new Map<string, number>();
 	for (const use of read.uses) {
-		result.set(`${use.kind}:${use.key}`, use.count);
+		const id = featureId(use.kind, use.key);
+		result.set(id, use.count);
 		if (use.kind === "command") {
-			result.set(`command:${use.key}:keyboard`, use.keyboard);
-			result.set(`command:${use.key}:palette`, use.palette);
+			result.set(`${id}:keyboard`, use.keyboard);
+			result.set(`${id}:palette`, use.palette);
 		}
 	}
 	return result;

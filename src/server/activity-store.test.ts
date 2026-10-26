@@ -29,7 +29,7 @@ describe("ActivityStore", () => {
 		const store = open();
 		store.append(CLIENT, 4, BATCH);
 		store.append(CLIENT, 4, BATCH);
-		expect(store.rows(null)).toEqual(BATCH.map((event, index) => ({ client: CLIENT, seq: 4 + index, ...event })));
+		expect(store.rows(0)).toEqual(BATCH.map((event, index) => ({ client: CLIENT, seq: 4 + index, ...event })));
 		store.close();
 	});
 
@@ -38,7 +38,18 @@ describe("ActivityStore", () => {
 		store.append(CLIENT, 0, BATCH);
 		expect(store.rows(200).map(({ seq }) => seq)).toEqual([1, 2]);
 		store.prune(200);
-		expect(store.rows(null).map(({ at }) => at)).toEqual([200, 300]);
+		expect(store.rows(0).map(({ at }) => at)).toEqual([200, 300]);
+		store.close();
+	});
+
+	test("lastUsed answers each feature's latest use over every row, leaving presence out", () => {
+		const store = open();
+		store.append(CLIENT, 0, [...BATCH, { kind: "view", key: "home", via: null, at: 400 }, { kind: "presence", key: "background", via: null, at: 500 }]);
+		expect(store.lastUsed().toSorted((a, b) => a.at - b.at)).toEqual([
+			{ kind: "command", key: "help", at: 200 },
+			{ kind: "action", key: "pin", at: 300 },
+			{ kind: "view", key: "home", at: 400 },
+		]);
 		store.close();
 	});
 });

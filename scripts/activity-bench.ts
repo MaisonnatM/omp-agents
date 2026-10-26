@@ -11,6 +11,7 @@ import { foldActivity } from "../src/activity";
 import { windowOf } from "../src/omp/stats";
 import { ActivityStore } from "../src/server/activity-store";
 import type { ActivityEvent } from "../src/shared/activity";
+import { DAY_MS } from "../src/shared/days";
 
 const { values } = parseArgs({ options: { rows: { type: "string", default: "200000" }, runs: { type: "string", default: "20" } } });
 const rows = Number(values.rows);
@@ -22,7 +23,7 @@ const dir = mkdtempSync(join(tmpdir(), "activity-bench-"));
 const path = join(dir, "activity.db");
 const store = new ActivityStore(path);
 const now = Date.now();
-const span = 365 * 86_400_000;
+const span = 365 * DAY_MS;
 
 /** `count` events numbered from `offset`, spread over the last year. */
 function events(count: number, offset: number): ActivityEvent[] {
@@ -49,7 +50,8 @@ for (let run = 0; run < runs; run++) {
 const reads: number[] = [];
 for (let run = 0; run < runs; run++) {
 	const start = performance.now();
-	foldActivity(store.rows(null), windowOf("90d", now).cutoff, now);
+	foldActivity(store.rows(windowOf("90d", now).cutoff ?? 0), now);
+	store.lastUsed();
 	reads.push(performance.now() - start);
 }
 

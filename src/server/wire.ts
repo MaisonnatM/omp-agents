@@ -64,7 +64,7 @@ import type { MergeQueueChange } from "../shared/merge-queue";
 import { canSubmitReview, FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding, type ReviewSubmit } from "../shared/review-drafts";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
-import { ACTIVITY_KEY, ACTIVITY_KINDS, ACTIVITY_VIAS, type ActivityEvent, MAX_ACTIVITY_BATCH } from "../shared/activity";
+import { type ActivityEvent, isActivityEvent, MAX_ACTIVITY_BATCH } from "../shared/activity";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
@@ -268,17 +268,8 @@ export function parseDiscussionRequest(value: unknown): Parsed<DiscussionRequest
 	return { ok: { source, quote, turns, question } };
 }
 
-const isActivityKind = oneOf(ACTIVITY_KINDS);
-const isActivityVia = oneOf(ACTIVITY_VIAS);
-
-/** One activity event: a known kind, a registry-id key, and a `via` on a command only. */
-function parseActivityEvent(value: unknown): ActivityEvent | null {
-	if (!isObject(value)) return null;
-	const { kind, key, at, via } = value;
-	if (!isActivityKind(kind) || typeof key !== "string" || !ACTIVITY_KEY.test(key) || !isCounter(at)) return null;
-	if (kind === "command") return isActivityVia(via) ? { kind, key, at, via } : null;
-	return via === null ? { kind, key, at, via } : null;
-}
+/** One activity event, {@link isActivityEvent}'s fields only. */
+const parseActivityEvent = (value: unknown): ActivityEvent | null => (isActivityEvent(value) ? { kind: value.kind, key: value.key, via: value.via, at: value.at } : null);
 
 /** Each socket message's parser, by its `t`. */
 const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) => Parsed<MsgOf<T>> } = {

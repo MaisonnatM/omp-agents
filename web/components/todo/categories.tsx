@@ -15,7 +15,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { localDay } from "../../days";
+import { localDay } from "../../../src/shared/days";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { categoryColor, leftIn, SIDEBAR_LISTS, sameTodoView } from "../../todo-views";
 import type { KnownSessions } from "./links";

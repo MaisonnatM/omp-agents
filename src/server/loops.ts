@@ -2,6 +2,7 @@ import { existsSync, type FSWatcher, mkdirSync, watch } from "node:fs";
 import { join } from "node:path";
 import { errorText } from "../json";
 import type { SessionFormat } from "../session-formats";
+import { DAY_MS } from "../shared/days";
 
 /** The registry has no change feed; listing it is one local IPC round trip per host. */
 const POLL_MS = 1500;
@@ -22,8 +23,6 @@ const PULL_MS = 5 * 60_000;
 const DASHBOARD_CHECK_MS = 5 * 60_000;
 /** Each process sample runs `ps` once and asks every daemon broker for its services. */
 const PROCESS_SAMPLE_MS = 15_000;
-/** Activity rows older than the kept days are pruned once a day. */
-const DAY_MS = 24 * 60 * 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */

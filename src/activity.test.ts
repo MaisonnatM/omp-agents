@@ -34,7 +34,7 @@ const NOW = DAY2 + 3 * MIN;
 
 describe("foldActivity", () => {
 	test("counts uses, days, and the command's channels over two page loads and two days", () => {
-		expect(foldActivity(ROWS, null, NOW).uses).toEqual([
+		expect(foldActivity(ROWS, NOW).uses).toEqual([
 			{ kind: "view", key: "home", count: 2, days: 1, lastAt: DAY1 + 42 * MIN, keyboard: 0, palette: 0 },
 			{ kind: "command", key: "help", count: 2, days: 2, lastAt: DAY2 + MIN, keyboard: 1, palette: 1 },
 			{ kind: "view", key: "pull-requests", count: 2, days: 2, lastAt: DAY2 + 2 * MIN, keyboard: 0, palette: 0 },
@@ -45,7 +45,7 @@ describe("foldActivity", () => {
 	});
 
 	test("moves between views stay within one page load", () => {
-		expect(foldActivity(ROWS, null, NOW).transitions).toEqual([
+		expect(foldActivity(ROWS, NOW).transitions).toEqual([
 			{ from: "home", to: "pull-requests", count: 1 },
 			{ from: "pull-requests", to: "settings/sync", count: 1 },
 			{ from: "settings/sync", to: "home", count: 1 },
@@ -55,7 +55,7 @@ describe("foldActivity", () => {
 
 	test("dwell caps each gap at five minutes and skips the background", () => {
 		// home: 1 + 1 + the last gap to now, capped at 5; pull requests: 5 of 6 + 1, then 1 on day two; settings: 1 + 2 after the return; todo: 2.
-		expect(foldActivity(ROWS, null, NOW).dwell).toEqual([
+		expect(foldActivity(ROWS, NOW).dwell).toEqual([
 			{ view: "home", ms: 7 * MIN },
 			{ view: "pull-requests", ms: 7 * MIN },
 			{ view: "settings/sync", ms: 3 * MIN },
@@ -64,16 +64,15 @@ describe("foldActivity", () => {
 	});
 
 	test("splits visits at a 31-minute gap and counts each day's active time and actions", () => {
-		expect(foldActivity(ROWS, null, NOW).days).toEqual([
+		expect(foldActivity(ROWS, NOW).days).toEqual([
 			{ day: "2026-10-01", activeMs: 16 * MIN, visits: 2, actions: 1 },
 			{ day: "2026-10-02", activeMs: 3 * MIN, visits: 1, actions: 0 },
 		]);
 	});
 
-	test("a cutoff narrows the uses but keeps every feature's last use", () => {
-		const fold = foldActivity(ROWS, DAY2, NOW);
+	test("a range's rows fold alone: nothing before it counts", () => {
+		const fold = foldActivity(ROWS.filter(({ at }) => at >= DAY2), NOW);
 		expect(fold.uses.map(({ key }) => key)).toEqual(["todo", "help", "pull-requests"]);
-		expect(fold.lastUsed).toContainEqual({ kind: "action", key: "pin", at: DAY1 + 8 * MIN });
-		expect(fold.days.map(({ day }) => day)).toEqual(["2026-10-02"]);
+		expect(fold.days).toEqual([{ day: "2026-10-02", activeMs: 3 * MIN, visits: 1, actions: 0 }]);
 	});
 });

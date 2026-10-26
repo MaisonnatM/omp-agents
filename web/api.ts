@@ -42,9 +42,8 @@ function signOut(): void {
 	for (const listener of signOutListeners) listener();
 }
 
-/** `fetch` with the access token, which signs the page out when the server refuses it. A write counts as the user's action, keyed by its route. */
+/** `fetch` with the access token, which signs the page out when the server refuses it. */
 export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
-	if (init.method !== undefined && init.method !== "GET") record("action", `${init.method.toLowerCase()} ${url.split("?", 1)[0]}`);
 	const token = stored(TOKEN_STORAGE_KEY);
 	const headers = new Headers(init.headers);
 	if (token !== null) headers.set("authorization", `Bearer ${token}`);
@@ -91,7 +90,9 @@ export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> 
 	return readJson<T>(await apiFetch(url, { signal }));
 }
 
+/** A `PUT`, which counts as the user's action, keyed by its route. */
 export async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+	record("action", `put ${url.split("?", 1)[0]}`);
 	return readJson<T>(
 		await apiFetch(url, {
 			method: "PUT",

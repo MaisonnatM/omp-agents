@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip } from "@/components/ui/tooltip";
 import { putJson } from "../../api";
 import { calendarChoices, keptChoice } from "../../calendar-model";
-import { dateOfDay, localDay, minutesOfTimeInput, timeInputValue } from "../../days";
+import { dateOfDay, localDay, minutesOfTimeInput, timeInputValue } from "../../../src/shared/days";
 import { useGoogleCalendars } from "../../reads";
 import { chordLabel } from "../../shortcuts";
 import { ERROR_TEXT, FormDialog, FormDialogHeader, isSubmitChord, type Submit } from "../form-dialog";

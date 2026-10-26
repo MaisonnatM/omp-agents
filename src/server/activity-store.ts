@@ -2,7 +2,7 @@
 import { Database, type Statement } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import type { ActivityEvent, ActivityRow } from "../shared/activity";
+import type { ActivityEvent, ActivityLastUse, ActivityRow } from "../shared/activity";
 
 /** How long the store keeps a row: past a year, so the report can still say when a feature was last used a year ago. */
 export const ACTIVITY_KEPT_DAYS = 400;
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS activity (
 	PRIMARY KEY (client, seq)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS activity_at ON activity (at);
+CREATE INDEX IF NOT EXISTS activity_feature ON activity (kind, key, at);
 `;
 
 export class ActivityStore {
@@ -41,9 +42,14 @@ export class ActivityStore {
 		})();
 	}
 
-	/** Every row at or after `cutoff`, `null` for all, by page load and sequence. */
-	rows(cutoff: number | null): ActivityRow[] {
-		return this.#db.query<ActivityRow, [number]>("SELECT client, seq, at, kind, key, via FROM activity WHERE at >= ? ORDER BY client, seq").all(cutoff ?? 0);
+	/** The rows at or after `cutoff`, by page load and sequence. */
+	rows(cutoff: number): ActivityRow[] {
+		return this.#db.query<ActivityRow, [number]>("SELECT client, seq, at, kind, key, via FROM activity WHERE at >= ? ORDER BY client, seq").all(cutoff);
+	}
+
+	/** Every feature's last use, whatever the range. */
+	lastUsed(): ActivityLastUse[] {
+		return this.#db.query<ActivityLastUse, []>("SELECT kind, key, MAX(at) AS at FROM activity WHERE kind != 'presence' GROUP BY kind, key").all();
 	}
 
 	/** Deletes the rows before `before`; one at `before` stays. */

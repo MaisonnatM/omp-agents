@@ -78,6 +78,7 @@ import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
+import { DAY_MS } from "../shared/days";
 import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
 import { createStarter, reattachAll } from "./start";
@@ -713,7 +714,7 @@ export class Dashboard {
 
 	/** Deletes the activity rows older than {@link ACTIVITY_KEPT_DAYS}. */
 	#pruneActivity(): void {
-		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * 86_400_000);
+		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
 	/**

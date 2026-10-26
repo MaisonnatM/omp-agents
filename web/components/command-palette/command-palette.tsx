@@ -47,7 +47,7 @@ import {
 	primaryAction,
 	topFrame,
 } from "../../command-palette";
-import { localDay } from "../../days";
+import { localDay } from "../../../src/shared/days";
 import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";

@@ -8,8 +8,7 @@ import { folderName } from "../../labels";
 import { contextStore } from "../../reads";
 import { LoadNote } from "../sheet-details";
 import { compact, dollars, full } from "./analytics-format";
-
-const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
+import { Count, percent, RowHead } from "./table";
 
 const kindLabel: Record<ContextSourceKind, string> = {
 	file: "Instruction file",
@@ -30,10 +29,6 @@ const SHOWN = 25;
 /** The value the filters use for "every workspace" and "every session": the select keeps strings. */
 const ALL = "";
 
-function Count({ children, title }: { children: string; title?: string }) {
-	return <td className="whitespace-nowrap border-t border-border py-2 ps-4 text-end tabular-nums" title={title}>{children}</td>;
-}
-
 function SourcesTable({ report }: { report: ContextReport }) {
 	const [all, setAll] = useState(false);
 	const shown = all ? report.sources : report.sources.slice(0, SHOWN);
@@ -51,7 +46,7 @@ function SourcesTable({ report }: { report: ContextReport }) {
 					</thead>
 					<tbody>
 						{shown.map(source => <tr key={`${source.kind}:${source.name}`}>
-							<th scope="row" className="max-w-80 truncate border-t border-border py-2 text-start font-medium" title={source.name}>{source.name}</th>
+							<RowHead className="max-w-80 truncate" title={source.name}>{source.name}</RowHead>
 							<td className="whitespace-nowrap border-t border-border py-2 ps-4 text-muted-foreground">{kindLabel[source.kind]}</td>
 							<Count>{compact.format(Math.round(source.tokens / source.turns))}</Count>
 							<Count>{full.format(source.turns)}</Count>
