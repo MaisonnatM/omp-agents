@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
 import type { Notice } from "../../src/shared/notices";
+import type { Project } from "../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
 import type { UserNoteList } from "../../src/user-notes-shared";
@@ -32,6 +33,8 @@ interface AppSidebarProps {
 	userTodos: UserTodoList | null;
 	userNotes: UserNoteList | null;
 	notesView: NotesListView;
+	/** Every project, for the Notes tab's project lists. */
+	projects: Project[];
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	hosts: RosterHost[];
 	past: PastSession[];
@@ -63,6 +66,7 @@ export const AppSidebar = memo(function AppSidebar({
 	userTodos,
 	userNotes,
 	notesView,
+	projects,
 	hosts,
 	past,
 	notices,
@@ -113,6 +117,7 @@ export const AppSidebar = memo(function AppSidebar({
 			todoView={todoView}
 			userNotes={userNotes}
 			notesView={notesView}
+			projects={projects}
 			todoSessions={todoSessions}
 			routines={routines}
 			calendarTab={calendarTab}

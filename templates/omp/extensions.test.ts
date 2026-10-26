@@ -15,7 +15,7 @@ let gate;
 let agentStart;
 let tool;
 let confirmations = 0;
-const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
+const sessionManager = { getSessionId: () => input.sessionId ?? "session", getSessionFile: () => input.sessionFile };
 extension({
 	// Importing omp's exports takes about a second, so only a test that reads them asks for them.
 	pi: input.omp ? await import(process.argv[2]) : undefined,
@@ -204,7 +204,16 @@ describe("user_note", () => {
 		}),
 	);
 	writeFileSync(join(config, "todos.json"), JSON.stringify({ todos: [{ id: "t1", text: "Ship the release" }] }));
-	const call = (params: object, sessionId = "s1") => exercise("notes", { run: true, params, sessionId }, env);
+	writeFileSync(
+		join(config, "projects.json"),
+		JSON.stringify({
+			projects: [
+				{ id: "p1", name: "Billing", archived: false, coordinator: { sessionId: "coord" }, workers: [{ id: "w", title: "Ledger", sessionId: "w1" }] },
+				{ id: "p2", name: "Search", archived: true, coordinator: { sessionId: "old" }, workers: [] },
+			],
+		}),
+	);
+	const call = (params: object, sessionId = "s1", sessionFile?: string) => exercise("notes", { run: true, params, sessionId, sessionFile }, env);
 	const left = () => readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
 
 	test("list keeps the notes holding every word of the query, in any case, and names the todo each belongs to", () => {
@@ -219,7 +228,7 @@ describe("user_note", () => {
 		const [added] = left();
 		expect(first.text).toBe(`Added to the user's notes (id ${added.note.id}).`);
 		expect(again.text).toContain(`already added it (id ${added.note.id})`);
-		expect(added.note).toMatchObject({ title: "Findings", body: "The cache misses.", todoId: null, addedBy: "s1" });
+		expect(added.note).toMatchObject({ title: "Findings", body: "The cache misses.", todoId: null, projectId: null, addedBy: "s1" });
 		call({ action: "add", title: "Findings" }, "s2");
 		expect(left()).toHaveLength(2);
 		expect(call({ action: "list", query: "cache" }).text).toContain(`Findings (id ${added.note.id}`);
@@ -232,6 +241,23 @@ describe("user_note", () => {
 		expect(call({ action: "read", id: "n1" }).text).toBe("Deploy checklist\n\nRun the staging smoke first.");
 		expect(call({ action: "read", id: "n2" }).text).toBe("Reading list\n\nDesigning Data-Intensive Applications\n\nThinking in Systems");
 		expect(call({ action: "list", query: "thinking systems" }).text).toContain("Reading list (id n2");
+	});
+
+	test("a note added from a project's session belongs to that project unless project_id names another, and list keeps one project's notes", () => {
+		expect(call({ action: "add", title: "Elsewhere", project_id: "gone" }, "coord").run.isError).toBe(true);
+		expect(call({ action: "add", title: "Ledger rounding" }, "w1").text).toEndWith(`, project "Billing").`);
+		call({ action: "add", title: "Ranking idea", project_id: "p2" }, "coord");
+		expect(left().slice(-2).map(change => change.note.projectId)).toEqual(["p1", "p2"]);
+		expect(call({ action: "list", project_id: "p1" }).text?.split("\n")).toEqual([expect.stringMatching(/^- Ledger rounding \(id \S+, updated \S+, project p1 "Billing"\)$/)]);
+		expect(call({ action: "list", project_id: "gone" }).run.isError).toBe(true);
+	});
+
+	test("a task subagent's note belongs to the project of the session it runs under", () => {
+		const sessions = join(root, "sessions");
+		mkdirSync(join(sessions, "2026-10-05T09-00-00_coord"), { recursive: true });
+		writeFileSync(join(sessions, "2026-10-05T09-00-00_coord.jsonl"), "");
+		const subagent = join(sessions, "2026-10-05T09-00-00_coord", "Explore.jsonl");
+		expect(call({ action: "add", title: "Subagent finding" }, "sub", subagent).text).toEndWith(`, project "Billing").`);
 	});
 });
 

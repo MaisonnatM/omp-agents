@@ -19,12 +19,12 @@ function notesPath(): string {
 
 const AT = "2026-10-05T09:00:00.000Z";
 
-test("another server loads a note's saved content, author, and todo link", () => {
+test("another server loads a note's saved content, author, todo link, and project", () => {
 	const path = notesPath();
 	const file = new UserNotesFile(path);
-	file.apply({ op: "add", note: { id: "n1", title: "Findings", body: "First", todoId: "t1", addedBy: "s1", createdAt: AT, updatedAt: AT } });
+	file.apply({ op: "add", note: { id: "n1", title: "Findings", body: "First", todoId: "t1", projectId: "p1", addedBy: "s1", createdAt: AT, updatedAt: AT } });
 	file.apply({ op: "append", id: "n1", text: "**Next**", at: "2026-10-06T09:00:00.000Z" });
-	expect(new UserNotesFile(path).value).toEqual({ notes: [{ id: "n1", title: "Findings", body: "First\n\n**Next**", todoId: "t1", addedBy: "s1", createdAt: AT, updatedAt: "2026-10-06T09:00:00.000Z" }] });
+	expect(new UserNotesFile(path).value).toEqual({ notes: [{ id: "n1", title: "Findings", body: "First\n\n**Next**", todoId: "t1", projectId: "p1", addedBy: "s1", createdAt: AT, updatedAt: "2026-10-06T09:00:00.000Z" }] });
 });
 
 test("an unreadable notes file is preserved rather than overwritten", () => {

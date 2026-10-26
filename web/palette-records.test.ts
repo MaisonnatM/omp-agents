@@ -97,7 +97,7 @@ test("each todo, closed ones too, ticket, and pull request opens where the dashb
 });
 
 test("note content is searchable and opens its note even with no title", () => {
-	const items = recordItems({ todos: [], tickets: [], pullRequestRepos: [], notes: [{ id: "n1", title: "", body: "Staging smoke findings", todoId: null, addedBy: null, createdAt: "2026-10-05T09:00:00.000Z", updatedAt: "2026-10-05T09:00:00.000Z" }] });
+	const items = recordItems({ todos: [], tickets: [], pullRequestRepos: [], notes: [{ id: "n1", title: "", body: "Staging smoke findings", todoId: null, projectId: null, addedBy: null, createdAt: "2026-10-05T09:00:00.000Z", updatedAt: "2026-10-05T09:00:00.000Z" }] });
 	const found = paletteSections(items, "STAGING smoke", {}, 0);
 	expect(found.map(section => [section.heading, section.items.map(item => [item.id, item.title, item.kind, item.actions[0][0]?.run])])).toEqual([
 		["Notes", [["note:n1", "Untitled", "Note", { kind: "link", href: "#notes?open=n1" }]]],

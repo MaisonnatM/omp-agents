@@ -90,8 +90,8 @@ export interface TodoRoute {
 	open: string | null;
 }
 
-/** Which notes the Notes page lists: every one, or those agents added. */
-export type NotesListView = { kind: "all" } | { kind: "agents" };
+/** Which notes the Notes page lists: every one, those agents added, or those of project `id`. */
+export type NotesListView = { kind: "all" } | { kind: "agents" } | { kind: "project"; id: string };
 
 /** The Notes page, listing `list`, with note `open` beside it when it is non-null and in the list. */
 export interface NotesRoute {
@@ -178,7 +178,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
- * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
+ * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, `#notes/project/<id>` with
+ *   that project's notes, and `?open=<id>` opens that note.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
  * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
@@ -208,7 +209,11 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const id = named ? null : decodeSegment(rest);
 		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
 	},
-	notes: (rest, query) => ({ kind: "notes", list: rest === "agents" ? { kind: "agents" } : { kind: "all" }, open: query.get("open") || null }),
+	notes: (rest, query) => {
+		const id = rest?.startsWith("project/") ? decodeSegment(rest.slice("project/".length)) : null;
+		const list: NotesListView = id ? { kind: "project", id } : rest === "agents" ? { kind: "agents" } : { kind: "all" };
+		return { kind: "notes", list, open: query.get("open") || null };
+	},
 	routines: rest => ({ kind: "routines", target: rest ? decodeSegment(rest) : null }),
 	projects: rest => {
 		const id = rest && rest !== "new" ? decodeSegment(rest) : null;
@@ -242,7 +247,7 @@ function restOfPage(page: Page): string | null {
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "notes":
-			return page.list.kind === "all" ? null : page.list.kind;
+			return page.list.kind === "all" ? null : page.list.kind === "project" ? `project/${encodeURIComponent(page.list.id)}` : page.list.kind;
 		case "routines":
 			return page.target === null ? null : encodeURIComponent(page.target);
 		case "inbox":

@@ -5,9 +5,9 @@ type AddChange = Extract<UserNoteChange, { op: "add" }>;
 
 /** The `add` of a new note, with a new id, added and updated now; whatever else `fields` leaves out is none. */
 export function addNote(fields: Partial<Omit<UserNote, "id" | "createdAt" | "updatedAt">> = {}): AddChange {
-	const { title = "", body = "", todoId = null, addedBy = null } = fields;
+	const { title = "", body = "", todoId = null, projectId = null, addedBy = null } = fields;
 	const at = new Date().toISOString();
-	return { op: "add", note: { id: crypto.randomUUID(), title, body, todoId, addedBy, createdAt: at, updatedAt: at } };
+	return { op: "add", note: { id: crypto.randomUUID(), title, body, todoId, projectId, addedBy, createdAt: at, updatedAt: at } };
 }
 
 /** The list with the note `id` names changed by `change`, moved first when `at` marks it updated; the same list when that changes nothing. */
@@ -34,6 +34,8 @@ export function applyUserNote(list: UserNoteList, change: UserNoteChange): UserN
 			return update(list, change.id, note => (change.text === "" ? note : { ...note, body: note.body === "" ? change.text : `${note.body}\n\n${change.text}` }), change.at);
 		case "set-todo":
 			return update(list, change.id, note => (note.todoId === change.todoId ? note : { ...note, todoId: change.todoId }), null);
+		case "set-project":
+			return update(list, change.id, note => (note.projectId === change.projectId ? note : { ...note, projectId: change.projectId }), null);
 		case "remove": {
 			const notes = list.notes.filter(note => note.id !== change.id);
 			return notes.length === list.notes.length ? list : { notes };

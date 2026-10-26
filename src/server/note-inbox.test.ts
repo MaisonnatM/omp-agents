@@ -18,7 +18,7 @@ function inboxDir(): string {
 }
 
 const AT = "2026-10-05T09:00:00.000Z";
-const note = (addedBy: string | null) => ({ id: "a", title: "Findings", body: "", todoId: null, addedBy, createdAt: AT, updatedAt: AT });
+const note = (addedBy: string | null) => ({ id: "a", title: "Findings", body: "", todoId: null, projectId: null, addedBy, createdAt: AT, updatedAt: AT });
 
 describe("NoteInbox", () => {
 	test("applies an agent's adds and appends, oldest first, and sets aside an edit, a removal, an add in no session's name, or a file that is not a change", async () => {

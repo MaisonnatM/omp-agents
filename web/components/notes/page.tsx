@@ -1,5 +1,6 @@
 import { Bot, NotebookPen, Plus, Search, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
+import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { everyWord } from "../../../src/shared/every-word";
 import { addNote } from "../../../src/user-notes";
@@ -10,9 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { dayLabel } from "../../labels";
-import { NOTES_LISTS, notesIn } from "../../notes-views";
+import { notesIn, notesListText } from "../../notes-views";
 import { PAGE_ICON } from "../../page-icons";
-import { hashForNotes, hashForTodoId, type NotesListView } from "../../routing";
+import { hashForNotes, hashForProjects, hashForTodoId, type NotesListView } from "../../routing";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useOpenLatest } from "../../use-open-latest";
 import { FieldPicker } from "../field-picker";
@@ -25,6 +26,7 @@ import { AddedByChip } from "../todo/links";
 interface NotesPageProps {
 	list: UserNoteList | null;
 	todos: UserTodoList | null;
+	projects: readonly Project[];
 	view: NotesListView;
 	openId: string | null;
 	disabled: boolean;
@@ -38,7 +40,7 @@ export function NotesPage({ list, ...props }: NotesPageProps) {
 	return <LoadedNotesPage list={list} {...props} />;
 }
 
-function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts, past }: NotesPageProps & { list: UserNoteList }) {
+function LoadedNotesPage({ list, todos, projects, view, openId, disabled, onChange, hosts, past }: NotesPageProps & { list: UserNoteList }) {
 	const [query, setQuery] = useState("");
 	const search = useRef<HTMLInputElement>(null);
 	const [created, setCreated] = useState<string | null>(null);
@@ -47,17 +49,18 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	const shown = listed.filter(note => matches(`${note.title}\n${note.body}`));
 	const open = listed.find(note => note.id === openId) ?? null;
 	const at = shown.findIndex(note => note.id === openId);
-	const kind = NOTES_LISTS.find(row => row.view.kind === view.kind)!;
+	const text = notesListText(view, projects);
 	const navigate = (id: string | null): void => { location.hash = hashForNotes(view, id); };
 	const rowOf = (note: UserNote): HTMLElement | null => document.getElementById(`note-${note.id}`);
 	useReturnFocus(open?.id ?? null, id => id, id => document.getElementById(`note-${id}`)?.querySelector("a"), list);
 	const create = (): void => {
 		if (disabled) return;
-		const change = addNote();
+		const home = view.kind === "project" && projects.some(project => project.id === view.id) ? view : null;
+		const change = addNote({ projectId: home?.id ?? null });
 		onChange(change);
 		setQuery("");
 		setCreated(change.note.id);
-		location.hash = hashForNotes({ kind: "all" }, change.note.id);
+		location.hash = hashForNotes(home ?? { kind: "all" }, change.note.id);
 	};
 	const step = (by: -1 | 1): void => {
 		if (open !== null) {
@@ -84,7 +87,7 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 		} } });
 	};
 	return (
-		<PageFrame title={view.kind === "all" ? "Notes" : kind.name} meta={`${listed.length} ${listed.length === 1 ? "note" : "notes"}`} actions={<>
+		<PageFrame title={view.kind === "all" ? "Notes" : text.name} meta={`${listed.length} ${listed.length === 1 ? "note" : "notes"}`} actions={<>
 			<label className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-muted-foreground focus-within:ring-2 focus-within:ring-ring [&>svg]:size-3.5">
 				<Search aria-hidden /><input ref={search} type="search" aria-label="Search notes" placeholder="Search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Escape") { setQuery(""); event.currentTarget.blur(); } }} className="w-32 bg-transparent text-foreground outline-none placeholder:text-muted-foreground" />
 			</label>
@@ -93,11 +96,11 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 			<ListSplit widthKey="omp-agents.notes-list-width" resizeLabel="Resize the note list" detailLabel="Open note" empty={{ icon: NotebookPen, title: "No note open", hint: "Click a note, or focus one with ↑ or ↓ and press Enter." }} list={
 				<ul aria-label="Notes" className="mx-auto w-full max-w-3xl space-y-0.5 px-3 py-2">
 					{shown.map(note => <li key={note.id} id={`note-${note.id}`}><a href={hashForNotes(view, note.id)} aria-current={note.id === openId ? "page" : undefined} className={cn("flex flex-col gap-1 rounded-md px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", note.id === openId && "bg-accent")}>
-						<span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-medium">{note.title || "Untitled"}</span>{note.todoId && <PAGE_ICON.todo aria-label="Linked to a todo" className="size-3.5 shrink-0 text-muted-foreground" />}{note.addedBy && <Bot aria-label="Added by an agent" className="size-3.5 shrink-0 text-muted-foreground" />}</span>
+						<span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-medium">{note.title || "Untitled"}</span>{note.todoId && <PAGE_ICON.todo aria-label="Linked to a todo" className="size-3.5 shrink-0 text-muted-foreground" />}{note.projectId && view.kind !== "project" && <PAGE_ICON.projects aria-label="In a project" className="size-3.5 shrink-0 text-muted-foreground" />}{note.addedBy && <Bot aria-label="Added by an agent" className="size-3.5 shrink-0 text-muted-foreground" />}</span>
 						<span className="truncate text-xs text-muted-foreground">{preview(note.body) || "No content"}</span>
 						<span className="text-xs text-muted-foreground">Updated {dayLabel(note.updatedAt)}</span>
 					</a></li>)}
-					{shown.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{query ? `No note matches “${query}”.` : kind.empty}</li>}
+					{shown.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{query ? `No note matches “${query}”.` : text.empty}</li>}
 				</ul>
 			} detail={open === null ? null : <section key={open.id} aria-label={open.title || "Untitled"}>
 				<DetailBar leading="Notes" previous={{ label: "Previous note", icon: CH_PREVIOUS, shortcut: "notesPrevious", onClick: at > 0 ? () => step(-1) : undefined }} next={{ label: "Next note", icon: CH_NEXT, shortcut: "notesNext", onClick: at >= 0 && at < shown.length - 1 ? () => step(1) : undefined }} close={{ label: "Close the note", icon: CH_CLOSE, shortcut: "notesClose", onClick: () => navigate(null) }}>
@@ -110,7 +113,13 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 						if (event.key === "Escape") event.currentTarget.value = open.title;
 						if (event.key === "Enter" || event.key === "Escape") { event.preventDefault(); event.currentTarget.blur(); }
 					}} onBlur={event => { setCreated(null); const title = event.currentTarget.value.trim(); if (!disabled && title !== open.title) onChange({ op: "edit-title", id: open.id, title, at: new Date().toISOString() }); }} className="-mx-1 min-w-0 rounded-md bg-transparent px-1 text-xl font-semibold outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring" />
-					<NoteTodo note={open} todos={todos} disabled={disabled} onChange={onChange} />
+					<div className="grid items-start gap-2 sm:grid-cols-2">
+						<NoteTodo note={open} todos={todos} disabled={disabled} onChange={onChange} />
+						<NoteProject note={open} projects={projects} disabled={disabled} onPick={projectId => {
+							onChange({ op: "set-project", id: open.id, projectId });
+							if (view.kind === "project") location.hash = hashForNotes(projectId === null ? { kind: "all" } : { kind: "project", id: projectId }, open.id);
+						}} />
+					</div>
 					<NotesEditor key={open.id} value={open.body} label={`Content of ${open.title || "Untitled"}`} readOnly={disabled} onSave={body => onChange({ op: "edit-body", id: open.id, body, at: new Date().toISOString() })} />
 					<div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground"><span>Created {dayLabel(open.createdAt)}</span>{open.addedBy && <AddedByChip sessionId={open.addedBy} sessions={{ hosts, past }} />}</div>
 				</div>
@@ -128,7 +137,18 @@ function NoteTodo({ note, todos, disabled, onChange }: { note: UserNote; todos: 
 	const current = todo?.text ?? (note.todoId ? "Deleted todo" : "No todo");
 	const href = todos && note.todoId ? hashForTodoId(todos, note.todoId) : null;
 	return <div className="flex min-w-0 flex-wrap items-center gap-2">
-		<FieldPicker field="Todo" current={current} trigger={<span className="truncate">{current}</span>} choices={[{ value: "", label: "No todo" }, ...choices.map(row => ({ value: row.id, label: row.text }))]} selected={[note.todoId ?? ""]} disabled={disabled || todos === null} onPick={value => { if ((value || null) !== note.todoId) onChange({ op: "set-todo", id: note.id, todoId: value || null }); }} />
+		<FieldPicker field="Todo" current={current} trigger={<><PAGE_ICON.todo aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{current}</span></>} choices={[{ value: "", label: "No todo" }, ...choices.map(row => ({ value: row.id, label: row.text }))]} selected={[note.todoId ?? ""]} disabled={disabled || todos === null} onPick={value => { if ((value || null) !== note.todoId) onChange({ op: "set-todo", id: note.id, todoId: value || null }); }} />
 		{href && <a href={href} className="text-xs text-muted-foreground underline underline-offset-2">Open todo</a>}
+	</div>;
+}
+
+/** The project picker offers the unarchived projects, and the note's own when it is archived. */
+function NoteProject({ note, projects, disabled, onPick }: { note: UserNote; projects: readonly Project[]; disabled: boolean; onPick: (projectId: string | null) => void }) {
+	const project = projects.find(row => row.id === note.projectId);
+	const current = project?.name ?? (note.projectId ? "Deleted project" : "No project");
+	const choices = projects.filter(row => !row.archived || row.id === note.projectId);
+	return <div className="flex min-w-0 flex-wrap items-center gap-2">
+		<FieldPicker field="Project" current={current} trigger={<><PAGE_ICON.projects aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{current}</span></>} choices={[{ value: "", label: "No project" }, ...choices.map(row => ({ value: row.id, label: row.name }))]} selected={[note.projectId ?? ""]} disabled={disabled} onPick={value => { if ((value || null) !== note.projectId) onPick(value || null); }} />
+		{project && <a href={hashForProjects({ kind: "project", id: project.id })} className="text-xs text-muted-foreground underline underline-offset-2">Open project</a>}
 	</div>;
 }

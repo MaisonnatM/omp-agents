@@ -64,7 +64,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool and check off a todo once they finish its work.
   The desktop app captures a todo from any app and badges the Dock with what is left.
 - **Notes.**
-  Markdown notes with search, optional todo links, and Undo, shared with agent sessions through the starter kit's `user_note` tool.
+  Markdown notes with search, optional todo links and projects, and Undo, shared with agent sessions through the starter kit's `user_note` tool.
 - **Settings editor.**
   Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, and pin a skill that every new session starts through.
 - **Plan quota.**

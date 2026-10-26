@@ -30,7 +30,8 @@
   A search that matches a project's name keeps all its rows, and one that matches a worker's title keeps that worker.
 - `#projects/<id>` opens one project: its coordinator's status with **Open coordinator**, a table of its workers in order with each one's phase and last reply, the updates still waiting for the coordinator, and its notes.
   A worker's phase is working, asking while it waits on a question, idle, interrupted when it stopped without **End session**, or ended.
-  **Notes** shows two trees, **Project** and **User**, each with its folders first and then its files, by name, and its directory under it; click a file to open it in the file dialog.
+  **Notes** first lists the project's [Notes page](notes.md) notes under **Notes page**, each opening in the project's list on the Notes page.
+  It then shows two trees, **Project** and **User**, each with its folders first and then its files, by name, and its directory under it; click a file to open it in the file dialog.
   **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, its coordinator's tools refuse to start, list, read, or message workers, and its updates wait.
   **Archive and end its sessions** also ends the project's sessions that run.
   **Unarchive** brings an archived project back and delivers what waited.
@@ -39,7 +40,7 @@
   **Linear issues assigned to me** reports issues assigned to you that are new or changed, filtered by a team, a label, and a project, each a name or key, empty for any.
   The dashboard looks every 2 minutes, and the first look at each pull request or issue only records it.
   **Ask me to review**, `every PR` by default, tells the coordinator how often to ask you to review, in your own words.
-- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** shows the same **Project** and **User** trees, and **PRs** the pull requests its workers submitted or worked on, each once.
+- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** shows the same **Notes page** list and **Project** and **User** trees, and **PRs** the pull requests its workers submitted or worked on, each once.
 - Workers report back on their own, so the coordinator never polls.
   Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
   Once the coordinator runs and is idle, every waiting update reaches it as one message that starts with `[omp-agents] Project update.`, quoting each finished worker's last reply up to 2,000 characters.

@@ -12,6 +12,8 @@ export interface UserNote {
 	body: string;
 	/** The top-level todo it belongs to, `null` for none. */
 	todoId: string | null;
+	/** The project it belongs to, `null` for none. */
+	projectId: string | null;
 	/** The omp session whose agent added it, `null` when you did. */
 	addedBy: string | null;
 	createdAt: string;
@@ -36,6 +38,7 @@ export type UserNoteChange =
 	/** Adds `text` as a paragraph after the body. */
 	| { op: "append"; id: string; text: string; at: string }
 	| { op: "set-todo"; id: string; todoId: string | null }
+	| { op: "set-project"; id: string; projectId: string | null }
 	| { op: "remove"; id: string }
 	/** Undoes a `remove`, putting `note` back at `index`. */
 	| { op: "restore"; note: UserNote; index: number };

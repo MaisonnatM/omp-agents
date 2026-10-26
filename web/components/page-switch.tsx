@@ -195,7 +195,7 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		case "notes":
-			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
+			return <NotesPage list={userNotes} todos={userTodos} projects={projects} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "routines":
 			return (
 				// Keyed by its target, so leaving for another routine or the list closes the editor.

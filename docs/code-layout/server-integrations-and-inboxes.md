@@ -38,7 +38,7 @@
 - `src/user-notes-shared.ts`, `src/user-notes.ts`, and `src/user-notes-parse.ts` hold the Notes page's model, reducer, and boundary parsers.
   `src/server/user-notes-file.ts` keeps `notes.json` with `ReducerFile`, registered in `src/server/list-registry.ts` under `user-notes`.
   `src/server/note-inbox.ts` drains agent adds and appends from `note-inbox/` through `JsonInboxDir` while its server owns the lock.
-  `templates/omp/agent/extensions/notes.ts` registers `user_note`, reads persisted notes and pending adds, and leaves requests without writing `notes.json`.
+  `templates/omp/agent/extensions/notes.ts` registers `user_note`, reads persisted notes and pending adds, and leaves requests without writing `notes.json`; an add belongs to the project `project_id` names, else to its session's, read from `projects.json` as `projects.ts` reads a role.
   See [User notes](../architecture/user-notes.md).
 - `src/shared/workspaces.ts`: the Settings › Workspaces list, `WorkspaceList` of added and hidden directories, its `WorkspaceChange`, and `applyWorkspace`, which the server applies to its file.
   `src/server/workspaces-file.ts` keeps the list in `workspaces.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `workspaces.json.invalid`.

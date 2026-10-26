@@ -72,7 +72,7 @@ The review a **Review** session saved of one pull request, with its verdict, sum
 _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 
 **Note**:
-A Markdown entry on the Notes page, optionally linked to a top-level todo.
+A Markdown entry on the Notes page, optionally linked to a top-level todo and optionally belonging to a project.
 It is separate from a todo's notes field and from the project and user Markdown directories shown on the Projects page.
 
 ## Unattended work

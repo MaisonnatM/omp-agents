@@ -34,12 +34,15 @@ import {
 
 const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, children: [], links: [], addedBy: null, ...fields });
 
-test("notes routes address both lists and encode the open note", () => {
+test("notes routes address each list and encode the open note", () => {
 	expect(hashForNotes({ kind: "all" }, "note / one")).toBe("#notes?open=note%20%2F%20one");
 	expect(routeFromHash("#notes?open=note%20%2F%20one")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: "note / one" } });
 	expect(hashForNotes({ kind: "agents" }, "n1")).toBe("#notes/agents?open=n1");
 	expect(routeFromHash("#notes/agents?open=n1")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "agents" }, open: "n1" } });
 	expect(routeFromHash("#notes/unknown")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: null } });
+	expect(hashForNotes({ kind: "project", id: "p/1" }, "n1")).toBe("#notes/project/p%2F1?open=n1");
+	expect(routeFromHash("#notes/project/p%2F1?open=n1")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "project", id: "p/1" }, open: "n1" } });
+	expect(routeFromHash("#notes/project/")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: null } });
 });
 
 describe("layout hash", () => {

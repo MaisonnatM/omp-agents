@@ -74,7 +74,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Calendar: `web/components/calendar/calendar-page.tsx`.
   - Inbox: `web/components/inbox/inbox-page.tsx`.
   - Routines: `web/components/routines/routines-page.tsx`.
-  - Projects: `web/components/projects/projects-page.tsx`; a project's **Project** and **User** notes trees are `ProjectNotesList` in `project-parts.tsx` beside it, over `noteRows` in `web/notes-model.ts`.
+  - Projects: `web/components/projects/projects-page.tsx`; a project's **Notes page** list and **Project** and **User** notes trees are `ProjectNotesList` in `project-parts.tsx` beside it, over `noteRows` in `web/notes-model.ts`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
     Settings › Integrations' Google account lines, with **Add account**, **Remove**, and the workspace picker: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
