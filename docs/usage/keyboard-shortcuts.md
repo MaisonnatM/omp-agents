@@ -28,7 +28,7 @@ Alt is Option on macOS.
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| Cmd+1 … Cmd+7 | Anywhere | Go to the first … seventh tab the sidebar shows, across **Dev** and **Ops** |
+| Cmd+1 … Cmd+4 | Anywhere | Go to the first … fourth tab the sidebar's bar draws, in the group the header's switch shows |
 | C | Outside text fields, except on the Todo, Notes, Calendar, and Inbox pages | Create a Linear ticket, when connected |
 | G then N | Outside text fields | Go to your notes |
 | G then I | Outside text fields | Go to your Gmail inbox, when connected |
@@ -70,12 +70,12 @@ Alt is Option on macOS.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
-- Cmd+1 through Cmd+7 go to the first through seventh tab the sidebar shows, even while typing.
-  The numbers count the tabs of both **Dev** and **Ops** in the order **Settings › Preferences** sets, whichever group the header's switch shows, and a number in the other group turns the switch to it: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
+- Cmd+1 through Cmd+4 go to the first through fourth tab the sidebar's bar draws, even while typing.
+  The numbers count only the tabs of the group the header's **Dev** and **Ops** switch shows, in the order **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
-  In the default order the tabs are Pull requests, Tickets, Sessions, Todo, Notes, Calendar, and Inbox, so with both services connected Cmd+5 opens **Notes** and Cmd+7 the **Inbox**.
+  In the default order, Cmd+1 opens **Pull requests** under **Dev** and **Notes** under **Ops**, and Cmd+3 opens **Sessions** under **Dev**, with Linear connected, and the **Inbox** under **Ops**.
   The **Inbox** takes its number like any tab and keeps G then I.
-  Cmd with T, W, L, R, D, Q, O, P, S, Tab, 8, 9, or 0 is left to the window, whose menu takes Cmd+W, Cmd+R, Cmd+Q, and Cmd+0; see [Desktop app](desktop-app.md).
+  Cmd with T, W, L, R, D, Q, O, P, S, Tab, or 5 through 0 is left to the window, whose menu takes Cmd+W, Cmd+R, Cmd+Q, and Cmd+0; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
 - In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.

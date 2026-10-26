@@ -109,7 +109,7 @@ interface CommandPaletteProps {
 	handlers: ShortcutHandlers;
 	/** Commands that do nothing now, which the palette leaves out. */
 	unavailable: ReadonlySet<ShortcutId>;
-	/** The tabs the sidebar shows, in order, whose position keys the tab commands show. */
+	/** The tabs the sidebar's bar draws, in order, whose position keys the tab commands show. */
 	tabs: readonly SidebarTab[];
 	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
 	todoCategories: readonly UserTodoCategory[] | null;

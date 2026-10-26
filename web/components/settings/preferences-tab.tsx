@@ -7,7 +7,7 @@ import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
 import { TAB_GROUPS } from "../../routing";
-import { hideTab, moveTab, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
+import { groupTabs, hideTab, moveTab, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
@@ -52,12 +52,12 @@ function SidebarTabs() {
 	return (
 		<Section
 			title="Sidebar tabs"
-			meta={`The tabs the sidebar shows, in order, and ${shortcutKeys("tab1")} goes to the first one shown. The header's Dev and Ops switch picks which group's tabs the bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
+			meta={`The tabs the sidebar shows, in order. The header's Dev and Ops switch picks which group's tabs the bar draws, and ${shortcutKeys("tab1")} goes to the first one it draws. A hidden tab's page, command, and links still work. Saved in this app.`}
 		>
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
 					const row = TAB_ROWS[tab];
-					const position = positionKey(tab, shown);
+					const position = positionKey(tab, groupTabs(shown, row.group));
 					return (
 						<li key={tab} className="flex items-center gap-2">
 							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />

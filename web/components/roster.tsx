@@ -17,11 +17,11 @@ import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
 import { folderName } from "../labels";
 import { pullRequestsStore, ticketsStore } from "../reads";
-import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type TabGroup, type TodoListView } from "../routing";
+import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
-import { groupTabs, TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
+import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
@@ -145,10 +145,8 @@ interface RosterProps {
 	newSessionOpen: boolean;
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;
-	/** The tabs the bar shows across both groups, in order, which the position keys count. */
+	/** The tabs the bar draws, the header switch's group's shown tabs, in order, which the position keys count. */
 	tabs: readonly SidebarTab[];
-	/** The group whose tabs the bar draws, from the header's switch. */
-	group: TabGroup;
 	/** The sidebar's panel, selected by the page or kept over the panes. */
 	tab: SidebarPanel;
 	onTab: (tab: SidebarTab) => void;
@@ -191,7 +189,6 @@ export function Roster({
 	newSessionOpen,
 	scheduledOpen,
 	tabs,
-	group,
 	tab,
 	onTab,
 	userTodos,
@@ -220,7 +217,6 @@ export function Roster({
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
-	const barTabs = groupTabs(tabs, group);
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">
@@ -234,10 +230,10 @@ export function Roster({
 				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
 				<span aria-hidden className="size-7 shrink-0" />
 			</SidebarHeader>
-			{barTabs.length > 0 && (
+			{tabs.length > 0 && (
 				<SizeProvider size="compact">
 					<TabsList aria-label="Sidebar" className="mx-2 mt-2 max-w-[calc(100%-1rem)] self-start">
-						{barTabs.map(value => {
+						{tabs.map(value => {
 							const { label, icon } = TAB_ROWS[value];
 							const counted = tabCounts[value];
 							const badge = counted && counted.count > 0 ? counted : undefined;

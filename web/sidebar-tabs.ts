@@ -7,8 +7,6 @@ import { SIDEBAR_TABS, type TabGroup, type SidebarTab } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
-// Every tab the bar shows takes a position key, so a tab added to `SIDEBAR_TABS` needs one more `TAB_SHORTCUTS` entry.
-TAB_SHORTCUTS.length satisfies (typeof SIDEBAR_TABS)["length"];
 // A tab's own shortcut, the command the palette lists for it and the row the dialog shows, has the tab's id.
 SIDEBAR_TABS satisfies readonly { value: ShortcutId }[];
 
@@ -82,7 +80,7 @@ export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] |
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
  * `signedOut` stays the same set until a tab's service signs in or out, whatever the integrations' polls answer, and
- * `shown`, which Cmd+1 through Cmd+7 go to across both groups, stays with it until the layout changes.
+ * `shown` stays with it until the layout changes.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;

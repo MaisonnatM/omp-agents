@@ -1,8 +1,8 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { commandKey, record } from "./activity";
 
-/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the sidebar shows, whichever it is. */
-export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
+/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the bar draws, whichever it is; one per tab of the larger group. */
+export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4"] as const;
 
 export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
 

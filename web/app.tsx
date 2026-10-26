@@ -80,6 +80,8 @@ export function App() {
 	const settings = useMemo(() => settingsRoute(page), [page]);
 	const { tab, showTab, group, showGroup } = useSidebarTab({ page, signedOutTabs, shown: tabs, layout, latestSession: sessions.latest, navigate, show });
 	const emptyGroups = useMemo((): ReadonlySet<TabGroup> => new Set(TAB_GROUPS.flatMap(({ value }) => (groupTabs(tabs, value).length === 0 ? [value] : []))), [tabs]);
+	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
+	const barTabs = useMemo(() => groupTabs(tabs, group), [tabs, group]);
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
@@ -142,7 +144,7 @@ export function App() {
 		listed: sessions.listed,
 		view: focused.view,
 		signedOutTabs,
-		tabs,
+		tabs: barTabs,
 		linearCallable,
 		hasDetails: detailsView !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
@@ -222,8 +224,7 @@ export function App() {
 											panes={layout.panes}
 											tab={tab}
 											onTab={showTab}
-											tabs={tabs}
-											group={group}
+											tabs={barTabs}
 											listed={state.listed}
 											userTodos={state.userTodos}
 											userNotes={state.userNotes}
@@ -302,7 +303,7 @@ export function App() {
 											/>
 										</DashboardSidebar>
 									)}
-									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
+									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />
 									{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
 									{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
 									<DiscussionPanel />
@@ -319,7 +320,7 @@ export function App() {
 										onTogglePin={sessions.togglePin}
 										handlers={handlers}
 										unavailable={unavailable}
-										tabs={tabs}
+										tabs={barTabs}
 										todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 										todos={mentionLists.todos}
 										notes={state.userNotes?.notes ?? null}
