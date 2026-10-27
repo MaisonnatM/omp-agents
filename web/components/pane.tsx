@@ -1,5 +1,5 @@
 import { Maximize2, Minimize2, Route, X } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -45,12 +45,28 @@ interface PaneProps {
 const paneArea = (index: number, count: number): string =>
 	count === 3 && index === 2 ? "2 / 1 / 3 / 3" : `${Math.floor(index / 2) + 1} / ${(index % 2) + 1}`;
 
-/** It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed token never asks this pane to render. */
-export const Pane = memo(function Pane({
-	view, index, count, focused, maximized, topRight, hasDetails, host, lastHost, session, models, workspaces, onLayout, toggleRight, rightOpen,
-}: PaneProps) {
-	const { send, request, start, focus, open, end } = useDashboardActions();
-	const controls = useHeaderControls();
+interface ViewConversationProps {
+	view: View;
+	focused: boolean;
+	host: RosterHost | null;
+	lastHost: RosterHost | null;
+	session: PastSession | null;
+	models: ModelList;
+	/** The workspaces, which the composer's directory picker offers. */
+	workspaces: Workspace[];
+	/** Header controls after the conversation's own, such as a split pane's maximize and close. */
+	actions?: ReactNode;
+	/** Show a past session's Resume button; a Bot's page leaves it out, since writing to the Bot resumes it. */
+	resumable: boolean;
+}
+
+/**
+ * A view's conversation, live or past, with its trajectory switch, its replay comparison, and what its transcript reads
+ * from around it. It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed
+ * token never asks it to render.
+ */
+export const ViewConversation = memo(function ViewConversation({ view, focused, host, lastHost, session, models, workspaces, actions, resumable }: ViewConversationProps) {
+	const { send, request, start, open, end } = useDashboardActions();
 	const { fork, resume } = useDashboardStatus().starts;
 	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const agents = host?.agents;
@@ -64,9 +80,6 @@ export const Pane = memo(function Pane({
 	);
 	const onFork = useCallback((itemId: string, point: ForkPoint) => start({ kind: "fork", view, itemId, point }), [start, view]);
 	const onResume = useCallback(() => view.kind === "past" && start({ kind: "resume", sessionId: view.sessionId }), [start, view]);
-	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
-	const onClose = useCallback(() => onLayout(index, "close"), [index, onLayout]);
-	const onFocus = useCallback(() => !focused && focus(index), [focus, focused, index]);
 	// Kept by view, so a pane that switches to another session shows its transcript.
 	const [trajectoryOf, setTrajectoryOf] = useState<string | null>(null);
 	const trajectory = trajectoryOf === hashForView(view);
@@ -88,9 +101,67 @@ export const Pane = memo(function Pane({
 			</Button>
 		</Tooltip>
 	);
-	const actions = (
+	const headerActions = (
 		<>
 			{replay && <Button {...activityControl("replay-compare.open")} size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
+			{actions}
+		</>
+	);
+	const content = view.kind === "past" ? (
+		<PastConversation
+			sessionId={view.sessionId}
+			session={session}
+			fork={fork}
+			onFork={onFork}
+			resume={resume}
+			onResume={resumable ? onResume : undefined}
+			actions={headerActions}
+			titleAction={trajectoryToggle}
+			trajectory={trajectory}
+		/>
+	) : (
+		<Conversation
+			view={view}
+			host={host}
+			lastHost={lastHost}
+			fork={fork}
+			onFork={onFork}
+			models={models}
+			send={send}
+			onEnd={end}
+			actions={headerActions}
+			titleAction={trajectoryToggle}
+			trajectory={trajectory}
+			focused={focused}
+			workspaces={workspaces}
+		/>
+	);
+
+	return (
+		<HeaderControlsContext.Provider value={null}>
+			<SubagentLinks.Provider value={links}>
+				<FileBaseContext.Provider value={fileBase(view.kind === "past" ? session : (host ?? lastHost))}>
+					<RenderBoundary resetKey={hashForView(view)} actions={headerActions}>
+						{content}
+						{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
+					</RenderBoundary>
+				</FileBaseContext.Provider>
+			</SubagentLinks.Provider>
+		</HeaderControlsContext.Provider>
+	);
+});
+
+/** A pane's cell in the grid: its view's conversation, with the grid's controls in its header. */
+export const Pane = memo(function Pane({
+	view, index, count, focused, maximized, topRight, hasDetails, host, lastHost, session, models, workspaces, onLayout, toggleRight, rightOpen,
+}: PaneProps) {
+	const { focus } = useDashboardActions();
+	const controls = useHeaderControls();
+	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
+	const onClose = useCallback(() => onLayout(index, "close"), [index, onLayout]);
+	const onFocus = useCallback(() => !focused && focus(index), [focus, focused, index]);
+	const actions = (
+		<>
 			{count > 1 && (
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
@@ -109,25 +180,6 @@ export const Pane = memo(function Pane({
 			{topRight && hasDetails && <SidebarToggle side="right" open={rightOpen} onToggle={toggleRight} />}
 		</>
 	);
-	const content = view.kind === "past" ? (
-		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} titleAction={trajectoryToggle} trajectory={trajectory} />
-	) : (
-		<Conversation
-			view={view}
-			host={host}
-			lastHost={lastHost}
-			fork={fork}
-			onFork={onFork}
-			models={models}
-			send={send}
-			onEnd={end}
-			actions={actions}
-			titleAction={trajectoryToggle}
-			trajectory={trajectory}
-			focused={focused}
-			workspaces={workspaces}
-		/>
-	);
 
 	return (
 		<section
@@ -140,16 +192,7 @@ export const Pane = memo(function Pane({
 			style={{ gridArea: maximized && focused ? "1 / 1 / -1 / -1" : paneArea(index, count) }}
 			className={cn("relative flex min-h-0 min-w-0 flex-col bg-background outline-none", maximized && (focused ? "z-10" : "invisible"))}
 		>
-			<HeaderControlsContext.Provider value={null}>
-				<SubagentLinks.Provider value={links}>
-					<FileBaseContext.Provider value={fileBase(view.kind === "past" ? session : (host ?? lastHost))}>
-						<RenderBoundary resetKey={hashForView(view)} actions={actions}>
-							{content}
-							{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
-						</RenderBoundary>
-					</FileBaseContext.Provider>
-				</SubagentLinks.Provider>
-			</HeaderControlsContext.Provider>
+			<ViewConversation view={view} focused={focused} host={host} lastHost={lastHost} session={session} models={models} workspaces={workspaces} actions={actions} resumable />
 		</section>
 	);
 });

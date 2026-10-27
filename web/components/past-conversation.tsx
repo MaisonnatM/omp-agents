@@ -22,7 +22,8 @@ interface PastConversationProps {
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	resume: StartOf<"resume"> | null;
-	onResume: () => void;
+	/** Resume the session from its file; without it, no Resume button shows, as on a Bot's page, whose composer resumes it. */
+	onResume?: () => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
 	/** A control the page puts right after the title, such as the trajectory switch; a foreign session has no trajectory, so it gets none. */
@@ -54,7 +55,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 					{session && (
 						<>
 							<SessionMeta facts={session} />
-							{!foreign && (
+							{!foreign && onResume && (
 								<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 									<Button
 										size="compact"

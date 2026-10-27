@@ -167,7 +167,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			const forgotten = sessionId === null ? state : withPanes(state, { kind: "forget-session", sessionId });
 			const eligible = new Set(state.hosts.filter(host => !state.ending.has(host.instanceId)).map(host => host.instanceId));
 			const layout = endSession(state.layout, action.instanceId, action.listed, eligible);
-			return writeRoute(state, { ...withPanes(forgotten, { kind: "edit", layout }), cover: null }, "push");
+			const cover = state.cover?.kind === "page" ? state.cover : null;
+			return writeRoute(state, { ...withPanes(forgotten, { kind: "edit", layout }), cover }, "push");
 		}
 		case "start":
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
