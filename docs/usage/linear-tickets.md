@@ -52,9 +52,9 @@
   Esc or the close button discards the draft, except while the issue is being created.
   C and **Create ticket** show only while Linear is connected.
 - A lightning button, which shows on a row in place of the day it last changed while you hover or focus the row, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
-  The page stays on screen, and the session shows at once as a chip with its status dot on the issue's row and after the buttons in its details; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
-  A row and the details show a chip for every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so they say whether an agent still works on it, after a reload too.
-  A row shows two chips at most.
+  The page stays on screen, and the issue's details show at once a button after their quick actions, such as **1 session**; its menu lists each session with its status dot, and choosing one opens it (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
+  The menu lists every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so it says whether an agent still works on it, after a reload too.
+  The rows of the list show no sessions.
   The session also shows in the sessions sidebar.
   A Linear issue names no repository, so the session starts where a new session would: in the sidebar's workspace, or under **All workspaces** in the open session's workspace, else the newest session's.
   **Work on it**, on any open issue, implements the issue in a git worktree on Linear's branch for it, continuing a branch or pull request that exists already, then commits and reports without pushing.

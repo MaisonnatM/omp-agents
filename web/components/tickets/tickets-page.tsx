@@ -1,7 +1,7 @@
 /** `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them, with the open one beside them. */
 import { ListTodo, Plus } from "lucide-react";
 import { useRef } from "react";
-import type { RosterHost, View } from "../../../src/shared/sessions";
+import type { RosterHost } from "../../../src/shared/sessions";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
@@ -9,7 +9,7 @@ import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, ticketActions, ticketStart, type WorkActionId } from "../../quick-actions";
 import { useEditableRead } from "../../editable-read";
 import { ticketsStore } from "../../reads";
-import { hashForTickets, type OpenMode } from "../../routing";
+import { hashForTickets } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
@@ -35,13 +35,11 @@ interface GroupProps {
 	/** The issue whose details show beside the list. */
 	target: string | null;
 	onToggle: () => void;
-	hosts: RosterHost[];
-	onOpen: (view: View, mode: OpenMode) => void;
 	quick: StartOf<"quick"> | null;
 	onQuickAction: (ticket: Ticket, action: WorkActionId) => void;
 }
 
-function GroupSection({ group, open, target, onToggle, hosts, onOpen, quick, onQuickAction }: GroupProps) {
+function GroupSection({ group, open, target, onToggle, quick, onQuickAction }: GroupProps) {
 	const { id } = ticketSection(group.status);
 	const [Icon, color] = statusIcon(group);
 	return (
@@ -64,8 +62,6 @@ function GroupSection({ group, open, target, onToggle, hosts, onOpen, quick, onQ
 								ticket={row}
 								nested={row !== ticket}
 								open={row.id === target}
-								sessions={sessionsOn({ kind: "ticket", id: row.id }, hosts)}
-								onOpen={onOpen}
 								pending={pendingOf(quick, { kind: "ticket", id: row.id })}
 								onQuickAction={action => onQuickAction(row, action)}
 							/>
@@ -146,8 +142,6 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 												open={!folds.isFolded(group.status)}
 												target={target}
 												onToggle={() => folds.toggle(group.status)}
-												hosts={hosts}
-												onOpen={open}
 												quick={quick}
 												onQuickAction={start}
 											/>

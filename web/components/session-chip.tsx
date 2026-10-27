@@ -1,7 +1,9 @@
-/** `SessionChip`, a small chip naming a session on a pull request or issue that opens it on click. */
-import { Bot } from "lucide-react";
+/** `SessionChip`, a small chip naming a session on a pull request or issue, and `LiveSessionsMenu`, a dropdown of the sessions on an item. */
+import { Bot, ChevronDown } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { HostStatus, RosterHost, View } from "../../src/shared/sessions";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { hostLabel, modeOf, SPLIT_CLICK } from "../labels";
@@ -41,22 +43,24 @@ export function SessionChip({ label, status, title, filled, compact = false, onC
 	);
 }
 
-/** The running sessions that work on an item, each with its status; nothing when none does. */
-export function LiveSessionChips({ hosts, onOpen }: { hosts: RosterHost[]; onOpen: (view: View, mode: OpenMode) => void }) {
+/** A button naming how many running sessions work on an item, whose menu lists them to open; nothing when none does. */
+export function LiveSessionsMenu({ hosts, onOpen }: { hosts: RosterHost[]; onOpen: (view: View, mode: OpenMode) => void }) {
 	if (hosts.length === 0) return null;
+	const count = `${hosts.length} ${hosts.length === 1 ? "session" : "sessions"}`;
 	return (
-		<div role="group" aria-label="Sessions working on it" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
-			<Bot aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-			{hosts.map(host => (
-				<SessionChip
-					key={host.instanceId}
-					label={hostLabel(host)}
-					status={host.status}
-					title={`A session works on it, ${statusLabel(host.status)}. Open the session (${SPLIT_CLICK} to split)`}
-					filled={false}
-					onClick={event => onOpen({ kind: "live", instanceId: host.instanceId, agentId: null }, modeOf(event))}
-				/>
-			))}
-		</div>
+		<DropdownMenu>
+			<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={Bot} trailingIcon={ChevronDown} aria-label={`${count} working on it`} />}>
+				<span className="tabular-nums">{count}</span>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="max-w-80">
+				{hosts.map(host => (
+					<MenuItem key={host.instanceId} title={`${statusLabel(host.status)}. ${SPLIT_CLICK} to split`} onClick={event => onOpen({ kind: "live", instanceId: host.instanceId, agentId: null }, modeOf(event))}>
+						<StatusDot status={host.status} />
+						<span className="min-w-0 flex-1 truncate">{hostLabel(host)}</span>
+						<MenuShortcut>{SPLIT_CLICK}</MenuShortcut>
+					</MenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

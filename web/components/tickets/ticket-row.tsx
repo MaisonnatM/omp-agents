@@ -18,17 +18,15 @@ import {
 	SignalMedium,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { dateLabel, dayLabel } from "../../labels";
 import { type QuickActionId, ticketActions, type WorkActionId } from "../../quick-actions";
-import { hashForTickets, type OpenMode } from "../../routing";
+import { hashForTickets } from "../../routing";
 import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
 import { IconTip } from "../pull-requests/avatars";
 import { AddToTodo } from "../todo/add-button";
 import { QuickActionsMenu } from "../quick-actions";
-import { LiveSessionChips } from "../session-chip";
 
 /** Linear's glyph for each state type, and In Review's own green one. */
 export const STATUS_ICON: Record<StatusKind, [LucideIcon, string]> = {
@@ -75,15 +73,12 @@ interface TicketRowProps {
 	nested?: boolean;
 	/** The issue whose details show beside the list, which the row marks as selected. */
 	open?: boolean;
-	/** The running sessions that work on this issue. */
-	sessions: RosterHost[];
-	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this issue, if any. */
 	pending: QuickActionId | null;
 	onQuickAction: (action: WorkActionId) => void;
 }
 
-export function TicketRow({ ticket, nested = false, open = false, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
+export function TicketRow({ ticket, nested = false, open = false, pending, onQuickAction }: TicketRowProps) {
 	return (
 		<li id={ticketRowId(ticket.id)} className={cn("group/row relative flex items-center rounded-md", open ? "bg-accent before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary" : "hover:bg-muted has-[:focus-visible]:bg-muted")}>
 			<a
@@ -131,11 +126,6 @@ export function TicketRow({ ticket, nested = false, open = false, sessions, onOp
 					{dayLabel(ticket.createdAt)}
 				</span>
 			</a>
-			{sessions.length > 0 && (
-				<div className="shrink-0 pl-1">
-					<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
-				</div>
-			)}
 			{/* The updated day and the row's buttons share one cell: the buttons show in the day's place on hover or focus. */}
 			<div className="grid shrink-0 items-center justify-items-end pr-2 pl-1 *:col-start-1 *:row-start-1">
 				<span
