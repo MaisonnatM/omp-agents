@@ -30,7 +30,7 @@ import { attachToPullRequest, loadPullRequestOptions, markPullRequestFileViewed,
 import { InvalidPullRequestCommit, listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
-import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
+import { attachToTicket, createTicket, loadLinearUsers, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
 import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
@@ -474,6 +474,9 @@ function integrationRoutes({ get, media, write }: RouteKit, integrations: Integr
 	/** `GET /api/linear/teams`: the workspace's Linear teams, `{ id, name, key }`, for the team a new issue goes in. */
 	const teams = get(() => answer(loadTeams));
 
+	/** `GET /api/linear/users`: the workspace's active Linear members, `{ id, name }`, for the composer's People. */
+	const linearUsers = get(() => answer(loadLinearUsers));
+
 	/** `GET /api/ticket/options?team=<id>`: what the field pickers offer for an issue of that Linear team. */
 	const ticketOptions = get(params => {
 		const team = params.get("team") ?? "";
@@ -507,6 +510,7 @@ function integrationRoutes({ get, media, write }: RouteKit, integrations: Integr
 		...Object.fromEntries(GOOGLE_SERVICES.map(id => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
 		"/api/tickets": { GET: tickets },
 		"/api/linear/teams": { GET: teams },
+		"/api/linear/users": { GET: linearUsers },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },
 		"/api/ticket/new": { PUT: ticketCreate },
 		"/api/ticket/attachment": { PUT: ticketAttach },

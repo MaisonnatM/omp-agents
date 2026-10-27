@@ -51,6 +51,7 @@ const data: MentionData = {
 		},
 		{ owner: "acme", repo: "api", cwds: ["/code/api"], error: "GitHub is down" },
 	],
+	linearUsers: [{ id: "u-1", name: "Cleo Dent" }],
 	hosts: [host("s-self", "Login work"), host("s-live", null)],
 	past: [{ sessionId: "s-old", title: "Login bug hunt", cwdDisplay: "~/code/api" } as PastSession],
 	threads: [{ id: "t1", from: "Ana", subject: "Login [alert]", url: "https://mail.google.com/t1" } as MailThread],
@@ -186,12 +187,13 @@ describe("mentionMenu", () => {
 		expect(pick("See @event:retro", "Login retro")?.text).toMatch(/^See calendar event "Login retro", .+ · This computer $/);
 	});
 
-	test("People lists the listed pull requests' authors, reviewers, and teams once each, without you or bots", () => {
-		expect(labels(menu("@person:"))).toEqual([["People", ["@ana", "@bo", "@acme/design"]]]);
-		expect(menu("@person:")[0].options.map(option => option.detail)).toEqual(["acme/webapp#7, acme/webapp#9", "acme/webapp#9", "acme/webapp#9"]);
+	test("People lists the listed pull requests' authors, reviewers, and teams once each, without you or bots, then the Linear members", () => {
+		expect(labels(menu("@person:"))).toEqual([["People", ["@ana", "@bo", "@acme/design", "Cleo Dent"]]]);
+		expect(menu("@person:")[0].options.map(option => option.detail)).toEqual(["acme/webapp#7, acme/webapp#9", "acme/webapp#9", "acme/webapp#9", "Linear"]);
 		expect(labels(menu("@person:#7"))).toEqual([["People", ["@ana"]]]);
 		expect(pick("Ask @person:bo", "@bo")).toEqual({ text: "Ask [@bo](https://github.com/bo) ", cursor: 33 });
 		expect(pick("Ask @person:design", "@acme/design")?.text).toBe("Ask [@acme/design](https://github.com/orgs/acme/teams/design) ");
+		expect(pick("Ask @person:cleo", "Cleo Dent")?.text).toBe('Ask Linear user "Cleo Dent" (id u-1) ');
 	});
 
 	test("a prefix shows only its source, up to fifty", () => {

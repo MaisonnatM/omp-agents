@@ -6,9 +6,12 @@ import { activityControl } from "../activity";
 import { completionTrigger, type MentionToken } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
-import { useMailAndEvents, useSearchSources } from "../reads";
+import type { TicketChoice } from "../../src/shared/tickets";
+import { useMailAndEvents, useRead, useSearchSources } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
+
+const NO_USERS: TicketChoice[] = [];
 
 export function CompletionPopup({ id, sections, active, onPick, error }: {
 	id: string;
@@ -106,12 +109,13 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const { pullRequestsScope } = useDashboardStatus();
 	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), pullRequestsScope);
 	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"), pullRequestsScope);
+	const linearUsers = useRead<TicketChoice[]>(query !== null && wants(query, "person") ? "/api/linear/users" : null).data ?? NO_USERS;
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =
 		menu === null
 			? []
 			: token
-				? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, threads, events }, composer, files: answer?.items ?? null })
+				? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, linearUsers, threads, events }, composer, files: answer?.items ?? null })
 				: answer?.items.length
 					? [{ title: null, options: answer.items.map(completionOption) }]
 					: [];

@@ -3,7 +3,7 @@ import { CalendarDays, File, Folder, GitPullRequest, ListTodo, type LucideIcon, 
 import { everyWord } from "../src/shared/every-word";
 import { isBotAuthor, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
-import type { Ticket as LinearTicket } from "../src/shared/tickets";
+import type { Ticket as LinearTicket, TicketChoice } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { MailThread } from "../src/shared/gmail";
@@ -26,6 +26,8 @@ export interface MentionLists {
 export interface MentionData extends MentionLists {
 	tickets: LinearTicket[];
 	pullRequestRepos: RepoPullRequests[];
+	/** The Linear workspace's active members. */
+	linearUsers: TicketChoice[];
 	threads: MailThread[];
 	events: MentionEvent[];
 }
@@ -172,7 +174,16 @@ const CATEGORIES: readonly Category[] = [
 				return { label: pr.title, detail: name, reference: `[${linkText(`${name} ${pr.title}`)}](${pullRequestUrl(pr)})` };
 			}),
 	}),
-	source({ id: "person", prefix: "person", title: "People", icon: UserRound, list: ({ pullRequestRepos }) => pullRequestPeople(pullRequestRepos) }),
+	source({
+		id: "person",
+		prefix: "person",
+		title: "People",
+		icon: UserRound,
+		list: ({ pullRequestRepos, linearUsers }) => [
+			...pullRequestPeople(pullRequestRepos),
+			...linearUsers.map(user => ({ label: user.name, detail: "Linear", reference: `Linear user ${JSON.stringify(user.name)} (id ${user.id})` })),
+		],
+	}),
 	source({
 		id: "mail",
 		prefix: "mail",

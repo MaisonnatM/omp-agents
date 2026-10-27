@@ -287,6 +287,14 @@ function choiceOf(raw: Record<string, unknown>): TicketChoice | null {
 
 const byName = (a: TicketChoice, b: TicketChoice): number => a.name.localeCompare(b.name);
 
+/** Linear's `list_users` rows of active members, by name. */
+const activeUsers = (users: Record<string, unknown>[]): TicketChoice[] =>
+	users
+		.filter(user => user.isActive !== false)
+		.map(choiceOf)
+		.filter(user => user !== null)
+		.sort(byName);
+
 /** The states, people, labels, and projects the pickers offer, from the answers of Linear's list tools. */
 export function parseTicketOptions(statusesText: string, users: Record<string, unknown>[], labels: Record<string, unknown>[], projects: Record<string, unknown>[]): TicketOptions {
 	const statuses = toolJson("Linear", "list_issue_statuses", statusesText);
@@ -297,11 +305,7 @@ export function parseTicketOptions(statusesText: string, users: Record<string, u
 			const statusType = statusTypeOf(str(raw.type));
 			return status && statusType ? [{ status, statusType }] : [];
 		}),
-		users: users
-			.filter(user => user.isActive !== false)
-			.map(choiceOf)
-			.filter(user => user !== null)
-			.sort(byName),
+		users: activeUsers(users),
 		labels: parseLabels(labels).sort((a, b) => a.name.localeCompare(b.name)),
 		projects: projects
 			.flatMap(project => str(project.name) ?? [])
@@ -348,6 +352,12 @@ async function queryTeams(): Promise<TicketTeam[]> {
 		})
 		.sort(byName);
 }
+
+const users = createCache<TicketChoice[]>(60 * 60_000);
+
+/** The workspace's active Linear members, by name, for the composer's People. */
+export const loadLinearUsers = (): Promise<TicketChoice[]> =>
+	users.get("", async () => activeUsers(await allPages(await linearServer(), "list_users", { limit: PAGE }, pageOf("list_users", "users"))));
 
 /** Opens `draft` in Linear and answers its identifier; the tickets list is read anew on its next request. */
 export async function createTicket({ title, description, team, assignee, ...fields }: TicketDraft): Promise<{ identifier: string }> {

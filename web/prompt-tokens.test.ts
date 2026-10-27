@@ -6,7 +6,7 @@ const kinds = (text: string, options?: Parameters<typeof promptTokens>[1]) => pr
 test("each reference the composer inserts reads back as its chip", () => {
 	expect(
 		kinds(
-			'/skill:poteto-mode fix @web/app.tsx in @"docs/my notes.md" and @src/ for [ENG-12 Fix \\[x\\]](https://linear.app/acme/issue/ENG-12/fix) and [acme/app#7 Ship](https://github.com/acme/app/pull/7) with [@ana-b](https://github.com/ana-b) and [@acme/design](https://github.com/orgs/acme/teams/design), todo "say \\"hi\\"" (id t-1) and omp session "Old run" (id s9)',
+			'/skill:poteto-mode fix @web/app.tsx in @"docs/my notes.md" and @src/ for [ENG-12 Fix \\[x\\]](https://linear.app/acme/issue/ENG-12/fix) and [acme/app#7 Ship](https://github.com/acme/app/pull/7) with [@ana-b](https://github.com/ana-b) and [@acme/design](https://github.com/orgs/acme/teams/design), todo "say \\"hi\\"" (id t-1) and omp session "Old run" (id s9) for Linear user "Cleo Dent" (id u-1)',
 		),
 	).toEqual([
 		{ kind: "skill", label: "Poteto Mode", target: "poteto-mode" },
@@ -19,6 +19,7 @@ test("each reference the composer inserts reads back as its chip", () => {
 		{ kind: "person", label: "@acme/design", target: "https://github.com/orgs/acme/teams/design" },
 		{ kind: "todo", label: 'say "hi"', target: "t-1" },
 		{ kind: "session", label: "Old run", target: "s9" },
+		{ kind: "person", label: "Cleo Dent", target: "u-1" },
 	]);
 });
 
