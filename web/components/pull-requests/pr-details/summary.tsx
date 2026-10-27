@@ -33,12 +33,14 @@ function LabelChips({ labels }: { labels: PullRequestDetail["labels"] }) {
 function Description({ detail, send }: { detail: PullRequestDetail; send: SendPullRequest }) {
 	const [editing, setEditing] = useState(false);
 	const [body, setBody] = useState(detail.body);
+	const [original, setOriginal] = useState(detail.body);
 	const save = useAction(async () => {
-		if (body !== detail.body) await send({ field: "body", body });
+		if (body !== original) await send({ field: "body", body, original, ...(!body.trim() ? { allowEmpty: true } : {}) });
 		setEditing(false);
 	}, "Could not save the description");
 	const edit = (): void => {
 		setBody(detail.body);
+		setOriginal(detail.body);
 		setEditing(true);
 	};
 	return (

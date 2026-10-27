@@ -62,7 +62,7 @@ import { Loops, repeat } from "./loops";
 import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
-import { OwnerLock } from "../owner-lock";
+import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
 import { PinsFile } from "./pins-file";
 import { ProcessSettingsFile } from "./process-settings-file";
 import { readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
@@ -269,6 +269,7 @@ export class Dashboard {
 			sessions,
 			pathFor,
 			savedFile: files.pathOf,
+			factsFor: files.factsOf,
 			mayDiscardReplay: async cwd => {
 				const at = await worktreeAt(cwd);
 				if (!at?.linked) return "This is not a registered linked worktree.";

@@ -15,6 +15,10 @@
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
   The message stays in the composer while omp starts, and also if the start fails, with the error above it.
+  A start or resume of a task another session already works on in the same repository is refused before anything is checked out: the error names that task, links the session that has it, and gives its dashboard port and directory.
+  A task is a ticket, a pull request, or a todo that the start names: through a quick action, a Linear or pull request URL that leads the message, or the argument of `/ship`, `/ticket`, `/review`, or `/fix-pr`; a ticket mentioned anywhere else in the message is not one.
+  Reviewing a pull request is a different task from working on it, so a **Review** session can run beside the one that implements it.
+  Focus or end that session first; once it ends, the task is free again.
   When omp is ready, the dashboard opens the session in the focused pane.
   The draft is in the URL hash, `#new` or `#new/<encoded directory>`, and leaves the panes behind it, as **Settings** does.
   A session that you start or fork in another directory than the selected workspace switches the workspace picker to that directory, so the sidebar lists it.

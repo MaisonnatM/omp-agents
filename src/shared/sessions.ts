@@ -306,6 +306,8 @@ export type StartRequest =
 			subject: WorkItem | null;
 			/** The todo the session works on, which links to it once omp starts; `null` for none. */
 			todoId: string | null;
+			/** Explicit independent task identity; overrides the subject for intentional disjoint work. */
+			taskId: string | null;
 			/** The session reviews `subject`, a pull request, as a review draft it saves through the dashboard's `save_review_draft` tool rather than posting on GitHub. */
 			reviewDraft: boolean;
 	  }
@@ -326,6 +328,7 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	skill: null,
 	subject: null,
 	todoId: null,
+	taskId: null,
 	reviewDraft: false,
 	...options,
 });
@@ -388,7 +391,7 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
  */
 export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest> {
 	if (!isObject(value) || value.kind !== "new") return null;
-	const { cwd, prompt, todoId = null, reviewDraft = false } = value;
+	const { cwd, prompt, todoId = null, taskId = null, reviewDraft = false } = value;
 	const images = parseImages(value.images);
 	const branch = parseBranchChoice(value.branch);
 	// `null` starts on omp's default model.
@@ -398,10 +401,11 @@ export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest
 	const subject = parseWorkItem(value.subject);
 	if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
 	if (todoId !== null && !isTodoId(todoId)) return null;
+	if (taskId !== null && !isNonEmpty(taskId)) return null;
 	// Only a pull request has a review draft.
 	if (typeof reviewDraft !== "boolean" || (reviewDraft && subject.ok?.kind !== "pull-request")) return null;
 	return prompt.trim() || images.ok.length > 0
-		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, reviewDraft }) }
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, taskId, reviewDraft }) }
 		: null;
 }
 

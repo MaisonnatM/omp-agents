@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { pullRequestActions } from "./pull-request-actions";
+import { PULL_REQUEST_ACTIONS, pullRequestActions } from "./pull-request-actions";
 import type { PullRequestSummary } from "./shared/github";
 
 describe("pullRequestActions", () => {
@@ -46,5 +46,12 @@ describe("pullRequestActions", () => {
 
 	test("a PR to review offers the reviews only, whatever its checks", () => {
 		expect(pullRequestActions(pr({ role: "reviewer", checks: "failing" }))).toEqual(["review", "thermonuclear-review"]);
+	});
+
+	test("thermonuclear description updates use the checked CLI tool instead of a shell overwrite", () => {
+		const prompt = PULL_REQUEST_ACTIONS["thermonuclear-review"].prompt(pr({}));
+		expect(prompt).toContain('pr_description({repo:"acme/webapp",pr:1,change:{kind:"read"}})');
+		expect(prompt).toContain('kind:"append"');
+		expect(prompt).not.toContain("gh pr edit");
 	});
 });

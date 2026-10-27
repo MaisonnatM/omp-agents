@@ -61,7 +61,7 @@ export interface ForkedSession {
 }
 
 /** The working directory a session file's header records; omp refuses to open the file from any other. */
-async function recordedCwd(sessionFile: string): Promise<string> {
+export async function recordedCwd(sessionFile: string): Promise<string> {
 	const head = await Bun.file(sessionFile).slice(0, 1 << 16).text();
 	// omp may write a title record ahead of the header.
 	const header = head

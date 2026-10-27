@@ -8,8 +8,15 @@ import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
 import { type CheckRunState, MERGE_STATES, type MergeState, type Person, type PullRequestEvent, type PullRequestFile, type Repo, type ReviewDecision, type ReviewerState } from "./shared/github";
+import { GitHubAccess, quotaReset, type GitHubBudget } from "../templates/omp/agent/extensions/github/access";
+import { CommandError } from "../templates/omp/agent/extensions/github/command";
 
 const GH_TIMEOUT_MS = 20_000;
+const access = new GitHubAccess();
+
+async function resetOf(budget: GitHubBudget): Promise<number | undefined> {
+	return quotaReset(await runJson(["gh", "api", "rate_limit"], { timeoutMs: GH_TIMEOUT_MS }), budget);
+}
 
 /** `git@github.com:o/r.git`, `ssh://git@github.com/o/r.git`, or `https://github.com/o/r`; `git push` prints `github.com:o/r.git`. */
 const GITHUB_REMOTE = /^(?:(?:[^@/:]+@)?github\.com:|(?:https|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
@@ -42,27 +49,42 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 }
 
 /**
+ * GitHub's printed answer even when `gh` exited non-zero, as callers read refusals and GraphQL partial data from it.
+ * The access layer saw the failure first: it classified quota exhaustion, which still rejects.
+ */
+async function answered(request: Promise<unknown>): Promise<unknown> {
+	try {
+		return await request;
+	} catch (error) {
+		if (error instanceof CommandError && error.answer !== undefined) return error.answer;
+		throw error;
+	}
+}
+
+/**
  * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}; a mutation goes through {@link ghMutation}.
  * `paginate` follows the query's `$endCursor` through every page, answering an array of the pages.
  */
 export function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
-	return runJson(["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS });
+	const argv = ["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields];
+	return answered(access.request("graphql", () => runJson(argv, { timeoutMs: GH_TIMEOUT_MS }), () => resetOf("graphql")));
 }
 
 /** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */
 export function ghRest(path: string, paginate = false): Promise<unknown> {
-	return runJson(["gh", "api", ...(paginate ? ["--paginate", "--slurp"] : []), path], { timeoutMs: GH_TIMEOUT_MS });
+	const argv = ["gh", "api", ...(paginate ? ["--paginate", "--slurp"] : []), path];
+	return answered(access.request("rest", () => runJson(argv, { timeoutMs: GH_TIMEOUT_MS }), () => resetOf("rest")));
 }
 
 /** `method` on REST `path` through `gh api`, each field a `-f` of its JSON body, a `name[]` field one item of an array; throws GitHub's refusal. */
 export async function ghRestWrite(method: "POST" | "PATCH" | "DELETE", path: string, fields: [name: string, value: string][] = []): Promise<void> {
-	await runChecked(["gh", "api", "-X", method, path, ...fields.flatMap(([name, value]) => ["-f", `${name}=${value}`])], { timeoutMs: GH_TIMEOUT_MS });
+	await access.request("rest", () => runChecked(["gh", "api", "-X", method, path, ...fields.flatMap(([name, value]) => ["-f", `${name}=${value}`])], { timeoutMs: GH_TIMEOUT_MS }), () => resetOf("rest"));
 }
 
 /** `gh api`'s answer to POST `body` on REST `path`, sent whole as JSON for a body that nests, such as a review's comments; GitHub's refusal comes back as its answer. */
 export function ghRestPost(path: string, body: unknown): Promise<unknown> {
-	return runJson(["gh", "api", "-X", "POST", path, "--input", "-"], { input: JSON.stringify(body), timeoutMs: GH_TIMEOUT_MS });
+	return answered(access.request("rest", () => runJson(["gh", "api", "-X", "POST", path, "--input", "-"], { input: JSON.stringify(body), timeoutMs: GH_TIMEOUT_MS }), () => resetOf("rest")));
 }
 
 /** GitHub's error messages in a `gh api graphql` answer, joined; empty when it reports none. */

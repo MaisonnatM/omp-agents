@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { run, runShell } from "./proc";
+import { CommandError } from "../templates/omp/agent/extensions/github/command";
+import { run, runJson, runShell } from "./proc";
 
 const limits = { timeoutMs: 10_000, maxOutput: 1024 };
 
@@ -80,4 +81,10 @@ test("run with `child` hides the server's own PORT and keeps what `env` adds", a
 		if (saved === undefined) delete process.env.PORT;
 		else process.env.PORT = saved;
 	}
+});
+
+test("runJson rejects a failed command even when stdout parses, keeping its answer for the caller to classify", async () => {
+	const failed = runJson(["/bin/sh", "-c", "printf '{\"body\":\"\"}'; printf 'API rate limit exceeded' >&2; exit 1"]);
+	await expect(failed).rejects.toBeInstanceOf(CommandError);
+	await expect(failed).rejects.toMatchObject({ message: "API rate limit exceeded", answer: { body: "" } });
 });

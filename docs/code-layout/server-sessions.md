@@ -1,6 +1,7 @@
 # Server: sessions and transcripts
 
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes; `reattach` opens one a previous server started, and `dispose` hangs up without stopping omp.
+  `recordedCwd` reads the session header's directory for resume and task ownership, before any resumed process starts.
   `rename` gives a running session the user's title over omp's `set_session_name`, through the turn gate, and stops the automatic `/rename` from replacing it.
   `withSessionVisuals` adds `src/omp/session-visuals-extension.ts` to every launch but a replay's, whose requests must match the original's.
   `src/keeper.ts` is the session keeper, the detached process that holds one session's omp, lends its stdio frame by frame to one server at a time over a Unix socket, so the session outlives the server, and stops every process omp started when the session ends; `src/keeper-link.ts` is the server's side, which starts, lists, and connects to keepers, and `reattachAll` in `src/server/start.ts` attaches to them at startup.

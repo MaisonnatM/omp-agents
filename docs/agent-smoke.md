@@ -20,6 +20,10 @@ For curl, send `Authorization: Bearer <token>` and a matching `Host` header.
 The server does not reload and serves the page bundle built at startup.
 Restart it after editing `src/` or `web/`.
 
+`bun test src/server/application-socket.test.ts` starts the actual application with temporary config and data directories and checks the dashboard socket through its real upgrade route.
+It refuses an unauthenticated handshake and a foreign origin, then authenticates with the browser's subprotocols, waits for the initial roster, and checks that the server negotiates only `omp-agents`, never the credential.
+This guardrail runs with `bun test` in CI and the pre-push hook; helper-only socket tests do not replace it.
+
 A session started from the smoke dashboard is a real omp session.
 Open `#new/%2Ftmp` to start one in `/tmp`, use a prompt such as `Reply with just the word ok. Use no tools.`, and end it with **End session**.
 

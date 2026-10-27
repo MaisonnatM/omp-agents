@@ -6,4 +6,5 @@ const dir = mkdtempSync(join(tmpdir(), "omp-agents-agent-"));
 process.env.PI_CODING_AGENT_DIR = dir;
 process.env.CLAUDE_CONFIG_DIR = join(dir, "claude");
 process.env.CODEX_HOME = join(dir, "codex");
+process.env.XDG_CONFIG_HOME = join(dir, "config");
 process.on("exit", () => rmSync(dir, { recursive: true, force: true }));

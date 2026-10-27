@@ -57,7 +57,7 @@ Every socket hears the routines after each change and each step of a run as a `r
 
 Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
 Routines, the todo inbox, the daily clean-up of checked todos, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
-`src/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
+`OwnerLock` in `templates/omp/agent/extensions/github/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it.
 Taking over a dead or invalid owner holds a short ownership lock at `<path>.reap` and rereads the original file before removal, so competing reclaimers cannot remove a new owner's lock.
 The same mechanism recovers a crashed reclaimer's lock.
