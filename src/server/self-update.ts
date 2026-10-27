@@ -126,10 +126,12 @@ const CHANGELOG_LIMIT = 300;
 const FEATURE_GREP = "^(feat(\\([^)]*\\))?!?:|Add )";
 const FEAT_PREFIX = /^feat(?:\(([^)]*)\))?!?:\s*/;
 const PR_SUFFIX = /\s*\(#(\d+)\)$/;
+/** A subject that only adds tests, as `Add failing tests for ...`, which ships no feature. */
+const TESTS_ONLY = /^add (?:(?:a|more|missing|failing|regression|unit|e2e) )*tests?\b/i;
 
 /**
  * Reads `git log --format=%H%x1f%ct%x1f%s` lines into entries; `pending` holds the commits the running build lacks.
- * A subject that is not a feature, as a line `--grep` let through, is dropped.
+ * A subject that is not a feature, as a line `--grep` let through, or that only adds tests, is dropped.
  */
 function parseChangelog(log: string, pending: ReadonlySet<string>): ChangelogEntry[] {
 	const entries: ChangelogEntry[] = [];
@@ -141,7 +143,7 @@ function parseChangelog(log: string, pending: ReadonlySet<string>): ChangelogEnt
 		let title = feat ? subject.slice(feat[0].length) : subject;
 		const pr = PR_SUFFIX.exec(title);
 		if (pr) title = title.slice(0, pr.index);
-		if (!title) continue;
+		if (!title || TESTS_ONLY.test(title)) continue;
 		entries.push({
 			commit,
 			at: Number(seconds) * 1000,

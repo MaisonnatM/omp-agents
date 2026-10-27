@@ -1,6 +1,6 @@
 /** The header's **What's new**: the features of the running omp-agents build, and those **Update dashboard** would load. */
 import { Download, Sparkles } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { ChangelogEntry, DashboardChangelog } from "../../src/shared/dashboard-update";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,11 @@ import { activityControl } from "../activity";
 import { updateDashboard } from "../dashboard-update";
 import { DAY_FORMAT } from "../labels";
 import { useRead } from "../reads";
+import { useStoredState } from "../stored-state";
+
+const SEEN_KEY = "omp-agents.whats-new-seen";
+/** The commit time, in ms, of the newest feature the popover showed on this machine; `0` before it ever opened. */
+const decodeSeen = (raw: string | null): number => (raw !== null && Number.isFinite(Number(raw)) ? Number(raw) : 0);
 
 /** `entries` in runs of one local day each, newest first, as the log lists them. */
 function byDay(entries: ChangelogEntry[]): [string, ChangelogEntry[]][] {
@@ -68,14 +73,27 @@ function Body({ changelog }: { changelog: DashboardChangelog }) {
 
 export function WhatsNew() {
 	const [open, setOpen] = useState(false);
-	// Read on open, so the list follows the last fetch without polling.
-	const read = useRead<DashboardChangelog>(open ? "/api/dashboard/changelog" : null, open);
+	// Read at load for the dot, and again at each open, so the list follows the last fetch without polling.
+	const [opens, setOpens] = useState(0);
+	const read = useRead<DashboardChangelog>("/api/dashboard/changelog", opens);
+	const [seen, setSeen] = useStoredState(SEEN_KEY, decodeSeen);
+	const entries = read.data?.kind === "checkout" ? read.data.entries : [];
+	const newest = Math.max(0, ...entries.map(entry => entry.at));
+	const unseen = newest > seen;
+	useEffect(() => {
+		if (open && newest > 0) setSeen(last => Math.max(last, newest));
+	}, [open, newest, setSeen]);
+	const toggle = (next: boolean): void => {
+		setOpen(next);
+		if (next) setOpens(count => count + 1);
+	};
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
+		<Popover open={open} onOpenChange={toggle}>
 			<Tooltip content="What's new" side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					<Button {...activityControl("header.whats-new")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="What's new" data-state={open ? "open" : "closed"} active={open}>
+					<Button {...activityControl("header.whats-new")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label={unseen ? "What's new, unseen features" : "What's new"} data-state={open ? "open" : "closed"} active={open}>
 						<Sparkles />
+						{unseen && <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500 ring-2 ring-background" />}
 					</Button>
 				</PopoverTrigger>
 			</Tooltip>

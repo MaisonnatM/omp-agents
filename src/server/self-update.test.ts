@@ -156,6 +156,7 @@ describe("SelfUpdate", () => {
 		};
 		const shown = await say("feat(ui): show the bell (#12)");
 		await say("fix: keep the bell");
+		await say("Add failing tests for the bell");
 		const added = await say("Add a What's new page");
 		const { update } = recorded({ kind: "checkout", build });
 		await update.newCommits();
