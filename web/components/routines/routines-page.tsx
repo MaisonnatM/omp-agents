@@ -172,10 +172,13 @@ interface DetailProps {
 	onEdit: () => void;
 }
 
-/** What a routine's task card shows: the prompt or the command, whole. */
+const TASK_HEADING: Record<RoutineTask["kind"], string> = { prompt: "Prompt", command: "Command", bot: "Message" };
+
+/** What a routine's task card shows: the prompt, the command, or the Bot's message, whole. */
 function TaskValue({ task }: { task: RoutineTask }) {
 	switch (task.kind) {
 		case "prompt":
+		case "bot":
 			return <p className="whitespace-pre-wrap break-words">{task.prompt}</p>;
 		case "command":
 			return <code className="block font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">{task.command}</code>;
@@ -212,8 +215,8 @@ function RoutineDetail({ routine, hosts, bots, now, connected, onChange, onEdit 
 		["Schedule", <ScheduleValue schedules={routine.schedules} />],
 		["Next run", <span className={cn("tabular-nums", !routine.enabled && "text-muted-foreground")}>{nextRunWords(routine, now)}</span>],
 	];
-	if (routine.target.kind === "bot") {
-		const { botId } = routine.target;
+	if (task.kind === "bot") {
+		const { botId } = task;
 		settings.push([
 			"Sends to",
 			<a href={hashForBots(botId)} className="underline-offset-2 hover:underline">
@@ -260,7 +263,7 @@ function RoutineDetail({ routine, hosts, bots, now, connected, onChange, onEdit 
 					<section aria-labelledby="routine-task" className="space-y-2">
 						<h3 id="routine-task" className="flex items-center gap-2 text-sm font-medium">
 							<TaskIcon task={task} className="size-4 text-muted-foreground" />
-							{task.kind === "prompt" ? "Prompt" : "Command"}
+							{TASK_HEADING[task.kind]}
 						</h3>
 						<div className="rounded-lg border border-border bg-card px-4 py-3 text-sm leading-relaxed">
 							<TaskValue task={task} />

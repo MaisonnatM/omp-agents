@@ -14,7 +14,6 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	cwd: "~/code/webapp",
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
-	target: { kind: "new-session" },
 	skill: null,
 	enabled: true,
 	createdAt: at(5, 10),
@@ -147,7 +146,6 @@ describe("editor form", () => {
 				enabled: false,
 				skill: "poteto-mode",
 				task: { kind: "prompt", prompt: "Reply ok.", pin: true },
-				target: { kind: "new-session" },
 				schedules: [{ kind: "every", minutes: 360 }],
 			},
 		});
@@ -164,7 +162,6 @@ describe("editor form", () => {
 				enabled: true,
 				skill: null,
 				task: { kind: "prompt", prompt: "Hi", pin: false },
-				target: { kind: "new-session" },
 				schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }],
 			},
 		});
@@ -186,7 +183,6 @@ describe("editor form", () => {
 				enabled: true,
 				skill: null,
 				task: { kind: "command", command: "git worktree prune" },
-				target: { kind: "new-session" },
 				schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }],
 			},
 		});
@@ -196,10 +192,24 @@ describe("editor form", () => {
 		expect(specOf(draftOf(saved))).toMatchObject({ ok: { task: { kind: "command", command: "git worktree prune" } } });
 	});
 
-	test("a prompt form aimed at a Bot saves that target unpinned, and a command form ignores the Bot", () => {
-		const draft: RoutineDraft = { ...newDraft("r4", "~/code", null), name: "Standup", prompt: "Post the standup.", pin: true, botId: "scout" as BotId };
-		expect(specOf(draft)).toMatchObject({ ok: { task: { kind: "prompt", prompt: "Post the standup.", pin: false }, target: { kind: "bot", botId: "scout" } } });
-		expect(specOf({ ...draft, task: "command", command: "git status" })).toMatchObject({ ok: { target: { kind: "new-session" } } });
-		expect(draftOf(routine({ target: { kind: "bot", botId: "scout" as BotId } })).botId).toBe("scout" as BotId);
+	test("a Bot form saves its Bot and trimmed message without a skill or pin, says what to fix first, and saves the same routine back", () => {
+		const scout = "scout" as BotId;
+		const draft: RoutineDraft = { ...newDraft("r4", "~/code", "poteto-mode"), name: "Standup", task: "bot", pin: true, botId: scout, message: " Post the standup.\n" };
+		expect(specOf(draft)).toEqual({
+			ok: {
+				id: "r4",
+				name: "Standup",
+				cwd: "~/code",
+				enabled: true,
+				skill: null,
+				task: { kind: "bot", botId: scout, prompt: "Post the standup." },
+				schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }],
+			},
+		});
+		expect(specOf({ ...draft, botId: null })).toEqual({ fix: "Choose the Bot to message." });
+		expect(specOf({ ...draft, message: " " })).toEqual({ fix: "Write the message the Bot gets." });
+		const saved = routine({ task: { kind: "bot", botId: scout, prompt: "Post the standup." } });
+		expect(draftOf(saved)).toMatchObject({ task: "bot", botId: scout, message: "Post the standup.", prompt: "" });
+		expect(specOf(draftOf(saved))).toMatchObject({ ok: { task: saved.task } });
 	});
 });

@@ -18,7 +18,9 @@ export type RoutineTask =
 	/** One session in `cwd` that takes `prompt`; with `pin`, the session is pinned once its turn finishes, in place of the routine's earlier sessions. */
 	| { kind: "prompt"; prompt: string; pin: boolean }
 	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
-	| { kind: "command"; command: string };
+	| { kind: "command"; command: string }
+	/** `prompt` sent into Bot `botId`'s conversation, as if you wrote it there; the Bot's own workspace, model, and skill apply. */
+	| { kind: "bot"; botId: BotId; prompt: string };
 
 /** A run's command: `running` from its launch, saved before it can end, then how it ended. */
 export type CommandRun =
@@ -28,9 +30,6 @@ export type CommandRun =
 	| { phase: "stopped"; reason: "time-limit" | "dashboard"; output: string; startedAt: number; endedAt: number }
 	/** `sh` could not start, as when the workspace is gone. */
 	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
-
-/** Where a prompt routine's prompt goes: a new session of its own each run, or the conversation of Bot `botId`. */
-export type RoutineTarget = { kind: "new-session" } | { kind: "bot"; botId: BotId };
 
 /** A claimed run waits `pending` until it starts the one thing it asks for: a session, a command, or a message in a Bot's conversation. */
 export type RoutineOutcome =
@@ -45,15 +44,14 @@ export interface RoutineRun {
 	errors: string[];
 }
 
-/** Schedules that start dashboard sessions, or run a command, on their own. */
+/** Schedules that start dashboard sessions, run a command, or message a Bot, on their own. */
 export interface Routine {
 	id: string;
 	name: string;
+	/** Where a prompt's sessions start and a command runs; a Bot's task runs in the Bot's own workspace. */
 	cwd: string;
 	schedules: Schedules;
 	task: RoutineTask;
-	/** A command, or a prompt that pins, always runs as `new-session`. */
-	target: RoutineTarget;
 	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
 	skill: string | null;
 	enabled: boolean;
@@ -120,7 +118,7 @@ function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 		routine.cwd === spec.cwd &&
 		routine.skill === spec.skill &&
 		routine.enabled === spec.enabled &&
-		JSON.stringify([routine.schedules, routine.task, routine.target]) === JSON.stringify([spec.schedules, spec.task, spec.target])
+		JSON.stringify([routine.schedules, routine.task]) === JSON.stringify([spec.schedules, spec.task])
 	);
 }
 
@@ -189,17 +187,13 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 			return isNonEmpty(value.prompt) && typeof value.pin === "boolean" ? { ok: { kind: "prompt", prompt: value.prompt, pin: value.pin } } : null;
 		case "command":
 			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
+		case "bot": {
+			const botId = parseBotId(value.botId);
+			return botId && isNonEmpty(value.prompt) ? { ok: { kind: "bot", botId, prompt: value.prompt } } : null;
+		}
 		default:
 			return null;
 	}
-}
-
-/** A target `task` can take: a Bot's conversation takes only a prompt that pins nothing, since the Bot keeps one session. */
-function parseRoutineTarget(value: unknown, task: RoutineTask): Parsed<RoutineTarget> {
-	if (!isObject(value)) return null;
-	if (value.kind === "new-session") return { ok: { kind: "new-session" } };
-	const botId = parseBotId(value.botId);
-	return value.kind === "bot" && botId && task.kind === "prompt" && !task.pin ? { ok: { kind: "bot", botId } } : null;
 }
 
 /**
@@ -211,8 +205,7 @@ export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	const { id, name, cwd, enabled } = value;
 	const schedules = parseSchedules(value.schedules);
 	const task = parseRoutineTask(value.task);
-	const target = task && parseRoutineTarget(value.target, task.ok);
 	const skill = parseSkill(value.skill);
-	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !target || !skill) return null;
-	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, target: target.ok, skill: skill.ok, enabled } };
+	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
+	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled } };
 }

@@ -1,7 +1,7 @@
 # Routines
 
 A routine starts dashboard sessions, or runs a shell command, on one or more schedules. A schedule is every so many minutes, counted from the last run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST. The routine is due at the earliest of them. Two intervals share that last run, so the shorter one decides.
-Its task is one prompt or one command.
+Its task is one prompt, one command, or one message for a Bot's conversation, a `bot` task; see [Bots](bots.md).
 The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
@@ -12,7 +12,7 @@ The next save writes `schedules` and `pin`.
 A file that is not a list of routines still moves aside.
 `parseRoutineSpec` in `src/routines.ts` checks each routine's fields both for the file and for the socket's `routine` save, so the two hold the same limits.
 Each routine holds its last 10 runs, newest first.
-A run holds its slot time, its errors, and one `outcome`: `pending` from its claim, with whether it is still `queued`; a `session` with the instance and session ids it started; or a `command` with the command's result once it ran.
+A run holds its slot time, its errors, and one `outcome`: `pending` from its claim, with whether it is still `queued`; a `session` with the instance and session ids it started; a `command` with the command's result once it ran; or a `bot` with the Bot and the session its message went to.
 A run from before `outcome` migrates as the file loads, in `parseRun`, and nothing else sees the old fields: its `command` becomes a `command` outcome, a started session a `session` (the first, of the several that a pull request routine's run started), and otherwise `pending`, queued when its `queued` is set or its `queue` list holds an entry.
 A run stays queued from its claim until the drain starts its session or command.
 
@@ -22,7 +22,7 @@ Each tick does three things, in order:
 
 1. It claims each due slot: it saves a new queued run before it starts anything.
    Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick.
-2. It starts the queued runs, oldest first, while fewer than 3 routine sessions are busy; a command takes no session slot, so a command run starts even when they are all busy.
+2. It starts the queued runs, oldest first, while fewer than 3 routine sessions are busy; a command or a Bot's message takes no session slot, so it starts even when they are all busy.
    It starts each prompt session through the same `start` the page uses.
    A failed start goes to the run's errors, and the next run tries again.
    A prompt routine whose last session still runs records an error instead of starting a second one.

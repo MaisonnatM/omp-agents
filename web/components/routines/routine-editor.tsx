@@ -1,6 +1,6 @@
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type RoutineSpec, type Weekday } from "../../../src/routines";
-import type { Bot, BotId } from "../../../src/shared/bots";
+import type { Bot } from "../../../src/shared/bots";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,17 +124,14 @@ interface RoutineEditorProps {
 	isNew: boolean;
 	/** The workspaces, which the workspace picker offers. */
 	workspaces: Workspace[];
-	/** The Bots a prompt can go to in place of a new session. */
+	/** The Bots a routine can message. */
 	bots: readonly Bot[];
 	connected: boolean;
 	onSave: (routine: RoutineSpec) => void;
 	onCancel: () => void;
 }
 
-/** The target picker's value for a new session each run; Bot ids are never empty. */
-const NEW_SESSION = "";
-
-/** A routine's name, workspace, task and where its prompt goes, schedules, and skill, saved together. */
+/** A routine's name, workspace, task, schedules, and skill, saved together. */
 export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
@@ -168,12 +165,11 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 					/>
 				</Field>
 
-				<Field
-					label="Workspace"
-					hint={draft.task === "command" ? "The command runs in this directory." : draft.botId === null ? "Its sessions start in this directory." : "The Bot's conversation runs in the Bot's own workspace."}
-				>
-					<DirectoryPicker cwd={draft.cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={cwd => set("cwd", cwd)} />
-				</Field>
+				{draft.task !== "bot" && (
+					<Field label="Workspace" hint={draft.task === "command" ? "The command runs in this directory." : "Its sessions start in this directory."}>
+						<DirectoryPicker cwd={draft.cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={cwd => set("cwd", cwd)} />
+					</Field>
+				)}
 
 				<Field label="Task">
 					<div className="space-y-3">
@@ -186,39 +182,13 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 								onChange={event => set("prompt", event.target.value)}
 								className={TEXT_AREA}
 							/>
-							<div className="flex items-center gap-2 text-sm">
-								Send to
-								<Select
-									items={[{ value: NEW_SESSION, label: "A new session" }, ...bots.map(bot => ({ value: bot.id as string, label: bot.name }))]}
-									value={draft.botId ?? NEW_SESSION}
-									onValueChange={next => next !== null && set("botId", next === NEW_SESSION ? null : (next as BotId))}
-								>
-									<SelectTrigger {...activityControl("routine-editor.target")} aria-label="Send the prompt to">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value={NEW_SESSION}>A new session</SelectItem>
-										{bots.map(bot => (
-											<SelectItem key={bot.id} value={bot.id}>
-												{bot.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							{draft.botId === null ? (
-								<>
-									<label className="flex items-center gap-2 text-sm">
-										<input type="checkbox" checked={draft.pin} aria-describedby={`${id}-pin-hint`} onChange={event => set("pin", event.target.checked)} className="size-4 accent-current" />
-										Pin the session when it finishes
-									</label>
-									<p id={`${id}-pin-hint`} className="ml-6 text-xs text-muted-foreground">
-										Replaces the pin of this routine's previous session.
-									</p>
-								</>
-							) : (
-								<p className="text-xs text-muted-foreground">Each run sends the prompt into the Bot's conversation, as if you wrote it there.</p>
-							)}
+							<label className="flex items-center gap-2 text-sm">
+								<input type="checkbox" checked={draft.pin} aria-describedby={`${id}-pin-hint`} onChange={event => set("pin", event.target.checked)} className="size-4 accent-current" />
+								Pin the session when it finishes
+							</label>
+							<p id={`${id}-pin-hint`} className="ml-6 text-xs text-muted-foreground">
+								Replaces the pin of this routine's previous session.
+							</p>
 						</Choice>
 						<Choice name={`${id}-task`} checked={draft.task === "command"} label="Run a command" onCheck={() => set("task", "command")}>
 							<textarea
@@ -233,6 +203,29 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 								className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							/>
 							<p className="text-xs text-muted-foreground">Runs with sh in the workspace, without an omp session. Stopped after {COMMAND_TIME_LIMIT}.</p>
+						</Choice>
+						<Choice name={`${id}-task`} checked={draft.task === "bot"} label="Message a Bot" onCheck={() => set("task", "bot")}>
+							<Select items={bots.map(bot => ({ value: bot.id, label: bot.name }))} value={draft.botId} onValueChange={next => set("botId", next)}>
+								<SelectTrigger {...activityControl("routine-editor.bot")} aria-label="Bot">
+									<SelectValue placeholder={bots.length === 0 ? "No Bots yet" : "Choose a Bot"} />
+								</SelectTrigger>
+								<SelectContent>
+									{bots.map(bot => (
+										<SelectItem key={bot.id} value={bot.id}>
+											{bot.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<textarea
+								aria-label="Message"
+								value={draft.message}
+								rows={4}
+								placeholder="Post today's standup."
+								onChange={event => set("message", event.target.value)}
+								className={TEXT_AREA}
+							/>
+							<p className="text-xs text-muted-foreground">Each run sends this into the Bot's conversation, as if you wrote it there.</p>
 						</Choice>
 					</div>
 				</Field>
@@ -256,7 +249,7 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 					</div>
 				</Field>
 
-				{draft.task === "prompt" && draft.botId === null && (
+				{draft.task === "prompt" && (
 					<Field label="Skill" hint="Each session's first message goes through this skill.">
 						<SkillPicker label="Skill" skills={skills} value={draft.skill} onPick={skill => set("skill", skill)} />
 					</Field>

@@ -22,7 +22,6 @@ const spec: RoutineSpec = {
 	cwd: "/work/webapp",
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
-	target: { kind: "new-session" },
 	skill: null,
 	enabled: true,
 };
@@ -44,12 +43,11 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec("routine")).toBeNull();
 	});
 
-	test("sends only a prompt that pins nothing into a Bot's conversation", () => {
-		const target = { kind: "bot" as const, botId: "scout" as BotId };
-		expect(parseRoutineSpec({ ...spec, target })).toEqual({ ok: { ...spec, target } });
-		expect(parseRoutineSpec({ ...spec, target, task: { kind: "prompt", prompt: "Hi", pin: true } })).toBeNull();
-		expect(parseRoutineSpec({ ...spec, target, task: { kind: "command", command: "git status" } })).toBeNull();
-		expect(parseRoutineSpec({ ...spec, target: { kind: "bot", botId: "../scout" } })).toBeNull();
+	test("takes a Bot task with a valid Bot id and a prompt", () => {
+		const task = { kind: "bot" as const, botId: "scout" as BotId, prompt: "Post the standup." };
+		expect(parseRoutineSpec({ ...spec, task })).toEqual({ ok: { ...spec, task } });
+		expect(parseRoutineSpec({ ...spec, task: { ...task, botId: "../scout" } })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, task: { ...task, prompt: " " } })).toBeNull();
 	});
 });
 

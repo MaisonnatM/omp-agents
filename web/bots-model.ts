@@ -55,9 +55,9 @@ export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], last
 		.sort((a, b) => b.at - a.at || a.bot.name.localeCompare(b.bot.name));
 }
 
-/** The routines that send their prompt to Bot `id`. */
+/** The routines that message Bot `id`. */
 export function botRoutines(routines: readonly Routine[], id: BotId): Routine[] {
-	return routines.filter(({ target }) => target.kind === "bot" && target.botId === id);
+	return routines.filter(({ task }) => task.kind === "bot" && task.botId === id);
 }
 
 /** One fact of a memory: the day `remember` wrote it, when the line has one, and the fact. */

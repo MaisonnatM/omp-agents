@@ -1,14 +1,14 @@
 # Routines
 
-- A routine starts sessions, or runs a shell command, on one or more schedules.
+- A routine starts sessions, runs a shell command, or messages a [Bot](bots.md), on one or more schedules.
   The **Routines** tab, next to **Todo** in the header's **Dev** group, or a `#routines` address, lists them in place of the panes; its sidebar lists **All** with their count, then each routine by name with its task's icon, a paused one muted with a pause icon, and a red dot beside one whose last run failed, blue while its command runs.
   `#routines/<id>` opens one routine.
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
 - **New routine** opens the editor: a name, the workspace it runs in, its task, its schedules, and its skill.
-  The task is a prompt you write, or a shell command.
+  The task is **Run a prompt**, a prompt you write, **Run a command**, a shell command, or **Message a Bot**, a message for the Bot you pick.
   A prompt task can also **Pin the session when it finishes**.
-  **Send to** picks where a prompt goes: **A new session** each run, or a [Bot](bots.md)'s conversation, as if you wrote it there; a Bot's routine takes no pin or skill, and its page shows **Sends to** in place of the workspace.
+  A Bot's message goes into the Bot's conversation each run, as if you wrote it there, so the editor hides the workspace and the skill, since the Bot has its own, and the routine's page shows **Sends to** and the Bot in place of the workspace.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
   The skill starts as the one pinned in **Settings › Preferences**, and **None** starts the sessions without one.
 - A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.

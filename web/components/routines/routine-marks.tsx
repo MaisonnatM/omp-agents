@@ -1,12 +1,15 @@
 /** What the sidebar's Routines tab and the Routines page both mark a routine with: its task's icon and its last run's dot. */
-import { MessageSquareText, SquareTerminal } from "lucide-react";
+import { type LucideIcon, MessageSquareText, SquareTerminal } from "lucide-react";
 import type { RoutineRun, RoutineTask } from "../../../src/routines";
 import { cn } from "@/lib/utils";
+import { PAGE_ICON } from "../../page-icons";
 import { type RunHealth, runHealth, runWords } from "../../routines-model";
 
-/** A prompt's speech bubble or a command's terminal. */
+const TASK_ICON: Record<RoutineTask["kind"], LucideIcon> = { prompt: MessageSquareText, command: SquareTerminal, bot: PAGE_ICON.bots };
+
+/** A prompt's speech bubble, a command's terminal, or the Bots page's icon for a Bot's message. */
 export function TaskIcon({ task, className }: { task: RoutineTask; className?: string }) {
-	const Icon = task.kind === "prompt" ? MessageSquareText : SquareTerminal;
+	const Icon = TASK_ICON[task.kind];
 	return <Icon aria-hidden className={className} />;
 }
 

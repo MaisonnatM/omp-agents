@@ -26,5 +26,5 @@
   Ending the session keeps the page open.
 - **Delete** asks first.
   Deleting a Bot forgets it, but its conversation stays one of your sessions, and its memory file stays.
-- A routine can send its prompt to a Bot in place of a new session; see [Routines](routines.md).
+- A routine can message a Bot on a schedule with its **Message a Bot** task; see [Routines](routines.md).
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.

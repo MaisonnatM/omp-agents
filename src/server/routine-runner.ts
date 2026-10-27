@@ -4,7 +4,7 @@
  * Every step converges: a slot claimed is on disk, so a second tick, or the next server, starts nothing twice.
  */
 import { errorText } from "../json";
-import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun } from "../routines";
+import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
 import { SerialLane } from "../serial-lane";
 import type { BotId } from "../shared/bots";
 import type { PinChange } from "../shared/pins";
@@ -47,8 +47,8 @@ interface Tracked {
 	phase: "starting" | "working";
 }
 
-/** A command runs without an omp session, and a Bot's routine in the Bot's own one, so neither holds a session slot. */
-const takesSession = (routine: Routine): boolean => routine.task.kind === "prompt" && routine.target.kind === "new-session";
+/** A command runs without an omp session, and a Bot's prompt in the Bot's own one, so neither holds a session slot. */
+const takesSession = (task: RoutineTask): boolean => task.kind === "prompt";
 
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
@@ -139,11 +139,23 @@ export class RoutineRunner {
 			const next = oldestQueued(file.value, this.#tracked.size >= MAX_ROUTINE_SESSIONS);
 			if (!next) return;
 			const { routine, run } = next;
-			const { task, target } = routine;
+			const { task } = routine;
 			file.dequeue(routine.id, run.at);
-			if (task.kind === "command") this.#launch(routine, run.at, task.command);
-			else if (target.kind === "bot") await this.#message(routine, run.at, target.botId, task.prompt);
-			else await this.#start(routine, run.at, task.prompt);
+			switch (task.kind) {
+				case "prompt":
+					await this.#start(routine, run.at, task.prompt);
+					break;
+				case "command":
+					this.#launch(routine, run.at, task.command);
+					break;
+				case "bot":
+					await this.#message(routine, run.at, task.botId, task.prompt);
+					break;
+				default: {
+					const unhandled: never = task;
+					return unhandled;
+				}
+			}
 		}
 	}
 
@@ -248,7 +260,7 @@ export class RoutineRunner {
 function oldestQueued(routines: Routine[], sessionsFull: boolean): { routine: Routine; run: RoutineRun } | null {
 	let oldest: { routine: Routine; run: RoutineRun } | null = null;
 	for (const routine of routines) {
-		if (sessionsFull && takesSession(routine)) continue;
+		if (sessionsFull && takesSession(routine.task)) continue;
 		for (const run of routine.runs) if (run.outcome.kind === "pending" && run.outcome.queued && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
 	}
 	return oldest;

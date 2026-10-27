@@ -28,7 +28,7 @@ const everyHour = { kind: "every" as const, minutes: 60 };
 
 function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false }): RoutinesFile {
 	const file = new RoutinesFile(path);
-	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, target: { kind: "new-session" }, skill: task.kind === "prompt" ? "ship" : null, enabled: true } }, T0);
+	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "prompt" ? "ship" : null, enabled: true } }, T0);
 	return file;
 }
 
@@ -38,7 +38,7 @@ function addPrompts(file: RoutinesFile, count: number): void {
 		file.apply(
 			{
 				op: "save",
-				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}`, pin: false }, target: { kind: "new-session" }, skill: null, enabled: true },
+				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}`, pin: false }, skill: null, enabled: true },
 			},
 			T0,
 		);
@@ -286,7 +286,7 @@ describe("RoutineRunner", () => {
 
 	test("a routine that does not pin, and a session ended at the start deadline, pin nothing", async () => {
 		const file = fileWith(routinesPath());
-		file.apply({ op: "save", routine: { id: "r2", name: "Retro", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, target: { kind: "new-session" }, skill: null, enabled: true } }, T0);
+		file.apply({ op: "save", routine: { id: "r2", name: "Retro", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, skill: null, enabled: true } }, T0);
 		const { runner, fake } = harness(file);
 		await runner.tick();
 		fake.sessions.get("i1")!.status = "working";
@@ -403,7 +403,7 @@ describe("RoutineRunner", () => {
 		test("runs while every session slot is busy", async () => {
 			const file = fileWith(routinesPath());
 			addPrompts(file, 3);
-			file.apply({ op: "save", routine: { id: "r4", name: "Prune", cwd: "/work/other", schedules: [everyHour], task: command, target: { kind: "new-session" }, skill: null, enabled: true } }, T0);
+			file.apply({ op: "save", routine: { id: "r4", name: "Prune", cwd: "/work/other", schedules: [everyHour], task: command, skill: null, enabled: true } }, T0);
 			const { runner, fake } = harness(file);
 			await runner.tick();
 			expect(fake.requests).toHaveLength(3);
@@ -430,10 +430,10 @@ describe("RoutineRunner", () => {
 		});
 	});
 
-	describe("a routine that targets a Bot", () => {
+	describe("a routine that messages a Bot", () => {
 		const toScout = (file: RoutinesFile, id: string): void =>
 			void file.apply(
-				{ op: "save", routine: { id, name: "Standup", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Post the standup.", pin: false }, target: { kind: "bot", botId: "scout" as BotId }, skill: null, enabled: true } },
+				{ op: "save", routine: { id, name: "Standup", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "bot", botId: "scout" as BotId, prompt: "Post the standup." }, skill: null, enabled: true } },
 				T0,
 			);
 

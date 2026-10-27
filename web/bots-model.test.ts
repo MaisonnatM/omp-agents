@@ -8,13 +8,12 @@ const scout = "scout" as BotId;
 
 const bot = (sessionId: string | null): Bot => ({ id: scout, name: "Scout", job: "", cwd: "~/code/webapp", model: null, skill: null, sessionId, createdAt: "2026-10-05T09:00:00.000Z" });
 
-const routine = (id: string, target: Routine["target"]): Routine => ({
+const routine = (id: string, task: Routine["task"]): Routine => ({
 	id,
 	name: id,
 	cwd: "~/code/webapp",
 	schedules: [{ kind: "weekly", days: [1], time: { hour: 9, minute: 0 } }],
-	task: { kind: "prompt", prompt: "Post the standup.", pin: false },
-	target,
+	task,
 	skill: null,
 	enabled: true,
 	createdAt: 0,
@@ -36,8 +35,9 @@ describe("Bots", () => {
 		expect(botHost(bot(null), hosts)).toBeNull();
 	});
 
-	test("a Bot's routines are those that send to it", () => {
-		const routines = [routine("mine", { kind: "bot", botId: scout }), routine("other", { kind: "bot", botId: "ranger" as BotId }), routine("new", { kind: "new-session" })];
+	test("a Bot's routines are those that message it", () => {
+		const message = (botId: BotId): Routine["task"] => ({ kind: "bot", botId, prompt: "Post the standup." });
+		const routines = [routine("mine", message(scout)), routine("other", message("ranger" as BotId)), routine("new", { kind: "prompt", prompt: "Post the standup.", pin: false })];
 		expect(botRoutines(routines, scout).map(({ id }) => id)).toEqual(["mine"]);
 	});
 

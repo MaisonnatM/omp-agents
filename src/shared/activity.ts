@@ -94,7 +94,7 @@ export const CONTROLS = [
 	{ id: "shortcuts.open", label: "Keyboard shortcuts button", area: "Sidebar" },
 	{ id: "shortcuts.tab", label: "Keyboard shortcuts category tab", area: "Sidebar" },
 	{ id: "calendar.routines.toggle", label: "Calendar routine visibility", area: "Calendar" },
-	{ id: "routine-editor.target", label: "Routine prompt target picker", area: "Routines" },
+	{ id: "routine-editor.bot", label: "Routine Bot picker", area: "Routines" },
 	{ id: "bots.delete", label: "Bot Delete, before it is confirmed", area: "Bots" },
 	{ id: "bots.details", label: "Bot details, opened from its name", area: "Bots" },
 	{ id: "bots.job.revert", label: "Bot job edit reverted", area: "Bots" },
