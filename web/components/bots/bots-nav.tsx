@@ -1,5 +1,5 @@
-/** The Bots tab: a search field and New Bot, then each Bot as a messaging app lists a conversation. */
-import { Plus } from "lucide-react";
+/** The Bots tab: a search field, All Bots, and New Bot, then each Bot as a messaging app lists a conversation. */
+import { LayoutGrid, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SidebarContent, SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -28,6 +28,13 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 				<div className="min-w-0 flex-1">
 					<SidebarSearch label="Filter the Bots" placeholder="Search Bots" query={query} onQuery={setQuery} />
 				</div>
+				<Tooltip content="All Bots" side="bottom">
+					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
+						<a href={hashForBots(null)} aria-label="All Bots">
+							<LayoutGrid />
+						</a>
+					</Button>
+				</Tooltip>
 				<Tooltip content="New Bot" side="bottom">
 					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
 						<a href={hashForNewBot()} aria-label="New Bot" aria-current={openId === null ? "page" : undefined}>

@@ -33,6 +33,7 @@ import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
+import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
@@ -79,7 +80,8 @@ export function App() {
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useMemo(() => settingsRoute(page), [page]);
-	const { tab, showTab, group, showGroup } = useSidebarTab({ page, signedOutTabs, shown: tabs, layout, latestSession: sessions.latest, navigate, show });
+	const latestBot = useMemo(() => (state.bots === null ? null : (botRows(state.bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [state.bots, state.hosts, state.botLasts]);
+	const { tab, showTab, group, showGroup } = useSidebarTab({ page, signedOutTabs, shown: tabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	const emptyGroups = useMemo((): ReadonlySet<TabGroup> => new Set(TAB_GROUPS.flatMap(({ value }) => (groupTabs(tabs, value).length === 0 ? [value] : []))), [tabs]);
 	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
 	const barTabs = useMemo(() => groupTabs(tabs, group), [tabs, group]);

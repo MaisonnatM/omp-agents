@@ -10,9 +10,10 @@
   A Bot made before you could pick keeps the shape and color its id gave it.
   The avatar bobs and glances while the Bot works, or pulses gently when your system asks for reduced motion, and an amber dot marks a question waiting on you.
 - The search field at the top of the tab filters the Bots by name, job, or the line under the name.
-  The **+** beside it, or a `#bots/new` address, opens the New Bot form.
+  The **+** beside it, or a `#bots/new` address, opens the New Bot form, and the grid button opens the gallery.
   Until the server sends the Bots, the tab reads **Loading your Bots…**.
-- `#bots`, the **Bots** tab's own page, is a gallery of every Bot as a card, as Grok's companions.
+- Choosing the **Bots** tab, or switching to its group while it was the last tab there, opens the page of the Bot at the top of its list, the one you spoke with most recently; with no Bot yet it opens the gallery.
+- `#bots` is a gallery of every Bot as a card, as Grok's companions.
   Each card shows the Bot's avatar, its name, the first sentence of its job or **No job yet**, whether its session runs or the question it waits on you for, its routine count, and the time of its last message.
   Click a card to open the Bot's page.
   The last card, and **New Bot** in the header, open the New Bot form.

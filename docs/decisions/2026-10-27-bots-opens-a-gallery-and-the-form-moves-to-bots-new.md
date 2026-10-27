@@ -21,6 +21,7 @@ Bot ids are UUIDs, as routine ids are, so `new` cannot name a Bot.
 
 ## Consequences
 
+- Choosing the **Bots** tab opens the latest Bot's page, as Sessions opens the latest session, so the gallery is reached by its address and the tab's grid button.
 - `BotsRoute` gains `adding` beside `target: null`, and `hashForNewBot()` names the form.
 - Deleting a Bot lands on the gallery instead of the form.
 - Settings › Activity counts `bots` and `bots/new` as two views.

@@ -6,7 +6,7 @@ import { groupEntry, TAB_ROWS } from "./sidebar-tabs";
 /** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
 const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", settings: "settings" };
 
-/** The page each tab shows, but for Sessions, which shows the panes. */
+/** The page each tab shows, but for Sessions, which shows the panes, and Bots while it has one to open. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
 	"pull-requests": { kind: "pull-requests", target: null },
 	tickets: { kind: "tickets", target: null },
@@ -31,6 +31,8 @@ interface SidebarTabInput {
 	layout: Layout;
 	/** The session the Sessions tab opens when no pane shows one; `null` for none. */
 	latestSession: View | null;
+	/** The Bot the Bots tab opens, the first of its list, the one spoken to most recently; `null` for the gallery while there is none. */
+	latestBot: string | null;
 	navigate: (page: Page) => void;
 	show: (layout: Layout) => void;
 }
@@ -44,12 +46,12 @@ interface GroupMemory {
 /**
  * The panel the sidebar shows and the header switch's group, and the ways to show another tab or group: a page selects its tab, and
  * `#pull-requests` picks the Pull requests tab, which stays while you work in the panes until you choose Sessions. Sessions keeps the
- * panes, or opens the latest session when no pane shows one. The group follows the tab, and stays while Settings is open.
+ * panes, or opens the latest session when no pane shows one; Bots opens the latest Bot's page. The group follows the tab, and stays while Settings is open.
  * `showTab` and `showGroup` keep their identity across renders.
  * A page whose tab the user hid in Preferences still selects that tab, so its panel, such as the Todo lists, shows with no trigger
  * in the bar; a page whose service is signed out keeps the tab the panes had.
  */
-export function useSidebarTab({ page, signedOutTabs, shown, layout, latestSession, navigate, show }: SidebarTabInput): {
+export function useSidebarTab({ page, signedOutTabs, shown, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
 	tab: SidebarPanel;
 	showTab: (tab: SidebarTab) => void;
 	group: TabGroup;
@@ -69,10 +71,12 @@ export function useSidebarTab({ page, signedOutTabs, shown, layout, latestSessio
 		const group = TAB_ROWS[tab].group;
 		if (memory.group !== group || memory.last[group] !== tab) setMemory({ group, last: { ...memory.last, [group]: tab } });
 	}
-	const latest = useRef({ layout, latestSession, shown, last: memory.last });
-	latest.current = { layout, latestSession, shown, last: memory.last };
+	const latest = useRef({ layout, latestSession, latestBot, shown, last: memory.last });
+	latest.current = { layout, latestSession, latestBot, shown, last: memory.last };
 	const showTab = useCallback(
 		(next: SidebarTab): void => {
+			const bot = latest.current.latestBot;
+			if (next === "bots" && bot !== null) return navigate({ kind: "bots", target: bot, routine: null });
 			if (next !== "sessions") return navigate(TAB_PAGE[next]);
 			setPaneTab("sessions");
 			const { layout: panes, latestSession: session } = latest.current;
