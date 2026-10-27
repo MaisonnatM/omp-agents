@@ -54,7 +54,7 @@ export function scheduleWords(schedule: Schedule): string {
 /** What starts a routine of each kind of trigger, as a checkbox and a summary say it. */
 export const TRIGGER_WORDS: Record<TriggerKind, string> = {
 	slack: "When a Slack message waits on you",
-	"pull-request": "When a pull request changes status",
+	"pull-request": "When a pull request waits on you",
 	event: "Before a calendar event starts",
 	gmail: "When unread mail comes in",
 };

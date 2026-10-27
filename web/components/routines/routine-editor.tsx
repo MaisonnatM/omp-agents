@@ -13,7 +13,7 @@ const UNITS: EveryUnit[] = ["minutes", "hours", "days"];
 /** What each trigger watches, under its checkbox. */
 const TRIGGER_HINTS: Record<TriggerKind, string> = {
 	slack: "A mention or direct message you have not answered. Needs Slack signed in under Settings › Integrations.",
-	"pull-request": "One of yours, or one waiting on your review, shows up or moves: its checks fail, it can merge, it merges.",
+	"pull-request": "One of yours, or one waiting on your review, comes to need you: a review, failing checks, a conflict, comments to address, or ready to merge.",
 	event: `${EVENT_LEAD_MS / 60_000} minutes before a timed event on your calendars.`,
 	gmail: "A new message, unread, in one of your Gmail inboxes. Needs Gmail signed in under Settings › Integrations.",
 };
@@ -128,12 +128,14 @@ interface RoutineEditorProps {
 	/** The name of the Bot the routine belongs to. */
 	botName: string;
 	connected: boolean;
+	/** A save is on its way to the server. */
+	saving: boolean;
 	onSave: (routine: RoutineSpec) => void;
 	onCancel: () => void;
 }
 
 /** A Bot's routine: its name, task, schedules, and triggers, saved together. */
-export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCancel }: RoutineEditorProps) {
+export function RoutineEditor({ initial, isNew, botName, connected, saving, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
 	const id = useId();
@@ -233,7 +235,7 @@ export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCa
 				</Field>
 
 				<div className="flex items-center gap-3 border-t border-border pt-4">
-					<Button type="submit" disabled={!connected}>
+					<Button type="submit" disabled={!connected} loading={saving}>
 						{isNew ? "Create routine" : "Save routine"}
 					</Button>
 					<Button type="button" variant="ghost" onClick={onCancel}>

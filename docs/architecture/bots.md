@@ -15,9 +15,11 @@ Once the session is live, `Bots` saves its session id on the Bot, and follows it
 
 The extension adds to the main agent's system prompt on every turn the Bot's name, its job, and its memory, read again each turn, so a saved job reaches the next turn.
 Its `remember` tool appends `- YYYY-MM-DD fact` to `$XDG_DATA_HOME/omp-agents/bots/<id>/memory.md`, and nothing else writes that file.
+It refuses a fact longer than `MAX_FACT_LENGTH`, 500 characters, so each fact stays one short sentence.
+`readTail` in `src/read-tail.ts` reads only the file's newest whole lines within `MAX_MEMORY_BYTES`, 16 KB, of its end, so a memory that grows for months costs each turn the same; when it left older lines out, the prompt says so before the memory.
 
 A `bot` socket message carries one `BotChange`.
-`save` and `remove` go through the list registry, so every socket hears the new list as a `bots` message, with each Bot's memory file's text.
+`save` and `remove` go through the list registry, so every socket hears the new list as a `bots` message, with as much of each Bot's memory as the prompt carries, so the message stays as small as the prompt's.
 The same message carries each Bot's last words, which `lastMessage` reads from the end of its session file, and the server sends it again as each turn of a Bot's conversation starts and ends, so the sidebar's previews and times follow the conversation.
 `Bots.msg` keeps each Bot's memory and last words as it read them, and reads one Bot's files again only when its conversation moved to another session or its session started or ended a turn or exited (`changed`), so a push reads one Bot's files, not every Bot's.
 `message` calls `Bots.message`, which answers once omp took the text: a follow-up in the live session, else a resume of the Bot's session followed by the text, else a new session in the Bot's workspace that starts with it.
@@ -25,8 +27,8 @@ Messages to one Bot wait on one another, so two at once never start two conversa
 
 Every routine belongs to one Bot through its `botId`; see [Routines](routines.md).
 A prompt routine sends its prompt through `Bots.message` and records a `sent` outcome with the session id, and a command routine runs in the Bot's workspace, then posts how it ended the same way; the routine neither tracks nor ends that session.
-The details in the right sidebar, `BotDetails`, list its routines, `#bots/<id>/routines/<routine id>` shows one routine's `RoutineDetail` in place of the conversation, and `#bots/<id>/routines/new` the editor of a new one.
+The details in the right sidebar, `BotDetails`, list its routines, `#bots/<id>/routines/<routine id>` shows one routine's `RoutineDetail` in place of the conversation, `#bots/<id>/routines/<routine id>/edit` its editor, and `#bots/<id>/routines/new` the editor of a new one.
 
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts that view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.
-The page and both hooks find that view with `botView` and `openBotView` in `web/bots-model.ts`: the live session that runs the Bot's conversation, else its saved one, and none while the page shows one of its routines.
+`useDashboard` works out the open Bot once with `openBot` in `web/bots-model.ts` and hands it to the page, the details, `watched`, and `useAttention`: its conversation's view is the live session that runs it, else its saved one, and none while the page shows a routine, a routine editor, or a routine its address names but the Bot does not have.

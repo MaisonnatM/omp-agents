@@ -54,7 +54,7 @@ describe("task words", () => {
 
 	test("several schedules read in the order they were saved, then the triggers", () => {
 		expect(startsWords({ schedules: [weekdays, { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 18, minute: 0 } }], triggers: [] })).toBe("Weekdays at 9:00, Weekdays at 18:00");
-		expect(startsWords({ schedules: [weekdays], triggers: [{ kind: "pull-request" }] })).toBe("Weekdays at 9:00, When a pull request changes status");
+		expect(startsWords({ schedules: [weekdays], triggers: [{ kind: "pull-request" }] })).toBe("Weekdays at 9:00, When a pull request waits on you");
 	});
 });
 

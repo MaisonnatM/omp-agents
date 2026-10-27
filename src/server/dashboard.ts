@@ -37,7 +37,7 @@ import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
 import { SettingsSync, syncStores } from "../settings-sync";
-import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, type TriggerKind, watchesAny } from "../routines";
+import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
@@ -72,7 +72,7 @@ import { readProcessTable, SessionProcessWatch, stopProcesses } from "./session-
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
-import { eventSightings, gmailSightings, pullRequestSightings, slackSightings, TriggerWatch } from "./routine-triggers";
+import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
@@ -225,11 +225,17 @@ export class Dashboard {
 				updateDashboard: () => selfUpdate.update(),
 				pullRequests: async () => {
 					const list = await loadPullRequests(this.knownCwds(), false);
-					this.#triggerWatch.learn(pullRequestSightings(list));
-					return { list, agent: agentOn(sessions.rows(files.factsOf)) };
+					const agent = agentOn(sessions.rows(files.factsOf));
+					this.#triggerWatch.learn(pullRequestSightings(list, agent));
+					return { list, agent };
 				},
 				slack: async () => {
-					const found = (await integrationSignedIn("slack")) ? await waitingOnYou(integrationFetch("slack"), Date.now()) : [];
+					// Signed out, Slack answers nothing, so its next answer, once signed in, is a baseline rather than news.
+					if (!(await integrationSignedIn("slack"))) {
+						this.#triggerWatch.forgetScope(SLACK_SCOPE);
+						return [];
+					}
+					const found = await waitingOnYou(integrationFetch("slack"), Date.now());
 					this.#triggerWatch.learn(slackSightings(found));
 					return found;
 				},
@@ -380,7 +386,6 @@ export class Dashboard {
 			},
 		});
 		const stopping = this.#stopping.signal;
-		this.#migrateRoutines();
 		const runner = (this.#runner = new RoutineRunner({
 			file: routines,
 			now: Date.now,
@@ -469,11 +474,11 @@ export class Dashboard {
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
-				// The routines' triggers read these checks, so the server that runs them checks without a page too.
-				const watched = (kinds: readonly TriggerKind[]): boolean => ownerLock.held && watchesAny(routines.value, kinds);
-				const bell = broadcasts.listening() || watched(ACTIVITY_KINDS);
-				this.#activityFresh = bell;
-				await Promise.all([bell && notices.check(ACTIVITY_KINDS), watched(["gmail"]) && this.#readMail()]);
+				// The routines' triggers read these checks, so the server that runs them checks without a page too, but only what an enabled routine watches.
+				const watched = ownerLock.held ? watchedKinds(routines.value) : [];
+				const kinds = broadcasts.listening() ? ACTIVITY_KINDS : ACTIVITY_KINDS.filter(kind => watched.includes(kind));
+				this.#activityFresh = kinds.length === ACTIVITY_KINDS.length;
+				await Promise.all([kinds.length > 0 && notices.check(kinds), watched.includes("gmail") && this.#readMail()]);
 				this.#fireTriggers();
 			},
 			onPullTick: async () => {
@@ -617,6 +622,7 @@ export class Dashboard {
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
 		if (this.#ownerLock.acquire()) {
+			this.#migrateRoutines();
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
 		} else {
@@ -823,10 +829,14 @@ export class Dashboard {
 		return owns;
 	}
 
-	/** Moves the routines of a file from before every routine had a Bot to their Bots, creating the Routines Bot unless it exists. */
+	/**
+	 * Moves the routines of a file from before every routine had a Bot to their Bots, creating each Bot they need unless it
+	 * exists. Only the server that runs routines saves the move, so another, such as a smoke run, never rewrites the files
+	 * an older owner still reads; any server reads the routines moved, in memory.
+	 */
 	#migrateRoutines(): void {
 		this.#routines.migrate(bot => {
-			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#botsFile.apply({ op: "save", bot }, new Date().toISOString());
+			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#lists.apply("bots", { op: "save", bot });
 		});
 	}
 

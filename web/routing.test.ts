@@ -3,6 +3,7 @@ import { hashForSession, type RosterHost, type View } from "../src/shared/sessio
 import type { StartOp } from "./starts";
 import type { UserTodo } from "../src/user-todos-shared";
 import {
+	type BotRoutineRoute,
 	adjacentSession,
 	closePane,
 	endSession,
@@ -170,16 +171,22 @@ describe("layout hash", () => {
 		for (const hash of ["#todo", "#todo/0b9e", "#todo?open=t1"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
-	test("the bots hash opens the New Bot form, one Bot, or one of its routines, and no bots or old routines hash is read as a page", () => {
+	test("the bots hash opens the New Bot form, one Bot, one of its routines, its editor, or a new routine's, and no bots or old routines hash is read as a page", () => {
 		const id = "3f2a9c1e-7b4d-4e8a-9f61-0c2d5e8b7a14";
+		const bots = (routine: BotRoutineRoute | null): Route => ({ kind: "page", page: { kind: "bots", target: "a b", routine } });
 		expect(hashForBots(null)).toBe("#bots");
 		expect(hashForBots("a b")).toBe("#bots/a%20b");
-		expect(hashForBotRoutine("a b", id)).toBe(`#bots/a%20b/routines/${id}`);
 		expect(routeFromHash("#bots")).toEqual({ kind: "page", page: { kind: "bots", target: null } });
-		expect(routeFromHash("#bots/a%20b")).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: null } });
-		expect(routeFromHash(`#bots/a%20b/routines/${id}`)).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: id } });
-		expect(routeFromHash(`#bots/a%20b/routines`)).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: null } });
-		expect(routeFromHash(`#bots/a%20b/runs/${id}`)).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: null } });
+		expect(routeFromHash("#bots/a%20b")).toEqual(bots(null));
+		for (const routine of [{ kind: "open", id }, { kind: "edit", id }, { kind: "new" }] as const) {
+			expect(routeFromHash(hashForBotRoutine("a b", routine))).toEqual(bots(routine));
+		}
+		expect(hashForBotRoutine("a b", { kind: "edit", id })).toBe(`#bots/a%20b/routines/${id}/edit`);
+		expect(hashForBotRoutine("a b", { kind: "new" })).toBe("#bots/a%20b/routines/new");
+		expect(routeFromHash(`#bots/a%20b/routines`)).toEqual(bots(null));
+		expect(routeFromHash(`#bots/a%20b/routines/new/edit`)).toEqual(bots(null));
+		expect(routeFromHash(`#bots/a%20b/routines/${id}/runs`)).toEqual(bots(null));
+		expect(routeFromHash(`#bots/a%20b/runs/${id}`)).toEqual(bots(null));
 		expect(routeFromHash("#botsx").kind).toBe("panes");
 		expect(routeFromHash(`#routines/${id}`).kind).toBe("panes");
 	});

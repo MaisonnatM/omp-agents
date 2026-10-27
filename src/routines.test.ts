@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { applyRoutine, isDue, nextRunAt, parseRoutineSpec, type Routine, type RoutineSpec, type Schedule } from "./routines";
+import { applyRoutine, isDue, nextRunAt, parseRoutineSpec, type Routine, type RoutineSpec, type Schedule, watchedKinds } from "./routines";
 import type { BotId } from "./shared/bots";
 
 // Weekly slots are local wall-clock times; Paris has both DST changes in the dates below.
@@ -83,6 +83,20 @@ describe("nextRunAt", () => {
 
 	test("an interval counts its minutes from the last run", () => {
 		expect(nextRunAt({ kind: "every", minutes: 90 }, at("2026-10-12T09:00:00+02:00"))).toBe(at("2026-10-12T10:30:00+02:00"));
+	});
+});
+
+describe("watchedKinds", () => {
+	test("names each kind an enabled routine runs on, once, and none a paused routine's", () => {
+		expect(watchedKinds([])).toEqual([]);
+		expect(watchedKinds([routine({ triggers: [{ kind: "slack" }] })])).toEqual(["slack"]);
+		expect(
+			watchedKinds([
+				routine({ id: "r1", triggers: [{ kind: "gmail" }, { kind: "slack" }] }),
+				routine({ id: "r2", triggers: [{ kind: "slack" }] }),
+				routine({ id: "r3", triggers: [{ kind: "pull-request" }], enabled: false }),
+			]),
+		).toEqual(["slack", "gmail"]);
 	});
 });
 

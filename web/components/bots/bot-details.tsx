@@ -9,17 +9,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botHost, memoryEntries } from "../../bots-model";
-import { hashForBotRoutine, hashForBots, NEW_ROUTINE } from "../../routing";
+import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../bots-model";
+import { hashForBotRoutine, hashForBots } from "../../routing";
 import { startsWords } from "../../routines-model";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { TEXT_AREA } from "../form-field";
-import { statusLabel } from "../status-dot";
 import { RunDot } from "../routines/routine-marks";
 import { BotAvatar } from "./bot-avatar";
 import { BotLookPicker } from "./bot-look-picker";
 
-export const specOf = ({ id, name, job, cwd, model, skill, shape, hue }: Bot): BotSpec => ({ id, name, job, cwd, model, skill, shape, hue });
+const botSpec = ({ id, name, job, cwd, model, skill, shape, hue }: Bot): BotSpec => ({ id, name, job, cwd, model, skill, shape, hue });
 
 /** **Delete**, which asks first in its place; the Bot's routines go with it, and its conversation stays a session of yours. */
 function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
@@ -67,11 +66,11 @@ function LookButton({ bot, host, connected }: { bot: Bot; host: RosterHost | nul
 					aria-label={`Change ${bot.name}'s shape and color`}
 					className="shrink-0 rounded-xl p-1 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
 				>
-					<BotAvatar look={bot} size="hero" working={host?.status === "working"} asking={host?.status === "needs-input"} />
+					<BotAvatar look={bot} size="hero" working={host?.status === "working"} asking={botAsking(host) !== null} />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent align="start" collisionPadding={8} aria-label={`${bot.name}'s shape and color`} className="w-auto max-w-72 p-3">
-				<BotLookPicker name={id} look={bot} disabled={!connected} onLook={look => changeBot({ op: "save", bot: { ...specOf(bot), ...look } })} />
+				<BotLookPicker name={id} look={bot} disabled={!connected} onLook={look => changeBot({ op: "save", bot: { ...botSpec(bot), ...look } })} />
 			</PopoverContent>
 		</Popover>
 	);
@@ -84,7 +83,7 @@ function NameField({ bot, connected }: { bot: Bot; connected: boolean }) {
 	const save = (): void => {
 		const name = draft.trim();
 		if (!name) setDraft(bot.name);
-		else if (name !== bot.name) changeBot({ op: "save", bot: { ...specOf(bot), name } });
+		else if (name !== bot.name) changeBot({ op: "save", bot: { ...botSpec(bot), name } });
 	};
 	return (
 		<input
@@ -97,7 +96,8 @@ function NameField({ bot, connected }: { bot: Bot; connected: boolean }) {
 				if (event.key === "Enter") event.currentTarget.blur();
 				if (event.key === "Escape") {
 					setDraft(bot.name);
-					requestAnimationFrame(() => (event.target as HTMLInputElement).blur());
+					const input = event.currentTarget;
+					requestAnimationFrame(() => input.blur());
 				}
 			}}
 			className="-mx-1.5 w-[calc(100%+0.75rem)] truncate rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-base font-semibold outline-none hover:border-border focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
@@ -110,7 +110,7 @@ function JobEditor({ bot, connected }: { bot: Bot; connected: boolean }) {
 	const { changeBot } = useDashboardActions();
 	const id = useId();
 	const [draft, setDraft] = useState(bot.job);
-	const dirty = draft !== bot.job;
+	const dirty = draft.trim() !== bot.job;
 	return (
 		<section aria-labelledby={id} className="space-y-2">
 			<h3 id={id} className="text-xs font-medium text-muted-foreground">
@@ -127,7 +127,7 @@ function JobEditor({ bot, connected }: { bot: Bot; connected: boolean }) {
 			/>
 			{dirty && (
 				<div className="flex items-center gap-2">
-					<Button size="compact" disabled={!connected} onClick={() => changeBot({ op: "save", bot: { ...specOf(bot), job: draft.trim() } })}>
+					<Button size="compact" disabled={!connected} onClick={() => changeBot({ op: "save", bot: { ...botSpec(bot), job: draft.trim() } })}>
 						Save job
 					</Button>
 					<Button {...activityControl("bots.job.revert")} variant="ghost" size="compact" onClick={() => setDraft(bot.job)}>
@@ -165,8 +165,9 @@ function MemoryList({ bot, memory }: { bot: Bot; memory: string }) {
 	);
 }
 
-/** The Bot's routines, each opening its settings and runs in place of the conversation, and **New routine**. */
-function BotRoutines({ bot, routines, openRoutine, connected }: { bot: Bot; routines: readonly Routine[]; openRoutine: string | null; connected: boolean }) {
+/** The Bot's routines, each opening its settings and runs in place of the conversation, and **New routine**; `open` is what the page shows, which they mark. */
+function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: readonly Routine[]; open: OpenRoutine; connected: boolean }) {
+	const openId = open.kind === "open" || open.kind === "edit" ? open.routine.id : null;
 	const id = useId();
 	return (
 		<section aria-labelledby={id} className="space-y-2">
@@ -176,7 +177,7 @@ function BotRoutines({ bot, routines, openRoutine, connected }: { bot: Bot; rout
 				</h3>
 				{connected ? (
 					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={Plus}>
-						<a href={hashForBotRoutine(bot.id, NEW_ROUTINE)} aria-current={openRoutine === NEW_ROUTINE ? "page" : undefined}>
+						<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined}>
 							New routine
 						</a>
 					</Button>
@@ -187,14 +188,14 @@ function BotRoutines({ bot, routines, openRoutine, connected }: { bot: Bot; rout
 				)}
 			</div>
 			{routines.length === 0 ? (
-				<p className="text-xs text-muted-foreground">No routine yet. A routine messages {bot.name} or runs a command in its workspace on a schedule.</p>
+				<p className="text-xs text-muted-foreground">No routine yet. A routine messages {bot.name} or runs a command in its workspace on its schedules, its triggers, or both.</p>
 			) : (
 				<ul className="space-y-1.5">
 					{routines.map(routine => (
 						<li key={routine.id}>
 							<a
-								href={hashForBotRoutine(bot.id, routine.id)}
-								aria-current={openRoutine === routine.id ? "page" : undefined}
+								href={hashForBotRoutine(bot.id, { kind: "open", id: routine.id })}
+								aria-current={openId === routine.id ? "page" : undefined}
 								className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 							>
 								<RunDot run={routine.runs[0]} />
@@ -212,24 +213,16 @@ function BotRoutines({ bot, routines, openRoutine, connected }: { bot: Bot; rout
 }
 
 interface BotDetailsProps {
-	bot: Bot;
+	/** The Bot, and what its page shows. */
+	open: OpenBot;
 	/** Its `memory.md`, empty while it remembers nothing. */
 	memory: string;
-	/** Every routine, the Bot's among them. */
-	routines: readonly Routine[];
-	/** Every session, since a Bot's workspace may be one the sidebar hides. */
-	hosts: readonly RosterHost[];
-	/** The routine the page shows in place of the conversation, `null` for the conversation. */
-	openRoutine: string | null;
 	connected: boolean;
 }
 
-export function BotDetails({ bot, memory, routines, hosts, openRoutine, connected }: BotDetailsProps) {
+export function BotDetails({ open: { bot, host, routines, routine, status }, memory, connected }: BotDetailsProps) {
 	const { end } = useDashboardActions();
 	const { ending } = useDashboardStatus();
-	const host = botHost(bot, hosts);
-	const own = routines.filter(({ botId }) => botId === bot.id);
-	const status = host ? statusLabel(host.status) : bot.sessionId ? "Not running" : "No conversation yet";
 	return (
 		<>
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center border-b border-border px-4 py-0">
@@ -249,7 +242,7 @@ export function BotDetails({ bot, memory, routines, hosts, openRoutine, connecte
 					</div>
 					<JobEditor key={bot.job} bot={bot} connected={connected} />
 					<MemoryList bot={bot} memory={memory} />
-					<BotRoutines bot={bot} routines={own} openRoutine={openRoutine} connected={connected} />
+					<BotRoutines bot={bot} routines={routines} open={routine} connected={connected} />
 					<div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
 						{host && (
 							<Button variant="ghost" size="compact" leadingIcon={CircleStop} loading={ending.has(host.instanceId)} disabled={!connected} onClick={() => end(host.instanceId)}>

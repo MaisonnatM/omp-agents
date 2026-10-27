@@ -6,7 +6,7 @@
 import { MAX_TRIGGER_DETAIL, type TriggerEvent } from "../routines";
 import type { EmailAnswer } from "../shared/gmail";
 import { prKey, pullRequestName, pullRequestUrl, type PullRequestList, repoKey } from "../shared/github";
-import { type MoveId, moveOf } from "../shared/moves";
+import { type AgentOn, type YourMove, yourMoves } from "../shared/moves";
 import { EVENT_LEAD_MS } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 import type { FoundEvent } from "./notices";
@@ -59,50 +59,55 @@ export class TriggerWatch {
 		this.#known.clear();
 		this.#news = [];
 	}
+
+	/** Forgets `scope`'s last answer, so its next answer is a baseline, as when its source signs out. */
+	forgetScope(scope: string): void {
+		this.#known.delete(scope);
+	}
 }
 
 const clip = (text: string): string => (text.length > MAX_TRIGGER_DETAIL ? `${text.slice(0, MAX_TRIGGER_DETAIL - 1)}…` : text);
 
-/** A pull request's status in words, as the run's message says it. A sighting reads its status without the sessions on it, so `answer` and `agent` never show. */
-const STATUS_WORDS: Record<MoveId, string> = {
+/** A pull request's move in words, as the run's message says it. */
+const MOVE_WORDS: Record<YourMove, string> = {
 	review: "waits on your review",
 	merge: "is ready to merge",
 	"fix-ci": "has failing checks",
 	rebase: "has conflicts with its base",
 	reply: "has comments to address",
-	"in-review": "is in review",
-	"checks-running": "has checks running",
-	draft: "is a draft",
-	merged: "was merged",
-	answer: "has a session waiting on your answer",
-	agent: "has a session working on it",
 };
 
-/** Each pull request of the repositories GitHub answered for, by its status: a pull request that shows up, or whose status changes, is a new sighting. */
-export function pullRequestSightings(list: PullRequestList): Seen {
-	const answered = list.repos.flatMap(repo => ("error" in repo ? [] : [repo]));
+/**
+ * Each pull request of the repositories GitHub answered for whose next move is yours, by that move, read with the
+ * sessions on it as the bell reads it: a pull request whose move becomes yours, or changes to another of yours, is a new
+ * sighting. A draft, checks still running, or a session at work on it is none, so a Bot's own push fires nothing until
+ * it ends in a move of yours.
+ */
+export function pullRequestSightings(list: PullRequestList, agent: AgentOn): Seen {
+	const { answered, yours } = yourMoves(list, agent);
 	return {
 		scopes: answered.map(repo => `pull-request:${repoKey(repo)}`),
-		sightings: answered.flatMap(repo =>
-			repo.pullRequests.map(pr => {
-				const move = moveOf(pr, null);
-				const event: TriggerEvent = { kind: "pull-request", title: `${pullRequestName(pr)} ${STATUS_WORDS[move]}`, detail: clip(`${pr.title}, by ${pr.author.login}`), url: pullRequestUrl(pr) };
-				return { id: `${prKey(pr)}:${move}`, scope: `pull-request:${repoKey(repo)}`, event };
-			}),
-		),
+		sightings: yours.map(({ repo, pr, move }) => ({
+			id: `${prKey(pr)}:${move}`,
+			scope: `pull-request:${repoKey(repo)}`,
+			event: { kind: "pull-request", title: `${pullRequestName(pr)} ${MOVE_WORDS[move]}`, detail: clip(`${pr.title}, by ${pr.author.login}`), url: pullRequestUrl(pr) },
+		})),
 	};
 }
+
+/** The scope of the Slack check's answer, which the check forgets while Slack is signed out. */
+export const SLACK_SCOPE = "slack";
 
 /** Each Slack conversation's newest message that waits on you; a newer one there is a new sighting. */
 export function slackSightings(found: SlackFound[]): Seen {
 	return {
-		scopes: ["slack"],
+		scopes: [SLACK_SCOPE],
 		sightings: found.map(message => {
 			const title =
 				message.type === "mention"
 					? `${message.from} mentioned you in ${message.channel}`
 					: `${message.from} wrote to you${message.type === "group-dm" ? " in a group message" : ""}${message.count > 1 ? ` (${message.count} messages)` : ""}`;
-			return { id: message.id, scope: "slack", event: { kind: "slack", title, detail: clip(message.text), url: message.permalink } };
+			return { id: message.id, scope: SLACK_SCOPE, event: { kind: "slack", title, detail: clip(message.text), url: message.permalink } };
 		}),
 	};
 }

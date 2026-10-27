@@ -113,12 +113,21 @@ export interface NotesRoute {
 
 /**
  * A Bot's page, its conversation beside the right sidebar's details: its look, name, job, memory, and routines; `null` for the New Bot form.
- * `routine` names the Bot's routine whose settings and runs show in place of the conversation, or is {@link NEW_ROUTINE} for the editor of a new one.
+ * `routine` names what shows in place of the conversation, `null` for none.
  */
-export type BotsRoute = { target: null } | { target: string; routine: string | null };
+export type BotsRoute = { target: null } | { target: string; routine: BotRoutineRoute | null };
 
-/** The `routine` of a Bot's page that opens the editor of a new routine; routine ids are UUIDs, so none reads as it. */
-export const NEW_ROUTINE = "new";
+/** A new routine's editor, one of the Bot's routines with its settings and runs, or that routine's editor. */
+export type BotRoutineRoute = { kind: "new" } | { kind: "open"; id: string } | { kind: "edit"; id: string };
+
+/** The routine `#bots/<id>/routines/<routine>/<more>` names, `null` for an address that names none. */
+function botRoutineRoute(routine: string, more: (string | null)[]): BotRoutineRoute | null {
+	if (more.length === 0) return routine === "new" ? { kind: "new" } : { kind: "open", id: routine };
+	return more.length === 1 && more[0] === "edit" && routine !== "new" ? { kind: "edit", id: routine } : null;
+}
+
+const restOfBotRoutine = (routine: BotRoutineRoute): string =>
+	routine.kind === "new" ? "new" : routine.kind === "open" ? encodeURIComponent(routine.id) : `${encodeURIComponent(routine.id)}/edit`;
 
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. `todoId` names the todo it works on. */
 export interface NewSessionRoute {
@@ -186,7 +195,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
  * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
- * - `#bots` opens the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines/<routine id>` the settings and runs of that Bot's routine, and `#bots/<id>/routines/new` a new routine's editor.
+ * - `#bots` opens the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines/<routine id>` the settings and runs of that Bot's routine,
+ *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; routine ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
@@ -217,7 +227,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	bots: rest => {
 		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
 		if (!target) return { kind: "bots", target: null };
-		return { kind: "bots", target, routine: routines === "routines" && routine && more.length === 0 ? routine : null };
+		return { kind: "bots", target, routine: routines === "routines" && routine ? botRoutineRoute(routine, more) : null };
 	},
 	calendar: () => ({ kind: "calendar" }),
 	email: rest => {
@@ -250,7 +260,7 @@ function restOfPage(page: Page): string | null {
 			return page.list.kind === "all" ? null : page.list.kind;
 		case "bots":
 			if (page.target === null) return null;
-			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/routines/${encodeURIComponent(page.routine)}`;
+			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/routines/${restOfBotRoutine(page.routine)}`;
 		case "email":
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
@@ -309,7 +319,7 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 }
 export const hashForNotes = (list: NotesListView, open: string | null = null): string => hashForPage({ kind: "notes", list, open });
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target } : { kind: "bots", target, routine: null });
-export const hashForBotRoutine = (botId: string, routine: string): string => hashForPage({ kind: "bots", target: botId, routine });
+export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });

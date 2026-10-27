@@ -2,18 +2,18 @@
  * The Bots on the server: how a Bot's session launches with the Bot extension, which conversation each Bot is bound
  * to as that session lives, and a message to a Bot, which reaches its live session or resumes it.
  */
-import { closeSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
 import { join } from "node:path";
 import { isObject } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
-import { type Bot, type BotEdit, type BotId, type BotLast } from "../shared/bots";
+import { type Bot, type BotEdit, type BotId, type BotLast, MAX_MEMORY_BYTES } from "../shared/bots";
 import type { ServerMsg } from "../shared/protocol";
 import { modelOfSelector } from "../shared/models";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { isDashboardPrompt } from "../shared/transcript";
 import { entryTime, oneLine, textOf } from "../session-entries";
+import { readTail } from "../read-tail";
 import { splitSuggestions } from "../transcript";
 import type { BotsFile } from "./bots-file";
 import type { SessionJoin } from "./start";
@@ -29,28 +29,12 @@ const LAST_TAIL = 256 * 1024;
 
 /** The last prompt or reply with text in session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
 export function lastMessage(path: string): BotLast | null {
-	let fd: number;
-	try {
-		fd = openSync(path, "r");
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-		throw error;
+	const lines = readTail(path, LAST_TAIL)?.text.split("\n") ?? [];
+	for (let i = lines.length - 1; i >= 0; i--) {
+		const last = messageOf(lines[i]!);
+		if (last) return last;
 	}
-	try {
-		const size = fstatSync(fd).size;
-		const length = Math.min(size, LAST_TAIL);
-		const tail = Buffer.alloc(length);
-		readSync(fd, tail, 0, length, size - length);
-		const lines = tail.toString("utf8").split("\n");
-		// A cut tail's first line is the end of an earlier one.
-		for (let i = lines.length - 1; i >= (length < size ? 1 : 0); i--) {
-			const last = messageOf(lines[i]!);
-			if (last) return last;
-		}
-		return null;
-	} finally {
-		closeSync(fd);
-	}
+	return null;
 }
 
 function messageOf(line: string): BotLast | null {
@@ -101,8 +85,9 @@ export class Bots {
 	}
 
 	/**
-	 * The `bots` message: every Bot, what each remembers, and its conversation's last words. Only a Bot that is new, whose
-	 * conversation moved, or whose session {@link changed} since the last message has its files read again.
+	 * The `bots` message: every Bot, the newest of what each remembers, as much as its turns' system prompt carries, and its
+	 * conversation's last words. Only a Bot that is new, whose conversation moved, or whose session {@link changed} since
+	 * the last message has its files read again.
 	 */
 	msg(): Extract<ServerMsg, { t: "bots" }> {
 		const memories: Record<BotId, string> = {};
@@ -110,23 +95,13 @@ export class Bots {
 		const read = new Map<BotId, BotFiles>();
 		for (const bot of this.list) {
 			const cached = this.#read.get(bot.id);
-			const entry = cached?.sessionId === bot.sessionId ? cached : { sessionId: bot.sessionId, memory: this.#memory(bot.id), last: this.#last(bot.sessionId) };
+			const entry = cached?.sessionId === bot.sessionId ? cached : { sessionId: bot.sessionId, memory: readTail(this.#memoryPath(bot.id), MAX_MEMORY_BYTES)?.text ?? "", last: this.#last(bot.sessionId) };
 			read.set(bot.id, entry);
 			memories[bot.id] = entry.memory;
 			lasts[bot.id] = entry.last;
 		}
 		this.#read = read;
 		return { t: "bots", bots: this.list, memories, lasts };
-	}
-
-	/** What Bot `id` remembers, as its session wrote it; empty before it remembers anything. */
-	#memory(id: BotId): string {
-		try {
-			return readFileSync(this.#memoryPath(id), "utf8");
-		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-			return "";
-		}
 	}
 
 	/** The last words of conversation `sessionId`, `null` before its first message. */

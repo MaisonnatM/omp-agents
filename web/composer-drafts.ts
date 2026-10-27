@@ -1,6 +1,7 @@
-/** Unsent composer text, one draft per session, subagent, and new-session draft, kept in this browser across reloads. */
+/** Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across reloads. */
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { fields, isNumber, isObject, isString } from "../src/json";
+import type { BotId } from "../src/shared/bots";
 import type { LiveView } from "../src/shared/sessions";
 
 const STORAGE_KEY = "omp-agents.composer-drafts";
@@ -46,6 +47,9 @@ export const liveDraftKey = (view: LiveView): string => (view.agentId === null ?
 
 /** The draft of the new-session page: one for the plain draft, one for each todo it starts from. */
 export const newDraftKey = (todoId: string | null): string => (todoId === null ? "new" : `new/todo/${todoId}`);
+
+/** The draft of a Bot's composer while no omp runs its conversation. */
+export const botDraftKey = (id: BotId): string => `bot/${id}`;
 
 /** Puts `text` in the composer of `key` for its next mount; `""` forgets it. */
 export const putDraft = (key: string, text: string): void => writeDraft(key, text === "" ? null : text);

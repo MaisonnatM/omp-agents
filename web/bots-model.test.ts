@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import type { Routine } from "../src/routines";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { RosterHost } from "../src/shared/sessions";
-import { botHost, botRows, botView, jobLine, memoryEntries, openBotView, starterPrompts } from "./bots-model";
+import { botHost, botRows, botStatus, botView, jobLine, memoryEntries, openBot, starterPrompts } from "./bots-model";
+import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
 
@@ -22,15 +24,29 @@ describe("Bots", () => {
 		expect(botView(bot(null), hosts)).toBeNull();
 	});
 
-	test("the open conversation is the open Bot's, and none on another page, on the New Bot form, on one of its routines, or for a Bot that is gone", () => {
+	test("the open Bot's page shows its conversation, streamed, only while no routine replaces it, and a routine it does not have shows as missing", () => {
 		const bots = [bot("s2")];
-		expect(openBotView({ kind: "bots", target: "scout", routine: null }, bots, [])).toEqual({ kind: "past", sessionId: "s2" });
-		expect(openBotView({ kind: "bots", target: "scout", routine: "r1" }, bots, [])).toBeNull();
-		expect(openBotView({ kind: "bots", target: "ranger", routine: null }, bots, [])).toBeNull();
-		expect(openBotView({ kind: "bots", target: null }, bots, [])).toBeNull();
-		expect(openBotView({ kind: "bots", target: "scout", routine: null }, null, [])).toBeNull();
-		expect(openBotView({ kind: "calendar" }, bots, [])).toBeNull();
-		expect(openBotView(null, bots, [])).toBeNull();
+		const routines = [{ id: "r1", botId: scout }, { id: "r2", botId: "ranger" }] as Routine[];
+		const page = (routine: BotRoutineRoute | null): Page => ({ kind: "bots", target: "scout", routine });
+		const shown = (routine: BotRoutineRoute | null) => {
+			const open = openBot(page(routine), bots, [], routines);
+			return open && { view: open.view, routine: open.routine, routines: open.routines.map(({ id }) => id) };
+		};
+		expect(shown(null)).toEqual({ view: { kind: "past", sessionId: "s2" }, routine: { kind: "conversation" }, routines: ["r1"] });
+		expect(shown({ kind: "new" })).toMatchObject({ view: null, routine: { kind: "new" } });
+		expect(shown({ kind: "open", id: "r1" })).toMatchObject({ view: null, routine: { kind: "open", routine: { id: "r1" } } });
+		expect(shown({ kind: "edit", id: "r1" })).toMatchObject({ view: null, routine: { kind: "edit", routine: { id: "r1" } } });
+		expect(shown({ kind: "open", id: "r2" })).toMatchObject({ view: null, routine: { kind: "missing", id: "r2" } });
+		expect(shown({ kind: "edit", id: "gone" })).toMatchObject({ view: null, routine: { kind: "missing", id: "gone" } });
+	});
+
+	test("no Bot is open on another page, on the New Bot form, while the Bots load, or for a Bot that is gone", () => {
+		const bots = [bot("s2")];
+		expect(openBot({ kind: "bots", target: "ranger", routine: null }, bots, [], [])).toBeNull();
+		expect(openBot({ kind: "bots", target: null }, bots, [], [])).toBeNull();
+		expect(openBot({ kind: "bots", target: "scout", routine: null }, null, [], [])).toBeNull();
+		expect(openBot({ kind: "calendar" }, bots, [], [])).toBeNull();
+		expect(openBot(null, bots, [], [])).toBeNull();
 	});
 
 	test("a row previews the question first, then Working…, then the freshest words as plain text, else no messages", () => {
@@ -47,13 +63,24 @@ describe("Bots", () => {
 			["replied" as BotId]: { at: 2_000, from: "user", text: "How is the build?" },
 			["talked" as BotId]: { at: 1_000, from: "user", text: "Thanks." },
 		};
-		expect(botRows(bots, hosts, lasts).map(({ bot, status, asking, unread, preview, at }) => [bot.name, status, asking, unread, preview, at])).toEqual([
-			["Fresh", null, null, false, "No messages yet", Date.parse("2026-10-05T09:00:00.000Z")],
-			["Replied", "idle", null, true, "The build is green.", 5_000],
-			["Asker", "needs-input", "Push to main?", false, "Push to main?", 4_000],
-			["Worker", "working", null, false, "Working…", 3_000],
-			["Talked", null, null, false, "You: Thanks.", 1_000],
+		expect(botRows(bots, hosts, lasts).map(({ bot, host, unread, preview, at }) => [bot.name, host?.sessionId ?? null, unread, preview, at])).toEqual([
+			["Fresh", null, false, "No messages yet", Date.parse("2026-10-05T09:00:00.000Z")],
+			["Replied", "s3", true, "The build is green.", 5_000],
+			["Asker", "s1", false, "Push to main?", 4_000],
+			["Worker", "s2", false, "Working…", 3_000],
+			["Talked", null, false, "You: Thanks.", 1_000],
 		]);
+	});
+
+	test("a Bot's status asks first, then names its session's status, else whether it ever talked", () => {
+		const hosts = [
+			{ sessionId: "s1", status: "needs-input", requests: [{ title: "Push to main?" }], unread: null },
+			{ sessionId: "s2", status: "working", requests: [], unread: null },
+		] as unknown as RosterHost[];
+		expect(botStatus(bot("s1"), hosts[0]!)).toBe("asking you");
+		expect(botStatus(bot("s2"), hosts[1]!)).toBe("working");
+		expect(botStatus(bot("s4"), null)).toBe("not running");
+		expect(botStatus(bot(null), null)).toBe("no conversation yet");
 	});
 
 	test("a job's first line is its first sentence, past headings and list marks", () => {

@@ -15,7 +15,9 @@
   With a trigger checked, **Remove** can take its last schedule, so the routine runs only on its triggers.
 - **Triggers** also start a run when something new happens:
   - **When a Slack message waits on you**: a mention or direct message you have not answered, once Slack is signed in under **Settings › Integrations**.
-  - **When a pull request changes status**: one of yours, or one waiting on your review, shows up or moves, such as its checks failing, it becoming ready to merge, or it merging.
+    What already waits when you sign in starts nothing.
+  - **When a pull request waits on you**: one of yours, or one waiting on your review, comes to wait on you, such as a review asked of you, its checks failing, a conflict, comments to address, or it becoming ready to merge.
+    A draft, checks still running, or a session at work on it, such as a Bot pushing a fix, starts nothing until it ends waiting on you.
   - **Before a calendar event starts**: a timed event on this Mac's calendars or a signed-in Google Calendar comes within 10 minutes of its start.
   - **When unread mail comes in**: a new message, unread, in the inbox of a Gmail account signed in under **Settings › Integrations**, in a new conversation or an old one.
 
@@ -43,7 +45,7 @@
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
-- Routines made before every routine had a Bot move to Bots as the dashboard starts.
+- Routines made before every routine had a Bot move to Bots as the dashboard that runs the routines starts or takes over.
   A routine that messaged a Bot stays with that Bot.
   Every other one goes to one Bot named **Routines**, made once, which works in the first such routine's workspace, else your home directory.
   A command that ran in another workspace now starts with `cd` into it, and a prompt that did starts by naming it; a prompt's skill moves into the message as `/skill:` and its name.

@@ -4,7 +4,8 @@
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { errorText, parseJson } from "../json";
-import { parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
+import { readTail } from "../read-tail";
+import { MAX_FACT_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
 
 /** The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, and its `memory.md`. */
 export const BOT_FLAGS = { bot: "omp-agents-bot", bots: "omp-agents-bots", memory: "omp-agents-bot-memory" } as const;
@@ -28,7 +29,7 @@ export interface BotExtensionApi {
 		approval: "write";
 		execute(toolCallId: string, params: { fact: string }): Promise<ToolResult>;
 	}): void;
-	typebox: { Type: { Object(properties: Record<string, unknown>): unknown; String(options: { description: string }): unknown } };
+	typebox: { Type: { Object(properties: Record<string, unknown>): unknown; String(options: { description: string; maxLength?: number }): unknown } };
 }
 
 function readText(path: string): string {
@@ -56,13 +57,19 @@ export default function botExtension(pi: BotExtensionApi): void {
 		if (ctx.agent.kind === "sub" || !id || !botsPath || !memoryPath) return undefined;
 		const bot = parseBots(parseJson(readText(botsPath)))?.find(bot => bot.id === id);
 		if (!bot) return undefined;
-		const memory = readText(memoryPath).trim();
+		let memory: { text: string; cut: boolean } | null = null;
+		try {
+			memory = readTail(memoryPath, MAX_MEMORY_BYTES);
+		} catch {
+			// An unreadable memory leaves this turn without it rather than stopping it.
+		}
 		const prompt = [
 			`You are ${bot.name}, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.`,
 			"Your job, and what you ask before doing:",
 			bot.job.trim() || "No job yet. Ask the user what it is, and what you should ask before doing, then `remember` what they say.",
 			"What you remember from earlier turns:",
-			memory || "Nothing yet.",
+			...(memory?.cut ? ["(Older memory was cut to keep this prompt short; only the newest facts follow.)"] : []),
+			memory?.text.trim() || "Nothing yet.",
 			"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
 		].join("\n");
 		return { systemPrompt: [...event.systemPrompt, prompt] };
@@ -71,8 +78,8 @@ export default function botExtension(pi: BotExtensionApi): void {
 	pi.registerTool({
 		name: REMEMBER_TOOL,
 		label: "Remember",
-		description: "Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true.",
-		parameters: pi.typebox.Type.Object({ fact: pi.typebox.Type.String({ description: "The fact, as one short sentence." }) }),
+		description: `Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`,
+		parameters: pi.typebox.Type.Object({ fact: pi.typebox.Type.String({ description: "The fact, as one short sentence.", maxLength: MAX_FACT_LENGTH }) }),
 		loadMode: "essential",
 		approval: "write",
 		async execute(_toolCallId, { fact }) {
@@ -80,6 +87,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 			const line = fact.replace(/\s+/g, " ").trim();
 			if (!memoryPath) throw new Error("This session is not an omp-agents Bot, so it has no memory.");
 			if (!line) throw new Error("fact is empty.");
+			if (line.length > MAX_FACT_LENGTH) throw new Error(`fact is ${line.length} characters; keep it to one short sentence of at most ${MAX_FACT_LENGTH}.`);
 			try {
 				mkdirSync(dirname(memoryPath), { recursive: true });
 				appendFileSync(memoryPath, `- ${new Date().toISOString().slice(0, 10)} ${line}\n`);

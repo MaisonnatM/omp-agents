@@ -2,6 +2,7 @@ import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
+import type { OpenBot } from "../bots-model";
 import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
@@ -65,6 +66,8 @@ type PageState = Pick<
 interface PageSwitchProps extends PageState {
 	/** The page covering the panes; `null` while the panes show. */
 	page: Page | null;
+	/** The Bot whose page is open, `null` on any other page, while the Bots load, or for a Bot that is gone. */
+	openBot: OpenBot | null;
 	/** The new session under way or failed, if there is one. */
 	newStart: StartOf<"new"> | null;
 	scope: WorkspaceScope;
@@ -99,6 +102,7 @@ export const PageSwitch = memo(function PageSwitch({
 	userNotes,
 	routines,
 	bots,
+	openBot,
 	workspaceList,
 	pins,
 	newSessionCompletions,
@@ -191,18 +195,14 @@ export const PageSwitch = memo(function PageSwitch({
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "bots": {
 			if (page.target === null) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
-			const bot = bots?.find(({ id }) => id === page.target);
-			if (!bot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
+			if (!openBot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
 			return (
-				// Keyed by the Bot and its routine, so another Bot's page starts with its own drafts, and leaving a routine closes its editor.
+				// Keyed by the Bot, so another Bot's page starts with its own drafts.
 				<BotPage
-					key={`${bot.id}/${page.routine ?? ""}`}
-					bot={bot}
-					routine={page.routine}
+					key={openBot.bot.id}
+					open={openBot}
 					detailsOpen={rightOpen}
 					onToggleDetails={() => toggleSidebar("right")}
-					routines={routines}
-					hosts={hosts}
 					past={past}
 					lastHosts={lastHosts}
 					models={models}

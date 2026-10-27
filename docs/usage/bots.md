@@ -9,7 +9,7 @@
 - Each Bot's avatar is a colored shape with two eyes, which you pick when you make it and can change later, so a rename keeps its face.
   A Bot made before you could pick keeps the shape and color its id gave it.
   The avatar bobs and glances while the Bot works, or pulses gently when your system asks for reduced motion, and an amber dot marks a question waiting on you.
-- The search field at the top of the tab filters the Bots by name.
+- The search field at the top of the tab filters the Bots by name, job, or the line under the name.
   The **+** beside it, or a `#bots` address, opens the New Bot form.
 - New Bot follows Grok's: name the Bot, pick a shape and a color, and choose **Create**; the form starts on a random shape and color.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
@@ -20,6 +20,7 @@
   The composer reads **Message** and the Bot's name.
   While its session runs, the conversation and its composer work as in a pane.
   Otherwise the composer writes to the Bot: the first message starts its conversation in its workspace, and a later one resumes the same session.
+  What you type there stays when you leave the page, one draft per Bot, until you send it.
   Its `/` and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, ticket, pull request, person, email, event, or session.
   Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
@@ -28,9 +29,12 @@
   Click the avatar to change its shape and color, and click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
   Below come its **Job**, its **Memory**, its **Routines**, **End session** while its session runs, and **Delete**.
   Editing the job shows **Save job** and **Revert**; every turn's system prompt carries the saved job.
-  **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date.
+  **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date; for a long memory it lists the newest 16 KB, the part the Bot reads.
   Only the Bot writes it, with its `remember` tool, when you tell it something worth keeping.
-  **Routines** lists the Bot's routines, each with its last run's dot and its schedules and triggers, and **New routine** opens the editor of a new one, `#bots/<id>/routines/new`; click a routine to open it in place of the conversation, and the details mark it.
+  **Routines** lists the Bot's routines, each with its last run's dot and its schedules and triggers, and **New routine** opens the editor of a new one, `#bots/<id>/routines/new`.
+  Click a routine to open it in place of the conversation, `#bots/<id>/routines/<routine id>`, and the details mark it; **Edit** in its menu opens its editor at `#bots/<id>/routines/<routine id>/edit`, so Back returns to the routine.
+  An address that names a routine the Bot does not have, such as one deleted, shows that, with a link back to the conversation.
+  Saving a routine opens it once the server has saved it; a save it refuses says why and keeps the editor open.
   Ending the session keeps the page open.
 - **Delete** asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.

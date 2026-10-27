@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { SidebarContent, SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { BotRow } from "../../bots-model";
+import { botAsking, botStatus, type BotRow } from "../../bots-model";
 import { mailTime } from "../../labels";
 import { hashForBots } from "../../routing";
-import { statusLabel } from "../status-dot";
 import { SidebarSearch } from "../sidebar-search";
 import { BotAvatar } from "./bot-avatar";
 
@@ -55,14 +54,14 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 	);
 }
 
-function BotRowLink({ row: { bot, status, asking, unread, preview, at }, active }: { row: BotRow; active: boolean }) {
-	const state = asking ? "asking you" : status ? statusLabel(status) : "not running";
+function BotRowLink({ row: { bot, host, unread, preview, at }, active }: { row: BotRow; active: boolean }) {
+	const asking = botAsking(host);
 	const when = new Date(at);
 	return (
 		<SidebarMenuItem>
 			<SidebarMenuButton asChild size="lg" isActive={active} className="h-auto gap-2.5 py-1.5">
-				<a href={hashForBots(bot.id)} aria-label={`${bot.name}, ${state}${unread ? ", unread" : ""}. ${preview}`}>
-					<BotAvatar look={bot} size="row" working={status === "working"} asking={asking !== null} />
+				<a href={hashForBots(bot.id)} aria-label={`${bot.name}, ${botStatus(bot, host)}${unread ? ", unread" : ""}. ${preview}`}>
+					<BotAvatar look={bot} size="row" working={host?.status === "working"} asking={asking !== null} />
 					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span className="flex items-baseline gap-2">
 							<span className={cn("truncate text-foreground", unread ? "font-semibold" : "font-medium")}>{bot.name}</span>

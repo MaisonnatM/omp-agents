@@ -7,7 +7,7 @@ import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
 import { openSocket } from "./api";
-import { openBotView } from "./bots-model";
+import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
@@ -61,6 +61,8 @@ export interface Dashboard {
 	state: DashboardState;
 	/** The page covering the panes; `null` while the panes show. */
 	page: Page | null;
+	/** The Bot whose page is open, which its page, its details, the streamed views, and the read turns all follow; `null` on any other page. */
+	openBot: OpenBot | null;
 	send: (msg: ClientMsg) => void;
 	/**
 	 * Send `msg` and settle once the server has handled it: rejects with the server's error, or at once while
@@ -98,6 +100,15 @@ export interface Dashboard {
 	changeBot: (change: Exclude<BotChange, { op: "message" }>) => void;
 }
 
+/** The Bot `page` opens, its conversation's view kept while it names the same conversation, since the roster changes far more often than which conversation shows. */
+function useOpenBot(page: Page | null, { bots, hosts, routines }: DashboardState): OpenBot | null {
+	const found = useMemo(() => findOpenBot(page, bots, hosts, routines), [page, bots, hosts, routines]);
+	const viewHash = found?.view ? hashForView(found.view) : null;
+	// Keyed on the hash alone: the view is the same while its hash is.
+	const view = useMemo(() => found?.view ?? null, [viewHash]);
+	return useMemo(() => found && { ...found, view }, [found, view]);
+}
+
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
 export function useDashboard(): Dashboard {
 	const [state, dispatch] = useReducer(reduce, null, () => initialState(routeFromHash(location.hash), readSplitRatios()));
@@ -108,11 +119,10 @@ export function useDashboard(): Dashboard {
 	const startsRef = useRef(state.starts);
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
+	const openBot = useOpenBot(page, state);
 	// A page covering the panes shows none of them, so the server streams only a Bot page's conversation until the panes return.
-	const botConversation = openBotView(page, state.bots, state.hosts);
-	// Keyed by its address, since openBotView builds a new view on each render.
-	const botPane = botConversation && hashForView(botConversation);
-	const watched = useMemo<View[]>(() => (!page ? state.layout.panes : botConversation ? [botConversation] : NO_VIEWS), [page, botPane, state.layout.panes]);
+	const botConversation = openBot?.view ?? null;
+	const watched = useMemo<View[]>(() => (!page ? state.layout.panes : botConversation ? [botConversation] : NO_VIEWS), [page, botConversation, state.layout.panes]);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 	const shownTrajectories = useShownTrajectories();
@@ -362,5 +372,5 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot };
+	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot };
 }

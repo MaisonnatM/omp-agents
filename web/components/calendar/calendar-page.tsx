@@ -61,7 +61,7 @@ function entryHref(entry: CalendarEntry): string | null {
 	switch (entry.kind) {
 		case "routine":
 		case "routine-interval":
-			return hashForBotRoutine(entry.botId, entry.routineId);
+			return hashForBotRoutine(entry.botId, { kind: "open", id: entry.routineId });
 		case "todo":
 			return hashForOpenTodo(entry.todoId, entry.categoryId);
 		case "ticket":

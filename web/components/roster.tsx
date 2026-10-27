@@ -25,7 +25,7 @@ import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
 import { BotsNav } from "./bots/bots-nav";
-import type { BotRow } from "../bots-model";
+import { botAsking, type BotRow } from "../bots-model";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { EmailNav } from "./email/email-nav";
@@ -218,7 +218,7 @@ export function Roster({
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
-		bots: { count: bots.filter(({ asking }) => asking !== null).length, meaning: "asking you" },
+		bots: { count: bots.filter(({ host }) => botAsking(host) !== null).length, meaning: "asking you" },
 		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);

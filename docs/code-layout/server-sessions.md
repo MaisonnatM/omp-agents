@@ -17,6 +17,7 @@
   `src/line-reader.ts` holds `FoldedFile`, which keeps a fold of a file's lines up to date, applying only appended complete lines and starting a fresh fold when the file shrinks.
   `src/tail.ts`, `src/media.ts`, `src/changes.ts`, `src/session-facts.ts`, and `src/foreign/usage.ts` each fold transcripts through it.
   The first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
+  `src/read-tail.ts` holds `readTail`, which reads only the whole lines within a limit of a file's end, as the Bot extension and the server read a Bot's memory and `lastMessage` a Bot's last words.
 - `src/session-formats.ts`: the registry of agents whose session files the dashboard lists, `SESSION_FORMATS`, each a `SessionFormat` with its root, its `fileOf`, `list`, and `read`, its line `decode`, and the `messageLine` conversation search parses.
   Formats other than omp also name the usage-file patterns and per-file folds for Analytics.
   `ompFormat` wraps omp's own listing in `src/omp/sessions.ts`, which also holds `sessionFileOf` and `renameSessionFile`, which retitles a saved omp session through omp's `SessionManager`; `formatOf` names the format of a file by the root that holds it, else omp's.

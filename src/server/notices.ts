@@ -5,7 +5,7 @@
 import { JsonFile } from "../fs";
 import { errorText, isObject } from "../json";
 import { type PullRequestList, prKey, repoKey } from "../shared/github";
-import { type AgentOn, moveOf, YOUR_MOVES, type YourMove } from "../shared/moves";
+import { type AgentOn, yourMoves } from "../shared/moves";
 import type { DashboardUpdateOutcome } from "../shared/dashboard-update";
 import type { PlanUsage } from "../shared/models";
 import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
@@ -127,18 +127,10 @@ function parseMarks(value: unknown): Marks | null {
 	return { seen: value.seen, read: isIds(value.read) ? value.read : [], cleared: value.cleared, scopes: isScopes(value.scopes) ? value.scopes : {} };
 }
 
-const isYourMove = (move: string): move is YourMove => (YOUR_MOVES as readonly string[]).includes(move);
-
 /** The pull requests of `list` whose next move is yours, each a notice per move; the repositories GitHub did not answer for stay unchecked. */
 function pullRequestNotices(list: PullRequestList, agent: AgentOn): Checked {
-	const answered = list.repos.flatMap(repo => ("error" in repo ? [] : [repo]));
-	const found = answered.flatMap(repo => {
-		const scope = repoKey(repo);
-		return repo.pullRequests.flatMap(pr => {
-			const move = moveOf(pr, agent(pr));
-			return isYourMove(move) ? [{ id: `pull-request:${prKey(pr)}:${move}`, at: pr.updatedAt, scope, kind: "pull-request", pr, move, cwd: repo.cwds[0] ?? "" } as const] : [];
-		});
-	});
+	const { answered, yours } = yourMoves(list, agent);
+	const found = yours.map(({ repo, pr, move }) => ({ id: `pull-request:${prKey(pr)}:${move}`, at: pr.updatedAt, scope: repoKey(repo), kind: "pull-request", pr, move, cwd: repo.cwds[0] ?? "" }) as const);
 	return { found, scopes: new Set(answered.map(repoKey)), dated: false };
 }
 

@@ -59,7 +59,7 @@ const ALL_NOTES: NotesListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot } = useDashboard();
+	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -71,7 +71,7 @@ export function App() {
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
-	useAttention(state, page, send);
+	useAttention(state, page, openBot?.view ?? null, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
@@ -86,9 +86,6 @@ export function App() {
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
-	/** The Bot page that shows, if any, and its Bot, whose details the right sidebar shows in a session's place. */
-	const botPage = page?.kind === "bots" && page.target !== null ? page : null;
-	const detailsBot = botPage && (state.bots?.find(({ id }) => id === botPage.target) ?? null);
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
@@ -150,7 +147,7 @@ export function App() {
 		signedOutTabs,
 		tabs: barTabs,
 		linearCallable,
-		hasDetails: detailsView !== null || detailsBot !== null,
+		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
 		palette: overlays.palette,
 		dispatchPalette,
@@ -262,6 +259,7 @@ export function App() {
 																	userNotes={state.userNotes}
 																	routines={state.routines}
 																	bots={state.bots}
+																	openBot={openBot}
 																	workspaceList={state.workspaceList}
 																	pins={state.pins}
 																	newSessionCompletions={state.newSessionCompletions}
@@ -291,31 +289,22 @@ export function App() {
 										</HeaderControlsContext.Provider>
 										<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 									</SidebarInset>
-									{detailsView && (
+									{(detailsView || openBot) && (
 										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-											<SessionDetails
-												key={hashForView(detailsView)}
-												view={detailsView}
-												working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-												cwd={focused.cwd ?? null}
-												pullRequests={focused.row?.pullRequests ?? []}
-												tickets={focused.row?.tickets ?? []}
-												workspace={workspace}
-												hosts={visible.hosts}
-											/>
-										</DashboardSidebar>
-									)}
-									{botPage && detailsBot && (
-										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-											<BotDetails
-												key={detailsBot.id}
-												bot={detailsBot}
-												memory={state.botMemories[detailsBot.id] ?? ""}
-												routines={state.routines}
-												hosts={state.hosts}
-												openRoutine={botPage.routine}
-												connected={state.connected}
-											/>
+											{detailsView ? (
+												<SessionDetails
+													key={hashForView(detailsView)}
+													view={detailsView}
+													working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+													cwd={focused.cwd ?? null}
+													pullRequests={focused.row?.pullRequests ?? []}
+													tickets={focused.row?.tickets ?? []}
+													workspace={workspace}
+													hosts={visible.hosts}
+												/>
+											) : (
+												openBot && <BotDetails key={openBot.bot.id} open={openBot} memory={state.botMemories[openBot.bot.id] ?? ""} connected={state.connected} />
+											)}
 										</DashboardSidebar>
 									)}
 									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />

@@ -1,7 +1,8 @@
 import { afterEach, expect, setSystemTime, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { MAX_FACT_LENGTH } from "../shared/bots";
 import botExtension, { BOT_FLAGS, type BotExtensionApi } from "./bot-extension";
 
 const dirs: string[] = [];
@@ -57,4 +58,25 @@ test("before the Bot remembers anything its prompt says so, and a subagent it sp
 	const bot = loadedBot();
 	expect(bot.prompt()?.[1]).toContain("What you remember from earlier turns:\nNothing yet.");
 	expect(bot.prompt("sub")).toBeUndefined();
+});
+
+test("a fact longer than one short sentence is refused and the memory keeps nothing of it", async () => {
+	const bot = loadedBot();
+	expect(await bot.remember("x".repeat(MAX_FACT_LENGTH))).toMatchObject({ content: [{ type: "text" }] });
+	await expect(bot.remember("y".repeat(MAX_FACT_LENGTH + 1))).rejects.toThrow(`fact is ${MAX_FACT_LENGTH + 1} characters`);
+	expect(readFileSync(bot.memory, "utf8")).not.toContain("y");
+});
+
+test("a memory past the cap reaches the prompt as its newest facts with a note that older ones were cut, and a short one whole", () => {
+	const bot = loadedBot();
+	mkdirSync(dirname(bot.memory), { recursive: true });
+	const lines = Array.from({ length: 1000 }, (_, index) => `- 2026-05-03 Fact number ${index}.`);
+	writeFileSync(bot.memory, `${lines.join("\n")}\n`);
+	const prompt = bot.prompt()?.[1] ?? "";
+	expect(prompt).toContain("What you remember from earlier turns:\n(Older memory was cut to keep this prompt short; only the newest facts follow.)\n- 2026-05-03 Fact number");
+	expect(prompt).toContain("- 2026-05-03 Fact number 999.\nWhen the user tells you");
+	expect(prompt).not.toContain("Fact number 0.");
+
+	writeFileSync(bot.memory, `${lines.slice(0, 2).join("\n")}\n`);
+	expect(bot.prompt()?.[1]).toContain(`What you remember from earlier turns:\n${lines.slice(0, 2).join("\n")}\nWhen the user tells you`);
 });

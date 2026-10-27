@@ -1,7 +1,7 @@
 /** A Bot's page, its one conversation under a header whose name shows or hides its details in the right sidebar, a routine's settings and runs or editor in place of the conversation, and the New Bot form. */
 import { BookmarkCheck } from "lucide-react";
 import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
-import type { Routine } from "../../../src/routines";
+import type { RoutineSpec } from "../../../src/routines";
 import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, REMEMBER_TOOL } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botHost, botView, starterPrompts } from "../../bots-model";
+import { botAsking, type OpenBot, starterPrompts } from "../../bots-model";
+import { botDraftKey, useComposerDraft } from "../../composer-drafts";
 import type { Completions } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
-import { hashForBotRoutine, hashForBots, hashForView, NEW_ROUTINE } from "../../routing";
+import { hashForBotRoutine, hashForBots } from "../../routing";
 import { draftOf, newDraft, type RoutineDraft } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useCompletion } from "../completion-popup";
@@ -24,7 +25,6 @@ import { ViewConversation } from "../pane";
 import { Header } from "../page-header";
 import type { PromptEditorHandle } from "../prompt-editor";
 import { SidebarToggle } from "../sidebar-panel";
-import { statusLabel } from "../status-dot";
 import { DirectoryPicker } from "../workspace-picker";
 import { type ToolChipLabels, ToolChipsContext } from "../tool-chips";
 import { RoutineDetail } from "../routines/routine-detail";
@@ -41,7 +41,7 @@ const NO_STARTERS: string[] = [];
 function BotComposer({ bot, connected, starters, completions }: { bot: Bot; connected: boolean; starters: string[]; completions: Completions | null }) {
 	const { request, send: post } = useDashboardActions();
 	const editorRef = useRef<PromptEditorHandle>(null);
-	const [text, setText] = useState("");
+	const [text, setText] = useComposerDraft(botDraftKey(bot.id), "");
 	const send = useAction(async (value: string) => {
 		await request({ t: "bot", change: { op: "message", id: bot.id, text: value } });
 		setText("");
@@ -94,14 +94,50 @@ function BotComposer({ bot, connected, starters, completions }: { bot: Bot; conn
 	);
 }
 
+/** The editor of a routine of `bot`, new or saved; the routine opens once the server has saved it, and a refused save says why. */
+function BotRoutineEditor({ bot, initial, isNew, connected }: { bot: Bot; initial: RoutineDraft; isNew: boolean; connected: boolean }) {
+	const { request } = useDashboardActions();
+	// The server sends the new routines before it answers, so the routine is there when the page opens it.
+	const save = useAction(async (spec: RoutineSpec) => {
+		await request({ t: "routine", change: { op: "save", routine: spec } });
+		location.hash = hashForBotRoutine(bot.id, { kind: "open", id: spec.id });
+	}, "Could not save the routine");
+	return (
+		<RoutineEditor
+			initial={initial}
+			isNew={isNew}
+			botName={bot.name}
+			connected={connected}
+			saving={save.pending}
+			onCancel={() => (location.hash = isNew ? hashForBots(bot.id) : hashForBotRoutine(bot.id, { kind: "open", id: initial.id }))}
+			onSave={spec => save.run(spec)}
+		/>
+	);
+}
+
+/** A new routine's editor, its id minted as it opens. */
+function NewBotRoutine({ bot, connected }: { bot: Bot; connected: boolean }) {
+	const [initial] = useState(() => newDraft(crypto.randomUUID(), bot.id));
+	return <BotRoutineEditor bot={bot} initial={initial} isNew connected={connected} />;
+}
+
+/** In place of a routine the Bot does not have, deleted or never made, with the way back to the conversation. */
+function MissingRoutine({ bot }: { bot: Bot }) {
+	return (
+		<PageFrame title="No such routine" meta={`${bot.name}'s routine`}>
+			<div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 py-10 text-center text-sm text-pretty text-muted-foreground">
+				<p>{bot.name} has no routine at this address. It may have been deleted.</p>
+				<Button asChild variant="ghost" size="compact">
+					<a href={hashForBots(bot.id)}>Back to {bot.name}</a>
+				</Button>
+			</div>
+		</PageFrame>
+	);
+}
+
 interface BotPageProps {
-	bot: Bot;
-	/** The Bot's routine whose settings and runs show in place of the conversation, {@link NEW_ROUTINE} for a new one's editor, `null` for the conversation. */
-	routine: string | null;
-	/** Every routine, the Bot's among them. */
-	routines: readonly Routine[];
-	/** Every session, since a Bot's workspace may be one the sidebar hides. */
-	hosts: RosterHost[];
+	/** The Bot, and what its page shows. */
+	open: OpenBot;
 	past: PastSession[];
 	lastHosts: ReadonlyMap<string, RosterHost>;
 	models: ReadonlyMap<string, ModelList>;
@@ -115,45 +151,38 @@ interface BotPageProps {
 }
 
 /** The Bot's header and its conversation, live, ended, or not begun, its name showing or hiding its details in the right sidebar; or one of its routines, or the routine editor, in its place. */
-export function BotPage({ bot, routine, routines, hosts, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
-	const { send } = useDashboardActions();
-	const [editing, setEditing] = useState<RoutineDraft | null>(null);
-	// The route remounts the page, so a new routine's id holds while its editor shows.
-	const [created] = useState(() => newDraft(crypto.randomUUID(), bot.id));
-	const own = useMemo(() => routines.filter(({ botId }) => botId === bot.id), [routines, bot.id]);
-	const host = botHost(bot, hosts);
+export function BotPage({ open, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
+	const { bot, host, view, routine, status } = open;
 	const instanceId = host?.instanceId ?? null;
-	const conversation = botView(bot, hosts);
-	// Keyed by its address, since botView builds a new view on each render.
-	const pane = conversation && hashForView(conversation);
-	const view = useMemo(() => conversation, [pane]);
 	const toolChips = useMemo<ToolChipLabels>(() => ({ [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } }), [bot.name]);
 	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
-	const isNew = routine === NEW_ROUTINE;
-	if (editing || isNew) {
-		return (
-			<RoutineEditor
-				initial={editing ?? created}
-				isNew={isNew}
-				botName={bot.name}
-				connected={connected}
-				onCancel={() => (isNew ? (location.hash = hashForBots(bot.id)) : setEditing(null))}
-				onSave={spec => {
-					send({ t: "routine", change: { op: "save", routine: spec } });
-					setEditing(null);
-					location.hash = hashForBotRoutine(bot.id, spec.id);
-				}}
-			/>
-		);
+	switch (routine.kind) {
+		case "new":
+			return <NewBotRoutine bot={bot} connected={connected} />;
+		case "edit":
+			return <BotRoutineEditor key={routine.routine.id} bot={bot} initial={draftOf(routine.routine)} isNew={false} connected={connected} />;
+		case "open":
+			return (
+				<RoutineDetail
+					routine={routine.routine}
+					botName={bot.name}
+					connected={connected}
+					onEdit={() => (location.hash = hashForBotRoutine(bot.id, { kind: "edit", id: routine.routine.id }))}
+				/>
+			);
+		case "missing":
+			return <MissingRoutine bot={bot} />;
+		case "conversation":
+			break;
+		default: {
+			const never: never = routine;
+			return never;
+		}
 	}
-	// A routine just saved shows once the server sends it back, and the conversation until then.
-	const shown = routine === null ? undefined : own.find(({ id }) => id === routine);
-	if (shown) return <RoutineDetail routine={shown} botName={bot.name} connected={connected} onEdit={() => setEditing(draftOf(shown))} />;
-	const status = host ? statusLabel(host.status) : bot.sessionId ? "not running" : "no conversation yet";
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header
-				leading={<BotAvatar look={bot} size="header" working={host?.status === "working"} asking={host?.status === "needs-input"} />}
+				leading={<BotAvatar look={bot} size="header" working={host?.status === "working"} asking={botAsking(host) !== null} />}
 				title={
 					<button
 						{...activityControl("bots.details")}

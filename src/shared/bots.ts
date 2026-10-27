@@ -61,6 +61,15 @@ export type BotEdit = Exclude<BotChange, { op: "message" }> | { op: "bind"; id: 
 /** The longest job a Bot keeps, since every turn's system prompt carries it. */
 export const MAX_JOB_LENGTH = 20_000;
 
+/** The longest fact `remember` keeps, one short sentence; the tool refuses a longer one. */
+export const MAX_FACT_LENGTH = 500;
+
+/**
+ * How much of a Bot's memory every turn's system prompt and every `bots` message carry: its newest whole lines within
+ * this many bytes of `memory.md`'s end, so a memory that grows for months costs each turn the same.
+ */
+export const MAX_MEMORY_BYTES = 16 * 1024;
+
 /** The last words of a Bot's conversation, which its sidebar row previews: when, in ms since the epoch, who said them, and the text as one line. */
 export interface BotLast {
 	at: number;

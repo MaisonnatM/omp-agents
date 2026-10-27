@@ -21,13 +21,15 @@ A run stays queued from its claim until the drain sends its message or starts it
 
 ## Routines from before Bots
 
-A routine from before Bots has no `botId`, and `RoutinesFile` gives it one as it reads the file; `RoutinesFile.migrate` saves that and creates the Bot it needs as a server starts, before the runner is built, and again as it takes over routines and rereads the file.
+A routine from before Bots has no `botId`, and `RoutinesFile` gives it one as it reads the file.
+Only the server that owns routines saves that and creates the Bot it needs, through `RoutinesFile.migrate`: as it takes ownership at start, before the runner recovers, and again as it takes over routines and rereads the file.
+Another server reads the migrated routines in memory and leaves both files alone.
 A `bot` task becomes a prompt of the Bot it named.
 Every other routine goes to one Bot named **Routines**, `ROUTINES_BOT_ID`, whose workspace is the first such routine's workspace, else the home directory, and whose job says it runs the routines moved there.
 A command whose workspace differs from that Bot's runs `cd` into its old workspace first, so it acts where it did.
 A prompt whose workspace differs starts with **Work in** and that workspace, and a prompt with a skill starts with `/skill:` and the skill's name.
 The pin goes, since a Bot's conversation is never ended.
-The Routines Bot is created only when it is missing, so a migration that runs again reuses it, and a file already migrated changes nothing.
+The Routines Bot is created only when it is missing, through the lists so pages hear of it, so a migration that runs again reuses it, and a file already migrated changes nothing.
 
 ## The runner
 
@@ -67,8 +69,10 @@ Triggers add no integration of their own: they read what the bell's checks alrea
 The `Dashboard` wraps four of the `NoticeSources`, `pullRequests`, `slack`, `localEvents`, and `googleEvents`, so each answer also goes, unchanged, through the helpers in `src/server/routine-triggers.ts`, which turn it into sightings.
 A sighting has an id that names what it saw in the state it saw it, and a scope, which one answer covers:
 
-- **Pull requests**: each pull request of a repository GitHub answered for, by its status as `moveOf` reads it without the sessions on it, so a pull request that shows up or changes status is new; scope `pull-request:<owner/repo>`.
+- **Pull requests**: each pull request of a repository GitHub answered for whose move is yours, by that move as `moveOf` reads it with the sessions on it, as the bell reads it; scope `pull-request:<owner/repo>`.
+  A pull request is new when its move becomes yours or changes to another of yours, so a draft, checks still running, or a session at work on it, such as a Bot pushing a fix, fires nothing until it ends in a move of yours.
 - **Slack**: each conversation's newest message that waits on you, by Slack's id for it; scope `slack`.
+  While Slack is signed out, the check forgets the scope, so the first answer after signing in sets a new baseline and fires nothing for messages already waiting.
 - **Gmail**: each unread conversation of an inbox that answered, by its last message's arrival, so new mail, in a new conversation or an old one, is new; scope `gmail:<account>`.
 - **Calendar events**: each timed event that starts within the bell's 10-minute lead, by its event and start, so it is new once as it comes within the lead and again if it moves; scope `event:local`, or `event:google/<account>` for an account that answered.
 
@@ -80,7 +84,8 @@ Every server learns its sightings, but only the server that owns routines fires 
 A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
 A prompt run sends the prompt, then the events, fenced as data; a command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run, which `runShell` sets beside the server's environment.
 Each event carries its kind, a title, a detail of at most 2,000 characters, and a link when it has one.
-The pull request and Slack checks run on the 2-minute activity tick, which skips while no page listens; the owner runs them anyway while an enabled routine has a `slack` or `pull-request` trigger.
+The pull request and Slack checks run on the 2-minute activity tick, which checks both while a page listens; while none does, the owner checks only the kinds an enabled routine has a trigger for, by `watchedKinds`, and another server checks nothing.
+A page that opens after a tick checked only some kinds checks both again.
 On the same tick, the owner reads the Gmail inboxes, 50 conversations each as the Email page lists them, while an enabled routine has a `gmail` trigger, and fires once both reads end.
 Calendar events are checked on the minute tick.
 

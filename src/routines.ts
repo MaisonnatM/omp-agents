@@ -135,8 +135,8 @@ export const isDue = (routine: Routine, now: number): boolean =>
 /** Whether `routine` runs when a trigger of `kind` sees something happen. */
 export const isTriggeredBy = (routine: Routine, kind: TriggerKind): boolean => routine.enabled && routine.triggers.some(trigger => trigger.kind === kind);
 
-/** Whether a routine of `routines` runs when a trigger of one of `kinds` sees something happen. */
-export const watchesAny = (routines: readonly Routine[], kinds: readonly TriggerKind[]): boolean => routines.some(routine => kinds.some(kind => isTriggeredBy(routine, kind)));
+/** The trigger kinds some enabled routine of `routines` runs on, so a check reads only what a routine watches. */
+export const watchedKinds = (routines: readonly Routine[]): TriggerKind[] => TRIGGER_KINDS.filter(kind => routines.some(routine => isTriggeredBy(routine, kind)));
 
 /** Whether `routine` already holds every field the page edits of `spec`. */
 function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
