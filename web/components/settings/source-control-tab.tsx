@@ -21,7 +21,8 @@ import { age, folderName } from "../../labels";
 import { useMergeMethodChoice } from "../../merge-method";
 import { IntegrationList } from "../integrations/integration-row";
 import { OrgIcon } from "../org-icon";
-import { Section, SettingSwitch } from "./editor";
+import { Section } from "./editor";
+import { ToggleSwitch } from "../toggle-switch";
 
 const PROVIDERS: Record<SourceControlProvider, { name: string; summary: string; signIn: string }> = {
 	github: { name: "GitHub", summary: "Reads your pull requests, changes them, and merges them through the gh CLI.", signIn: "gh auth login" },
@@ -111,7 +112,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 			<Section title="Automatically pull" meta="Keeps the default branch current when the checkout has no local changes or commits. Projects can override it.">
 				<p className="text-xs text-muted-foreground">Each repository your workspaces use is a project; its own choice wins over the default.</p>
 				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-					<SettingSwitch label="Automatically pull" checked={on} disabled={!answer || pending} onCheckedChange={next => void change({ op: "default", on: next })} />
+					<ToggleSwitch aria-label="Automatically pull" checked={on} disabled={!answer || pending} onCheckedChange={next => void change({ op: "default", on: next })} />
 					Pull every five minutes
 				</label>
 				{error && (
@@ -152,7 +153,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 			<Section title="After a merge" meta="Once a pull request merges, from the dashboard or anywhere else, each session the dashboard started that it leaves idle with every pull request merged or closed ends.">
 				<p className="text-xs text-muted-foreground">Its linked worktree and the merged branch go too, unless another session still works there, the worktree has changes, or the branch has commits the merge did not take. Sessions you run in a terminal never end. A project's workers follow the project's own setting.</p>
 				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-					<SettingSwitch label="Clean up after a merge" checked={answer?.cleanUp ?? true} disabled={!answer || pending} onCheckedChange={next => void change({ op: "clean-up", on: next })} />
+					<ToggleSwitch aria-label="Clean up after a merge" checked={answer?.cleanUp ?? true} disabled={!answer || pending} onCheckedChange={next => void change({ op: "clean-up", on: next })} />
 					End finished sessions and remove their worktrees and branches
 				</label>
 			</Section>

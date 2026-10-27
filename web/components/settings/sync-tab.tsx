@@ -7,7 +7,8 @@ import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { age } from "../../labels";
 import { IntegrationList } from "../integrations/integration-row";
-import { FIELD, Section, SettingSwitch } from "./editor";
+import { FIELD, Section } from "./editor";
+import { ToggleSwitch } from "../toggle-switch";
 
 const SKIP_REASON: Record<SyncSkip["reason"], string> = { link: "a link", binary: "not text", large: "over 1 MB", credential: "looks like it holds a credential" };
 const SIDE_LABEL: Record<SyncSide, string> = { local: "This machine", remote: "Remote" };
@@ -200,8 +201,8 @@ export function SyncTab({ active }: { active: boolean }) {
 										<p className="truncate text-[13px] font-medium">{item.label}</p>
 										<p className="truncate text-xs text-muted-foreground">{item.detail}</p>
 									</div>
-									<SettingSwitch
-										label={`Sync ${item.label}`}
+									<ToggleSwitch
+										aria-label={`Sync ${item.label}`}
 										checked={on}
 										disabled={!answer || pending !== null}
 										onCheckedChange={next => void save({ ...settings, excluded: next ? settings.excluded.filter(id => id !== item.id) : [...settings.excluded, item.id] })}
