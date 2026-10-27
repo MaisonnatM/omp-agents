@@ -104,6 +104,8 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (page?.kind === "settings") show(layout);
 				else navigate({ kind: "settings", ...settings });
 			},
+			back: () => history.back(),
+			forward: () => history.forward(),
 			"pull-requests": goTo["pull-requests"],
 			tickets: goTo.tickets,
 			newTicket: () => {

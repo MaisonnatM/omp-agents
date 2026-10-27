@@ -79,12 +79,12 @@ function HistoryButtons() {
 	const ends = useSyncExternalStore(subscribeHistory, historyEnds);
 	return (
 		<div className="flex items-center gap-0.5 [-webkit-app-region:no-drag]">
-			<Tooltip content="Back" side="bottom">
+			<Tooltip content="Back" shortcut={shortcutLabels("back")} side="bottom">
 				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!(ends & 1)} onClick={() => history.back()}>
 					<ChevronLeft />
 				</Button>
 			</Tooltip>
-			<Tooltip content="Forward" side="bottom">
+			<Tooltip content="Forward" shortcut={shortcutLabels("forward")} side="bottom">
 				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!(ends & 2)} onClick={() => history.forward()}>
 					<ChevronRight />
 				</Button>

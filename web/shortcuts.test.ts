@@ -127,9 +127,11 @@ test("↓ and ↑ step through sessions, pull requests, todos, notes, conversati
 	expect(press("k", "KeyK")).toEqual([]);
 });
 
-test("Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", () => {
-	expect(press("[", "BracketLeft", { ctrl: true })).toEqual(["previousSession"]);
-	expect(press("]", "BracketRight", { ctrl: true })).toEqual(["nextSession"]);
+test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+arrows step through sessions, and Alt+Shift+arrows move a todo", () => {
+	expect(press("[", "BracketLeft", { ctrl: true })).toEqual(["back"]);
+	expect(press("]", "BracketRight", { ctrl: true })).toEqual(["forward"]);
+	expect(press("ArrowUp", "ArrowUp", { ctrl: true, alt: true })).toEqual(["previousSession"]);
+	expect(press("ArrowDown", "ArrowDown", { ctrl: true, alt: true })).toEqual(["nextSession"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual([]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["moveUp"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);

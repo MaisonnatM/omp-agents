@@ -11,11 +11,12 @@ Alt is Option on macOS.
 | Shift+Tab | Composer | Cycle the thinking level |
 | ↑ | Empty composer | Move the last queued message back into the composer |
 | Cmd+K | Anywhere | Open the command menu |
+| Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the title bar's Back and Forward buttons do |
 | Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
 | Cmd+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+Shift+X | Anywhere | End the focused session |
-| Cmd+[ | Anywhere | Open the previous session in the sidebar |
-| Cmd+] | Anywhere | Open the next session in the sidebar |
+| Cmd+Alt+↑ | Anywhere | Open the previous session in the sidebar |
+| Cmd+Alt+↓ | Anywhere | Open the next session in the sidebar |
 | ↓ / ↑ | Sessions, outside text fields | Open the next or previous session in the sidebar |
 | Cmd+Alt+/ | Anywhere | Choose the session's model |
 | Cmd+Alt+P | Anywhere | Choose the session's working directory |
@@ -103,7 +104,7 @@ Alt is Option on macOS.
   You stay on the page you were on.
   The title can end with a due day or a `#category`, as in [Todo list](todo-list.md).
   With Linear connected, it also offers **Create ticket**, which opens the new-ticket dialog with what you typed as the title; see [Linear tickets](linear-tickets.md).
-  Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
+  Cmd+Alt+↑ and Cmd+Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑ do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
 - Cmd+N opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
