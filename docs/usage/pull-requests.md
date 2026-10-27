@@ -115,6 +115,7 @@
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
   Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the app keeps the last one of each workspace.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
+  While fewer than 1000 of your GitHub token's hourly GraphQL points are left, which your agents' `gh` and `gt` share, the list stops asking GitHub and says `Cannot refresh pull requests: GitHub quota low until HH:MM`, keeping the list it has until the quota resets; details you open, and every change you make, still go to GitHub until the quota is spent.
   A pull request's details open on **Summary**.
   A session's **PRs** sidebar shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
   While the Pull requests page shows a PR, Cmd+Shift+K copies its `#N` and Cmd+Shift+C copies its GitHub link.

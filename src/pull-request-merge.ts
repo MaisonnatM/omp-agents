@@ -2,7 +2,7 @@
  * Merging a pull request on GitHub: the merge itself, the steps a merge that waits until it is ready takes (update the
  * branch, retarget it, mark it ready, arm auto-merge), and the reads that say which step comes next.
  */
-import { dataOf, ghGraphql, ghMutation, mergeStateOf, STATUS } from "./github";
+import { dataOf, ghGraphql, ghMutation, ghPolledGraphql, mergeStateOf, STATUS } from "./github";
 import { isObject, str } from "./json";
 import { type CheckState, type MergeState, type PullRequest, pullRequestName, prKey, type UpdateMethod } from "./shared/github";
 import type { MergeMethod } from "./shared/source-control";
@@ -117,7 +117,7 @@ export interface PullRequestState {
 	head: string;
 }
 
-/** The state of each of `prs`, by {@link prKey}, with one `gh api graphql` call per repository; a pull request GitHub does not answer is left out. */
+/** The state of each of `prs`, by {@link prKey}, with one `gh api graphql` call per repository, which waits out a low quota; a pull request GitHub does not answer is left out. */
 export async function readPullRequestStates(prs: readonly PullRequest[]): Promise<Map<string, PullRequestState>> {
 	const states = new Map<string, PullRequestState>();
 	const byRepo = Map.groupBy(prs, pr => `${pr.owner}/${pr.repo}`);
@@ -125,7 +125,7 @@ export async function readPullRequestStates(prs: readonly PullRequest[]): Promis
 		const [{ owner, repo }] = group as [PullRequest];
 		const numbers = [...new Set(group.map(pr => pr.number))];
 		const fields = numbers.map(number => `p${number}: pullRequest(number: ${number}) { state headRefName headRefOid }`).join("\n");
-		const data = dataOf(await ghGraphql(`query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { ${fields} } }`, { owner, repo }));
+		const data = dataOf(await ghPolledGraphql(`query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { ${fields} } }`, { owner, repo }));
 		const repository = isObject(data.repository) ? data.repository : {};
 		for (const number of numbers) {
 			const node = repository[`p${number}`];

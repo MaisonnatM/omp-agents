@@ -3,7 +3,8 @@
  * terms. The repository and pull request keys, which the page uses too, live in `shared/github.ts`.
  */
 import { createCache } from "./cache";
-import { isObject, str } from "./json";
+import { GithubQuota, parseRateLimit } from "./github-quota";
+import { errorText, isObject, str } from "./json";
 import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
@@ -48,6 +49,9 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 	);
 }
 
+/** The dashboard's share of the user's GraphQL budget, read from `gh api rate_limit`, which spends none of it. */
+export const githubQuota = new GithubQuota(async () => parseRateLimit(await runJson(["gh", "api", "rate_limit"], { timeoutMs: GH_TIMEOUT_MS })));
+
 /**
  * GitHub's printed answer even when `gh` exited non-zero, as callers read refusals and GraphQL partial data from it.
  * The access layer saw the failure first: it classified quota exhaustion, which still rejects.
@@ -69,6 +73,15 @@ export function ghGraphql(query: string, vars: Record<string, string | number>, 
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
 	const argv = ["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields];
 	return answered(access.request("graphql", () => runJson(argv, { timeoutMs: GH_TIMEOUT_MS }), () => resetOf("graphql")));
+}
+
+/**
+ * {@link ghGraphql} for a read the dashboard makes on its own, such as the pull request list it polls: while
+ * {@link githubQuota} holds the budget's last points for agents, it throws `GithubQuotaPaused` naming when reads resume, without asking GitHub.
+ */
+export async function ghPolledGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
+	await githubQuota.admit();
+	return ghGraphql(query, vars, paginate);
 }
 
 /** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */

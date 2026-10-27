@@ -8,6 +8,7 @@
   `ghRest`, `ghGraphql`, and their write helpers run through the installed kit's `GitHubAccess`, which pauses only the exhausted REST or GraphQL budget until its reset, across processes; the `createCache` layers above them are the only answer caches.
   Quota failures remain failures, not authentication diagnoses or stale successful answers.
   `runJson` in `src/proc.ts` rejects a non-zero exit with the kit's `CommandError` even when stdout parses, keeping the parsed answer; `answered` in `src/github.ts` returns that answer, so GitHub's refusals and GraphQL's partial `data` still reach the caller that classifies them, such as a batched merge read that keeps the pull requests GitHub did answer.
+  On top of that, the list's query, the stack's, and the merge cleanup's state reads go through `ghPolledGraphql` in `src/github.ts`, which asks `githubQuota` first; `src/github-quota.ts` holds `GithubQuota`, which keeps them from spending the last `GRAPHQL_RESERVE` GraphQL points, until the quota resets, and `GithubQuotaPaused`, the error that names when.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
   The list leaves out a pull request whose own state says closed, which the open searches still return for up to a minute after a close, since GitHub's search index lags it.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either; the details count `unresolved` from the threads they keep, so their counts and threads agree.
