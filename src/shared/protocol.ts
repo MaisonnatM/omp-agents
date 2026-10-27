@@ -50,7 +50,7 @@ export type ServerMsg =
 	| { t: "user-notes"; list: UserNoteList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
-	/** Every Bot, whole, what each remembers, and the last words of its conversation, sent when a socket opens, after every change, and after each turn of a Bot's conversation. */
+	/** Every Bot, whole, what each remembers, and the last words of its conversation, sent when a socket opens, after every change, and as each turn of a Bot's conversation starts and ends. */
 	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string>; lasts: Record<BotId, BotLast | null> }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }

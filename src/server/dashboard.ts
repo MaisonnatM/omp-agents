@@ -722,6 +722,8 @@ export class Dashboard {
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnStarted(sessionId);
+				// Its row moves up with the prompt that started the turn.
+				if (this.#bots.isBot(instanceId)) this.#broadcasts.pushList("bots");
 				return;
 			}
 			case "turn-ended": {

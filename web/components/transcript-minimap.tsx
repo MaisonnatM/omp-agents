@@ -8,7 +8,7 @@ import { type ComponentProps, memo, type RefObject, useEffect, useMemo, useRef, 
 import type { Item } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { skillLabel } from "../labels";
+import { plainMarkdown, skillLabel } from "../labels";
 import { type OutlineTurn, outline } from "../transcript-view";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import { Tooltip } from "./ui/tooltip";
@@ -93,21 +93,8 @@ function useReadingTurn(turns: OutlineTurn[], rail: RefObject<HTMLElement | null
 	return { current, jump };
 }
 
-/** A leading bold label such as `**Résumé**` or `**Summary:**`, which every reply of a format repeats. */
-const LEAD_LABEL = /^\s*\*\*[^*\n]{1,24}\*\*\s*[:.—–-]?\s*/;
-
-/** Markdown read as the words it renders, on one line, so `**Résumé** Done.` reads as `Done.` */
-const plain = (text: string): string =>
-	text
-		.replace(LEAD_LABEL, "")
-		.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-		.replace(/^\s*(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
-		.replace(/\*\*|__|`/g, "")
-		.replace(/\s+/g, " ")
-		.trim();
-
 /** Cut long before the card would show it all, so a long message's accessible name stays short. */
-const excerpt = (text: string): string => plain(text).slice(0, 240);
+const excerpt = (text: string): string => plainMarkdown(text).slice(0, 240);
 
 const titleOf = (turn: OutlineTurn): string => [turn.skill && skillLabel(turn.skill), excerpt(turn.prompt)].filter(Boolean).join(" · ") || "Prompt";
 
