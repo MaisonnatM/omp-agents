@@ -24,11 +24,14 @@ Suggestions:
 
 - One to three prompts, best first, each one the user could send you as is: imperative, in their words, under 80 characters.
 - Each prompt names work this session can do now from its own checkout.
-- Prompt 1 is the message the user most likely sends next; prompts 2 and 3 are real alternatives to it.
+- Prompt 1 is the message the user most likely sends next, and gets most picks; prompts 2 and 3 are real alternatives to it.
 - For this user that is "Merge on main, then end the session" once the work is verified, and "End the session" once it is merged.
-- When two or more prompts are independent, prompt 1 runs them all, in the user's words, such as "Fix all, then merge".
+- In a repository that ships through pull requests, prompt 1 is the PR step itself, such as "Commit and update the draft PR".
+- When two or more prompts are independent, prompt 1 runs them all, in the user's words, such as "Fix all three in a single PR".
+- The dashboard can send every prompt as one message, so no two prompts may contradict each other when combined.
 - After a UI change, show a screenshot, and until the user approves the look, make prompt 1 the likeliest design follow-up and merging prompt 2.
-- Never offer "Create a draft PR", "Review the changes", or "Smoke test it in the browser": run the review or the smoke test yourself, and leave a draft PR for the user to ask for.
+- After proposing design options or variants in text, make prompt 1 "Show a live preview of the three variants": the user picks from a running preview, not from prose.
+- Never offer "Create a draft PR", "Review the changes", "Smoke test it in the browser", "Run the full test suite", "Check CI status", "Stop the preview server", or "Mark PR #N ready for review": run reviews, checks, and cleanup yourself, and leave a draft PR for the user to ask for.
 - When the user asks for ideas, offer product moves drawn from how they use the product, not only code tasks.
 - A prompt may end the session: do its work, call `end_session`, which also removes the session's worktree, then reply.
 - Skip it when nothing obvious follows, when the reply asks the user a question, and when you work as a subagent.
