@@ -2,7 +2,7 @@ import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import type { OpenBot } from "../bots-model";
+import { botRows, type OpenBot } from "../bots-model";
 import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
@@ -22,6 +22,7 @@ import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
 import { BotPage, NewBot } from "./bots/bot-page";
+import { BotsGallery } from "./bots/bots-gallery";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
@@ -60,7 +61,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -102,6 +103,7 @@ export const PageSwitch = memo(function PageSwitch({
 	userNotes,
 	routines,
 	bots,
+	botLasts,
 	openBot,
 	workspaceList,
 	pins,
@@ -194,7 +196,10 @@ export const PageSwitch = memo(function PageSwitch({
 		case "notes":
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "bots": {
-			if (page.target === null) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
+			if (page.target === null) {
+				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
+				return <BotsGallery rows={bots === null ? null : botRows(bots, hosts, botLasts)} routines={routines} />;
+			}
 			if (!openBot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
 			return (
 				// Keyed by the Bot, so another Bot's page starts with its own drafts.

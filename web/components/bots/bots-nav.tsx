@@ -7,14 +7,14 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { botAsking, botStatus, type BotRow } from "../../bots-model";
 import { mailTime } from "../../labels";
-import { hashForBots } from "../../routing";
+import { hashForBots, hashForNewBot } from "../../routing";
 import { SidebarSearch } from "../sidebar-search";
 import { BotAvatar } from "./bot-avatar";
 
 interface BotsNavProps {
 	/** `null` until the server sends the Bots. */
 	rows: readonly BotRow[] | null;
-	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while another page or the panes show. */
+	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while the gallery, another page, or the panes show. */
 	openId: string | null | undefined;
 }
 
@@ -30,7 +30,7 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 				</div>
 				<Tooltip content="New Bot" side="bottom">
 					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
-						<a href={hashForBots(null)} aria-label="New Bot" aria-current={openId === null ? "page" : undefined}>
+						<a href={hashForNewBot()} aria-label="New Bot" aria-current={openId === null ? "page" : undefined}>
 							<Plus />
 						</a>
 					</Button>

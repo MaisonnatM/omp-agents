@@ -98,7 +98,7 @@ export const AppSidebar = memo(function AppSidebar({
 			newSessionOpen={page?.kind === "new"}
 			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
 			bots={botList}
-			botsOpen={page?.kind === "bots" ? page.target : undefined}
+			botsOpen={page?.kind !== "bots" ? undefined : page.target === null ? (page.adding ? null : undefined) : page.target}
 			tabs={tabs}
 			tab={tab}
 			onTab={onTab}

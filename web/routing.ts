@@ -112,10 +112,10 @@ export interface NotesRoute {
 }
 
 /**
- * A Bot's page, its conversation beside the right sidebar's details: its look, name, job, memory, and routines; `null` for the New Bot form.
- * `routine` names what shows in place of the conversation, `null` for none.
+ * A Bot's page, its conversation beside the right sidebar's details: its look, name, job, memory, and routines; `null` for the gallery of
+ * every Bot, or the New Bot form while `adding`. `routine` names what shows in place of the conversation, `null` for none.
  */
-export type BotsRoute = { target: null } | { target: string; routine: BotRoutineRoute | null };
+export type BotsRoute = { target: null; adding: boolean } | { target: string; routine: BotRoutineRoute | null };
 
 /** A new routine's editor, one of the Bot's routines with its settings and runs, or that routine's editor. */
 export type BotRoutineRoute = { kind: "new" } | { kind: "open"; id: string } | { kind: "edit"; id: string };
@@ -195,8 +195,9 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
  * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
- * - `#bots` opens the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines/<routine id>` the settings and runs of that Bot's routine,
- *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; routine ids are UUIDs, so none reads as `new`.
+ * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines/<routine id>`
+ *   the settings and runs of that Bot's routine, `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new`
+ *   a new routine's editor; Bot and routine ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
@@ -225,8 +226,9 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 	notes: (rest, query) => ({ kind: "notes", list: rest === "agents" ? { kind: "agents" } : { kind: "all" }, open: query.get("open") || null }),
 	bots: rest => {
+		if (rest === "new") return { kind: "bots", target: null, adding: true };
 		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
-		if (!target) return { kind: "bots", target: null };
+		if (!target) return { kind: "bots", target: null, adding: false };
 		return { kind: "bots", target, routine: routines === "routines" && routine ? botRoutineRoute(routine, more) : null };
 	},
 	calendar: () => ({ kind: "calendar" }),
@@ -259,7 +261,7 @@ function restOfPage(page: Page): string | null {
 		case "notes":
 			return page.list.kind === "all" ? null : page.list.kind;
 		case "bots":
-			if (page.target === null) return null;
+			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/routines/${restOfBotRoutine(page.routine)}`;
 		case "email":
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
@@ -318,7 +320,8 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
 }
 export const hashForNotes = (list: NotesListView, open: string | null = null): string => hashForPage({ kind: "notes", list, open });
-export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target } : { kind: "bots", target, routine: null });
+export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
+export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });

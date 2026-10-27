@@ -148,7 +148,7 @@ interface RosterProps {
 	scheduledOpen: string | null;
 	/** Every Bot's row, whatever the workspace, the most recent conversation first; `null` until the server sends the Bots. */
 	bots: readonly BotRow[] | null;
-	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while another page or the panes show. */
+	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while the gallery, another page, or the panes show. */
 	botsOpen: string | null | undefined;
 	/** The tabs the bar draws, the header switch's group's shown tabs, in order, which the position keys count. */
 	tabs: readonly SidebarTab[];

@@ -8,6 +8,7 @@ import {
 	closePane,
 	endSession,
 	hashForBots,
+	hashForNewBot,
 	hashForEmail,
 	hashForPullRequests,
 	hashForLayout,
@@ -175,8 +176,10 @@ describe("layout hash", () => {
 		const id = "3f2a9c1e-7b4d-4e8a-9f61-0c2d5e8b7a14";
 		const bots = (routine: BotRoutineRoute | null): Route => ({ kind: "page", page: { kind: "bots", target: "a b", routine } });
 		expect(hashForBots(null)).toBe("#bots");
+		expect(hashForNewBot()).toBe("#bots/new");
 		expect(hashForBots("a b")).toBe("#bots/a%20b");
-		expect(routeFromHash("#bots")).toEqual({ kind: "page", page: { kind: "bots", target: null } });
+		expect(routeFromHash("#bots")).toEqual({ kind: "page", page: { kind: "bots", target: null, adding: false } });
+		expect(routeFromHash("#bots/new")).toEqual({ kind: "page", page: { kind: "bots", target: null, adding: true } });
 		expect(routeFromHash("#bots/a%20b")).toEqual(bots(null));
 		for (const routine of [{ kind: "open", id }, { kind: "edit", id }, { kind: "new" }] as const) {
 			expect(routeFromHash(hashForBotRoutine("a b", routine))).toEqual(bots(routine));
@@ -227,7 +230,7 @@ describe("layout hash", () => {
 	test("a malformed percent-escape names nothing instead of throwing: the page opens without its target, and its pane drops", () => {
 		const page = (page: Page): Route => ({ kind: "page", page });
 		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: { kind: "all" }, open: null }));
-		expect(routeFromHash("#bots/%zz")).toEqual(page({ kind: "bots", target: null }));
+		expect(routeFromHash("#bots/%zz")).toEqual(page({ kind: "bots", target: null, adding: false }));
 		expect(routeFromHash("#bots/b1/routines/%zz")).toEqual(page({ kind: "bots", target: "b1", routine: null }));
 		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));
 		expect(routeFromHash("#pull-requests/acme/web/1/files/%E0")).toEqual(page({ kind: "pull-requests", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));

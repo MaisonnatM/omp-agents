@@ -259,6 +259,7 @@ export function App() {
 																	userNotes={state.userNotes}
 																	routines={state.routines}
 																	bots={state.bots}
+																	botLasts={state.botLasts}
 																	openBot={openBot}
 																	workspaceList={state.workspaceList}
 																	pins={state.pins}

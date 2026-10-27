@@ -43,7 +43,7 @@ describe("Bots", () => {
 	test("no Bot is open on another page, on the New Bot form, while the Bots load, or for a Bot that is gone", () => {
 		const bots = [bot("s2")];
 		expect(openBot({ kind: "bots", target: "ranger", routine: null }, bots, [], [])).toBeNull();
-		expect(openBot({ kind: "bots", target: null }, bots, [], [])).toBeNull();
+		expect(openBot({ kind: "bots", target: null, adding: false }, bots, [], [])).toBeNull();
 		expect(openBot({ kind: "bots", target: "scout", routine: null }, null, [], [])).toBeNull();
 		expect(openBot({ kind: "calendar" }, bots, [], [])).toBeNull();
 		expect(openBot(null, bots, [], [])).toBeNull();
