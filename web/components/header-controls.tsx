@@ -1,6 +1,6 @@
 /** The Dev and Ops switch, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header. */
-import { Search } from "lucide-react";
-import { createContext, memo, type ReactNode, useContext } from "react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { createContext, memo, type ReactNode, useContext, useSyncExternalStore } from "react";
 import type { Notice } from "../../src/shared/notices";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -68,11 +68,37 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 	);
 });
 
-/** The window's title bar: a drag strip with the window's buttons inset at its left, the document title centered, and the controls at its right. */
+/** Whether the window's history has an entry behind and ahead, from the Navigation API that Electron's Chromium provides. */
+function subscribeHistory(onChange: () => void) {
+	navigation.addEventListener("currententrychange", onChange);
+	return () => navigation.removeEventListener("currententrychange", onChange);
+}
+const historyEnds = () => (navigation.canGoBack ? 1 : 0) | (navigation.canGoForward ? 2 : 0);
+
+function HistoryButtons() {
+	const ends = useSyncExternalStore(subscribeHistory, historyEnds);
+	return (
+		<div className="flex items-center gap-0.5 [-webkit-app-region:no-drag]">
+			<Tooltip content="Back" side="bottom">
+				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!(ends & 1)} onClick={() => history.back()}>
+					<ChevronLeft />
+				</Button>
+			</Tooltip>
+			<Tooltip content="Forward" side="bottom">
+				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!(ends & 2)} onClick={() => history.forward()}>
+					<ChevronRight />
+				</Button>
+			</Tooltip>
+		</div>
+	);
+}
+
+/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward, the document title centered, and the controls at its right. */
 export function DesktopTitleBar({ title, controls }: { title: string; controls: ReactNode }) {
 	return (
-		<div className="relative flex h-9 shrink-0 items-center justify-end border-b border-border bg-sidebar px-3 select-none [-webkit-app-region:drag]">
+		<div className="relative flex h-9 shrink-0 items-center justify-between border-b border-border bg-sidebar pr-3 pl-[78px] select-none [-webkit-app-region:drag]">
 			<p className="pointer-events-none absolute inset-x-40 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>
+			<HistoryButtons />
 			<div className="[-webkit-app-region:no-drag]">{controls}</div>
 		</div>
 	);

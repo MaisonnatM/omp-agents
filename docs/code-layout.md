@@ -66,6 +66,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
 - Keyboard shortcuts: the table in `web/shortcuts.ts`, the page-wide handlers in `web/use-page-shortcuts.ts`, and the reference dialog in `web/components/shortcuts-dialog.tsx`.
 - Dev and Ops switch, command menu button, notification bell, and Settings button: `HeaderControls` in `web/components/header-controls.tsx`, in the desktop app's title bar, `DesktopTitleBar` there, else at the end of each page's `Header`; the bell is `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
+  The title bar's Back and Forward buttons, at its top left after the window's buttons, are `HistoryButtons` in the same file.
 - System notifications of sessions that ask or finish, and the desktop app's Dock badge: `useAttention` in `web/use-attention.ts`, shown by `desktop/attention.ts` in the desktop app; their switch is `SessionNotifications` in `web/components/settings/preferences-tab.tsx`.
 - Pages, each routed by `web/routing.ts`:
   - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, with the board above its composer, `NewSessionBoard` in `new-session-board.tsx`, which lists what `web/new-session-board-model.ts` picks.
