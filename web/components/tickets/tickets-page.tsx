@@ -1,10 +1,10 @@
-/** `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them. */
-import { Plus } from "lucide-react";
+/** `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them, with the open one beside them. */
+import { ListTodo, Plus } from "lucide-react";
 import { useRef } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, ticketActions, ticketStart, type WorkActionId } from "../../quick-actions";
 import { useEditableRead } from "../../editable-read";
@@ -13,11 +13,12 @@ import { hashForTickets, type OpenMode } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
-import { shortcutLabels } from "../../shortcuts";
+import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
-import { DetailPage, ListPage, useReturnFocus } from "../list-page";
+import { PolledContent, PolledPageFrame, useReturnFocus } from "../list-page";
+import { type BarAction, CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
 import { TicketDetailContent } from "./ticket-details";
 import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
@@ -31,6 +32,8 @@ export const TICKETS_META = "Your assigned issues on Linear";
 interface GroupProps {
 	group: TicketGroup;
 	open: boolean;
+	/** The issue whose details show beside the list. */
+	target: string | null;
 	onToggle: () => void;
 	hosts: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
@@ -38,7 +41,7 @@ interface GroupProps {
 	onQuickAction: (ticket: Ticket, action: WorkActionId) => void;
 }
 
-function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickAction }: GroupProps) {
+function GroupSection({ group, open, target, onToggle, hosts, onOpen, quick, onQuickAction }: GroupProps) {
 	const { id } = ticketSection(group.status);
 	const [Icon, color] = statusIcon(group);
 	return (
@@ -60,6 +63,7 @@ function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickActi
 								key={row.id}
 								ticket={row}
 								nested={row !== ticket}
+								open={row.id === target}
 								sessions={sessionsOn({ kind: "ticket", id: row.id }, hosts)}
 								onOpen={onOpen}
 								pending={pendingOf(quick, { kind: "ticket", id: row.id })}
@@ -74,7 +78,7 @@ function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickActi
 }
 
 interface TicketsPageProps {
-	/** The issue whose details replace the list; `null` shows the list. */
+	/** The issue whose details show beside the list; `null` shows the list alone. */
 	target: string | null;
 	/** The group a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: SectionTarget | null;
@@ -87,7 +91,7 @@ interface TicketsPageProps {
 	hosts: RosterHost[];
 }
 
-/** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
+/** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them, and beside them the issue `target` names. */
 export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const { open, start: startSession, dismissStart, openNewTicket } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
@@ -99,77 +103,92 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const listRef = useRef<HTMLDivElement>(null);
 	useReturnFocus(target, id => id, id => document.getElementById(ticketRowId(id))?.querySelector<HTMLElement>("a"), poll.read, () => listRef.current);
 	useReveal(target === null ? section : null, folds, { token: section, block: "start", focus: true });
+	// On this page ⌘N creates a ticket, where the App's binding of it starts a session.
+	useShortcuts({ ticketsNew: () => openNewTicket("") });
 
-	if (target !== null) {
-		const listed = tickets.find(ticket => ticket.id === target) ?? null;
-		return (
-			<DetailPage
-				title={target}
-				meta={(detailRead.data ?? listed)?.title ?? "Linear issue"}
-				backHref={hashForTickets(null)}
-				backLabel="Back to tickets"
-				notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-				className="max-w-6xl pt-8"
-			>
-				<TicketDetailContent
-					key={target}
-					id={target}
-					listed={listed}
-					read={detailRead}
-					actions={ticket => (
-						<DetailQuickActions
-							actions={ticketActions(ticket)}
-							pending={pendingOf(quick, { kind: "ticket", id: target })}
-							onRun={action => {
-								if (action === "work" || action === "plan") start(ticket, action);
-							}}
-							sessions={sessionsOn({ kind: "ticket", id: target }, hosts)}
-							onOpen={open}
-						/>
-					)}
-				/>
-			</DetailPage>
-		);
-	}
+	const groups = ticketGroups(tickets);
+	// The rows in the list's order, sub-issues under their parents, which the open issue's previous and next step through.
+	const rows = groups.flatMap(group => group.entries.flatMap(({ ticket, subIssues }) => [ticket, ...subIssues]));
+	const at = rows.findIndex(row => row.id === target);
+	const stepTo = (row: Ticket | undefined, label: string, icon: BarAction["icon"]): BarAction => (row ? { label, icon, href: hashForTickets(row.id) } : { label, icon, onClick: undefined });
 
 	return (
-		<ListPage
+		<PolledPageFrame
 			title={TICKETS_TITLE}
 			meta={TICKETS_META}
-			noun="the tickets"
-			loading="Asking Linear for your issues…"
 			poll={poll}
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
 			actions={
-				<Tooltip content="Create a Linear issue, assigned to you" shortcut={shortcutLabels("newTicket")} side="bottom">
+				<Tooltip content="Create a Linear issue, assigned to you" shortcut={[...shortcutLabels("ticketsNew"), ...shortcutLabels("newTicket")]} side="bottom">
 					<Button variant="ghost" size="compact" leadingIcon={Plus} onClick={() => openNewTicket("")}>
 						New ticket
 					</Button>
 				</Tooltip>
 			}
-			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-			className="max-w-none space-y-1 px-4 pt-3"
 		>
-			{() => {
-				const groups = ticketGroups(tickets);
-				return (
-					<div ref={listRef} tabIndex={-1} className="space-y-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
-						{groups.length === 0 && <p className="text-sm text-muted-foreground">No issues assigned to you.</p>}
-						{groups.map(group => (
-							<GroupSection
-								key={group.status}
-								group={group}
-								open={!folds.isFolded(group.status)}
-								onToggle={() => folds.toggle(group.status)}
-								hosts={hosts}
-								onOpen={open}
-								quick={quick}
-								onQuickAction={start}
-							/>
-						))}
-					</div>
-				);
-			}}
-		</ListPage>
+			<TooltipProvider>
+				<ListSplit
+					widthKey="omp-agents.tickets-list-width"
+					resizeLabel="Resize the ticket list"
+					detailLabel="Open issue"
+					empty={{ icon: ListTodo, title: "No issue open", hint: "Click one to see its details here." }}
+					list={
+						<div className="space-y-1 px-2 pt-2 pb-6">
+							{quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
+							<PolledContent noun="the tickets" loading="Asking Linear for your issues…" poll={poll}>
+								{() => (
+									<div ref={listRef} tabIndex={-1} className="space-y-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+										{groups.length === 0 && <p className="px-3 text-sm text-muted-foreground">No issues assigned to you.</p>}
+										{groups.map(group => (
+											<GroupSection
+												key={group.status}
+												group={group}
+												open={!folds.isFolded(group.status)}
+												target={target}
+												onToggle={() => folds.toggle(group.status)}
+												hosts={hosts}
+												onOpen={open}
+												quick={quick}
+												onQuickAction={start}
+											/>
+										))}
+									</div>
+								)}
+							</PolledContent>
+						</div>
+					}
+					detail={
+						target === null ? null : (
+							<section key={target} aria-label={target} className="flex h-full min-h-0 min-w-0 flex-col">
+								<DetailBar
+									leading={at >= 0 && <span className="tabular-nums">{at + 1} of {rows.length}</span>}
+									previous={stepTo(rows[at - 1], "Previous issue", CH_PREVIOUS)}
+									next={at >= 0 ? stepTo(rows[at + 1], "Next issue", CH_NEXT) : stepTo(undefined, "Next issue", CH_NEXT)}
+									close={{ label: "Close", icon: CH_CLOSE, href: hashForTickets(null) }}
+								/>
+								<div className="min-h-0 flex-1 overflow-y-auto pb-6">
+									<TicketDetailContent
+										id={target}
+										listed={rows[at] ?? null}
+										read={detailRead}
+										actions={ticket => (
+											<DetailQuickActions
+												actions={ticketActions(ticket)}
+												pending={pendingOf(quick, { kind: "ticket", id: target })}
+												onRun={action => {
+													if (action === "work" || action === "plan") start(ticket, action);
+												}}
+												sessions={sessionsOn({ kind: "ticket", id: target }, hosts)}
+												onOpen={open}
+											/>
+										)}
+									/>
+								</div>
+							</section>
+						)
+					}
+				/>
+			</TooltipProvider>
+		</PolledPageFrame>
 	);
 }

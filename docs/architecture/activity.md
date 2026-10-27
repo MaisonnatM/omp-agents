@@ -82,7 +82,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Ask about this and the discussion panel | control, action | `ask-about.open`, `discussion.close`; actions `discuss`, `discuss-stop`; Send to session is action `prompt` |
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |
-| Notification bell and command menu button | control, command | `header.command-menu`, which opens the command palette as command `switcher` does; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags |
+| Dev and Ops switch, command menu button, notification bell, and Settings button | control, command | `header.group`; `header.command-menu`, which opens the command palette as command `switcher` does; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `header.settings`, which opens or closes Settings as command `settings` does |
 | System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switch in Settings › Preferences is a `PUT` |
 | Pages: New session | view | `new` |
 | Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view.list`, `pull-requests.view.board`; Rebase N behind is a `PUT` |

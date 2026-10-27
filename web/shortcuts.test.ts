@@ -22,8 +22,8 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("b", "KeyB", { ctrl: true, alt: true })).toEqual(["detailsSidebar"]);
 	expect(pressOn(true, "b", "KeyB", { meta: true, alt: true })).toEqual(["detailsSidebar"]);
 	expect(press("B", "KeyB", { ctrl: true, shift: true })).toEqual([]);
-	expect(press("n", "KeyN", { ctrl: true })).toEqual(["newSession"]);
-	expect(pressOn(true, "n", "KeyN", { meta: true })).toEqual(["newSession"]);
+	expect(press("n", "KeyN", { ctrl: true })).toEqual(["newSession", "ticketsNew"]);
+	expect(pressOn(true, "n", "KeyN", { meta: true })).toEqual(["newSession", "ticketsNew"]);
 	expect(pressOn(true, "n", "KeyN", { ctrl: true })).toEqual([]);
 	expect(press("f", "KeyF", { ctrl: true })).toEqual(["sessionSearch"]);
 	expect(pressOn(true, "f", "KeyF", { meta: true })).toEqual(["sessionSearch"]);
@@ -49,7 +49,7 @@ test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's wind
 test("browser-reserved chords stay the browser's, apart from the app's new-session and PR copy bindings", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["9", "Digit9"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 		expect(pressOn(mac, "K", "KeyK", { ...mod, shift: true })).toEqual(["copyPullRequestNumber"]);
@@ -57,9 +57,9 @@ test("browser-reserved chords stay the browser's, apart from the app's new-sessi
 	}
 });
 
-test("Cmd+1–8 go to the sidebar's tabs by position on macOS, Ctrl+1–8 elsewhere, including AZERTY", () => {
-	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7", "tab8"] as const;
-	const azerty = ["&", "é", "\"", "'", "(", "-", "è", "_"];
+test("Cmd+1–4 go to the sidebar's tabs by position on macOS, Ctrl+1–4 elsewhere, including AZERTY", () => {
+	const positions = ["tab1", "tab2", "tab3", "tab4"] as const;
+	const azerty = ["&", "é", "\"", "'"];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
 		for (const [index, id] of positions.entries()) {
@@ -135,13 +135,15 @@ test("Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", 
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then N, R, W, or I goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then N, R, W, I, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	// R alone replies on an open conversation, so after a G both match.
 	expect(after("g", "r")).toEqual(["routines", "inboxReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "i")).toEqual(["inbox"]);
 	expect(after("g", "n")).toEqual(["notes"]);
+	expect(pressOn(false, ",", "Comma", {}, "g")).toEqual(["settings"]);
+	expect(pressOn(false, ",", "Comma")).toEqual([]);
 	expect(after(null, "n")).toEqual([]);
 	expect(after(null, "i")).toEqual([]);
 	expect(after(null, "w")).toEqual([]);

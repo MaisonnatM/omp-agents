@@ -3,12 +3,10 @@ import { useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import { integrationsStore } from "./reads";
-import { SIDEBAR_TABS, type SidebarTab } from "./routing";
+import { SIDEBAR_TABS, type TabGroup, type SidebarTab } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
-// Every tab the bar shows takes a position key, so a tab added to `SIDEBAR_TABS` needs one more `TAB_SHORTCUTS` entry.
-TAB_SHORTCUTS.length satisfies (typeof SIDEBAR_TABS)["length"];
 // A tab's own shortcut, the command the palette lists for it and the row the dialog shows, has the tab's id.
 SIDEBAR_TABS satisfies readonly { value: ShortcutId }[];
 
@@ -19,11 +17,11 @@ export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
 export const DEFAULT_TAB_LAYOUT: TabLayout = SIDEBAR_TABS.map(({ value }) => ({ tab: value, hidden: false }));
 
-/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, the integration it waits on, and whether it is pinned. */
+/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, group, and the integration it waits on. */
 export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, row])) as Record<SidebarTab, (typeof SIDEBAR_TABS)[number]>;
 
 /**
- * The layout stored as `raw`. It keeps each known tab once and never hides a pinned tab.
+ * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out.
  * A tab missing from what is stored, such as one added since, takes its default place; anything unreadable gives the default.
  */
 export function decodeTabLayout(raw: string | null): TabLayout {
@@ -39,7 +37,7 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 		if (!isObject(entry)) continue;
 		const tab = SIDEBAR_TABS.find(({ value }) => value === entry.tab)?.value;
 		if (tab === undefined || layout.some(kept => kept.tab === tab)) continue;
-		layout.push({ tab, hidden: !("pinned" in TAB_ROWS[tab]) && entry.hidden === true });
+		layout.push({ tab, hidden: entry.hidden === true });
 	}
 	for (const [index, { value }] of SIDEBAR_TABS.entries()) {
 		if (!layout.some(kept => kept.tab === value)) layout.splice(Math.min(index, layout.length), 0, { tab: value, hidden: false });
@@ -59,15 +57,21 @@ export function moveTab(layout: TabLayout, tab: SidebarTab, by: -1 | 1): TabLayo
 	return next;
 }
 
-/** `layout` with `tab` hidden or shown; a pinned tab always shows. */
-export function hideTab(layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout {
-	if ("pinned" in TAB_ROWS[tab]) return layout;
-	return layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
-}
+/** `layout` with `tab` hidden or shown. */
+export const hideTab = (layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout => layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
 
 /** The tabs the bar shows, in order: those the user did not hide, less those whose service omp holds no sign-in to. */
 export const shownTabs = (layout: TabLayout, signedOut: ReadonlySet<SidebarTab>): SidebarTab[] =>
 	layout.filter(({ tab, hidden }) => !hidden && !signedOut.has(tab)).map(({ tab }) => tab);
+
+/** The tabs of `shown` that the bar draws while the header's switch is on `group`, in their order. */
+export const groupTabs = (shown: readonly SidebarTab[], group: TabGroup): SidebarTab[] => shown.filter(tab => TAB_ROWS[tab].group === group);
+
+/** The tab the header's switch opens for `group`: `last`, the tab you left it on, while it shows, else the group's first shown tab; none when the group shows no tab. */
+export function groupEntry(shown: readonly SidebarTab[], group: TabGroup, last: SidebarTab): SidebarTab | undefined {
+	const tabs = groupTabs(shown, group);
+	return tabs.includes(last) ? last : tabs[0];
+}
 
 /** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
@@ -76,7 +80,7 @@ export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] |
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
  * `signedOut` stays the same set until a tab's service signs in or out, whatever the integrations' polls answer, and
- * `shown`, which Cmd+1 through Cmd+8 go to, stays with it until the layout changes.
+ * `shown` stays with it until the layout changes.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;

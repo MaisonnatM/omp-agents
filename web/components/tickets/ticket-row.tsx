@@ -73,6 +73,8 @@ interface TicketRowProps {
 	ticket: Ticket;
 	/** A sub-issue listed under its parent's row, which indents it. */
 	nested?: boolean;
+	/** The issue whose details show beside the list, which the row marks as selected. */
+	open?: boolean;
 	/** The running sessions that work on this issue. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
@@ -81,13 +83,16 @@ interface TicketRowProps {
 	onQuickAction: (action: WorkActionId) => void;
 }
 
-export function TicketRow({ ticket, nested = false, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
+export function TicketRow({ ticket, nested = false, open = false, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
 	return (
-		<li id={ticketRowId(ticket.id)} className="group/row flex items-center rounded-md hover:bg-muted has-[:focus-visible]:bg-muted">
+		<li id={ticketRowId(ticket.id)} className={cn("group/row relative flex items-center rounded-md", open ? "bg-accent before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary" : "hover:bg-muted has-[:focus-visible]:bg-muted")}>
 			<a
 				href={hashForTickets(ticket.id)}
+				aria-current={open ? "true" : undefined}
 				className={cn(
-					"@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+					"@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none",
+					// The open row looks selected, so its focus needs no ring of its own.
+					!open && "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
 					nested && "pl-10",
 				)}
 			>

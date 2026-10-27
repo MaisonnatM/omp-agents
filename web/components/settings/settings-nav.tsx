@@ -6,7 +6,7 @@ const GROUPS = [
 	{ scope: "workspace", label: "This workspace" },
 ] as const;
 
-/** The Settings tab of the sidebar: the sections that are the same in every workspace, then those the workspace picker changes. */
+/** The sidebar while the Settings page is open: the sections that are the same in every workspace, then those the workspace picker changes. */
 export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
 	return GROUPS.map(group => (
 		<SidebarGroup key={group.scope}>

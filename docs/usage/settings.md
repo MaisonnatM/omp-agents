@@ -1,8 +1,8 @@
 # Settings
 
-- **Settings** is the last sidebar tab by default, after **Calendar** and, once Gmail is connected, **Inbox**.
-  It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
-  Select **Sessions** to return to the existing panes.
+- The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
+  It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
+  While Settings is open the sidebar lists its sections instead of a tab's content; select a tab, such as **Sessions**, to leave.
   The sidebar lists twelve sections in two groups.
   **General** holds **Analytics**, **Activity**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, **Workspaces**, and **Sync**, which are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
@@ -93,9 +93,9 @@
 - **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files, except **Stop idle processes**, which the server keeps.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
-  **Sidebar tabs** lists the seven sidebar tabs in the order the sidebar shows them, each with the Cmd+number it takes now, a switch that shows or hides it, and buttons that move it up or down.
+  **Sidebar tabs** lists the seven sidebar tabs in the order the sidebar shows them, each with its group, **Dev** or **Ops**, the Cmd+number it takes while its group shows, a switch that shows or hides it, and buttons that move it up or down.
   A hidden tab only leaves the sidebar and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
-  **Settings** cannot be hidden, so you can always come back to show the others, but it can move.
+  Hiding every tab of a group disables its side of the header's **Dev** and **Ops** switch; the gear button always leads back here.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Inbox** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off.
@@ -127,7 +127,7 @@
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
   With **All workspaces**, **Models**, **Files**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
-  Selecting the active **Settings** sidebar tab keeps the section.
+  Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.
   The page is in the URL hash, `#settings/<section>`, such as `#settings/integrations`; `#settings` opens **Analytics**.
   After each save the page shows the settings as omp loads them from disk.

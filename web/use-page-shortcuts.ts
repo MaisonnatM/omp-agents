@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
-import { adjacentSession, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
+import { adjacentSession, type Layout, type Page, type SettingsRoute, type SidebarPanel, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { positionHandlers } from "./sidebar-tabs";
 
@@ -11,14 +11,14 @@ export interface PageShortcutInput {
 	layout: Layout;
 	/** A pane fills the grid. */
 	maximized: boolean;
-	tab: SidebarTab;
+	tab: SidebarPanel;
 	settings: SettingsRoute;
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
 	view: View | null;
 	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
 	signedOutTabs: ReadonlySet<SidebarTab>;
-	/** The tabs the sidebar shows, in order: Cmd+1 goes to the first. */
+	/** The tabs the sidebar's bar draws, the header switch's group's, in order: Cmd+1 goes to the first. */
 	tabs: readonly SidebarTab[];
 	/** The dashboard can create Linear issues, so the new-ticket shortcut applies. */
 	linearCallable: boolean;
@@ -57,18 +57,13 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			if (next) open(next, "replace");
 			else if (!listed.length) return false;
 		};
-		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "settings" | "pull-requests">): ShortcutHandler => () => {
+		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "pull-requests">): ShortcutHandler => () => {
 			const { signedOutTabs, page, showTab } = latest.current;
 			if (signedOutTabs.has(tab)) return false;
 			if (page?.kind === tab) return;
 			showTab(tab);
 		};
 		const goTo: Record<SidebarTab, ShortcutHandler> = {
-			settings: () => {
-				const { page, layout, settings, navigate, show } = latest.current;
-				if (page?.kind === "settings") show(layout);
-				else navigate({ kind: "settings", ...settings });
-			},
 			"pull-requests": () => {
 				const { page } = latest.current;
 				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
@@ -104,7 +99,11 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (!latest.current.hasDetails) return false;
 				latest.current.toggleSidebar("right");
 			},
-			settings: goTo.settings,
+			settings: () => {
+				const { page, layout, settings, navigate, show } = latest.current;
+				if (page?.kind === "settings") show(layout);
+				else navigate({ kind: "settings", ...settings });
+			},
 			"pull-requests": goTo["pull-requests"],
 			tickets: goTo.tickets,
 			newTicket: () => {

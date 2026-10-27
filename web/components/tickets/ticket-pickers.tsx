@@ -1,5 +1,6 @@
 /** The pickers for a Linear issue's status, priority, assignee, labels, and project, shared by the issue's side column and the new-issue dialog. */
-import { Box, CircleUser, Tag } from "lucide-react";
+import { Box, CircleUser, type LucideIcon, Tag } from "lucide-react";
+import type { ReactNode } from "react";
 import type { TicketChoice, TicketLabel, TicketOptions, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
@@ -10,7 +11,7 @@ const PRIORITIES: TicketPriority[] = [0, 1, 2, 3, 4];
 
 /** What each picker that offers the team's choices takes: they read `options` once a click opens them. */
 interface TeamPickerProps {
-	/** A row of the side column, or a pill in the new-issue dialog. */
+	/** A row of the side column, a property row of the details, or a pill in the new-issue dialog. */
 	look: PickerLook;
 	/** The team's choices, `null` until they arrive or when they failed to, with `error`. */
 	options: TicketOptions | null;
@@ -20,7 +21,10 @@ interface TeamPickerProps {
 	onOpen: () => void;
 }
 
-const iconSize = (look: PickerLook): string => (look === "chip" ? "size-3.5" : "size-4");
+const iconSize = (look: PickerLook): string => (look === "field" ? "size-4" : "size-3.5");
+
+/** A property row names its field beside the picker, so the picker leaves out the field's generic icon. */
+const fieldIcon = (look: PickerLook, Icon: LucideIcon): ReactNode => look !== "row" && <Icon aria-hidden className={cn(iconSize(look), "text-muted-foreground")} />;
 
 /** The workflow status, `null` while it is the team's default and not yet known. */
 export function TicketStatusPicker({ look, value, options, error, disabled, onOpen, onChange }: TeamPickerProps & { value: TicketStatus | null; onChange: (status: TicketStatus) => void }) {
@@ -93,7 +97,7 @@ export function TicketAssigneePicker({ look, value, offerMe = false, options, er
 			current={value === undefined ? "loading" : (name ?? "unassigned")}
 			trigger={
 				<>
-					<CircleUser aria-hidden className={cn(iconSize(look), "text-muted-foreground")} />
+					{fieldIcon(look, CircleUser)}
 					<span className="truncate">{name ?? (look === "chip" || value === undefined ? "Assignee" : "Unassigned")}</span>
 				</>
 			}
@@ -142,7 +146,7 @@ export function TicketLabelsPicker({ look, value, options, error, disabled, onOp
 					</span>
 				) : (
 					<>
-						<Tag aria-hidden className="size-4 text-muted-foreground" />
+						{fieldIcon(look, Tag)}
 						<span className="text-muted-foreground">Add label</span>
 					</>
 				)
@@ -169,7 +173,7 @@ export function TicketProjectPicker({ look, value, options, error, disabled, onO
 			current={value ?? "none"}
 			trigger={
 				<>
-					<Box aria-hidden className={cn(iconSize(look), "text-muted-foreground")} />
+					{fieldIcon(look, Box)}
 					<span className={cn("truncate", look !== "chip" && !value && "text-muted-foreground")}>{value ?? (look === "chip" ? "Project" : "Add to project")}</span>
 				</>
 			}

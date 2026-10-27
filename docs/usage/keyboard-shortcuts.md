@@ -11,7 +11,7 @@ Alt is Option on macOS.
 | Shift+Tab | Composer | Cycle the thinking level |
 | ↑ | Empty composer | Move the last queued message back into the composer |
 | Cmd+K | Anywhere | Open the command menu |
-| Cmd+N / S | Anywhere / outside text fields | Start a new session |
+| Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
 | Cmd+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+Shift+X | Anywhere | End the focused session |
 | Cmd+[ | Anywhere | Open the previous session in the sidebar |
@@ -28,11 +28,12 @@ Alt is Option on macOS.
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| Cmd+1 … Cmd+8 | Anywhere | Go to the first … eighth tab the sidebar shows |
+| Cmd+1 … Cmd+4 | Anywhere | Go to the first … fourth tab the sidebar's bar draws, in the group the header's switch shows |
 | C | Outside text fields, except on the Todo, Notes, Calendar, and Inbox pages | Create a Linear ticket, when connected |
 | G then N | Outside text fields | Go to your notes |
 | G then I | Outside text fields | Go to your Gmail inbox, when connected |
 | G then R | Outside text fields | Go to your routines |
+| G then , | Outside text fields | Open or close Settings |
 | G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
 | ↑ | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
@@ -69,12 +70,12 @@ Alt is Option on macOS.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
-- Cmd+1 through Cmd+8 go to the first through eighth tab the sidebar shows, even while typing.
-  The numbers follow the order the sidebar shows, which **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
+- Cmd+1 through Cmd+4 go to the first through fourth tab the sidebar's bar draws, even while typing.
+  The numbers count only the tabs of the group the header's **Dev** and **Ops** switch shows, in the order **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
-  In the default order the tabs are Pull requests, Tickets, Sessions, Todo, Notes, Calendar, Inbox, and Settings, so with both services connected Cmd+7 opens the **Inbox** and Cmd+8 **Settings**.
+  In the default order, Cmd+1 opens **Pull requests** under **Dev** and **Notes** under **Ops**, and Cmd+3 opens **Sessions** under **Dev**, with Linear connected, and the **Inbox** under **Ops**.
   The **Inbox** takes its number like any tab and keeps G then I.
-  Cmd with T, W, L, R, D, Q, O, P, S, Tab, 9, or 0 is left to the window, whose menu takes Cmd+W, Cmd+R, Cmd+Q, and Cmd+0; see [Desktop app](desktop-app.md).
+  Cmd with T, W, L, R, D, Q, O, P, S, Tab, or 5 through 0 is left to the window, whose menu takes Cmd+W, Cmd+R, Cmd+Q, and Cmd+0; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
 - In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.
@@ -105,7 +106,7 @@ Alt is Option on macOS.
   Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑ do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
-- Cmd+N opens the new-session draft, as **New session** at the top of the session list does.
+- Cmd+N opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
   Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
   It does nothing in a subagent, a read-only room, or a past session.
@@ -119,7 +120,7 @@ Alt is Option on macOS.
 - The number of the **Pull requests** tab opens the Pull requests page, and that of **Tickets** opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
   The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the inbox, the routines, Settings, or the new-session draft to the panes.
   The numbers of **Todo** and **Calendar** open those pages, G then I or the Inbox's number the **Inbox** page when connected to Gmail, and G then R the **Routines** page.
-  The number of **Settings** opens Settings, where the model roles and the integrations live, and closes it again.
+  G then ,, like the header's gear button, opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

@@ -1,6 +1,10 @@
 # Sessions sidebar
 
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
+- The **Dev** and **Ops** switch at the right end of the header picks which tabs the sidebar's tab bar shows.
+  **Dev** shows **Pull requests**, **Tickets**, **Sessions**, and **Todo**; **Ops** shows **Notes**, **Calendar**, and **Inbox**.
+  Switching opens the tab you last left in that group, else its first tab, and the switch follows any page you open, so G then N or a link to a note turns it to **Ops**.
+  A side whose tabs are all hidden or signed out is disabled.
 - The dot before each session shows its state.
   Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of its working directory, on the right before its age.

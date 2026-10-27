@@ -4,7 +4,7 @@
   It builds the two dashboard contexts and lays out the sidebars, the page, the command palette, and the dialogs, and leaves each slice of state to a hook of its own.
   `web/use-workspace-scope.ts` holds the visible sessions, the workspaces, the selected workspace, which localStorage keeps, and its pull request poll.
   `web/use-focused-session.ts` holds the focused pane's session, the document title, and the sidebar following a `/move`.
-  `web/use-session-lists.ts` holds the Sessions tab's lists and search, the session `latestSession` from `web/sessions.ts` picks from the selected workspace's rows, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`, whose Sessions tab opens that session when no pane shows one.
+  `web/use-session-lists.ts` holds the Sessions tab's lists and search, the session `latestSession` from `web/sessions.ts` picks from the selected workspace's rows, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`, whose Sessions tab opens that session when no pane shows one, and the header's group with `showGroup`, which reopens the tab a group was left on.
   `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
   `web/use-transcript-display.ts` holds how transcripts show tool calls and thinking, and `web/use-page-shortcuts.ts` the page-wide shortcuts and the commands the palette runs.
   `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.

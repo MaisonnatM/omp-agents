@@ -2,7 +2,7 @@ import { type ReactNode, useState } from "react";
 import { type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestLabel, type PullRequestOptions, type Reviewer } from "../../../src/shared/github";
 import { withReviewer } from "../../pull-requests-model";
 import { type ReadState, useRead } from "../../reads";
-import { FieldPicker } from "../field-picker";
+import { FieldPicker, ROW_BUTTON } from "../field-picker";
 import { PersonPicture } from "./avatars";
 
 /** A pick's change, sent to GitHub, and what the details show until GitHub answers. */
@@ -10,9 +10,6 @@ export type SavePullRequest = (change: PullRequestChange, shown: Partial<PullReq
 
 /** Sends a reply or a comment and settles once GitHub took it, or rejects with why it did not. */
 export type SendPullRequest = (change: PullRequestChange) => Promise<void>;
-
-/** A picker's button laid in a property row: its text lines up with the row's, and it spans the row. */
-const ROW_FIELD = "-mx-2 -my-1 h-auto min-h-6 w-[calc(100%+1rem)] justify-start px-2 py-1 text-xs font-normal text-foreground";
 
 /** The repository's labels and reviewers; `open` asks GitHub for them, again after a failure. */
 export type PullRequestOptionsRead = ReadState<PullRequestOptions> & { open: () => void };
@@ -57,7 +54,7 @@ interface ReviewersFieldProps {
  * The review requests: a pick asks the person for a review, or withdraws the request, and asks again of someone who
  * already reviewed. A withdrawn request leaves the person's review in place.
  */
-export function ReviewersField({ pr, options, onChange, className = ROW_FIELD, children }: ReviewersFieldProps) {
+export function ReviewersField({ pr, options, onChange, className = ROW_BUTTON, children }: ReviewersFieldProps) {
 	const requested = requestedLogins(pr.reviewers);
 	const names = pr.reviewers.map(reviewer => reviewer.login).join(", ");
 	const people = reviewerChoices(pr, options);
@@ -97,7 +94,7 @@ export function LabelsField({ detail, options, save, children }: OptionsFieldPro
 		<FieldPicker
 			field="Labels"
 			current={names.join(", ") || "none"}
-			className={ROW_FIELD}
+			look="row"
 			trigger={children}
 			choices={options.data?.labels.map(label => ({ value: label.name, label: label.name, icon: <LabelDot label={label} /> })) ?? null}
 			error={options.error}
