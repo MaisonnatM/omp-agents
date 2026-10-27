@@ -161,15 +161,15 @@ function MemoryList({ bot, memory }: { bot: Bot; memory: string }) {
 /** The routines that send their prompt into the Bot's conversation. */
 function BotRoutines({ bot, routines }: { bot: Bot; routines: readonly Routine[] }) {
 	const id = useId();
-	const targeting = botRoutines(routines, bot.id);
+	const messaging = botRoutines(routines, bot.id);
 	return (
 		<section aria-labelledby={id} className="space-y-2">
 			<h3 id={id} className="text-xs font-medium text-muted-foreground">
 				Routines
 			</h3>
-			{targeting.length === 0 ? (
+			{messaging.length === 0 ? (
 				<p className="text-xs text-muted-foreground">
-					No routine writes to {bot.name}. Pick it as a routine's target on the{" "}
+					No routine messages {bot.name}. Make one with Message a Bot on the{" "}
 					<a href={hashForRoutines(null)} className="underline underline-offset-2">
 						Routines page
 					</a>
@@ -177,7 +177,7 @@ function BotRoutines({ bot, routines }: { bot: Bot; routines: readonly Routine[]
 				</p>
 			) : (
 				<ul className="space-y-1.5">
-					{targeting.map(routine => (
+					{messaging.map(routine => (
 						<li key={routine.id}>
 							<a
 								href={hashForRoutines(routine.id)}
