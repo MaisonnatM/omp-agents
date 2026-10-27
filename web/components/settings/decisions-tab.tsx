@@ -1,5 +1,5 @@
 /** The Settings Decisions section: the workspace repository's decision records as a timeline, newest first, the ones in force by default. */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { DecisionRecord, DecisionRecords } from "../../../src/shared/models";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,11 @@ const STATUS_COLORS: Record<string, "green" | "blue" | "red" | "gray" | "amber">
 };
 /** Statuses of a record that no longer applies, which **In force** hides. */
 const RETIRED: Record<string, true> = { superseded: true, deprecated: true, rejected: true };
+
+/** The month a `YYYY-MM-DD` date falls in, as "October 2026", for the timeline's sticky headers. */
+function monthOf(date: string | null): string {
+	return date ? new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "Undated";
+}
 
 /** Record names as links that open each record listed here, plain text for one that is not. */
 function RecordLinks({ label, names, records, onOpen }: { label: string; names: string[]; records: DecisionRecord[]; onOpen: (name: string) => void }) {
@@ -45,7 +50,7 @@ function RecordLinks({ label, names, records, onOpen }: { label: string; names: 
 function RecordEntry({ record, records, dir, expanded, onToggle, onOpen }: { record: DecisionRecord; records: DecisionRecord[]; dir: string; expanded: boolean; onToggle: () => void; onOpen: (name: string) => void }) {
 	const retired = record.status !== null && RETIRED[record.status] === true;
 	return (
-		<li id={`decision-${record.name}`} className="grid scroll-mt-6 grid-cols-[6.5rem_minmax(0,1fr)] gap-6 py-6">
+		<li id={`decision-${record.name}`} className="grid scroll-mt-10 grid-cols-[6.5rem_minmax(0,1fr)] gap-6 border-b border-border py-6 last:border-b-0">
 			<time className="pt-0.5 text-xs tabular-nums text-muted-foreground">{record.date}</time>
 			<article className="min-w-0 space-y-2" aria-label={record.title}>
 				{record.status !== null ? (
@@ -141,10 +146,20 @@ export function DecisionsTab({ cwd, active }: { cwd: string | null; active: bool
 				</div>
 			</div>
 			{shown.length === 0 && hidden === 0 ? <p className="py-6 text-sm text-muted-foreground">No record matches.</p> : null}
-			<ol className="divide-y divide-border">
-				{shown.map(record => (
-					<RecordEntry key={record.name} record={record} records={records} dir={dir} expanded={expanded.has(record.name)} onToggle={() => toggle(record.name)} onOpen={open} />
-				))}
+			<ol>
+				{shown.map((record, i) => {
+					const month = monthOf(record.date);
+					return (
+						<Fragment key={record.name}>
+							{i === 0 || monthOf(shown[i - 1]!.date) !== month ? (
+								<li aria-hidden className="sticky top-0 z-10 border-b border-border bg-background py-2 text-xs font-medium text-muted-foreground">
+									{month}
+								</li>
+							) : null}
+							<RecordEntry record={record} records={records} dir={dir} expanded={expanded.has(record.name)} onToggle={() => toggle(record.name)} onOpen={open} />
+						</Fragment>
+					);
+				})}
 			</ol>
 			{hidden > 0 ? (
 				<button type="button" onClick={() => setInForce(false)} className="mt-2 w-full rounded-md border border-dashed border-border py-2 text-xs text-muted-foreground hover:bg-muted">

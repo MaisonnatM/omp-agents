@@ -90,7 +90,7 @@
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
   If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
-- The **Decisions** section shows the decision records of the workspace's repository as a timeline, newest first: each record's date, status, title, and first paragraph, with **Read the record** to open the whole of it.
+- The **Decisions** section shows the decision records of the workspace's repository as a timeline, newest first, under a month header that stays at the top while you scroll: each record's date, status, title, and first paragraph, with **Read the record** to open the whole of it.
   Records are the files the starter kit's `decision-records` skill writes in `docs/decisions/`; a repository that keeps them in an ADR directory, docs/adr or doc/adr, shows those instead.
   **In force** hides superseded, deprecated, and rejected records, and **All** shows them, struck through; **Search** narrows the list by title, file name, status, or text.
   A record's **Supersedes** and **Superseded by** open and scroll to the records they name, and a link to another file in the repository opens it in the file dialog.
