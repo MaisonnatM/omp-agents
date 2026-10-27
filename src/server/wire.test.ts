@@ -143,6 +143,7 @@ describe("parseClientMsg", () => {
 			botId: "scout" as BotId,
 			name: "Reviews",
 			schedules: [weekdays],
+			triggers: [],
 			task: { kind: "prompt", prompt: "Summarize" },
 			enabled: true,
 		};

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { botHost, memoryEntries } from "../../bots-model";
 import { hashForBotRoutine, hashForBots, NEW_ROUTINE } from "../../routing";
-import { schedulesWords } from "../../routines-model";
+import { startsWords } from "../../routines-model";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { TEXT_AREA } from "../form-field";
 import { statusLabel } from "../status-dot";
@@ -200,7 +200,7 @@ function BotRoutines({ bot, routines, openRoutine, connected }: { bot: Bot; rout
 								<RunDot run={routine.runs[0]} />
 								<span className="min-w-0">
 									<span className={cn("block truncate font-medium", !routine.enabled && "text-muted-foreground")}>{routine.name}</span>
-									<span className="block truncate text-xs text-muted-foreground">{routine.enabled ? schedulesWords(routine.schedules) : "Paused"}</span>
+									<span className="block truncate text-xs text-muted-foreground">{routine.enabled ? startsWords(routine) : "Paused"}</span>
 								</span>
 							</a>
 						</li>

@@ -21,11 +21,12 @@ const spec: RoutineSpec = {
 	botId: "scout" as BotId,
 	name: "Notes",
 	schedules: [weekdays],
+	triggers: [],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
 	enabled: true,
 };
 
-const routine = (fields: Partial<Routine>): Routine => ({ ...spec, createdAt: at("2026-10-01T08:00:00+02:00"), runs: [], ...fields });
+const routine = (fields: Partial<Routine>): Routine => ({ ...spec, createdAt: at("2026-10-01T08:00:00+02:00"), scheduledAt: null, runs: [], ...fields });
 
 describe("parseRoutineSpec", () => {
 	test("keeps a routine's edited fields and drops the runs and creation time the server keeps", () => {
@@ -48,6 +49,13 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec({ ...spec, task: { kind: "command", command: "git worktree prune" } })?.ok.task).toEqual({ kind: "command", command: "git worktree prune" });
 		expect(parseRoutineSpec({ ...spec, task: { kind: "prompt", prompt: " " } })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, task: { kind: "bot", botId: "scout", prompt: "Post the standup." } })).toBeNull();
+	});
+
+	test("takes triggers in place of schedules, but refuses neither, an unknown kind, and a kind twice", () => {
+		expect(parseRoutineSpec({ ...spec, schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] })?.ok).toMatchObject({ schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] });
+		expect(parseRoutineSpec({ ...spec, schedules: [] })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "gmail" }] })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "event" }, { kind: "event" }] })).toBeNull();
 	});
 });
 
@@ -79,39 +87,41 @@ describe("nextRunAt", () => {
 });
 
 describe("isDue", () => {
-	const fridayRun = { at: at("2026-10-09T09:00:00+02:00"), outcome: { kind: "pending", queued: false } as const, errors: [] };
+	const friday = at("2026-10-09T09:00:00+02:00");
 
 	test("slots missed over a weekend coalesce into one run, which is not due again once claimed", () => {
 		const monday = at("2026-10-12T11:00:00+02:00");
-		expect(isDue(routine({ runs: [fridayRun] }), monday)).toBe(true);
-		const claimed = routine({ runs: [{ ...fridayRun, at: monday }, fridayRun] });
-		expect(isDue(claimed, at("2026-10-12T11:01:00+02:00"))).toBe(false);
+		expect(isDue(routine({ scheduledAt: friday }), monday)).toBe(true);
+		expect(isDue(routine({ scheduledAt: monday }), at("2026-10-12T11:01:00+02:00"))).toBe(false);
 	});
 
 	test("a routine that never ran counts from its creation, and a paused one is never due", () => {
 		expect(isDue(routine({}), at("2026-10-01T09:00:00+02:00"))).toBe(true);
 		expect(isDue(routine({}), at("2026-10-01T08:59:00+02:00"))).toBe(false);
-		expect(isDue(routine({ enabled: false, runs: [fridayRun] }), at("2026-10-12T11:00:00+02:00"))).toBe(false);
+		expect(isDue(routine({ enabled: false, scheduledAt: friday }), at("2026-10-12T11:00:00+02:00"))).toBe(false);
+	});
+
+	test("a routine with only triggers is never due", () => {
+		expect(isDue(routine({ schedules: [], triggers: [{ kind: "slack" }] }), at("2027-01-01T00:00:00+01:00"))).toBe(false);
 	});
 
 	test("the earliest schedule is the one that is due", () => {
-		const both = routine({ schedules: [weekdays, evening], runs: [fridayRun] });
+		const both = routine({ schedules: [weekdays, evening], scheduledAt: friday });
 		expect(isDue(both, at("2026-10-09T17:59:00+02:00"))).toBe(false);
 		expect(isDue(both, at("2026-10-09T18:00:00+02:00"))).toBe(true);
-		expect(isDue(routine({ schedules: [weekdays, evening], runs: [{ ...fridayRun, at: at("2026-10-09T18:00:00+02:00") }] }), at("2026-10-09T18:01:00+02:00"))).toBe(false);
+		expect(isDue(routine({ schedules: [weekdays, evening], scheduledAt: at("2026-10-09T18:00:00+02:00") }), at("2026-10-09T18:01:00+02:00"))).toBe(false);
 	});
 
-	test("two intervals share the last run, so the shorter one wins", () => {
-		const anchor = at("2026-10-09T09:00:00+02:00");
+	test("two intervals share the last scheduled run, so the shorter one wins", () => {
 		const both = routine({
 			schedules: [
 				{ kind: "every", minutes: 90 },
 				{ kind: "every", minutes: 60 },
 			],
-			runs: [{ ...fridayRun, at: anchor }],
+			scheduledAt: friday,
 		});
-		expect(isDue(both, anchor + 60 * 60_000 - 1)).toBe(false);
-		expect(isDue(both, anchor + 60 * 60_000)).toBe(true);
+		expect(isDue(both, friday + 60 * 60_000 - 1)).toBe(false);
+		expect(isDue(both, friday + 60 * 60_000)).toBe(true);
 	});
 });
 
@@ -119,21 +129,22 @@ describe("applyRoutine", () => {
 	const now = at("2026-10-05T12:00:00+02:00");
 
 	test("a new routine starts with no runs, created now", () => {
-		expect(applyRoutine([], { op: "save", routine: spec }, now)).toEqual([{ ...spec, createdAt: now, runs: [] }]);
+		expect(applyRoutine([], { op: "save", routine: spec }, now)).toEqual([{ ...spec, createdAt: now, scheduledAt: null, runs: [] }]);
 	});
 
-	test("an edit keeps the routine's creation and runs", () => {
-		const run = { at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true } as const, errors: [] };
-		const saved = routine({ runs: [run] });
+	test("an edit keeps the routine's creation, schedule clock, and runs", () => {
+		const run = { at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true } as const, errors: [], triggeredBy: [] };
+		const saved = routine({ scheduledAt: run.at, runs: [run] });
 		expect(applyRoutine([saved], { op: "save", routine: { ...spec, name: "Morning notes", schedules: [daily] } }, now)).toEqual([
 			{ ...saved, name: "Morning notes", schedules: [daily] },
 		]);
 	});
 
 	test("a save that matches the stored routine returns the same list", () => {
-		const saved = routine({ runs: [{ at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true }, errors: [] }] });
+		const saved = routine({ runs: [{ at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true }, errors: [], triggeredBy: [] }] });
 		const list = [saved];
 		expect(applyRoutine(list, { op: "save", routine: spec }, now)).toBe(list);
+		expect(applyRoutine(list, { op: "save", routine: { ...spec, triggers: [{ kind: "event" }] } }, now)).not.toBe(list);
 		expect(applyRoutine(list, { op: "save", routine: { ...spec, enabled: false } }, now)).not.toBe(list);
 	});
 

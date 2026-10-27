@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CommandRun, Routine, RoutineRun, Schedule, Weekday } from "../src/routines";
 import type { BotId } from "../src/shared/bots";
-import { draftOf, newDraft, nextRunWords, runHealth, runWords, type RoutineDraft, schedulesWords, scheduleWords, specOf, taskWords, whenWords } from "./routines-model";
+import { draftOf, newDraft, nextRunWords, runHealth, runWords, type RoutineDraft, scheduleWords, specOf, startsWords, taskWords, whenWords } from "./routines-model";
 
 // Local times, so the expected words hold in any time zone. Oct 5 2026 is a Monday.
 const at = (day: number, hour: number, minute = 0): number => new Date(2026, 9, day, hour, minute).getTime();
@@ -10,19 +10,22 @@ const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour
 
 const scout = "scout" as BotId;
 
+/** A routine whose runs a schedule started, unless `fields` says otherwise. */
 const routine = (fields: Partial<Routine>): Routine => ({
 	id: "r1",
 	botId: scout,
 	name: "Morning notes",
 	schedules: [weekdays],
+	triggers: [],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
 	enabled: true,
 	createdAt: at(5, 10),
 	runs: [],
+	scheduledAt: fields.runs?.[0]?.at ?? null,
 	...fields,
 });
 
-const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), outcome: { kind: "pending", queued: false }, errors: [], ...fields });
+const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [], ...fields });
 
 describe("schedule words", () => {
 	test("an interval reads in its largest whole unit", () => {
@@ -49,8 +52,9 @@ describe("task words", () => {
 		expect(taskWords({ kind: "prompt", prompt: "\n  Summarize yesterday's commits.  \nThen list open questions." })).toBe("Summarize yesterday's commits.");
 	});
 
-	test("several schedules read in the order they were saved", () => {
-		expect(schedulesWords([weekdays, { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 18, minute: 0 } }])).toBe("Weekdays at 9:00, Weekdays at 18:00");
+	test("several schedules read in the order they were saved, then the triggers", () => {
+		expect(startsWords({ schedules: [weekdays, { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 18, minute: 0 } }], triggers: [] })).toBe("Weekdays at 9:00, Weekdays at 18:00");
+		expect(startsWords({ schedules: [weekdays], triggers: [{ kind: "pull-request" }] })).toBe("Weekdays at 9:00, When a pull request changes status");
 	});
 });
 
@@ -61,6 +65,12 @@ describe("next run", () => {
 		expect(nextRunWords(routine({ schedules: [{ kind: "weekly", days: [1, 5], time: { hour: 18, minute: 30 } }] }), now)).toBe("Today at 18:30");
 		expect(nextRunWords(routine({ schedules: [{ kind: "weekly", days: [5], time: { hour: 9, minute: 0 } }] }), now)).toBe("Fri at 9:00");
 		expect(nextRunWords(routine({ schedules: [{ kind: "weekly", days: [1], time: { hour: 9, minute: 0 } }] }), now)).toBe("Oct 12 at 9:00");
+	});
+
+	test("a triggered run does not move the next slot, and a routine with only triggers runs on one", () => {
+		const triggered = run({ at: at(5, 11), triggeredBy: [{ kind: "slack", title: "Bo wrote to you", detail: "Lunch?", url: null }] });
+		expect(nextRunWords(routine({ runs: [triggered], scheduledAt: at(5, 9) }), at(5, 12))).toBe("Tomorrow at 9:00");
+		expect(nextRunWords(routine({ schedules: [], triggers: [{ kind: "slack" }] }), at(5, 12))).toBe("On a trigger");
 	});
 
 	test("an interval counts from the last run, else from when the routine was made", () => {
@@ -140,7 +150,7 @@ describe("editor form", () => {
 		expect(draftOf(saved).schedules[0]).toMatchObject({ amount: "6", unit: "hours" });
 		expect(draftOf(saved)).toMatchObject({ botId: scout, task: "prompt", prompt: "Reply ok." });
 		expect(specOf(draftOf(saved))).toEqual({
-			ok: { id: "r1", botId: scout, name: "Morning notes", enabled: false, task: { kind: "prompt", prompt: "Reply ok." }, schedules: [{ kind: "every", minutes: 360 }] },
+			ok: { id: "r1", botId: scout, name: "Morning notes", enabled: false, task: { kind: "prompt", prompt: "Reply ok." }, schedules: [{ kind: "every", minutes: 360 }], triggers: [] },
 		});
 	});
 
@@ -148,7 +158,7 @@ describe("editor form", () => {
 		const base = newDraft("r2", scout);
 		const draft: RoutineDraft = { ...base, name: " Standup ", prompt: "Hi", schedules: [{ ...base.schedules[0]!, days: [3, 1], time: "18:30" }] };
 		expect(specOf(draft)).toEqual({
-			ok: { id: "r2", botId: scout, name: "Standup", enabled: true, task: { kind: "prompt", prompt: "Hi" }, schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }] },
+			ok: { id: "r2", botId: scout, name: "Standup", enabled: true, task: { kind: "prompt", prompt: "Hi" }, schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }], triggers: [] },
 		});
 		expect(specOf({ ...draft, name: "" })).toEqual({ fix: "Name the routine." });
 		expect(specOf({ ...draft, schedules: [{ ...draft.schedules[0]!, days: [] }] })).toEqual({ fix: "Pick at least one day." });
@@ -158,10 +168,17 @@ describe("editor form", () => {
 		expect(specOf({ ...draft, schedules: [...draft.schedules, evening] })).toEqual({ fix: "Schedule 2: Pick at least one day." });
 	});
 
+	test("a form with a trigger needs no schedule, saves its triggers in one order, and one with neither says to add one", () => {
+		const draft: RoutineDraft = { ...newDraft("r4", scout), name: "Triage", prompt: "Triage it.", schedules: [], triggers: ["event", "slack"] };
+		expect(specOf(draft)).toMatchObject({ ok: { schedules: [], triggers: [{ kind: "slack" }, { kind: "event" }] } });
+		expect(draftOf(routine({ schedules: [], triggers: [{ kind: "event" }] })).triggers).toEqual(["event"]);
+		expect(specOf({ ...draft, triggers: [] })).toEqual({ fix: "Add a schedule or a trigger." });
+	});
+
 	test("a command form saves its command, trimmed, and keeps the prompt typed for the other task", () => {
 		const draft = { ...newDraft("r3", scout), name: "Prune", task: "command" as const, prompt: "Hi", command: "  git worktree prune\n" };
 		expect(specOf(draft)).toEqual({
-			ok: { id: "r3", botId: scout, name: "Prune", enabled: true, task: { kind: "command", command: "git worktree prune" }, schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }] },
+			ok: { id: "r3", botId: scout, name: "Prune", enabled: true, task: { kind: "command", command: "git worktree prune" }, schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }], triggers: [] },
 		});
 		expect(specOf({ ...draft, command: " " })).toEqual({ fix: "Write the command to run." });
 		expect(specOf({ ...draft, task: "prompt" })).toMatchObject({ ok: { task: { kind: "prompt", prompt: "Hi" } } });

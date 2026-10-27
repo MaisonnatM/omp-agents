@@ -21,16 +21,19 @@ const OCTOBER = { year: 2026, month: 9 };
 /** Wednesday 14 October 2026, noon. */
 const NOW = at("2026-10-14T12:00:00+02:00");
 
-const run = (iso: string, fields: Partial<RoutineRun> = {}): RoutineRun => ({ at: at(iso), outcome: { kind: "pending", queued: false }, errors: [], ...fields });
+const run = (iso: string, fields: Partial<RoutineRun> = {}): RoutineRun => ({ at: at(iso), outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [], ...fields });
+/** A routine whose runs a schedule started, unless `fields` says otherwise. */
 const routine = (fields: Partial<Routine>): Routine => ({
 	id: "r1",
 	botId: "scout" as BotId,
 	name: "Notes",
 	schedules: [weekdays],
+	triggers: [],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
 	enabled: true,
 	createdAt: at("2026-09-01T08:00:00+02:00"),
 	runs: [],
+	scheduledAt: fields.runs?.[0]?.at ?? null,
 	...fields,
 });
 const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, children: [], links: [], addedBy: null, ...fields });

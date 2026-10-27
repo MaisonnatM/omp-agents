@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles } from "../fs";
 import { HOME } from "../paths";
-import type { Schedules } from "../routines";
+import type { Schedule, TriggerEvent } from "../routines";
 import type { BotId, BotSpec } from "../shared/bots";
 import { RoutinesFile, ROUTINES_BOT_ID, routinesBot } from "./routines-file";
 
@@ -87,11 +87,14 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 			...kept,
 			botId: ROUTINES_BOT_ID,
 			schedules: [schedule],
+			triggers: [],
+			// Before triggers, the schedules counted from the newest run.
+			scheduledAt: 4,
 			runs: [
-				{ at: 4, outcome: { kind: "pending", queued: true }, errors: [] },
-				{ at: 3, outcome: { kind: "sent", sessionId: "s1" }, errors: [] },
-				{ at: 2, outcome: { kind: "sent", sessionId: "s2" }, errors: [] },
-				{ at: 1, outcome: { kind: "pending", queued: false }, errors: [] },
+				{ at: 4, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy: [] },
+				{ at: 3, outcome: { kind: "sent", sessionId: "s1" }, errors: [], triggeredBy: [] },
+				{ at: 2, outcome: { kind: "sent", sessionId: "s2" }, errors: [], triggeredBy: [] },
+				{ at: 1, outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [] },
 			],
 		},
 	]);
@@ -160,11 +163,25 @@ test("deleting a Bot's routines leaves the other Bots' routines", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const file = new RoutinesFile(join(dir, "routines.json"));
-	const spec = (id: string, botId: string) => ({ id, botId: botId as BotId, name: id, schedules: [{ kind: "every", minutes: 60 }] as Schedules, task: { kind: "prompt", prompt: "Hi." } as const, enabled: true });
+	const spec = (id: string, botId: string) => ({ id, botId: botId as BotId, name: id, schedules: [{ kind: "every", minutes: 60 }] as Schedule[], triggers: [], task: { kind: "prompt", prompt: "Hi." } as const, enabled: true });
 	file.apply({ op: "save", routine: spec("r1", "scout") }, 1);
 	file.apply({ op: "save", routine: spec("r2", "ranger") }, 1);
 	file.apply({ op: "save", routine: spec("r3", "scout") }, 1);
 	expect([file.removeBot("scout" as BotId), file.removeBot("scout" as BotId), file.value.map(({ id }) => id)]).toEqual([true, false, ["r2"]]);
+});
+
+test("a triggered run keeps the schedules' clock, which a scheduled run moves, and both survive a reload", () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
+	dirs.push(dir);
+	const path = join(dir, "routines.json");
+	const file = new RoutinesFile(path);
+	file.apply({ op: "save", routine: { id: "r1", botId: "scout" as BotId, name: "Triage", schedules: [{ kind: "every", minutes: 60 }], triggers: [{ kind: "slack" }], task: { kind: "prompt", prompt: "Hi." }, enabled: true } }, 1);
+	const dm: TriggerEvent = { kind: "slack", title: "Bo wrote to you", detail: "Lunch?", url: null };
+	file.claim("r1", 10, []);
+	file.claim("r1", 20, [dm]);
+	expect(file.value[0]).toMatchObject({ scheduledAt: 10, runs: [{ at: 20, triggeredBy: [dm] }, { at: 10, triggeredBy: [] }] });
+	file.flush();
+	expect(new RoutinesFile(path).value).toEqual(file.value);
 });
 
 test("a file that is not a list of routines moves aside", () => {

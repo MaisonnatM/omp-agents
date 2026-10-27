@@ -1,13 +1,21 @@
 import { type ReactNode, useId, useState } from "react";
-import { COMMAND_TIME_LIMIT, type RoutineSpec, type Weekday } from "../../../src/routines";
+import { COMMAND_TIME_LIMIT, type RoutineSpec, TRIGGER_KINDS, type TriggerKind, type Weekday } from "../../../src/routines";
+import { EVENT_LEAD_MS } from "../../../src/shared/notices";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
+import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, TRIGGER_WORDS, WEEK, WEEKDAYS } from "../../routines-model";
 import { PageFrame } from "../list-page";
 import { Field, FIELD, TEXT_AREA } from "../form-field";
 
 const UNITS: EveryUnit[] = ["minutes", "hours", "days"];
+
+/** What each trigger watches, under its checkbox. */
+const TRIGGER_HINTS: Record<TriggerKind, string> = {
+	slack: "A mention or direct message you have not answered. Needs Slack signed in under Settings › Integrations.",
+	"pull-request": "One of yours, or one waiting on your review, shows up or moves: its checks fail, it can merge, it merges.",
+	event: `${EVENT_LEAD_MS / 60_000} minutes before a timed event on your calendars.`,
+};
 
 /** One choice of a radio group, with the controls it enables under it. */
 function Choice({ name, checked, label, onCheck, children }: { name: string; checked: boolean; label: string; onCheck: () => void; children: ReactNode }) {
@@ -123,7 +131,7 @@ interface RoutineEditorProps {
 	onCancel: () => void;
 }
 
-/** A Bot's routine: its name, task, and schedules, saved together. */
+/** A Bot's routine: its name, task, schedules, and triggers, saved together. */
 export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
@@ -133,10 +141,12 @@ export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCa
 		setDraft(current => ({ ...current, schedules: current.schedules.map((item, i) => (i === index ? schedule : item)) }));
 	const removeSchedule = (index: number): void =>
 		setDraft(current => ({ ...current, schedules: current.schedules.filter((_, i) => i !== index) }));
+	const toggleTrigger = (kind: TriggerKind): void =>
+		setDraft(current => ({ ...current, triggers: current.triggers.includes(kind) ? current.triggers.filter(item => item !== kind) : [...current.triggers, kind] }));
 	const result = specOf(draft);
 
 	return (
-		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta={`${botName}'s routine, which runs on a schedule while the dashboard runs`}>
+		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta={`${botName}'s routine, which runs on a schedule or a trigger while the dashboard runs`}>
 			<form
 				className="mx-auto w-full max-w-2xl space-y-6 px-6 py-6"
 				onSubmit={event => {
@@ -188,7 +198,7 @@ export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCa
 					</div>
 				</Field>
 
-				<Field label="Schedules" hint="Runs at the soonest of these. A missed time still starts one run.">
+				<Field label="Schedules" hint="Runs at the soonest of these. A missed time still starts one run. With a trigger, a routine needs no schedule.">
 					<div className="space-y-3">
 						{draft.schedules.map((schedule, index) => (
 							<ScheduleEditor
@@ -196,7 +206,7 @@ export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCa
 								id={`${id}-schedule-${index}`}
 								index={index}
 								schedule={schedule}
-								canRemove={draft.schedules.length > 1}
+								canRemove={draft.schedules.length > 1 || draft.triggers.length > 0}
 								onChange={next => setSchedule(index, next)}
 								onRemove={() => removeSchedule(index)}
 							/>
@@ -204,6 +214,20 @@ export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCa
 						<Button type="button" variant="ghost" size="compact" onClick={() => set("schedules", [...draft.schedules, blankSchedule()])}>
 							Add schedule
 						</Button>
+					</div>
+				</Field>
+
+				<Field label="Triggers" hint="Also runs when one of these sees something new, and tells the run what it saw. What happens while the dashboard is closed starts nothing.">
+					<div className="space-y-3">
+						{TRIGGER_KINDS.map(kind => (
+							<label key={kind} className="flex items-start gap-2 text-sm">
+								<input type="checkbox" checked={draft.triggers.includes(kind)} onChange={() => toggleTrigger(kind)} className="mt-0.5 size-4 shrink-0 accent-current" />
+								<span className="space-y-0.5">
+									<span className="block">{TRIGGER_WORDS[kind]}</span>
+									<span className="block text-xs text-muted-foreground">{TRIGGER_HINTS[kind]}</span>
+								</span>
+							</label>
+						))}
 					</div>
 				</Field>
 

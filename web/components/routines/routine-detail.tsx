@@ -1,14 +1,14 @@
 /** One routine of a Bot: its task and runs, newest first, beside its settings, with Run now and its menu. */
 import { ArrowLeft, Pause, Pencil, Play, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
+import type { Routine, RoutineChange, RoutineRun, RoutineTask, TriggerEvent } from "../../../src/routines";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { readTime } from "../../labels";
 import { hashForBots } from "../../routing";
-import { nextRunWords, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
+import { nextRunWords, runWords, scheduleWords, startsWords, taskWords, TRIGGER_WORDS } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useMinute } from "../../use-minute";
 import { useDashboardActions } from "../dashboard-context";
@@ -92,7 +92,7 @@ function CommandOutput({ output }: { output: string }) {
 	);
 }
 
-/** One run: when, how it went, and what its command printed or why it failed. */
+/** One run: when, how it went, what started it when a trigger did, and what its command printed or why it failed. */
 function RunItem({ run }: { run: RoutineRun }) {
 	const { outcome } = run;
 	const output = outcome.kind === "command" && "output" in outcome.run ? outcome.run.output : "";
@@ -103,8 +103,9 @@ function RunItem({ run }: { run: RoutineRun }) {
 				<span className="font-medium tabular-nums">{readTime(run.at)}</span>
 				<span className="min-w-0 truncate text-xs text-muted-foreground">{runWords(run)}</span>
 			</div>
-			{(output.trim() !== "" || run.errors.length > 0) && (
+			{(output.trim() !== "" || run.errors.length > 0 || run.triggeredBy.length > 0) && (
 				<div className="space-y-2 pl-[1.375rem]">
+					{run.triggeredBy.length > 0 && <TriggeredBy events={run.triggeredBy} />}
 					{output.trim() !== "" && <CommandOutput output={output} />}
 					{run.errors.length > 0 && (
 						<ul aria-label="Errors" className="space-y-0.5 text-xs text-red-600 dark:text-red-400">
@@ -118,6 +119,26 @@ function RunItem({ run }: { run: RoutineRun }) {
 				</div>
 			)}
 		</li>
+	);
+}
+
+/** What a trigger saw that started a run, each a link when it has one. */
+function TriggeredBy({ events }: { events: TriggerEvent[] }) {
+	return (
+		<ul aria-label="Started by" className="space-y-1 text-xs">
+			{events.map((event, index) => (
+				<li key={index} className="min-w-0">
+					{event.url ? (
+						<a href={event.url} target="_blank" rel="noreferrer" className="font-medium break-words underline-offset-2 hover:underline">
+							{event.title}
+						</a>
+					) : (
+						<span className="font-medium break-words">{event.title}</span>
+					)}
+					<p className="line-clamp-2 break-words text-muted-foreground">{event.detail}</p>
+				</li>
+			))}
+		</ul>
 	);
 }
 
@@ -145,12 +166,15 @@ function TaskValue({ task }: { task: RoutineTask }) {
 	}
 }
 
-/** The schedules, one line each. */
-function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
+/** The schedules, then the triggers, one line each. */
+function StartsValue({ routine }: { routine: Routine }) {
 	return (
 		<ul>
-			{schedules.map((schedule, index) => (
+			{routine.schedules.map((schedule, index) => (
 				<li key={index}>{scheduleWords(schedule)}</li>
+			))}
+			{routine.triggers.map(({ kind }) => (
+				<li key={kind}>{TRIGGER_WORDS[kind]}</li>
 			))}
 		</ul>
 	);
@@ -170,13 +194,13 @@ export function RoutineDetail({ routine, botName, connected, onEdit }: DetailPro
 				{routine.enabled ? "Active" : "Paused"}
 			</Badge>,
 		],
-		["Schedule", <ScheduleValue schedules={routine.schedules} />],
+		[routine.triggers.length > 0 ? "Starts" : "Schedule", <StartsValue routine={routine} />],
 		["Next run", <span className={cn("tabular-nums", !routine.enabled && "text-muted-foreground")}>{nextRunWords(routine, now)}</span>],
 	];
 	return (
 		<PageFrame
 			title={routine.name}
-			meta={`${schedulesWords(routine.schedules)} · ${taskWords(task)}`}
+			meta={`${startsWords(routine)} · ${taskWords(task)}`}
 			actions={
 				<>
 					<Button asChild variant="ghost" size="compact" leadingIcon={ArrowLeft}>

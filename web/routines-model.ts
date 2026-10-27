@@ -1,6 +1,17 @@
 /** What a Bot's page says about its routines, and the editor's form and how it becomes a routine to save. */
-import { nonEmpty } from "../src/json";
-import { MAX_COMMAND_LENGTH, nextDueAt, type CommandRun, type Routine, type RoutineRun, type RoutineSpec, type RoutineTask, type Schedule, type Weekday } from "../src/routines";
+import {
+	MAX_COMMAND_LENGTH,
+	nextDueAt,
+	TRIGGER_KINDS,
+	type CommandRun,
+	type Routine,
+	type RoutineRun,
+	type RoutineSpec,
+	type RoutineTask,
+	type Schedule,
+	type TriggerKind,
+	type Weekday,
+} from "../src/routines";
 import type { BotId } from "../src/shared/bots";
 import { minutesOfTimeInput, timeInputValue } from "../src/shared/days";
 
@@ -40,8 +51,16 @@ export function scheduleWords(schedule: Schedule): string {
 	}
 }
 
-/** The schedules in the order they were saved, each in its own words. */
-export const schedulesWords = (schedules: readonly Schedule[]): string => schedules.map(scheduleWords).join(", ");
+/** What starts a routine of each kind of trigger, as a checkbox and a summary say it. */
+export const TRIGGER_WORDS: Record<TriggerKind, string> = {
+	slack: "When a Slack message waits on you",
+	"pull-request": "When a pull request changes status",
+	event: "Before a calendar event starts",
+};
+
+/** What starts `routine`: its schedules in the order they were saved, then its triggers, each in its own words. */
+export const startsWords = ({ schedules, triggers }: Pick<Routine, "schedules" | "triggers">): string =>
+	[...schedules.map(scheduleWords), ...triggers.map(({ kind }) => TRIGGER_WORDS[kind])].join(", ");
 
 /** The first line of `text` with anything but blanks, trimmed. */
 const firstLine = (text: string): string => text.split("\n").find(line => line.trim())?.trim() ?? "";
@@ -74,10 +93,14 @@ export function whenWords(at: number, now: number): string {
 	return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()} at ${time}`;
 }
 
-/** When `routine` runs next: `Paused` while it is off, `Due now` once its slot passed, which the next minute's check runs. */
+/**
+ * When `routine` runs next: `Paused` while it is off, `Due now` once its slot passed, which the next minute's check runs,
+ * and `On a trigger` when it has no schedule.
+ */
 export function nextRunWords(routine: Routine, now: number): string {
 	if (!routine.enabled) return "Paused";
-	const next = nextDueAt(routine.schedules, routine.runs[0]?.at ?? routine.createdAt);
+	if (routine.schedules.length === 0) return "On a trigger";
+	const next = nextDueAt(routine.schedules, routine.scheduledAt ?? routine.createdAt);
 	return next <= now ? "Due now" : whenWords(next, now);
 }
 
@@ -165,11 +188,12 @@ export interface RoutineDraft {
 	prompt: string;
 	command: string;
 	schedules: ScheduleDraft[];
+	triggers: TriggerKind[];
 }
 
 /** A new routine's form for Bot `botId`: a prompt on weekdays at 9:00. */
 export function newDraft(id: string, botId: BotId): RoutineDraft {
-	return { id, botId, name: "", enabled: true, task: "prompt", prompt: "", command: "", schedules: [blankSchedule()] };
+	return { id, botId, name: "", enabled: true, task: "prompt", prompt: "", command: "", schedules: [blankSchedule()], triggers: [] };
 }
 
 /** One saved schedule as the editor shows it, with the other kind's fields at their defaults. */
@@ -195,6 +219,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
 		command: task.kind === "command" ? task.command : draft.command,
 		schedules: routine.schedules.map(scheduleDraft),
+		triggers: routine.triggers.map(({ kind }) => kind),
 	};
 }
 
@@ -226,9 +251,9 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 		if ("fix" in parsed) return parsed;
 		schedules.push(parsed.ok);
 	}
-	const schedulesOf = nonEmpty(schedules);
-	if (!schedulesOf) return { fix: "Add a schedule." };
-	return { ok: { id: draft.id, botId: draft.botId, name, enabled: draft.enabled, task, schedules: schedulesOf } };
+	if (schedules.length === 0 && draft.triggers.length === 0) return { fix: "Add a schedule or a trigger." };
+	const triggers = TRIGGER_KINDS.filter(kind => draft.triggers.includes(kind)).map(kind => ({ kind }));
+	return { ok: { id: draft.id, botId: draft.botId, name, enabled: draft.enabled, task, schedules, triggers } };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */

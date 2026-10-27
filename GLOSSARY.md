@@ -82,9 +82,14 @@ _Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
 ## Unattended work
 
 **Routine**:
-A task a Bot does on one or more schedules: a message into its conversation, or a shell command in its workspace.
+A task a Bot does on its schedules, its triggers, or both: a message into its conversation, or a shell command in its workspace.
 Every routine belongs to one Bot.
 _Avoid_: Cron job, automation
+
+**Trigger**:
+What also starts a routine's run when something new happens: a Slack message waiting on you, a pull request changing status, or a calendar event about to start.
+The run gets what the trigger saw.
+_Avoid_: Hook, webhook, event listener
 
 **Bot**:
 A named teammate with one conversation you come back to, a job, and a memory that only its `remember` tool writes.

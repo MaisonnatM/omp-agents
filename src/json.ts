@@ -101,9 +101,6 @@ export const decoder =
 	(raw: unknown): T | null =>
 		guard(raw) ? raw : null;
 
-/** `list` as a tuple that has a first member, or `null` when it is empty. */
-export const nonEmpty = <T>(list: readonly T[]): [T, ...T[]] | null => (list.length === 0 ? null : (list as [T, ...T[]]));
-
 /** Every entry of `values` through `parse`, or `null` when `values` is no array or one entry does not parse. */
 export function parseAll<T>(values: unknown, parse: (value: unknown) => T | null): T[] | null {
 	if (!Array.isArray(values)) return null;

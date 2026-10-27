@@ -1,17 +1,27 @@
 # Routines
 
-- A routine belongs to one [Bot](bots.md), and on one or more schedules it messages that Bot or runs a shell command in the Bot's workspace.
+- A routine belongs to one [Bot](bots.md), and on its schedules, its triggers, or both, it messages that Bot or runs a shell command in the Bot's workspace.
   Every routine has a Bot; deleting a Bot deletes its routines.
-- Click a Bot's name at the top of its page to see its **Routines**: each with its last run's dot, its name, and its schedules, or **Paused**.
+- Click a Bot's name at the top of its page to see its **Routines**: each with its last run's dot, its name, and its schedules and triggers, or **Paused**.
   Click one to open it in place of the conversation, at `#bots/<Bot id>/routines/<routine id>`.
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
-- **New routine**, under **Routines** in the Bot's details, opens the editor in place of the conversation: a name, its task, and its schedules.
+- **New routine**, under **Routines** in the Bot's details, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
   The task is **Send a message**, a message that goes into the Bot's conversation each run, as if you wrote it there, or **Run a command**, a shell command.
-  Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick.
+  Each schedule repeats every so many minutes, hours, or days, counted from the last run a schedule or **Run now** started, or runs at a time of day on the days you pick.
   **Weekdays** and **Every day** pick those days at once.
   **Add schedule** adds another.
   The routine runs at the earliest of them, and a missed time still starts one run.
+  With a trigger checked, **Remove** can take its last schedule, so the routine runs only on its triggers.
+- **Triggers** also start a run when something new happens:
+  - **When a Slack message waits on you**: a mention or direct message you have not answered, once Slack is signed in under **Settings › Integrations**.
+  - **When a pull request changes status**: one of yours, or one waiting on your review, shows up or moves, such as its checks failing, it becoming ready to merge, or it merging.
+  - **Before a calendar event starts**: a timed event on this Mac's calendars or a signed-in Google Calendar comes within 10 minutes of its start.
+
+  They watch what the bell already checks: Slack and pull requests every 2 minutes, calendars every minute.
+  Everything that happened between two checks starts one run, and the run gets what the trigger saw: a message gets it after the routine's text, as data rather than as instructions, and a command gets it as a JSON list in `$ROUTINE_TRIGGERS`, which is `[]` when a schedule or **Run now** started it.
+  What happened while the dashboard was quit starts nothing when it comes back, nor does what was already there when it started.
+  A triggered run leaves the schedules alone: an hourly routine still runs on the hour.
 - A message reaches the Bot the way your own does: it follows the Bot's running session, resumes its saved one, or starts its first.
   A routine starts no session of its own, so the Bot keeps one conversation, and its answers show there.
 - A command runs with `sh` in the Bot's workspace, without an omp session.
@@ -21,9 +31,10 @@
   If the Bot cannot take that message, the run keeps the output anyway and lists why among its errors.
   A command routine whose last command still runs records an error instead of running a second one.
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.
-- A routine's page shows its message or command in full, then its last 10 runs, newest first, each with its dot, its command's output, and its errors; beside them, its status, **Active** or **Paused**, schedules, and next run.
+- A routine's page shows its message or command in full, then its last 10 runs, newest first, each with its dot, what triggered it, its command's output, and its errors; beside them, its status, **Active** or **Paused**, schedules and triggers, and next run, **On a trigger** when it has no schedule.
   The dot is green when the run went fine, red when it had an error, blue while its command runs, and amber while it waits to start.
   A message's run reads **Sent to the Bot** once it went into the conversation.
+  A triggered run lists each thing it saw, linked to the Slack message, pull request, or event when it can.
   Output longer than 20 lines folds behind **Show output**.
   **Run now** runs it at once whatever its schedules, and shows progress until the server sends the message or starts the command, not until it finishes.
   Its **⋯** menu has **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.

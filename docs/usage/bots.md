@@ -30,9 +30,9 @@
   Editing the job shows **Save job** and **Revert**; every turn's system prompt carries the saved job.
   **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date.
   Only the Bot writes it, with its `remember` tool, when you tell it something worth keeping.
-  **Routines** lists the Bot's routines, each with its last run's dot and its schedules, and **New routine** opens the editor of a new one, `#bots/<id>/routines/new`; click a routine to open it in place of the conversation, and the details mark it.
+  **Routines** lists the Bot's routines, each with its last run's dot and its schedules and triggers, and **New routine** opens the editor of a new one, `#bots/<id>/routines/new`; click a routine to open it in place of the conversation, and the details mark it.
   Ending the session keeps the page open.
 - **Delete** asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
-- Every routine belongs to a Bot: on a schedule it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
+- Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, or a calendar event triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.

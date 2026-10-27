@@ -37,7 +37,7 @@ import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
 import { SettingsSync, syncStores } from "../settings-sync";
-import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
+import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchesAny } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
@@ -72,6 +72,7 @@ import { readProcessTable, SessionProcessWatch, stopProcesses } from "./session-
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
+import { eventSightings, pullRequestSightings, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
@@ -155,6 +156,8 @@ export class Dashboard {
 	readonly #reattached = Promise.withResolvers<void>();
 	readonly #endInbox: EndInbox;
 	readonly #runner: RoutineRunner;
+	/** What the bell's checks saw last, which tells the routines' triggers what is new. */
+	readonly #triggerWatch = new TriggerWatch();
 	readonly #scheduledRunner: ScheduledRunner;
 	readonly #autoContinue: AutoContinue;
 	readonly #mergeQueue: MergeQueue;
@@ -220,8 +223,16 @@ export class Dashboard {
 				upgradeModel,
 				dashboardCommits: () => selfUpdate.newCommits(),
 				updateDashboard: () => selfUpdate.update(),
-				pullRequests: async () => ({ list: await loadPullRequests(this.knownCwds(), false), agent: agentOn(sessions.rows(files.factsOf)) }),
-				slack: async () => ((await integrationSignedIn("slack")) ? waitingOnYou(integrationFetch("slack"), Date.now()) : []),
+				pullRequests: async () => {
+					const list = await loadPullRequests(this.knownCwds(), false);
+					this.#triggerWatch.learn(pullRequestSightings(list));
+					return { list, agent: agentOn(sessions.rows(files.factsOf)) };
+				},
+				slack: async () => {
+					const found = (await integrationSignedIn("slack")) ? await waitingOnYou(integrationFetch("slack"), Date.now()) : [];
+					this.#triggerWatch.learn(slackSightings(found));
+					return found;
+				},
 				plans: async () => {
 					const usage = this.#usage.report;
 					if (usage === null) throw new Error("omp usage has not run yet");
@@ -229,10 +240,15 @@ export class Dashboard {
 					return usage.plans;
 				},
 				creditRuns: () => readCreditRuns(Date.now()),
-				localEvents: () =>
-					this.#localEvents.value.flatMap(({ id, title, when }) => (when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null }])),
-				googleEvents: async (from, to) =>
-					(await this.#google.byAccount(new Date(from), new Date(to))).map(read => ({
+				localEvents: () => {
+					const events = this.#localEvents.value.flatMap(({ id, title, when }) =>
+						when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null }],
+					);
+					this.#triggerWatch.learn(eventSightings([{ scope: "event:local", events }], Date.now()));
+					return events;
+				},
+				googleEvents: async (from, to) => {
+					const accounts = (await this.#google.byAccount(new Date(from), new Date(to))).map(read => ({
 						account: read.account,
 						events:
 							"error" in read
@@ -240,7 +256,10 @@ export class Dashboard {
 								: read.events.flatMap(({ account, calendarId, eventId, title, calendar, color, url, when }) =>
 										when.allDay ? [] : [{ ref: `google/${account}/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url }],
 									),
-					})),
+					}));
+					this.#triggerWatch.learn(eventSightings(accounts.flatMap(({ account, events }) => (events ? [{ scope: `event:google/${account}`, events }] : [])), Date.now()));
+					return accounts;
+				},
 				stoppedSessions: () =>
 					interrupted.midTurn().map(sessionId => {
 						const saved = files.savedOf(sessionId);
@@ -366,10 +385,10 @@ export class Dashboard {
 			file: routines,
 			now: Date.now,
 			workspace: botId => this.#botsFile.value.find(({ id }) => id === botId)?.cwd ?? null,
-			async exec(command, cwd) {
+			async exec(command, cwd, env) {
 				const dir = await directoryOf(cwd);
 				if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
-				return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping });
+				return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping, env });
 			},
 			onChange: () => broadcasts.pushList("routines"),
 			messageBot: (botId, text) => this.#bots.message(botId, text),
@@ -439,6 +458,7 @@ export class Dashboard {
 				scheduled.reload();
 				broadcasts.pushList("scheduled");
 				await notices.check([...EVENT_KINDS, ...STOPPED_KINDS]);
+				this.#fireTriggers();
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
 				// It reads every sandbox's checkout, which takes minutes, so the routines and sends after it do not wait for it.
@@ -449,7 +469,9 @@ export class Dashboard {
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
-				if (broadcasts.listening()) await this.#checkActivity();
+				// The routines' Slack and pull request triggers read this check, so the server that runs them checks without a page too.
+				const triggers = ownerLock.held && watchesAny(routines.value, ACTIVITY_KINDS);
+				if (broadcasts.listening() || triggers) await this.#checkActivity();
 				else this.#activityFresh = false;
 			},
 			onPullTick: async () => {
@@ -793,6 +815,8 @@ export class Dashboard {
 			this.#scheduledRunner.recover();
 			void this.#todoInbox.drain();
 			void this.#noteInbox.drain();
+			// It learned what the triggers see while another server ran routines, which that server fired.
+			this.#triggerWatch.forget();
 		}
 		return owns;
 	}
@@ -804,10 +828,17 @@ export class Dashboard {
 		});
 	}
 
-	/** Checks the pull requests and Slack for the bell. */
-	#checkActivity(): Promise<void> {
+	/** Starts the runs of the routines whose triggers the last check saw news for, on the server that runs routines; another server drops the news. */
+	#fireTriggers(): void {
+		const news = this.#triggerWatch.take();
+		if (news.length > 0 && this.#ownerLock.held) void this.#runner.fire(news).catch((err: unknown) => console.error(`omp-agents: a triggered routine failed to start: ${errorText(err)}`));
+	}
+
+	/** Checks the pull requests and Slack for the bell and the routines' triggers. */
+	async #checkActivity(): Promise<void> {
 		this.#activityFresh = true;
-		return this.#notices.check(ACTIVITY_KINDS);
+		await this.#notices.check(ACTIVITY_KINDS);
+		this.#fireTriggers();
 	}
 
 	/** The session list changed: views may now find their file, and the past list is out of date. */

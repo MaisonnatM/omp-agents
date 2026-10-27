@@ -64,7 +64,8 @@ function runState(run: RoutineRun): "ran" | "failed" {
 
 /**
  * `routine`'s runs and slots from `from` up to `to`. A slot that passed without a run runs at the next minute's check,
- * so it shows at `now`; each later slot counts from the one before, as the schedule counts from the last run.
+ * so it shows at `now`; each later slot counts from the one before, as the schedule counts from its last run. A routine
+ * with only triggers plans no slot.
  */
 function routineEntries(routine: Routine, from: number, to: number, now: number): CalendarEntry[] {
 	const { id: routineId, botId, name } = routine;
@@ -78,7 +79,7 @@ function routineEntries(routine: Routine, from: number, to: number, now: number)
 		.filter(run => run.at >= from && run.at < to)
 		.map(run => ({ kind: "routine", day: localDay(run.at), at: run.at, botId, routineId, name, state: runState(run) }));
 	if (!routine.enabled) return entries;
-	for (let after = routine.runs[0]?.at ?? routine.createdAt; ; ) {
+	for (let after = routine.scheduledAt ?? routine.createdAt; ; ) {
 		const at = Math.max(nextDueAt(routine.schedules, after), now);
 		if (at >= to) break;
 		if (at >= from) entries.push({ kind: "routine", day: localDay(at), at, botId, routineId, name, state: "planned" });

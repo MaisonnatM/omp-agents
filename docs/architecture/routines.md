@@ -1,9 +1,10 @@
 # Routines
 
-Every routine belongs to a Bot, through its required `botId`, and acts in that Bot on one or more schedules; see [Bots](bots.md).
-A schedule is every so many minutes, counted from the last run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST.
+Every routine belongs to a Bot, through its required `botId`, and acts in that Bot on its schedules, its triggers, or both, with at least one of either; see [Bots](bots.md).
+A schedule is every so many minutes, counted from the last scheduled run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST.
 The routine is due at the earliest of them.
-Two intervals share that last run, so the shorter one decides.
+Two intervals share that last scheduled run, so the shorter one decides.
+The routine keeps that run's time in `scheduledAt`, which a slot's or **Run now**'s claim sets and a trigger's leaves alone, so a busy Slack moves no schedule; a file from before triggers reads it as its newest run's time.
 Its task is a `prompt`, a message that goes into the Bot's conversation, or a `command`, a shell command that runs in the Bot's workspace.
 A routine has no workspace, skill, or pin of its own: the Bot's workspace, job, and conversation stand in for them.
 
@@ -14,7 +15,7 @@ A file that is not a list of routines still moves aside.
 `parseRoutineSpec` in `src/routines.ts` checks each routine's fields both for the file and for the socket's `routine` save, so the two hold the same limits.
 The `Dashboard` refuses a save whose `botId` names no Bot, and sends the routines back to the page that asked.
 Each routine holds its last 10 runs, newest first.
-A run holds its slot time, its errors, and one `outcome`: `pending` from its claim, with whether it is still `queued`; `sent` with the session its message went to; or a `command` with the command's result once it ran.
+A run holds its slot time, its errors, `triggeredBy`, the events that started it, empty for a slot's or **Run now**'s run, and one `outcome`: `pending` from its claim, with whether it is still `queued`; `sent` with the session its message went to; or a `command` with the command's result once it ran.
 A run from before `outcome` migrates as the file loads, in `parseRun`, and nothing else sees the old fields: its `command` becomes a `command` outcome, a started session or a Bot's message `sent`, and otherwise `pending`, queued when its `queued` is set or its `queue` list holds an entry.
 A run stays queued from its claim until the drain sends its message or starts its command.
 
@@ -44,7 +45,7 @@ Each tick does two things, in order:
    `runShell` runs `/bin/sh -c` with stderr merged into stdout, keeps the last 64 KB of output, and stops the command after 10 minutes.
    It spawns the shell in its own process group and stops the whole group with SIGTERM, since a command's own children would otherwise keep running and hold the output pipe open.
    When the command ends, the runner writes its exit code, output, and times to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
-   It then posts `commandReport` into the Bot's conversation through `Bots.message`: the routine's name, the command, how it ended, and its output fenced as data.
+   It then posts `commandReport` into the Bot's conversation through `Bots.message`: the routine's name, the command, what triggered it, how it ended, and its output fenced as data.
    The run keeps the output whether or not the post goes through, and a post the Bot refused adds why to the run's errors.
    The runner keeps the routines whose command runs in memory, since a run holds one outcome and later `run-now` claims can push a running command's run out of the saved 10; a command routine whose last command still runs records an error instead of running a second one.
 
@@ -59,6 +60,28 @@ A `routine` socket message carries one change: `save`, `remove`, `enable`, or `r
 Every socket hears the routines after each change and each step of a run as a `routines` message on the roster topic, also sent when a socket opens.
 Removing a Bot removes its routines first, in the same `bot` change, and every socket hears both lists.
 
+## Triggers
+
+A trigger is a kind of thing that happened, `slack`, `pull-request`, or `event`, that also starts a run of each enabled routine that lists it.
+Triggers add no integration of their own: they read what the bell's checks already fetch, in `src/server/notices.ts`.
+The `Dashboard` wraps four of the `NoticeSources`, `pullRequests`, `slack`, `localEvents`, and `googleEvents`, so each answer also goes, unchanged, through the helpers in `src/server/routine-triggers.ts`, which turn it into sightings.
+A sighting has an id that names what it saw in the state it saw it, and a scope, which one answer covers:
+
+- **Pull requests**: each pull request of a repository GitHub answered for, by its status as `moveOf` reads it without the sessions on it, so a pull request that shows up or changes status is new; scope `pull-request:<owner/repo>`.
+- **Slack**: each conversation's newest message that waits on you, by Slack's id for it; scope `slack`.
+- **Calendar events**: each timed event that starts within the bell's 10-minute lead, by its event and start, so it is new once as it comes within the lead and again if it moves; scope `event:local`, or `event:google/<account>` for an account that answered.
+
+`TriggerWatch` keeps the ids of each scope's last answer in memory, and keeps the ids it had not seen as news until the `Dashboard` takes them once the check ends, so the sources of one check start one run of a routine.
+A scope's first answer since the server started only sets what it knows, so a restart, or what happened while the dashboard was stopped, starts nothing; a scope whose check failed keeps what it knew.
+Every server learns its sightings, but only the server that owns routines fires them; another drops its news, and a server that takes over routines forgets what it learned before, so its next answers set a new baseline and a takeover fires nothing old.
+
+`RoutineRunner.fire` claims one run of each routine that watches a kind of the news, holding the first 10 of those events the check listed, then drains, in the same `SerialLane` as ticks and **Run now**.
+A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
+A prompt run sends the prompt, then the events, fenced as data; a command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run, which `runShell` sets beside the server's environment.
+Each event carries its kind, a title, a detail of at most 2,000 characters, and a link when it has one.
+The pull request and Slack checks run on the 2-minute activity tick, which skips while no page listens; the owner runs them anyway while an enabled routine has a `slack` or `pull-request` trigger.
+Calendar events are checked on the minute tick.
+
 ## One server runs the unattended work
 
 Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
@@ -71,7 +94,7 @@ A process id that another program reused keeps the lock held; delete `server.loc
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
 On a takeover the server logs it, reads `routines.json` and `todos.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo inbox.
 A server that exits normally deletes its lock.
-The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the todo inbox, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo inbox, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 `scheduled.json` is the exception: `ScheduledFile` is a `shared` `ReducerFile`, so a send added on any server reaches the owner and only one process can claim it.
 Each mutation holds an `OwnerLock` at `<path>.lock` across reload, reduction, and the immediate JSON replacement, so independent server processes keep one another's changes.

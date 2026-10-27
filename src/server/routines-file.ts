@@ -2,13 +2,24 @@
  * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a queued run is on disk before the runner starts anything from it.
  * A routine whose task was pull requests or a project's prompt is dropped on load. The rest of the file stays.
- * A file from before `schedules`, before a run's `outcome`, or before every routine had a Bot migrates here, so everything else sees the current shape.
+ * A file from before `schedules`, before a run's `outcome`, before every routine had a Bot, or before triggers migrates here, so everything else sees the current shape.
  */
 import { resolve } from "node:path";
 import { ReducerFile } from "../fs";
-import { isNonEmpty, isObject, isSafeInteger, isTexts, parseAll } from "../json";
+import { fields, isNonEmpty, isObject, isSafeInteger, isString, isTexts, nullable, parseAll } from "../json";
 import { expandHome, HOME } from "../paths";
-import { applyRoutine, MAX_ROUTINE_RUNS, parseRoutineSpec, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
+import {
+	applyRoutine,
+	isTriggerKind,
+	MAX_ROUTINE_RUNS,
+	parseRoutineSpec,
+	type CommandRun,
+	type Routine,
+	type RoutineChange,
+	type RoutineOutcome,
+	type RoutineRun,
+	type TriggerEvent,
+} from "../routines";
 import { type BotId, type BotSpec, defaultLook } from "../shared/bots";
 
 /** The Bot the routines from before Bots move to; page Bots have random UUIDs, so none takes this id. */
@@ -49,12 +60,21 @@ function parseCommandRun(value: unknown): CommandRun | null {
 	}
 }
 
+const isTriggerEvent = fields<TriggerEvent>({ kind: isTriggerKind, title: isString, detail: isString, url: nullable(isString) });
+
+function parseTriggerEvent(value: unknown): TriggerEvent | null {
+	return isTriggerEvent(value) ? { kind: value.kind, title: value.title, detail: value.detail, url: value.url } : null;
+}
+
 /**
  * A run's `outcome`, or the fields it had before: `queued` or `queue`, `started` sessions, and `command`. Of several sessions, only a pull request routine's run started more than one, and the first stays.
  * A run from before every routine had a Bot that started a session or messaged a Bot sent its prompt into that session.
  */
 function parseRun(value: unknown): RoutineRun | null {
 	if (!isObject(value) || !isSafeInteger(value.at) || !isTexts(value.errors)) return null;
+	// A run from before triggers was started by a schedule or Run now.
+	const triggeredBy = "triggeredBy" in value ? parseAll(value.triggeredBy, parseTriggerEvent) : [];
+	if (!triggeredBy) return null;
 	if (isObject(value.outcome)) {
 		const { outcome } = value;
 		let parsed: RoutineOutcome | null = null;
@@ -64,14 +84,14 @@ function parseRun(value: unknown): RoutineRun | null {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
 		}
-		return parsed ? { at: value.at, outcome: parsed, errors: value.errors } : null;
+		return parsed ? { at: value.at, outcome: parsed, errors: value.errors, triggeredBy } : null;
 	}
 	const queued = "queued" in value ? value.queued : isTexts(value.queue) && value.queue.length > 0;
 	const started = parseAll(value.started, parseStarted);
 	if (typeof queued !== "boolean" || !started) return null;
 	const command = parseCommandRun(value.command);
 	const outcome: RoutineOutcome = command ? { kind: "command", run: command } : started.length > 0 ? { kind: "sent", sessionId: started[0]!.sessionId } : { kind: "pending", queued };
-	return { at: value.at, outcome, errors: value.errors };
+	return { at: value.at, outcome, errors: value.errors, triggeredBy };
 }
 
 /** What a parse of a file from before every routine had a Bot found: whether a routine moved to a Bot, and the workspace of the Routines Bot when one moved there. */
@@ -122,11 +142,14 @@ function parseRoutine(value: unknown): Routine | { dropped: string } | null {
 	const dropped = isObject(value) && isObject(value.task) && typeof value.task.kind === "string" ? DROPPED_TASKS.get(value.task.kind) : undefined;
 	if (dropped) return { dropped };
 	if (!isObject(value)) return null;
-	const spec = parseRoutineSpec({ ...value, schedules: "schedules" in value ? value.schedules : [value.schedule] });
+	const spec = parseRoutineSpec({ ...value, schedules: "schedules" in value ? value.schedules : [value.schedule], triggers: "triggers" in value ? value.triggers : [] });
 	if (!spec) return null;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
-	return typeof createdAt === "number" && runs ? { ...spec.ok, createdAt, runs } : null;
+	if (typeof createdAt !== "number" || !runs) return null;
+	// Before triggers, every run was a schedule's or Run now's, and the schedules counted from the newest.
+	const scheduledAt = "scheduledAt" in value ? value.scheduledAt : (runs[0]?.at ?? null);
+	return scheduledAt === null || isSafeInteger(scheduledAt) ? { ...spec.ok, createdAt, scheduledAt, runs } : null;
 }
 
 /** `routines.json`'s list, recording in `migration` what moved from the shape before every routine had a Bot. */
@@ -189,11 +212,15 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 		});
 	}
 
-	/** Claims routine `id`'s slot at `at`, queued, keeping the newest {@link MAX_ROUTINE_RUNS} runs. */
-	claim(id: string, at: number): void {
+	/**
+	 * Claims a run of routine `id` at `at`, queued, keeping the newest {@link MAX_ROUTINE_RUNS} runs. A run with no
+	 * `triggeredBy` is a schedule's or Run now's, which the schedules count from.
+	 */
+	claim(id: string, at: number, triggeredBy: TriggerEvent[]): void {
 		this.#updateRoutine(id, routine => ({
 			...routine,
-			runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [] } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
+			scheduledAt: triggeredBy.length === 0 ? at : routine.scheduledAt,
+			runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
 		}));
 	}
 

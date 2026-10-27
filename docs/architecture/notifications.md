@@ -3,7 +3,7 @@
 `src/server/notices.ts` owns the bell's notices: what the last checks found, the status of each update a page started, and which notices the user saw, read, or cleared, which it keeps in `notices.json` beside the access token.
 Each kind has its own check, and `src/server/loops.ts` runs five of them.
 The update check (`UPDATE_KINDS`) runs at startup and every six hours, whether or not a page is connected, and again after each update that succeeds.
-The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, and when a socket opens unless it ran since the last tick that found none.
+The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, or on the owner while an enabled routine has a Slack or pull request trigger ([Triggers](routines.md#triggers)), and when a socket opens unless it ran since the last tick that found none.
 The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run of the usage tick, every minute while a socket listens, and when a socket opens unless it succeeded since the last tick that found none; a continue's own run skips it ([Plan quota](plan-quota.md)).
 The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page is connected.
 The dashboard check (`DASHBOARD_KINDS`) runs at startup and every five minutes, whether or not a page is connected: `SelfUpdate.newCommits` fetches the branch the server runs from origin and counts the commits past the running one.

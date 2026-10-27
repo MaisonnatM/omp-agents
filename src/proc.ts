@@ -65,6 +65,8 @@ export interface ShellOptions {
 	maxOutput: number;
 	/** Stops the command when it aborts. */
 	signal?: AbortSignal;
+	/** Set beside this process's environment. */
+	env?: Record<string, string>;
 }
 
 /** What a shell command ended with: `exitCode` is null once it was stopped. */
@@ -79,7 +81,7 @@ export interface ShellResult {
  */
 export async function runShell(command: string, cwd: string, opts: ShellOptions): Promise<ShellResult> {
 	opts.signal?.throwIfAborted();
-	const child = Bun.spawn(["/bin/sh", "-c", `exec 2>&1\n${command}`], { cwd, env: childEnv(), stdin: "ignore", stdout: "pipe", stderr: "ignore", detached: true });
+	const child = Bun.spawn(["/bin/sh", "-c", `exec 2>&1\n${command}`], { cwd, env: childEnv(opts.env), stdin: "ignore", stdout: "pipe", stderr: "ignore", detached: true });
 	// The command's own children keep the pipe open after `sh` dies, so stopping it signals its whole process group.
 	const stop = (): void => {
 		try {
