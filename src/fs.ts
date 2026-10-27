@@ -162,6 +162,8 @@ interface ReducerFileOptions<S, A extends unknown[]> extends Pick<JsonFileOption
 export class ReducerFile<S, A extends unknown[]> {
 	readonly #file: JsonFile<S>;
 	readonly #reduce: (value: S, ...change: A) => S;
+	readonly #parse: (json: unknown) => S | null;
+	readonly #toJson: ((value: S) => unknown) | undefined;
 	readonly #lock: OwnerLock | null;
 	readonly #path: string;
 	#value: S;
@@ -171,11 +173,28 @@ export class ReducerFile<S, A extends unknown[]> {
 		this.#lock = shared ? new OwnerLock(`${path}.lock`, 0) : null;
 		this.#file = new JsonFile(path, { parse, toJson, holds, onInvalid: "aside", indent: "\t", written: () => this.#lock?.release() });
 		this.#reduce = reduce;
+		this.#parse = parse;
+		this.#toJson = toJson;
 		this.#value = this.#file.load() ?? empty;
 	}
 
 	get value(): S {
 		return this.#value;
+	}
+
+	/** `value`, the one it holds unless given, as its file holds it. */
+	json(value: S = this.#value): unknown {
+		return this.#toJson ? this.#toJson(value) : value;
+	}
+
+	/** The value a file holding `json` holds, or `null` when that is something else. */
+	parse(json: unknown): S | null {
+		return this.#parse(json);
+	}
+
+	/** Replaces the value with `value` and saves; whether it changed. */
+	replace(value: S): boolean {
+		return this.update(() => value);
 	}
 
 	/** Applies `change` through `reduce` and saves; whether it changed anything. */

@@ -27,6 +27,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Isolation sandboxes](architecture/routines.md#isolation-sandboxes)
 - [Scheduled sends](architecture/scheduled-sends.md)
 - [Pins](architecture/pins.md)
+- [Preferences](architecture/preferences.md)
 - [User notes](architecture/user-notes.md)
 - [Notifications](architecture/notifications.md)
   - [Session notifications](architecture/notifications.md#session-notifications)

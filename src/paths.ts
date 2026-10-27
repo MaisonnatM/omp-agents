@@ -46,6 +46,8 @@ export const workspacesFile = join(configDir, "workspaces.json");
 export const oldWorkspacesFile = join(configDir, "projects.json");
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
+/** The page's preferences that follow the user to every machine, beside {@link tokenFile}. */
+export const preferencesFile = join(configDir, "preferences.json");
 /** When the idle stop ends a session's processes, beside {@link tokenFile}. */
 export const processesFile = join(configDir, "processes.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */

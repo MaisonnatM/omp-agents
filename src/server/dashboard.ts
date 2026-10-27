@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { activityDb, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -36,7 +36,7 @@ import { canonical, worktreeAt } from "../git";
 import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
-import { SettingsSync, sourceControlStore } from "../settings-sync";
+import { SettingsSync, syncStores } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -64,6 +64,7 @@ import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
 import { PinsFile } from "./pins-file";
+import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
 import { readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
 import { ReviewDrafts } from "./review-drafts";
@@ -112,6 +113,7 @@ export class Dashboard {
 	readonly #workspaces: WorkspacesFile;
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #processSettings = new ProcessSettingsFile(processesFile);
+	readonly #preferences = new PreferencesFile(preferencesFile);
 	readonly #reviewDrafts = new ReviewDrafts({
 		file: new ReviewDraftsFile(reviewDraftsFile),
 		github: { target: readReviewTarget, reviews: listReviews, reviewComments: listReviewComments, viewer: viewerLogin, post: postReview },
@@ -119,7 +121,7 @@ export class Dashboard {
 		onChange: () => this.#broadcasts.pushList("review-drafts"),
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
-	readonly #settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores: { "source-control": sourceControlStore(this.#sourceControl, HOME) } });
+	readonly #settingsSync: SettingsSync;
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
 	readonly #localEvents = new LocalEventsFile(localEventsFile);
@@ -175,6 +177,13 @@ export class Dashboard {
 		// An older version kept the workspace list in `projects.json`, so it moves first.
 		adoptOldWorkspaces(oldWorkspacesFile, workspacesFile);
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
+		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
+		const stores = syncStores(
+			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars },
+			HOME,
+			list => this.#broadcasts.pushList(list),
+		);
+		this.#settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores });
 		const files = this.#files;
 		const todos = this.#todos;
 		const notes = this.#notes;
@@ -249,6 +258,7 @@ export class Dashboard {
 				apply: change => workspaces.apply(change),
 			},
 			pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
+			preferences: { msg: () => ({ t: "preferences", values: this.#preferences.value }), apply: change => this.#preferences.apply(change) },
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },

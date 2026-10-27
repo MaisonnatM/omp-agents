@@ -83,7 +83,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |
 | Dev and Ops switch, command menu button, notification bell, and Settings button | control, command | `header.group`; `header.command-menu`, which opens the command palette as command `switcher` does; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `header.settings`, which opens or closes Settings as command `settings` does |
-| System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switch in Settings › Preferences is a `PUT` |
+| System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switch in Settings › Preferences is action `preference` |
 | Pages: New session | view | `new` |
 | Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view.list`, `pull-requests.view.board`; Rebase N behind is a `PUT` |
 | Pages: Tickets | view | `tickets`, `tickets/item` |
@@ -96,6 +96,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |
 | Settings › Worktrees | view, action | `settings/worktrees`; Remove merged is a `PUT` |
+| Settings › Preferences | view, action | `settings/preferences`; each change to a preference that follows you, the theme, transcript, sidebar tabs, notifications, pinned skill, default merge method, diff, and calendar routine choices, is action `preference`, wherever you change it; Stop idle processes is a `PUT` |
 | Settings › Sync | view, action | `settings/sync`; Sync and its switches are `PUT`s |
 | ListSplit | not observed | dragging the line is not a click |
 | Shared primitives | not applicable | tags go on the component that owns a control, not on the primitive |

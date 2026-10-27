@@ -157,6 +157,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
+	preference: ({ lists }, peer, { change }) => void lists.apply("preferences", change, peer),
 	"review-draft": ({ lists }, peer, { change }) => void lists.apply("review-drafts", change, peer),
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),
 	discuss: ({ discussions }, peer, { id, request }) => discussions.ask(peer, id, request),

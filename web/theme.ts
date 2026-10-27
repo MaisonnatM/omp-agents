@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { useStoredState } from "./stored-state";
+import { onStoredChange, useStoredState } from "./stored-state";
 
 /** The page's color scheme: follow the OS, or pin light or dark. */
 export type Theme = "system" | "light" | "dark";
@@ -12,27 +12,21 @@ const OS_DARK = "(prefers-color-scheme: dark)";
 
 const themeOf = (stored: string | null): Theme => THEMES.find(theme => theme === stored) ?? "system";
 
-const storedTheme = (): Theme => themeOf(localStorage.getItem(THEME_KEY));
-
 // The Fluid tokens switch on a `.dark` class.
-const applyTheme = (theme: Theme): void =>
-	void document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && window.matchMedia(OS_DARK).matches));
+function applyStoredTheme(): void {
+	const theme = themeOf(localStorage.getItem(THEME_KEY));
+	document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && window.matchMedia(OS_DARK).matches));
+}
 
-/** Applies the saved theme before the first render, and follows the OS while the theme is `system`. */
+/** Applies the saved theme before the first render, again whenever it changes, from this page, another, or the server, and follows the OS while it is `system`. */
 export function startTheme(): void {
-	applyTheme(storedTheme());
-	window.matchMedia(OS_DARK).addEventListener("change", () => applyTheme(storedTheme()));
+	applyStoredTheme();
+	onStoredChange(THEME_KEY, applyStoredTheme);
+	window.matchMedia(OS_DARK).addEventListener("change", applyStoredTheme);
 }
 
-/** The saved theme and its setter, which applies it at once and keeps it in localStorage. */
-export function useTheme(): [Theme, (theme: Theme) => void] {
-	const [theme, store] = useStoredState(THEME_KEY, themeOf);
-	const pick = (next: Theme): void => {
-		store(next);
-		applyTheme(next);
-	};
-	return [theme, pick];
-}
+/** The saved theme and its setter, which keeps it in localStorage; {@link startTheme} applies it. */
+export const useTheme = (): [Theme, (theme: Theme) => void] => useStoredState(THEME_KEY, themeOf);
 
 function onClassChange(changed: () => void): () => void {
 	const observer = new MutationObserver(changed);

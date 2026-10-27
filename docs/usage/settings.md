@@ -90,7 +90,9 @@
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
   If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
-- **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files, except **Stop idle processes**, which the server keeps.
+- **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files.
+  The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
+  The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
   **Sidebar tabs** lists the seven sidebar tabs in the order the sidebar shows them, each with its group, **Dev** or **Ops**, the Cmd+number it takes while its group shows, a switch that shows or hides it, and buttons that move it up or down.

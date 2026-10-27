@@ -33,6 +33,7 @@
   A `JsonFile`'s `save` writes once per event-loop turn however many changes arrive in it, and `flushJsonFiles` retries every dirty value as the server stops or exits.
   `flush` reports success and retains a failed write for a later retry.
   `ReducerFile` wraps `JsonFile` for reducer-backed lists, loads the value or an empty one, and saves only when a change gives a new value.
+  Settings sync reads and replaces one whole through `json`, the value as its file holds it, `parse`, the file's own parser, and `replace`.
   A `shared` reducer holds `templates/omp/agent/extensions/github/owner-lock.ts`'s `OwnerLock` at `<path>.lock` across reload, reduction, and immediate persistence.
   A failed shared write rejects its caller and retains both the dirty value and ownership until a successful retry.
   `src/owner-lock.test.ts` covers ownership and takeover; `src/fs.test.ts` also races real processes over shared updates and scheduled claims.
