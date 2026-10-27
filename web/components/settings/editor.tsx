@@ -1,5 +1,4 @@
-/** What the Settings editors share: the edit-then-save hook, the Edit/Save bar, save errors, sections, and switches. */
-import { Switch } from "@base-ui/react/switch";
+/** What the Settings editors share: the edit-then-save hook, the Edit/Save bar, save errors, and sections. */
 import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
@@ -111,21 +110,6 @@ export function Section({ title, meta, actions, children }: { title: string; met
 			</div>
 			{children}
 		</section>
-	);
-}
-
-/** An on/off setting, labelled for screen readers by `label`. */
-export function SettingSwitch(props: { checked: boolean; disabled: boolean; label: string; onCheckedChange: (on: boolean) => void }) {
-	return (
-		<Switch.Root
-			aria-label={props.label}
-			checked={props.checked}
-			disabled={props.disabled}
-			onCheckedChange={props.onCheckedChange}
-			className="inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-input p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 motion-reduce:transition-none"
-		>
-			<Switch.Thumb className="size-3 rounded-full bg-background shadow-xs transition-transform data-[checked]:translate-x-3 motion-reduce:transition-none" />
-		</Switch.Root>
 	);
 }
 

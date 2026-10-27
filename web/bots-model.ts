@@ -4,7 +4,7 @@ import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { statusLabel } from "./components/status-dot";
 import { plainMarkdown } from "./labels";
-import type { Page } from "./routing";
+import type { BotRoutineRoute, Page } from "./routing";
 
 /** The running session of the Bot's conversation, `null` while none runs. */
 export function botHost(bot: Bot, hosts: readonly RosterHost[]): RosterHost | null {
@@ -30,8 +30,17 @@ export function botStatus(bot: Bot, host: RosterHost | null): string {
 /** The Bot's routines, in `routines`' order. */
 export const botRoutines = (routines: readonly Routine[], id: BotId): Routine[] => routines.filter(({ botId }) => botId === id);
 
-/** What a Bot's page shows: its conversation, a new routine's editor, one of its routines or that routine's editor, or that the routine its address names is missing. */
-export type OpenRoutine = { kind: "conversation" } | { kind: "new" } | { kind: "open"; routine: Routine } | { kind: "edit"; routine: Routine } | { kind: "missing"; id: string };
+/**
+ * What a Bot's page shows: its conversation, the card of its routines with none or one open, a new routine's editor, a routine's editor,
+ * or that the routine its address names is missing.
+ */
+export type OpenRoutine =
+	| { kind: "conversation" }
+	| { kind: "list" }
+	| { kind: "new" }
+	| { kind: "open"; routine: Routine }
+	| { kind: "edit"; routine: Routine }
+	| { kind: "missing"; id: string };
 
 /** The Bot whose page is open: what its page and its details show, and the conversation the server streams for it. */
 export interface OpenBot {
@@ -46,6 +55,21 @@ export interface OpenBot {
 	status: string;
 }
 
+/** What `route` shows of the Bot's routines `own`. */
+function openRoutine(route: BotRoutineRoute | null, own: readonly Routine[]): OpenRoutine {
+	if (route === null) return { kind: "conversation" };
+	switch (route.kind) {
+		case "list":
+		case "new":
+			return route;
+		case "open":
+		case "edit": {
+			const routine = own.find(({ id }) => id === route.id);
+			return routine ? { kind: route.kind, routine } : { kind: "missing", id: route.id };
+		}
+	}
+}
+
 /** The Bot `page` opens, `null` on another page, on the New Bot form, while the Bots load, or for a Bot that is gone. */
 export function openBot(page: Page | null, bots: readonly Bot[] | null, hosts: readonly RosterHost[], routines: readonly Routine[]): OpenBot | null {
 	if (page?.kind !== "bots" || page.target === null) return null;
@@ -53,10 +77,7 @@ export function openBot(page: Page | null, bots: readonly Bot[] | null, hosts: r
 	if (!bot) return null;
 	const host = botHost(bot, hosts);
 	const own = botRoutines(routines, bot.id);
-	const route = page.routine;
-	const named = route === null || route.kind === "new" ? undefined : own.find(({ id }) => id === route.id);
-	const routine: OpenRoutine =
-		route === null ? { kind: "conversation" } : route.kind === "new" ? route : named ? { kind: route.kind, routine: named } : { kind: "missing", id: route.id };
+	const routine = openRoutine(page.routine, own);
 	return { bot, host, view: routine.kind === "conversation" ? botView(bot, hosts) : null, routines: own, routine, status: botStatus(bot, host) };
 }
 

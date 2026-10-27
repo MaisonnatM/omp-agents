@@ -323,6 +323,15 @@
     opacity: 0.45;
   }
 }
+/* A running routine's line under its row, a third of its width sweeping across; outside @theme for the same reason. */
+@keyframes routine-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
 
 @utility surface-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);

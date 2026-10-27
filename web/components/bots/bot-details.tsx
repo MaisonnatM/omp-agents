@@ -174,7 +174,7 @@ function MemoryList({ bot, memory }: { bot: Bot; memory: string }) {
 	);
 }
 
-/** The Bot's routines, each opening its settings and runs in place of the conversation, and **New routine**; `open` is what the page shows, which they mark. */
+/** The Bot's routines, each opening the card of them with its row open in place of the conversation, the heading opening the card, and **New routine**; `open` is what the page shows, which they mark. */
 function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: readonly Routine[]; open: OpenRoutine; connected: boolean }) {
 	const openId = open.kind === "open" || open.kind === "edit" ? open.routine.id : null;
 	const id = useId();
@@ -182,7 +182,13 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 		<section aria-labelledby={id} className="space-y-2">
 			<div className="flex items-center justify-between gap-2">
 				<h3 id={id} className="text-xs font-medium text-muted-foreground">
-					Routines
+					<a
+						href={hashForBotRoutine(bot.id, { kind: "list" })}
+						aria-current={open.kind === "list" ? "page" : undefined}
+						className="rounded-sm underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:text-foreground"
+					>
+						Routines
+					</a>
 				</h3>
 				{connected ? (
 					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={Plus}>

@@ -1,4 +1,4 @@
-/** A Bot's page, its one conversation under a header whose name shows or hides its details in the right sidebar, a routine's settings and runs or editor in place of the conversation, and the New Bot form. */
+/** A Bot's page, its one conversation under a header whose name shows or hides its details in the right sidebar, the card of its routines or a routine's editor in place of the conversation, and the New Bot form. */
 import { BookmarkCheck } from "lucide-react";
 import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import type { RoutineSpec } from "../../../src/routines";
@@ -28,7 +28,7 @@ import { SidebarToggle } from "../sidebar-panel";
 import { DirectoryPicker } from "../workspace-picker";
 import { type ToolChipLabels, ToolChipsContext } from "../tool-chips";
 import { ActivityShown } from "../transcript";
-import { RoutineDetail } from "../routines/routine-detail";
+import { RoutinesCard } from "../routines/routines-card";
 import { RoutineEditor } from "../routines/routine-editor";
 import { BotAvatar } from "./bot-avatar";
 import { BotLookPicker } from "./bot-look-picker";
@@ -151,9 +151,9 @@ interface BotPageProps {
 	completions: Completions | null;
 }
 
-/** The Bot's header and its conversation, live, ended, or not begun, its name showing or hiding its details in the right sidebar; or one of its routines, or the routine editor, in its place. */
+/** The Bot's header and its conversation, live, ended, or not begun, its name showing or hiding its details in the right sidebar; or the card of its routines, or the routine editor, in its place. */
 export function BotPage({ open, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
-	const { bot, host, view, routine, status } = open;
+	const { bot, host, view, routines, routine, status } = open;
 	const instanceId = host?.instanceId ?? null;
 	const toolChips = useMemo<ToolChipLabels>(() => ({ [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } }), [bot.name]);
 	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
@@ -162,15 +162,10 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 			return <NewBotRoutine bot={bot} connected={connected} />;
 		case "edit":
 			return <BotRoutineEditor key={routine.routine.id} bot={bot} initial={draftOf(routine.routine)} isNew={false} connected={connected} />;
+		case "list":
+			return <RoutinesCard bot={bot} routines={routines} openId={null} connected={connected} />;
 		case "open":
-			return (
-				<RoutineDetail
-					routine={routine.routine}
-					botName={bot.name}
-					connected={connected}
-					onEdit={() => (location.hash = hashForBotRoutine(bot.id, { kind: "edit", id: routine.routine.id }))}
-				/>
-			);
+			return <RoutinesCard bot={bot} routines={routines} openId={routine.routine.id} connected={connected} />;
 		case "missing":
 			return <MissingRoutine bot={bot} />;
 		case "conversation":

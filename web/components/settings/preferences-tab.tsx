@@ -1,8 +1,8 @@
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { Switch } from "@base-ui/react/switch";
+import { ToggleSwitch } from "../toggle-switch";
 import { type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
-import { type ComponentProps, useContext } from "react";
+import { useContext } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
@@ -26,21 +26,10 @@ const THEME_OPTIONS: Record<Theme, [string, LucideIcon]> = {
 	dark: ["Dark", Moon],
 };
 
-function PreferenceSwitch(props: Omit<ComponentProps<typeof Switch.Root>, "className" | "children">) {
-	return (
-		<Switch.Root
-			{...props}
-			className="inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-input p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 motion-reduce:transition-none"
-		>
-			<Switch.Thumb className="size-3 rounded-full bg-background shadow-xs transition-transform data-[checked]:translate-x-3 motion-reduce:transition-none" />
-		</Switch.Root>
-	);
-}
-
 function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string; shortcut: ShortcutId; checked: boolean; onToggle: () => void }) {
 	return (
 		<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-			<PreferenceSwitch checked={checked} onCheckedChange={onToggle} />
+			<ToggleSwitch checked={checked} onCheckedChange={onToggle} />
 			{label}
 			<span className="text-muted-foreground">{shortcutKeys(shortcut)}</span>
 		</label>
@@ -70,7 +59,7 @@ function SidebarTabs() {
 								)}
 							</div>
 							<span className="w-12 shrink-0 text-right text-xs text-muted-foreground">{position === undefined ? null : shortcutKeys(position)}</span>
-							<PreferenceSwitch
+							<ToggleSwitch
 								checked={!hidden}
 								onCheckedChange={checked => setLayout(prev => hideTab(prev, tab, !checked))}
 								aria-label={`Show ${row.label}`}
@@ -122,11 +111,11 @@ function SessionNotifications() {
 		>
 			<div className="space-y-2">
 				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-					<PreferenceSwitch checked={on} onCheckedChange={setOn} />
+					<ToggleSwitch checked={on} onCheckedChange={setOn} />
 					Notify me when a session needs me
 				</label>
 				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px] has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:text-muted-foreground">
-					<PreferenceSwitch checked={turns} onCheckedChange={setTurns} disabled={!on} />
+					<ToggleSwitch checked={turns} onCheckedChange={setTurns} disabled={!on} />
 					Also when a session finishes a turn
 				</label>
 				<div className="flex items-center gap-2 text-[12px]">
@@ -145,7 +134,7 @@ function SessionNotifications() {
 					</Select>
 				</div>
 				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px] has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:text-muted-foreground">
-					<PreferenceSwitch checked={soundWhenFocused} onCheckedChange={setSoundWhenFocused} disabled={!on || sound === "off"} />
+					<ToggleSwitch checked={soundWhenFocused} onCheckedChange={setSoundWhenFocused} disabled={!on || sound === "off"} />
 					Play the sound while this window is focused too
 				</label>
 			</div>

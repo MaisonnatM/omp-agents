@@ -2,11 +2,11 @@
 
 - A routine belongs to one [Bot](bots.md), and on its schedules, its triggers, or both, it messages that Bot or runs a shell command in the Bot's workspace.
   Every routine has a Bot; deleting a Bot deletes its routines.
-- Click a Bot's name at the top of its page to see its **Routines**: each with its last run's dot, its name, and its schedules and triggers, or **Paused**.
-  Click one to open it in place of the conversation, at `#bots/<Bot id>/routines/<routine id>`.
+- Click a Bot's name at the top of its page to see its **Routines** in its details: each with its last run's dot, its name, and its schedules and triggers, or **Paused**.
+  Click the **Routines** heading to open the Bot's routines card in place of the conversation, at `#bots/<Bot id>/routines`, or click one routine to open the card with its row open, at `#bots/<Bot id>/routines/<routine id>`.
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
-- **New routine**, under **Routines** in the Bot's details, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
+- **New routine**, under **Routines** in the Bot's details or at the top of its routines card, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
   The task is **Send a message**, a message that goes into the Bot's conversation each run, as if you wrote it there, or **Run a command**, a shell command.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run a schedule or **Run now** started, or runs at a time of day on the days you pick.
   **Weekdays** and **Every day** pick those days at once.
@@ -34,13 +34,23 @@
   If the Bot cannot take that message, the run keeps the output anyway and lists why among its errors.
   A command routine whose last command still runs records an error instead of running a second one.
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.
-- A routine's page shows its message or command in full, then its last 10 runs, newest first, each with its dot, what triggered it, its command's output, and its errors; beside them, its status, **Active** or **Paused**, schedules and triggers, and next run, **On a trigger** when it has no schedule.
-  The dot is green when the run went fine, red when it had an error, blue while its command runs, and amber while it waits to start.
-  A message's run reads **Sent to the Bot** once it went into the conversation.
+- The routines card lists every routine of the Bot under how many of them are on schedule, with **New routine** at the top.
+  Each row shows the routine's name, **Run now** while you point at the row or tab into it, and a switch that pauses or resumes the routine.
+  Under the name are its schedules and its next run, counting down by the second in its last hour, or **Paused**, and its last run's mark and time.
+  The last line shows the logos of its triggers, its message or command, and its last 10 runs as ticks, oldest on the left; pointing at a tick, or focusing it, shows how the run went, when, how long its command took, and what started it.
+  The mark and the tick are green when the run went fine, red when it had an error, blue while its command runs, and amber while it waits to start.
+  While a run is under way, the row reads **Running…** over a moving line, which holds still when your system asks to reduce motion.
+  On a narrow card, **Run now** shows only its icon and the last run's time leaves the row.
+  Click a row to open it in place, which closes the one open before; click a tick to open the row on that run.
+  The arrow keys move between the routines' names, and between the ticks of a strip.
+- An open row shows the run it picked, the latest one at first, with what triggered it, its command's output, and its errors.
+  A message's run reads **Sent to** and the Bot's name, a link to its conversation, once it went in.
   A triggered run lists each thing it saw, linked to the Slack message, pull request, mail, or event when it can.
   Output longer than 20 lines folds behind **Show output**.
+  Then it shows the routine's instructions, its message or command in full, and its schedule: **Hourly**, **Daily**, **Weekdays**, or **Weekly**, with its time and, for **Weekly**, its day, each saved as you change it.
+  A routine whose schedules fit none of these lists them with no choice picked, and picking one replaces them; its triggers stay.
+  **Edit** opens the full editor, and **Delete** asks first, then closes the row.
   **Run now** runs it at once whatever its schedules, and shows progress until the server sends the message or starts the command, not until it finishes.
-  Its **⋯** menu has **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.
   **Back to** and the Bot's name returns to the conversation.
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
