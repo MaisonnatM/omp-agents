@@ -1,23 +1,8 @@
-/** What the page shows of a Bot: its avatar's shape and hue, its sidebar row, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
+/** What the page shows of a Bot: its sidebar row, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { plainMarkdown } from "./labels";
 import type { Page } from "./routing";
-
-/** The shapes a Bot's avatar takes. */
-export const BOT_SHAPES = ["circle", "triangle", "hexagon", "square", "cloud", "diamond", "clover", "pill"] as const;
-
-export type BotShape = (typeof BOT_SHAPES)[number];
-
-/** The avatar's hues on the OKLCH wheel, far enough apart that two Bots side by side read as different. */
-export const BOT_HUES = [25, 70, 110, 150, 195, 235, 275, 320] as const;
-
-/** A Bot's avatar: its shape and hue, both from its id, so a Bot keeps its look everywhere and across renames. */
-export function botLook(id: BotId): { shape: BotShape; hue: number } {
-	let hash = 0;
-	for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-	return { shape: BOT_SHAPES[hash % BOT_SHAPES.length]!, hue: BOT_HUES[Math.floor(hash / BOT_SHAPES.length) % BOT_HUES.length]! };
-}
 
 /** The running session of the Bot's conversation, `null` while none runs. */
 export function botHost(bot: Bot, hosts: readonly RosterHost[]): RosterHost | null {

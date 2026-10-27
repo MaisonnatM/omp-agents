@@ -60,7 +60,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 		const prompt = [
 			`You are ${bot.name}, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.`,
 			"Your job, and what you ask before doing:",
-			bot.job.trim() || "No job yet. Ask the user what it is.",
+			bot.job.trim() || "No job yet. Ask the user what it is, and what you should ask before doing, then `remember` what they say.",
 			"What you remember from earlier turns:",
 			memory || "Nothing yet.",
 			"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",

@@ -4,6 +4,8 @@ A Bot is a named, long-lived teammate: one conversation, a job, and a memory.
 `src/shared/bots.ts` holds the model, `Bot` and `BotChange`, and `applyBot`, the reducer that the page and the server share.
 `src/server/bots-file.ts` keeps the list in `bots.json` beside the access token.
 A save keeps the Bot's `sessionId`, and a remove forgets the Bot but leaves its session file and its memory directory; the `Dashboard` removes the Bot's routines first.
+A Bot's `shape` and `hue`, one of `BOT_SHAPES` and `BOT_HUES`, are its avatar's look; `parseBotSpec` gives an entry saved before them the look `defaultLook` hashes from its id, so an old Bot keeps its face.
+A new Bot's `job` is empty until its first conversation gives it one: the extension then tells the Bot to ask for it and `remember` the answer.
 
 `Bots` in `src/server/bots.ts` binds each Bot to the session its conversation runs in.
 A new session whose `StartRequest` names a `bot`, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, and its `memory.md` path.
@@ -23,7 +25,7 @@ Messages to one Bot wait on one another, so two at once never start two conversa
 
 Every routine belongs to one Bot through its `botId`; see [Routines](routines.md).
 A prompt routine sends its prompt through `Bots.message` and records a `sent` outcome with the session id, and a command routine runs in the Bot's workspace, then posts how it ended the same way; the routine neither tracks nor ends that session.
-The Bot page's details list its routines, and `#bots/<id>/routines/<routine id>` shows one routine's `RoutineDetail` in place of the conversation.
+The details in the right sidebar, `BotDetails`, list its routines, `#bots/<id>/routines/<routine id>` shows one routine's `RoutineDetail` in place of the conversation, and `#bots/<id>/routines/new` the editor of a new one.
 
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts that view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.

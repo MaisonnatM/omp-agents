@@ -12,7 +12,7 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const scout: BotSpec = { id: "scout" as BotId, name: "Scout", job: "Watch the build.", cwd: "/work/webapp", model: null, skill: null };
+const scout: BotSpec = { id: "scout" as BotId, name: "Scout", job: "Watch the build.", cwd: "/work/webapp", model: null, skill: null, shape: "circle", hue: 25 };
 
 interface FakeSession {
 	instanceId: string;

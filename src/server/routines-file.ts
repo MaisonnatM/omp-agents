@@ -9,7 +9,7 @@ import { ReducerFile } from "../fs";
 import { isNonEmpty, isObject, isSafeInteger, isTexts, parseAll } from "../json";
 import { expandHome, HOME } from "../paths";
 import { applyRoutine, MAX_ROUTINE_RUNS, parseRoutineSpec, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
-import type { BotId, BotSpec } from "../shared/bots";
+import { type BotId, type BotSpec, defaultLook } from "../shared/bots";
 
 /** The Bot the routines from before Bots move to; page Bots have random UUIDs, so none takes this id. */
 export const ROUTINES_BOT_ID = "routines" as BotId;
@@ -22,6 +22,7 @@ export const routinesBot = (cwd: string): BotSpec => ({
 	cwd,
 	model: null,
 	skill: null,
+	...defaultLook(ROUTINES_BOT_ID),
 });
 
 /** A session a run recorded before `outcome`, which also held its `label`. */

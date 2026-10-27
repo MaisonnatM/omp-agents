@@ -211,7 +211,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{
 		id: "detailsSidebar",
 		category: "sessions",
-		label: "Show or hide the session details sidebar, on the right",
+		label: "Show or hide the details sidebar, on the right: a session's, or a Bot's",
 		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},

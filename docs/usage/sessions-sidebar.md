@@ -72,7 +72,7 @@
   The button at the outer corner of the sessions sidebar's header hides it: the sidebar slides shut and the button glides with its edge to the narrow strip it leaves, on the header's line, where a click shows it again.
   Both sidebars slide open and shut in about a quarter second, or at once when the system asks for reduced motion.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
-  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
+  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
 - A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.

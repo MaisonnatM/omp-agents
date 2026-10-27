@@ -7,11 +7,34 @@ declare const BOT_ID: unique symbol;
 /** A Bot's id, which the page picks when it creates one, so a save sent twice saves once. */
 export type BotId = string & { readonly [BOT_ID]: true };
 
-export interface Bot {
+/** The shapes a Bot's avatar takes. */
+export const BOT_SHAPES = ["circle", "triangle", "hexagon", "square", "cloud", "diamond", "clover", "pill"] as const;
+
+export type BotShape = (typeof BOT_SHAPES)[number];
+
+/** The avatar's hues on the OKLCH wheel, far enough apart that two Bots side by side read as different. */
+export const BOT_HUES = [25, 70, 110, 150, 195, 235, 275, 320] as const;
+
+export type BotHue = (typeof BOT_HUES)[number];
+
+/** A Bot's avatar: the shape and color you pick for it. */
+export interface BotLook {
+	shape: BotShape;
+	hue: BotHue;
+}
+
+/** The look a Bot saved before you could pick one gets, from its id, so it keeps the face it had. */
+export function defaultLook(id: BotId): BotLook {
+	let hash = 0;
+	for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+	return { shape: BOT_SHAPES[hash % BOT_SHAPES.length]!, hue: BOT_HUES[Math.floor(hash / BOT_SHAPES.length) % BOT_HUES.length]! };
+}
+
+export interface Bot extends BotLook {
 	id: BotId;
 	/** Shown in the sidebar and the Bot's header. */
 	name: string;
-	/** Markdown: what the Bot does, and what it asks before doing. */
+	/** Markdown: what the Bot does, and what it asks before doing; empty until you give it one. */
 	job: string;
 	/** The workspace its conversation runs in. */
 	cwd: string;
@@ -56,8 +79,8 @@ export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
 	switch (edit.op) {
 		case "save": {
 			if (!stored) return [...bots, { ...edit.bot, sessionId: null, createdAt: now }];
-			const { name, job, cwd, model, skill } = edit.bot;
-			if (name === stored.name && job === stored.job && cwd === stored.cwd && model === stored.model && skill === stored.skill) return bots;
+			const { name, job, cwd, model, skill, shape, hue } = edit.bot;
+			if (name === stored.name && job === stored.job && cwd === stored.cwd && model === stored.model && skill === stored.skill && shape === stored.shape && hue === stored.hue) return bots;
 			return bots.with(index, { ...edit.bot, sessionId: stored.sessionId, createdAt: stored.createdAt });
 		}
 		case "remove":
@@ -74,7 +97,7 @@ export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
 /** An id names the Bot's memory directory, so it holds no path separator or dot. */
 export const parseBotId = (value: unknown): BotId | null => (typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? (value as BotId) : null);
 
-/** A Bot as the page saves it, or `null` when a field is missing, of the wrong type, or too long; other fields drop. */
+/** A Bot as the page saves it, or `null` when a field is missing, of the wrong type, or too long; other fields drop. A Bot saved without a look gets {@link defaultLook}. */
 export function parseBotSpec(value: unknown): Parsed<BotSpec> {
 	if (!isObject(value)) return null;
 	const { name, job, cwd, model = null } = value;
@@ -82,7 +105,10 @@ export function parseBotSpec(value: unknown): Parsed<BotSpec> {
 	const skill = parseSkill(value.skill);
 	if (!id || !isNonEmpty(name) || typeof job !== "string" || job.length > MAX_JOB_LENGTH || !isNonEmpty(cwd) || !skill) return null;
 	if (model !== null && (typeof model !== "string" || !modelOfSelector(model))) return null;
-	return { ok: { id, name: name.trim(), job, cwd, model, skill: skill.ok } };
+	const look = defaultLook(id);
+	const { shape = look.shape, hue = look.hue } = value;
+	if (!BOT_SHAPES.includes(shape as BotShape) || !BOT_HUES.includes(hue as BotHue)) return null;
+	return { ok: { id, name: name.trim(), job, cwd, model, skill: skill.ok, shape: shape as BotShape, hue: hue as BotHue } };
 }
 
 function parseBot(value: unknown): Bot | null {

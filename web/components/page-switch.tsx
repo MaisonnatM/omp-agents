@@ -59,7 +59,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botMemories" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -99,7 +99,6 @@ export const PageSwitch = memo(function PageSwitch({
 	userNotes,
 	routines,
 	bots,
-	botMemories,
 	workspaceList,
 	pins,
 	newSessionCompletions,
@@ -200,7 +199,8 @@ export const PageSwitch = memo(function PageSwitch({
 					key={`${bot.id}/${page.routine ?? ""}`}
 					bot={bot}
 					routine={page.routine}
-					memory={botMemories[bot.id] ?? ""}
+					detailsOpen={rightOpen}
+					onToggleDetails={() => toggleSidebar("right")}
 					routines={routines}
 					hosts={hosts}
 					past={past}

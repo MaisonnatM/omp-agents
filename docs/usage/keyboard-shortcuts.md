@@ -24,7 +24,7 @@ Alt is Option on macOS.
 | Cmd+Shift+E | Anywhere | Show or hide tool calls |
 | Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
-| Cmd+Alt+B | Anywhere | Show or hide the session details sidebar |
+| Cmd+Alt+B | Anywhere | Show or hide the details sidebar, on the right: a session's, or a Bot's |
 | Ctrl+\` | Anywhere, the terminal too, on every platform | Show or hide the terminal |
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |

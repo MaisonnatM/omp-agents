@@ -4,6 +4,7 @@ import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
+import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { DESKTOP_TITLE_BAR, DesktopTitleBar, HeaderControls, HeaderControlsContext } from "./components/header-controls";
 import {
@@ -85,6 +86,9 @@ export function App() {
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
+	/** The Bot page that shows, if any, and its Bot, whose details the right sidebar shows in a session's place. */
+	const botPage = page?.kind === "bots" && page.target !== null ? page : null;
+	const detailsBot = botPage && (state.bots?.find(({ id }) => id === botPage.target) ?? null);
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
@@ -146,7 +150,7 @@ export function App() {
 		signedOutTabs,
 		tabs: barTabs,
 		linearCallable,
-		hasDetails: detailsView !== null,
+		hasDetails: detailsView !== null || detailsBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
 		palette: overlays.palette,
 		dispatchPalette,
@@ -258,7 +262,6 @@ export function App() {
 																	userNotes={state.userNotes}
 																	routines={state.routines}
 																	bots={state.bots}
-																	botMemories={state.botMemories}
 																	workspaceList={state.workspaceList}
 																	pins={state.pins}
 																	newSessionCompletions={state.newSessionCompletions}
@@ -299,6 +302,19 @@ export function App() {
 												tickets={focused.row?.tickets ?? []}
 												workspace={workspace}
 												hosts={visible.hosts}
+											/>
+										</DashboardSidebar>
+									)}
+									{botPage && detailsBot && (
+										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+											<BotDetails
+												key={detailsBot.id}
+												bot={detailsBot}
+												memory={state.botMemories[detailsBot.id] ?? ""}
+												routines={state.routines}
+												hosts={state.hosts}
+												openRoutine={botPage.routine}
+												connected={state.connected}
 											/>
 										</DashboardSidebar>
 									)}

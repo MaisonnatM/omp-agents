@@ -62,7 +62,7 @@ function BotRowLink({ row: { bot, status, asking, unread, preview, at }, active 
 		<SidebarMenuItem>
 			<SidebarMenuButton asChild size="lg" isActive={active} className="h-auto gap-2.5 py-1.5">
 				<a href={hashForBots(bot.id)} aria-label={`${bot.name}, ${state}${unread ? ", unread" : ""}. ${preview}`}>
-					<BotAvatar id={bot.id} size="row" working={status === "working"} asking={asking !== null} />
+					<BotAvatar look={bot} size="row" working={status === "working"} asking={asking !== null} />
 					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span className="flex items-baseline gap-2">
 							<span className={cn("truncate text-foreground", unread ? "font-semibold" : "font-medium")}>{bot.name}</span>

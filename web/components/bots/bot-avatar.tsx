@@ -1,8 +1,7 @@
-/** `BotAvatar`, a Bot's face: a colored shape with two eyes, picked from its id, that looks around while the Bot works. */
+/** `BotAvatar`, a Bot's face: a colored shape with two eyes, the look you picked for it, that looks around while the Bot works. */
 import type { CSSProperties, ReactNode } from "react";
-import type { BotId } from "../../../src/shared/bots";
+import type { BotLook, BotShape } from "../../../src/shared/bots";
 import { cn } from "@/lib/utils";
-import { type BotShape, botLook } from "../../bots-model";
 
 const SIZE = { header: "size-6", row: "size-9", sheet: "size-10", hero: "size-16" } as const;
 
@@ -40,7 +39,8 @@ const BODY: Record<BotShape, { eyes: number; body: ReactNode }> = {
 };
 
 interface BotAvatarProps {
-	id: BotId;
+	/** Its shape and hue; a `Bot` is one. */
+	look: BotLook;
 	size: keyof typeof SIZE;
 	/** The Bot is working: it bobs and glances, or with reduced motion its eyes pulse. */
 	working?: boolean;
@@ -49,8 +49,7 @@ interface BotAvatarProps {
 	className?: string;
 }
 
-export function BotAvatar({ id, size, working = false, asking = false, className }: BotAvatarProps) {
-	const { shape, hue } = botLook(id);
+export function BotAvatar({ look: { shape, hue }, size, working = false, asking = false, className }: BotAvatarProps) {
 	const { eyes, body } = BODY[shape];
 	return (
 		<span aria-hidden className={cn("relative inline-flex shrink-0", SIZE[size], className)} style={{ "--bot-hue": hue } as CSSProperties}>

@@ -13,10 +13,12 @@ interface HeaderProps {
 	/** Controls right after the title, such as the switch to a session's trajectory, shown while the pointer is over the title or one of them has focus, and always on a touch screen. */
 	trailing?: ReactNode;
 	children?: ReactNode;
+	/** After the command menu and the bell, at the header's end, as the top-right pane puts the right sidebar's toggle. */
+	end?: ReactNode;
 }
 
 /** The title, an optional meta line, and controls that head a pane or a page, ending with the command menu and the bell. */
-export function Header({ title, meta, status, alert = false, leading, trailing, children }: HeaderProps) {
+export function Header({ title, meta, status, alert = false, leading, trailing, children, end }: HeaderProps) {
 	const controls = useHeaderControls();
 	return (
 		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6">
@@ -40,6 +42,7 @@ export function Header({ title, meta, status, alert = false, leading, trailing, 
 				)}
 				{children}
 				{controls}
+				{end}
 			</div>
 		</header>
 	);

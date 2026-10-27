@@ -58,7 +58,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		frame: "",
 	},
 	right: {
-		name: "Session details",
+		name: "Details",
 		id: "details-sidebar",
 		defaultWidth: 288,
 		widthKey: "omp-agents.plan-width",

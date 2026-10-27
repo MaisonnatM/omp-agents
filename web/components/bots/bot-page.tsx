@@ -1,69 +1,36 @@
-/** A Bot's page, its one conversation under a header whose name opens its job, memory, and routines, a routine's settings and runs or editor in place of the conversation, and the New Bot form. */
-import { BookmarkCheck, ChevronDown, CircleStop, Plus, Trash2 } from "lucide-react";
+/** A Bot's page, its one conversation under a header whose name shows or hides its details in the right sidebar, a routine's settings and runs or editor in place of the conversation, and the New Bot form. */
+import { BookmarkCheck } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
 import type { Routine } from "../../../src/routines";
-import { type Bot, type BotId, type BotSpec, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
+import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, REMEMBER_TOOL } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botHost, botView, memoryEntries, starterPrompts } from "../../bots-model";
+import { botHost, botView, starterPrompts } from "../../bots-model";
 import { type ModelList, UNREAD } from "../../reads";
-import { hashForBotRoutine, hashForBots, hashForView } from "../../routing";
-import { draftOf, newDraft, type RoutineDraft, schedulesWords } from "../../routines-model";
+import { hashForBotRoutine, hashForBots, hashForView, NEW_ROUTINE } from "../../routing";
+import { draftOf, newDraft, type RoutineDraft } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useSuggestions } from "../composer-suggestions";
-import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
-import { Field, FIELD, TEXT_AREA } from "../form-field";
+import { useDashboardActions } from "../dashboard-context";
+import { Field, FIELD } from "../form-field";
 import { PageFrame } from "../list-page";
 import { ViewConversation } from "../pane";
 import { Header } from "../page-header";
 import type { PromptEditorHandle } from "../prompt-editor";
+import { SidebarToggle } from "../sidebar-panel";
 import { statusLabel } from "../status-dot";
 import { DirectoryPicker } from "../workspace-picker";
 import { type ToolChipLabels, ToolChipsContext } from "../tool-chips";
 import { RoutineDetail } from "../routines/routine-detail";
 import { RoutineEditor } from "../routines/routine-editor";
-import { RunDot } from "../routines/routine-marks";
 import { BotAvatar } from "./bot-avatar";
+import { BotLookPicker } from "./bot-look-picker";
 
 const NO_STARTERS: string[] = [];
-
-const specOf = ({ id, name, job, cwd, model, skill }: Bot): BotSpec => ({ id, name, job, cwd, model, skill });
-
-/** **Delete**, which asks first in its place; the Bot's routines go with it, and its conversation stays a session of yours. */
-function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
-	const { changeBot } = useDashboardActions();
-	const [confirming, setConfirming] = useState(false);
-	if (confirming) {
-		return (
-			<div role="group" aria-label={`Delete ${bot.name}?`} className="flex shrink-0 items-center gap-2 text-xs">
-				<span>Delete {bot.name}? Its routines are deleted too, and its conversation stays in your sessions.</span>
-				<Button
-					size="compact"
-					disabled={!connected}
-					onClick={() => {
-						changeBot({ op: "remove", id: bot.id });
-						location.hash = hashForBots(null);
-					}}
-				>
-					Delete Bot
-				</Button>
-				<Button variant="ghost" size="compact" autoFocus onClick={() => setConfirming(false)}>
-					Cancel
-				</Button>
-			</div>
-		);
-	}
-	return (
-		<Button {...activityControl("bots.delete")} variant="ghost" size="compact" leadingIcon={Trash2} disabled={!connected} onClick={() => setConfirming(true)}>
-			Delete
-		</Button>
-	);
-}
 
 /** The composer while no omp runs the Bot's conversation: a message resumes it, or starts it when it has none, and a new Bot offers its starters. */
 function BotComposer({ bot, connected, starters }: { bot: Bot; connected: boolean; starters: string[] }) {
@@ -101,109 +68,10 @@ function BotComposer({ bot, connected, starters }: { bot: Bot; connected: boolea
 	);
 }
 
-/** The Bot's job, which every turn's system prompt carries, saved when you say so. */
-function JobEditor({ bot, connected }: { bot: Bot; connected: boolean }) {
-	const { changeBot } = useDashboardActions();
-	const id = useId();
-	const [draft, setDraft] = useState(bot.job);
-	const dirty = draft !== bot.job;
-	return (
-		<section aria-labelledby={id} className="space-y-2">
-			<h3 id={id} className="text-xs font-medium text-muted-foreground">
-				Job
-			</h3>
-			<textarea
-				aria-labelledby={id}
-				value={draft}
-				rows={6}
-				maxLength={MAX_JOB_LENGTH}
-				placeholder="What it does for you, and what it asks before doing."
-				onChange={event => setDraft(event.target.value)}
-				className={TEXT_AREA}
-			/>
-			{dirty && (
-				<div className="flex items-center gap-2">
-					<Button size="compact" disabled={!connected} onClick={() => changeBot({ op: "save", bot: { ...specOf(bot), job: draft.trim() } })}>
-						Save job
-					</Button>
-					<Button {...activityControl("bots.job.revert")} variant="ghost" size="compact" onClick={() => setDraft(bot.job)}>
-						Revert
-					</Button>
-				</div>
-			)}
-		</section>
-	);
-}
-
-/** The facts the Bot keeps, which only its `remember` tool writes. */
-function MemoryList({ bot, memory }: { bot: Bot; memory: string }) {
-	const id = useId();
-	const entries = memoryEntries(memory);
-	return (
-		<section aria-labelledby={id} className="space-y-2">
-			<h3 id={id} className="flex items-baseline gap-2 text-xs font-medium text-muted-foreground">
-				Memory
-				<span className="truncate font-mono font-normal">bots/{bot.id}/memory.md</span>
-			</h3>
-			{entries.length === 0 ? (
-				<p className="text-xs text-muted-foreground">Nothing yet. Tell {bot.name} something worth keeping, and it remembers it.</p>
-			) : (
-				<ul className="space-y-1.5">
-					{entries.map((entry, index) => (
-						<li key={index} className="rounded-md border border-border bg-card px-3 py-2 text-sm">
-							<p className="break-words">{entry.fact}</p>
-							{entry.date && <p className="text-xs tabular-nums text-muted-foreground">{entry.date}</p>}
-						</li>
-					))}
-				</ul>
-			)}
-		</section>
-	);
-}
-
-/** The Bot's routines, each opening its settings and runs, and **New routine**. */
-function BotRoutines({ bot, routines, connected, onNew }: { bot: Bot; routines: readonly Routine[]; connected: boolean; onNew: () => void }) {
-	const id = useId();
-	return (
-		<section aria-labelledby={id} className="space-y-2">
-			<div className="flex items-center justify-between gap-2">
-				<h3 id={id} className="text-xs font-medium text-muted-foreground">
-					Routines
-				</h3>
-				<Button {...activityControl("bots.routine.new")} variant="ghost" size="compact" leadingIcon={Plus} disabled={!connected} onClick={onNew}>
-					New routine
-				</Button>
-			</div>
-			{routines.length === 0 ? (
-				<p className="text-xs text-muted-foreground">No routine yet. A routine messages {bot.name} or runs a command in its workspace on a schedule.</p>
-			) : (
-				<ul className="space-y-1.5">
-					{routines.map(routine => (
-						<li key={routine.id}>
-							<a
-								href={hashForBotRoutine(bot.id, routine.id)}
-								className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<RunDot run={routine.runs[0]} />
-								<span className="min-w-0">
-									<span className={cn("block truncate font-medium", !routine.enabled && "text-muted-foreground")}>{routine.name}</span>
-									<span className="block truncate text-xs text-muted-foreground">{routine.enabled ? schedulesWords(routine.schedules) : "Paused"}</span>
-								</span>
-							</a>
-						</li>
-					))}
-				</ul>
-			)}
-		</section>
-	);
-}
-
 interface BotPageProps {
 	bot: Bot;
-	/** The Bot's routine whose settings and runs show in place of the conversation, `null` for the conversation. */
+	/** The Bot's routine whose settings and runs show in place of the conversation, {@link NEW_ROUTINE} for a new one's editor, `null` for the conversation. */
 	routine: string | null;
-	/** Its `memory.md`, empty while it remembers nothing. */
-	memory: string;
 	/** Every routine, the Bot's among them. */
 	routines: readonly Routine[];
 	/** Every session, since a Bot's workspace may be one the sidebar hides. */
@@ -213,70 +81,17 @@ interface BotPageProps {
 	models: ReadonlyMap<string, ModelList>;
 	workspaces: Workspace[];
 	connected: boolean;
+	/** Whether the right sidebar, which shows the Bot's details, is open. */
+	detailsOpen: boolean;
+	onToggleDetails: () => void;
 }
 
-/** The Bot's details, which its name in the header opens: where it works, its job, memory, and routines, then End session while it runs and Delete. */
-function BotDetails({
-	bot,
-	host,
-	memory,
-	routines,
-	connected,
-	onNewRoutine,
-}: {
-	bot: Bot;
-	host: RosterHost | null;
-	memory: string;
-	routines: readonly Routine[];
-	connected: boolean;
-	onNewRoutine: () => void;
-}) {
-	const { end } = useDashboardActions();
-	const { ending } = useDashboardStatus();
-	const status = host ? statusLabel(host.status) : bot.sessionId ? "not running" : "no conversation yet";
-	return (
-		<Popover>
-			<PopoverTrigger asChild>
-				<button
-					{...activityControl("bots.details")}
-					type="button"
-					aria-label={`${bot.name}, ${status}. Show its details`}
-					className="flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-semibold outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
-				>
-					<span className="truncate">{bot.name}</span>
-					<ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-				</button>
-			</PopoverTrigger>
-			<PopoverContent align="start" collisionPadding={8} aria-label={`About ${bot.name}`} className="max-h-(--radix-popover-content-available-height) w-96 max-w-[calc(100vw-2rem)] space-y-5 overflow-y-auto p-4">
-				<div className="flex items-center gap-3">
-					<BotAvatar id={bot.id} size="sheet" working={host?.status === "working"} asking={host?.status === "needs-input"} />
-					<div className="min-w-0">
-						<p className="truncate text-sm font-semibold">{bot.name}</p>
-						<p className="truncate font-mono text-xs text-muted-foreground" title={bot.cwd}>
-							{bot.cwd}
-						</p>
-					</div>
-				</div>
-				<JobEditor key={bot.job} bot={bot} connected={connected} />
-				<MemoryList bot={bot} memory={memory} />
-				<BotRoutines bot={bot} routines={routines} connected={connected} onNew={onNewRoutine} />
-				<div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
-					{host && (
-						<Button variant="ghost" size="compact" leadingIcon={CircleStop} loading={ending.has(host.instanceId)} disabled={!connected} onClick={() => end(host.instanceId)}>
-							End session
-						</Button>
-					)}
-					<DeleteBot bot={bot} connected={connected} />
-				</div>
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-/** The Bot's header and its conversation, live, ended, or not begun, with its details behind its name; or one of its routines, or the routine editor, in its place. */
-export function BotPage({ bot, routine, memory, routines, hosts, past, lastHosts, models, workspaces, connected }: BotPageProps) {
+/** The Bot's header and its conversation, live, ended, or not begun, its name showing or hiding its details in the right sidebar; or one of its routines, or the routine editor, in its place. */
+export function BotPage({ bot, routine, routines, hosts, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails }: BotPageProps) {
 	const { send } = useDashboardActions();
-	const [editing, setEditing] = useState<{ draft: RoutineDraft; isNew: boolean } | null>(null);
+	const [editing, setEditing] = useState<RoutineDraft | null>(null);
+	// The route remounts the page, so a new routine's id holds while its editor shows.
+	const [created] = useState(() => newDraft(crypto.randomUUID(), bot.id));
 	const own = useMemo(() => routines.filter(({ botId }) => botId === bot.id), [routines, bot.id]);
 	const host = botHost(bot, hosts);
 	const instanceId = host?.instanceId ?? null;
@@ -286,14 +101,15 @@ export function BotPage({ bot, routine, memory, routines, hosts, past, lastHosts
 	const view = useMemo(() => conversation, [pane]);
 	const toolChips = useMemo<ToolChipLabels>(() => ({ [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } }), [bot.name]);
 	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
-	if (editing) {
+	const isNew = routine === NEW_ROUTINE;
+	if (editing || isNew) {
 		return (
 			<RoutineEditor
-				initial={editing.draft}
-				isNew={editing.isNew}
+				initial={editing ?? created}
+				isNew={isNew}
 				botName={bot.name}
 				connected={connected}
-				onCancel={() => setEditing(null)}
+				onCancel={() => (isNew ? (location.hash = hashForBots(bot.id)) : setEditing(null))}
 				onSave={spec => {
 					send({ t: "routine", change: { op: "save", routine: spec } });
 					setEditing(null);
@@ -304,12 +120,26 @@ export function BotPage({ bot, routine, memory, routines, hosts, past, lastHosts
 	}
 	// A routine just saved shows once the server sends it back, and the conversation until then.
 	const shown = routine === null ? undefined : own.find(({ id }) => id === routine);
-	if (shown) return <RoutineDetail routine={shown} botName={bot.name} connected={connected} onEdit={() => setEditing({ draft: draftOf(shown), isNew: false })} />;
+	if (shown) return <RoutineDetail routine={shown} botName={bot.name} connected={connected} onEdit={() => setEditing(draftOf(shown))} />;
+	const status = host ? statusLabel(host.status) : bot.sessionId ? "not running" : "no conversation yet";
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header
-				leading={<BotAvatar id={bot.id} size="header" working={host?.status === "working"} asking={host?.status === "needs-input"} />}
-				title={<BotDetails bot={bot} host={host} memory={memory} routines={own} connected={connected} onNewRoutine={() => setEditing({ draft: newDraft(crypto.randomUUID(), bot.id), isNew: true })} />}
+				leading={<BotAvatar look={bot} size="header" working={host?.status === "working"} asking={host?.status === "needs-input"} />}
+				title={
+					<button
+						{...activityControl("bots.details")}
+						type="button"
+						aria-label={`${bot.name}, ${status}. ${detailsOpen ? "Hide" : "Show"} its details`}
+						aria-expanded={detailsOpen}
+						aria-controls="details-sidebar"
+						onClick={onToggleDetails}
+						className="inline-flex max-w-full items-center rounded-md px-1.5 py-0.5 text-sm font-semibold outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						<span className="truncate">{bot.name}</span>
+					</button>
+				}
+				end={<SidebarToggle side="right" open={detailsOpen} onToggle={onToggleDetails} />}
 			/>
 			<div className="relative flex min-h-0 flex-1 flex-col">
 				{view ? (
@@ -328,9 +158,13 @@ export function BotPage({ bot, routine, memory, routines, hosts, past, lastHosts
 					</ToolChipsContext.Provider>
 				) : (
 					<div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
-						<BotAvatar id={bot.id} size="hero" />
+						<BotAvatar look={bot} size="hero" />
 						<p className="text-lg font-semibold text-balance">Hi, I'm {bot.name}.</p>
-						<p className="text-sm text-pretty text-muted-foreground">I keep one conversation with you and remember what matters. Pick a starter below, or write your own.</p>
+						<p className="text-sm text-pretty text-muted-foreground">
+							{bot.job.trim()
+								? "I keep one conversation with you and remember what matters. Pick a starter below, or write your own."
+								: "Tell me my job: what to do, where to look, and what to ask you before acting. I'll remember it."}
+						</p>
 					</div>
 				)}
 			</div>
@@ -339,54 +173,56 @@ export function BotPage({ bot, routine, memory, routines, hosts, past, lastHosts
 	);
 }
 
-/** The New Bot form: its name and job, then the workspace its conversation runs in, the sidebar's by default. */
+const randomOf = <T,>(values: readonly T[]): T => values[Math.floor(Math.random() * values.length)]!;
+
+/** The New Bot form, as Grok's: a name, a shape and a color, and the workspace its conversation runs in, the sidebar's by default; its job comes in its first message. */
 export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Workspace[]; defaultCwd: string; connected: boolean }) {
 	const { changeBot } = useDashboardActions();
 	const id = useId();
 	const [name, setName] = useState("");
+	const [look, setLook] = useState<BotLook>(() => ({ shape: randomOf(BOT_SHAPES), hue: randomOf(BOT_HUES) }));
 	const [cwd, setCwd] = useState(defaultCwd);
-	const [job, setJob] = useState("");
 	const [tried, setTried] = useState(false);
 	const fix = !name.trim() ? "Name the Bot." : !cwd.trim() ? "Pick the workspace it works in." : null;
 	return (
 		<PageFrame title="New Bot" meta="A teammate with one conversation you come back to, a job, and a memory">
 			<form
-				className="mx-auto w-full max-w-2xl space-y-6 px-6 py-6"
+				className="mx-auto flex w-full max-w-sm flex-col items-center gap-6 px-6 py-10"
 				onSubmit={event => {
 					event.preventDefault();
 					setTried(true);
 					if (fix) return;
 					const botId = crypto.randomUUID() as BotId;
-					changeBot({ op: "save", bot: { id: botId, name: name.trim(), job: job.trim(), cwd, model: null, skill: null } });
+					changeBot({ op: "save", bot: { id: botId, name: name.trim(), job: "", cwd, model: null, skill: null, ...look } });
 					location.hash = hashForBots(botId);
 				}}
 			>
-				<Field label="Name" htmlFor={`${id}-name`}>
-					<input id={`${id}-name`} autoFocus value={name} placeholder="Scout" onChange={event => setName(event.target.value)} className={cn(FIELD, "w-full")} />
-				</Field>
-				<Field label="Job" htmlFor={`${id}-job`} hint="Every turn's system prompt carries it. You can change it later.">
-					<textarea
-						id={`${id}-job`}
-						value={job}
-						rows={6}
-						maxLength={MAX_JOB_LENGTH}
-						placeholder="Watch the main branch's CI and tell me what broke. Ask before you push."
-						onChange={event => setJob(event.target.value)}
-						className={TEXT_AREA}
-					/>
-				</Field>
-				<Field label="Workspace" hint="Its conversation runs in this directory.">
-					<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={setCwd} />
-				</Field>
-				<div className="flex items-center gap-3 border-t border-border pt-4">
+				<BotAvatar look={look} size="hero" />
+				<input
+					id={`${id}-name`}
+					aria-label="Name"
+					autoFocus
+					value={name}
+					placeholder="Name your Bot"
+					onChange={event => setName(event.target.value)}
+					className={cn(FIELD, "h-9 w-full text-center text-base")}
+				/>
+				<div className="w-full space-y-6">
+					<BotLookPicker name={id} look={look} onLook={setLook} />
+					<Field label="Workspace" hint="Its conversation runs in this directory.">
+						<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={setCwd} />
+					</Field>
+				</div>
+				<div className="flex w-full flex-col items-stretch gap-2">
 					<Button type="submit" disabled={!connected}>
-						Create Bot
+						Create
 					</Button>
 					{tried && fix && (
-						<p role="alert" className="text-sm text-red-600 dark:text-red-400">
+						<p role="alert" className="text-center text-sm text-red-600 dark:text-red-400">
 							{fix}
 						</p>
 					)}
+					<p className="text-center text-xs text-pretty text-muted-foreground">Then tell it its job in your first message.</p>
 				</div>
 			</form>
 		</PageFrame>

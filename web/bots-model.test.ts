@@ -1,20 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { RosterHost } from "../src/shared/sessions";
-import { botHost, botLook, botRows, botView, jobLine, memoryEntries, openBotView, starterPrompts } from "./bots-model";
+import { botHost, botRows, botView, jobLine, memoryEntries, openBotView, starterPrompts } from "./bots-model";
 
 const scout = "scout" as BotId;
 
-const bot = (sessionId: string | null): Bot => ({ id: scout, name: "Scout", job: "", cwd: "~/code/webapp", model: null, skill: null, sessionId, createdAt: "2026-10-05T09:00:00.000Z" });
+const bot = (sessionId: string | null): Bot => ({ id: scout, name: "Scout", job: "", cwd: "~/code/webapp", model: null, skill: null, shape: "clover", hue: 320, sessionId, createdAt: "2026-10-05T09:00:00.000Z" });
 
 describe("Bots", () => {
-	test("the avatar's shape and hue depend on the id alone", () => {
-		expect(botLook(scout)).toEqual({ shape: "clover", hue: 320 });
-		expect(botLook("ranger" as BotId)).toEqual({ shape: "diamond", hue: 110 });
-		expect(botLook("a" as BotId)).toEqual({ shape: "triangle", hue: 195 });
-		expect(botLook("3f2a9c1e-7b4d-4e8a-9f61-0c2d5e8b7a14" as BotId)).toEqual({ shape: "square", hue: 195 });
-	});
-
 	test("the Bot's running session is the host of its session id, and none without one", () => {
 		const hosts = [{ instanceId: "7c51f77b", sessionId: "s1" }] as RosterHost[];
 		expect(botHost(bot("s1"), hosts)?.instanceId).toBe("7c51f77b");
