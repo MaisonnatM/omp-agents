@@ -34,5 +34,5 @@
   Ending the session keeps the page open.
 - **Delete** asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
-- Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, or a calendar event triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
+- Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, a calendar event, or unread mail triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.

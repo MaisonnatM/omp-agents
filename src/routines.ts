@@ -12,9 +12,9 @@ export type Schedule =
 
 /**
  * What the dashboard already watches that starts a run when it happens: a Slack message that waits on you, a pull
- * request of a workspace whose status changes, or a calendar event about to start.
+ * request of a workspace whose status changes, a calendar event about to start, or unread mail in a Gmail inbox.
  */
-export const TRIGGER_KINDS = ["slack", "pull-request", "event"] as const;
+export const TRIGGER_KINDS = ["slack", "pull-request", "event", "gmail"] as const;
 export type TriggerKind = (typeof TRIGGER_KINDS)[number];
 
 export interface Trigger {

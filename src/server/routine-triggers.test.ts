@@ -3,7 +3,8 @@ import type { TriggerEvent } from "../routines";
 import { EVENT_LEAD_MS } from "../shared/notices";
 import type { PullRequestList, PullRequestSummary } from "../shared/github";
 import type { SlackFound } from "../slack-messages";
-import { eventSightings, pullRequestSightings, type Seen, slackSightings, TriggerWatch } from "./routine-triggers";
+import type { MailThread } from "../shared/gmail";
+import { eventSightings, gmailSightings, pullRequestSightings, type Seen, slackSightings, TriggerWatch } from "./routine-triggers";
 
 const person = { login: "ada", avatarUrl: null };
 const pr: PullRequestSummary = {
@@ -75,6 +76,18 @@ describe("TriggerWatch", () => {
 		expect(watch.take()).toEqual([]);
 		watch.forget();
 		expect(news(watch, pullRequestSightings(list([{ ...pr, checks: "passing" }])))).toEqual([]);
+	});
+
+	test("unread mail is news once per new message; mail read, already there, or of an account that failed is not", () => {
+		const mail = (id: string, at: number, unread: boolean, account = "gmail"): MailThread => ({ account, id, from: "Bo", subject: id === "t2" ? "" : "Lunch", snippet: "Free at noon?", at, unread, count: 1, url: `https://mail.test/${id}` });
+		const watch = new TriggerWatch();
+		const inbox = (threads: MailThread[], failed: string[] = []) => news(watch, gmailSightings({ accounts: ["gmail", "gmail-2"].map(account => ({ account, error: failed.includes(account) ? "Gmail answered 500" : null })), threads }));
+		expect(inbox([mail("t1", 1, true), mail("t9", 1, true, "gmail-2")])).toEqual([]);
+		expect(inbox([mail("t1", 1, true), mail("t2", 5, true), mail("t3", 5, false), mail("t9", 1, true, "gmail-2")])).toEqual([
+			{ kind: "gmail", title: "Bo wrote: (no subject)", detail: "Free at noon?", url: "https://mail.test/t2" },
+		]);
+		expect(inbox([mail("t1", 9, true)], ["gmail-2"]).map(({ url }) => url)).toEqual(["https://mail.test/t1"]);
+		expect(inbox([mail("t1", 9, true), mail("t9", 1, true, "gmail-2")])).toEqual([]);
 	});
 
 	test("a calendar event is news once, as it comes within the lead, and again when it moves", () => {

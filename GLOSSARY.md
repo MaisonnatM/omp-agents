@@ -87,7 +87,7 @@ Every routine belongs to one Bot.
 _Avoid_: Cron job, automation
 
 **Trigger**:
-What also starts a routine's run when something new happens: a Slack message waiting on you, a pull request changing status, or a calendar event about to start.
+What also starts a routine's run when something new happens: a Slack message waiting on you, a pull request changing status, a calendar event about to start, or unread mail in Gmail.
 The run gets what the trigger saw.
 _Avoid_: Hook, webhook, event listener
 

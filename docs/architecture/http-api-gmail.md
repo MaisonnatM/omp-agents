@@ -6,6 +6,7 @@ The client reads, replies, and moves conversations to Trash; it never deletes ma
 `GET /api/gmail/inbox` answers an `EmailAnswer` from `src/shared/gmail.ts`, `{ accounts, threads }`: each signed-in account with the error its read failed with, or `null`, and the `MailThread`s of every account's inbox merged newest first, the latest 50 threads of each (`threads?labelIds=INBOX&maxResults=50`).
 The page names each account by the address its integration account holds, the one source of an account's address.
 An account whose read fails keeps its error while the others answer; only when every account fails is the answer an error.
+The server that runs routines also reads it every 2 minutes, page or not, while an enabled routine has a Gmail trigger, sharing the read's minute-long cache with the page; see [Triggers](routines.md#triggers).
 Each thread is read with `format=metadata` and only its `From` and `Subject` headers, eight at a time.
 A `MailThread` holds its `account`, the thread id, the display name of the last message's sender or else its address, the first message's subject, the thread's snippet with its HTML entities decoded, the last message's `internalDate`, whether any message carries the `UNREAD` label, the number of messages, and a link that opens the thread in Gmail under its inbox's address.
 A thread without an id, messages, or an arrival time is left out, and one that cannot be read fails its account's read with Google's message, so an account's list never has a silent gap.

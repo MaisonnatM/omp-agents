@@ -179,7 +179,7 @@ function fenced(text: string): string {
 	return `${fence}text\n${text}\n${fence}`;
 }
 
-const EVENT_LABELS: Record<TriggerEvent["kind"], string> = { slack: "Slack", "pull-request": "Pull request", event: "Calendar event" };
+const EVENT_LABELS: Record<TriggerEvent["kind"], string> = { slack: "Slack", "pull-request": "Pull request", event: "Calendar event", gmail: "Gmail" };
 
 /** What started a triggered run, fenced as data: each event's kind, what happened, its detail, and its link. */
 function triggerReport(triggeredBy: TriggerEvent[]): string {

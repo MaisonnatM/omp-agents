@@ -15,6 +15,7 @@ const TRIGGER_HINTS: Record<TriggerKind, string> = {
 	slack: "A mention or direct message you have not answered. Needs Slack signed in under Settings › Integrations.",
 	"pull-request": "One of yours, or one waiting on your review, shows up or moves: its checks fail, it can merge, it merges.",
 	event: `${EVENT_LEAD_MS / 60_000} minutes before a timed event on your calendars.`,
+	gmail: "A new message, unread, in one of your Gmail inboxes. Needs Gmail signed in under Settings › Integrations.",
 };
 
 /** One choice of a radio group, with the controls it enables under it. */

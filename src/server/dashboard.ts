@@ -37,7 +37,7 @@ import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
 import { SettingsSync, syncStores } from "../settings-sync";
-import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchesAny } from "../routines";
+import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, type TriggerKind, watchesAny } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
@@ -72,7 +72,7 @@ import { readProcessTable, SessionProcessWatch, stopProcesses } from "./session-
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
-import { eventSightings, pullRequestSightings, slackSightings, TriggerWatch } from "./routine-triggers";
+import { eventSightings, gmailSightings, pullRequestSightings, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
@@ -469,10 +469,12 @@ export class Dashboard {
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
-				// The routines' Slack and pull request triggers read this check, so the server that runs them checks without a page too.
-				const triggers = ownerLock.held && watchesAny(routines.value, ACTIVITY_KINDS);
-				if (broadcasts.listening() || triggers) await this.#checkActivity();
-				else this.#activityFresh = false;
+				// The routines' triggers read these checks, so the server that runs them checks without a page too.
+				const watched = (kinds: readonly TriggerKind[]): boolean => ownerLock.held && watchesAny(routines.value, kinds);
+				const bell = broadcasts.listening() || watched(ACTIVITY_KINDS);
+				this.#activityFresh = bell;
+				await Promise.all([bell && notices.check(ACTIVITY_KINDS), watched(["gmail"]) && this.#readMail()]);
+				this.#fireTriggers();
 			},
 			onPullTick: async () => {
 				if (ownerLock.held) await this.#sourceControl.pull(this.#workspaceCwds());
@@ -839,6 +841,12 @@ export class Dashboard {
 		this.#activityFresh = true;
 		await this.#notices.check(ACTIVITY_KINDS);
 		this.#fireTriggers();
+	}
+
+	/** Reads the Gmail inboxes for the routines' Gmail triggers; when every account fails, the watch keeps what it knew. */
+	async #readMail(): Promise<void> {
+		const answer = await this.#gmail.inbox().catch(() => null);
+		if (answer) this.#triggerWatch.learn(gmailSightings(answer));
 	}
 
 	/** The session list changed: views may now find their file, and the past list is out of date. */

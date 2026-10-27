@@ -17,8 +17,9 @@
   - **When a Slack message waits on you**: a mention or direct message you have not answered, once Slack is signed in under **Settings › Integrations**.
   - **When a pull request changes status**: one of yours, or one waiting on your review, shows up or moves, such as its checks failing, it becoming ready to merge, or it merging.
   - **Before a calendar event starts**: a timed event on this Mac's calendars or a signed-in Google Calendar comes within 10 minutes of its start.
+  - **When unread mail comes in**: a new message, unread, in the inbox of a Gmail account signed in under **Settings › Integrations**, in a new conversation or an old one.
 
-  They watch what the bell already checks: Slack and pull requests every 2 minutes, calendars every minute.
+  They watch what the bell and the Email page already read: Slack, pull requests, and Gmail every 2 minutes, calendars every minute.
   Everything that happened between two checks starts one run, and the run gets what the trigger saw: a message gets it after the routine's text, as data rather than as instructions, and a command gets it as a JSON list in `$ROUTINE_TRIGGERS`, which is `[]` when a schedule or **Run now** started it.
   What happened while the dashboard was quit starts nothing when it comes back, nor does what was already there when it started.
   A triggered run leaves the schedules alone: an hourly routine still runs on the hour.
@@ -34,7 +35,7 @@
 - A routine's page shows its message or command in full, then its last 10 runs, newest first, each with its dot, what triggered it, its command's output, and its errors; beside them, its status, **Active** or **Paused**, schedules and triggers, and next run, **On a trigger** when it has no schedule.
   The dot is green when the run went fine, red when it had an error, blue while its command runs, and amber while it waits to start.
   A message's run reads **Sent to the Bot** once it went into the conversation.
-  A triggered run lists each thing it saw, linked to the Slack message, pull request, or event when it can.
+  A triggered run lists each thing it saw, linked to the Slack message, pull request, mail, or event when it can.
   Output longer than 20 lines folds behind **Show output**.
   **Run now** runs it at once whatever its schedules, and shows progress until the server sends the message or starts the command, not until it finishes.
   Its **⋯** menu has **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.

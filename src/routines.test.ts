@@ -54,7 +54,7 @@ describe("parseRoutineSpec", () => {
 	test("takes triggers in place of schedules, but refuses neither, an unknown kind, and a kind twice", () => {
 		expect(parseRoutineSpec({ ...spec, schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] })?.ok).toMatchObject({ schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] });
 		expect(parseRoutineSpec({ ...spec, schedules: [] })).toBeNull();
-		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "gmail" }] })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "linear" }] })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "event" }, { kind: "event" }] })).toBeNull();
 	});
 });

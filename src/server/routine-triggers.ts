@@ -1,8 +1,10 @@
 /**
- * What routines' triggers see: the pull requests, Slack messages, and calendar events the bell's checks read, turned into
- * sightings, and the watch that tells which sightings are new since the last answer for their scope.
+ * What routines' triggers see: the pull requests, Slack messages, and calendar events the bell's checks read, and the
+ * Gmail inboxes the Email page reads, turned into sightings, and the watch that tells which sightings are new since the
+ * last answer for their scope.
  */
 import { MAX_TRIGGER_DETAIL, type TriggerEvent } from "../routines";
+import type { EmailAnswer } from "../shared/gmail";
 import { prKey, pullRequestName, pullRequestUrl, type PullRequestList, repoKey } from "../shared/github";
 import { type MoveId, moveOf } from "../shared/moves";
 import { EVENT_LEAD_MS } from "../shared/notices";
@@ -102,6 +104,21 @@ export function slackSightings(found: SlackFound[]): Seen {
 					: `${message.from} wrote to you${message.type === "group-dm" ? " in a group message" : ""}${message.count > 1 ? ` (${message.count} messages)` : ""}`;
 			return { id: message.id, scope: "slack", event: { kind: "slack", title, detail: clip(message.text), url: message.permalink } };
 		}),
+	};
+}
+
+/** Each unread conversation of the Gmail inboxes that answered, by its last message: new mail, there or in a conversation of its own, is a new sighting. */
+export function gmailSightings(answer: EmailAnswer): Seen {
+	const scope = (account: string): string => `gmail:${account}`;
+	return {
+		scopes: answer.accounts.flatMap(({ account, error }) => (error === null ? [scope(account)] : [])),
+		sightings: answer.threads
+			.filter(thread => thread.unread)
+			.map(({ account, id, at, from, subject, snippet, url }) => ({
+				id: `${account}:${id}:${at}`,
+				scope: scope(account),
+				event: { kind: "gmail", title: `${from} wrote: ${subject || "(no subject)"}`, detail: clip(snippet), url },
+			})),
 	};
 }
 
