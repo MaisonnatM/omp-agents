@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelOption } from "../../src/shared/models";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";
@@ -25,7 +25,6 @@ import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ContextRing } from "./context-ring";
-import { ConversationChromeContext } from "./conversation-chrome";
 import { ConversationHeader } from "./conversation-header";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
@@ -67,6 +66,10 @@ interface ConversationProps {
 	focused: boolean;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the directory picker offers. */
 	workspaces: Workspace[];
+	/** Draw the session's header; a Bot's page draws its own. */
+	header: boolean;
+	/** The composer's placeholder while the session waits on a message, in place of "Message this session…". */
+	placeholder?: string;
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view: its draft is kept per view, in this browser, while queues and scroll reset per view. */
@@ -78,14 +81,14 @@ export function Conversation(props: ConversationProps) {
 	);
 }
 
-function placeholderOf({ writable, working, followUps, agent, phase }: Subject): string {
+function placeholderOf({ writable, working, followUps, agent, phase }: Subject, idle = "Message this session…"): string {
 	if (!writable) return phase.phase === "live" && agent && !agent.canMessage ? "This subagent cannot be messaged." : "Messaging is unavailable for this view.";
 	if (working) {
 		const target = agent ? "this subagent" : "the running turn";
 		return followUps ? `Queue a follow-up… ${STEER_KEYS} steers ${target} now` : `Steer ${target}…`;
 	}
 	if (agent) return agent.status === "parked" ? "Message to revive this subagent…" : "Message this subagent…";
-	return "Message this session…";
+	return idle;
 }
 
 function LiveConversation({
@@ -102,6 +105,8 @@ function LiveConversation({
 	trajectory,
 	focused,
 	workspaces,
+	header,
+	placeholder,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const editorRef = useRef<PromptEditorHandle>(null);
@@ -112,7 +117,6 @@ function LiveConversation({
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	const subject = subjectOf(view, host, lastHost);
 	const { shown, agent, writable, working, requests, shell } = subject;
-	const chrome = useContext(ConversationChromeContext);
 	const attachments = usePromptAttachments(subject.images);
 
 	const session = subject.kind === "session";
@@ -273,7 +277,7 @@ function LiveConversation({
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			{!chrome && <ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} titleAction={titleAction} />}
+			{header && <ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} titleAction={titleAction} />}
 			{trajectory ? (
 				<Trajectory view={view} />
 			) : (
@@ -361,7 +365,7 @@ function LiveConversation({
 								{writable && <AttachButton onClick={() => openFilePicker()} />}
 							</>
 						)}
-						placeholder={chrome && writable && !working && !agent ? chrome.placeholder : placeholderOf(subject)}
+						placeholder={placeholderOf(subject, placeholder)}
 						disabled={!writable}
 						status={working ? "streaming" : "idle"}
 						onStop={session ? interrupt : undefined}

@@ -16,7 +16,6 @@ import { hashForBots, hashForRoutines, hashForView } from "../../routing";
 import { schedulesWords } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useSuggestions } from "../composer-suggestions";
-import { type ConversationChrome, ConversationChromeContext } from "../conversation-chrome";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Field, FIELD, TEXT_AREA } from "../form-field";
 import { PageFrame } from "../list-page";
@@ -25,6 +24,7 @@ import { Header } from "../page-header";
 import type { PromptEditorHandle } from "../prompt-editor";
 import { statusLabel } from "../status-dot";
 import { DirectoryPicker } from "../workspace-picker";
+import { type ToolChipLabels, ToolChipsContext } from "../tool-chips";
 import { BotAvatar } from "./bot-avatar";
 
 const NO_STARTERS: string[] = [];
@@ -262,10 +262,7 @@ export function BotPage({ bot, memory, routines, hosts, past, lastHosts, models,
 	// Keyed by its address, since botView builds a new view on each render.
 	const pane = conversation && hashForView(conversation);
 	const view = useMemo(() => conversation, [pane]);
-	const chrome = useMemo<ConversationChrome>(
-		() => ({ placeholder: `Message ${bot.name}`, toolChips: { [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } } }),
-		[bot.name],
-	);
+	const toolChips = useMemo<ToolChipLabels>(() => ({ [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } }), [bot.name]);
 	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
@@ -275,7 +272,7 @@ export function BotPage({ bot, memory, routines, hosts, past, lastHosts, models,
 			/>
 			<div className="relative flex min-h-0 flex-1 flex-col">
 				{view ? (
-					<ConversationChromeContext.Provider value={chrome}>
+					<ToolChipsContext.Provider value={toolChips}>
 						<ViewConversation
 							view={view}
 							focused
@@ -284,9 +281,10 @@ export function BotPage({ bot, memory, routines, hosts, past, lastHosts, models,
 							session={bot.sessionId !== null ? (past.find(({ sessionId }) => sessionId === bot.sessionId) ?? null) : null}
 							models={(instanceId !== null && models.get(instanceId)) || UNREAD}
 							workspaces={workspaces}
-							resumable={false}
+							header={false}
+							placeholder={`Message ${bot.name}`}
 						/>
-					</ConversationChromeContext.Provider>
+					</ToolChipsContext.Provider>
 				) : (
 					<div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
 						<BotAvatar id={bot.id} size="hero" />

@@ -56,8 +56,10 @@ interface ViewConversationProps {
 	workspaces: Workspace[];
 	/** Header controls after the conversation's own, such as a split pane's maximize and close. */
 	actions?: ReactNode;
-	/** Show a past session's Resume button; a Bot's page leaves it out, since writing to the Bot resumes it. */
-	resumable: boolean;
+	/** Draw the conversation's own header, with a past session's Resume; a Bot's page draws its own and resumes from its composer. */
+	header: boolean;
+	/** The composer's placeholder while the session waits on a message. */
+	placeholder?: string;
 }
 
 /**
@@ -65,7 +67,7 @@ interface ViewConversationProps {
  * from around it. It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed
  * token never asks it to render.
  */
-export const ViewConversation = memo(function ViewConversation({ view, focused, host, lastHost, session, models, workspaces, actions, resumable }: ViewConversationProps) {
+export const ViewConversation = memo(function ViewConversation({ view, focused, host, lastHost, session, models, workspaces, actions, header, placeholder }: ViewConversationProps) {
 	const { send, request, start, open, end } = useDashboardActions();
 	const { fork, resume } = useDashboardStatus().starts;
 	const instanceId = view.kind === "live" ? view.instanceId : null;
@@ -114,10 +116,11 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			fork={fork}
 			onFork={onFork}
 			resume={resume}
-			onResume={resumable ? onResume : undefined}
+			onResume={onResume}
 			actions={headerActions}
 			titleAction={trajectoryToggle}
 			trajectory={trajectory}
+			header={header}
 		/>
 	) : (
 		<Conversation
@@ -134,6 +137,8 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			trajectory={trajectory}
 			focused={focused}
 			workspaces={workspaces}
+			header={header}
+			placeholder={placeholder}
 		/>
 	);
 
@@ -192,7 +197,7 @@ export const Pane = memo(function Pane({
 			style={{ gridArea: maximized && focused ? "1 / 1 / -1 / -1" : paneArea(index, count) }}
 			className={cn("relative flex min-h-0 min-w-0 flex-col bg-background outline-none", maximized && (focused ? "z-10" : "invisible"))}
 		>
-			<ViewConversation view={view} focused={focused} host={host} lastHost={lastHost} session={session} models={models} workspaces={workspaces} actions={actions} resumable />
+			<ViewConversation view={view} focused={focused} host={host} lastHost={lastHost} session={session} models={models} workspaces={workspaces} actions={actions} header />
 		</section>
 	);
 });

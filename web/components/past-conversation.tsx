@@ -1,4 +1,4 @@
-import { type ReactNode, useContext, useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import type { PastSession } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { MessageScrollerProvider } from "@/components/ui/message-scroller";
@@ -9,7 +9,6 @@ import type { ForkPoint } from "../transcript-view";
 import { pastLabel, SOURCE_LABELS } from "../labels";
 import { AskAboutSelection } from "./ask-about-selection";
 import { ChangesCard } from "./changes-card";
-import { ConversationChromeContext } from "./conversation-chrome";
 import { Header } from "./page-header";
 import { SessionIdCopy, SessionMeta } from "./session-meta";
 import { SessionTitle } from "./session-title";
@@ -23,27 +22,27 @@ interface PastConversationProps {
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	resume: StartOf<"resume"> | null;
-	/** Resume the session from its file; without it, no Resume button shows, as on a Bot's page, whose composer resumes it. */
-	onResume?: () => void;
+	onResume: () => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
 	/** A control the page puts right after the title, such as the trajectory switch; a foreign session has no trajectory, so it gets none. */
 	titleAction?: ReactNode;
 	/** Show its turns in place of its transcript. */
 	trajectory: boolean;
+	/** Draw the session's header, with its title and Resume; a Bot's page draws its own and resumes from its composer. */
+	header: boolean;
 }
 
-export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, titleAction, trajectory }: PastConversationProps) {
+export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, titleAction, trajectory, header }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
 	const failed = resume?.phase === "failed" && resume.op.sessionId === sessionId ? resume.error : null;
 	const foreign = session !== null && session.source !== "omp";
-	const chrome = useContext(ConversationChromeContext);
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
-				{!chrome && (
+				{header && (
 					<Header
 						title={session && !foreign ? <SessionTitle sessionId={sessionId} title={title} /> : title}
 						trailing={
@@ -58,7 +57,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						{session && (
 							<>
 								<SessionMeta facts={session} />
-								{!foreign && onResume && (
+								{!foreign && (
 									<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 										<Button
 											size="compact"
