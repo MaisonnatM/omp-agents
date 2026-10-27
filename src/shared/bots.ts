@@ -38,6 +38,16 @@ export type BotEdit = Exclude<BotChange, { op: "message" }> | { op: "bind"; id: 
 /** The longest job a Bot keeps, since every turn's system prompt carries it. */
 export const MAX_JOB_LENGTH = 20_000;
 
+/** The last words of a Bot's conversation, which its sidebar row previews: when, in ms since the epoch, who said them, and the text as one line. */
+export interface BotLast {
+	at: number;
+	from: "user" | "bot";
+	text: string;
+}
+
+/** The tool a Bot's session writes its memory with; the page marks each finished call in the conversation. */
+export const REMEMBER_TOOL = "remember";
+
 /** `bots` after `edit`, or `bots` itself when it changes nothing. A save keeps the Bot's conversation; a remove forgets it but leaves its file. */
 export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
 	const id = edit.op === "save" ? edit.bot.id : edit.id;

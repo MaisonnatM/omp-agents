@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId, BotSpec } from "../shared/bots";
 import type { StartRequest, StartResult } from "../shared/sessions";
-import { Bots } from "./bots";
+import { Bots, lastMessage } from "./bots";
 import { BotsFile } from "./bots-file";
 
 const dirs: string[] = [];
@@ -124,5 +124,45 @@ describe("Bots", () => {
 		mkdirSync(join(dir, "bots", "scout"), { recursive: true });
 		writeFileSync(join(dir, "bots", "scout", "memory.md"), "- 2026-05-02 Prefers short answers.\n");
 		expect(bots.memories).toEqual({ ["scout" as BotId]: "- 2026-05-02 Prefers short answers.\n", ["scribe" as BotId]: "" });
+	});
+
+	test("lasts holds no last words for a Bot whose conversation has no file", async () => {
+		const { bots } = harness();
+		expect(bots.lasts).toEqual({ ["scout" as BotId]: null });
+		await bots.message(scout.id, "Hello.");
+		expect(bots.lasts).toEqual({ ["scout" as BotId]: null });
+	});
+});
+
+describe("lastMessage", () => {
+	const line = (role: string, content: unknown, timestamp = "2026-05-02T09:30:00.000Z") => JSON.stringify({ type: "message", timestamp, message: { role, content } });
+	const write = (lines: string[]): string => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-agents-last-"));
+		dirs.push(dir);
+		const path = join(dir, "session.jsonl");
+		writeFileSync(path, `${lines.join("\n")}\n`);
+		return path;
+	};
+
+	test("the last reply with text wins, without its suggested prompts, past tool calls and results", () => {
+		const path = write([
+			JSON.stringify({ type: "session", id: "s1" }),
+			line("user", "Watch the build.", "2026-05-02T09:00:00.000Z"),
+			line("assistant", [{ type: "thinking", thinking: "Hm." }, { type: "text", text: "The build is green.\n\nSuggestions:\n1. Open the PR" }]),
+			line("assistant", [{ type: "toolCall", id: "t1", name: "remember", arguments: {} }]),
+			line("toolResult", [{ type: "text", text: "Remembered." }]),
+		]);
+		expect(lastMessage(path)).toEqual({ at: Date.parse("2026-05-02T09:30:00.000Z"), from: "bot", text: "The build is green." });
+	});
+
+	test("the user's own prompt counts, as one line; a prompt the dashboard sent does not", () => {
+		const path = write([line("user", "Keep an eye on\nthe deploy."), line("user", "[omp-agents] Continue.")]);
+		expect(lastMessage(path)).toEqual({ at: Date.parse("2026-05-02T09:30:00.000Z"), from: "user", text: "Keep an eye on the deploy." });
+	});
+
+	test("a file whose end is all tool output, or no file at all, has no last words", () => {
+		const path = write([line("user", "Hello."), line("toolResult", [{ type: "text", text: "x".repeat(300 * 1024) }])]);
+		expect(lastMessage(path)).toBeNull();
+		expect(lastMessage(join(tmpdir(), "omp-agents-no-such-session.jsonl"))).toBeNull();
 	});
 });

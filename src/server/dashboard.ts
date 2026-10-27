@@ -267,7 +267,7 @@ export class Dashboard {
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
-			bots: { msg: () => ({ t: "bots", bots: this.#bots.list, memories: this.#bots.memories }), apply: change => this.#botsFile.apply(change, new Date().toISOString()) },
+			bots: { msg: () => ({ t: "bots", bots: this.#bots.list, memories: this.#bots.memories, lasts: this.#bots.lasts }), apply: change => this.#botsFile.apply(change, new Date().toISOString()) },
 		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),

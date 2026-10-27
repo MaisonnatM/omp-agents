@@ -2,19 +2,68 @@
  * The Bots on the server: how a Bot's session launches with the Bot extension, which conversation each Bot is bound
  * to as that session lives, and a message to a Bot, which reaches its live session or resumes it.
  */
-import { readFileSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
 import { join } from "node:path";
+import { isObject } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
-import { type Bot, type BotEdit, type BotId } from "../shared/bots";
+import { type Bot, type BotEdit, type BotId, type BotLast } from "../shared/bots";
 import { modelOfSelector } from "../shared/models";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
+import { isDashboardPrompt } from "../shared/transcript";
+import { entryTime, oneLine, textOf } from "../session-entries";
+import { splitSuggestions } from "../transcript";
 import type { BotsFile } from "./bots-file";
 import type { SessionJoin } from "./start";
 
 /** What a message needs of a live session. */
 type BotSession = Pick<LiveSession, "sessionId" | "prompt">;
+
+/** How much of a session file's end {@link lastMessage} reads; a conversation whose last words sit further back previews none. */
+const LAST_TAIL = 256 * 1024;
+
+/** The last prompt or reply with text in session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
+export function lastMessage(path: string): BotLast | null {
+	let fd: number;
+	try {
+		fd = openSync(path, "r");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+		throw error;
+	}
+	try {
+		const size = fstatSync(fd).size;
+		const length = Math.min(size, LAST_TAIL);
+		const tail = Buffer.alloc(length);
+		readSync(fd, tail, 0, length, size - length);
+		const lines = tail.toString("utf8").split("\n");
+		if (length < size) lines.shift();
+		for (const line of lines.toReversed()) {
+			const last = messageOf(line);
+			if (last) return last;
+		}
+		return null;
+	} finally {
+		closeSync(fd);
+	}
+}
+
+function messageOf(line: string): BotLast | null {
+	let entry: unknown;
+	try {
+		entry = JSON.parse(line);
+	} catch {
+		return null;
+	}
+	if (!isObject(entry) || entry.type !== "message" || !isObject(entry.message)) return null;
+	const { role, content } = entry.message;
+	const text = textOf(content).trim();
+	if (!text) return null;
+	if (role === "user" && !isDashboardPrompt(text)) return { at: entryTime(entry) ?? 0, from: "user", text: oneLine(text) };
+	if (role === "assistant") return { at: entryTime(entry) ?? 0, from: "bot", text: oneLine(splitSuggestions(text).body) };
+	return null;
+}
 
 export interface BotsDeps {
 	file: BotsFile;
@@ -59,6 +108,16 @@ export class Bots {
 			}
 		}
 		return memories;
+	}
+
+	/** The last words of each Bot's conversation, `null` before its first message. */
+	get lasts(): Record<BotId, BotLast | null> {
+		const lasts: Record<BotId, BotLast | null> = {};
+		for (const { id, sessionId } of this.list) {
+			const path = sessionId === null ? null : this.#deps.savedFile(sessionId);
+			lasts[id] = path === null ? null : lastMessage(path);
+		}
+		return lasts;
 	}
 
 	#memoryPath(id: BotId): string {

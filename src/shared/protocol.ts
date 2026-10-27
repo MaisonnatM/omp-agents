@@ -3,7 +3,7 @@ import type { Routine, RoutineChange } from "../routines";
 import type { UserNoteChange, UserNoteList } from "../user-notes-shared";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity";
-import type { Bot, BotChange, BotId } from "./bots";
+import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DiscussionEvent, DiscussionRequest } from "./discussions";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
@@ -50,8 +50,8 @@ export type ServerMsg =
 	| { t: "user-notes"; list: UserNoteList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
-	/** Every Bot, whole, and what each remembers, sent when a socket opens, after every change, and after each turn of a Bot's conversation. */
-	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string> }
+	/** Every Bot, whole, what each remembers, and the last words of its conversation, sent when a socket opens, after every change, and after each turn of a Bot's conversation. */
+	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string>; lasts: Record<BotId, BotLast | null> }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */

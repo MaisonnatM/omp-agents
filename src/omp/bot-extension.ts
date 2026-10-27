@@ -4,7 +4,7 @@
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { errorText } from "../json";
-import { parseBots, parseBotId } from "../shared/bots";
+import { parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
 
 /** The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, and its `memory.md`. */
 export const BOT_FLAGS = { bot: "omp-agents-bot", bots: "omp-agents-bots", memory: "omp-agents-bot-memory" } as const;
@@ -73,7 +73,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 	});
 
 	pi.registerTool({
-		name: "remember",
+		name: REMEMBER_TOOL,
 		label: "Remember",
 		description: "Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true.",
 		parameters: pi.typebox.Type.Object({ fact: pi.typebox.Type.String({ description: "The fact, as one short sentence." }) }),

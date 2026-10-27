@@ -66,7 +66,7 @@ function setup(initial: PastSession[]) {
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 		preferences: { msg: () => ({ t: "preferences", values: preferences.value }), apply: change => preferences.apply(change) },
 		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change.op === "add-finding" ? { ...change, at: 0 } : change) },
-		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
+		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {}, lasts: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 	}, kind => broadcasts.pushList(kind));
