@@ -7,6 +7,7 @@ import type { Server } from "bun";
 import { join } from "node:path";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
+import { readFavicon } from "../favicon";
 import { readGithubMedia } from "../github-media";
 import { errorText, type Parsed } from "../json";
 import { listSkills } from "../commands";
@@ -665,6 +666,8 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 
 	/** Images and videos hosted by GitHub; the proxy restricts hosts and keeps the GitHub token off redirected hosts. */
 	const githubMedia = media(params => readGithubMedia(params.get("url")));
+	/** The icons of the sites the changes card's sources name; the proxy asks public HTTPS hosts only. */
+	const favicon = media(params => readFavicon(params.get("host")));
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
@@ -774,6 +777,7 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/github-media": { GET: githubMedia },
+		"/api/favicon": { GET: favicon },
 		"/api/pull-request/attachment": { PUT: pullRequestAttach },
 		"/api/pull-request/checkout": { PUT: pullRequestCheckout },
 		"/api/pull-request/rebase": { PUT: pullRequestRebase },

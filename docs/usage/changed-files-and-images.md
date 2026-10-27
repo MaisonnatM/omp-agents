@@ -40,5 +40,6 @@
 - **Sources** lists the web pages and remote items the agent and its subagents at any depth opened, each address once, oldest first.
   It counts a `read` or fetch of a web address, a page the browser opened from `eval`, a GitHub pull request or issue read through `pr://` or `issue://`, and the web addresses in the arguments of an MCP call that gets, reads, fetches, finds, or analyzes something.
   A failed call, a page on this computer such as a dev server, and search results the agent never opened are left out, and so are the session's own pull requests and Linear issues, which the [session details sidebar](session-details-sidebar.md) shows.
-  Each row shows the site and the page's path; its tooltip names the full address, the agent and tool, what the call said it did, and how long ago.
+  Each row shows the site's icon, the site, and the page's path; its tooltip names the full address, the agent and tool, what the call said it did, and how long ago.
+  The dashboard's server fetches the icons from the sites themselves, so no outside icon service learns which sites a session opened; a site without one shows a globe.
   Click a row to open the page in your browser; the list scrolls within the card.
