@@ -1,10 +1,10 @@
 /**
  * The sessions that need you, outside the page: the desktop app's Dock badge counts them, and each moment one asks or
- * ends a turn raises a system notification through the desktop shell, which shows it while the window is not in front.
- * Showing a session in a focused window reads its turn.
+ * ends a turn raises a system notification through the desktop shell while the window is not in front, or, while it
+ * is, plays the chosen sound alone if you asked for that. Showing a session in a focused window reads its turn.
  */
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import type { DesktopBridge } from "../src/shared/desktop-bridge";
+import { isNotificationSound, type DesktopBridge, type NotificationSound } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import { type Attention, attend, needsYou, unreadShown } from "./attention";
@@ -23,21 +23,39 @@ declare global {
 const desktop: DesktopBridge | undefined = typeof window === "undefined" ? undefined : window.ompDesktop;
 
 const NOTIFICATIONS_KEY = "omp-agents.session-notifications";
+const TURNS_KEY = "omp-agents.notify-turns";
+const SOUND_KEY = "omp-agents.notification-sound";
+const FOCUSED_SOUND_KEY = "omp-agents.notification-sound-focused";
 
-/** On until you turn it off. */
-const decodeOn = (raw: string | null): boolean => raw !== "off";
+const encodeOn = (value: boolean): string => (value ? "on" : "off");
+const decodeSound = (raw: string | null): NotificationSound => (isNotificationSound(raw) ? raw : "default");
 
 export interface SessionNotifications {
-	/** Whether a session that needs you raises a system notification while the window is not in front. */
+	/** Whether a session that needs you raises a system notification while the window is not in front; on until you turn it off. */
 	on: boolean;
-	set(on: boolean): void;
+	setOn(on: boolean): void;
+	/** Whether a finished turn raises one too, besides a question; on until you turn it off. */
+	turns: boolean;
+	setTurns(turns: boolean): void;
+	/** What a notification plays, the system's sound by default. */
+	sound: NotificationSound;
+	setSound(sound: NotificationSound): void;
+	/** Whether the sound plays alone while the window is in front, where no notification shows; off until you turn it on. */
+	soundWhenFocused: boolean;
+	setSoundWhenFocused(soundWhenFocused: boolean): void;
 }
 
-/** The Settings › Preferences switch for session notifications, kept in this app. */
+/** The Settings › Preferences choices for session notifications and their sound, kept in this app. */
 export function useSessionNotifications(): SessionNotifications {
-	const [on, set] = useStoredState(NOTIFICATIONS_KEY, decodeOn, value => (value ? "on" : "off"));
-	return { on, set };
+	const [on, setOn] = useStoredState(NOTIFICATIONS_KEY, raw => raw !== "off", encodeOn);
+	const [turns, setTurns] = useStoredState(TURNS_KEY, raw => raw !== "off", encodeOn);
+	const [sound, setSound] = useStoredState(SOUND_KEY, decodeSound);
+	const [soundWhenFocused, setSoundWhenFocused] = useStoredState(FOCUSED_SOUND_KEY, raw => raw === "on", encodeOn);
+	return { on, setOn, turns, setTurns, sound, setSound, soundWhenFocused, setSoundWhenFocused };
 }
+
+/** Plays `sound` through the desktop app, as Settings' preview of it; nothing outside the app or in one built before it. */
+export const playSound = (sound: NotificationSound): void => desktop?.playSound?.(sound);
 
 function subscribeFocus(change: () => void): () => void {
 	window.addEventListener("focus", change);
@@ -55,18 +73,21 @@ const NO_VIEWS: View[] = [];
 /** Keeps the Dock badge, the notifications, and the read turns in step with the roster. */
 export function useAttention(state: DashboardState, page: Page | null, send: (msg: ClientMsg) => void): void {
 	const { hosts, connected, layout } = state;
-	const { on } = useSessionNotifications();
+	const notifications = useSessionNotifications();
 	const focused = useSyncExternalStore(subscribeFocus, () => document.hasFocus());
 	const count = connected ? hosts.filter(needsYou).length : 0;
 	useEffect(() => desktop?.badge(count), [count]);
 
 	const attention = useRef<Attention>(new Map());
-	const raising = useRef(false);
-	raising.current = on;
+	const raising = useRef(notifications);
+	raising.current = notifications;
 	useEffect(() => {
-		const { raise, attention: next } = attend(attention.current, hosts);
+		const { on, turns, sound, soundWhenFocused } = raising.current;
+		const { raise, attention: next } = attend(attention.current, hosts, turns);
 		attention.current = next;
-		if (raising.current) for (const alert of raise) desktop?.alert(alert);
+		if (!on || raise.length === 0) return;
+		if (!document.hasFocus()) for (const alert of raise) desktop?.alert({ ...alert, sound });
+		else if (soundWhenFocused) playSound(sound);
 	}, [hosts]);
 
 	// A maximized pane hides the others, and a page hides them all, but a Bot's page shows its conversation.

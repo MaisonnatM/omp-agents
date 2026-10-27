@@ -9,7 +9,7 @@ import { type ShortcutId, shortcutKeys } from "../../shortcuts";
 import { TAB_GROUPS } from "../../routing";
 import { groupTabs, hideTab, moveTab, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
-import { useSessionNotifications } from "../../use-attention";
+import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { type ProcessSettings, STOP_IDLE_CHOICES } from "../../../src/shared/processes";
+import { NOTIFICATION_SOUNDS, type NotificationSound } from "../../../src/shared/desktop-bridge";
 
 const THEME_OPTIONS: Record<Theme, [string, LucideIcon]> = {
 	system: ["System", Monitor],
@@ -105,18 +106,49 @@ function PinnedSkill({ cwd, workspace }: { cwd: string | null; workspace: string
 	);
 }
 
-/** The system notifications of sessions that ask you something or end a turn, while the window is not focused. */
+const SOUND_LABELS: Record<NotificationSound, string> = Object.fromEntries(NOTIFICATION_SOUNDS.map(sound => [sound, sound === "off" ? "None" : sound === "default" ? "System default" : sound])) as Record<NotificationSound, string>;
+
+/** The system notifications of sessions that ask you something or end a turn, while the window is not focused, and the sound they play. */
 function SessionNotifications() {
-	const { on, set } = useSessionNotifications();
+	const { on, setOn, turns, setTurns, sound, setSound, soundWhenFocused, setSoundWhenFocused } = useSessionNotifications();
+	const chooseSound = (next: NotificationSound): void => {
+		setSound(next);
+		playSound(next);
+	};
 	return (
 		<Section
 			title="Notifications"
-			meta="A system notification when a session asks you something or finishes a turn while this window is not focused; clicking it opens the session. Saved in this app."
+			meta="In the desktop app, a system notification when a session asks you something or finishes a turn while this window is not focused; clicking it opens the session. Picking a sound plays it. Saved in this app."
 		>
-			<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-				<PreferenceSwitch checked={on} onCheckedChange={set} />
-				Notify me when a session needs me
-			</label>
+			<div className="space-y-2">
+				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
+					<PreferenceSwitch checked={on} onCheckedChange={setOn} />
+					Notify me when a session needs me
+				</label>
+				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px] has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:text-muted-foreground">
+					<PreferenceSwitch checked={turns} onCheckedChange={setTurns} disabled={!on} />
+					Also when a session finishes a turn
+				</label>
+				<div className="flex items-center gap-2 text-[12px]">
+					<span className={on ? undefined : "text-muted-foreground"}>Sound</span>
+					<Select<NotificationSound> items={SOUND_LABELS} value={sound} onValueChange={next => next && chooseSound(next)} disabled={!on}>
+						<SelectTrigger aria-label="Notification sound" className="w-fit">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{NOTIFICATION_SOUNDS.map(choice => (
+								<SelectItem key={choice} value={choice}>
+									{SOUND_LABELS[choice]}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</div>
+				<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px] has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:text-muted-foreground">
+					<PreferenceSwitch checked={soundWhenFocused} onCheckedChange={setSoundWhenFocused} disabled={!on || sound === "off"} />
+					Play the sound while this window is focused too
+				</label>
+			</div>
 		</Section>
 	);
 }

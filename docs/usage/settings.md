@@ -100,7 +100,7 @@
   Hiding every tab of a group disables its side of the header's **Dev** and **Ops** switch; the gear button always leads back here.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
-  **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off.
+  **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.
   **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 minutes, 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
   A process stops once every session it serves has been idle that long; see [Sessions sidebar](sessions-sidebar.md).
   The server keeps the choice in `processes.json` beside its access token, so it applies with no page open.

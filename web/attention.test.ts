@@ -20,11 +20,11 @@ describe("needsYou", () => {
 });
 
 describe("attend", () => {
-	const raisedOver = (pushes: RosterHost[][]): string[] => {
+	const raisedOver = (pushes: RosterHost[][], turns: (push: number) => boolean = () => true): string[] => {
 		let attention: Attention = new Map();
 		const raised: string[] = [];
-		for (const hosts of pushes) {
-			const next = attend(attention, hosts);
+		for (const [index, hosts] of pushes.entries()) {
+			const next = attend(attention, hosts, turns(index));
 			raised.push(...next.raise.map(alert => alert.body));
 			attention = next.attention;
 		}
@@ -38,12 +38,16 @@ describe("attend", () => {
 
 	test("raises one alert per session, titled by the session and opening it: its oldest question over an unread turn", () => {
 		const confirm: UserRequest = { id: "r2", title: "Delete the branch?", deadline: null, kind: "confirm", message: "feat/x has unpushed work." };
-		const seen = attend(new Map(), [host("a", "idle"), host("b", "idle"), host("c", "idle")]).attention;
-		const { raise } = attend(seen, [
-			host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged." } }),
-			host("b", "needs-input", { requests: [confirm] }),
-			host("c", "idle", { sessionName: null, unread: { at: 3, reply: null } }),
-		]);
+		const seen = attend(new Map(), [host("a", "idle"), host("b", "idle"), host("c", "idle")], true).attention;
+		const { raise } = attend(
+			seen,
+			[
+				host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged." } }),
+				host("b", "needs-input", { requests: [confirm] }),
+				host("c", "idle", { sessionName: null, unread: { at: 3, reply: null } }),
+			],
+			true,
+		);
 		expect(raise).toEqual([
 			{ hash: "#session/s-a", title: "Session a", body: "Which branch?" },
 			{ hash: "#session/s-b", title: "Session b", body: "Delete the branch?\nfeat/x has unpushed work." },
@@ -76,6 +80,11 @@ describe("attend", () => {
 
 	test("forgets a session that leaves the roster, so it returns as one the page sees for the first time", () => {
 		expect(raisedOver([idle, [], asks()])).toEqual([]);
+	});
+
+	test("with finished turns off, raises questions only, and a turn muted then stays heard once they are back on", () => {
+		expect(raisedOver([idle, turn(1), working, asks(), placeholder], () => false)).toEqual(["Which branch?"]);
+		expect(raisedOver([idle, turn(1), turn(1), working, turn(2)], push => push >= 2)).toEqual(["Turn 2."]);
 	});
 });
 
