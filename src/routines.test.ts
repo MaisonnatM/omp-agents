@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { applyRoutine, isDue, nextRunAt, parseRoutineSpec, type Routine, type RoutineSpec, type Schedule } from "./routines";
+import type { BotId } from "./shared/bots";
 
 // Weekly slots are local wall-clock times; Paris has both DST changes in the dates below.
 const savedTz = process.env.TZ;
@@ -21,6 +22,7 @@ const spec: RoutineSpec = {
 	cwd: "/work/webapp",
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
+	target: { kind: "new-session" },
 	skill: null,
 	enabled: true,
 };
@@ -40,6 +42,14 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec({ ...spec, schedules: [{ ...weekdays, days: [7] }] })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, schedules: [{ kind: "every", minutes: 1.5 }] })).toBeNull();
 		expect(parseRoutineSpec("routine")).toBeNull();
+	});
+
+	test("sends only a prompt that pins nothing into a Bot's conversation", () => {
+		const target = { kind: "bot" as const, botId: "scout" as BotId };
+		expect(parseRoutineSpec({ ...spec, target })).toEqual({ ok: { ...spec, target } });
+		expect(parseRoutineSpec({ ...spec, target, task: { kind: "prompt", prompt: "Hi", pin: true } })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, target, task: { kind: "command", command: "git status" } })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, target: { kind: "bot", botId: "../scout" } })).toBeNull();
 	});
 });
 

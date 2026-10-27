@@ -143,6 +143,7 @@ describe("parseClientMsg", () => {
 			cwd: "/work/webapp",
 			schedules: [weekdays],
 			task: { kind: "prompt", prompt: "Summarize", pin: false },
+			target: { kind: "new-session" },
 			skill: null,
 			enabled: true,
 		};

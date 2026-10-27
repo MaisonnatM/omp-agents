@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { activityDb, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -48,6 +48,8 @@ import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
+import { Bots } from "./bots";
+import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
 import { EndInbox } from "./end-inbox";
@@ -83,7 +85,8 @@ import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
 import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
-import { createStarter, reattachAll } from "./start";
+import { botExtension } from "./resources";
+import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { UserNotesFile } from "./user-notes-file";
@@ -120,6 +123,8 @@ export class Dashboard {
 		now: Date.now,
 		onChange: () => this.#broadcasts.pushList("review-drafts"),
 	});
+	readonly #botsFile = new BotsFile(botsFile);
+	readonly #bots: Bots;
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
 	readonly #calendars = new CalendarsFile(calendarsFile);
@@ -262,6 +267,7 @@ export class Dashboard {
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
+			bots: { msg: () => ({ t: "bots", bots: this.#bots.list, memories: this.#bots.memories }), apply: change => this.#botsFile.apply(change, new Date().toISOString()) },
 		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -290,7 +296,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			joinFor: request => this.#reviewDrafts.join(request),
+			joinFor: request => this.#joinFor(request),
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
@@ -324,6 +330,16 @@ export class Dashboard {
 			if (!resumed) throw new Error("The session exited as it resumed.");
 			return resumed;
 		};
+		this.#bots = new Bots({
+			file: this.#botsFile,
+			start: startSession,
+			live: sessionId => sessions.bySessionId(sessionId),
+			session: instanceId => sessions.get(instanceId),
+			savedFile: files.pathOf,
+			paths: { extension: botExtension, botsFile, botsDir },
+			now: () => new Date().toISOString(),
+			onChange: () => broadcasts.pushList("bots"),
+		});
 		this.#endInbox = new EndInbox(sessionEndInboxDir, {
 			end: async sessionId => {
 				const session = sessions.bySessionId(sessionId);
@@ -351,6 +367,7 @@ export class Dashboard {
 			},
 			onChange: () => broadcasts.pushList("routines"),
 			changePins: change => void lists.apply("pins", change),
+			messageBot: (botId, text) => this.#bots.message(botId, text),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -473,6 +490,7 @@ export class Dashboard {
 			cancelContinue: sessionId => autoContinue.cancel(sessionId),
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
+			messageBot: async (id, text) => void (await this.#bots.message(id, text)),
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			discussions: this.#discussions,
 			activity: { owner: () => ownerLock.held, store: this.#activity },
@@ -569,7 +587,7 @@ export class Dashboard {
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, request => this.#reviewDrafts.join(request), survived => this.#interrupted.recover(survived));
+		await reattachAll(this.#sessions, request => this.#joinFor(request), survived => this.#interrupted.recover(survived));
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
@@ -677,6 +695,9 @@ export class Dashboard {
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#reviewDrafts.exited(instanceId);
+				// Its last turn may have remembered something.
+				if (this.#bots.isBot(instanceId)) this.#broadcasts.pushList("bots");
+				this.#bots.exited(instanceId);
 				this.#sessions.remove(instanceId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
@@ -690,7 +711,10 @@ export class Dashboard {
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				if (sessionId) this.#reviewDrafts.switched(instanceId, sessionId);
+				if (sessionId) {
+					this.#reviewDrafts.switched(instanceId, sessionId);
+					this.#bots.switched(instanceId, sessionId);
+				}
 				return;
 			}
 			case "turn-started": {
@@ -706,6 +730,7 @@ export class Dashboard {
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
+				if (this.#bots.isBot(instanceId)) this.#broadcasts.pushList("bots");
 				return;
 			}
 			default: {
@@ -723,6 +748,17 @@ export class Dashboard {
 	/** Deletes the activity rows older than {@link ACTIVITY_KEPT_DAYS}. */
 	#pruneActivity(): void {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
+	}
+
+	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain. */
+	#joinFor(request: StartRequest): SessionJoin {
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request)];
+		return {
+			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
+			attach: session => {
+				for (const join of joins) join.attach(session);
+			},
+		};
 	}
 
 	/**
@@ -743,9 +779,11 @@ export class Dashboard {
 			console.log("omp-agents: this server now runs routines and the todo and note inboxes.");
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
+			this.#botsFile.reload();
 			this.#todos.reload();
 			this.#notes.reload();
 			this.#broadcasts.pushList("routines");
+			this.#broadcasts.pushList("bots");
 			this.#broadcasts.pushList("user-todos");
 			this.#broadcasts.pushList("user-notes");
 			this.#runner.recover();

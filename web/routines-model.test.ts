@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { CommandRun, Routine, RoutineRun, Schedule, Weekday } from "../src/routines";
+import type { BotId } from "../src/shared/bots";
 import { draftOf, newDraft, nextRunWords, runHealth, runWords, type RoutineDraft, schedulesWords, scheduleWords, specOf, taskWords, whenWords } from "./routines-model";
 
 // Local times, so the expected words hold in any time zone. Oct 5 2026 is a Monday.
@@ -13,6 +14,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	cwd: "~/code/webapp",
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
+	target: { kind: "new-session" },
 	skill: null,
 	enabled: true,
 	createdAt: at(5, 10),
@@ -145,6 +147,7 @@ describe("editor form", () => {
 				enabled: false,
 				skill: "poteto-mode",
 				task: { kind: "prompt", prompt: "Reply ok.", pin: true },
+				target: { kind: "new-session" },
 				schedules: [{ kind: "every", minutes: 360 }],
 			},
 		});
@@ -161,6 +164,7 @@ describe("editor form", () => {
 				enabled: true,
 				skill: null,
 				task: { kind: "prompt", prompt: "Hi", pin: false },
+				target: { kind: "new-session" },
 				schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }],
 			},
 		});
@@ -182,6 +186,7 @@ describe("editor form", () => {
 				enabled: true,
 				skill: null,
 				task: { kind: "command", command: "git worktree prune" },
+				target: { kind: "new-session" },
 				schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }],
 			},
 		});
@@ -189,5 +194,12 @@ describe("editor form", () => {
 		expect(specOf({ ...draft, task: "prompt", prompt: "Hi" })).toMatchObject({ ok: { skill: "poteto-mode" } });
 		const saved = routine({ task: { kind: "command", command: "git worktree prune" } });
 		expect(specOf(draftOf(saved))).toMatchObject({ ok: { task: { kind: "command", command: "git worktree prune" } } });
+	});
+
+	test("a prompt form aimed at a Bot saves that target unpinned, and a command form ignores the Bot", () => {
+		const draft: RoutineDraft = { ...newDraft("r4", "~/code", null), name: "Standup", prompt: "Post the standup.", pin: true, botId: "scout" as BotId };
+		expect(specOf(draft)).toMatchObject({ ok: { task: { kind: "prompt", prompt: "Post the standup.", pin: false }, target: { kind: "bot", botId: "scout" } } });
+		expect(specOf({ ...draft, task: "command", command: "git status" })).toMatchObject({ ok: { target: { kind: "new-session" } } });
+		expect(draftOf(routine({ target: { kind: "bot", botId: "scout" as BotId } })).botId).toBe("scout" as BotId);
 	});
 });

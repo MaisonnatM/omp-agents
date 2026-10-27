@@ -1,6 +1,7 @@
 /** Bots: named, long-lived teammates, each one conversation with a job and a memory; how a change edits the list `bots.json` keeps, and which Bot the page and the file may hold. */
 import { isNonEmpty, isObject, type Parsed } from "../json";
-import { type ModelOption, parseSkill } from "./sessions";
+import { modelOfSelector } from "./models";
+import { parseSkill } from "./sessions";
 
 declare const BOT_ID: unique symbol;
 /** A Bot's id, which the page picks when it creates one, so a save sent twice saves once. */
@@ -63,12 +64,6 @@ export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
 /** An id names the Bot's memory directory, so it holds no path separator or dot. */
 export const parseBotId = (value: unknown): BotId | null => (typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? (value as BotId) : null);
 
-/** `model` as omp's `provider/id` names it. */
-export function botModel(model: string): ModelOption {
-	const slash = model.indexOf("/");
-	return { provider: model.slice(0, slash), id: model.slice(slash + 1) };
-}
-
 /** A Bot as the page saves it, or `null` when a field is missing, of the wrong type, or too long; other fields drop. */
 export function parseBotSpec(value: unknown): Parsed<BotSpec> {
 	if (!isObject(value)) return null;
@@ -76,7 +71,7 @@ export function parseBotSpec(value: unknown): Parsed<BotSpec> {
 	const id = parseBotId(value.id);
 	const skill = parseSkill(value.skill);
 	if (!id || !isNonEmpty(name) || typeof job !== "string" || job.length > MAX_JOB_LENGTH || !isNonEmpty(cwd) || !skill) return null;
-	if (model !== null && (typeof model !== "string" || !/^[^/\s]+\/\S+$/.test(model))) return null;
+	if (model !== null && (typeof model !== "string" || !modelOfSelector(model))) return null;
 	return { ok: { id, name: name.trim(), job, cwd, model, skill: skill.ok } };
 }
 

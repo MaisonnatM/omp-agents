@@ -27,6 +27,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	cwd: "/work/webapp",
 	schedules: [weekdays],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
+	target: { kind: "new-session" },
 	skill: null,
 	enabled: true,
 	createdAt: at("2026-09-01T08:00:00+02:00"),

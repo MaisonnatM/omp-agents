@@ -2,11 +2,12 @@
  * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a queued run is on disk before the runner starts anything from it.
  * A routine whose task was pull requests or a project's prompt is dropped on load. The rest of the file stays.
- * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
+ * A file from before `schedules`, before a run's `outcome`, before a prompt task's `pin`, or before `target` migrates here, so everything else sees the current shape.
  */
 import { ReducerFile } from "../fs";
 import { isObject, isSafeInteger, isTexts, parseAll } from "../json";
 import { applyRoutine, MAX_ROUTINE_RUNS, parseRoutineSpec, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
+import { type BotId, parseBotId } from "../shared/bots";
 
 /** A session a run recorded before `outcome`, which also held its `label`. */
 function parseStarted(value: unknown): { instanceId: string; sessionId: string } | null {
@@ -40,6 +41,8 @@ function parseRun(value: unknown): RoutineRun | null {
 		let parsed: RoutineOutcome | null = null;
 		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = { kind: "pending", queued: outcome.queued };
 		if (outcome.kind === "session" && typeof outcome.instanceId === "string" && typeof outcome.sessionId === "string") parsed = { kind: "session", instanceId: outcome.instanceId, sessionId: outcome.sessionId };
+		const botId = parseBotId(outcome.botId);
+		if (outcome.kind === "bot" && botId && typeof outcome.sessionId === "string") parsed = { kind: "bot", botId, sessionId: outcome.sessionId };
 		if (outcome.kind === "command") {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
@@ -71,6 +74,7 @@ function parseRoutine(value: unknown): Routine | { dropped: string } | null {
 		...value,
 		schedules: "schedules" in value ? value.schedules : [value.schedule],
 		task: isObject(task) && task.kind === "prompt" && !("pin" in task) ? { ...task, pin: false } : task,
+		target: "target" in value ? value.target : { kind: "new-session" },
 	});
 	if (!spec) return null;
 	const { createdAt } = value;
@@ -115,6 +119,11 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 	/** Records the sole session the run at `at` started. */
 	started(id: string, at: number, session: { instanceId: string; sessionId: string }): void {
 		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "session", ...session } }));
+	}
+
+	/** Records the Bot conversation the run at `at` sent its prompt into. */
+	sent(id: string, at: number, botId: BotId, sessionId: string): void {
+		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "bot", botId, sessionId } }));
 	}
 
 	/** Records the command of the run at `at` as it launches and again as it ends. */

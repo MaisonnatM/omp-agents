@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type BotId } from "../shared/bots";
 import { applyPins } from "../shared/pins";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
@@ -27,7 +28,7 @@ const everyHour = { kind: "every" as const, minutes: 60 };
 
 function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false }): RoutinesFile {
 	const file = new RoutinesFile(path);
-	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "prompt" ? "ship" : null, enabled: true } }, T0);
+	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, target: { kind: "new-session" }, skill: task.kind === "prompt" ? "ship" : null, enabled: true } }, T0);
 	return file;
 }
 
@@ -37,7 +38,7 @@ function addPrompts(file: RoutinesFile, count: number): void {
 		file.apply(
 			{
 				op: "save",
-				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}`, pin: false }, skill: null, enabled: true },
+				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}`, pin: false }, target: { kind: "new-session" }, skill: null, enabled: true },
 			},
 			T0,
 		);
@@ -71,6 +72,9 @@ function harness(file: RoutinesFile, sessions = new Map<string, FakeSession>()) 
 		pins: [] as string[],
 		/** Each pin change and session end, in order. */
 		log: [] as string[],
+		/** Each message a Bot was sent, as `<bot>: <text>`; a Bot not named in `bots` is gone. */
+		messages: [] as string[],
+		bots: new Map<string, string>(),
 	};
 	const runner = new RoutineRunner({
 		file,
@@ -104,6 +108,12 @@ function harness(file: RoutinesFile, sessions = new Map<string, FakeSession>()) 
 		changePins(change) {
 			fake.pins = applyPins(fake.pins, change);
 			fake.log.push(`${change.op} ${change.sessionIds.join(",")}`);
+		},
+		async messageBot(botId: BotId, text: string): Promise<string> {
+			const sessionId = fake.bots.get(botId);
+			if (!sessionId) throw new Error("This Bot is gone.");
+			fake.messages.push(`${botId}: ${text}`);
+			return sessionId;
 		},
 	});
 	return { runner, fake };
@@ -276,7 +286,7 @@ describe("RoutineRunner", () => {
 
 	test("a routine that does not pin, and a session ended at the start deadline, pin nothing", async () => {
 		const file = fileWith(routinesPath());
-		file.apply({ op: "save", routine: { id: "r2", name: "Retro", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, skill: null, enabled: true } }, T0);
+		file.apply({ op: "save", routine: { id: "r2", name: "Retro", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, target: { kind: "new-session" }, skill: null, enabled: true } }, T0);
 		const { runner, fake } = harness(file);
 		await runner.tick();
 		fake.sessions.get("i1")!.status = "working";
@@ -393,7 +403,7 @@ describe("RoutineRunner", () => {
 		test("runs while every session slot is busy", async () => {
 			const file = fileWith(routinesPath());
 			addPrompts(file, 3);
-			file.apply({ op: "save", routine: { id: "r4", name: "Prune", cwd: "/work/other", schedules: [everyHour], task: command, skill: null, enabled: true } }, T0);
+			file.apply({ op: "save", routine: { id: "r4", name: "Prune", cwd: "/work/other", schedules: [everyHour], task: command, target: { kind: "new-session" }, skill: null, enabled: true } }, T0);
 			const { runner, fake } = harness(file);
 			await runner.tick();
 			expect(fake.requests).toHaveLength(3);
@@ -417,6 +427,34 @@ describe("RoutineRunner", () => {
 					errors: ["The dashboard stopped while the command ran."],
 				},
 			]);
+		});
+	});
+
+	describe("a routine that targets a Bot", () => {
+		const toScout = (file: RoutinesFile, id: string): void =>
+			void file.apply(
+				{ op: "save", routine: { id, name: "Standup", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Post the standup.", pin: false }, target: { kind: "bot", botId: "scout" as BotId }, skill: null, enabled: true } },
+				T0,
+			);
+
+		test("sends its prompt into the Bot's conversation while every session slot is busy", async () => {
+			const file = fileWith(routinesPath());
+			addPrompts(file, 3);
+			toScout(file, "r4");
+			const { runner, fake } = harness(file);
+			fake.bots.set("scout", "s-scout");
+			await runner.tick();
+			expect(fake.requests).toHaveLength(3);
+			expect(fake.messages).toEqual(["scout: Post the standup."]);
+			expect(file.value[3]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "bot", botId: "scout" as BotId, sessionId: "s-scout" }, errors: [] });
+		});
+
+		test("a run whose Bot is gone records why", async () => {
+			const file = new RoutinesFile(routinesPath());
+			toScout(file, "r1");
+			const { runner } = harness(file);
+			await runner.runNow("r1");
+			expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "pending", queued: false }, errors: ["Standup: This Bot is gone."] });
 		});
 	});
 });

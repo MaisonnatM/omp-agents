@@ -1,5 +1,6 @@
 /** The rules of routines: when one is due, how a change edits the list, and which routine the page and `routines.json` may hold. */
 import { isNonEmpty, isObject, isSafeInteger, nonEmpty, type Parsed } from "./json";
+import { type BotId, parseBotId } from "./shared/bots";
 import { parseSkill } from "./shared/sessions";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -28,11 +29,15 @@ export type CommandRun =
 	/** `sh` could not start, as when the workspace is gone. */
 	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
 
-/** A claimed run waits `pending` until it starts the one thing it asks for: a session, or a command. */
+/** Where a prompt routine's prompt goes: a new session of its own each run, or the conversation of Bot `botId`. */
+export type RoutineTarget = { kind: "new-session" } | { kind: "bot"; botId: BotId };
+
+/** A claimed run waits `pending` until it starts the one thing it asks for: a session, a command, or a message in a Bot's conversation. */
 export type RoutineOutcome =
 	| { kind: "pending"; queued: boolean }
 	| { kind: "session"; instanceId: string; sessionId: string }
-	| { kind: "command"; run: CommandRun };
+	| { kind: "command"; run: CommandRun }
+	| { kind: "bot"; botId: BotId; sessionId: string };
 
 export interface RoutineRun {
 	at: number;
@@ -47,6 +52,8 @@ export interface Routine {
 	cwd: string;
 	schedules: Schedules;
 	task: RoutineTask;
+	/** A command, or a prompt that pins, always runs as `new-session`. */
+	target: RoutineTarget;
 	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
 	skill: string | null;
 	enabled: boolean;
@@ -113,7 +120,7 @@ function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 		routine.cwd === spec.cwd &&
 		routine.skill === spec.skill &&
 		routine.enabled === spec.enabled &&
-		JSON.stringify([routine.schedules, routine.task]) === JSON.stringify([spec.schedules, spec.task])
+		JSON.stringify([routine.schedules, routine.task, routine.target]) === JSON.stringify([spec.schedules, spec.task, spec.target])
 	);
 }
 
@@ -187,6 +194,14 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 	}
 }
 
+/** A target `task` can take: a Bot's conversation takes only a prompt that pins nothing, since the Bot keeps one session. */
+function parseRoutineTarget(value: unknown, task: RoutineTask): Parsed<RoutineTarget> {
+	if (!isObject(value)) return null;
+	if (value.kind === "new-session") return { ok: { kind: "new-session" } };
+	const botId = parseBotId(value.botId);
+	return value.kind === "bot" && botId && task.kind === "prompt" && !task.pin ? { ok: { kind: "bot", botId } } : null;
+}
+
 /**
  * A routine as the page saves it and `routines.json` keeps it, or `null` when a field is missing, of the wrong type, or
  * out of range; other fields drop.
@@ -196,7 +211,8 @@ export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	const { id, name, cwd, enabled } = value;
 	const schedules = parseSchedules(value.schedules);
 	const task = parseRoutineTask(value.task);
+	const target = task && parseRoutineTarget(value.target, task.ok);
 	const skill = parseSkill(value.skill);
-	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
-	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled } };
+	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !target || !skill) return null;
+	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, target: target.ok, skill: skill.ok, enabled } };
 }

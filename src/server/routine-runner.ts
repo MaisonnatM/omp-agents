@@ -1,11 +1,12 @@
 /**
- * Starts the sessions and runs the commands that routines ask for. Each tick claims the
+ * Starts the sessions, runs the commands, and messages the Bots that routines ask for. Each tick claims the
  * slots that came due, starts the queued runs while session slots are free, and ends the sessions that finished their turn.
  * Every step converges: a slot claimed is on disk, so a second tick, or the next server, starts nothing twice.
  */
 import { errorText } from "../json";
-import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
+import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun } from "../routines";
 import { SerialLane } from "../serial-lane";
+import type { BotId } from "../shared/bots";
 import type { PinChange } from "../shared/pins";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutinesFile } from "./routines-file";
@@ -33,6 +34,8 @@ export interface RoutineRunnerDeps {
 	onChange(): void;
 	/** Pins or unpins sidebar sessions, for every window, page open or not. */
 	changePins(change: PinChange): void;
+	/** Sends `text` into Bot `botId`'s conversation, as the user's message would; the session it went to. Rejects with why it could not. */
+	messageBot(botId: BotId, text: string): Promise<string>;
 }
 
 /** A session a routine started: `starting` until its turn is seen running, `working` after; it leaves once it finished. */
@@ -44,8 +47,8 @@ interface Tracked {
 	phase: "starting" | "working";
 }
 
-/** A command runs without an omp session, so it holds no session slot. */
-const takesSession = (task: RoutineTask): boolean => task.kind === "prompt";
+/** A command runs without an omp session, and a Bot's routine in the Bot's own one, so neither holds a session slot. */
+const takesSession = (routine: Routine): boolean => routine.task.kind === "prompt" && routine.target.kind === "new-session";
 
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
@@ -78,6 +81,8 @@ export class RoutineRunner {
 				// Its turn may have ended while no server watched, so it counts as worked and ends once idle.
 				if (!this.#tracked.has(outcome.instanceId) && this.#deps.session(outcome.instanceId))
 					this.#tracked.set(outcome.instanceId, { routineId, runAt: at, startedAt: now(), phase: "working" });
+				return;
+			case "bot":
 				return;
 			case "command":
 				if (outcome.run.phase !== "running") return;
@@ -134,9 +139,10 @@ export class RoutineRunner {
 			const next = oldestQueued(file.value, this.#tracked.size >= MAX_ROUTINE_SESSIONS);
 			if (!next) return;
 			const { routine, run } = next;
-			const { task } = routine;
+			const { task, target } = routine;
 			file.dequeue(routine.id, run.at);
 			if (task.kind === "command") this.#launch(routine, run.at, task.command);
+			else if (target.kind === "bot") await this.#message(routine, run.at, target.botId, task.prompt);
 			else await this.#start(routine, run.at, task.prompt);
 		}
 	}
@@ -155,6 +161,17 @@ export class RoutineRunner {
 		} else {
 			this.#tracked.set(result.instanceId, { routineId: routine.id, runAt: at, startedAt: this.#deps.now(), phase: session.occupied ? "working" : "starting" });
 			file.started(routine.id, at, { instanceId: result.instanceId, sessionId: session.sessionId });
+		}
+		this.#deps.onChange();
+	}
+
+	/** Sends the prompt into the Bot's conversation, which the routine neither tracks nor ends: the Bot keeps it. */
+	async #message(routine: Routine, at: number, botId: BotId, prompt: string): Promise<void> {
+		const { file } = this.#deps;
+		try {
+			file.sent(routine.id, at, botId, await this.#deps.messageBot(botId, prompt));
+		} catch (error) {
+			file.failed(routine.id, at, `${routine.name}: ${errorText(error)}`);
 		}
 		this.#deps.onChange();
 	}
@@ -231,7 +248,7 @@ export class RoutineRunner {
 function oldestQueued(routines: Routine[], sessionsFull: boolean): { routine: Routine; run: RoutineRun } | null {
 	let oldest: { routine: Routine; run: RoutineRun } | null = null;
 	for (const routine of routines) {
-		if (sessionsFull && takesSession(routine.task)) continue;
+		if (sessionsFull && takesSession(routine)) continue;
 		for (const run of routine.runs) if (run.outcome.kind === "pending" && run.outcome.queued && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
 	}
 	return oldest;

@@ -83,6 +83,7 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 		{
 			...kept,
 			schedules: [schedule],
+			target: { kind: "new-session" },
 			runs: [
 				{ at: 4, outcome: { kind: "pending", queued: true }, errors: [] },
 				{ at: 3, outcome: { kind: "session", instanceId: "i1", sessionId: "s1" }, errors: [] },
@@ -101,7 +102,7 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 	expect(saved.routines[0]?.schedule).toBeUndefined();
 });
 
-test("a prompt task from before `pin` reads as unpinned, and the next save writes it", () => {
+test("a routine from before `pin` and `target` reads as unpinned and running in a new session, and the next save writes both", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -120,12 +121,14 @@ test("a prompt task from before `pin` reads as unpinned, and the next save write
 	writeFileSync(path, JSON.stringify({ routines: [routine] }));
 	const file = new RoutinesFile(path);
 	expect(file.value[0]?.task).toEqual({ kind: "prompt", prompt: "Write the daily retro.", pin: false });
+	expect(file.value[0]?.target).toEqual({ kind: "new-session" });
 	expect(existsSync(`${path}.invalid`)).toBe(false);
 
 	file.apply({ op: "enable", id: "r1", enabled: false }, 2);
 	flushJsonFiles();
-	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: { task: unknown }[] };
+	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: { task: unknown; target: unknown }[] };
 	expect(saved.routines[0]?.task).toEqual({ kind: "prompt", prompt: "Write the daily retro.", pin: false });
+	expect(saved.routines[0]?.target).toEqual({ kind: "new-session" });
 });
 
 test("a file that is not a list of routines moves aside", () => {

@@ -240,6 +240,7 @@ export function useDashboard(): Dashboard {
 					case "user-todos":
 					case "user-notes":
 					case "routines":
+					case "bots":
 					case "scheduled":
 					case "workspaces":
 					case "notices":

@@ -219,6 +219,7 @@ export const ACTION_MESSAGES: Record<ClientMsg["t"], boolean> = {
 	"user-todo": true,
 	"user-note": true,
 	routine: true,
+	bot: true,
 	schedule: true,
 	pin: true,
 	preference: true,
