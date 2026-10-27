@@ -7,6 +7,7 @@ import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
 import { openSocket } from "./api";
+import { openBotView } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
@@ -108,13 +109,10 @@ export function useDashboard(): Dashboard {
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
 	// A page covering the panes shows none of them, so the server streams only a Bot page's conversation until the panes return.
-	const botSession = page?.kind === "bots" ? (state.bots?.find(({ id }) => id === page.target)?.sessionId ?? null) : null;
-	const botInstance = botSession === null ? null : (state.hosts.find(host => host.sessionId === botSession)?.instanceId ?? null);
-	const watched = useMemo<View[]>(() => {
-		if (!page) return state.layout.panes;
-		if (botSession === null) return NO_VIEWS;
-		return [botInstance === null ? { kind: "past", sessionId: botSession } : { kind: "live", instanceId: botInstance, agentId: null }];
-	}, [page, botSession, botInstance, state.layout.panes]);
+	const botConversation = openBotView(page, state.bots, state.hosts);
+	// Keyed by its address, since openBotView builds a new view on each render.
+	const botPane = botConversation && hashForView(botConversation);
+	const watched = useMemo<View[]>(() => (!page ? state.layout.panes : botConversation ? [botConversation] : NO_VIEWS), [page, botPane, state.layout.panes]);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 	const shownTrajectories = useShownTrajectories();

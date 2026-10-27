@@ -25,3 +25,4 @@ A routine whose task is `{kind: "bot", botId, prompt}` sends its prompt through 
 
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts that view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.
+The page and both hooks find that view with `botView` and `openBotView` in `web/bots-model.ts`: the live session that runs the Bot's conversation, else its saved one.

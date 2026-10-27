@@ -3,16 +3,16 @@ import { BookmarkCheck, ChevronDown, CircleStop, Trash2 } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { type Bot, type BotId, type BotSpec, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
-import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
+import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botHost, botRoutines, memoryEntries, starterPrompts } from "../../bots-model";
+import { botHost, botRoutines, botView, memoryEntries, starterPrompts } from "../../bots-model";
 import { type ModelList, UNREAD } from "../../reads";
-import { hashForBots, hashForRoutines } from "../../routing";
+import { hashForBots, hashForRoutines, hashForView } from "../../routing";
 import { schedulesWords } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useSuggestions } from "../composer-suggestions";
@@ -258,10 +258,10 @@ function BotDetails({ bot, host, memory, routines, connected }: { bot: Bot; host
 export function BotPage({ bot, memory, routines, hosts, past, lastHosts, models, workspaces, connected }: BotPageProps) {
 	const host = botHost(bot, hosts);
 	const instanceId = host?.instanceId ?? null;
-	const view = useMemo<View | null>(
-		() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : bot.sessionId !== null ? { kind: "past", sessionId: bot.sessionId } : null),
-		[instanceId, bot.sessionId],
-	);
+	const conversation = botView(bot, hosts);
+	// Keyed by its address, since botView builds a new view on each render.
+	const pane = conversation && hashForView(conversation);
+	const view = useMemo(() => conversation, [pane]);
 	const chrome = useMemo<ConversationChrome>(
 		() => ({ placeholder: `Message ${bot.name}`, toolChips: { [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } } }),
 		[bot.name],

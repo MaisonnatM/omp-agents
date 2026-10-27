@@ -8,6 +8,7 @@ import type { DesktopBridge } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import { type Attention, attend, needsYou, unreadShown } from "./attention";
+import { openBotView } from "./bots-model";
 import type { DashboardState } from "./dashboard-state";
 import type { Page } from "./routing";
 import { useStoredState } from "./stored-state";
@@ -69,8 +70,8 @@ export function useAttention(state: DashboardState, page: Page | null, send: (ms
 	}, [hosts]);
 
 	// A maximized pane hides the others, and a page hides them all, but a Bot's page shows its conversation.
-	const botSession = page?.kind === "bots" && page.target !== null ? (state.bots?.find(({ id }) => id === page.target)?.sessionId ?? null) : null;
-	const botInstance = botSession === null ? null : (hosts.find(({ sessionId }) => sessionId === botSession)?.instanceId ?? null);
+	const botConversation = openBotView(page, state.bots, hosts);
+	const botInstance = botConversation?.kind === "live" ? botConversation.instanceId : null;
 	const shown = useMemo<View[]>(
 		() => (botInstance !== null ? [{ kind: "live", instanceId: botInstance, agentId: null }] : page ? NO_VIEWS : layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes),
 		[botInstance, page, layout],

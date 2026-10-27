@@ -1,8 +1,9 @@
-/** What the page shows of a Bot: its avatar's shape and hue, its sidebar row, its running session, the routines that send to it, its memory's lines, and the prompts a new Bot offers. */
+/** What the page shows of a Bot: its avatar's shape and hue, its sidebar row, its running session and conversation, the routines that send to it, its memory's lines, and the prompts a new Bot offers. */
 import type { Routine } from "../src/routines";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
-import type { HostStatus, RosterHost } from "../src/shared/sessions";
+import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { plainMarkdown } from "./labels";
+import type { Page } from "./routing";
 
 /** The shapes a Bot's avatar takes. */
 export const BOT_SHAPES = ["circle", "triangle", "hexagon", "square", "cloud", "diamond", "clover", "pill"] as const;
@@ -22,6 +23,20 @@ export function botLook(id: BotId): { shape: BotShape; hue: number } {
 /** The running session of the Bot's conversation, `null` while none runs. */
 export function botHost(bot: Bot, hosts: readonly RosterHost[]): RosterHost | null {
 	return bot.sessionId === null ? null : (hosts.find(host => host.sessionId === bot.sessionId) ?? null);
+}
+
+/** The Bot's conversation: its running session, else its saved one, `null` before its first message. */
+export function botView(bot: Bot, hosts: readonly RosterHost[]): View | null {
+	const host = botHost(bot, hosts);
+	if (host) return { kind: "live", instanceId: host.instanceId, agentId: null };
+	return bot.sessionId === null ? null : { kind: "past", sessionId: bot.sessionId };
+}
+
+/** The conversation `page` shows: the open Bot's, `null` on another page, on the New Bot form, or for a Bot that is gone. */
+export function openBotView(page: Page | null, bots: readonly Bot[] | null, hosts: readonly RosterHost[]): View | null {
+	if (page?.kind !== "bots" || page.target === null) return null;
+	const bot = bots?.find(({ id }) => id === page.target);
+	return bot ? botView(bot, hosts) : null;
 }
 
 /** A Bot as the sidebar lists it, like a conversation in a messaging app. */

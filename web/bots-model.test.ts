@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Routine } from "../src/routines";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { RosterHost } from "../src/shared/sessions";
-import { botHost, botLook, botRoutines, botRows, jobLine, memoryEntries, starterPrompts } from "./bots-model";
+import { botHost, botLook, botRoutines, botRows, botView, jobLine, memoryEntries, openBotView, starterPrompts } from "./bots-model";
 
 const scout = "scout" as BotId;
 
@@ -33,6 +33,23 @@ describe("Bots", () => {
 		expect(botHost(bot("s1"), hosts)?.instanceId).toBe("7c51f77b");
 		expect(botHost(bot("s2"), hosts)).toBeNull();
 		expect(botHost(bot(null), hosts)).toBeNull();
+	});
+
+	test("the Bot's conversation is its running session, else its saved one, and none before its first message", () => {
+		const hosts = [{ instanceId: "7c51f77b", sessionId: "s1" }] as RosterHost[];
+		expect(botView(bot("s1"), hosts)).toEqual({ kind: "live", instanceId: "7c51f77b", agentId: null });
+		expect(botView(bot("s2"), hosts)).toEqual({ kind: "past", sessionId: "s2" });
+		expect(botView(bot(null), hosts)).toBeNull();
+	});
+
+	test("the open conversation is the open Bot's, and none on another page, on the New Bot form, or for a Bot that is gone", () => {
+		const bots = [bot("s2")];
+		expect(openBotView({ kind: "bots", target: "scout" }, bots, [])).toEqual({ kind: "past", sessionId: "s2" });
+		expect(openBotView({ kind: "bots", target: "ranger" }, bots, [])).toBeNull();
+		expect(openBotView({ kind: "bots", target: null }, bots, [])).toBeNull();
+		expect(openBotView({ kind: "bots", target: "scout" }, null, [])).toBeNull();
+		expect(openBotView({ kind: "routines", target: "scout" }, bots, [])).toBeNull();
+		expect(openBotView(null, bots, [])).toBeNull();
 	});
 
 	test("a Bot's routines are those that message it", () => {
