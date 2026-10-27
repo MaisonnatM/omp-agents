@@ -10,6 +10,7 @@ import { TAB_GROUPS, type TabGroup } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { NoticesBell } from "./notices";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "./segmented-tabs";
+import { WhatsNew } from "./whats-new";
 
 /** The desktop app on macOS hides the system's title bar, so the page draws it, `DesktopTitleBar`, with these controls. */
 export const DESKTOP_TITLE_BAR = typeof window !== "undefined" && window.ompDesktop?.titleBar === true;
@@ -50,6 +51,7 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 					<Search />
 				</Button>
 			</Tooltip>
+			<WhatsNew />
 			<NoticesBell notices={notices} />
 			<Tooltip content={settingsOpen ? "Close settings" : "Settings"} shortcut={shortcutLabels("settings")} side="bottom">
 				<Button

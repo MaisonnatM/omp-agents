@@ -31,7 +31,8 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch 
    If Graphite is configured, run `gt track <branch> -p <parent> --no-interactive -q` and `gt submit --cwd <checkout> --no-edit --no-stack -q` so the PR is registered.
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"thermonuclear", pr:<number>})`.
    A successful `gh pr create` also records this transition.
-4. **Thermonuclear.** Run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
+4. **Thermonuclear.** If the repository commits `.omp/review-paths` and the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"ready_gate"})` and say in one line of the report that the review was skipped and why.
+   Otherwise run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
    Review the actual PR including tests.
    Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once, commit and push.
    Repeat the review if substantial changes invalidate it.
@@ -40,7 +41,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch 
    Add the checkbox only AFTER the fixes are pushed.
    Call `ship_stage({stage:"ready_gate"})`.
 5. **Put live for review.** Show the issue, PR URL, checks, findings and dispositions before promotion.
-   Run `gh pr ready <number>` only after the review checkbox is in the body.
+   Run `gh pr ready <number>` only after the review checkbox is in the body, unless step 4 skipped the review.
    If the body has an unchecked `- [ ] Browser proof` box from the repository's PR template, do what the box and the repository's instructions ask, then check it; the extension blocks on the unchecked box and does not look for a screenshot.
    The extension asks the user for approval and blocks the command if they decline or no UI is available.
    Request the named reviewer, if any, only after promotion succeeds.

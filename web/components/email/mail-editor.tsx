@@ -1,4 +1,4 @@
-/** `MailEditor`: the Inbox's mail composer with recipient chips, subject, and formatted body, showing the draft a `useMailDraft` owns. */
+/** `MailEditor`: the Email page's mail composer with recipient chips, subject, and formatted body, showing the draft a `useMailDraft` owns. */
 import { $generateHtmlFromNodes } from "@lexical/html";
 import { $isLinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
 import { $isListNode, INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from "@lexical/list";

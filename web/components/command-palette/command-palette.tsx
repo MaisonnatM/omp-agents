@@ -84,7 +84,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	todo: PAGE_ICON.todo,
 	notes: PAGE_ICON.notes,
 	calendar: PAGE_ICON.calendar,
-	inbox: PAGE_ICON.inbox,
+	email: PAGE_ICON.email,
 	terminal: SquareTerminal,
 };
 

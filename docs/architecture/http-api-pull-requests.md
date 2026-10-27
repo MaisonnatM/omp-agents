@@ -72,6 +72,8 @@ While fewer than `GRAPHQL_RESERVE` (1000) points are left, those reads ask GitHu
 `GitHubAccess` still pauses every GraphQL call, these and the user's, once GitHub reports the budget spent, and a refusal leaves `remaining` under the reserve, so the gate needs no refusal handling of its own.
 `loadPullRequests` throws either error for the whole list rather than answering a repository with an error, so the page keeps the list it has and shows it as **Cannot refresh pull requests:**, as for any failed refresh, and the merge cleanup skips a look either error stops without logging it.
 Everything a click asks for, a pull request's details, files, pickers, and title, each change and its mutations, and the merge queue's reads for a merge the user queued, runs through `ghGraphql`, below the reserve too, until `GitHubAccess` finds the budget spent.
+GitHub bills a nested connection for every node its parents may return, so the list's query costs 5 points a call: asking each of a search's 100 threads for its first comment made it 125, which at one poll a minute spent the hour's budget down to the reserve on its own.
+The list reads a thread's starter once instead, at a point for each 100 new open threads; check a query's cost with `rateLimit(dryRun: true) { cost }` before polling it.
 
 `GET /api/github-media?url=<HTTPS URL>` reads GitHub images and videos through `src/github-media.ts`.
 The allowlist is `github.com/user-attachments/`, `private-user-images.githubusercontent.com`, `user-images.githubusercontent.com`, and `camo.githubusercontent.com`; credentials, alternate ports, and every other host or scheme are rejected.
@@ -80,6 +82,12 @@ It reads `gh auth token --hostname github.com` only for a `github.com` hop, at m
 Only image and video content types pass, up to 20 MiB streamed under one 15-second deadline, with a five-minute private cache bounded to 32 entries and 40 MiB.
 Upstream cookies and headers do not pass through; responses have `nosniff` and a sandbox CSP.
 A `github.com` upload may redirect once into GitHub's signed upload bucket, `github-production-user-asset-6210df.s3.amazonaws.com`, which gets no token and which no other hop or request may reach.
+
+`GET /api/favicon?host=<host name>` reads a site's icon through `src/favicon.ts` for the changes card's Sources section, so the page's CSP keeps refusing outside images.
+It asks `https://<host>/favicon.ico`, then the first icon the home page's `<link rel="icon">` names, over HTTPS without ports or credentials.
+It refuses IP literals, single-label and local names, and any host or redirect hop whose DNS answers hold a loopback, private, link-local, or multicast address, so a page cannot steer it at this computer or its network.
+Only image types up to 256 KiB pass, and a home page up to 512 KiB, under one 8-second deadline; each host's answer, an icon or none, is cached for a day, up to 256 hosts.
+Responses have `nosniff` and a sandbox CSP; a host with no icon answers 404 and the page shows a globe.
 
 `PUT /api/merge-queue` takes a `MergeQueueChange` from `src/shared/merge-queue.ts`, checked by `parseMergeQueueChange` in `src/server/wire.ts`: `{ op: "add", method, prs }`, one to `MAX_QUEUED_STACK` (20) pull requests in any order, each with the head commit the confirmation showed or `null`, or `{ op: "cancel", id }`.
 It answers a `MergeQueueAnswer`, the queued merges after it, which every socket also hears as a `merges` message, and the pull requests it merged on the way, which `writeMergeQueue` in `web/reads.ts` marks merged in the list at once; a refusal, such as a branch that moved or a pull request already queued, is a 409 with the reason.

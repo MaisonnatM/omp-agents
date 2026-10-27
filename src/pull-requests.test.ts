@@ -2,11 +2,12 @@ import { describe, expect, setSystemTime, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { branchPullRequest, loadPullRequests, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, readBehindBy, repoOf } from "./pull-requests";
+import { branchPullRequest, loadPullRequests, openThreadIds, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, parseStartersAnswer, readBehindBy, repoOf } from "./pull-requests";
 import { runChecked } from "./proc";
 import * as proc from "./proc";
 
 const repo = { owner: "acme", repo: "webapp" };
+const noStarters = new Map<string, boolean>();
 const me = { login: "me", avatarUrl: "https://avatars.example/me" };
 
 
@@ -127,6 +128,7 @@ describe("parseListAnswer", () => {
 				},
 			},
 			repo,
+			noStarters,
 		);
 		expect(prs).toEqual([
 			{
@@ -243,6 +245,7 @@ describe("parseListAnswer", () => {
 				},
 			},
 			repo,
+			noStarters,
 		);
 		expect(pr?.reviewers).toEqual([
 			{ login: "bsaintot", avatarUrl: "https://avatars.example/bsaintot", state: "requested" },
@@ -269,6 +272,7 @@ describe("parseListAnswer", () => {
 				},
 			},
 			repo,
+			noStarters,
 		);
 		expect(prs.map(pr => [pr.number, pr.review])).toEqual([
 			[1, "changes-requested"],
@@ -293,6 +297,7 @@ describe("parseListAnswer", () => {
 				},
 			},
 			repo,
+			noStarters,
 		);
 		expect(prs.map(pr => [pr.number, pr.unresolved])).toEqual([
 			[1, { count: 0, exact: true, bots: 0 }],
@@ -302,37 +307,60 @@ describe("parseListAnswer", () => {
 		]);
 	});
 
-	test("counts the open threads a bot started, by GitHub's type or a `[bot]` login, leaving out resolved ones and threads without a first comment", () => {
-		const thread = (isResolved: boolean, author?: Record<string, unknown>) => ({ isResolved, comments: { nodes: author ? [{ author }] : [] } });
-		const bugbot = { __typename: "Bot", login: "cursor" };
-		const [pr] = parseListAnswer(
-			{
-				data: {
-					authored: {
-						nodes: [
-							node(1, {
-								reviewThreads: {
-									totalCount: 5,
-									nodes: [thread(false, bugbot), thread(false, { __typename: "User", login: "github-actions[bot]" }), thread(false, { __typename: "User", login: "amy" }), thread(true, bugbot), thread(false)],
-								},
-							}),
-						],
-					},
-				},
-			},
-			repo,
-		);
+	test("counts the open threads a bot started, by each thread's id, leaving out resolved ones and threads it has no starter for", () => {
+		const thread = (id: string, isResolved: boolean) => ({ id, isResolved });
+		const answer = { data: { authored: { nodes: [node(1, { reviewThreads: { totalCount: 5, nodes: [thread("a", false), thread("b", false), thread("c", false), thread("d", true), thread("e", false)] } })] } } };
+		const [pr] = parseListAnswer(answer, repo, new Map([["a", true], ["b", true], ["c", false], ["d", true]]));
 		expect(pr?.unresolved).toEqual({ count: 4, exact: true, bots: 2 });
+		expect(openThreadIds(answer)).toEqual(["a", "b", "c", "e"]);
 	});
 
 	test("leaves out a pull request that an open search still returns after it closed", () => {
-		const prs = parseListAnswer({ data: { authored: { nodes: [node(1, { state: "CLOSED" }), node(2, {})] }, reviewing: { nodes: [node(3, { state: "CLOSED" })] } } }, repo);
+		const prs = parseListAnswer({ data: { authored: { nodes: [node(1, { state: "CLOSED" }), node(2, {})] }, reviewing: { nodes: [node(3, { state: "CLOSED" })] } } }, repo, noStarters);
 		expect(prs.map(pr => [pr.number, pr.state])).toEqual([[2, "open"]]);
 	});
 
 	test("an answer without data reports GitHub's errors", () => {
-		expect(() => parseListAnswer({ errors: [{ message: "Could not resolve to a Repository" }] }, repo)).toThrow("Could not resolve to a Repository");
+		expect(() => parseListAnswer({ errors: [{ message: "Could not resolve to a Repository" }] }, repo, noStarters)).toThrow("Could not resolve to a Repository");
 	});
+});
+
+test("parseStartersAnswer tells a bot by GitHub's type or a `[bot]` login, and leaves out a thread without a first comment", () => {
+	const thread = (id: string, author?: Record<string, unknown>) => ({ id, comments: { nodes: author ? [{ author }] : [] } });
+	const answer = { data: { nodes: [thread("a", { __typename: "Bot", login: "cursor" }), thread("b", { __typename: "User", login: "github-actions[bot]" }), thread("c", { __typename: "User", login: "amy" }), thread("d"), null] } };
+	expect(parseStartersAnswer(answer)).toEqual(new Map([["a", true], ["b", true], ["c", false]]));
+});
+
+test("the list reads each open thread's starter from GitHub once, then only the threads it has not seen open", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-pull-requests-"));
+	await runChecked(["git", "init", "-q", dir]);
+	await runChecked(["git", "-C", dir, "remote", "add", "origin", "git@github.com:acme/starters.git"]);
+	let open = ["a", "b"];
+	const asked: string[][] = [];
+	const gh = spyOn(proc, "runJson").mockImplementation(async argv => {
+		if (argv.includes("rate_limit")) return { resources: { graphql: { remaining: 5000, reset: Math.floor(Date.now() / 1000) + 3600 } } };
+		const query = argv.find(arg => arg.startsWith("query=")) ?? "";
+		const ids = query.match(/nodes\(ids: (\[[^\]]*\])/)?.[1];
+		if (ids === undefined) return { data: { authored: { nodes: [node(1, { reviewThreads: { totalCount: open.length, nodes: open.map(id => ({ id, isResolved: false })) } })] } } };
+		const requested: string[] = JSON.parse(ids);
+		asked.push(requested);
+		return { data: { nodes: requested.map(id => ({ id, comments: { nodes: [{ author: { __typename: id === "a" ? "Bot" : "User", login: id } }] } })) } };
+	});
+	const bots = async () => {
+		const [entry] = (await loadPullRequests([dir], true)).repos;
+		return entry && "pullRequests" in entry ? entry.pullRequests[0]?.unresolved : entry;
+	};
+	try {
+		expect(await bots()).toEqual({ count: 2, exact: true, bots: 1 });
+		expect(await bots()).toEqual({ count: 2, exact: true, bots: 1 });
+		open = ["a", "c"];
+		expect(await bots()).toEqual({ count: 2, exact: true, bots: 1 });
+		expect(asked).toEqual([["a", "b"], ["c"]]);
+		expect(gh.mock.calls.find(([argv]) => argv.some(arg => arg.includes("search(")))?.[0].find(arg => arg.startsWith("query="))).not.toContain("comments(first");
+	} finally {
+		gh.mockRestore();
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 describe("parseDetailAnswer", () => {

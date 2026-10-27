@@ -34,9 +34,9 @@ Read the stack with `gt log short --stack`; `gt log` and `gt state` print every 
 ## Create drafts before publishing
 
 Create the PR as a draft with `gt submit --draft` when Graphite is configured, or `gh pr create --draft` otherwise.
-The ship extension blocks publication until a thermonuclear review is applied and pushed.
-Run the thermonuclear stage, commit and push its fixes, then add `- [x] Thermo-nuclear code quality review` to the PR body.
-Follow `~/.omp/agent/docs/review-workflow.md` for the review and checkbox rules.
+The ship extension blocks publication until a thermonuclear review is applied and pushed, unless the repository commits `.omp/review-paths` and the PR changes no file its globs match.
+When the review applies, run the thermonuclear stage, commit and push its fixes, then add `- [x] Thermo-nuclear code quality review` to the PR body.
+Follow `~/.omp/agent/docs/review-workflow.md` for when the review applies and for the review and checkbox rules.
 The extension also blocks while the body has an unchecked `- [ ] Browser proof` box, which yampa's PR template declares.
 For a change under `front/components/` or `front/app/`, run the verify-yampa skill, attach a screenshot of the changed UI with `gh pr edit <N> --attach`, then check the box; otherwise delete the line.
 The extension checks the box, not the screenshot.

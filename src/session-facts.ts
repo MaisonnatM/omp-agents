@@ -84,10 +84,11 @@ const isShipWork = oneOf(SHIP_WORK);
 /**
  * One pull request a transcript links to. `number` is a PR in the session's own repository, the one `origin`
  * names in its working directory. `branch` is a branch a push updated or a submit submitted; it links to the PR whose head it is.
+ * `named` marks a PR the session's own prompt links or names, as opposed to one a call worked on.
  */
 export type PullRequestRef =
-	| ({ kind: "pr"; link: PullRequestLink } & PullRequest)
-	| { kind: "number"; number: number }
+	| ({ kind: "pr"; link: PullRequestLink; named?: true } & PullRequest)
+	| { kind: "number"; number: number; named?: true }
 	| ({ kind: "branch"; branch: string; link: PullRequestLink } & Repo);
 
 /**
@@ -334,7 +335,7 @@ export class SessionFactsScan {
 
 	/** The session's own prompt: a PR or Linear issue it links is work on it, and a PR number or issue identifier it writes names one. */
 	#prompt(text: string): void {
-		for (const [, owner, repo, number] of text.matchAll(PR_URL)) this.#add({ kind: "pr", link: "worked", owner: owner!, repo: repo!, number: Number(number) });
+		for (const [, owner, repo, number] of text.matchAll(PR_URL)) this.#add({ kind: "pr", link: "worked", named: true, owner: owner!, repo: repo!, number: Number(number) });
 		for (const [, written, hashed] of text.matchAll(PR_NUMBER)) this.named.add(Number(written ?? hashed));
 		for (const [, id] of text.matchAll(LINEAR_URL)) this.#ticket(id!, "worked");
 		for (const [id] of text.matchAll(TICKET_TOKEN)) this.#ticket(id, "named");
@@ -383,20 +384,23 @@ export class SessionFactsScan {
 		if (expected?.pushed) for (const ref of pushedBranches(text)) this.#add(ref);
 	}
 
-	/** A submission outranks work on the same PR, and keeps the place the work had. */
+	/** A submission outranks work on the same PR, and work outranks the prompt naming it; either keeps the place the first had. */
 	#add(ref: FoundRef): void {
 		const key = refKey(ref);
 		const known = this.found.get(key);
-		if (!known || (ref.kind === "pr" && ref.link === "submitted" && known.kind === "pr" && known.link === "worked")) this.found.set(key, ref);
+		if (!known || (ref.kind === "pr" && known.kind === "pr" && ((ref.link === "submitted" && known.link === "worked") || (known.named && !ref.named)))) this.found.set(key, ref);
 	}
 }
 
 /**
- * The pull requests `refs` name, each once, in order; a submission outranks work on the same PR. A bare number
- * needs the session's `repo`, and a branch needs `heads`, the listed PRs by `owner/repo:branch`.
+ * The pull requests `refs` name, each once; a submission outranks work on the same PR. Those a call worked on come
+ * before those the session's prompt only names, each in the order found, so the session details sidebar first shows
+ * a PR the session opened over one its prompt links. A bare number needs the session's `repo`, and a branch needs
+ * `heads`, the listed PRs by `owner/repo:branch`.
  */
 export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, heads: ReadonlyMap<string, PullRequest>): LinkedPullRequest[] {
 	const linked = new Map<string, LinkedPullRequest>();
+	const worked = new Set<string>();
 	for (const ref of refs) {
 		let pr: LinkedPullRequest | null = null;
 		if (ref.kind === "pr") pr = { owner: ref.owner, repo: ref.repo, number: ref.number, link: ref.link };
@@ -407,11 +411,13 @@ export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, 
 		}
 		if (!pr) continue;
 		const key = prKey(pr);
+		if (ref.kind === "branch" || !ref.named) worked.add(key);
 		const known = linked.get(key);
 		if (!known) linked.set(key, pr);
 		else if (pr.link === "submitted") known.link = "submitted";
 	}
-	return [...linked.values()];
+	const all = [...linked];
+	return [...all.filter(([key]) => worked.has(key)), ...all.filter(([key]) => !worked.has(key))].map(([, pr]) => pr);
 }
 
 /**
@@ -685,8 +691,8 @@ export class SessionFactsIndex {
 			}
 			if (ref.kind !== "read") return [ref];
 			if (!session.named.has(ref.number)) return [];
-			if (!ref.repository) return [{ kind: "number", number: ref.number }];
-			return repo && repoKey(ref.repository) === repoKey(repo) ? [{ kind: "pr", link: "worked", ...ref.repository, number: ref.number }] : [];
+			if (!ref.repository) return [{ kind: "number", number: ref.number, named: true }];
+			return repo && repoKey(ref.repository) === repoKey(repo) ? [{ kind: "pr", link: "worked", named: true, ...ref.repository, number: ref.number }] : [];
 		});
 		const pullRequests = resolveLinks(repo && linking ? [...refs, { kind: "branch", ...repo, branch: linking, link: "worked" }] : refs, repo, this.#heads);
 		const before = session.pullRequests;

@@ -8,7 +8,7 @@ A key never holds a title, a path, a session id, or anything the user typed; the
 
 `web/activity.ts` holds the recorder, which `web/use-dashboard.ts` installs once per page load under a fresh client id from `crypto.randomUUID()`.
 
-- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, or `inbox/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
+- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, or `email/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
   `viewOf` returns a `ViewKey`, so a view missing from `VIEWS` is a type error, and the hook records it whenever it changes.
 - A **command** is a shortcut that took its key, recorded in `dispatch` in `web/shortcuts.ts` with `via: "keyboard"`, or a palette command, recorded in `web/components/command-palette/command-palette.tsx` with `via: "palette"`.
   Its key is the shortcut id in kebab case, `newSession` as `new-session`, so both channels share one key.
@@ -34,6 +34,7 @@ A page load resends what an earlier one left under that load's own client id and
 ## Storage
 
 `src/server/activity-store.ts` keeps the events in `activity.db` in the dashboard's data directory, a SQLite table keyed by client id and sequence, so a batch sent twice is stored once.
+Opening the store once renames the old Inbox page's `inbox` views and commands to their `email` keys, in a transaction that sets SQLite's `user_version` to 1, so it never runs again and rows a later page stores under `inbox` keep their keys.
 Only the server holding `server.lock` stores events; another server, such as a smoke server on your state, acknowledges a batch and drops it.
 That server prunes rows older than 400 days at start and once a day.
 Deleting `activity.db` while the server is stopped clears the history; settings sync never carries it.
@@ -48,7 +49,7 @@ A visit starts after 30 minutes without use or on a new local day.
 `web/activity-report.ts` builds the inventory from `VIEWS`, `SETTINGS_SECTIONS`, `SHORTCUTS`, `CONTROLS`, `ACTION_MESSAGES`, and the server's `PUT` routes.
 It splits it into used, rarely used (once or twice), never used, and not set up, and lists the 20 most used.
 A feature is not set up while its tab is one `useSidebarTabs` reports signed out, which is every integration tab until the integrations answer.
-The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab; the Inbox views, the Inbox commands, and the `/api/gmail/` routes go with the Inbox tab.
+The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab; the Email views, the Email commands, and the `/api/gmail/` routes go with the Email tab.
 
 ## Coverage
 
@@ -61,7 +62,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Composer | action | `prompt` (sent, steered, or queued), `edit-prompt` |
 | Composer's directory, branch, and context ring | control, command, action | `composer.directory`, `composer.branch`, `composer.context-ring`; command `directory`; a move sends action `prompt` (`/move`) |
 | Rows above the composer | control, action | `composer-queue.send-now`, `composer-queue.edit`, `composer-queue.remove`, `composer-suggestions.pick`, `composer-suggestions.send-all`; actions `dequeue`, `promote`, `prompt`, `schedule`, `answer` |
-| Changes card (Files and Images sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.image.to-ticket`; sending images is a `PUT` |
+| Changes card (Files, Images, and Sources sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.sources.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.image.to-ticket`, `changes-card.source`; sending images is a `PUT` |
 | `/` and `@` menus | control | `completion.pick` (a click; picking by keyboard records nothing) |
 | Model and thinking switch | control, command, action | `composer.model`; command `model`; actions `set-model`, `set-thinking`, `set-fast` |
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `replay-compare.open`; dragging the divider is not observed |
@@ -82,7 +83,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Ask about this and the discussion panel | control, action | `ask-about.open`, `discussion.close`; actions `discuss`, `discuss-stop`; Send to session is action `prompt` |
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |
-| Dev and Ops switch, command menu button, notification bell, and Settings button | control, command | `header.group`; `header.command-menu`, which opens the command palette as command `switcher` does; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `header.settings`, which opens or closes Settings as command `settings` does; `header.back` and `header.forward`, the title bar's Back and Forward, which go back and forward as commands `back` and `forward` do |
+| Dev and Ops switch, command menu button, What's new, notification bell, and Settings button | control, command | `header.group`; `header.command-menu`, which opens the command palette as command `switcher` does; `header.whats-new`, which opens What's new; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `header.settings`, which opens or closes Settings as command `settings` does; `header.back` and `header.forward`, the title bar's Back and Forward, which go back and forward as commands `back` and `forward` do |
 | System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switch in Settings › Preferences is action `preference` |
 | Pages: New session | view | `new` |
 | Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view.list`, `pull-requests.view.board`; Rebase N behind is a `PUT` |
@@ -90,7 +91,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Todo | view | `todo`, `todo/item` |
 | Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
-| Pages: Inbox | view | `inbox`, `inbox/new`, `inbox/item` |
+| Pages: Email | view | `email`, `email/new`, `email/item` |
 | Pages: Bots | view, control, action | `bots`, `bots/item`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.routine.new`; `bot` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |

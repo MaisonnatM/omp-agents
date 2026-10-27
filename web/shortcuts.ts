@@ -43,7 +43,7 @@ export type ShortcutId =
 	| "todo"
 	| "notes"
 	| "calendar"
-	| "inbox"
+	| "email"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -69,14 +69,14 @@ export type ShortcutId =
 	| "notesNew"
 	| "notesClose"
 	| "calendarNewEvent"
-	| "inboxNext"
-	| "inboxPrevious"
-	| "inboxClose"
-	| "inboxOnGmail"
-	| "inboxReply"
-	| "inboxReplyAll"
-	| "inboxTrash"
-	| "inboxCompose"
+	| "emailNext"
+	| "emailPrevious"
+	| "emailClose"
+	| "emailOnGmail"
+	| "emailReply"
+	| "emailReplyAll"
+	| "emailTrash"
+	| "emailCompose"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
@@ -116,7 +116,7 @@ export const SHORTCUT_CATEGORIES = [
 	{ id: "pull-requests", label: "Pull requests" },
 	{ id: "todo", label: "Todo" },
 	{ id: "notes", label: "Notes" },
-	{ id: "inbox", label: "Inbox" },
+	{ id: "email", label: "Email" },
 	{ id: "calendar", label: "Calendar" },
 	{ id: "changes", label: "Changes" },
 ] as const;
@@ -239,14 +239,14 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
-	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Notes, Calendar, and Inbox pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Notes, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] },
 	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
 	{ id: "notes", category: "general", label: "Go to your notes", command: "Go to notes", keys: [{ goTo: "n" }] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
-	{ id: "inbox", category: "general", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
+	{ id: "email", category: "general", label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
@@ -277,14 +277,14 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "notesNew", category: "notes", label: "Add a note and open it", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "notesClose", category: "notes", label: "Close the open note", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "calendarNewEvent", category: "calendar", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "inboxNext", category: "inbox", label: "Inbox: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "inboxPrevious", category: "inbox", label: "Inbox: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "inboxClose", category: "inbox", label: "Inbox: close the open conversation", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "inboxOnGmail", category: "inbox", label: "Inbox: open the focused or open conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
-	{ id: "inboxReply", category: "inbox", label: "Inbox: reply to the open conversation's last message", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
-	{ id: "inboxReplyAll", category: "inbox", label: "Inbox: reply to everyone on the open conversation's last message", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
-	{ id: "inboxTrash", category: "inbox", label: "Inbox: move the open conversation to Gmail's Trash", keys: [{ chord: { key: "#" }, scope: "outside-fields" }] },
-	{ id: "inboxCompose", category: "inbox", label: "Inbox: write a new mail", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "emailNext", category: "email", label: "Email: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
+	{ id: "emailPrevious", category: "email", label: "Email: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{ id: "emailClose", category: "email", label: "Email: close the open conversation", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{ id: "emailOnGmail", category: "email", label: "Email: open the focused or open conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
+	{ id: "emailReply", category: "email", label: "Email: reply to the open conversation's last message", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
+	{ id: "emailReplyAll", category: "email", label: "Email: reply to everyone on the open conversation's last message", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
+	{ id: "emailTrash", category: "email", label: "Email: move the open conversation to Gmail's Trash", keys: [{ chord: { key: "#" }, scope: "outside-fields" }] },
+	{ id: "emailCompose", category: "email", label: "Email: write a new mail", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
@@ -389,7 +389,7 @@ for (const { id, keys } of SHORTCUTS) {
 	LABELS[id] = keys.map(bindingLabel);
 }
 
-/** Every key that runs `id`: `[{ goTo: "i" }]`. */
+/** Every key that runs `id`: `[{ goTo: "m" }]`. */
 export const shortcutBindings = (id: ShortcutId): readonly Binding[] => KEYS[id];
 
 /** Every key that runs `id`, one label each, as a tooltip's chips draw them: `["⌘/", "?"]`. */

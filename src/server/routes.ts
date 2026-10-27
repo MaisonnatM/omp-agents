@@ -7,6 +7,7 @@ import type { Server } from "bun";
 import { join } from "node:path";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
+import { readFavicon } from "../favicon";
 import { readGithubMedia } from "../github-media";
 import { errorText, type Parsed } from "../json";
 import { listSkills } from "../commands";
@@ -63,7 +64,7 @@ import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
-import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
+import type { DashboardChangelog, DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
 import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
@@ -120,6 +121,7 @@ export interface DashboardRoutesEnv {
 	build: ServedBuild;
 	status(): Promise<DashboardUpdateStatus>;
 	update(): Promise<DashboardUpdateOutcome>;
+	changelog(): Promise<DashboardChangelog>;
 }
 
 /** What the settings sync routes read and run: Settings › Sync. */
@@ -599,17 +601,17 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 	};
 }
 
-/** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Inbox page sends. */
+/** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Email page sends. */
 function gmailRoutes({ get, media, write }: RouteKit, gmail: GmailAccounts): Routes {
 	/** `GET /api/gmail/inbox[?fresh]`: each signed-in account and their inboxes' latest conversations, newest first. */
 	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
-	/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
+	/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: that conversation in full, for the Email page's details. */
 	const thread = get(params => {
 		const account = params.get("account");
 		const id = params.get("id");
 		return account && id ? answer(() => gmail.thread(account, id, params.has("fresh"))) : fail(400, "Expected ?account= and ?id= naming a Gmail conversation");
 	});
-	/** `GET /api/gmail/message?account=<account>&thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Inbox page frames. */
+	/** `GET /api/gmail/message?account=<account>&thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Email page frames. */
 	const message = media(async params => {
 		const account = params.get("account");
 		const threadId = params.get("thread");
@@ -665,6 +667,8 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 
 	/** Images and videos hosted by GitHub; the proxy restricts hosts and keeps the GitHub token off redirected hosts. */
 	const githubMedia = media(params => readGithubMedia(params.get("url")));
+	/** The icons of the sites the changes card's sources name; the proxy asks public HTTPS hosts only. */
+	const favicon = media(params => readFavicon(params.get("host")));
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
@@ -774,6 +778,7 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/github-media": { GET: githubMedia },
+		"/api/favicon": { GET: favicon },
 		"/api/pull-request/attachment": { PUT: pullRequestAttach },
 		"/api/pull-request/checkout": { PUT: pullRequestCheckout },
 		"/api/pull-request/rebase": { PUT: pullRequestRebase },
@@ -925,6 +930,8 @@ function dashboardRoutes({ get, write }: RouteKit, env: DashboardRoutesEnv): Rou
 			GET: get(() => answer(() => env.status())),
 			PUT: write(() => null, () => env.update(), err => (err instanceof UpdateRefused ? fail(409, err.message) : null)),
 		},
+		/** Settings › What's new: `DashboardChangelog`, read from the checkout without asking origin. */
+		"/api/dashboard/changelog": { GET: get(() => answer(() => env.changelog())) },
 	};
 }
 

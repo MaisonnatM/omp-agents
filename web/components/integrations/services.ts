@@ -29,7 +29,7 @@ export const SERVICES: Record<McpIntegrationId, Service> = {
 	},
 	gmail: {
 		logo: GMAIL_LOGO,
-		gives: "Your accounts' inboxes on the Inbox tab, with replies and Delete, and each account's Gmail tools in every omp session.",
+		gives: "Your accounts' inboxes on the Email tab, with replies and Delete, and each account's Gmail tools in every omp session.",
 		client: "Your Google OAuth client",
 	},
 };

@@ -315,7 +315,7 @@ await answer(1, "after a reply");
 console.log(JSON.stringify({ urls: requests.map(({ url }) => url), seen: seen.map(state => JSON.parse(state)) }));
 `;
 
-test("a conversation is read once and again when the inbox lists a later message arrival", async () => {
+test("a conversation is read once and again when the Email page lists a later message arrival", async () => {
 	const child = Bun.spawn([process.execPath, "--eval", mailThreadScenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
 	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });

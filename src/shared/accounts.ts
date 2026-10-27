@@ -134,7 +134,7 @@ export type ClientService = { [K in McpIntegrationId]: ClientOf<K> extends "none
 /**
  * What each Google sign-in asks for. Google Calendar: events, to read them here and let omp sessions write them, the
  * calendar list, to know which calendars you show, and free/busy, which the MCP server's scheduling tool reads.
- * Gmail: reading your mail, for the Inbox page, and sending replies and moving conversations to Trash from it; it cannot delete mail for good.
+ * Gmail: reading your mail, for the Email page, and sending replies and moving conversations to Trash from it; it cannot delete mail for good.
  */
 export const GOOGLE_SCOPES: Record<GoogleService, readonly string[]> = {
 	"google-calendar": [
@@ -218,7 +218,7 @@ export const serverConnection = ({ name, url }: { name: string; url: string }, s
 	server: { name, url, host: new URL(url).host },
 });
 
-/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Inbox, shows. */
+/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Email, shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";
 
 /** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */

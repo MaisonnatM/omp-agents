@@ -13,7 +13,7 @@ import type { StartOf } from "../starts";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
-import { InboxPage } from "./inbox/inbox-page";
+import { EmailPage } from "./email/email-page";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
@@ -213,8 +213,8 @@ export const PageSwitch = memo(function PageSwitch({
 		}
 		case "calendar":
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
-		case "inbox":
-			return <InboxPage target={page.target} workspace={workspace} />;
+		case "email":
+			return <EmailPage target={page.target} workspace={workspace} />;
 		case undefined:
 			if (layout.panes.length > 0) {
 				return (

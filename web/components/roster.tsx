@@ -28,7 +28,7 @@ import { BotsNav } from "./bots/bots-nav";
 import type { BotRow } from "../bots-model";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav } from "./calendar/calendar-nav";
-import { InboxNav } from "./inbox/inbox-nav";
+import { EmailNav } from "./email/email-nav";
 import { NotesNav } from "./notes/nav";
 import { SessionList } from "./session-list";
 import { SettingsNav } from "./settings/settings-nav";
@@ -306,9 +306,9 @@ export function Roster({
 					<CalendarNav open={calendarOpen} workspace={workspace} />
 				</SidebarContent>
 			</TabPanel>
-			<TabPanel value="inbox" asChild>
+			<TabPanel value="email" asChild>
 				<SidebarContent>
-					<InboxNav workspace={workspace} />
+					<EmailNav workspace={workspace} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="settings" asChild>

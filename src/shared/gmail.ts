@@ -1,8 +1,8 @@
-/** The Inbox page's mail: the latest conversations of your Gmail inbox, one conversation in full, and the mail and trashing it sends. */
+/** The Email page's mail: the latest conversations of your Gmail inbox, one conversation in full, and the mail and trashing it sends. */
 import { arrayOf, decoder, fields, isBoolean, isNumber, isString, nullable } from "../json";
 import type { AccountId } from "./accounts";
 
-/** One conversation in your Gmail inbox, as the Inbox page lists it. */
+/** One conversation in your Gmail inbox, as the Email page lists it. */
 export interface MailThread {
 	/** The Gmail account whose inbox holds it. */
 	account: AccountId;
@@ -19,26 +19,26 @@ export interface MailThread {
 	unread: boolean;
 	/** How many messages it holds, drafts left out. */
 	count: number;
-	/** The thread in Gmail, signed in as the inbox's address. */
+	/** The thread in Gmail, signed in as its account's address. */
 	url: string;
 }
 
-/** One Gmail account the inbox read, and why its read failed, `null` when it worked; its address is its integration account's. */
-export interface InboxAccount {
+/** One Gmail account whose inbox was read, and why its read failed, `null` when it worked; its address is its integration account's. */
+export interface EmailAccount {
 	account: AccountId;
 	error: string | null;
 }
 
 /** `GET /api/gmail/inbox[?fresh]`: each signed-in Gmail account and the latest conversations of their inboxes, newest first. */
-export interface InboxAnswer {
-	accounts: InboxAccount[];
+export interface EmailAnswer {
+	accounts: EmailAccount[];
 	threads: MailThread[];
 }
 
-/** A kept {@link InboxAnswer} with every account and conversation whole, or `null`. */
-export const decodeInboxAnswer = decoder(
-	fields<InboxAnswer>({
-		accounts: arrayOf(fields<InboxAccount>({ account: isString, error: nullable(isString) })),
+/** A kept {@link EmailAnswer} with every account and conversation whole, or `null`. */
+export const decodeEmailAnswer = decoder(
+	fields<EmailAnswer>({
+		accounts: arrayOf(fields<EmailAccount>({ account: isString, error: nullable(isString) })),
 		threads: arrayOf(
 			fields<MailThread>({
 				account: isString,
@@ -80,7 +80,7 @@ export interface MailAttachment {
 	size: number;
 }
 
-/** One message of a conversation, drafts left out, as the Inbox page's details show it. */
+/** One message of a conversation, drafts left out, as the Email page's details show it. */
 export interface MailMessage {
 	id: string;
 	/** The first person the `From` header names; an empty name and address when it names none. */
@@ -104,7 +104,7 @@ export interface ThreadAnswer {
 	id: string;
 	/** The first message's subject; `""` when it has none. */
 	subject: string;
-	/** The conversation in Gmail, signed in as the inbox's address. */
+	/** The conversation in Gmail, signed in as its account's address. */
 	url: string;
 	/** Its messages, oldest first. */
 	messages: MailMessage[];
@@ -113,7 +113,7 @@ export interface ThreadAnswer {
 /** The longest body, as text or as HTML, that a sent mail carries, in characters. */
 export const MAX_MAIL_BODY = 500_000;
 
-/** A mail as the Inbox page's editor writes it: whom it goes to, its subject, and its body as HTML and as plain text. */
+/** A mail as the Email page's editor writes it: whom it goes to, its subject, and its body as HTML and as plain text. */
 export interface MailDraft {
 	to: MailPerson[];
 	cc: MailPerson[];

@@ -153,7 +153,7 @@ const CATEGORIES: readonly Category[] = [
 	source({
 		id: "mail",
 		prefix: "mail",
-		title: "Inbox",
+		title: "Email",
 		icon: Mail,
 		list: ({ threads }) =>
 			threads.map(thread => {

@@ -66,7 +66,7 @@ export function DetailBar({ leading, previous, next, children, close }: { leadin
 	);
 }
 
-/** Chevron icons for {@link DetailBar} `previous` and `next`; the inbox and the todo use them. */
+/** Chevron icons for {@link DetailBar} `previous` and `next`; the Email and Todo pages use them. */
 export const CH_PREVIOUS: BarAction["icon"] = <ChevronUp />;
 export const CH_NEXT: BarAction["icon"] = <ChevronDown />;
 export const CH_CLOSE: BarAction["icon"] = <X />;

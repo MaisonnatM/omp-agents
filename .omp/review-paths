@@ -1,0 +1,24 @@
+# A pull request touching a file these globs match needs the thermonuclear review; see templates/omp/agent/APPEND_SYSTEM.md.
+.omp/review-paths
+
+# Shared contracts between the server, the page, and transports.
+src/shared/protocol.ts
+src/shared/sessions.ts
+src/live-session.ts
+src/omp/modules.ts
+
+# Central server and page files.
+src/server/wire.ts
+src/server/socket.ts
+src/server/dashboard.ts
+src/server/live-sessions.ts
+src/server/session-files.ts
+web/use-dashboard.ts
+
+# The starter kit's installer, gates, and system prompt.
+templates/omp/install.ts
+templates/omp/agent/extensions/**
+templates/omp/agent/APPEND_SYSTEM.md
+
+# The desktop app.
+desktop/**

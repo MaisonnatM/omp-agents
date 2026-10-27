@@ -1,5 +1,5 @@
 /**
- * A Gmail message's HTML as a document of its own, which the Inbox page frames by its address. A frame's `srcdoc` would
+ * A Gmail message's HTML as a document of its own, which the Email page frames by its address. A frame's `srcdoc` would
  * inherit the page's policy, whose `img-src` no message can widen, so its images would never load; this document
  * carries its own policy in a header instead.
  */

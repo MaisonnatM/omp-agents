@@ -1,15 +1,15 @@
-# Inbox
+# Email
 
-- The **Inbox** tab, G then I, or an `#inbox` address shows the latest 50 conversations of each Gmail inbox the sidebar's workspace shows, merged newest first, in place of the panes.
+- The **Email** tab, G then M, or an `#email` address shows the latest 50 conversations of each Gmail inbox the sidebar's workspace shows, merged newest first, in place of the panes.
   The tab and its shortcut show only once a Gmail account is connected in **Settings › Integrations**; see [Integrations](integrations.md).
   The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread; with several accounts it shows **All inboxes** and a row for each address, each with its unread count, and picking one narrows the list to that account and leaves an open conversation open, a choice the app keeps.
   While the workspace shows one account, the list shows it whatever was picked, and the pick comes back in a workspace that shows that account among others.
   While the list holds several accounts, each conversation is tagged with its inbox's address, and a new mail picks the address it is sent **From**.
-  A conversation opens at `#inbox/<account>/<thread id>`, and opening such an address while the picker narrows to another account picks the conversation's own; an account that cannot be read says why above the list while the others still show.
+  A conversation opens at `#email/<account>/<thread id>`, and opening such an address while the picker narrows to another account picks the conversation's own; an account that cannot be read says why above the list while the others still show.
 - Each row shows, on three lines, who sent the conversation's last message, how many messages it holds when more than one, and when its last message arrived: the time today, the day earlier this year, and the full date before; then its subject; then a snippet.
   An unread conversation's sender and subject are bold, with a blue dot before them, and the header counts them beside your address.
-- Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at its `#inbox/<account>/<thread id>` address; its row shows selected, with a bar on its left edge.
-  Arriving at the page, from the **Inbox** tab, G then I, or the Inbox's number, opens the newest conversation.
+- Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at its `#email/<account>/<thread id>` address; its row shows selected, with a bar on its left edge.
+  Arriving at the page, from the **Email** tab, G then M, or the Email tab's number, opens the newest conversation.
   Closing it leaves the list with nothing open, and the panel then says how to open one.
   Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.
   With no conversation open, ↓ and ↑ outside text fields focus the next and previous row, and O opens the focused row's conversation in Gmail in your default browser, signed in as the inbox's address.
@@ -39,7 +39,7 @@
   Cmd+Enter or **Send** sends the mail as HTML with a plain text copy, in the conversation, which then shows in the conversation and the list.
   While it sends, the editor shows **Sending…** and takes no edit, so what you see is what goes; a failed send reopens it as it was, with **Cannot send** and why, and a mail Gmail took stays sent and closes the editor even when the app cannot forget its draft.
   Esc closes the editor and keeps the draft in the app, per conversation, until you reopen it, as long as anything in it differs from how it began, recipients included; **Discard draft** drops it.
-- **Compose**, in the header, or C outside text fields, opens a new mail at `#inbox/new` in the panel, in the same editor, with a **Subject** row, focused on **To**; it keeps its draft the same way, and sending it goes back to the list.
+- **Compose**, in the header, or C outside text fields, opens a new mail at `#email/new` in the panel, in the same editor, with a **Subject** row, focused on **To**; it keeps its draft the same way, and sending it goes back to the list.
 - **Delete**, or #, moves the conversation to Gmail's Trash, where Gmail keeps it 30 days, with no confirmation, and opens the next conversation of the list, else the previous one.
 - The page never labels a conversation or marks it read, so opening one here leaves it unread, in Gmail and in the list, until you read it in Gmail.
 - The page reads Gmail again every minute while it is open, and **Refresh** asks Gmail at once; the server keeps each read for a minute.

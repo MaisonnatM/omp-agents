@@ -2,7 +2,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { CompletionItem, View, WithdrawnMessage } from "../src/shared/sessions";
 import type { Turn } from "../src/shared/trajectory";
-import { type AgentMedia, type ChangedFile, type Item, newestMediaFirst } from "../src/shared/transcript";
+import { type AgentMedia, type AgentSource, type ChangedFile, type Item, newestMediaFirst } from "../src/shared/transcript";
 import { applyDelta } from "./keyed-list";
 import { keyedStore } from "./keyed-store";
 import { hashForView } from "./routing";
@@ -26,6 +26,8 @@ export interface PaneData {
 	files: ChangedFile[] | null;
 	/** The images its agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
 	media: AgentMedia[] | null;
+	/** The web pages and remote items its agent's and its subagents' tools opened, oldest first; `null` until the server sends them. */
+	sources: AgentSource[] | null;
 	/** The view's turns while its Trajectory shows; `null` until the server sends them. */
 	turns: Turn[] | null;
 }
@@ -33,7 +35,7 @@ export interface PaneData {
 /** The part of a view's data its composer reads: the server's last answers to its `complete`, `dequeue`, and `interrupt`. */
 export type ComposerData = Pick<PaneData, "completions" | "withdrawn">;
 
-export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, withdrawn: null, files: null, media: null, turns: null };
+export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, withdrawn: null, files: null, media: null, sources: null, turns: null };
 
 /** The server messages that belong to one open view: its transcript, its changed files, its images, its turns, its composer's suggestions, and the queued messages it took back. */
 export type PaneMsg =
@@ -77,7 +79,11 @@ export function applyPaneMessage(msg: PaneMsg): void {
 			panes.set(key, { ...pane, files: applyDelta(pane.files ?? [], msg.reset, msg.files, file => file.path, []) });
 			break;
 		case "media":
-			panes.set(key, { ...pane, media: msg.reset ? msg.media : [...(pane.media ?? []), ...msg.media].sort(newestMediaFirst) });
+			panes.set(key, {
+				...pane,
+				media: msg.reset ? msg.media : msg.media.length > 0 ? [...(pane.media ?? []), ...msg.media].sort(newestMediaFirst) : pane.media,
+				sources: msg.reset ? msg.sources : msg.sources.length > 0 ? [...(pane.sources ?? []), ...msg.sources].sort((a, b) => a.at - b.at) : pane.sources,
+			});
 			break;
 		case "turns":
 			if (trajectories.has(key)) panes.set(key, { ...pane, turns: applyDelta(pane.turns ?? [], msg.reset, msg.turns, turn => turn.id, []) });
@@ -107,6 +113,7 @@ const itemsOf = (pane: PaneData): Item[] => pane.items;
 const loadedOf = (pane: PaneData): boolean => pane.loaded;
 const filesOf = (pane: PaneData): ChangedFile[] | null => pane.files;
 const mediaOf = (pane: PaneData): AgentMedia[] | null => pane.media;
+const sourcesOf = (pane: PaneData): AgentSource[] | null => pane.sources;
 const turnsOf = (pane: PaneData): Turn[] | null => pane.turns;
 const composerOf = ({ completions, withdrawn }: PaneData): ComposerData => ({ completions, withdrawn });
 const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.withdrawn === b.withdrawn;
@@ -123,6 +130,9 @@ export const useChangedFiles = (view: View): ChangedFile[] | null => usePaneSele
 
 /** The images `view`'s agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
 export const useMedia = (view: View): AgentMedia[] | null => usePaneSelect(view, mediaOf);
+
+/** The web pages and remote items `view`'s agent's and its subagents' tools opened, oldest first; `null` until the server sends them. */
+export const useSources = (view: View): AgentSource[] | null => usePaneSelect(view, sourcesOf);
 
 /** `view`'s turns, in order; `null` until the server sends them. */
 export const useTurns = (view: View): Turn[] | null => usePaneSelect(view, turnsOf);

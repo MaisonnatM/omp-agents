@@ -29,10 +29,10 @@ export const SIDEBAR_TABS = [
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, group: "dev" },
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, group: "ops" },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, group: "ops" },
-	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox, group: "ops", integration: "gmail" },
+	{ value: "email", label: "Email", icon: PAGE_ICON.email, group: "ops", integration: "gmail" },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: TabGroup; integration?: McpIntegrationId }[];
 
-/** A tab of the sidebar's bar; the tickets, Bots, todo, notes, calendar, and inbox tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A tab of the sidebar's bar; the tickets, Bots, todo, notes, calendar, and email tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** What the sidebar shows: a tab's panel, or the settings sections while the Settings page is open. */
@@ -53,16 +53,16 @@ export interface TicketsRoute {
 }
 
 /** A Gmail conversation, by the account whose inbox holds it and its thread id. */
-export interface InboxThread {
+export interface EmailThread {
 	/** The account's server name in omp's config: `gmail`, `gmail-2`. */
 	account: string;
 	/** Gmail's thread id: `18f2a3c4d5e6f708`. */
 	thread: string;
 }
 
-/** The Inbox list, beside the Gmail conversation `target` names, or the new mail when it is `new`. */
-export interface InboxRoute {
-	target: InboxThread | "new" | null;
+/** The Email page's list, beside the Gmail conversation `target` names, or the new mail when it is `new`. */
+export interface EmailRoute {
+	target: EmailThread | "new" | null;
 }
 
 /**
@@ -137,7 +137,7 @@ export type Page =
 	| ({ kind: "notes" } & NotesRoute)
 	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "calendar" }
-	| ({ kind: "inbox" } & InboxRoute)
+	| ({ kind: "email" } & EmailRoute)
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "scheduled" } & ScheduledRoute);
 
@@ -185,8 +185,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
  * - `#bots` opens the New Bot form, `#bots/<id>` that Bot's page, and `#bots/<id>/routines/<routine id>` the settings and runs of that Bot's routine.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
- * - `#inbox` opens the Inbox page, your Gmail inboxes' latest conversations, `#inbox/new` a new mail, and
- *   `#inbox/<account>/<thread id>` that account's conversation in full in the main content.
+ * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
+ *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
  * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
@@ -217,10 +217,10 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "bots", target, routine: routines === "routines" && routine && more.length === 0 ? routine : null };
 	},
 	calendar: () => ({ kind: "calendar" }),
-	inbox: rest => {
-		if (rest === "new") return { kind: "inbox", target: "new" };
+	email: rest => {
+		if (rest === "new") return { kind: "email", target: "new" };
 		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
-		return { kind: "inbox", target: account && thread && more.length === 0 ? { account, thread } : null };
+		return { kind: "email", target: account && thread && more.length === 0 ? { account, thread } : null };
 	},
 };
 
@@ -248,7 +248,7 @@ function restOfPage(page: Page): string | null {
 		case "bots":
 			if (page.target === null) return null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/routines/${encodeURIComponent(page.routine)}`;
-		case "inbox":
+		case "email":
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
@@ -274,7 +274,7 @@ function queryOfPage(page: Page): string | null {
 		case "tickets":
 		case "bots":
 		case "calendar":
-		case "inbox":
+		case "email":
 		case "scheduled":
 			return null;
 		default: {
@@ -293,7 +293,7 @@ export function hashForPage(page: Page): string {
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
-export const hashForInbox = (target: InboxRoute["target"]): string => hashForPage({ kind: "inbox", target });
+export const hashForEmail = (target: EmailRoute["target"]): string => hashForPage({ kind: "email", target });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
 export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);

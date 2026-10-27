@@ -19,8 +19,8 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`.
 - The composer's directory, branch, and context ring: the directory is `DirectoryPicker` in `web/components/workspace-picker.tsx`, or `DirectoryLabel` in `web/components/composer.tsx` where the session cannot move, in the composer's `leftSlot`, followed in the new-session draft by `BranchPicker` in `web/components/git.tsx`; the ring is `ContextRing` in `web/components/context-ring.tsx`, in its `rightSlot`.
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
-- Changed files and images above the composer: `ChangesCard` in `web/components/changes-card.tsx`, mounted by `conversation.tsx`, and below a past session's transcript by `past-conversation.tsx`.
-  Its **Files** section is `ChangedFileList` in `changed-files-section.tsx`; its **Images** section is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request or Linear issue.
+- Changed files, images, and sources above the composer: `ChangesCard` in `web/components/changes-card.tsx`, mounted by `conversation.tsx`, and below a past session's transcript by `past-conversation.tsx`.
+  Its **Files** section is `ChangedFileList` in `changed-files-section.tsx`; its **Images** section is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request or Linear issue; its **Sources** section is `SourceList` in `sources-section.tsx`.
   The sections fold independently, with closed sections kept by `useStoredKeys`.
   A subagent's recorded edits open `FileChangesDialog` in `changed-files-section.tsx`, with Kobra-inspired cards from `web/components/file-diff.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
@@ -65,7 +65,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - **Ask about this**, the button on selected text and the discussion panel at the top right: the button is `AskAboutSelection` in `web/components/ask-about-selection.tsx`, which wraps the transcript in `conversation.tsx` and `past-conversation.tsx` and the explorer in `web/components/pull-requests/pr-details/code.tsx`; the panel is `DiscussionPanel` in `web/components/discussion-panel.tsx`, which `web/app.tsx` mounts, over `web/discussions.ts`.
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
 - Keyboard shortcuts: the table in `web/shortcuts.ts`, the page-wide handlers in `web/use-page-shortcuts.ts`, and the reference dialog in `web/components/shortcuts-dialog.tsx`.
-- Dev and Ops switch, command menu button, notification bell, and Settings button: `HeaderControls` in `web/components/header-controls.tsx`, in the desktop app's title bar, `DesktopTitleBar` there, else at the end of each page's `Header`; the bell is `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
+- Dev and Ops switch, command menu button, What's new, notification bell, and Settings button: `HeaderControls` in `web/components/header-controls.tsx`, in the desktop app's title bar, `DesktopTitleBar` there, else at the end of each page's `Header`; What's new is `WhatsNew` in `web/components/whats-new.tsx`; the bell is `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
   The title bar's Back and Forward buttons, at its top left after the window's buttons, are `HistoryButtons` in the same file.
 - System notifications of sessions that ask or finish, and the desktop app's Dock badge: `useAttention` in `web/use-attention.ts`, shown by `desktop/attention.ts` in the desktop app; their switch is `SessionNotifications` in `web/components/settings/preferences-tab.tsx`.
 - Pages, each routed by `web/routing.ts`:
@@ -75,7 +75,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Todo: `web/components/todo/page.tsx`.
   - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
-  - Inbox: `web/components/inbox/inbox-page.tsx`.
+  - Email: `web/components/email/email-page.tsx`.
   - Bots: a Bot's page, with its routines in the details popover and one routine's page from `web/components/routines/routine-detail.tsx` in place of the conversation, and the New Bot form in `web/components/bots/bot-page.tsx`, with the sidebar's **Bots** tab in `web/components/bots/bots-nav.tsx` and each Bot's face in `web/components/bots/bot-avatar.tsx`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
@@ -107,6 +107,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Bots, Routines, Calendar, and Inbox](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Bots, Routines, Calendar, and Email](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

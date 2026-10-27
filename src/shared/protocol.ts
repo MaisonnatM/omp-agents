@@ -13,7 +13,7 @@ import type { PagePreferences, PreferenceChange } from "./preferences";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
-import type { AgentMedia, ChangedFile, Item } from "./transcript";
+import type { AgentMedia, AgentSource, ChangedFile, Item } from "./transcript";
 import type { Turn } from "./trajectory";
 import type { Workspace, WorkspaceList } from "./workspaces";
 
@@ -28,8 +28,11 @@ export type ServerMsg =
 	| { t: "items"; view: View; reset: boolean; items: Item[]; removed: string[] }
 	/** The files the view's agent changed, in first-touch order: `reset` replaces them; otherwise `files` replace or join by `path`, new paths appended. */
 	| { t: "work"; view: View; reset: boolean; files: ChangedFile[] }
-	/** The images the view's agent and its subagents' tools returned: `reset` replaces them; otherwise `media` joins them. The page orders them with {@link newestMediaFirst}. */
-	| { t: "media"; view: View; reset: boolean; media: AgentMedia[] }
+	/**
+	 * The images the view's agent and its subagents' tools returned, and the web pages and remote items they opened: `reset` replaces both;
+	 * otherwise `media` and `sources` join them. The page orders the images with {@link newestMediaFirst} and the sources oldest first.
+	 */
+	| { t: "media"; view: View; reset: boolean; media: AgentMedia[]; sources: AgentSource[] }
 	/** The turns of a view whose Trajectory the socket watches: `reset` replaces them; otherwise `turns` replace or join by `id`, new ids appended. */
 	| { t: "turns"; view: View; reset: boolean; turns: Turn[] }
 	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */

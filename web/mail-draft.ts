@@ -232,7 +232,7 @@ export interface ReplyDraft extends MailDraftController {
 	compose: (all: boolean) => void;
 }
 
-/** The reply being written in conversation `thread`, whose latest message is `last`, from the inbox's own `address`. */
+/** The reply being written in conversation `thread`, whose latest message is `last`, from its account's own `address`. */
 export function useReplyDraft(thread: string, last: MailMessage | undefined, address: string): ReplyDraft {
 	const mail = useMailDraft(`thread.${thread}`, null);
 	const [all, setAll] = useState(false);

@@ -43,10 +43,11 @@ Files, in `agent/`:
   Read the matching reference under `~/.omp/agent/docs/` before taking that branch of the workflow, regardless of the repository's working directory.
 - `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear review, proof boxes, PR descriptions, and PR screenshots.
   These references load on demand rather than in every session's context.
-- `APPEND_SYSTEM.md`: short final replies (Résumé, Action, Then) that end on up to three suggested next prompts, questions asked through the ask tool with the recommended option first, and a code-quality review before any pull request.
+- `APPEND_SYSTEM.md`: short final replies (Résumé, Action, Then) that end on up to three suggested next prompts, questions asked through the ask tool with the recommended option first, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
 - `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, thermonuclear review, and live review.
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
+  When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
   When GitHub rejects the credential gh uses, the gate also names it, such as `GITHUB_TOKEN`, the project `.env` file omp read it from at startup, and the working login it overrides, never the token itself.
   A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
@@ -71,6 +72,9 @@ Files, in `agent/`:
   `bun ~/.omp/agent/extensions/request-log.ts <session.jsonl>` rebuilds every recorded request and checks its hash, and a request number after the path prints that request's body.
   The record is the body this extension receives, after the extensions that load before it; Anthropic can still withhold a disabled field afterwards, Codex over WebSocket sends only the new input after the first request, and compaction, summary, and title requests are not recorded.
   The blobs hold what the provider received, including your `AGENTS.md` files, environment details, and any secret that reached the conversation, so keep `~/.omp/agent/blobs/` as private as the session files.
+- `extensions/session-trailer.ts`: adds an `Omp-Session: <session id>` trailer to every commit an omp session makes, through a config-based `prepare-commit-msg` git hook set in omp's environment, which runs beside a repository's own hooks, husky's included.
+  `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` names each commit's session, and `omp -r <session id>` reopens it.
+  A git without config-based hooks ignores it.
 - `extensions/worktree-guard.ts`: keeps agents from changing a checkout under each other.
   It blocks every `edit` or `write` in a repository's main checkout while it is on its default branch (`origin/HEAD`, else `main` or `master`), and tells the agent to work in a linked worktree; on any other branch the main checkout is edited in place, as `AGENTS.md` asks.
   The omp process that last changed a checkout, a session with its subagents, owns it, and `omp-checkout-owner.json` in the checkout's git dir names its pid.

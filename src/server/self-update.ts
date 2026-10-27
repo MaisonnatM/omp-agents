@@ -5,7 +5,7 @@
  */
 import { run, runChecked } from "../proc";
 import { SerialLane } from "../serial-lane";
-import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
+import type { ChangelogEntry, DashboardChangelog, DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
 import { packagedResources, sourceDir } from "./resources";
 
 /** The checkout the server started from: its top directory, the branch it had checked out, and that branch's commit. */
@@ -120,6 +120,51 @@ async function bunInstall(dir: string): Promise<void> {
 	}
 }
 
+/** The most feature commits What's new lists. */
+const CHANGELOG_LIMIT = 300;
+/** A feature subject: `feat:`, `feat(area):`, `feat!:`, or one that starts with `Add `. */
+const FEATURE_GREP = "^(feat(\\([^)]*\\))?!?:|Add )";
+const FEAT_PREFIX = /^feat(?:\(([^)]*)\))?!?:\s*/;
+const PR_SUFFIX = /\s*\(#(\d+)\)$/;
+/** A subject that only adds tests, as `Add failing tests for ...`, which ships no feature. */
+const TESTS_ONLY = /^add (?:(?:a|more|missing|failing|regression|unit|e2e) )*tests?\b/i;
+
+/**
+ * Reads `git log --format=%H%x1f%ct%x1f%s` lines into entries; `pending` holds the commits the running build lacks.
+ * A subject that is not a feature, as a line `--grep` let through, or that only adds tests, is dropped.
+ */
+function parseChangelog(log: string, pending: ReadonlySet<string>): ChangelogEntry[] {
+	const entries: ChangelogEntry[] = [];
+	for (const line of log.split("\n")) {
+		const [commit, seconds, subject] = line.split("\x1f");
+		if (!commit || !seconds || subject === undefined) continue;
+		const feat = FEAT_PREFIX.exec(subject);
+		if (!feat && !subject.startsWith("Add ")) continue;
+		let title = feat ? subject.slice(feat[0].length) : subject;
+		const pr = PR_SUFFIX.exec(title);
+		if (pr) title = title.slice(0, pr.index);
+		if (!title || TESTS_ONLY.test(title)) continue;
+		entries.push({
+			commit,
+			at: Number(seconds) * 1000,
+			title: title[0]!.toUpperCase() + title.slice(1),
+			area: feat?.[1] || null,
+			pr: pr ? Number(pr[1]) : null,
+			installed: !pending.has(commit),
+		});
+	}
+	return entries;
+}
+
+/** The feature commits on the running build and on `origin/<branch>` as last fetched, newest first. */
+async function readChangelog({ dir, branch, commit }: RunningBuild): Promise<ChangelogEntry[]> {
+	const remote = await commitOf(dir, originRef(branch));
+	const heads = remote === null ? [commit] : [commit, remote];
+	const pending = remote === null ? "" : (await gitIn(dir, ["rev-list", `${commit}..${remote}`])).stdout;
+	const log = await gitIn(dir, ["log", "--no-merges", "-E", `--grep=${FEATURE_GREP}`, `--max-count=${CHANGELOG_LIMIT}`, "--format=%H%x1f%ct%x1f%s", ...heads]);
+	return parseChangelog(log.stdout, new Set(pending.split("\n").filter(Boolean)));
+}
+
 /** The server's own update: the build it runs, or why it cannot update; one git call chain at a time; and the restart it ends with. */
 export class SelfUpdate {
 	readonly #checkout: Checkout;
@@ -167,6 +212,15 @@ export class SelfUpdate {
 			if (this.#restarting || checkout.kind === "unavailable" || !(await fetchBranch(checkout.build))) return null;
 			const commits = await commitsPast(checkout.build);
 			return commits > 0 ? { branch: checkout.build.branch, running: checkout.build.commit, commits } : null;
+		});
+	}
+
+	/** Settings › What's new: the feature commits the checkout holds, as of the last fetch; this asks origin nothing. */
+	changelog(): Promise<DashboardChangelog> {
+		return this.#lane.run(async () => {
+			const checkout = this.#checkout;
+			if (checkout.kind === "unavailable") return checkout;
+			return { kind: "checkout", branch: checkout.build.branch, entries: await readChangelog(checkout.build) };
 		});
 	}
 

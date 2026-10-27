@@ -42,7 +42,7 @@
 - **Activity** shows how you use the dashboard over the last 30 days; choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
   It counts the pages and settings sections you open, the shortcuts and command palette commands you run, the changes you send, and clicks on a few controls that change nothing else, by name only, never what they show or what you typed.
   **Not used** lists every feature with no use in the range and when you last used it, or **Never**; features used once or twice follow.
-  The pages, commands, and changes of a service omp is not signed in to, such as **Inbox** and its commands without Gmail, are listed apart and not counted.
+  The pages, commands, and changes of a service omp is not signed in to, such as **Email** and its commands without Gmail, are listed apart and not counted.
   **Most used** lists the top 20 features, with how many days you used each and, for a command, how often you ran it by its keys and from the palette.
   **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
   **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
@@ -98,7 +98,7 @@
   **Sidebar tabs** lists the eight sidebar tabs in the order the sidebar shows them, each with its group, **Dev** or **Ops**, the Cmd+number it takes while its group shows, a switch that shows or hides it, and buttons that move it up or down.
   A hidden tab only leaves the sidebar and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
   Hiding every tab of a group disables its side of the header's **Dev** and **Ops** switch; the gear button always leads back here.
-  While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Inbox** row says that tab shows only once the service is connected.
+  While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off.
   **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 minutes, 30 minutes, 1 hour, or 2 hours, 30 minutes by default.

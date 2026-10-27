@@ -56,7 +56,7 @@ function Groups({ answer, google, workspaces }: { answer: IntegrationsAnswer; go
 			<Group title="Connected" entries={entries.filter(entry => entry.connected)} />
 			<Group title="Available" entries={entries.filter(entry => !entry.connected)} />
 			<p className="px-1 text-xs text-pretty text-muted-foreground">
-				omp keeps its MCP sign-ins in its own credential store, so every omp session can use them. The Calendar page reads Google Calendar, and the Inbox page reads Gmail, with omp's
+				omp keeps its MCP sign-ins in its own credential store, so every omp session can use them. The Calendar page reads Google Calendar, and the Email page reads Gmail, with omp's
 				sign-in to each account. A Google account linked to workspaces shows on those pages only while the sidebar picks one of them, and sessions in them are told to use it.
 			</p>
 		</div>

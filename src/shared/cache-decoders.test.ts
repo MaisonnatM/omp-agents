@@ -3,7 +3,7 @@ import { decodeIntegrationsAnswer, type IntegrationsAnswer } from "./accounts";
 import { type Analytics, decodeAnalytics, type Usage } from "./analytics";
 import { type CalendarEventsAnswer, decodeCalendarEventsAnswer, decodeGoogleStatus, decodeLocalEventsAnswer, type GoogleStatus, type LocalEventsAnswer } from "./calendar";
 import { decodePullRequestList, type PullRequestList, type PullRequestSummary } from "./github";
-import { decodeInboxAnswer, type InboxAnswer } from "./gmail";
+import { decodeEmailAnswer, type EmailAnswer } from "./gmail";
 import { decodeTicketsAnswer, type TicketsAnswer } from "./tickets";
 
 const server = { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" };
@@ -47,7 +47,7 @@ const events: CalendarEventsAnswer = {
 
 const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 } }] };
 
-const inbox: InboxAnswer = {
+const email: EmailAnswer = {
 	accounts: [{ account: "gmail", error: null }],
 	threads: [{ account: "gmail", id: "t1", from: "Ada", subject: "Hi", snippet: "Hello", at: 1, unread: true, count: 2, url: "https://mail.google.com/t1" }],
 };
@@ -154,9 +154,9 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 	},
 	{
 		name: "Gmail inbox",
-		decode: decodeInboxAnswer,
-		whole: inbox,
-		partial: { "a conversation without its unread flag": { ...inbox, threads: [{ ...inbox.threads[0], unread: undefined }] } },
+		decode: decodeEmailAnswer,
+		whole: email,
+		partial: { "a conversation without its unread flag": { ...email, threads: [{ ...email.threads[0], unread: undefined }] } },
 	},
 	{
 		name: "tickets",

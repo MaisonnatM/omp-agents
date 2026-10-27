@@ -103,7 +103,7 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 		{ id: "restore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
 		{ id: "notesClose", scope: "outside-fields", key: 0 },
-		{ id: "inboxClose", scope: "outside-fields", key: 0 },
+		{ id: "emailClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere", key: 0 }]);
@@ -121,8 +121,8 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 });
 
 test("↓ and ↑ step through sessions, pull requests, todos, notes, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "notesNext", "inboxNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "inboxPrevious", "previousChangedFile"]);
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "notesNext", "emailNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "emailPrevious", "previousChangedFile"]);
 	expect(press("j", "KeyJ")).toEqual([]);
 	expect(press("k", "KeyK")).toEqual([]);
 });
@@ -137,17 +137,18 @@ test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+arrows step through sessions,
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then N, W, I, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then N, W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	// R alone replies on an open conversation, and a G before it changes nothing.
-	expect(after("g", "r")).toEqual(["inboxReply"]);
+	expect(after("g", "r")).toEqual(["emailReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
-	expect(after("g", "i")).toEqual(["inbox"]);
+	expect(after("g", "m")).toEqual(["email"]);
+	expect(after("g", "i")).toEqual([]);
 	expect(after("g", "n")).toEqual(["notes"]);
 	expect(pressOn(false, ",", "Comma", {}, "g")).toEqual(["settings"]);
 	expect(pressOn(false, ",", "Comma")).toEqual([]);
 	expect(after(null, "n")).toEqual([]);
-	expect(after(null, "i")).toEqual([]);
+	expect(after(null, "m")).toEqual([]);
 	expect(after(null, "w")).toEqual([]);
 	expect(after("h", "w")).toEqual([]);
 	expect(after("g", "W", { shift: true })).toEqual([]);

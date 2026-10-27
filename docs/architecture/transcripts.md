@@ -80,6 +80,7 @@ Every transcript comes from the session files on this machine, not from a networ
   A session that names a PR by number alone, reads by number one its own prompt names, or works on a branch, costs one `git remote get-url origin` in its working directory.
   A `gt submit` call costs, once per directory it ran in, one `git remote get-url origin` and a `git reflog show HEAD` with a `git symbolic-ref HEAD`, which place the branch checked out at the call's time; the server keeps each call's branch for as long as it lists the session.
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
+  `resolveLinks` lists the pull requests a call worked on, submitted, or pushed, or that the session's branch heads, before those the session's own prompt only links or names, each in the order found, since the session details sidebar shows the first.
 - The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
   `get_issue` and `save_issue` name the issue in `id`, `list_comments` and `save_comment` in `issueId`; a `save_issue` with no `id` opens one, whose identifier its result's JSON `id` names.
   A UUID is left out, since the tickets page opens an issue by identifier.

@@ -81,7 +81,7 @@ if (input.command) {
 	const result = await hooks.before_agent_start({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
 } else if (input.run) {
-	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false, sessionManager });
+	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager });
 	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null, executed }));
 } else {
 	if (!tool) throw new Error("No tool schema registered");
@@ -116,6 +116,25 @@ function quotaConfig(): Record<string, string> {
 	return { XDG_CONFIG_HOME: dir };
 }
 
+const checkouts: string[] = [];
+afterAll(() => { for (const dir of checkouts) rmSync(dir, { recursive: true, force: true }); });
+/** A checkout of the test's own, with `reviewPaths` as its `.omp/review-paths` when given, so this repository's file reaches no test. */
+function checkout(reviewPaths?: string): string {
+	const dir = mkdtempSync(join(tmpdir(), "ship-checkout-"));
+	checkouts.push(dir);
+	mkdirSync(join(dir, ".git"));
+	if (reviewPaths !== undefined) {
+		mkdirSync(join(dir, ".omp"));
+		writeFileSync(join(dir, ".omp/review-paths"), reviewPaths);
+	}
+	return dir;
+}
+
+/** `gh pr view --json body,changedFiles,files` answering with this body and changed files. */
+function prView(body: string, files: string[] = []) {
+	return { code: 0, stdout: JSON.stringify({ body, changedFiles: files.length, files: files.map(path => ({ path })) }), stderr: "" };
+}
+
 describe("ship publication gate", () => {
 	test("a branch without a PR is blocked with draft-first recovery", () => {
 		const { result } = exercise("ship", {
@@ -139,17 +158,26 @@ describe("ship publication gate", () => {
 
 	test("an unreviewed PR cannot reach operator approval", () => {
 		const { result, confirmations } = exercise("ship", {
-			command: "gt submit --publish", approve: true,
-			response: { code: 0, stdout: "Unreviewed PR", stderr: "" },
+			command: "gt submit --publish", approve: true, cwd: checkout(),
+			response: prView("Unreviewed PR", ["README.md"]),
 		});
 		expect(result?.block).toBe(true);
 		expect(confirmations).toBe(0);
 	});
 
+	test.each([["README.md", false], ["src/shared/protocol.ts", true]])("with review paths, an unreviewed PR changing %s is blocked: %s", (file, blocked) => {
+		const { result, confirmations } = exercise("ship", {
+			command: "gh pr ready 7", approve: true, cwd: checkout("# Shared contracts\nsrc/shared/**\n"),
+			responses: { "pr view": prView("Unreviewed PR", [file]) },
+		});
+		expect(result?.block ?? false).toBe(blocked);
+		expect(confirmations).toBe(blocked ? 0 : 1);
+	});
+
 	test.each([false, true])("a reviewed PR requires operator approval (%s)", approve => {
 		const { result, confirmations } = exercise("ship", {
-			command: "gt submit --publish", approve,
-			response: { code: 0, stdout: "- [x] Thermo-nuclear code quality review", stderr: "" },
+			command: "gt submit --publish", approve, cwd: checkout(),
+			response: prView("- [x] Thermo-nuclear code quality review"),
 		});
 		expect(result?.block ?? false).toBe(!approve);
 		expect(confirmations).toBe(1);
@@ -157,8 +185,8 @@ describe("ship publication gate", () => {
 
 	test.each([["- [ ] Browser proof (UI changes: run verify-yampa, attach screenshot)", true], ["- [x] Browser proof (UI changes: run verify-yampa, attach screenshot)", false]])("a reviewed PR with %j is blocked: %s", (box, blocked) => {
 		const { result, confirmations } = exercise("ship", {
-			command: "gh pr ready 7", approve: true,
-			responses: { "pr view": { code: 0, stdout: `## Checks\n${box}\n- [x] Thermo-nuclear code quality review`, stderr: "" } },
+			command: "gh pr ready 7", approve: true, cwd: checkout(),
+			responses: { "pr view": prView(`## Checks\n${box}\n- [x] Thermo-nuclear code quality review`) },
 		});
 		expect(result?.block ?? false).toBe(blocked);
 		expect(confirmations).toBe(blocked ? 0 : 1);
@@ -167,10 +195,10 @@ describe("ship publication gate", () => {
 
 	test.each([["dustinspecker/awesome-eslint", false], ["me/app", true], ["ME/other", true]])("gh pr ready -R %s is gated: %s", (repo, gated) => {
 		const { result, confirmations } = exercise("ship", {
-			command: `gh pr ready 5 -R ${repo} >/dev/null`, approve: true,
+			command: `gh pr ready 5 -R ${repo} >/dev/null`, approve: true, cwd: checkout(),
 			responses: {
 				"repo view": { code: 0, stdout: "me/app", stderr: "" },
-				"pr view": { code: 0, stdout: "Unreviewed PR", stderr: "" },
+				"pr view": prView("Unreviewed PR"),
 			},
 		});
 		expect(result?.block ?? false).toBe(gated);
@@ -179,8 +207,8 @@ describe("ship publication gate", () => {
 
 	test("a publish run through `env` is gated", () => {
 		const { result, confirmations } = exercise("ship", {
-			command: "env -u GITHUB_TOKEN gt submit --publish", approve: true,
-			response: { code: 0, stdout: "Unreviewed PR", stderr: "" },
+			command: "env -u GITHUB_TOKEN gt submit --publish", approve: true, cwd: checkout(),
+			response: prView("Unreviewed PR"),
 		});
 		expect(result?.block).toBe(true);
 		expect(confirmations).toBe(0);
@@ -258,18 +286,27 @@ describe("checked PR description CLI", () => {
 });
 
 describe("ship_stage ready gate", () => {
-	test.each([["- [x] Thermo-nuclear code quality review", false], ["Unreviewed PR", true]])("the first call naming the PR reads its body (%s)", (body, isError) => {
+	// A PR with this body changing `file`, checked from a checkout with `reviewPaths`.
+	const readyGate = (body: string, file: string, reviewPaths?: string) => {
 		const pullRequest = {
 			state: "OPEN", isDraft: true, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
+			changedFiles: 1, files: { nodes: [{ path: file }] },
 			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
 			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
 		};
-		const { run } = exercise("ship", {
-			run: true,
+		return exercise("ship", {
+			run: true, cwd: checkout(reviewPaths),
 			params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
 			response: { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) },
-		});
-		expect(run).toEqual({ isError, stage: isError ? null : "ready_gate" });
+		}).run;
+	};
+
+	test.each([["- [x] Thermo-nuclear code quality review", false], ["Unreviewed PR", true]])("the first call naming the PR reads its body (%s)", (body, isError) => {
+		expect(readyGate(body, "README.md")).toEqual({ isError, stage: isError ? null : "ready_gate" });
+	});
+
+	test.each([["README.md", false], ["src/shared/protocol.ts", true]])("with review paths, an unreviewed PR changing %s is held: %s", (file, isError) => {
+		expect(readyGate("Unreviewed PR", file, "src/shared/**\n")).toEqual({ isError, stage: isError ? null : "ready_gate" });
 	});
 
 	test("quota exhaustion exposes stale status and cannot advance the ready gate", () => {

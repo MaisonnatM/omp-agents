@@ -8,12 +8,13 @@ const extension: {
 	prSelector(args: string[]): string[];
 	selectorOwner(selector: string[]): string | undefined;
 	otherOwner(owner: string | undefined, repo: string | undefined): boolean;
-	publishBlocker(body: string): string | undefined;
+	publishBlocker(body: string, needsReview: boolean): string | undefined;
+	reviewNeeded(reviewPaths: string | undefined, files: string[], changedFiles: number): boolean;
 	authDiagnosis(credentials: { host: string; state: string; active: boolean; login: string; tokenSource: string }[], dotenvFiles: Record<string, string>): string | undefined;
 	CHECKBOX: string;
 	PROOF_BOX: string;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
-const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, authDiagnosis, CHECKBOX, PROOF_BOX } = extension;
+const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewNeeded, authDiagnosis, CHECKBOX, PROOF_BOX } = extension;
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
 function readySelectors(line: string): string[][] {
@@ -69,21 +70,55 @@ describe("publish gate", () => {
 	const reviewed = `## Checks\n${CHECKBOX}`;
 
 	test("a reviewed PR without a proof box goes live", () => {
-		expect(publishBlocker(reviewed)).toBeUndefined();
+		expect(publishBlocker(reviewed, true)).toBeUndefined();
 	});
 
 	test("an unreviewed PR is blocked on the review", () => {
-		expect(publishBlocker(PROOF_BOX)).toContain(CHECKBOX);
+		expect(publishBlocker(PROOF_BOX, true)).toContain(CHECKBOX);
+	});
+
+	test("an unreviewed PR that needs no review goes live", () => {
+		expect(publishBlocker("## Summary", false)).toBeUndefined();
+	});
+
+	test("an unreviewed PR that needs no review is still blocked on the box", () => {
+		const reason = publishBlocker(PROOF_BOX, false);
+		expect(reason).toContain(PROOF_BOX);
+		expect(reason).not.toContain(CHECKBOX);
 	});
 
 	test.each([PROOF_BOX, `  ${PROOF_BOX} (UI changes: run verify-yampa, attach screenshot)`])("a reviewed PR with %j is blocked on the box", box => {
-		const reason = publishBlocker(`${reviewed}\n${box}`);
+		const reason = publishBlocker(`${reviewed}\n${box}`, true);
 		expect(reason).toContain(PROOF_BOX);
 		expect(reason).not.toContain(CHECKBOX);
 	});
 
 	test.each(["- [x] Browser proof", "- [X] Browser proof (UI changes)"])("a reviewed PR with %j goes live", box => {
-		expect(publishBlocker(`${reviewed}\n${box}`)).toBeUndefined();
+		expect(publishBlocker(`${reviewed}\n${box}`, true)).toBeUndefined();
+	});
+});
+
+describe("review paths", () => {
+	const paths = "# Shared contracts\nsrc/shared/protocol.ts\n\n  templates/omp/agent/extensions/**  # the kit's gates\n";
+
+	test("a repository without review paths reviews every change", () => {
+		expect(reviewNeeded(undefined, ["README.md"], 1)).toBe(true);
+	});
+
+	test("a change that matches no glob needs no review", () => {
+		expect(reviewNeeded(paths, ["README.md", "src/shared/protocol.test.ts"], 2)).toBe(false);
+	});
+
+	test.each(["src/shared/protocol.ts", "templates/omp/agent/extensions/github/access.ts"])("a change to %s needs the review", file => {
+		expect(reviewNeeded(paths, ["README.md", file], 2)).toBe(true);
+	});
+
+	test("comments and blank lines match nothing", () => {
+		expect(reviewNeeded("# src/shared/protocol.ts\n\n", ["src/shared/protocol.ts"], 1)).toBe(false);
+	});
+
+	test("a change list GitHub cut short needs the review", () => {
+		expect(reviewNeeded(paths, ["README.md"], 101)).toBe(true);
 	});
 });
 
