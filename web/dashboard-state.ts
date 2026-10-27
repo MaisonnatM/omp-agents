@@ -1,4 +1,5 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
+import { applyBot, type Bot, type BotChange, type BotId, type BotLast } from "../src/shared/bots";
 import type { PlanUsage } from "../src/shared/models";
 import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
@@ -50,6 +51,12 @@ export interface DashboardState extends PaneNavigation {
 	userNotes: UserNoteList | null;
 	/** Every routine, empty until the server first sends them. */
 	routines: Routine[];
+	/** Every Bot, `null` until the server first sends them; a change shows here before the server answers. */
+	bots: Bot[] | null;
+	/** What each Bot remembers, as the server last read it. */
+	botMemories: Record<BotId, string>;
+	/** The last words of each Bot's conversation, as the server last read them. */
+	botLasts: Record<BotId, BotLast | null>;
 	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
 	scheduled: ScheduledSend[];
 	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
@@ -67,7 +74,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "scheduled" | "workspaces" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "scheduled" | "workspaces" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -88,6 +95,7 @@ export type Action =
 	| { t: "user-todo"; change: UserTodoChange }
 	| { t: "user-note"; change: UserNoteChange }
 	| { t: "pin"; change: PinChange }
+	| { t: "bot"; change: Exclude<BotChange, { op: "message" }>; now: string }
 	| ServerAction;
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
@@ -161,7 +169,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			const forgotten = sessionId === null ? state : withPanes(state, { kind: "forget-session", sessionId });
 			const eligible = new Set(state.hosts.filter(host => !state.ending.has(host.instanceId)).map(host => host.instanceId));
 			const layout = endSession(state.layout, action.instanceId, action.listed, eligible);
-			return writeRoute(state, { ...withPanes(forgotten, { kind: "edit", layout }), cover: null }, "push");
+			const cover = state.cover?.kind === "page" ? state.cover : null;
+			return writeRoute(state, { ...withPanes(forgotten, { kind: "edit", layout }), cover }, "push");
 		}
 		case "start":
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
@@ -212,6 +221,10 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, userNotes: action.list };
 		case "routines":
 			return { ...state, routines: action.routines };
+		case "bots":
+			return { ...state, bots: action.bots, botMemories: action.memories, botLasts: action.lasts };
+		case "bot":
+			return state.bots ? { ...state, bots: applyBot(state.bots, action.change, action.now) } : state;
 		case "scheduled":
 			return { ...state, scheduled: action.sends };
 		case "workspaces":
@@ -260,6 +273,9 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		userTodos: null,
 		userNotes: null,
 		routines: [],
+		bots: null,
+		botMemories: {},
+		botLasts: {},
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		pins: [],

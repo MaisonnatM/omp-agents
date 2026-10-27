@@ -3,6 +3,7 @@ import type { Routine, RoutineChange } from "../routines";
 import type { UserNoteChange, UserNoteList } from "../user-notes-shared";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity";
+import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DiscussionEvent, DiscussionRequest } from "./discussions";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
@@ -52,6 +53,8 @@ export type ServerMsg =
 	| { t: "user-notes"; list: UserNoteList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
+	/** Every Bot, whole, what each remembers, and the last words of its conversation, sent when a socket opens, after every change, and as each turn of a Bot's conversation starts and ends. */
+	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string>; lasts: Record<BotId, BotLast | null> }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
@@ -124,6 +127,8 @@ export type ClientMsg =
 	| { t: "user-note"; change: UserNoteChange }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
+	/** Create, edit, or remove a Bot, or send one a message; every socket then gets the Bots as they are after. */
+	| { t: "bot"; change: BotChange }
 	/** Schedule a message or a session start, cancel one, take one back to edit, or send one now; every socket then gets the scheduled sends as they are after. */
 	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */

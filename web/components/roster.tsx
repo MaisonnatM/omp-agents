@@ -3,7 +3,6 @@ import { Folder, Keyboard } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
-import type { Routine } from "../../src/routines";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
@@ -25,11 +24,12 @@ import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
+import { BotsNav } from "./bots/bots-nav";
+import type { BotRow } from "../bots-model";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { EmailNav } from "./email/email-nav";
 import { NotesNav } from "./notes/nav";
-import { RoutinesNav } from "./routines/routines-nav";
 import { SessionList } from "./session-list";
 import { SettingsNav } from "./settings/settings-nav";
 import { workspaceItems } from "./workspace-picker";
@@ -146,6 +146,10 @@ interface RosterProps {
 	newSessionOpen: boolean;
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;
+	/** Every Bot's row, whatever the workspace, the most recent conversation first. */
+	bots: readonly BotRow[];
+	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while another page or the panes show. */
+	botsOpen: string | null | undefined;
 	/** The tabs the bar draws, the header switch's group's shown tabs, in order, which the position keys count. */
 	tabs: readonly SidebarTab[];
 	/** The sidebar's panel, selected by the page or kept over the panes. */
@@ -161,9 +165,6 @@ interface RosterProps {
 	userNotes: UserNoteList | null;
 	/** The list the Notes page shows. */
 	notesView: NotesListView;
-	routines: Routine[];
-	/** The routine the Routines page shows, `null` for its list, `undefined` while another page is open. */
-	routinesOpen: string | null | undefined;
 	/** The Calendar page is open. */
 	calendarOpen: boolean;
 	/** The settings section and workspace the sidebar's settings links keep. */
@@ -191,6 +192,8 @@ export function Roster({
 	open,
 	newSessionOpen,
 	scheduledOpen,
+	bots,
+	botsOpen,
 	tabs,
 	tab,
 	onTab,
@@ -199,8 +202,6 @@ export function Roster({
 	todoSessions,
 	userNotes,
 	notesView,
-	routines,
-	routinesOpen,
 	calendarOpen,
 	settingsRoute,
 	sectionTarget,
@@ -217,6 +218,7 @@ export function Roster({
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
+		bots: { count: bots.filter(({ asking }) => asking !== null).length, meaning: "asking you" },
 		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
@@ -276,6 +278,9 @@ export function Roster({
 					newSessionLabel={newSessionLabel}
 				/>
 			</TabPanel>
+			<TabPanel value="bots" className="flex min-h-0 flex-1 flex-col">
+				<BotsNav rows={bots} openId={botsOpen} />
+			</TabPanel>
 			<TabPanel value="pull-requests" asChild>
 				<SidebarContent>
 					{pullRequestsTab}
@@ -289,11 +294,6 @@ export function Roster({
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
 					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="routines" asChild>
-				<SidebarContent>
-					<RoutinesNav routines={routines} current={routinesOpen} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="notes" asChild>

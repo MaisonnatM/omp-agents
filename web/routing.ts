@@ -24,15 +24,15 @@ export type TabGroup = (typeof TAB_GROUPS)[number]["value"];
 export const SIDEBAR_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], group: "dev" },
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, group: "dev", integration: "linear" },
+	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, group: "dev" },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, group: "dev" },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, group: "dev" },
-	{ value: "routines", label: "Routines", icon: PAGE_ICON.routines, group: "dev" },
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, group: "ops" },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, group: "ops" },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, group: "ops", integration: "gmail" },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: TabGroup; integration?: McpIntegrationId }[];
 
-/** A tab of the sidebar's bar; the tickets, todo, routines, notes, calendar, and email tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A tab of the sidebar's bar; the tickets, Bots, todo, notes, calendar, and email tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** What the sidebar shows: a tab's panel, or the settings sections while the Settings page is open. */
@@ -111,10 +111,11 @@ export interface NotesRoute {
 	open: string | null;
 }
 
-/** The Routines page: the list, or routine `target`'s settings and runs when it is non-null. */
-export interface RoutinesRoute {
-	target: string | null;
-}
+/**
+ * A Bot's page, its conversation behind a header whose name opens its job, memory, and routines; `null` for the New Bot form.
+ * `routine` names the Bot's routine whose settings and runs show in place of the conversation.
+ */
+export type BotsRoute = { target: null } | { target: string; routine: string | null };
 
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. `todoId` names the todo it works on. */
 export interface NewSessionRoute {
@@ -134,7 +135,7 @@ export type Page =
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "notes" } & NotesRoute)
-	| ({ kind: "routines" } & RoutinesRoute)
+	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "email" } & EmailRoute)
 	| ({ kind: "new" } & NewSessionRoute)
@@ -182,7 +183,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
  * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
- * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
+ * - `#bots` opens the New Bot form, `#bots/<id>` that Bot's page, and `#bots/<id>/routines/<routine id>` the settings and runs of that Bot's routine.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
@@ -210,7 +211,11 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
 	},
 	notes: (rest, query) => ({ kind: "notes", list: rest === "agents" ? { kind: "agents" } : { kind: "all" }, open: query.get("open") || null }),
-	routines: rest => ({ kind: "routines", target: rest ? decodeSegment(rest) : null }),
+	bots: rest => {
+		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
+		if (!target) return { kind: "bots", target: null };
+		return { kind: "bots", target, routine: routines === "routines" && routine && more.length === 0 ? routine : null };
+	},
 	calendar: () => ({ kind: "calendar" }),
 	email: rest => {
 		if (rest === "new") return { kind: "email", target: "new" };
@@ -240,8 +245,9 @@ function restOfPage(page: Page): string | null {
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "notes":
 			return page.list.kind === "all" ? null : page.list.kind;
-		case "routines":
-			return page.target === null ? null : encodeURIComponent(page.target);
+		case "bots":
+			if (page.target === null) return null;
+			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/routines/${encodeURIComponent(page.routine)}`;
 		case "email":
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
@@ -266,7 +272,7 @@ function queryOfPage(page: Page): string | null {
 		case "settings":
 		case "pull-requests":
 		case "tickets":
-		case "routines":
+		case "bots":
 		case "calendar":
 		case "email":
 		case "scheduled":
@@ -299,7 +305,8 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
 }
 export const hashForNotes = (list: NotesListView, open: string | null = null): string => hashForPage({ kind: "notes", list, open });
-export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
+export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target } : { kind: "bots", target, routine: null });
+export const hashForBotRoutine = (botId: string, routine: string): string => hashForPage({ kind: "bots", target: botId, routine });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
@@ -363,7 +370,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `notes`, `routines`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `notes`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));

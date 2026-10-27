@@ -20,9 +20,9 @@ import {
 const DEFAULT: TabLayout = [
 	{ tab: "pull-requests", hidden: false },
 	{ tab: "tickets", hidden: false },
+	{ tab: "bots", hidden: false },
 	{ tab: "sessions", hidden: false },
 	{ tab: "todo", hidden: false },
-	{ tab: "routines", hidden: false },
 	{ tab: "notes", hidden: false },
 	{ tab: "calendar", hidden: false },
 	{ tab: "email", hidden: false },
@@ -50,13 +50,18 @@ test("decoding keeps each known tab once, drops a stored Settings tab, and puts 
 	expect(decodeTabLayout(raw)).toEqual([
 		{ tab: "pull-requests", hidden: false },
 		{ tab: "tickets", hidden: false },
+		{ tab: "bots", hidden: false },
 		{ tab: "email", hidden: true },
 		{ tab: "todo", hidden: false },
-		{ tab: "routines", hidden: false },
 		{ tab: "notes", hidden: false },
 		{ tab: "calendar", hidden: false },
 		{ tab: "sessions", hidden: false },
 	]);
+});
+
+test("a layout stored before the Bots tab gets it at its default place, before Sessions, and loses the Routines tab", () => {
+	const before = ["pull-requests", "tickets", "sessions", "todo", "routines", "notes", "calendar", "email"].map(tab => ({ tab, hidden: false }));
+	expect(decodeTabLayout(JSON.stringify(before))).toEqual(DEFAULT);
 });
 
 test("a layout stored before the Email tab's rename reads its inbox entry as the Email tab, in its place and hidden as it was", () => {
@@ -64,9 +69,9 @@ test("a layout stored before the Email tab's rename reads its inbox entry as the
 		{ tab: "inbox", hidden: true },
 		{ tab: "pull-requests", hidden: false },
 		{ tab: "tickets", hidden: false },
+		{ tab: "bots", hidden: false },
 		{ tab: "sessions", hidden: false },
 		{ tab: "todo", hidden: false },
-		{ tab: "routines", hidden: false },
 		{ tab: "notes", hidden: false },
 		{ tab: "calendar", hidden: false },
 	]);
@@ -74,9 +79,9 @@ test("a layout stored before the Email tab's rename reads its inbox entry as the
 		{ tab: "email", hidden: true },
 		{ tab: "pull-requests", hidden: false },
 		{ tab: "tickets", hidden: false },
+		{ tab: "bots", hidden: false },
 		{ tab: "sessions", hidden: false },
 		{ tab: "todo", hidden: false },
-		{ tab: "routines", hidden: false },
 		{ tab: "notes", hidden: false },
 		{ tab: "calendar", hidden: false },
 	]);
@@ -90,24 +95,24 @@ test("a stored layout decodes back to itself", () => {
 test("moveTab swaps a tab with its neighbor and leaves a tab at either end where it is", () => {
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", -1)).toBe(DEFAULT_TAB_LAYOUT);
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "email", 1)).toBe(DEFAULT_TAB_LAYOUT);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "email", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "tickets", "sessions", "todo", "routines", "notes", "email", "calendar"]);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "sessions", "todo", "routines", "notes", "calendar", "email"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "email", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "tickets", "bots", "sessions", "todo", "notes", "email", "calendar"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "bots", "sessions", "todo", "notes", "calendar", "email"]);
 });
 
 test("hideTab hides and shows any tab", () => {
-	expect(hideTab(DEFAULT_TAB_LAYOUT, "todo", true)[3]).toEqual({ tab: "todo", hidden: true });
+	expect(hideTab(DEFAULT_TAB_LAYOUT, "todo", true)[4]).toEqual({ tab: "todo", hidden: true });
 	expect(hideTab(DEFAULT_TAB_LAYOUT, "email", true)[7]).toEqual({ tab: "email", hidden: true });
 	expect(hideTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "todo", false)).toEqual(DEFAULT);
 });
 
 test("shownTabs drops hidden and signed-out tabs and keeps the order", () => {
 	const layout = moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "email", -1);
-	expect(shownTabs(layout, new Set(["tickets"]))).toEqual(["pull-requests", "sessions", "routines", "notes", "email", "calendar"]);
+	expect(shownTabs(layout, new Set(["tickets"]))).toEqual(["pull-requests", "bots", "sessions", "notes", "email", "calendar"]);
 });
 
 test("groupTabs keeps the shown tabs of one group, in their order: Notes, Calendar, and Email are Ops, the rest Dev", () => {
 	const shown = shownTabs(moveTab(DEFAULT_TAB_LAYOUT, "email", -1), new Set());
-	expect(groupTabs(shown, "dev")).toEqual(["pull-requests", "tickets", "sessions", "todo", "routines"]);
+	expect(groupTabs(shown, "dev")).toEqual(["pull-requests", "tickets", "bots", "sessions", "todo"]);
 	expect(groupTabs(shown, "ops")).toEqual(["notes", "email", "calendar"]);
 	expect(groupTabs(["sessions", "todo"], "ops")).toEqual([]);
 });
@@ -137,7 +142,8 @@ test("positionKey takes the position among the tabs the bar draws, or none", () 
 	const dev = groupTabs(shown, "dev");
 	const ops = groupTabs(shown, "ops");
 	expect(positionKey("pull-requests", dev)).toBe("tab1");
-	expect(positionKey("sessions", dev)).toBe("tab2");
+	expect(positionKey("bots", dev)).toBe("tab2");
+	expect(positionKey("sessions", dev)).toBe("tab3");
 	expect(positionKey("notes", ops)).toBe("tab1");
 	expect(positionKey("email", ops)).toBe("tab2");
 	expect(positionKey("calendar", ops)).toBe("tab3");

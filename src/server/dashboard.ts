@@ -1,7 +1,7 @@
 /**
  * The dashboard behind the server: the registries and stores, the live sessions and the views on them, and the loops and
  * inboxes that keep them current. It builds its parts in dependency order, each handed the parts above it.
- * Two edges point down, closing the only cycles: a live session's update reaches the views, the broadcasts, the routines,
+ * Two edges point down, closing the only cycles: a live session's update reaches the views, the broadcasts, the Bots,
  * and the loops through its live-update handler, and a notice change reaches the broadcasts that read the notices.
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { activityDb, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -48,6 +48,8 @@ import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
+import { Bots } from "./bots";
+import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
 import { EndInbox } from "./end-inbox";
@@ -83,7 +85,8 @@ import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
 import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
-import { createStarter, reattachAll } from "./start";
+import { botExtension } from "./resources";
+import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { UserNotesFile } from "./user-notes-file";
@@ -120,6 +123,8 @@ export class Dashboard {
 		now: Date.now,
 		onChange: () => this.#broadcasts.pushList("review-drafts"),
 	});
+	readonly #botsFile = new BotsFile(botsFile);
+	readonly #bots: Bots;
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
 	readonly #calendars = new CalendarsFile(calendarsFile);
@@ -248,7 +253,11 @@ export class Dashboard {
 		const lists = (this.#lists = new ListRegistry({
 			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 			"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
-			routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, Date.now()) },
+			// Every routine belongs to a Bot, so a save for a Bot that is gone saves nothing.
+			routines: {
+				msg: () => ({ t: "routines", routines: routines.value }),
+				apply: change => (change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.routine.botId) ? false : routines.apply(change, Date.now())),
+			},
 			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
@@ -262,7 +271,15 @@ export class Dashboard {
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
-		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
+			bots: {
+				msg: () => this.#bots.msg(),
+				apply: change => {
+					// Deleting a Bot deletes its routines, first, so a crash between the two saves leaves no routine without its Bot.
+					if (change.op === "remove" && routines.removeBot(change.id)) this.#broadcasts.pushList("routines");
+					return this.#botsFile.apply(change, new Date().toISOString());
+				},
+			},
+		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
@@ -290,7 +307,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			joinFor: request => this.#reviewDrafts.join(request),
+			joinFor: request => this.#joinFor(request),
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
@@ -324,6 +341,16 @@ export class Dashboard {
 			if (!resumed) throw new Error("The session exited as it resumed.");
 			return resumed;
 		};
+		this.#bots = new Bots({
+			file: this.#botsFile,
+			start: startSession,
+			live: sessionId => sessions.bySessionId(sessionId),
+			session: instanceId => sessions.get(instanceId),
+			savedFile: files.pathOf,
+			paths: { extension: botExtension, botsFile, botsDir },
+			now: () => new Date().toISOString(),
+			onChange: () => broadcasts.pushList("bots"),
+		});
 		this.#endInbox = new EndInbox(sessionEndInboxDir, {
 			end: async sessionId => {
 				const session = sessions.bySessionId(sessionId);
@@ -334,30 +361,25 @@ export class Dashboard {
 			},
 		});
 		const stopping = this.#stopping.signal;
+		this.#migrateRoutines();
 		const runner = (this.#runner = new RoutineRunner({
 			file: routines,
-			start: startSession,
-			session(instanceId) {
-				const session = sessions.get(instanceId);
-				if (!session) return null;
-				const { status } = session.row();
-				return { status, occupied: occupiedBy(status, autoContinue.held(session.sessionId)), sessionId: session.sessionId, end: () => session.end() };
-			},
 			now: Date.now,
+			workspace: botId => this.#botsFile.value.find(({ id }) => id === botId)?.cwd ?? null,
 			async exec(command, cwd) {
 				const dir = await directoryOf(cwd);
 				if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
 				return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping });
 			},
 			onChange: () => broadcasts.pushList("routines"),
-			changePins: change => void lists.apply("pins", change),
+			messageBot: (botId, text) => this.#bots.message(botId, text),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
 			start: startSession,
 			reach,
 			now: Date.now,
-			onChange: () => this.#publishScheduled(),
+			onChange: () => broadcasts.pushList("scheduled"),
 		}));
 		const autoContinue = (this.#autoContinue = new AutoContinue({
 			file: scheduled,
@@ -367,11 +389,7 @@ export class Dashboard {
 				return plans;
 			},
 			now: Date.now,
-			onChange: () => this.#publishScheduled(),
-			released: sessionId => {
-				const session = sessions.bySessionId(sessionId);
-				if (session) runner.observe(session.instanceId);
-			},
+			onChange: () => broadcasts.pushList("scheduled"),
 		}));
 		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
 		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
@@ -419,7 +437,7 @@ export class Dashboard {
 			onMinuteTick: async () => {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
-				this.#publishScheduled();
+				broadcasts.pushList("scheduled");
 				await notices.check([...EVENT_KINDS, ...STOPPED_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -473,6 +491,7 @@ export class Dashboard {
 			cancelContinue: sessionId => autoContinue.cancel(sessionId),
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
+			messageBot: async (id, text) => void (await this.#bots.message(id, text)),
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			discussions: this.#discussions,
 			activity: { owner: () => ownerLock.held, store: this.#activity },
@@ -569,7 +588,7 @@ export class Dashboard {
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, request => this.#reviewDrafts.join(request), survived => this.#interrupted.recover(survived));
+		await reattachAll(this.#sessions, request => this.#joinFor(request), survived => this.#interrupted.recover(survived));
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
@@ -656,11 +675,10 @@ export class Dashboard {
 		return [...new Set([...this.knownCwds(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 
-	/** Where every live session's update goes: the views, the broadcasts, the routines, and the loops. */
+	/** Where every live session's update goes: the views, the broadcasts, the Bots, and the loops. */
 	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 		switch (update.kind) {
 			case "roster":
-				this.#runner.observe(instanceId);
 				this.#broadcasts.rosterChanged();
 				return;
 			case "event":
@@ -677,6 +695,9 @@ export class Dashboard {
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#reviewDrafts.exited(instanceId);
+				// Its last turn may have remembered something.
+				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
+				this.#bots.exited(instanceId);
 				this.#sessions.remove(instanceId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
@@ -690,7 +711,10 @@ export class Dashboard {
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				if (sessionId) this.#reviewDrafts.switched(instanceId, sessionId);
+				if (sessionId) {
+					this.#reviewDrafts.switched(instanceId, sessionId);
+					this.#bots.switched(instanceId, sessionId);
+				}
 				return;
 			}
 			case "turn-started": {
@@ -698,6 +722,8 @@ export class Dashboard {
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnStarted(sessionId);
+				// Its row moves up with the prompt that started the turn.
+				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
 			}
 			case "turn-ended": {
@@ -706,6 +732,7 @@ export class Dashboard {
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
+				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
 			}
 			default: {
@@ -723,6 +750,17 @@ export class Dashboard {
 	/** Deletes the activity rows older than {@link ACTIVITY_KEPT_DAYS}. */
 	#pruneActivity(): void {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
+	}
+
+	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain. */
+	#joinFor(request: StartRequest): SessionJoin {
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request)];
+		return {
+			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
+			attach: session => {
+				for (const join of joins) join.attach(session);
+			},
+		};
 	}
 
 	/**
@@ -743,9 +781,12 @@ export class Dashboard {
 			console.log("omp-agents: this server now runs routines and the todo and note inboxes.");
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
+			this.#bots.reload();
+			this.#migrateRoutines();
 			this.#todos.reload();
 			this.#notes.reload();
 			this.#broadcasts.pushList("routines");
+			this.#broadcasts.pushList("bots");
 			this.#broadcasts.pushList("user-todos");
 			this.#broadcasts.pushList("user-notes");
 			this.#runner.recover();
@@ -756,16 +797,17 @@ export class Dashboard {
 		return owns;
 	}
 
+	/** Moves the routines of a file from before every routine had a Bot to their Bots, creating the Routines Bot unless it exists. */
+	#migrateRoutines(): void {
+		this.#routines.migrate(bot => {
+			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#botsFile.apply({ op: "save", bot }, new Date().toISOString());
+		});
+	}
+
 	/** Checks the pull requests and Slack for the bell. */
 	#checkActivity(): Promise<void> {
 		this.#activityFresh = true;
 		return this.#notices.check(ACTIVITY_KINDS);
-	}
-
-	/** The scheduled sends changed, here or on another server: every socket hears them, and a held session whose continue went or left them is released. */
-	#publishScheduled(): void {
-		this.#broadcasts.pushList("scheduled");
-		this.#autoContinue.sendsChanged();
 	}
 
 	/** The session list changed: views may now find their file, and the past list is out of date. */

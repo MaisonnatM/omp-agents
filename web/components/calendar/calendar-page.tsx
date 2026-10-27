@@ -24,7 +24,7 @@ import { putJson } from "../../api";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
 import { dateOfDay, localDay } from "../../../src/shared/days";
 import { calendarEventsStore, localEventsStore, monthSpan, ticketsStore, useGoogleCalendars } from "../../reads";
-import { hashForOpenTodo, hashForRoutines, hashForTickets } from "../../routing";
+import { hashForBotRoutine, hashForOpenTodo, hashForTickets } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useMinute } from "../../use-minute";
@@ -61,7 +61,7 @@ function entryHref(entry: CalendarEntry): string | null {
 	switch (entry.kind) {
 		case "routine":
 		case "routine-interval":
-			return hashForRoutines(entry.routineId);
+			return hashForBotRoutine(entry.botId, entry.routineId);
 		case "todo":
 			return hashForOpenTodo(entry.todoId, entry.categoryId);
 		case "ticket":

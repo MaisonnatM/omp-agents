@@ -29,9 +29,11 @@ interface PastConversationProps {
 	titleAction?: ReactNode;
 	/** Show its turns in place of its transcript. */
 	trajectory: boolean;
+	/** Draw the session's header, with its title and Resume; a Bot's page draws its own and resumes from its composer. */
+	header: boolean;
 }
 
-export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, titleAction, trajectory }: PastConversationProps) {
+export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, titleAction, trajectory, header }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
@@ -40,36 +42,38 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
-				<Header
-					title={session && !foreign ? <SessionTitle sessionId={sessionId} title={title} /> : title}
-					trailing={
-						<>
-							<SessionIdCopy id={sessionId} />
-							{!foreign && titleAction}
-						</>
-					}
-					status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"}
-					alert={false}
-				>
-					{session && (
-						<>
-							<SessionMeta facts={session} />
-							{!foreign && (
-								<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
-									<Button
-										size="compact"
-										onClick={onResume}
-										disabled={resume?.phase === "starting"}
-										aria-busy={resuming || undefined}
-									>
-										{resuming ? "Resuming…" : "Resume"}
-									</Button>
-								</Tooltip>
-							)}
-						</>
-					)}
-					{actions}
-				</Header>
+				{header && (
+					<Header
+						title={session && !foreign ? <SessionTitle sessionId={sessionId} title={title} /> : title}
+						trailing={
+							<>
+								<SessionIdCopy id={sessionId} />
+								{!foreign && titleAction}
+							</>
+						}
+						status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"}
+						alert={false}
+					>
+						{session && (
+							<>
+								<SessionMeta facts={session} />
+								{!foreign && (
+									<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
+										<Button
+											size="compact"
+											onClick={onResume}
+											disabled={resume?.phase === "starting"}
+											aria-busy={resuming || undefined}
+										>
+											{resuming ? "Resuming…" : "Resume"}
+										</Button>
+									</Tooltip>
+								)}
+							</>
+						)}
+						{actions}
+					</Header>
+				)}
 				{failed && (
 					<p role="alert" className={cn("border-b border-border px-6 py-2 text-xs", NOTICE_TONE.error)}>
 						{failed}

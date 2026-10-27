@@ -137,10 +137,10 @@ test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+arrows step through sessions,
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then N, R, W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then N, W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	// R alone replies on an open conversation, so after a G both match.
-	expect(after("g", "r")).toEqual(["routines", "emailReply"]);
+	// R alone replies on an open conversation, and a G before it changes nothing.
+	expect(after("g", "r")).toEqual(["emailReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "m")).toEqual(["email"]);
 	expect(after("g", "i")).toEqual([]);

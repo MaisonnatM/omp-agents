@@ -38,6 +38,10 @@ export const userNoteInboxDir = join(configDir, "note-inbox");
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
+/** The Bots: each one's name, job, workspace, and conversation, beside {@link tokenFile}. */
+export const botsFile = join(configDir, "bots.json");
+/** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
+export const botsDir = join(dataDir, "bots");
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */
 export const scheduledFile = join(configDir, "scheduled.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */

@@ -20,7 +20,7 @@ import { NewSession } from "./new-session";
 import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
-import { RoutinesPage } from "./routines/routines-page";
+import { BotPage, NewBot } from "./bots/bot-page";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
@@ -59,7 +59,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botMemories" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -73,8 +73,6 @@ interface PageSwitchProps extends PageState {
 	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	todoView: TodoListView;
-	/** The routine the Routines page shows, `null` for its list. */
-	routinesTarget: string | null;
 	linear: McpIntegration | null;
 	/** The dashboard reads and writes Linear. */
 	linearCallable: boolean;
@@ -100,6 +98,8 @@ export const PageSwitch = memo(function PageSwitch({
 	userTodos,
 	userNotes,
 	routines,
+	bots,
+	botMemories,
 	workspaceList,
 	pins,
 	newSessionCompletions,
@@ -111,7 +111,6 @@ export const PageSwitch = memo(function PageSwitch({
 	defaultWorkspace,
 	sectionTarget,
 	todoView,
-	routinesTarget,
 	linear,
 	linearCallable,
 	maximized,
@@ -191,20 +190,27 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "notes":
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
-		case "routines":
+		case "bots": {
+			if (page.target === null) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
+			const bot = bots?.find(({ id }) => id === page.target);
+			if (!bot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
 			return (
-				// Keyed by its target, so leaving for another routine or the list closes the editor.
-				<RoutinesPage
-					key={routinesTarget ?? ""}
+				// Keyed by the Bot and its routine, so another Bot's page starts with its own drafts, and leaving a routine closes its editor.
+				<BotPage
+					key={`${bot.id}/${page.routine ?? ""}`}
+					bot={bot}
+					routine={page.routine}
+					memory={botMemories[bot.id] ?? ""}
 					routines={routines}
-					target={routinesTarget}
-					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.
 					hosts={hosts}
+					past={past}
+					lastHosts={lastHosts}
+					models={models}
 					workspaces={workspaces}
-					defaultCwd={defaultWorkspace}
 					connected={connected}
 				/>
 			);
+		}
 		case "calendar":
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
 		case "email":

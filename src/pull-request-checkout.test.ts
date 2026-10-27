@@ -106,6 +106,7 @@ describe("in a separate worktree", () => {
 				todoId: null,
 				taskId: null,
 				reviewDraft: false,
+				bot: null,
 			},
 		]);
 	});

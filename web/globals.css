@@ -298,6 +298,31 @@
     stroke-dasharray: 40 60;
   }
 }
+/* A working Bot's avatar: it bobs, its eyes glance aside and back, and with reduced motion its eyes only pulse. Outside @theme, as the spinner's, since an arbitrary `animate-[…]` class names them. */
+@keyframes bot-bob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6%);
+  }
+}
+@keyframes bot-glance {
+  0%, 30%, 100% {
+    transform: translateX(0);
+  }
+  45%, 75% {
+    transform: translateX(2px);
+  }
+}
+@keyframes bot-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
 
 @utility surface-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);

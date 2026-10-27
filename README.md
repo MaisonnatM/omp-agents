@@ -27,7 +27,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 
 - **Live roster.**
   Every running and past session, with a status dot (running, idle, or waiting on a question), filtered by workspace.
-  Pin a session to keep it at the top in every window, and let a routine pin the session it just finished in place of its last one.
+  Pin a session to keep it at the top in every window.
   Sessions that stopped when the dashboard went down wait in an **interrupted** group, and **Resume all** brings them back.
   Claude Code and Codex sessions on the same machine list beside omp's, as read-only transcripts you can search.
 - **Session details.**

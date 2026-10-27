@@ -21,7 +21,7 @@ Removal uses `git worktree remove` without `--force`, so Git keeps the branch an
 The preview reads the status with executable-mode detection forced on, and refuses a checkout whose index hides changes with assume-unchanged or skip-worktree flags.
 A missing directory is removed the same way, which drops only that registration.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
-Starts that create no worktree, such as a resume or a routine's session, stay parallel and wait only while a removal runs.
+Starts that create no worktree, such as a resume or a Bot's session, stay parallel and wait only while a removal runs.
 
 `WorktreeOccupants` supplies named, located directories and unresolved repository scopes to `Worktrees`.
 It protects each live session's default directory and reported worktree, plus each resident subagent's native default directory and every declared Bash `cwd`.

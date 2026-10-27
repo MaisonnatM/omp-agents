@@ -92,7 +92,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
 | Pages: Email | view | `email`, `email/new`, `email/item` |
-| Pages: Routines | view | `routines`, `routines/item` |
+| Pages: Bots | view, control, action | `bots`, `bots/item`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.routine.new`; `bot` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |
@@ -104,5 +104,5 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Colors, the font, and tokens | not applicable | no interaction |
 
 The checkout menu lives at `web/components/pull-requests/pr-details/checkout-menu.tsx`, not `pull-requests/checkout-menu.tsx` as the plan lists.
-`CommandPicker`, `DirectoryPicker`, and `ModelPicker` take an optional `control`, so the same picker on the routine editor, Settings, or the replay dialog records nothing.
+`CommandPicker`, `DirectoryPicker`, and `ModelPicker` take an optional `control`, so the same picker on Settings or the replay dialog records nothing.
 `DetailsTab` takes a required `control`, so every new right-sidebar tab must name one.

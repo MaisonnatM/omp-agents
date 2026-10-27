@@ -39,6 +39,6 @@
 - The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit or a retry after the provider's connection error.
 - A session waits on one continue at most: a later limit moves it to the new reset, and a later fault to its next retry.
   Any new turn of that session cancels it, whoever sends the prompt: you or a scheduled message; so do an edited prompt and **End session**.
-- Until the continue goes, fails, or you cancel it, the session stays on its task: a routine does not end the session, and **After a merge** does not end it.
+- Until the continue goes, fails, or you cancel it, the session stays on its task: **After a merge** does not end it.
   The sidebar still shows it idle, and it stays on its task when the dashboard restarts.
 - omp's own `retry.waitForUsageReset` setting instead keeps the turn waiting inside omp, so a turn it holds never ends on the limit.

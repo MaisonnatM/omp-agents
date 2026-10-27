@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import type { BotChange } from "../src/shared/bots";
 import type { PinChange } from "../src/shared/pins";
 import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
@@ -6,6 +7,7 @@ import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
 import { openSocket } from "./api";
+import { openBotView } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
@@ -92,6 +94,8 @@ export interface Dashboard {
 	changeNote: (change: UserNoteChange) => void;
 	/** Pin or unpin sessions, which shows at once and reaches the server and every other window. */
 	changePins: (change: PinChange) => void;
+	/** Add, change, or delete a Bot, which shows at once and reaches the server and every other window. */
+	changeBot: (change: Exclude<BotChange, { op: "message" }>) => void;
 }
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
@@ -104,8 +108,11 @@ export function useDashboard(): Dashboard {
 	const startsRef = useRef(state.starts);
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
-	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
-	const watched = useMemo<View[]>(() => (page ? NO_VIEWS : state.layout.panes), [page, state.layout.panes]);
+	// A page covering the panes shows none of them, so the server streams only a Bot page's conversation until the panes return.
+	const botConversation = openBotView(page, state.bots, state.hosts);
+	// Keyed by its address, since openBotView builds a new view on each render.
+	const botPane = botConversation && hashForView(botConversation);
+	const watched = useMemo<View[]>(() => (!page ? state.layout.panes : botConversation ? [botConversation] : NO_VIEWS), [page, botPane, state.layout.panes]);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 	const shownTrajectories = useShownTrajectories();
@@ -240,6 +247,7 @@ export function useDashboard(): Dashboard {
 					case "user-todos":
 					case "user-notes":
 					case "routines":
+					case "bots":
 					case "scheduled":
 					case "workspaces":
 					case "notices":
@@ -346,6 +354,13 @@ export function useDashboard(): Dashboard {
 		},
 		[send],
 	);
+	const changeBot = useCallback(
+		(change: Exclude<BotChange, { op: "message" }>) => {
+			dispatch({ t: "bot", change, now: new Date().toISOString() });
+			send({ t: "bot", change });
+		},
+		[send],
+	);
 
-	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins };
+	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot };
 }

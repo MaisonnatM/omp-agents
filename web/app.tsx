@@ -58,7 +58,7 @@ const ALL_NOTES: NotesListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins } = useDashboard();
+	const { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -165,8 +165,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, endHost, setFilePath, setNewTicket, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setFilePath, setNewTicket, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const replay = startOf(state.starts, "replay");
@@ -187,8 +187,6 @@ export function App() {
 		(): TodoListView => (routedTodoList === null || (routedTodoList.kind === "category" && !categories?.some(({ id }) => id === routedTodoList.id)) ? ALL_TODOS : routedTodoList),
 		[routedTodoList, categories],
 	);
-	/** The routine the Routines page shows; one another window deleted shows the list. */
-	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
@@ -231,9 +229,9 @@ export function App() {
 											notesView={notesView}
 											hosts={state.hosts}
 											past={state.past}
-											routines={state.routines}
+											bots={state.bots}
+											botLasts={state.botLasts}
 											todoView={todoView}
-											routinesTarget={routinesTarget}
 											settings={settings}
 											sectionTarget={sectionTarget}
 											onSectionTarget={setSectionTarget}
@@ -259,6 +257,8 @@ export function App() {
 																	userTodos={state.userTodos}
 																	userNotes={state.userNotes}
 																	routines={state.routines}
+																	bots={state.bots}
+																	botMemories={state.botMemories}
 																	workspaceList={state.workspaceList}
 																	pins={state.pins}
 																	newSessionCompletions={state.newSessionCompletions}
@@ -270,7 +270,6 @@ export function App() {
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
 																	todoView={todoView}
-																	routinesTarget={routinesTarget}
 																	linear={linear}
 																	linearCallable={linearCallable}
 																	maximized={maximized}

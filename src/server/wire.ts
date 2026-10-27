@@ -7,6 +7,7 @@
  */
 import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
+import { parseBotChange } from "../shared/bots";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
@@ -379,6 +380,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	routine(value) {
 		const change = parseRoutineChange(value.change);
 		return change ? { ok: { t: "routine", change: change.ok } } : null;
+	},
+	bot(value) {
+		const change = parseBotChange(value.change);
+		return change && { ok: { t: "bot", change } };
 	},
 	schedule(value) {
 		const change = parseScheduledChange(value.change);

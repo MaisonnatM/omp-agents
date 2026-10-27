@@ -49,10 +49,9 @@ An `edit-prompt` cancels the old session id's continue through `AutoContinue.can
 A cancel that arrives while the usage read runs keeps the continue from being scheduled.
 
 `AutoContinue.held` reads the hold from the schedule: a session is held while `scheduled.json` has a continue for it that waits or is under way, or while its limit's usage read runs, the one part kept in memory.
-A continue that failed never goes on its own, so it holds nothing: the runner's failure reaches `sendsChanged` like any change, which releases the session, while the row stays for **Try again** or **Dismiss**.
+A continue that failed never goes on its own, so it holds nothing, while the row stays for **Try again** or **Dismiss**.
 So a session the server attached to after a restart is still held while its continue waits.
-The routine runner and the cleanup after a merge read a session's real `status` and its `occupied`: a turn runs or waits on a question (`occupiedBy` in `src/server/auto-continue.ts`), or `AutoContinue` holds it.
-An occupied session is not ended by a routine or by the cleanup after a merge, which tries it again at its next look.
+The cleanup after a merge reads a session's real `status` and its `occupied`: a turn runs or waits on a question (`occupiedBy` in `src/server/auto-continue.ts`), or `AutoContinue` holds it.
+An occupied session is not ended by the cleanup after a merge, which tries it again at its next look.
 The page reads the roster, so a held session shows idle.
-`AutoContinue.sendsChanged` compares the held sessions with those it last saw, starting from the file as the server starts, and releases each that is no longer held.
-Every change to the sends goes through `Dashboard`'s `#publishScheduled`, which tells every socket and calls `sendsChanged`: the page's edits, through the list registry's push, the runner's claims, sends, and failures, `AutoContinue`'s own continues and cancels, and the minute tick's read of the file, which brings in what another server did.
+Every change to the sends tells every socket through the list registry's `pushList("scheduled")`: the page's edits, through the list registry's push, the runner's claims, sends, and failures, `AutoContinue`'s own continues and cancels, and the minute tick's read of the file, which brings in what another server did.

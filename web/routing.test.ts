@@ -6,12 +6,13 @@ import {
 	adjacentSession,
 	closePane,
 	endSession,
+	hashForBots,
 	hashForEmail,
 	hashForPullRequests,
 	hashForLayout,
 	hashForNewSession,
 	hashForPullRequestFiles,
-	hashForRoutines,
+	hashForBotRoutine,
 	hashForSettings,
 	hashForTickets,
 	hashForOpenTodo,
@@ -169,14 +170,18 @@ describe("layout hash", () => {
 		for (const hash of ["#todo", "#todo/0b9e", "#todo?open=t1"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
-	test("the routines hash opens the list or one routine, and no routines hash is read as a layout", () => {
+	test("the bots hash opens the New Bot form, one Bot, or one of its routines, and no bots or old routines hash is read as a page", () => {
 		const id = "3f2a9c1e-7b4d-4e8a-9f61-0c2d5e8b7a14";
-		expect(hashForRoutines(null)).toBe("#routines");
-		expect(hashForRoutines(id)).toBe(`#routines/${id}`);
-		expect(routeFromHash("#routines")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
-		expect(routeFromHash(`#routines/${id}`)).toEqual({ kind: "page", page: { kind: "routines", target: id } });
-		expect(routeFromHash("#routines/")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
-		expect(routeFromHash("#routinesx").kind).toBe("panes");
+		expect(hashForBots(null)).toBe("#bots");
+		expect(hashForBots("a b")).toBe("#bots/a%20b");
+		expect(hashForBotRoutine("a b", id)).toBe(`#bots/a%20b/routines/${id}`);
+		expect(routeFromHash("#bots")).toEqual({ kind: "page", page: { kind: "bots", target: null } });
+		expect(routeFromHash("#bots/a%20b")).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: null } });
+		expect(routeFromHash(`#bots/a%20b/routines/${id}`)).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: id } });
+		expect(routeFromHash(`#bots/a%20b/routines`)).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: null } });
+		expect(routeFromHash(`#bots/a%20b/runs/${id}`)).toEqual({ kind: "page", page: { kind: "bots", target: "a b", routine: null } });
+		expect(routeFromHash("#botsx").kind).toBe("panes");
+		expect(routeFromHash(`#routines/${id}`).kind).toBe("panes");
 	});
 
 	test("the email hash opens the list, a new mail, or one account's conversation, round-trips both ids, and is not read as a layout", () => {
@@ -215,7 +220,8 @@ describe("layout hash", () => {
 	test("a malformed percent-escape names nothing instead of throwing: the page opens without its target, and its pane drops", () => {
 		const page = (page: Page): Route => ({ kind: "page", page });
 		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: { kind: "all" }, open: null }));
-		expect(routeFromHash("#routines/%zz")).toEqual(page({ kind: "routines", target: null }));
+		expect(routeFromHash("#bots/%zz")).toEqual(page({ kind: "bots", target: null }));
+		expect(routeFromHash("#bots/b1/routines/%zz")).toEqual(page({ kind: "bots", target: "b1", routine: null }));
 		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));
 		expect(routeFromHash("#pull-requests/acme/web/1/files/%E0")).toEqual(page({ kind: "pull-requests", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));
 		expect(routeFromHash("#session/%E0")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });

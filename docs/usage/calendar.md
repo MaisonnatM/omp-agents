@@ -7,7 +7,7 @@
   A violet dot is a todo, an amber one a ticket, a timed Google event uses its calendar's color, and an event on this computer is slate gray; an all-day event is a band in that color; a done or canceled todo or ticket is struck through.
 - **Show routines** starts checked.
   Uncheck it to hide past, planned, and interval routine entries from the month, day previews, and selected-day list.
-  This does not pause routines or change the **Routines** tab.
+  This does not pause routines or change a Bot's routine list.
   The app keeps the choice across reloads and shares it between windows on the same dashboard address.
 - Planned runs follow each routine's schedules from its last run.
   A time that passed without a run shows as now, since the next minute's check runs it.
@@ -17,7 +17,7 @@
 - A day cell shows three entries and how many more there are; today's number is circled.
   Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
   Click anywhere in a day's cell to list all of its entries beside the month; today is listed when the page opens.
-- Click an entry to open its routine, its todo beside its list, or its ticket; a Google event opens in Google Calendar in your default browser.
+- Click an entry to open its routine under its Bot, its todo beside its list, or its ticket; a Google event opens in Google Calendar in your default browser.
   An event on this computer has no page of its own, so clicking it in a day cell lists its day.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
   Choosing the selected month or year keeps it selected; neither menu clears the calendar's date.

@@ -33,7 +33,6 @@ Alt is Option on macOS.
 | C | Outside text fields, except on the Todo, Notes, Calendar, and Email pages | Create a Linear ticket, when connected |
 | G then N | Outside text fields | Go to your notes |
 | G then M | Outside text fields | Go to your email, when connected |
-| G then R | Outside text fields | Go to your routines |
 | G then , | Outside text fields | Open or close Settings |
 | G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
@@ -74,7 +73,7 @@ Alt is Option on macOS.
 - Cmd+1 through Cmd+5 go to the first through fifth tab the sidebar's bar draws, even while typing.
   The numbers count only the tabs of the group the header's **Dev** and **Ops** switch shows, in the order **Settings › Preferences** sets: a tab you hide, or Tickets or Email without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
-  In the default order, Cmd+1 opens **Pull requests** under **Dev** and **Notes** under **Ops**, Cmd+3 opens **Sessions** under **Dev**, with Linear connected, and **Email** under **Ops**, and Cmd+5 opens **Routines** under **Dev**.
+  In the default order, Cmd+1 opens **Pull requests** under **Dev** and **Notes** under **Ops**, Cmd+3 opens **Bots** under **Dev**, with Linear connected, and **Email** under **Ops**, Cmd+4 opens **Sessions** under **Dev**, and Cmd+5 opens **Todo** under **Dev**.
   The **Email** tab takes its number like any tab and keeps G then M.
   Cmd with T, W, L, R, D, Q, O, P, S, Tab, or 6 through 0 is left to the window, whose menu takes Cmd+W, Cmd+R, Cmd+Q, and Cmd+0; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
@@ -119,8 +118,8 @@ Alt is Option on macOS.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
 - The number of the **Pull requests** tab opens the Pull requests page, and that of **Tickets** opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
-  The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the email, the routines, Settings, or the new-session draft to the panes.
-  The numbers of **Todo**, **Routines**, and **Calendar** open those pages, G then M or the Email tab's number the **Email** page when connected to Gmail, and G then R the **Routines** page.
+  The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the email, a Bot, Settings, or the new-session draft to the panes.
+  The numbers of **Todo** and **Calendar** open those pages, and G then M or the Email tab's number the **Email** page when connected to Gmail.
   G then ,, like the header's gear button, opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

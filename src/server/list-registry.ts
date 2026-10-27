@@ -1,5 +1,6 @@
 /** Whole-list snapshots and edits: one registration owns each message builder and its store's reducer. */
 import type { RoutineChange } from "../routines";
+import type { BotChange } from "../shared/bots";
 import type { PinChange } from "../shared/pins";
 import type { PreferenceChange } from "../shared/preferences";
 import type { ServerMsg } from "../shared/protocol";
@@ -19,6 +20,7 @@ interface ListChanges {
 	pins: PinChange;
 	"review-drafts": ReviewDraftEdit;
 	preferences: PreferenceChange;
+	bots: Exclude<BotChange, { op: "message" }>;
 }
 
 /** The lists only the server changes, through actions of their own: the bell's notices, and the queued merges. */

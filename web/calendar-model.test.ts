@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import type { Routine, RoutineRun, Schedule } from "../src/routines";
 import type { GoogleAccount } from "../src/shared/accounts";
+import type { BotId } from "../src/shared/bots";
 import type { CalendarEvent, GoogleCalendar, LocalEvent } from "../src/shared/calendar";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
@@ -23,11 +24,10 @@ const NOW = at("2026-10-14T12:00:00+02:00");
 const run = (iso: string, fields: Partial<RoutineRun> = {}): RoutineRun => ({ at: at(iso), outcome: { kind: "pending", queued: false }, errors: [], ...fields });
 const routine = (fields: Partial<Routine>): Routine => ({
 	id: "r1",
+	botId: "scout" as BotId,
 	name: "Notes",
-	cwd: "/work/webapp",
 	schedules: [weekdays],
-	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
-	skill: null,
+	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
 	enabled: true,
 	createdAt: at("2026-09-01T08:00:00+02:00"),
 	runs: [],
