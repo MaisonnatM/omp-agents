@@ -10,7 +10,7 @@
     "omp-template": "bun templates/omp/install.ts",
     "prepare": "git config core.hooksPath .githooks",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "(test -d node_modules || bun install --frozen-lockfile) && tsc --noEmit"
   },
   "devDependencies": {
     "@total-typescript/shoehorn": "^0.1.2",

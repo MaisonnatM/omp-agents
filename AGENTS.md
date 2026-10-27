@@ -2,7 +2,7 @@
 
 ## Pitfalls
 
-Read [LEARNINGS.md](LEARNINGS.md) before you set up a new worktree or retry a failed check; it lists the mistakes agents already made here.
+Read [LEARNINGS.md](LEARNINGS.md) before you retry a failed check; it lists the mistakes agents already made here.
 
 ## Read before you act
 
