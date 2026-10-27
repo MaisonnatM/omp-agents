@@ -55,7 +55,7 @@ function harness() {
 		},
 		live: sessionId => live(sessions.find(session => session.sessionId === sessionId && !session.ended)),
 		session: instanceId => live(sessions.find(session => session.instanceId === instanceId)),
-		savedFile: sessionId => (saved.has(sessionId) ? `/sessions/${sessionId}.jsonl` : null),
+		savedFile: sessionId => (saved.has(sessionId) ? join(dir, `${sessionId}.jsonl`) : null),
 		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botsDir: join(dir, "bots") },
 		now: () => "2026-05-02T09:00:00.000Z",
 		onChange: () => {},
@@ -119,19 +119,36 @@ describe("Bots", () => {
 		expect(file.value[0]?.sessionId).toBe("s1-moved");
 	});
 
-	test("memories read each Bot's memory.md, empty before it remembers anything", () => {
+	test("the message holds each Bot's memory.md, empty before it remembers anything", () => {
 		const { bots, file, dir } = harness();
 		file.apply({ op: "save", bot: { ...scout, id: "scribe" as BotId, name: "Scribe" } }, "2026-05-02T09:00:00.000Z");
 		mkdirSync(join(dir, "bots", "scout"), { recursive: true });
 		writeFileSync(join(dir, "bots", "scout", "memory.md"), "- 2026-05-02 Prefers short answers.\n");
-		expect(bots.memories).toEqual({ ["scout" as BotId]: "- 2026-05-02 Prefers short answers.\n", ["scribe" as BotId]: "" });
+		expect(bots.msg().memories).toEqual({ ["scout" as BotId]: "- 2026-05-02 Prefers short answers.\n", ["scribe" as BotId]: "" });
 	});
 
-	test("lasts holds no last words for a Bot whose conversation has no file", async () => {
+	test("the message holds no last words for a Bot whose conversation has no file", async () => {
 		const { bots } = harness();
-		expect(bots.lasts).toEqual({ ["scout" as BotId]: null });
+		expect(bots.msg().lasts).toEqual({ ["scout" as BotId]: null });
 		await bots.message(scout.id, "Hello.");
-		expect(bots.lasts).toEqual({ ["scout" as BotId]: null });
+		expect(bots.msg().lasts).toEqual({ ["scout" as BotId]: null });
+	});
+
+	test("the message reads a Bot's files again only once its session changed, and forgets a removed Bot", async () => {
+		const { bots, file, dir } = harness();
+		await bots.message(scout.id, "Hello.");
+		const said = (text: string) => writeFileSync(join(dir, "s1.jsonl"), `${JSON.stringify({ type: "message", timestamp: "2026-05-02T09:30:00.000Z", message: { role: "assistant", content: text } })}\n`);
+		said("Hi.");
+		expect(bots.msg().lasts[scout.id]?.text).toBe("Hi.");
+		said("Still here.");
+		mkdirSync(join(dir, "bots", "scout"), { recursive: true });
+		writeFileSync(join(dir, "bots", "scout", "memory.md"), "- 2026-05-02 Prefers short answers.\n");
+		expect(bots.msg()).toMatchObject({ memories: { scout: "" }, lasts: { scout: { text: "Hi." } } });
+		expect(bots.changed("i9")).toBe(false);
+		expect(bots.changed("i1")).toBe(true);
+		expect(bots.msg()).toMatchObject({ memories: { scout: "- 2026-05-02 Prefers short answers.\n" }, lasts: { scout: { text: "Still here." } } });
+		file.apply({ op: "remove", id: scout.id }, "2026-05-02T09:00:00.000Z");
+		expect(bots.msg()).toEqual({ t: "bots", bots: [], memories: {}, lasts: {} });
 	});
 });
 

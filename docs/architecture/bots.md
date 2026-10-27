@@ -17,6 +17,7 @@ Its `remember` tool appends `- YYYY-MM-DD fact` to `$XDG_DATA_HOME/omp-agents/bo
 A `bot` socket message carries one `BotChange`.
 `save` and `remove` go through the list registry, so every socket hears the new list as a `bots` message, with each Bot's memory file's text.
 The same message carries each Bot's last words, which `lastMessage` reads from the end of its session file, and the server sends it again as each turn of a Bot's conversation starts and ends, so the sidebar's previews and times follow the conversation.
+`Bots.msg` keeps each Bot's memory and last words as it read them, and reads one Bot's files again only when its conversation moved to another session or its session started or ended a turn or exited (`changed`), so a push reads one Bot's files, not every Bot's.
 `message` calls `Bots.message`, which answers once omp took the text: a follow-up in the live session, else a resume of the Bot's session followed by the text, else a new session in the Bot's workspace that starts with it.
 Messages to one Bot wait on one another, so two at once never start two conversations.
 

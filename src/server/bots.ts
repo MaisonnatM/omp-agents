@@ -9,6 +9,7 @@ import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { type Bot, type BotEdit, type BotId, type BotLast } from "../shared/bots";
+import type { ServerMsg } from "../shared/protocol";
 import { modelOfSelector } from "../shared/models";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { isDashboardPrompt } from "../shared/transcript";
@@ -19,6 +20,9 @@ import type { SessionJoin } from "./start";
 
 /** What a message needs of a live session. */
 type BotSession = Pick<LiveSession, "sessionId" | "prompt">;
+
+/** A Bot's memory and its conversation's last words, as read for its session `sessionId`. */
+type BotFiles = { sessionId: string | null; memory: string; last: BotLast | null };
 
 /** How much of a session file's end {@link lastMessage} reads; a conversation whose last words sit further back previews none. */
 const LAST_TAIL = 256 * 1024;
@@ -85,6 +89,8 @@ export class Bots {
 	readonly #live = new Map<string, BotId>();
 	/** Each Bot's message under way, which the next waits on, so two at once never start two conversations. */
 	readonly #sending = new Map<BotId, Promise<unknown>>();
+	/** Each Bot's memory and last words as last read, with the session they were read for; {@link changed} drops a Bot's. */
+	#read = new Map<BotId, BotFiles>();
 
 	constructor(deps: BotsDeps) {
 		this.#deps = deps;
@@ -94,28 +100,45 @@ export class Bots {
 		return this.#deps.file.value;
 	}
 
-	/** What each Bot remembers, as its session wrote it; empty before it remembers anything. */
-	get memories(): Record<BotId, string> {
+	/**
+	 * The `bots` message: every Bot, what each remembers, and its conversation's last words. Only a Bot that is new, whose
+	 * conversation moved, or whose session {@link changed} since the last message has its files read again.
+	 */
+	msg(): Extract<ServerMsg, { t: "bots" }> {
 		const memories: Record<BotId, string> = {};
-		for (const { id } of this.list) {
-			try {
-				memories[id] = readFileSync(this.#memoryPath(id), "utf8");
-			} catch (error) {
-				if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-				memories[id] = "";
-			}
+		const lasts: Record<BotId, BotLast | null> = {};
+		const read = new Map<BotId, BotFiles>();
+		for (const bot of this.list) {
+			const cached = this.#read.get(bot.id);
+			const entry = cached?.sessionId === bot.sessionId ? cached : { sessionId: bot.sessionId, memory: this.#memory(bot.id), last: this.#last(bot.sessionId) };
+			read.set(bot.id, entry);
+			memories[bot.id] = entry.memory;
+			lasts[bot.id] = entry.last;
 		}
-		return memories;
+		this.#read = read;
+		return { t: "bots", bots: this.list, memories, lasts };
 	}
 
-	/** The last words of each Bot's conversation, `null` before its first message. */
-	get lasts(): Record<BotId, BotLast | null> {
-		const lasts: Record<BotId, BotLast | null> = {};
-		for (const { id, sessionId } of this.list) {
-			const path = sessionId === null ? null : this.#deps.savedFile(sessionId);
-			lasts[id] = path === null ? null : lastMessage(path);
+	/** What Bot `id` remembers, as its session wrote it; empty before it remembers anything. */
+	#memory(id: BotId): string {
+		try {
+			return readFileSync(this.#memoryPath(id), "utf8");
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+			return "";
 		}
-		return lasts;
+	}
+
+	/** The last words of conversation `sessionId`, `null` before its first message. */
+	#last(sessionId: string | null): BotLast | null {
+		const path = sessionId === null ? null : this.#deps.savedFile(sessionId);
+		return path === null ? null : lastMessage(path);
+	}
+
+	/** Reads `bots.json` again, after another server saved it, and forgets every Bot's files as read. */
+	reload(): void {
+		this.#deps.file.reload();
+		this.#read.clear();
 	}
 
 	#memoryPath(id: BotId): string {
@@ -149,9 +172,14 @@ export class Bots {
 		this.#live.delete(instanceId);
 	}
 
-	/** Whether live session `instanceId` is a Bot's conversation. */
-	isBot(instanceId: string): boolean {
-		return this.#live.has(instanceId);
+	/**
+	 * Live session `instanceId` started or ended a turn, or exited, so its Bot's memory and last words may have changed;
+	 * the next {@link msg} reads them again. Whether the session is a Bot's conversation.
+	 */
+	changed(instanceId: string): boolean {
+		const id = this.#live.get(instanceId);
+		if (id) this.#read.delete(id);
+		return id !== undefined;
 	}
 
 	/**

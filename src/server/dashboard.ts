@@ -267,7 +267,7 @@ export class Dashboard {
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
-			bots: { msg: () => ({ t: "bots", bots: this.#bots.list, memories: this.#bots.memories, lasts: this.#bots.lasts }), apply: change => this.#botsFile.apply(change, new Date().toISOString()) },
+			bots: { msg: () => this.#bots.msg(), apply: change => this.#botsFile.apply(change, new Date().toISOString()) },
 		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -696,7 +696,7 @@ export class Dashboard {
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#reviewDrafts.exited(instanceId);
 				// Its last turn may have remembered something.
-				if (this.#bots.isBot(instanceId)) this.#broadcasts.pushList("bots");
+				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
 				this.#sessions.remove(instanceId);
 				this.#broadcasts.syncRoster();
@@ -723,7 +723,7 @@ export class Dashboard {
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnStarted(sessionId);
 				// Its row moves up with the prompt that started the turn.
-				if (this.#bots.isBot(instanceId)) this.#broadcasts.pushList("bots");
+				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
 			}
 			case "turn-ended": {
@@ -732,7 +732,7 @@ export class Dashboard {
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
-				if (this.#bots.isBot(instanceId)) this.#broadcasts.pushList("bots");
+				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
 			}
 			default: {
@@ -781,7 +781,7 @@ export class Dashboard {
 			console.log("omp-agents: this server now runs routines and the todo and note inboxes.");
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
-			this.#botsFile.reload();
+			this.#bots.reload();
 			this.#todos.reload();
 			this.#notes.reload();
 			this.#broadcasts.pushList("routines");
