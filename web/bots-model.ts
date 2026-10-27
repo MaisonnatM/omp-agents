@@ -1,5 +1,4 @@
-/** What the page shows of a Bot: its avatar's shape and hue, its sidebar row, its running session and conversation, the routines that send to it, its memory's lines, and the prompts a new Bot offers. */
-import type { Routine } from "../src/routines";
+/** What the page shows of a Bot: its avatar's shape and hue, its sidebar row, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { plainMarkdown } from "./labels";
@@ -32,9 +31,9 @@ export function botView(bot: Bot, hosts: readonly RosterHost[]): View | null {
 	return bot.sessionId === null ? null : { kind: "past", sessionId: bot.sessionId };
 }
 
-/** The conversation `page` shows: the open Bot's, `null` on another page, on the New Bot form, or for a Bot that is gone. */
+/** The conversation `page` shows: the open Bot's, `null` on another page, on the New Bot form, on a Bot's routine, or for a Bot that is gone. */
 export function openBotView(page: Page | null, bots: readonly Bot[] | null, hosts: readonly RosterHost[]): View | null {
-	if (page?.kind !== "bots" || page.target === null) return null;
+	if (page?.kind !== "bots" || page.target === null || page.routine !== null) return null;
 	const bot = bots?.find(({ id }) => id === page.target);
 	return bot ? botView(bot, hosts) : null;
 }
@@ -68,11 +67,6 @@ export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], last
 			return { bot, status: host?.status ?? null, asking, unread: unread !== null, preview, at: Math.max(last?.at ?? 0, unread?.at ?? 0) || Date.parse(bot.createdAt) };
 		})
 		.sort((a, b) => b.at - a.at || a.bot.name.localeCompare(b.bot.name));
-}
-
-/** The routines that message Bot `id`. */
-export function botRoutines(routines: readonly Routine[], id: BotId): Routine[] {
-	return routines.filter(({ task }) => task.kind === "bot" && task.botId === id);
 }
 
 /** One fact of a memory: the day `remember` wrote it, when the line has one, and the fact. */

@@ -4,7 +4,7 @@ import { type Layout, openView, type Page, type SettingsRoute, type TabGroup, ty
 import { groupEntry, TAB_ROWS } from "./sidebar-tabs";
 
 /** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", routines: "routines", bots: "bots", notes: "notes", calendar: "calendar", inbox: "inbox", settings: "settings" };
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", inbox: "inbox", settings: "settings" };
 
 /** The page each tab shows, but for Sessions, which shows the panes. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
@@ -12,7 +12,6 @@ const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
 	tickets: { kind: "tickets", target: null },
 	bots: { kind: "bots", target: null },
 	todo: { kind: "todo", list: { kind: "all" }, open: null },
-	routines: { kind: "routines", target: null },
 	notes: { kind: "notes", list: { kind: "all" }, open: null },
 	calendar: { kind: "calendar" },
 	inbox: { kind: "inbox", target: null },

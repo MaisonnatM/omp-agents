@@ -1,16 +1,10 @@
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type RoutineSpec, type Weekday } from "../../../src/routines";
-import type { Bot } from "../../../src/shared/bots";
-import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { activityControl } from "../../activity";
 import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
-import { useSkills } from "../../use-skills";
 import { PageFrame } from "../list-page";
-import { DirectoryPicker } from "../workspace-picker";
-import { SkillPicker } from "../skill-picker";
 import { Field, FIELD, TEXT_AREA } from "../form-field";
 
 const UNITS: EveryUnit[] = ["minutes", "hours", "days"];
@@ -122,20 +116,17 @@ function ScheduleEditor({
 interface RoutineEditorProps {
 	initial: RoutineDraft;
 	isNew: boolean;
-	/** The workspaces, which the workspace picker offers. */
-	workspaces: Workspace[];
-	/** The Bots a routine can message. */
-	bots: readonly Bot[];
+	/** The name of the Bot the routine belongs to. */
+	botName: string;
 	connected: boolean;
 	onSave: (routine: RoutineSpec) => void;
 	onCancel: () => void;
 }
 
-/** A routine's name, workspace, task, schedules, and skill, saved together. */
-export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onSave, onCancel }: RoutineEditorProps) {
+/** A Bot's routine: its name, task, and schedules, saved together. */
+export function RoutineEditor({ initial, isNew, botName, connected, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
-	const skills = useSkills(draft.cwd || "~");
 	const id = useId();
 	const set = <K extends keyof RoutineDraft>(key: K, value: RoutineDraft[K]): void => setDraft(current => ({ ...current, [key]: value }));
 	const setSchedule = (index: number, schedule: ScheduleDraft): void =>
@@ -145,7 +136,7 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 	const result = specOf(draft);
 
 	return (
-		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta="Runs on a schedule while the dashboard runs">
+		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta={`${botName}'s routine, which runs on a schedule while the dashboard runs`}>
 			<form
 				className="mx-auto w-full max-w-2xl space-y-6 px-6 py-6"
 				onSubmit={event => {
@@ -165,30 +156,18 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 					/>
 				</Field>
 
-				{draft.task !== "bot" && (
-					<Field label="Workspace" hint={draft.task === "command" ? "The command runs in this directory." : "Its sessions start in this directory."}>
-						<DirectoryPicker cwd={draft.cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={cwd => set("cwd", cwd)} />
-					</Field>
-				)}
-
 				<Field label="Task">
 					<div className="space-y-3">
-						<Choice name={`${id}-task`} checked={draft.task === "prompt"} label="Run a prompt" onCheck={() => set("task", "prompt")}>
+						<Choice name={`${id}-task`} checked={draft.task === "prompt"} label="Send a message" onCheck={() => set("task", "prompt")}>
 							<textarea
-								aria-label="Prompt"
+								aria-label="Message"
 								value={draft.prompt}
 								rows={4}
 								placeholder="Summarize yesterday's commits on main."
 								onChange={event => set("prompt", event.target.value)}
 								className={TEXT_AREA}
 							/>
-							<label className="flex items-center gap-2 text-sm">
-								<input type="checkbox" checked={draft.pin} aria-describedby={`${id}-pin-hint`} onChange={event => set("pin", event.target.checked)} className="size-4 accent-current" />
-								Pin the session when it finishes
-							</label>
-							<p id={`${id}-pin-hint`} className="ml-6 text-xs text-muted-foreground">
-								Replaces the pin of this routine's previous session.
-							</p>
+							<p className="text-xs text-muted-foreground">Each run sends this into {botName}'s conversation, as if you wrote it there.</p>
 						</Choice>
 						<Choice name={`${id}-task`} checked={draft.task === "command"} label="Run a command" onCheck={() => set("task", "command")}>
 							<textarea
@@ -202,30 +181,9 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 								onChange={event => set("command", event.target.value)}
 								className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							/>
-							<p className="text-xs text-muted-foreground">Runs with sh in the workspace, without an omp session. Stopped after {COMMAND_TIME_LIMIT}.</p>
-						</Choice>
-						<Choice name={`${id}-task`} checked={draft.task === "bot"} label="Message a Bot" onCheck={() => set("task", "bot")}>
-							<Select items={bots.map(bot => ({ value: bot.id, label: bot.name }))} value={draft.botId} onValueChange={next => set("botId", next)}>
-								<SelectTrigger {...activityControl("routine-editor.bot")} aria-label="Bot">
-									<SelectValue placeholder={bots.length === 0 ? "No Bots yet" : "Choose a Bot"} />
-								</SelectTrigger>
-								<SelectContent>
-									{bots.map(bot => (
-										<SelectItem key={bot.id} value={bot.id}>
-											{bot.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							<textarea
-								aria-label="Message"
-								value={draft.message}
-								rows={4}
-								placeholder="Post today's standup."
-								onChange={event => set("message", event.target.value)}
-								className={TEXT_AREA}
-							/>
-							<p className="text-xs text-muted-foreground">Each run sends this into the Bot's conversation, as if you wrote it there.</p>
+							<p className="text-xs text-muted-foreground">
+								Runs with sh in {botName}'s workspace, without an omp session, and stops after {COMMAND_TIME_LIMIT}. Its output goes into {botName}'s conversation.
+							</p>
 						</Choice>
 					</div>
 				</Field>
@@ -248,12 +206,6 @@ export function RoutineEditor({ initial, isNew, workspaces, bots, connected, onS
 						</Button>
 					</div>
 				</Field>
-
-				{draft.task === "prompt" && (
-					<Field label="Skill" hint="Each session's first message goes through this skill.">
-						<SkillPicker label="Skill" skills={skills} value={draft.skill} onPick={skill => set("skill", skill)} />
-					</Field>
-				)}
 
 				<div className="flex items-center gap-3 border-t border-border pt-4">
 					<Button type="submit" disabled={!connected}>

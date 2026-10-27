@@ -2,7 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 import { commandKey, record } from "./activity";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the bar draws, whichever it is; one per tab of the larger group. */
-export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6"] as const;
+export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
 
 export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
 
@@ -44,7 +44,6 @@ export type ShortcutId =
 	| "notes"
 	| "calendar"
 	| "inbox"
-	| "routines"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -248,8 +247,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "notes", category: "general", label: "Go to your notes", command: "Go to notes", keys: [{ goTo: "n" }] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "inbox", category: "general", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
-	// After a G, R is also the Inbox page's `inboxReply`: the page outranks the App, so G then R replies while a conversation is open.
-	{ id: "routines", category: "general", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

@@ -1,24 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import type { Routine } from "../src/routines";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { RosterHost } from "../src/shared/sessions";
-import { botHost, botLook, botRoutines, botRows, botView, jobLine, memoryEntries, openBotView, starterPrompts } from "./bots-model";
+import { botHost, botLook, botRows, botView, jobLine, memoryEntries, openBotView, starterPrompts } from "./bots-model";
 
 const scout = "scout" as BotId;
 
 const bot = (sessionId: string | null): Bot => ({ id: scout, name: "Scout", job: "", cwd: "~/code/webapp", model: null, skill: null, sessionId, createdAt: "2026-10-05T09:00:00.000Z" });
-
-const routine = (id: string, task: Routine["task"]): Routine => ({
-	id,
-	name: id,
-	cwd: "~/code/webapp",
-	schedules: [{ kind: "weekly", days: [1], time: { hour: 9, minute: 0 } }],
-	task,
-	skill: null,
-	enabled: true,
-	createdAt: 0,
-	runs: [],
-});
 
 describe("Bots", () => {
 	test("the avatar's shape and hue depend on the id alone", () => {
@@ -42,20 +29,15 @@ describe("Bots", () => {
 		expect(botView(bot(null), hosts)).toBeNull();
 	});
 
-	test("the open conversation is the open Bot's, and none on another page, on the New Bot form, or for a Bot that is gone", () => {
+	test("the open conversation is the open Bot's, and none on another page, on the New Bot form, on one of its routines, or for a Bot that is gone", () => {
 		const bots = [bot("s2")];
-		expect(openBotView({ kind: "bots", target: "scout" }, bots, [])).toEqual({ kind: "past", sessionId: "s2" });
-		expect(openBotView({ kind: "bots", target: "ranger" }, bots, [])).toBeNull();
+		expect(openBotView({ kind: "bots", target: "scout", routine: null }, bots, [])).toEqual({ kind: "past", sessionId: "s2" });
+		expect(openBotView({ kind: "bots", target: "scout", routine: "r1" }, bots, [])).toBeNull();
+		expect(openBotView({ kind: "bots", target: "ranger", routine: null }, bots, [])).toBeNull();
 		expect(openBotView({ kind: "bots", target: null }, bots, [])).toBeNull();
-		expect(openBotView({ kind: "bots", target: "scout" }, null, [])).toBeNull();
-		expect(openBotView({ kind: "routines", target: "scout" }, bots, [])).toBeNull();
+		expect(openBotView({ kind: "bots", target: "scout", routine: null }, null, [])).toBeNull();
+		expect(openBotView({ kind: "calendar" }, bots, [])).toBeNull();
 		expect(openBotView(null, bots, [])).toBeNull();
-	});
-
-	test("a Bot's routines are those that message it", () => {
-		const message = (botId: BotId): Routine["task"] => ({ kind: "bot", botId, prompt: "Post the standup." });
-		const routines = [routine("mine", message(scout)), routine("other", message("ranger" as BotId)), routine("new", { kind: "prompt", prompt: "Post the standup.", pin: false })];
-		expect(botRoutines(routines, scout).map(({ id }) => id)).toEqual(["mine"]);
 	});
 
 	test("a row previews the question first, then Working…, then the freshest words as plain text, else no messages", () => {

@@ -57,9 +57,9 @@ test("browser-reserved chords stay the browser's, apart from the app's new-sessi
 	}
 });
 
-test("Cmd+1–6 go to the sidebar's tabs by position on macOS, Ctrl+1–6 elsewhere, including AZERTY", () => {
-	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6"] as const;
-	const azerty = ["&", "é", "\"", "'", "(", "-"];
+test("Cmd+1–5 go to the sidebar's tabs by position on macOS, Ctrl+1–5 elsewhere, including AZERTY", () => {
+	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
+	const azerty = ["&", "é", "\"", "'", "("];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
 		for (const [index, id] of positions.entries()) {
@@ -137,10 +137,10 @@ test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+arrows step through sessions,
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then N, R, W, I, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then N, W, I, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	// R alone replies on an open conversation, so after a G both match.
-	expect(after("g", "r")).toEqual(["routines", "inboxReply"]);
+	// R alone replies on an open conversation, and a G before it changes nothing.
+	expect(after("g", "r")).toEqual(["inboxReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "i")).toEqual(["inbox"]);
 	expect(after("g", "n")).toEqual(["notes"]);

@@ -187,8 +187,6 @@ export function App() {
 		(): TodoListView => (routedTodoList === null || (routedTodoList.kind === "category" && !categories?.some(({ id }) => id === routedTodoList.id)) ? ALL_TODOS : routedTodoList),
 		[routedTodoList, categories],
 	);
-	/** The routine the Routines page shows; one another window deleted shows the list. */
-	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
@@ -231,11 +229,9 @@ export function App() {
 											notesView={notesView}
 											hosts={state.hosts}
 											past={state.past}
-											routines={state.routines}
 											bots={state.bots}
 											botLasts={state.botLasts}
 											todoView={todoView}
-											routinesTarget={routinesTarget}
 											settings={settings}
 											sectionTarget={sectionTarget}
 											onSectionTarget={setSectionTarget}
@@ -274,7 +270,6 @@ export function App() {
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
 																	todoView={todoView}
-																	routinesTarget={routinesTarget}
 																	linear={linear}
 																	linearCallable={linearCallable}
 																	maximized={maximized}

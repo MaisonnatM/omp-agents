@@ -3,7 +3,7 @@
  * scheduled send that the scheduled runner delivers, for when a usage limit resets, or after a backoff that grows with
  * each transient connection or provider fault in a row. A turn the session starts first, from any prompt, cancels it,
  * and so does an edited prompt or End session. While `scheduled.json` holds the session's continue, or its limit's usage
- * read runs, the session is held: it stays on its task for its routine and its merge cleanup, across a server restart too.
+ * read runs, the session is held: it stays on its task for its merge cleanup, across a server restart too.
  */
 import { randomUUID } from "node:crypto";
 import type { TurnFailure } from "../omp/turn-failure";
@@ -66,27 +66,22 @@ export interface AutoContinueDeps {
 	/** The plans as `omp usage` reports them, read after the limit; rejects when it fails. */
 	plans(): Promise<readonly PlanUsage[]>;
 	now(): number;
-	/** The continues changed: every socket should hear the sends, and {@link AutoContinue.sendsChanged} release the holds they end. */
+	/** The continues changed: every socket should hear the sends. */
 	onChange(): void;
-	/** Session `sessionId` is held no more: its continue went, left the schedule, or was canceled. */
-	released(sessionId: string): void;
 }
 
 export class AutoContinue {
 	readonly #deps: AutoContinueDeps;
 	/** Each session whose continue waits on its usage read, with that limit; a cancel meanwhile takes it out. */
 	readonly #reading = new Map<string, UsageLimit>();
-	/** The held sessions as the last {@link sendsChanged} saw them, so the next one knows which holds ended. */
-	#seen: Set<string>;
 	/** How many transient faults in a row each session's retries followed; the count lives in memory and starts over with the server. */
 	readonly #retries = new Map<string, number>();
 
 	constructor(deps: AutoContinueDeps) {
 		this.#deps = deps;
-		this.#seen = this.#heldNow();
 	}
 
-	/** Whether session `sessionId` waits on its continue, so its routine or merge cleanup counts it as still on its task. */
+	/** Whether session `sessionId` waits on its continue, so its merge cleanup counts it as still on its task. */
 	held(sessionId: string): boolean {
 		return this.#reading.has(sessionId) || this.#deps.file.value.some(send => holds(send) && send.target.sessionId === sessionId);
 	}
@@ -118,7 +113,6 @@ export class AutoContinue {
 		this.#retries.delete(sessionId);
 		const at = now();
 		this.#reading.set(sessionId, hit);
-		this.sendsChanged();
 		// Without a usage report the provider's own wait still counts.
 		const read = await plans().catch(() => []);
 		if (this.#reading.get(sessionId) !== hit) return;
@@ -158,21 +152,6 @@ export class AutoContinue {
 	cancel(sessionId: string): void {
 		this.#retries.delete(sessionId);
 		this.turnStarted(sessionId);
-	}
-
-	/** The scheduled sends changed, here or on another server: a session held before and not now is released. */
-	sendsChanged(): void {
-		const now = this.#heldNow();
-		const ended = [...this.#seen].filter(sessionId => !now.has(sessionId));
-		this.#seen = now;
-		for (const sessionId of ended) this.#deps.released(sessionId);
-	}
-
-	/** The held sessions now: those whose usage read runs, and those whose continue waits or goes. */
-	#heldNow(): Set<string> {
-		const held = new Set(this.#reading.keys());
-		for (const send of this.#deps.file.value) if (holds(send)) held.add(send.target.sessionId);
-		return held;
 	}
 }
 

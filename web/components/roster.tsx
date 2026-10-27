@@ -3,7 +3,6 @@ import { Folder, Keyboard } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
-import type { Routine } from "../../src/routines";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { InboxNav } from "./inbox/inbox-nav";
 import { NotesNav } from "./notes/nav";
-import { RoutinesNav } from "./routines/routines-nav";
 import { SessionList } from "./session-list";
 import { SettingsNav } from "./settings/settings-nav";
 import { workspaceItems } from "./workspace-picker";
@@ -167,9 +165,6 @@ interface RosterProps {
 	userNotes: UserNoteList | null;
 	/** The list the Notes page shows. */
 	notesView: NotesListView;
-	routines: Routine[];
-	/** The routine the Routines page shows, `null` for its list, `undefined` while another page is open. */
-	routinesOpen: string | null | undefined;
 	/** The Calendar page is open. */
 	calendarOpen: boolean;
 	/** The settings section and workspace the sidebar's settings links keep. */
@@ -207,8 +202,6 @@ export function Roster({
 	todoSessions,
 	userNotes,
 	notesView,
-	routines,
-	routinesOpen,
 	calendarOpen,
 	settingsRoute,
 	sectionTarget,
@@ -301,11 +294,6 @@ export function Roster({
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
 					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="routines" asChild>
-				<SidebarContent>
-					<RoutinesNav routines={routines} current={routinesOpen} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="notes" asChild>

@@ -71,7 +71,7 @@ describe("dashboard state", () => {
 	});
 
 	test("a session ended from a page keeps the page, and one ended from the panes leaves no cover", () => {
-		const page = { kind: "page", page: { kind: "routines", target: null } } as const;
+		const page = { kind: "page", page: { kind: "calendar" } } as const;
 		const onPage = reduce(reduce(blank(), { t: "route", route: page }), { t: "end", instanceId: "a" });
 		expect(reduce(onPage, { t: "end-success", instanceId: "a", listed: ["a"] }).cover).toEqual(page);
 		const onPanes = reduce(reduce(blank(), { t: "route", route: { kind: "panes", layout: layout([live("a")]) } }), { t: "end", instanceId: "a" });

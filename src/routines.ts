@@ -1,7 +1,6 @@
 /** The rules of routines: when one is due, how a change edits the list, and which routine the page and `routines.json` may hold. */
 import { isNonEmpty, isObject, isSafeInteger, nonEmpty, type Parsed } from "./json";
 import { type BotId, parseBotId } from "./shared/bots";
-import { parseSkill } from "./shared/sessions";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -14,13 +13,12 @@ export type Schedule =
 /** One or more. A routine is due at the earliest. */
 export type Schedules = [Schedule, ...Schedule[]];
 
+/** What a run does in its Bot: the Bot's model, skill, and workspace apply to both. */
 export type RoutineTask =
-	/** One session in `cwd` that takes `prompt`; with `pin`, the session is pinned once its turn finishes, in place of the routine's earlier sessions. */
-	| { kind: "prompt"; prompt: string; pin: boolean }
-	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
-	| { kind: "command"; command: string }
-	/** `prompt` sent into Bot `botId`'s conversation, as if you wrote it there; the Bot's own workspace, model, and skill apply. */
-	| { kind: "bot"; botId: BotId; prompt: string };
+	/** `prompt` sent into the Bot's conversation, as if you wrote it there. */
+	| { kind: "prompt"; prompt: string }
+	/** `command` through `sh -c` in the Bot's workspace, with no omp session; what it printed is then posted into the Bot's conversation. */
+	| { kind: "command"; command: string };
 
 /** A run's command: `running` from its launch, saved before it can end, then how it ended. */
 export type CommandRun =
@@ -31,12 +29,11 @@ export type CommandRun =
 	/** `sh` could not start, as when the workspace is gone. */
 	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
 
-/** A claimed run waits `pending` until it starts the one thing it asks for: a session, a command, or a message in a Bot's conversation. */
+/** A claimed run waits `pending` until it sends its prompt into conversation `sessionId` or runs its command. */
 export type RoutineOutcome =
 	| { kind: "pending"; queued: boolean }
-	| { kind: "session"; instanceId: string; sessionId: string }
-	| { kind: "command"; run: CommandRun }
-	| { kind: "bot"; botId: BotId; sessionId: string };
+	| { kind: "sent"; sessionId: string }
+	| { kind: "command"; run: CommandRun };
 
 export interface RoutineRun {
 	at: number;
@@ -44,16 +41,14 @@ export interface RoutineRun {
 	errors: string[];
 }
 
-/** Schedules that start dashboard sessions, run a command, or message a Bot, on their own. */
+/** A schedule of a Bot's: each run sends a prompt into the Bot's conversation or runs a command in its workspace. */
 export interface Routine {
 	id: string;
+	/** The Bot the routine belongs to; deleting the Bot deletes the routine. */
+	botId: BotId;
 	name: string;
-	/** Where a prompt's sessions start and a command runs; a Bot's task runs in the Bot's own workspace. */
-	cwd: string;
 	schedules: Schedules;
 	task: RoutineTask;
-	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
-	skill: string | null;
 	enabled: boolean;
 	createdAt: number;
 	/** Newest first, the last 10. `runs[0].at` is the time every schedule counts from. */
@@ -70,9 +65,6 @@ export type RoutineChange =
 	| { op: "enable"; id: string; enabled: boolean }
 	/** Claims a run now, whatever the schedule says. */
 	| { op: "run-now"; id: string };
-
-/** What every routine session's prompt ends with, since nobody watches it. */
-export const UNATTENDED = "This session runs unattended from a routine. Do not ask questions. If something blocks you, say what and stop.";
 
 /** A command routine's command: the longest one a routine saves, how long it may run, and how much of its output a run keeps. */
 export const MAX_COMMAND_LENGTH = 10_000;
@@ -114,9 +106,8 @@ export const isDue = (routine: Routine, now: number): boolean =>
 /** Whether `routine` already holds every field the page edits of `spec`. */
 function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 	return (
+		routine.botId === spec.botId &&
 		routine.name === spec.name &&
-		routine.cwd === spec.cwd &&
-		routine.skill === spec.skill &&
 		routine.enabled === spec.enabled &&
 		JSON.stringify([routine.schedules, routine.task]) === JSON.stringify([spec.schedules, spec.task])
 	);
@@ -184,13 +175,9 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 	if (!isObject(value)) return null;
 	switch (value.kind) {
 		case "prompt":
-			return isNonEmpty(value.prompt) && typeof value.pin === "boolean" ? { ok: { kind: "prompt", prompt: value.prompt, pin: value.pin } } : null;
+			return isNonEmpty(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
 		case "command":
 			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
-		case "bot": {
-			const botId = parseBotId(value.botId);
-			return botId && isNonEmpty(value.prompt) ? { ok: { kind: "bot", botId, prompt: value.prompt } } : null;
-		}
 		default:
 			return null;
 	}
@@ -202,10 +189,10 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
  */
 export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isObject(value)) return null;
-	const { id, name, cwd, enabled } = value;
+	const { id, name, enabled } = value;
+	const botId = parseBotId(value.botId);
 	const schedules = parseSchedules(value.schedules);
 	const task = parseRoutineTask(value.task);
-	const skill = parseSkill(value.skill);
-	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
-	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled } };
+	if (!isNonEmpty(id) || !botId || !isNonEmpty(name) || typeof enabled !== "boolean" || !schedules || !task) return null;
+	return { ok: { id, botId, name, schedules: schedules.ok, task: task.ok, enabled } };
 }

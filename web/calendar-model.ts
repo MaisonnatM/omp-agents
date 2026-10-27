@@ -4,6 +4,7 @@
  */
 import { nextDueAt, type Routine, type RoutineRun } from "../src/routines";
 import type { GoogleAccount } from "../src/shared/accounts";
+import type { BotId } from "../src/shared/bots";
 import { type CalendarEvent, calendarKey, type EventWhen, type GoogleCalendar, type GoogleEventRef, type LocalEvent, type LocalEventRef, type NewEventCalendar } from "../src/shared/calendar";
 import type { Ticket, TicketStatusType } from "../src/shared/tickets";
 import type { UserTodoList } from "../src/user-todos-shared";
@@ -32,9 +33,9 @@ export interface ShownEvent {
 /** One thing on one day; `day` is the local day, `YYYY-MM-DD`, and `at` its time, `null` for one without. */
 export type CalendarEntry =
 	/** A run that happened, or a slot the schedule will run. */
-	| { kind: "routine"; day: string; at: number; routineId: string; name: string; state: "ran" | "failed" | "planned" }
+	| { kind: "routine"; day: string; at: number; botId: BotId; routineId: string; name: string; state: "ran" | "failed" | "planned" }
 	/** A routine that runs more than once a day, shown once per day instead of once per run. */
-	| { kind: "routine-interval"; day: string; at: null; routineId: string; name: string; minutes: number }
+	| { kind: "routine-interval"; day: string; at: null; botId: BotId; routineId: string; name: string; minutes: number }
 	| { kind: "todo"; day: string; at: null; todoId: string; categoryId: string | null; text: string; done: boolean }
 	| { kind: "ticket"; day: string; at: null; identifier: string; title: string; status: string; statusType: TicketStatusType }
 	/** One day of an event, timed on its first day; an event across days shows on each. */
@@ -66,21 +67,21 @@ function runState(run: RoutineRun): "ran" | "failed" {
  * so it shows at `now`; each later slot counts from the one before, as the schedule counts from the last run.
  */
 function routineEntries(routine: Routine, from: number, to: number, now: number): CalendarEntry[] {
-	const { id: routineId, name } = routine;
+	const { id: routineId, botId, name } = routine;
 	const intervals = routine.schedules.flatMap(schedule => (schedule.kind === "every" && schedule.minutes < DAY_MINUTES ? [schedule.minutes] : []));
 	if (intervals.length > 0) {
 		if (!routine.enabled) return [];
 		const minutes = Math.min(...intervals);
-		return daysBetween(localDay(Math.max(from, now)), localDay(to - 1)).map(day => ({ kind: "routine-interval", day, at: null, routineId, name, minutes }));
+		return daysBetween(localDay(Math.max(from, now)), localDay(to - 1)).map(day => ({ kind: "routine-interval", day, at: null, botId, routineId, name, minutes }));
 	}
 	const entries: CalendarEntry[] = routine.runs
 		.filter(run => run.at >= from && run.at < to)
-		.map(run => ({ kind: "routine", day: localDay(run.at), at: run.at, routineId, name, state: runState(run) }));
+		.map(run => ({ kind: "routine", day: localDay(run.at), at: run.at, botId, routineId, name, state: runState(run) }));
 	if (!routine.enabled) return entries;
 	for (let after = routine.runs[0]?.at ?? routine.createdAt; ; ) {
 		const at = Math.max(nextDueAt(routine.schedules, after), now);
 		if (at >= to) break;
-		if (at >= from) entries.push({ kind: "routine", day: localDay(at), at, routineId, name, state: "planned" });
+		if (at >= from) entries.push({ kind: "routine", day: localDay(at), at, botId, routineId, name, state: "planned" });
 		after = at;
 	}
 	return entries;

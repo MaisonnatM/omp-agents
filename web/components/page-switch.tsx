@@ -1,6 +1,5 @@
 import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
-import type { Bot } from "../../src/shared/bots";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { newDraftKey } from "../composer-drafts";
@@ -21,7 +20,6 @@ import { NewSession } from "./new-session";
 import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
-import { RoutinesPage } from "./routines/routines-page";
 import { BotPage, NewBot } from "./bots/bot-page";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
@@ -58,8 +56,6 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 	return { text: todo.text, prompt: body ? `${todo.text}\n\n${body}` : todo.text };
 }
 
-const NO_BOTS: Bot[] = [];
-
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
@@ -77,8 +73,6 @@ interface PageSwitchProps extends PageState {
 	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	todoView: TodoListView;
-	/** The routine the Routines page shows, `null` for its list. */
-	routinesTarget: string | null;
 	linear: McpIntegration | null;
 	/** The dashboard reads and writes Linear. */
 	linearCallable: boolean;
@@ -117,7 +111,6 @@ export const PageSwitch = memo(function PageSwitch({
 	defaultWorkspace,
 	sectionTarget,
 	todoView,
-	routinesTarget,
 	linear,
 	linearCallable,
 	maximized,
@@ -197,30 +190,16 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "notes":
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
-		case "routines":
-			return (
-				// Keyed by its target, so leaving for another routine or the list closes the editor.
-				<RoutinesPage
-					key={routinesTarget ?? ""}
-					routines={routines}
-					target={routinesTarget}
-					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.
-					hosts={hosts}
-					workspaces={workspaces}
-					defaultCwd={defaultWorkspace}
-					connected={connected}
-					bots={bots ?? NO_BOTS}
-				/>
-			);
 		case "bots": {
 			if (page.target === null) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
 			const bot = bots?.find(({ id }) => id === page.target);
 			if (!bot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
 			return (
-				// Keyed by the Bot, so another Bot's page starts with its own drafts.
+				// Keyed by the Bot and its routine, so another Bot's page starts with its own drafts, and leaving a routine closes its editor.
 				<BotPage
-					key={bot.id}
+					key={`${bot.id}/${page.routine ?? ""}`}
 					bot={bot}
+					routine={page.routine}
 					memory={botMemories[bot.id] ?? ""}
 					routines={routines}
 					hosts={hosts}

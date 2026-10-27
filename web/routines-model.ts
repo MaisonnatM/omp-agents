@@ -1,4 +1,4 @@
-/** What the Routines page says about a routine, and the editor's form and how it becomes a routine to save. */
+/** What a Bot's page says about its routines, and the editor's form and how it becomes a routine to save. */
 import { nonEmpty } from "../src/json";
 import { MAX_COMMAND_LENGTH, nextDueAt, type CommandRun, type Routine, type RoutineRun, type RoutineSpec, type RoutineTask, type Schedule, type Weekday } from "../src/routines";
 import type { BotId } from "../src/shared/bots";
@@ -46,11 +46,10 @@ export const schedulesWords = (schedules: readonly Schedule[]): string => schedu
 /** The first line of `text` with anything but blanks, trimmed. */
 const firstLine = (text: string): string => text.split("\n").find(line => line.trim())?.trim() ?? "";
 
-/** The prompt's first line, a Bot's message's, or the command's after `$ `. */
+/** The prompt's first line, or the command's after `$ `. */
 export function taskWords(task: RoutineTask): string {
 	switch (task.kind) {
 		case "prompt":
-		case "bot":
 			return firstLine(task.prompt);
 		case "command":
 			return `$ ${firstLine(task.command)}`;
@@ -96,17 +95,16 @@ function commandWords(command: CommandRun): string {
 	}
 }
 
-/** A run's result: `1 session started, 2 errors, Queued`, the parts that apply, or how its command stands. */
+/** A run's result: `Sent to the Bot, 2 errors`, the parts that apply, or how its command stands. */
 export function runWords(run: RoutineRun): string {
 	const { outcome } = run;
 	if (outcome.kind === "command") return commandWords(outcome.run);
 	const parts = [
-		outcome.kind === "session" && "1 session started",
-		outcome.kind === "bot" && "Sent to the Bot",
+		outcome.kind === "sent" && "Sent to the Bot",
 		run.errors.length > 0 && `${run.errors.length} ${run.errors.length === 1 ? "error" : "errors"}`,
 		outcome.kind === "pending" && outcome.queued && "Queued",
 	].filter(part => part !== false);
-	return parts.length > 0 ? parts.join(", ") : "Nothing started";
+	return parts.length > 0 ? parts.join(", ") : "Nothing sent";
 }
 
 /** How a run went, for its dot: `failed` once it has an error, which a command that did not succeed records. */
@@ -117,8 +115,7 @@ export function runHealth({ outcome, errors }: RoutineRun): RunHealth {
 	switch (outcome.kind) {
 		case "pending":
 			return "waiting";
-		case "session":
-		case "bot":
+		case "sent":
 			return "ok";
 		case "command": {
 			const { run } = outcome;
@@ -156,42 +153,23 @@ export function blankSchedule(): ScheduleDraft {
 }
 
 /**
- * The editor's form. It keeps every task's fields, so switching kind and back keeps what you typed.
+ * The editor's form. It keeps both tasks' fields, so switching kind and back keeps what you typed.
  */
 export interface RoutineDraft {
 	id: string;
+	/** The Bot the routine belongs to, which the editor never changes. */
+	botId: BotId;
 	name: string;
-	cwd: string;
 	enabled: boolean;
-	skill: string | null;
 	task: RoutineTask["kind"];
 	prompt: string;
-	/** Whether the prompt's session is pinned once it finishes. */
-	pin: boolean;
 	command: string;
-	/** The Bot a Bot task messages; `null` until you pick one. */
-	botId: BotId | null;
-	/** What a Bot task sends into the Bot's conversation. */
-	message: string;
 	schedules: ScheduleDraft[];
 }
 
-/** A new routine's form: a prompt on weekdays at 9:00 in `cwd`, through `skill`. */
-export function newDraft(id: string, cwd: string, skill: string | null): RoutineDraft {
-	return {
-		id,
-		name: "",
-		cwd,
-		enabled: true,
-		skill,
-		task: "prompt",
-		prompt: "",
-		pin: false,
-		command: "",
-		botId: null,
-		message: "",
-		schedules: [blankSchedule()],
-	};
+/** A new routine's form for Bot `botId`: a prompt on weekdays at 9:00. */
+export function newDraft(id: string, botId: BotId): RoutineDraft {
+	return { id, botId, name: "", enabled: true, task: "prompt", prompt: "", command: "", schedules: [blankSchedule()] };
 }
 
 /** One saved schedule as the editor shows it, with the other kind's fields at their defaults. */
@@ -207,7 +185,7 @@ function scheduleDraft(schedule: Schedule): ScheduleDraft {
 
 /** `routine`'s form, its other task's fields at their defaults. */
 export function draftOf(routine: Routine): RoutineDraft {
-	const draft = newDraft(routine.id, routine.cwd, routine.skill);
+	const draft = newDraft(routine.id, routine.botId);
 	const { task } = routine;
 	return {
 		...draft,
@@ -215,10 +193,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		enabled: routine.enabled,
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
-		pin: task.kind === "prompt" ? task.pin : draft.pin,
 		command: task.kind === "command" ? task.command : draft.command,
-		botId: task.kind === "bot" ? task.botId : draft.botId,
-		message: task.kind === "bot" ? task.prompt : draft.message,
 		schedules: routine.schedules.map(scheduleDraft),
 	};
 }
@@ -227,13 +202,11 @@ export function draftOf(routine: Routine): RoutineDraft {
 export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string } {
 	const name = draft.name.trim();
 	if (!name) return { fix: "Name the routine." };
-	const cwd = draft.cwd.trim();
-	if (!cwd) return { fix: "Choose a workspace." };
 	let task: RoutineTask;
 	switch (draft.task) {
 		case "prompt":
-			if (!draft.prompt.trim()) return { fix: "Write the prompt the session starts with." };
-			task = { kind: "prompt", prompt: draft.prompt.trim(), pin: draft.pin };
+			if (!draft.prompt.trim()) return { fix: "Write the message the Bot gets." };
+			task = { kind: "prompt", prompt: draft.prompt.trim() };
 			break;
 		case "command": {
 			const command = draft.command.trim();
@@ -242,11 +215,6 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 			task = { kind: "command", command };
 			break;
 		}
-		case "bot":
-			if (draft.botId === null) return { fix: "Choose the Bot to message." };
-			if (!draft.message.trim()) return { fix: "Write the message the Bot gets." };
-			task = { kind: "bot", botId: draft.botId, prompt: draft.message.trim() };
-			break;
 		default: {
 			const unhandled: never = draft.task;
 			return unhandled;
@@ -260,7 +228,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	}
 	const schedulesOf = nonEmpty(schedules);
 	if (!schedulesOf) return { fix: "Add a schedule." };
-	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill: task.kind === "prompt" ? draft.skill : null, task, schedules: schedulesOf } };
+	return { ok: { id: draft.id, botId: draft.botId, name, enabled: draft.enabled, task, schedules: schedulesOf } };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */

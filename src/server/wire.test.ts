@@ -3,6 +3,7 @@ import type { ClientFrame } from "../shared/protocol";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
+import type { BotId } from "../shared/bots";
 import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } from "../shared/discussions";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
@@ -139,20 +140,19 @@ describe("parseClientMsg", () => {
 		const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
 		const routine: RoutineSpec = {
 			id: "r1",
+			botId: "scout" as BotId,
 			name: "Reviews",
-			cwd: "/work/webapp",
 			schedules: [weekdays],
-			task: { kind: "prompt", prompt: "Summarize", pin: false },
-			skill: null,
+			task: { kind: "prompt", prompt: "Summarize" },
 			enabled: true,
 		};
 		const save = (fields: Record<string, unknown>) => change({ op: "save", routine: { ...routine, ...fields } });
 
 		test("save takes a whole routine and drops what the server keeps or does not know", () => {
 			expect(save({ runs: [], createdAt: 1, extra: 1, schedules: [{ ...weekdays, extra: 1 }] })).toEqual({ t: "routine", change: { op: "save", routine } });
-			expect(save({ schedules: [{ kind: "every", minutes: 90 }, weekdays], skill: "ship" })).toEqual({
+			expect(save({ schedules: [{ kind: "every", minutes: 90 }, weekdays] })).toEqual({
 				t: "routine",
-				change: { op: "save", routine: { ...routine, schedules: [{ kind: "every", minutes: 90 }, weekdays], skill: "ship" } },
+				change: { op: "save", routine: { ...routine, schedules: [{ kind: "every", minutes: 90 }, weekdays] } },
 			});
 			expect(change({ op: "enable", id: "r1", enabled: false })).toEqual({ t: "routine", change: { op: "enable", id: "r1", enabled: false } });
 			expect(change({ op: "run-now", id: "r1", at: 5 })).toEqual({ t: "routine", change: { op: "run-now", id: "r1" } });
@@ -173,21 +173,19 @@ describe("parseClientMsg", () => {
 			expect(save({ schedules: [] })).toBeNull();
 		});
 
-		test("save refuses a pull request task, and a blank name, workspace, or prompt, and a prompt task without its pin choice", () => {
+		test("save refuses a pull request or Bot task, a blank name or prompt, and a routine without a Bot", () => {
 			expect(save({ task: { kind: "pull-requests", action: "review" } })).toBeNull();
-			expect(save({ task: { kind: "prompt", prompt: " ", pin: false } })).toBeNull();
-			expect(save({ task: { kind: "prompt", prompt: "Summarize" } })).toBeNull();
-			expect(save({ task: { kind: "prompt", prompt: "Summarize", pin: "yes" } })).toBeNull();
-			expect(save({ task: { kind: "prompt", prompt: "Summarize", pin: true } })).toEqual({ t: "routine", change: { op: "save", routine: { ...routine, task: { kind: "prompt", prompt: "Summarize", pin: true } } } });
+			expect(save({ task: { kind: "bot", botId: "scout", prompt: "Summarize" } })).toBeNull();
+			expect(save({ task: { kind: "prompt", prompt: " " } })).toBeNull();
 			expect(save({ name: "" })).toBeNull();
-			expect(save({ cwd: "  " })).toBeNull();
+			expect(save({ botId: null })).toBeNull();
 			expect(save({ enabled: "yes" })).toBeNull();
 			expect(change({ op: "enable", id: "r1" })).toBeNull();
 		});
 
 		test("save takes a command task, and refuses one blank or past the length limit", () => {
 			const command = { kind: "command", command: "git worktree prune" } as const;
-			expect(save({ task: command, skill: null })).toEqual({ t: "routine", change: { op: "save", routine: { ...routine, task: command, skill: null } } });
+			expect(save({ task: command })).toEqual({ t: "routine", change: { op: "save", routine: { ...routine, task: command } } });
 			expect(save({ task: { kind: "command", command: " \n" } })).toBeNull();
 			expect(save({ task: { kind: "command" } })).toBeNull();
 			const longest = { kind: "command", command: "x".repeat(10_000) };

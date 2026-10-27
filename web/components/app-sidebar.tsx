@@ -1,6 +1,5 @@
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
-import type { Routine } from "../../src/routines";
 import type { Bot, BotId, BotLast } from "../../src/shared/bots";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
@@ -35,13 +34,11 @@ interface AppSidebarProps {
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	hosts: RosterHost[];
 	past: PastSession[];
-	routines: Routine[];
 	/** The Bots, `null` until the server sends them. */
 	bots: Bot[] | null;
 	/** Each Bot's conversation's last words, `null` for a Bot with none yet. */
 	botLasts: Readonly<Record<BotId, BotLast | null>>;
 	todoView: TodoListView;
-	routinesTarget: string | null;
 	settings: SettingsRoute;
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
@@ -67,11 +64,9 @@ export const AppSidebar = memo(function AppSidebar({
 	notesView,
 	hosts,
 	past,
-	routines,
 	bots,
 	botLasts,
 	todoView,
-	routinesTarget,
 	settings,
 	sectionTarget,
 	onSectionTarget,
@@ -90,7 +85,6 @@ export const AppSidebar = memo(function AppSidebar({
 		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
 	}, [listed, page, pullRequestsView, workspace, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
-	const routinesOpen = page?.kind === "routines" ? routinesTarget : undefined;
 	const botList = useMemo(() => botRows(bots ?? NO_BOTS, hosts, botLasts), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
 	return (
@@ -114,8 +108,6 @@ export const AppSidebar = memo(function AppSidebar({
 			userNotes={userNotes}
 			notesView={notesView}
 			todoSessions={todoSessions}
-			routines={routines}
-			routinesOpen={routinesOpen}
 			calendarOpen={page?.kind === "calendar"}
 			settingsRoute={settings}
 			sectionTarget={sectionTarget}

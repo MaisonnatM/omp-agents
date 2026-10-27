@@ -1,7 +1,7 @@
 /**
  * The dashboard behind the server: the registries and stores, the live sessions and the views on them, and the loops and
  * inboxes that keep them current. It builds its parts in dependency order, each handed the parts above it.
- * Two edges point down, closing the only cycles: a live session's update reaches the views, the broadcasts, the routines,
+ * Two edges point down, closing the only cycles: a live session's update reaches the views, the broadcasts, the Bots,
  * and the loops through its live-update handler, and a notice change reaches the broadcasts that read the notices.
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
@@ -253,7 +253,11 @@ export class Dashboard {
 		const lists = (this.#lists = new ListRegistry({
 			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 			"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
-			routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, Date.now()) },
+			// Every routine belongs to a Bot, so a save for a Bot that is gone saves nothing.
+			routines: {
+				msg: () => ({ t: "routines", routines: routines.value }),
+				apply: change => (change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.routine.botId) ? false : routines.apply(change, Date.now())),
+			},
 			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
@@ -267,8 +271,15 @@ export class Dashboard {
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
-			bots: { msg: () => this.#bots.msg(), apply: change => this.#botsFile.apply(change, new Date().toISOString()) },
-		}, kind => (kind === "scheduled" ? this.#publishScheduled() : this.#broadcasts.pushList(kind))));
+			bots: {
+				msg: () => this.#bots.msg(),
+				apply: change => {
+					// Deleting a Bot deletes its routines, first, so a crash between the two saves leaves no routine without its Bot.
+					if (change.op === "remove" && routines.removeBot(change.id)) this.#broadcasts.pushList("routines");
+					return this.#botsFile.apply(change, new Date().toISOString());
+				},
+			},
+		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
@@ -350,23 +361,17 @@ export class Dashboard {
 			},
 		});
 		const stopping = this.#stopping.signal;
+		this.#migrateRoutines();
 		const runner = (this.#runner = new RoutineRunner({
 			file: routines,
-			start: startSession,
-			session(instanceId) {
-				const session = sessions.get(instanceId);
-				if (!session) return null;
-				const { status } = session.row();
-				return { status, occupied: occupiedBy(status, autoContinue.held(session.sessionId)), sessionId: session.sessionId, end: () => session.end() };
-			},
 			now: Date.now,
+			workspace: botId => this.#botsFile.value.find(({ id }) => id === botId)?.cwd ?? null,
 			async exec(command, cwd) {
 				const dir = await directoryOf(cwd);
 				if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
 				return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping });
 			},
 			onChange: () => broadcasts.pushList("routines"),
-			changePins: change => void lists.apply("pins", change),
 			messageBot: (botId, text) => this.#bots.message(botId, text),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
@@ -374,7 +379,7 @@ export class Dashboard {
 			start: startSession,
 			reach,
 			now: Date.now,
-			onChange: () => this.#publishScheduled(),
+			onChange: () => broadcasts.pushList("scheduled"),
 		}));
 		const autoContinue = (this.#autoContinue = new AutoContinue({
 			file: scheduled,
@@ -384,11 +389,7 @@ export class Dashboard {
 				return plans;
 			},
 			now: Date.now,
-			onChange: () => this.#publishScheduled(),
-			released: sessionId => {
-				const session = sessions.bySessionId(sessionId);
-				if (session) runner.observe(session.instanceId);
-			},
+			onChange: () => broadcasts.pushList("scheduled"),
 		}));
 		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
 		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
@@ -436,7 +437,7 @@ export class Dashboard {
 			onMinuteTick: async () => {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
-				this.#publishScheduled();
+				broadcasts.pushList("scheduled");
 				await notices.check([...EVENT_KINDS, ...STOPPED_KINDS]);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -674,11 +675,10 @@ export class Dashboard {
 		return [...new Set([...this.knownCwds(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 
-	/** Where every live session's update goes: the views, the broadcasts, the routines, and the loops. */
+	/** Where every live session's update goes: the views, the broadcasts, the Bots, and the loops. */
 	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 		switch (update.kind) {
 			case "roster":
-				this.#runner.observe(instanceId);
 				this.#broadcasts.rosterChanged();
 				return;
 			case "event":
@@ -782,6 +782,7 @@ export class Dashboard {
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#bots.reload();
+			this.#migrateRoutines();
 			this.#todos.reload();
 			this.#notes.reload();
 			this.#broadcasts.pushList("routines");
@@ -796,16 +797,17 @@ export class Dashboard {
 		return owns;
 	}
 
+	/** Moves the routines of a file from before every routine had a Bot to their Bots, creating the Routines Bot unless it exists. */
+	#migrateRoutines(): void {
+		this.#routines.migrate(bot => {
+			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#botsFile.apply({ op: "save", bot }, new Date().toISOString());
+		});
+	}
+
 	/** Checks the pull requests and Slack for the bell. */
 	#checkActivity(): Promise<void> {
 		this.#activityFresh = true;
 		return this.#notices.check(ACTIVITY_KINDS);
-	}
-
-	/** The scheduled sends changed, here or on another server: every socket hears them, and a held session whose continue went or left them is released. */
-	#publishScheduled(): void {
-		this.#broadcasts.pushList("scheduled");
-		this.#autoContinue.sendsChanged();
 	}
 
 	/** The session list changed: views may now find their file, and the past list is out of date. */

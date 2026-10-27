@@ -57,7 +57,7 @@ describe("continueWhen", () => {
 function harness(dir = mkdtempSync(join(tmpdir(), "omp-agents-continue-"))) {
 	dirs.push(dir);
 	const file = new ScheduledFile(join(dir, "scheduled.json"));
-	const fake = { changes: 0, plans: [] as PlanUsage[], usageError: null as string | null, gate: null as Promise<void> | null, released: [] as string[] };
+	const fake = { changes: 0, plans: [] as PlanUsage[], usageError: null as string | null, gate: null as Promise<void> | null };
 	const auto = new AutoContinue({
 		file,
 		async plans() {
@@ -66,11 +66,7 @@ function harness(dir = mkdtempSync(join(tmpdir(), "omp-agents-continue-"))) {
 			return fake.plans;
 		},
 		now: () => NOW,
-		onChange: () => {
-			fake.changes++;
-			auto.sendsChanged();
-		},
-		released: sessionId => void fake.released.push(sessionId),
+		onChange: () => void fake.changes++,
 	});
 	/** Usage reads wait until the returned function answers them. */
 	const holdUsage = (): (() => void) => {
@@ -108,7 +104,7 @@ describe("AutoContinue", () => {
 	});
 
 	test("the session is held from the limit, before the usage read answers, until its continue goes", async () => {
-		const { file, fake, auto, holdUsage } = harness();
+		const { file, auto, holdUsage } = harness();
 		const answer = holdUsage();
 		const limited = auto.limited("s1", anthropic(HOUR));
 		expect(auto.held("s1")).toBe(true);
@@ -116,40 +112,35 @@ describe("AutoContinue", () => {
 		await limited;
 		const id = file.value[0]!.id;
 		file.claim(id);
-		auto.sendsChanged();
-		expect([auto.held("s1"), fake.released]).toEqual([true, []]);
+		expect(auto.held("s1")).toBe(true);
 		file.sent(id);
-		auto.sendsChanged();
-		expect([auto.held("s1"), fake.released]).toEqual([false, ["s1"]]);
+		expect(auto.held("s1")).toBe(false);
 	});
 
-	test("after a restart, a session whose continue waits in the file is still held, so its routine counts it on its task", async () => {
+	test("after a restart, a session whose continue waits in the file is still held, so its merge cleanup counts it on its task", async () => {
 		const before = harness();
 		await before.auto.limited("s1", anthropic(HOUR));
 		before.file.flush();
 
 		const after = harness(before.dir);
-		expect([after.auto.held("s1"), occupiedBy("idle", after.auto.held("s1")), after.auto.held("s2"), after.fake.released]).toEqual([true, true, false, []]);
+		expect([after.auto.held("s1"), occupiedBy("idle", after.auto.held("s1")), after.auto.held("s2")]).toEqual([true, true, false]);
 		after.file.apply({ op: "remove", id: after.file.value[0]!.id }, NOW);
-		after.auto.sendsChanged();
-		expect([after.auto.held("s1"), after.fake.released]).toEqual([false, ["s1"]]);
+		expect(after.auto.held("s1")).toBe(false);
 	});
 
-	test("a continue the page cancels releases the session, and so does one that fails, while one under way still holds", async () => {
-		const { file, fake, auto } = harness();
+	test("a continue the page cancels holds no more, and neither does one that fails, while one under way still holds", async () => {
+		const { file, auto } = harness();
 		await auto.limited("s1", anthropic(HOUR));
 		await auto.limited("s2", anthropic(HOUR));
 		const [first, second] = file.value;
 		file.apply({ op: "remove", id: first!.id }, NOW);
 		file.claim(second!.id);
-		auto.sendsChanged();
-		expect([auto.held("s1"), auto.held("s2"), fake.released]).toEqual([false, true, ["s1"]]);
+		expect([auto.held("s1"), auto.held("s2")]).toEqual([false, true]);
 		file.failed(second!.id, "Cannot resume the session", NOW);
-		auto.sendsChanged();
-		expect([auto.held("s2"), fake.released, file.value.map(send => send.state.phase)]).toEqual([false, ["s1", "s2"], ["failed"]]);
+		expect([auto.held("s2"), file.value.map(send => send.state.phase)]).toEqual([false, ["failed"]]);
 	});
 
-	test("cancel drops that session's continue and releases it, leaving the others and plain scheduled messages", async () => {
+	test("cancel drops that session's continue, leaving the others and plain scheduled messages", async () => {
 		const { file, fake, auto, pending } = harness();
 		file.apply({ op: "add", send: { id: "mine", at: NOW + HOUR, reset: null, target: { kind: "message", sessionId: "s1", text: "and then this" } } }, NOW);
 		await auto.limited("s1", anthropic(HOUR));
@@ -161,17 +152,17 @@ describe("AutoContinue", () => {
 			[{ kind: "message", sessionId: "s1", text: "and then this" }, NOW + HOUR, null, "waiting"],
 			[continued("s2", "Anthropic"), NOW + HOUR + MINUTE, "Anthropic limit", "waiting"],
 		]);
-		expect([fake.changes - changes, fake.released, auto.held("s2")]).toEqual([1, ["s1"], true]);
+		expect([fake.changes - changes, auto.held("s1"), auto.held("s2")]).toEqual([1, false, true]);
 	});
 
-	test("a cancel while the usage read runs keeps the continue from being scheduled and releases the session", async () => {
-		const { fake, auto, holdUsage, pending } = harness();
+	test("a cancel while the usage read runs keeps the continue from being scheduled and holds the session no more", async () => {
+		const { auto, holdUsage, pending } = harness();
 		const answer = holdUsage();
 		const limited = auto.limited("s1", anthropic(HOUR));
 		auto.cancel("s1");
 		answer();
 		await limited;
-		expect([pending(), fake.released, auto.held("s1")]).toEqual([[], ["s1"], false]);
+		expect([pending(), auto.held("s1")]).toEqual([[], false]);
 	});
 
 	test("a continue under way stays when the session hits the limit again, beside the new one, and a cancel leaves it", async () => {
@@ -192,7 +183,7 @@ describe("AutoContinue", () => {
 	};
 
 	test("a transient fault holds the session for a retry, and faults in a row wait 1, 2, 4, 8, then 16 minutes; the sixth leaves it idle", () => {
-		const { file, fake, auto, pending } = harness();
+		const { file, auto, pending } = harness();
 		expect([endTurn(file, auto, dropped), pending(), auto.held("s1")]).toEqual([
 			1,
 			[[{ kind: "continue", sessionId: "s1", provider: "OpenAI Codex", cause: "transient" }, NOW + MINUTE, null, "waiting"]],
@@ -203,11 +194,10 @@ describe("AutoContinue", () => {
 			const id = file.value[0]!.id;
 			file.claim(id);
 			file.sent(id);
-			auto.sendsChanged();
 			auto.turnStarted("s1");
 			waits.push(endTurn(file, auto, dropped));
 		}
-		expect([waits, pending(), auto.held("s1"), fake.released.length]).toEqual([[2, 4, 8, 16, false], [], false, 5]);
+		expect([waits, pending(), auto.held("s1")]).toEqual([[2, 4, 8, 16, false], [], false]);
 		expect(endTurn(file, auto, dropped)).toBe(1);
 	});
 

@@ -18,11 +18,10 @@ const evening: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour:
 
 const spec: RoutineSpec = {
 	id: "r1",
+	botId: "scout" as BotId,
 	name: "Notes",
-	cwd: "/work/webapp",
 	schedules: [weekdays],
-	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
-	skill: null,
+	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
 	enabled: true,
 };
 
@@ -31,23 +30,24 @@ const routine = (fields: Partial<Routine>): Routine => ({ ...spec, createdAt: at
 describe("parseRoutineSpec", () => {
 	test("keeps a routine's edited fields and drops the runs and creation time the server keeps", () => {
 		expect(parseRoutineSpec({ ...routine({}), extra: 1 })).toEqual({ ok: spec });
-		expect(parseRoutineSpec({ ...spec, skill: "ship", schedules: [{ kind: "every", minutes: 90 }, weekdays] })?.ok).toMatchObject({ skill: "ship" });
-		expect(parseRoutineSpec({ ...spec, preset: "minimal" })).toEqual({ ok: spec });
+		expect(parseRoutineSpec({ ...spec, schedules: [{ kind: "every", minutes: 90 }, weekdays] })?.ok).toMatchObject({ schedules: [{ kind: "every", minutes: 90 }, weekdays] });
+		expect(parseRoutineSpec({ ...spec, preset: "minimal", cwd: "/work", skill: "ship" })).toEqual({ ok: spec });
 	});
 
-	test("refuses a skill that is not one token, an hour past 23, a weekday past Saturday, and a fractional interval", () => {
-		expect(parseRoutineSpec({ ...spec, skill: "two words" })).toBeNull();
+	test("refuses a routine without a valid Bot, an hour past 23, a weekday past Saturday, and a fractional interval", () => {
+		const { botId: _botId, ...orphan } = spec;
+		expect(parseRoutineSpec(orphan)).toBeNull();
+		expect(parseRoutineSpec({ ...spec, botId: "../scout" })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, schedules: [{ ...weekdays, time: { hour: 24, minute: 0 } }] })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, schedules: [{ ...weekdays, days: [7] }] })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, schedules: [{ kind: "every", minutes: 1.5 }] })).toBeNull();
 		expect(parseRoutineSpec("routine")).toBeNull();
 	});
 
-	test("takes a Bot task with a valid Bot id and a prompt", () => {
-		const task = { kind: "bot" as const, botId: "scout" as BotId, prompt: "Post the standup." };
-		expect(parseRoutineSpec({ ...spec, task })).toEqual({ ok: { ...spec, task } });
-		expect(parseRoutineSpec({ ...spec, task: { ...task, botId: "../scout" } })).toBeNull();
-		expect(parseRoutineSpec({ ...spec, task: { ...task, prompt: " " } })).toBeNull();
+	test("takes a prompt or a command, and refuses a blank one or the old Bot task", () => {
+		expect(parseRoutineSpec({ ...spec, task: { kind: "command", command: "git worktree prune" } })?.ok.task).toEqual({ kind: "command", command: "git worktree prune" });
+		expect(parseRoutineSpec({ ...spec, task: { kind: "prompt", prompt: " " } })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, task: { kind: "bot", botId: "scout", prompt: "Post the standup." } })).toBeNull();
 	});
 });
 

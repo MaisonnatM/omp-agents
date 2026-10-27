@@ -2,12 +2,27 @@
  * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a queued run is on disk before the runner starts anything from it.
  * A routine whose task was pull requests or a project's prompt is dropped on load. The rest of the file stays.
- * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
+ * A file from before `schedules`, before a run's `outcome`, or before every routine had a Bot migrates here, so everything else sees the current shape.
  */
+import { resolve } from "node:path";
 import { ReducerFile } from "../fs";
-import { isObject, isSafeInteger, isTexts, parseAll } from "../json";
+import { isNonEmpty, isObject, isSafeInteger, isTexts, parseAll } from "../json";
+import { expandHome, HOME } from "../paths";
 import { applyRoutine, MAX_ROUTINE_RUNS, parseRoutineSpec, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
-import { type BotId, parseBotId } from "../shared/bots";
+import type { BotId, BotSpec } from "../shared/bots";
+
+/** The Bot the routines from before Bots move to; page Bots have random UUIDs, so none takes this id. */
+export const ROUTINES_BOT_ID = "routines" as BotId;
+
+/** The Bot {@link RoutinesFile.migrate} creates for the routines that had none, working in `cwd`. */
+export const routinesBot = (cwd: string): BotSpec => ({
+	id: ROUTINES_BOT_ID,
+	name: "Routines",
+	job: "Run the routines that moved here from the Routines page.\nDo what each routine's message asks without asking questions, and answer briefly.\nIf something blocks you, say what and stop.",
+	cwd,
+	model: null,
+	skill: null,
+});
 
 /** A session a run recorded before `outcome`, which also held its `label`. */
 function parseStarted(value: unknown): { instanceId: string; sessionId: string } | null {
@@ -33,16 +48,17 @@ function parseCommandRun(value: unknown): CommandRun | null {
 	}
 }
 
-/** A run's `outcome`, or the fields it had before: `queued` or `queue`, `started` sessions, and `command`. Of several sessions, only a pull request routine's run started more than one, and the first stays. */
+/**
+ * A run's `outcome`, or the fields it had before: `queued` or `queue`, `started` sessions, and `command`. Of several sessions, only a pull request routine's run started more than one, and the first stays.
+ * A run from before every routine had a Bot that started a session or messaged a Bot sent its prompt into that session.
+ */
 function parseRun(value: unknown): RoutineRun | null {
 	if (!isObject(value) || !isSafeInteger(value.at) || !isTexts(value.errors)) return null;
 	if (isObject(value.outcome)) {
 		const { outcome } = value;
 		let parsed: RoutineOutcome | null = null;
 		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = { kind: "pending", queued: outcome.queued };
-		if (outcome.kind === "session" && typeof outcome.instanceId === "string" && typeof outcome.sessionId === "string") parsed = { kind: "session", instanceId: outcome.instanceId, sessionId: outcome.sessionId };
-		const botId = parseBotId(outcome.botId);
-		if (outcome.kind === "bot" && botId && typeof outcome.sessionId === "string") parsed = { kind: "bot", botId, sessionId: outcome.sessionId };
+		if ((outcome.kind === "sent" || outcome.kind === "session" || outcome.kind === "bot") && typeof outcome.sessionId === "string") parsed = { kind: "sent", sessionId: outcome.sessionId };
 		if (outcome.kind === "command") {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
@@ -53,11 +69,47 @@ function parseRun(value: unknown): RoutineRun | null {
 	const started = parseAll(value.started, parseStarted);
 	if (typeof queued !== "boolean" || !started) return null;
 	const command = parseCommandRun(value.command);
-	const outcome: RoutineOutcome = command ? { kind: "command", run: command }
-		: started.length > 0 ? { kind: "session", instanceId: started[0]!.instanceId, sessionId: started[0]!.sessionId }
-		: { kind: "pending", queued };
+	const outcome: RoutineOutcome = command ? { kind: "command", run: command } : started.length > 0 ? { kind: "sent", sessionId: started[0]!.sessionId } : { kind: "pending", queued };
 	return { at: value.at, outcome, errors: value.errors };
 }
+
+/** What a parse of a file from before every routine had a Bot found: whether a routine moved to a Bot, and the workspace of the Routines Bot when one moved there. */
+interface Migration {
+	moved: boolean;
+	workspace: string | null;
+}
+
+/** `text` as one shell word. */
+const shellWord = (text: string): string => `'${text.replaceAll("'", `'\\''`)}'`;
+
+/**
+ * A routine from before every routine had a Bot, in the current shape: one that messaged a Bot belongs to it, and the
+ * rest to the Routines Bot working in `workspace`, with their own workspace and skill folded into the task, so each run
+ * does what it did before. `toRoutinesBot` says whether the routine went to the Routines Bot.
+ */
+function adoptLegacy(value: Record<string, unknown>, workspace: string): { fields: Record<string, unknown>; toRoutinesBot: boolean } {
+	const { task, skill } = value;
+	const elsewhere = typeof value.cwd === "string" && value.cwd !== workspace ? value.cwd : null;
+	if (!isObject(task)) return { fields: value, toRoutinesBot: false };
+	switch (task.kind) {
+		case "bot":
+			return { fields: { ...value, botId: task.botId, task: { kind: "prompt", prompt: task.prompt } }, toRoutinesBot: false };
+		case "command": {
+			const command = elsewhere !== null && typeof task.command === "string" ? `cd ${shellWord(resolve(HOME, expandHome(elsewhere.trim())))} && ${task.command}` : task.command;
+			return { fields: { ...value, botId: ROUTINES_BOT_ID, task: { kind: "command", command } }, toRoutinesBot: true };
+		}
+		case "prompt": {
+			const text = elsewhere !== null && typeof task.prompt === "string" ? `Work in ${elsewhere}.\n\n${task.prompt}` : task.prompt;
+			const prompt = isNonEmpty(skill) && typeof text === "string" ? `/skill:${skill} ${text}` : text;
+			return { fields: { ...value, botId: ROUTINES_BOT_ID, task: { kind: "prompt", prompt } }, toRoutinesBot: true };
+		}
+		default:
+			return { fields: value, toRoutinesBot: false };
+	}
+}
+
+/** Whether `entry` is a routine from before every routine had a Bot. */
+const isLegacy = (entry: unknown): entry is Record<string, unknown> => isObject(entry) && !("botId" in entry);
 
 /** What a routine of each task kind routines no longer run did, by kind; such a routine is dropped on load. */
 const DROPPED_TASKS = new Map([
@@ -69,23 +121,30 @@ function parseRoutine(value: unknown): Routine | { dropped: string } | null {
 	const dropped = isObject(value) && isObject(value.task) && typeof value.task.kind === "string" ? DROPPED_TASKS.get(value.task.kind) : undefined;
 	if (dropped) return { dropped };
 	if (!isObject(value)) return null;
-	const { task } = value;
-	const spec = parseRoutineSpec({
-		...value,
-		schedules: "schedules" in value ? value.schedules : [value.schedule],
-		task: isObject(task) && task.kind === "prompt" && !("pin" in task) ? { ...task, pin: false } : task,
-	});
+	const spec = parseRoutineSpec({ ...value, schedules: "schedules" in value ? value.schedules : [value.schedule] });
 	if (!spec) return null;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
 	return typeof createdAt === "number" && runs ? { ...spec.ok, createdAt, runs } : null;
 }
 
-function parseRoutines(value: unknown): Routine[] | null {
+/** `routines.json`'s list, recording in `migration` what moved from the shape before every routine had a Bot. */
+function parseRoutines(value: unknown, migration: Migration): Routine[] | null {
+	migration.moved = false;
+	migration.workspace = null;
 	if (!isObject(value) || !Array.isArray(value.routines)) return null;
+	const firstCwd = value.routines.find((entry): entry is Record<string, unknown> => isLegacy(entry) && isNonEmpty(entry.cwd) && !(isObject(entry.task) && entry.task.kind === "bot"))?.cwd;
+	const workspace = typeof firstCwd === "string" ? firstCwd : HOME;
 	const routines: Routine[] = [];
 	for (const entry of value.routines) {
-		const routine = parseRoutine(entry);
+		let current: unknown = entry;
+		if (isLegacy(entry)) {
+			const { fields, toRoutinesBot } = adoptLegacy(entry, workspace);
+			current = fields;
+			migration.moved = true;
+			if (toRoutinesBot) migration.workspace = workspace;
+		}
+		const routine = parseRoutine(current);
 		if (routine === null) return null;
 		if ("dropped" in routine) {
 			const name = isObject(entry) && typeof entry.name === "string" && entry.name ? entry.name : "unnamed";
@@ -98,8 +157,35 @@ function parseRoutines(value: unknown): Routine[] | null {
 }
 
 export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<RoutineChange, { op: "run-now" }>, now: number]> {
+	/** What the last read of the file found to migrate, until {@link migrate} saves it. */
+	readonly #migration: Migration;
+
 	constructor(path: string) {
-		super(path, { parse: parseRoutines, toJson: routines => ({ routines }), holds: "a list of routines", empty: [], reduce: applyRoutine });
+		const migration: Migration = { moved: false, workspace: null };
+		super(path, { parse: value => parseRoutines(value, migration), toJson: routines => ({ routines }), holds: "a list of routines", empty: [], reduce: applyRoutine });
+		this.#migration = migration;
+	}
+
+	/**
+	 * Saves a file read in the shape from before every routine had a Bot in the current one. When a routine moved to the
+	 * Routines Bot, `adopt` first gets that Bot, to create unless it exists. A file read in the current shape changes
+	 * nothing, so a second call does nothing, and a crash before the save migrates the same way on the next read.
+	 */
+	migrate(adopt: (bot: BotSpec) => void): void {
+		const { moved, workspace } = this.#migration;
+		if (!moved) return;
+		if (workspace !== null) adopt(routinesBot(workspace));
+		this.#migration.moved = false;
+		this.#migration.workspace = null;
+		this.replace([...this.value]);
+	}
+
+	/** Deletes Bot `botId`'s routines, as deleting the Bot does; whether it deleted any. */
+	removeBot(botId: BotId): boolean {
+		return this.update(routines => {
+			const kept = routines.filter(routine => routine.botId !== botId);
+			return kept.length === routines.length ? routines : kept;
+		});
 	}
 
 	/** Claims routine `id`'s slot at `at`, queued, keeping the newest {@link MAX_ROUTINE_RUNS} runs. */
@@ -110,19 +196,14 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 		}));
 	}
 
-	/** Takes routine `id`'s run at `at` off the queue, saved before its session or command starts. */
+	/** Takes routine `id`'s run at `at` off the queue, saved before its message or command starts. */
 	dequeue(id: string, at: number): void {
 		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "pending", queued: false } }));
 	}
 
-	/** Records the sole session the run at `at` started. */
-	started(id: string, at: number, session: { instanceId: string; sessionId: string }): void {
-		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "session", ...session } }));
-	}
-
 	/** Records the Bot conversation the run at `at` sent its prompt into. */
-	sent(id: string, at: number, botId: BotId, sessionId: string): void {
-		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "bot", botId, sessionId } }));
+	sent(id: string, at: number, sessionId: string): void {
+		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "sent", sessionId } }));
 	}
 
 	/** Records the command of the run at `at` as it launches and again as it ends. */
