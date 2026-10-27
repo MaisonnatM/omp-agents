@@ -1,6 +1,6 @@
 /** The changes card on top of the composer: the files the view's agent changed, the images its tools took, and the pages they opened, each in a section that folds. */
 import { ChevronDown } from "lucide-react";
-import { memo, type ReactNode, useMemo, useState } from "react";
+import { memo, type ReactNode, useContext, useMemo, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { SessionFacts, View } from "../../src/shared/sessions";
 import { type AgentSource, lineTotals } from "../../src/shared/transcript";
@@ -15,6 +15,7 @@ import { SessionChangesDialog } from "./changes/session-changes-dialog";
 import { LineCounts } from "./line-counts";
 import { MediaStrip } from "./media-section";
 import { SourceList } from "./sources-section";
+import { ActivityShown } from "./transcript";
 
 /** The sections folded shut, `files`, `images`, and `sources`, which localStorage keeps for every view; each starts open. */
 const CLOSED_KEY = "omp-agents.changes-card-closed";
@@ -92,7 +93,7 @@ export const ChangesCard = memo(function ChangesCard({ view, sessionId, cwd, wor
 	const [closed, toggle] = useStoredKeys(CLOSED_KEY);
 	const [shown, setShown] = useState<Shown>(null);
 	const history = shown?.kind === "history" ? files?.find(file => file.path === shown.path) : undefined;
-	if (!files?.length && !media?.length && sources.length === 0) return null;
+	if (!useContext(ActivityShown) || (!files?.length && !media?.length && sources.length === 0)) return null;
 	return (
 		<>
 			<section aria-label="Changes" className={cn("mx-3 -mb-3 divide-y divide-border/60 rounded-t-xl bg-muted pb-3", className)}>

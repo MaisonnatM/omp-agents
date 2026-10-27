@@ -147,7 +147,7 @@ export const ActivityVisibility = createContext<ActivityVisibility>({
 	toggleThinking: () => {},
 });
 
-/** Whether the transcript draws its tool and thinking groups; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
+/** Whether the transcript draws its tool and thinking groups and the changes card; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
 export const ActivityShown = createContext(true);
 
 export const HIDE_TOOL_CALLS_KEY = "omp-agents.hide-tool-calls";
