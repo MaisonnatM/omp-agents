@@ -8,11 +8,15 @@ import { execFile } from "node:child_process";
 import { app, type BrowserWindow, ipcMain, type IpcMainEvent, Notification, shell } from "electron";
 import { ALERT_CHANNEL, BADGE_CHANNEL, isNotificationSound, isSessionAlert, type NotificationSound, SOUND_CHANNEL } from "../src/shared/desktop-bridge";
 
+/** The name macOS looks `sound` up by among its system sounds; none for `off` and for `default`, the system's own. */
+const systemName = (sound: NotificationSound): string | undefined => (sound === "off" || sound === "default" ? undefined : sound);
+
 /** Plays `sound` outside a notification: a named sound through `afplay` on macOS, else the system's beep. */
 function play(sound: NotificationSound): void {
 	if (sound === "off") return;
-	if (sound === "default" || process.platform !== "darwin") shell.beep();
-	else execFile("afplay", [`/System/Library/Sounds/${sound}.aiff`], () => {});
+	const name = systemName(sound);
+	if (name && process.platform === "darwin") execFile("afplay", [`/System/Library/Sounds/${name}.aiff`], () => {});
+	else shell.beep();
 }
 
 /** Takes the page's reports; `fromDashboard` tells the dashboard's own page from a page of the shell's, and `reveal` shows and focuses the window. */
@@ -27,8 +31,7 @@ export function showAttention(win: BrowserWindow, fromDashboard: (url: string) =
 		if (!trusted(event) || !isSessionAlert(alert) || win.isFocused()) return;
 		shown.get(alert.hash)?.close();
 		const sound = alert.sound ?? "default";
-		// macOS plays a named notification sound from the system's sound folders; `default` leaves the system's own.
-		const notification = new Notification({ title: alert.title, body: alert.body, silent: sound === "off", sound: sound === "off" || sound === "default" ? undefined : sound });
+		const notification = new Notification({ title: alert.title, body: alert.body, silent: sound === "off", sound: systemName(sound) });
 		notification.on("click", () => {
 			reveal();
 			void win.webContents.executeJavaScript(`location.hash = ${JSON.stringify(alert.hash)}`).catch(() => {});

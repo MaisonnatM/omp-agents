@@ -106,7 +106,7 @@ function PinnedSkill({ cwd, workspace }: { cwd: string | null; workspace: string
 	);
 }
 
-const SOUND_LABELS: Record<NotificationSound, string> = Object.fromEntries(NOTIFICATION_SOUNDS.map(sound => [sound, sound === "off" ? "None" : sound === "default" ? "System default" : sound])) as Record<NotificationSound, string>;
+const SOUND_ITEMS = NOTIFICATION_SOUNDS.map(value => ({ value, label: value === "off" ? "None" : value === "default" ? "System default" : value }));
 
 /** The system notifications of sessions that ask you something or end a turn, while the window is not focused, and the sound they play. */
 function SessionNotifications() {
@@ -131,14 +131,14 @@ function SessionNotifications() {
 				</label>
 				<div className="flex items-center gap-2 text-[12px]">
 					<span className={on ? undefined : "text-muted-foreground"}>Sound</span>
-					<Select<NotificationSound> items={SOUND_LABELS} value={sound} onValueChange={next => next && chooseSound(next)} disabled={!on}>
+					<Select<NotificationSound> items={SOUND_ITEMS} value={sound} onValueChange={next => next && chooseSound(next)} disabled={!on}>
 						<SelectTrigger aria-label="Notification sound" className="w-fit">
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							{NOTIFICATION_SOUNDS.map(choice => (
-								<SelectItem key={choice} value={choice}>
-									{SOUND_LABELS[choice]}
+							{SOUND_ITEMS.map(({ value, label }) => (
+								<SelectItem key={value} value={value}>
+									{label}
 								</SelectItem>
 							))}
 						</SelectContent>

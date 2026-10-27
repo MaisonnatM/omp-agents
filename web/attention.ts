@@ -51,14 +51,19 @@ function raises(seen: Watch, moment: Moment): boolean {
 	}
 }
 
+/** One alert `attend` raises, and whether a finished turn raised it rather than a question or a wait. */
+export interface Raised {
+	alert: SessionAlert;
+	turn: boolean;
+}
+
 /**
  * The alerts that `hosts`, the sessions on the roster now, raise after `before`, and what the page knows from now on.
  * A session the page sees for the first time raises nothing, so what already waited when the page loaded, or before a
  * terminal session joined, stays quiet; a session that came to need you since the page saw it not needing you raises.
- * With `turns` off, a finished turn raises nothing but is still heard, so turning it back on raises no turn of before.
  */
-export function attend(before: Attention, hosts: readonly RosterHost[], turns: boolean): { raise: SessionAlert[]; attention: Attention } {
-	const raise: SessionAlert[] = [];
+export function attend(before: Attention, hosts: readonly RosterHost[]): { raise: Raised[]; attention: Attention } {
+	const raise: Raised[] = [];
 	const attention = new Map<string, Watch>();
 	for (const host of hosts) {
 		const seen = before.get(host.instanceId);
@@ -68,7 +73,7 @@ export function attend(before: Attention, hosts: readonly RosterHost[], turns: b
 			attention.set(host.instanceId, { wait: null, heard });
 			continue;
 		}
-		if (seen && (turns || moment.kind !== "turn") && raises(seen, moment)) raise.push({ hash: hashForSession(host.sessionId), title: hostLabel(host), body: moment.body });
+		if (seen && raises(seen, moment)) raise.push({ alert: { hash: hashForSession(host.sessionId), title: hostLabel(host), body: moment.body }, turn: moment.kind === "turn" });
 		if (moment.kind === "input") attention.set(host.instanceId, { wait: seen?.wait ?? "input", heard });
 		else attention.set(host.instanceId, { wait: "told", heard: heard.has(moment.key) ? heard : new Set([...heard, moment.key]) });
 	}

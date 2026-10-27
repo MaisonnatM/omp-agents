@@ -73,20 +73,19 @@ const NO_VIEWS: View[] = [];
 /** Keeps the Dock badge, the notifications, and the read turns in step with the roster. */
 export function useAttention(state: DashboardState, page: Page | null, send: (msg: ClientMsg) => void): void {
 	const { hosts, connected, layout } = state;
-	const notifications = useSessionNotifications();
+	const { on, turns, sound, soundWhenFocused } = useSessionNotifications();
 	const focused = useSyncExternalStore(subscribeFocus, () => document.hasFocus());
 	const count = connected ? hosts.filter(needsYou).length : 0;
 	useEffect(() => desktop?.badge(count), [count]);
 
 	const attention = useRef<Attention>(new Map());
-	const raising = useRef(notifications);
-	raising.current = notifications;
+	// Only a new roster raises: changing a preference raises nothing, and a turn it muted stays heard.
 	useEffect(() => {
-		const { on, turns, sound, soundWhenFocused } = raising.current;
-		const { raise, attention: next } = attend(attention.current, hosts, turns);
+		const { raise, attention: next } = attend(attention.current, hosts);
 		attention.current = next;
-		if (!on || raise.length === 0) return;
-		if (!document.hasFocus()) for (const alert of raise) desktop?.alert({ ...alert, sound });
+		const alerts = on ? raise.filter(raised => turns || !raised.turn) : [];
+		if (alerts.length === 0) return;
+		if (!focused) for (const { alert } of alerts) desktop?.alert({ ...alert, sound });
 		else if (soundWhenFocused) playSound(sound);
 	}, [hosts]);
 
