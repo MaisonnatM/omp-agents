@@ -16,6 +16,7 @@
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
+- `src/decisions.ts`: reads a repository's decision records for Settings › Decisions; `src/decisions.test.ts` tests a record with and without frontmatter, the directory it picks from a nested directory, and a repository with none.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist.
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.
 - `.env.test`: `bun test` loads it before any test, so every child a test starts, even through Bun's default spawn environment, runs git without the developer's global and system config, with a test identity and no auto-maintenance.

@@ -90,6 +90,11 @@
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
   If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
+- The **Decisions** section shows the decision records of the workspace's repository as a timeline, newest first, under a month header that stays at the top while you scroll: each record's date, status, title, and first paragraph, with **Read the record** to open the whole of it.
+  Records are the files the starter kit's `decision-records` skill writes in `docs/decisions/`; a repository that keeps them in an ADR directory, docs/adr or doc/adr, shows those instead.
+  **In force** hides superseded, deprecated, and rejected records, and **All** shows them, struck through; **Search** narrows the list by title, file name, status, or text.
+  A record's **Supersedes** and **Superseded by** open and scroll to the records they name, and a link to another file in the repository opens it in the file dialog.
+  The section only reads the records, since a record changes in the same commit as the code it covers; with **All workspaces** it asks you to pick one.
 - **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files.
   The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.

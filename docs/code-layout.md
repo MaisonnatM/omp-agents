@@ -61,6 +61,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - The changes card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
   - Settings › Files, omp's own config files: `Files` in `web/components/settings/files-tab.tsx`.
+  - Settings › Decisions, a workspace repository's decision records: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`.
 - A file opened from a path in agent text: `web/components/file-dialog.tsx`.
 - **Ask about this**, the button on selected text and the discussion panel at the top right: the button is `AskAboutSelection` in `web/components/ask-about-selection.tsx`, which wraps the transcript in `conversation.tsx` and `past-conversation.tsx` and the explorer in `web/components/pull-requests/pr-details/code.tsx`; the panel is `DiscussionPanel` in `web/components/discussion-panel.tsx`, which `web/app.tsx` mounts, over `web/discussions.ts`.
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
