@@ -39,7 +39,7 @@ Settings, in `config.yml`:
 
 Files, in `agent/`:
 
-- `AGENTS.md`: worktree and force-push safety, plus conditional pointers for model routing and reviews.
+- `AGENTS.md`: worktree and force-push safety, plus conditional pointers for model routing, reviews, and decision records.
   Read the matching reference under `~/.omp/agent/docs/` before taking that branch of the workflow, regardless of the repository's working directory.
 - `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear review, proof boxes, PR descriptions, and PR screenshots.
   These references load on demand rather than in every session's context.
@@ -89,7 +89,7 @@ Files, in `agent/`:
   On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
 - `extensions/notes.ts`: `user_note` lists and reads the dashboard's notes and queues add/append changes.
   An empty parameter reads as left out, and a session that adds a title it already added gets that note's id back.
-- `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
+- `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; `decision-records`, which keeps each choice made in a project as one dated file in its `docs/decisions/`, with a `check.ts` that checks them; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.
 
 ## Requirements

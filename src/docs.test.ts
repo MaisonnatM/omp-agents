@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { checkDecisions } from "../templates/omp/agent/skills/decision-records/check";
 
 /**
  * Agents read these docs through tools that cut a line at 768 characters and end it with `…`.
@@ -101,5 +102,9 @@ describe("docs name files and headings that exist", () => {
 		});
 		expect(problems).toEqual([]);
 	});
+});
+
+test("decision records follow the decision-records skill", () => {
+	expect(checkDecisions(join(root, "docs/decisions"))).toEqual([]);
 });
 
