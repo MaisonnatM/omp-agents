@@ -92,12 +92,19 @@ as arena runners, still pass `isolated: true`.
 
 # Before any pull request
 
-When your work is done and the next step is opening, pushing, or proposing a pull request, run a code-quality review first. No exceptions for small changes.
+When your work is done and the next step is opening, pushing, or proposing a pull request, decide whether it needs a code-quality review.
+It does when the repository commits no `.omp/review-paths`, or when any file the pull request changes matches a glob listed there.
+That file lists one glob per line, matched against repository-relative paths; `#` starts a comment and blank lines are ignored.
+Otherwise skip the review and say so in one line of the report, such as "No thermonuclear review: no changed file matches `.omp/review-paths`."
+When it does, run the review even for a small change:
 
 1. Collect `git diff <base>...HEAD` plus the working-tree `git diff` (base defaults to `main`) and the full contents of every changed file.
-2. Spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`. Do not run the rubric yourself or override its model.
-3. Apply every finding that keeps behavior the same and stays inside the change's scope. Skip a finding only with a one-line reason.
+2. Spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`.
+   Do not run the rubric yourself or override its model.
+3. Apply every finding that keeps behavior the same and stays inside the change's scope.
+   Skip a finding only with a one-line reason.
 4. Re-run the checks and smoke run that proved the change, then open or update the PR.
-5. Only then say the PR is ready. The report names what the review changed and any finding you skipped and why.
+5. Only then say the PR is ready.
+   The report names what the review changed and any finding you skipped and why.
 
 The review subagent itself never triggers this rule.

@@ -29,7 +29,7 @@ Split unrelated staged work onto a separate branch off main.
 Poteto Opening a PR applies, with Graphite as the transport.
 
 Create the draft before publishing.
-Apply thermonuclear findings, commit and push the fixes, then add the review checkbox according to `~/.omp/agent/docs/review-workflow.md`.
+When the change needs the thermonuclear review, as `~/.omp/agent/docs/review-workflow.md` decides from the repository's `.omp/review-paths`, apply its findings, commit and push the fixes, then add the review checkbox according to that doc.
 Present stack state before ready-for-review submission unless the user already approved publication.
 Commits require a user request; a draft PR request or **go on** + ticket URL counts.
 Amend only when the user's commit rules allow it.

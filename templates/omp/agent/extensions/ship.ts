@@ -1,8 +1,8 @@
 // Tracks the /ship workflow (Linear ticket -> draft PR -> thermonuclear -> live for review) per session.
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { commands } from "./shell/commands";
@@ -12,6 +12,8 @@ import { type Gh, ghJson, ghText } from "./github/command";
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
 export const CHECKBOX = "- [x] Thermo-nuclear code quality review";
+/** A repository opts out of reviewing every change by committing this file of globs; see `reviewNeeded`. */
+export const REVIEW_PATHS = ".omp/review-paths";
 /** A proof box a repository's PR template declares; the PR goes live only once the author checks it. The gate reads the box, not the proof behind it. */
 export const PROOF_BOX = "- [ ] Browser proof";
 const POLL_MS = 60_000;
@@ -41,7 +43,7 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'implement', issue}).",
 	implement: "Implement and commit on the issue's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
-	thermonuclear: `Run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	thermonuclear: `If the status says no changed file matches \`${REVIEW_PATHS}\`, skip the review. Otherwise run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, ask the user to approve, then run \`gh pr ready <N>\`.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
@@ -58,6 +60,8 @@ export interface PrStatus {
 	approved: boolean;
 	checks: "pass" | "fail" | "pending" | "none";
 	reviewed: boolean;
+	/** Whether the PR needs the thermonuclear review; see `reviewNeeded`. */
+	reviewNeeded: boolean;
 }
 
 export interface ShipState {
@@ -77,7 +81,8 @@ export interface Need {
 }
 
 const PR_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
-state isDraft mergeable mergeStateStatus reviewDecision body
+state isDraft mergeable mergeStateStatus reviewDecision body changedFiles
+files(first:100){nodes{path}}
 reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}`;
 
@@ -88,11 +93,14 @@ interface PrResponse {
 	mergeStateStatus: string;
 	reviewDecision: string | null;
 	body: string;
+	changedFiles: number;
+	files: { nodes: { path: string }[] };
 	reviewThreads: { nodes: { isResolved: boolean }[]; pageInfo: { hasNextPage: boolean } };
 	commits: { nodes: { commit: { statusCheckRollup: { state: string } | null } }[] };
 }
 
-export function parsePr(pr: PrResponse): PrStatus {
+/** The PR's status; `reviewPaths` is the checkout's `.omp/review-paths` text, `undefined` when it has none. */
+export function parsePr(pr: PrResponse, reviewPaths: string | undefined): PrStatus {
 	const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup?.state;
 	const threads = pr.reviewThreads.nodes;
 	return {
@@ -106,6 +114,7 @@ export function parsePr(pr: PrResponse): PrStatus {
 		approved: pr.reviewDecision === "APPROVED",
 		checks: !rollup ? "none" : rollup === "SUCCESS" ? "pass" : rollup === "FAILURE" || rollup === "ERROR" ? "fail" : "pending",
 		reviewed: pr.body.includes(CHECKBOX),
+		reviewNeeded: reviewNeeded(reviewPaths, pr.files.nodes.map(file => file.path), pr.changedFiles),
 	};
 }
 
@@ -139,7 +148,8 @@ export function renderLines(s: ShipState): string[] {
 	lines.push(STAGES.slice(4).map((stage, i) => `${i + 4 < at || s.stage === "merged" ? "✓" : i + 4 === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
 	if (s.stage === "live" && s.prStatus) lines.push(`Live: ${liveSummary(s.prStatus)}`);
 	if (s.stage === "live" && s.work) lines.push(`Working on: ${LABEL[s.work]}`);
-	if (s.prStatus && !s.prStatus.reviewed && (s.stage === "thermonuclear" || s.stage === "ready_gate")) lines.push("Thermonuclear checkbox missing from the PR body");
+	if (s.prStatus?.reviewNeeded && !s.prStatus.reviewed && (s.stage === "thermonuclear" || s.stage === "ready_gate")) lines.push("Thermonuclear checkbox missing from the PR body");
+	if (s.prStatus && !s.prStatus.reviewNeeded && s.stage === "thermonuclear") lines.push(`Thermonuclear review not needed: no changed file matches ${REVIEW_PATHS}`);
 	if (s.note) lines.push(`Note: ${s.note}`);
 	return lines;
 }
@@ -204,9 +214,31 @@ export function otherOwner(owner: string | undefined, repo: string | undefined):
 	return owner !== undefined && own !== undefined && owner.toLowerCase() !== own.toLowerCase();
 }
 
-/** Why a PR with this body may not go live, or `undefined` when it may: it needs the thermonuclear checkbox and no unchecked proof box. */
-export function publishBlocker(body: string): string | undefined {
-	if (!body.includes(CHECKBOX)) {
+/**
+ * Whether a PR needs the thermonuclear review: always when the repository commits no `.omp/review-paths` (`reviewPaths` is `undefined`)
+ * or GitHub listed fewer `files` than the PR's `changedFiles`, else when a changed repository-relative path matches one of its globs.
+ * The file lists one glob per line; `#` starts a comment and blank lines are ignored.
+ */
+export function reviewNeeded(reviewPaths: string | undefined, files: string[], changedFiles: number): boolean {
+	if (reviewPaths === undefined || files.length < changedFiles) return true;
+	const globs = reviewPaths.split("\n").map(line => line.replace(/#.*/, "").trim()).filter(Boolean).map(glob => new Bun.Glob(glob));
+	return files.some(file => globs.some(glob => glob.match(file)));
+}
+
+/** The text of `.omp/review-paths` at the top of the checkout holding `dir`, or `undefined` when it has none. */
+function readReviewPaths(dir: string): string | undefined {
+	for (let at = dir; ; at = dirname(at)) {
+		if (existsSync(join(at, ".git"))) {
+			const file = join(at, REVIEW_PATHS);
+			return existsSync(file) ? readFileSync(file, "utf8") : undefined;
+		}
+		if (dirname(at) === at) return undefined;
+	}
+}
+
+/** Why a PR with this body may not go live, or `undefined` when it may: it needs the thermonuclear checkbox when `needsReview`, and no unchecked proof box. */
+export function publishBlocker(body: string, needsReview: boolean): string | undefined {
+	if (needsReview && !body.includes(CHECKBOX)) {
 		return `Blocked: the PR is not live until the thermonuclear review is applied and pushed. Run the thermonuclear stage, then add \`${CHECKBOX}\` to the PR body.`;
 	}
 	if (body.split("\n").some(line => line.trimStart().startsWith(PROOF_BOX))) {
@@ -269,6 +301,8 @@ export default function ship(pi: ExtensionAPI) {
 		mergeStateStatus: z.string(),
 		reviewDecision: z.string().nullable(),
 		body: z.string(),
+		changedFiles: z.number().int(),
+		files: z.object({ nodes: z.array(z.object({ path: z.string() })) }),
 		reviewThreads: z.object({ nodes: z.array(z.object({ isResolved: z.boolean() })), pageInfo: z.object({ hasNextPage: z.boolean() }) }),
 		commits: z.object({ nodes: z.array(z.object({ commit: z.object({ statusCheckRollup: z.object({ state: z.string() }).nullable() }) })) }),
 	});
@@ -276,12 +310,15 @@ export default function ship(pi: ExtensionAPI) {
 		state: z.enum(["OPEN", "MERGED", "CLOSED"]), draft: z.boolean(), conflicts: z.boolean(), behind: z.boolean(),
 		unresolvedThreads: z.number().int(), moreThreads: z.boolean(), changesRequested: z.boolean(), approved: z.boolean(),
 		checks: z.enum(["pass", "fail", "pending", "none"]), reviewed: z.boolean(),
+		// A status recorded before review paths existed needed the review.
+		reviewNeeded: z.boolean().default(true),
 	});
 	const stateSchema = z.object({
 		stage: z.enum(STAGES), work: z.enum(LIVE_WORK).optional(), issue: z.string().optional(),
 		repo: z.string().optional(), pr: z.number().int().optional(), note: z.string().optional(),
 		prStatus: prStatusSchema.optional(), updatedAt: z.string(),
 	});
+	const viewSchema = z.object({ body: z.string(), changedFiles: z.number().int(), files: z.array(z.object({ path: z.string() })) });
 	let state: ShipState | undefined;
 	let lastRefresh = 0;
 	let lastSummary = "";
@@ -384,7 +421,7 @@ export default function ship(pi: ExtensionAPI) {
 			return render(ctx);
 		}
 		refreshFailure = undefined;
-		const prStatus = parsePr(parsed.data);
+		const prStatus = parsePr(parsed.data, readReviewPaths(ctx.cwd));
 		const merged = prStatus.state === "MERGED";
 		const stage: Stage = merged ? "merged" : state.stage;
 		if (JSON.stringify(prStatus) === JSON.stringify(state.prStatus) && stage === state.stage) return render(ctx);
@@ -397,17 +434,26 @@ export default function ship(pi: ExtensionAPI) {
 	}
 
 	async function publishCheck(selector: string[], cwd: string, sessionDir: string): Promise<string | undefined> {
-		const r = await gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd);
+		const r = await gh(["pr", "view", ...selector, "--json", "body,changedFiles,files"], cwd);
 		if (r.code !== 0) {
 			const error = r.stderr.trim() || r.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {
-				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
+				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage when the change needs it, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
 			}
 			const auth = quotaExhausted(error) ? undefined : await authProblem(sessionDir);
 			// gh's hint after its first line, `gh auth login`, cannot replace a token an environment variable holds, and the diagnosis names the fix.
 			return `Could not read the PR body to check its review and proof boxes: ${auth ? `${error.split("\n")[0]}. ${auth}` : error}`;
 		}
-		return publishBlocker(r.stdout);
+		let view: unknown;
+		try {
+			view = JSON.parse(r.stdout);
+		} catch {
+			view = undefined;
+		}
+		const parsed = viewSchema.safeParse(view);
+		if (!parsed.success) return "Could not read the PR body and changed files to check its review and proof boxes: gh returned an unexpected answer.";
+		const { body, files, changedFiles } = parsed.data;
+		return publishBlocker(body, reviewNeeded(readReviewPaths(cwd), files.map(file => file.path), changedFiles));
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -429,7 +475,7 @@ export default function ship(pi: ExtensionAPI) {
 		for (const words of commands(input.command)) {
 			const create = ghPr(words, "create");
 			if (create && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
-				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the thermonuclear review." };
+				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the ready gate, and after the thermonuclear review when its changes need one." };
 			}
 			const ready = ghPr(words, "ready");
 			if (ready && !ready.includes("--undo")) {
@@ -439,14 +485,14 @@ export default function ship(pi: ExtensionAPI) {
 				if (owner && otherOwner(owner, await resolveRepo(cwd))) continue;
 				const reason = await publishCheck(selector, cwd, ctx.cwd);
 				if (reason) return { block: true, reason };
-				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The thermonuclear review is complete. Mark this draft ready for human review?"))) {
+				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The PR passed the ship gate. Mark this draft ready for human review?"))) {
 					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
 				}
 			}
 			if (words[0] === "gt" && (words[1] === "submit" || words[1] === "ss") && words.some(a => a === "--publish" || a === "-p")) {
 				const reason = await publishCheck([], cwd, ctx.cwd);
 				if (reason) return { block: true, reason };
-				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "Publish this reviewed PR for human review?"))) {
+				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The PR passed the ship gate. Publish it for human review?"))) {
 					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
 				}
 			}
@@ -504,8 +550,8 @@ export default function ship(pi: ExtensionAPI) {
 				return { content: [{ type: "text", text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
 			}
 			if (stage || issue || pr || repo || note !== undefined) {
-				if (stage === "ready_gate" && state?.prStatus?.reviewed !== true) {
-					return { content: [{ type: "text", text: "The PR must have the thermonuclear checkbox after the review fixes are pushed." }], isError: true };
+				if (stage === "ready_gate" && (!state?.prStatus || (state.prStatus.reviewNeeded && !state.prStatus.reviewed))) {
+					return { content: [{ type: "text", text: `The PR must have the thermonuclear checkbox after the review fixes are pushed, since the repository has no \`${REVIEW_PATHS}\` or a changed file matches it.` }], isError: true };
 				}
 				if ((stage === "live" || stage === "rebase" || stage === "fix_comments" || stage === "fix_ci") && (!state?.prStatus || state.prStatus.draft || state.prStatus.state !== "OPEN")) {
 					return { content: [{ type: "text", text: "The PR must be open and ready for review before recording live work." }], isError: true };

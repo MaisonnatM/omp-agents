@@ -16,6 +16,7 @@ Then read the section for the work: [omp imports](#omp-imports), [omp internals]
 - Bump the tested omp version at all five of its pins together: `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, and the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
   Bump Bun's version in both workflows together with the README's.
   Check a new omp release with `bun run omp-release` and the [omp release skill](.agents/skills/omp-release/SKILL.md) before you bump it.
+- A change to a file that [`.omp/review-paths`](.omp/review-paths) matches needs the thermonuclear review before it ships; add a file there when it becomes a shared contract or a central file.
 
 ## omp imports
 

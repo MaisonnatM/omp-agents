@@ -13,6 +13,13 @@ Read the current description with `pr_description({repo:"<owner>/<repo>", pr:<N>
 If the checkbox already exists, leave it unchanged.
 Append it under an existing checklist; otherwise add a `## Checks` section before any `<!-- CURSOR_SUMMARY -->` Bugbot block, or at the end when there is no such block.
 
+## When a pull request needs the review
+
+A pull request needs the thermonuclear review when its repository commits no `.omp/review-paths`, or when any file it changes matches a glob listed there.
+The file lists one glob per line, matched against repository-relative paths; `#` starts a comment and blank lines are ignored.
+When the file exists and the pull request touches none of its globs, skip the review and the Thermonuclear stage, and say so in one line of the report.
+The ship extension reads the file from the checkout and the changed files from GitHub, and asks for the checkbox only when the review applies; it asks for it whenever GitHub lists fewer files than the pull request changes.
+
 ## Proof boxes
 
 A repository's PR template can declare `- [ ] Browser proof`.
