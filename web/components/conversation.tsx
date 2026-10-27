@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelOption } from "../../src/shared/models";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";
@@ -25,6 +25,7 @@ import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ContextRing } from "./context-ring";
+import { ConversationChromeContext } from "./conversation-chrome";
 import { ConversationHeader } from "./conversation-header";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
@@ -111,6 +112,7 @@ function LiveConversation({
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	const subject = subjectOf(view, host, lastHost);
 	const { shown, agent, writable, working, requests, shell } = subject;
+	const chrome = useContext(ConversationChromeContext);
 	const attachments = usePromptAttachments(subject.images);
 
 	const session = subject.kind === "session";
@@ -271,7 +273,7 @@ function LiveConversation({
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} titleAction={titleAction} />
+			{!chrome && <ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} titleAction={titleAction} />}
 			{trajectory ? (
 				<Trajectory view={view} />
 			) : (
@@ -359,7 +361,7 @@ function LiveConversation({
 								{writable && <AttachButton onClick={() => openFilePicker()} />}
 							</>
 						)}
-						placeholder={placeholderOf(subject)}
+						placeholder={chrome && writable && !working && !agent ? chrome.placeholder : placeholderOf(subject)}
 						disabled={!writable}
 						status={working ? "streaming" : "idle"}
 						onStop={session ? interrupt : undefined}

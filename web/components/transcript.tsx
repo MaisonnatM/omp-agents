@@ -71,6 +71,7 @@ import { revealed, useReveal } from "../message-reveal";
 import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, replacingPrompt, type ToolItem, toBlocks, toolImages, turnReplies, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
+import { type ConversationChrome, ConversationChromeContext } from "./conversation-chrome";
 import { ImageViewer } from "./media-viewer";
 import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -321,6 +322,20 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 		</TraceCollapsible>
 	);
 });
+
+/** A chip under an activity group for each tool `chips` names that finished in it, once per tool. */
+function ToolChips({ entries, chips }: { entries: ActivityItem[]; chips: ConversationChrome["toolChips"] }) {
+	const names = new Set(entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(chips, entry.name) ? [entry.name] : [])));
+	return [...names].map(name => {
+		const { label, icon: Icon } = chips[name]!;
+		return (
+			<p key={name} className="mt-1.5 inline-flex items-center gap-1.5 self-start rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground" data-tool-chip={name}>
+				<Icon aria-hidden className="size-3.5 shrink-0" />
+				{label}
+			</p>
+		);
+	});
+}
 
 function CopyButton({ text }: { text: string }) {
 	const { copied, copy } = useCopy();
@@ -592,6 +607,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
 	const revealId = useReveal(view);
+	const chrome = useContext(ConversationChromeContext);
 	const { scrollToMessage } = useMessageScroller();
 	// The command palette opened this view at a match. Scroll once the whole transcript has loaded, a frame after the
 	// scroller places it at its end, so that placement does not undo the scroll. The reveal ends when the scroll lands,
@@ -615,6 +631,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 								return (
 									<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
 										<ActivityGroup entries={block.entries} />
+										{chrome && <ToolChips entries={block.entries} chips={chrome.toolChips} />}
 									</MessageScrollerItem>
 								);
 							}
