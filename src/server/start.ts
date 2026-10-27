@@ -1,7 +1,7 @@
 /** Starting a dashboard session: a new one, a fork of a transcript, or a past session resumed. All three spawn omp the same way. */
 import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboard-session";
-import { checkoutDir } from "../git";
+import { checkoutDir, worktreeAt } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
 import { keptSessions, PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
@@ -110,7 +110,8 @@ export function createStarter(env: StartEnv): Starter {
 				const { branch, model, thinking, skill, images } = request;
 				return claimed(taskIdentity(request), dir, async allocated => {
 					let cwd = dir;
-					if (branch) {
+					// A ticket names no repository, so its branch applies only when the workspace it starts from is a git checkout.
+					if (branch && (branch.kind !== "work" || (await worktreeAt(dir)))) {
 						try {
 							cwd = await checkoutDir(dir, branch);
 						} catch (err) {

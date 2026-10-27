@@ -7,7 +7,7 @@ import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { commands } from "./shell/commands";
 import { GitHubAccess, quotaExhausted, quotaReset } from "./github/access";
-import { type Gh, ghJson, ghText } from "./github/command";
+import { GH, type Gh, ghJson, ghText } from "./github/command";
 
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
@@ -326,8 +326,8 @@ export default function ship(pi: ExtensionAPI) {
 	const access = new GitHubAccess();
 
 	const gh = async (ghArgs: string[], cwd: string) => {
-		if (ghArgs[0] === "auth") return pi.exec("gh", ghArgs, { cwd, timeout: 20_000 });
-		const run: Gh = args => pi.exec("gh", args, { cwd, timeout: 20_000 });
+		if (ghArgs[0] === "auth") return pi.exec(GH, ghArgs, { cwd, timeout: 20_000 });
+		const run: Gh = args => pi.exec(GH, args, { cwd, timeout: 20_000 });
 		const budget = ghArgs[0] === "api" && ghArgs[1] !== "graphql" ? "rest" : "graphql";
 		try {
 			return { code: 0, stdout: await access.request(budget, () => ghText(run, ghArgs), async () => quotaReset(await ghJson(run, ["api", "rate_limit"]), budget)), stderr: "" };

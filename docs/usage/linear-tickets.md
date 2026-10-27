@@ -56,8 +56,9 @@
   The menu lists every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so it says whether an agent still works on it, after a reload too.
   The rows of the list show no sessions.
   The session also shows in the sessions sidebar.
-  A Linear issue names no repository, so the session starts where a new session would: in the sidebar's workspace, or under **All workspaces** in the open session's workspace, else the newest session's.
-  **Work on it**, on any open issue, implements the issue in a git worktree on Linear's branch for it, continuing a branch or pull request that exists already, then commits and reports without pushing.
+  A Linear issue names no repository, so the session starts from where a new session would: the sidebar's workspace, or under **All workspaces** the open session's workspace, else the newest session's.
+  **Work on it**, on any open issue, starts the session in a git worktree on Linear's branch for it, beside that workspace's main worktree: the worktree that has the branch checked out, else a new one on the local branch, else on origin's branch, else on a new branch from origin's default branch. A workspace that is not a git checkout starts the session there and the agent creates the worktree. The session implements the issue, continuing a branch or pull request that exists already, then commits and reports without pushing.
+  Start it from a workspace of the issue's repository: from another one, the worktree and its branch land in that repository.
   **Plan it**, on an issue that has not started yet (triage, backlog, or unstarted), reads the issue and the code and reports a plan without changing anything.
   A completed or canceled issue has none.
   The button waits while the session starts.

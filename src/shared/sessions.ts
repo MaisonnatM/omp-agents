@@ -375,7 +375,7 @@ export function parseSkill(value: unknown): Parsed<string | null> {
 export function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
 	if (value === null || value === undefined) return { ok: null };
 	if (!isObject(value) || !isNonEmpty(value.name)) return null;
-	if (value.kind === "existing") return { ok: { kind: "existing", name: value.name } };
+	if (value.kind === "existing" || value.kind === "work") return { ok: { kind: value.kind, name: value.name } };
 	return value.kind === "new" && isNonEmpty(value.base) ? { ok: { kind: "new", name: value.name, base: value.base } } : null;
 }
 

@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { GitHubAccess, quotaReset } from "./github/access";
-import { type Gh, ghJson } from "./github/command";
+import { GH, type Gh, ghJson } from "./github/command";
 import { descriptionSnapshot, editDescription } from "./github/description";
 import { commands } from "./shell/commands";
 
@@ -38,7 +38,7 @@ export default function prDescription(pi: ExtensionAPI) {
 			if (!parsed.success) return { content: [{ type: "text", text: "Invalid PR description input." }], isError: true };
 			const { repo, pr, change } = parsed.data;
 			const path = `repos/${repo}/pulls/${pr}`;
-			const gh: Gh = args => pi.exec("gh", args, { cwd: ctx.cwd, timeout: 20_000 });
+			const gh: Gh = args => pi.exec(GH, args, { cwd: ctx.cwd, timeout: 20_000 });
 			const reset = async () => quotaReset(await ghJson(gh, ["api", "rate_limit"]), "rest");
 			const read = async () => descriptionSnapshot(await access.request("rest", () => ghJson(gh, ["api", path]), reset));
 			try {

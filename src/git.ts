@@ -223,10 +223,34 @@ export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
 	};
 }
 
+/** How long a start waits on `git fetch` for the branch a pull request or ticket names. */
+const FETCH_MS = 30_000;
+
+/**
+ * Where branch `name` of `cwd`'s repository comes from when no local branch has it: origin's branch, fetched, when
+ * origin has it; else origin's default branch, fetched, for a new branch; else the main worktree's branch when the
+ * repository has no origin.
+ * @throws Error with git's reason when origin cannot be reached, so a pull request's branch never restarts from the default branch.
+ */
+async function workSource(cwd: string, name: string, mainBranch: string | null): Promise<{ track: boolean; ref: string }> {
+	const opts = { timeoutMs: FETCH_MS, env: { GIT_TERMINAL_PROMPT: "0" } };
+	if ((await run(["git", "-C", cwd, "remote", "get-url", "origin"])).code !== 0) {
+		if (!mainBranch) throw new Error("The repository has no origin, and its main worktree has no branch checked out.");
+		return { track: false, ref: mainBranch };
+	}
+	const listed = await run(["git", "-C", cwd, "ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${name}`], opts);
+	// `--exit-code` exits 2 when origin answers without the branch.
+	if (listed.code !== 0 && listed.code !== 2) throw new Error(`Cannot reach origin: ${listed.stderr.trim() || `git ls-remote exited ${listed.code}`}`);
+	const base = listed.code === 0 ? name : (await runChecked(["git", "-C", cwd, "rev-parse", "--abbrev-ref", "origin/HEAD"])).trim().replace(/^origin\//, "");
+	await runChecked(["git", "-C", cwd, "fetch", "--quiet", "origin", `+refs/heads/${base}:refs/remotes/origin/${base}`], opts);
+	return { track: listed.code === 0, ref: `origin/${base}` };
+}
+
 /**
  * The directory a new session started from `cwd` runs in on `choice`. An existing branch runs in the worktree that has
  * it checked out, `cwd` itself when that is `cwd`'s own worktree, else in a new worktree; a new branch always gets a
- * new worktree.
+ * new worktree. A work branch is an existing one when a local branch has that name, else a new worktree on it, from
+ * origin's branch or else from the default branch.
  * @throws Error with git's reason when the branch is unknown, the name is invalid, or the worktree cannot be added.
  */
 export async function checkoutDir(cwd: string, choice: BranchChoice): Promise<string> {
@@ -235,24 +259,28 @@ export async function checkoutDir(cwd: string, choice: BranchChoice): Promise<st
 		branchesOf(cwd),
 		runChecked(["git", "-C", cwd, "rev-parse", "--show-toplevel"]),
 	]);
-	const from = choice.kind === "existing" ? choice.name : choice.base;
-	if (!names.includes(from)) throw new Error(`No local branch is named ${from}.`);
-	if (choice.kind === "existing") {
+	const existing = choice.kind === "existing" || (choice.kind === "work" && names.includes(choice.name));
+	if (choice.kind === "new" && !names.includes(choice.base)) throw new Error(`No local branch is named ${choice.base}.`);
+	if (choice.kind === "existing" && !names.includes(choice.name)) throw new Error(`No local branch is named ${choice.name}.`);
+	if (existing) {
 		const path = worktrees.find(worktree => worktree.branch === choice.name)?.path;
 		if (path) return path === own.trim() ? cwd : path;
 	} else {
 		if (names.includes(choice.name)) throw new Error(`A branch named ${choice.name} already exists.`);
 		await runChecked(["git", "-C", cwd, "check-ref-format", "--branch", choice.name]);
 	}
-	const main = worktrees[0]?.path;
+	const main = worktrees[0];
 	if (!main) throw new Error("git lists no worktree for this repository.");
-	const dir = worktreeDir(main, choice.name);
+	const dir = worktreeDir(main.path, choice.name);
 	// `worktree add -b` creates the branch before it checks the path, so a taken path would leave the branch behind.
 	if (existsSync(dir)) throw new Error(`${dir} already exists.`);
-	await runChecked(
-		choice.kind === "new"
-			? ["git", "-C", cwd, "worktree", "add", "-b", choice.name, "--", dir, choice.base]
-			: ["git", "-C", cwd, "worktree", "add", "--", dir, choice.name],
-	);
+	if (existing) {
+		await runChecked(["git", "-C", cwd, "worktree", "add", "--", dir, choice.name]);
+	} else if (choice.kind === "new") {
+		await runChecked(["git", "-C", cwd, "worktree", "add", "-b", choice.name, "--", dir, choice.base]);
+	} else {
+		const source = await workSource(cwd, choice.name, main.branch);
+		await runChecked(["git", "-C", cwd, "worktree", "add", source.track ? "--track" : "--no-track", "-b", choice.name, "--", dir, source.ref]);
+	}
 	return dir;
 }

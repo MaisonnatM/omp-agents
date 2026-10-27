@@ -28,8 +28,8 @@ export type StartOp =
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "replay"; view: View; turnId: string; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
 	| { kind: "resume"; sessionId: string }
-	/** `skill`: the skill pinned in the settings, `null` for none. */
-	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject; skill: string | null }
+	/** `skill`: the skill pinned in the settings, `null` for none. `branch`: the branch whose worktree it starts in, `null` to start in `cwd`. */
+	| { kind: "quick"; cwd: string; branch: BranchChoice | null; prompt: string; subject: QuickSubject; skill: string | null }
 	| { kind: "resume-all"; sessionIds: string[] };
 
 export type NewOp = Extract<StartOp, { kind: "new" }>;
@@ -52,7 +52,7 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 		case "new":
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId, taskId: null, reviewDraft: false, bot: null };
 		case "quick":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, taskId: null, bot: null, ...startTarget(op.subject) };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: op.branch, model: null, thinking: null, skill: op.skill, taskId: null, bot: null, ...startTarget(op.subject) };
 		case "fork":
 			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "replay":

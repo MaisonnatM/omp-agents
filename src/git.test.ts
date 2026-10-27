@@ -156,4 +156,32 @@ describe("checkoutDir", () => {
 		await expect(checkoutDir(main, { kind: "new", name: "fix/login", base: "main" })).rejects.toThrow(`${join(parent, "app-fix-login")} already exists.`);
 		expect((await gitCheckout(main))?.branches.map(branch => branch.name)).toEqual(["main", "wip", "old"]);
 	});
+
+	test("a work branch reuses the local branch, else tracks origin's, else starts from origin's default branch without tracking it", async () => {
+		const { parent, main } = await repo();
+		const origin = join(parent, "origin.git");
+		await git(parent, "clone", "-q", "--bare", main, origin);
+		await git(origin, "branch", "pr-head", "old");
+		await git(main, "remote", "add", "origin", origin);
+		await git(main, "fetch", "-q", "origin");
+		await git(main, "remote", "set-head", "origin", "main");
+
+		expect(await checkoutDir(main, { kind: "work", name: "wip" })).toBe(join(parent, "app-wip"));
+
+		const pr = await checkoutDir(main, { kind: "work", name: "pr-head" });
+		expect(pr).toBe(join(parent, "app-pr-head"));
+		expect(await git(pr, "rev-parse", "HEAD")).toBe(await git(main, "rev-parse", "old"));
+		expect((await git(pr, "rev-parse", "--abbrev-ref", "@{upstream}")).trim()).toBe("origin/pr-head");
+
+		const ticket = await checkoutDir(main, { kind: "work", name: "eng-7-fix" });
+		expect(await git(ticket, "rev-parse", "HEAD")).toBe(await git(main, "rev-parse", "main"));
+		await expect(git(ticket, "rev-parse", "--abbrev-ref", "@{upstream}")).rejects.toThrow();
+	});
+
+	test("a work branch that origin may have fails when origin cannot be reached, creating no branch", async () => {
+		const { parent, main } = await repo();
+		await git(main, "remote", "add", "origin", join(parent, "missing.git"));
+		await expect(checkoutDir(main, { kind: "work", name: "pr-head" })).rejects.toThrow("Cannot reach origin");
+		expect((await gitCheckout(main))?.branches.map(branch => branch.name)).toEqual(["main", "wip", "old"]);
+	});
 });

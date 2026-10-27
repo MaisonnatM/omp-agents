@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 /** A command that exited non-zero; `answer` is its stdout parsed as JSON when it parses, such as `gh api`'s error answer beside partial data. */
 export class CommandError extends Error {
 	constructor(message: string, readonly answer: unknown) {
@@ -20,6 +22,12 @@ export interface CommandOutput {
 	stdout: string;
 	stderr: string;
 }
+
+/**
+ * The `gh` an extension runs: the one on omp's PATH, else Homebrew's. An omp that a GUI app or launchd started can have
+ * no Homebrew directory on its PATH, where a bare `gh` fails with ENOENT although the shell finds it.
+ */
+export const GH = Bun.which("gh") ?? ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].find(path => existsSync(path)) ?? "gh";
 
 /** Runs `gh` with `args`, as an extension binds `pi.exec` to its directory and timeout. */
 export type Gh = (args: string[]) => Promise<CommandOutput>;

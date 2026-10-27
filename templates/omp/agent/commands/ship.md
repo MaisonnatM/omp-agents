@@ -9,15 +9,14 @@ The session's ship widget and status show the stage and PR needs.
 Read it FIRST on each invocation; resume from the recorded stage and the actual Linear, git, and GitHub state rather than repeating completed work.
 Report the current stage at every stopping point.
 Keep this session available after the PR goes live so `/ship` can resume when new review feedback or conflicts arrive.
-If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch or registering a PR.
+If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR or branching in a Graphite repository.
 
 1. **Ticket.** If no workflow exists, call `ship_stage({stage:"ticket"})`.
    If `$ARGUMENTS` has a Linear issue ID or URL, fetch that issue with `get_issue`.
    Otherwise create a concise issue with `save_issue`, using the Engineering team unless a different team is specified.
    Record `ship_stage({stage:"implement", issue:"<identifier>"})`.
    Read the issue's `gitBranchName` and use its issue ID in the branch.
-   If this is the main checkout on its default branch, create a dedicated worktree off the current parent branch; on any other branch, work in place.
-   In a worktree, use its absolute path for every edit, command, and check in this session.
+   If this is the main checkout on its default branch, create a dedicated worktree off the current parent branch per the Git safety rule in `AGENTS.md`; on any other branch, work in place.
    In a Graphite repo, register the branch under its parent.
 2. **Implement.** Delegate to `poteto-agent`, isolated or in place per the Git safety rule in `AGENTS.md`.
    Tell it to implement the issue in this session's checkout, but stop before opening a PR.

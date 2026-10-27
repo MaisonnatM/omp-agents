@@ -70,8 +70,8 @@ const WORK_ACTIONS: Record<WorkActionId, Pick<QuickAction<unknown>, "label" | "d
 	plan: { label: "Plan it", description: "Start a session that reads it and the code and proposes a plan, without changing anything" },
 };
 
-/** Which subjects of type `S` a work action applies to, and the prompt that starts its session on one. */
-type WorkRule<S> = Pick<QuickAction<S>, "applies" | "prompt">;
+/** Which subjects of type `S` a work action applies to, the prompt that starts its session on one, and the branch it starts on. */
+type WorkRule<S> = Pick<QuickAction<S>, "applies" | "prompt" | "branch">;
 
 /** What every ticket prompt opens with: which issue, and where to read it in full. */
 const ticketContext = (ticket: Ticket): string =>
@@ -84,16 +84,18 @@ const TICKET_RULES: Record<WorkActionId, WorkRule<Ticket>> = {
 	work: {
 		applies: isOpen,
 		prompt: ticket => {
-			const branch = ticket.branch
-				? `the branch \`${ticket.branch}\`, Linear's name for it, so that Linear links the work to the issue (check it out if it exists already)`
-				: `a new branch named after ${ticket.id}`;
-			return `${ticketContext(ticket)} Then work on it in a git worktree on ${branch}. When a branch or pull request for it exists already, continue from there. Implement what the issue asks, add tests for the behavior you change, run the project's checks, and commit. Report what you changed and what is left open. Do not push, open a pull request, or update the issue on Linear.`;
+			const where = ticket.branch
+				? `The dashboard starts this session in a git worktree on \`${ticket.branch}\`, Linear's name for the branch, so that Linear links the work to the issue; when the session's directory is not in a git repository, create that worktree yourself.`
+				: `Work on it in a git worktree on a new branch named after ${ticket.id}.`;
+			return `${ticketContext(ticket)} ${where} When a branch or pull request for it exists already, continue from there. Implement what the issue asks, add tests for the behavior you change, run the project's checks, and commit. Report what you changed and what is left open. Do not push, open a pull request, or update the issue on Linear.`;
 		},
+		branch: ticket => ticket.branch,
 	},
 	plan: {
 		applies: ticket => isOpen(ticket) && ticket.statusType !== "started",
 		prompt: ticket =>
 			`${ticketContext(ticket)} Then read the code it concerns, and report a plan to resolve it here: the cause or the design, the files to change, the tests to add, and the questions the issue leaves open. Do not change any file, and do not update the issue on Linear.`,
+		branch: () => null,
 	},
 };
 
@@ -110,11 +112,13 @@ const TODO_RULES: Record<WorkActionId, WorkRule<UserTodo>> = {
 		applies: todo => todo.doneAt === null,
 		prompt: todo =>
 			`${todoContext(todo)}\n\nDo what it asks. When it changes code, work in a git worktree on a new branch named after it, add tests for the behavior you change, run the project's checks, and commit. Report what you did and what is left open. Do not push or open a pull request.`,
+		branch: () => null,
 	},
 	plan: {
 		applies: todo => todo.doneAt === null && todo.status !== "in-progress",
 		prompt: todo =>
 			`${todoContext(todo)}\n\nRead the code or material it concerns, and report a plan to do it here: the steps, the files to change, and the questions it leaves open. Do not change any file.`,
+		branch: () => null,
 	},
 };
 
@@ -129,19 +133,24 @@ export const ticketActions = (ticket: Ticket): WorkActionId[] => WORK_IDS.filter
 /** The actions that apply to `todo`, in registry order: none once it is closed, and no plan once work started. */
 export const todoActions = (todo: UserTodo): WorkActionId[] => WORK_IDS.filter(id => TODO_RULES[id].applies(todo));
 
-/** The start of `action` on `pr`, in `cwd`, through the pinned `skill` when one is pinned. */
+/** The branch choice of a quick start that works on `branch`, `null` to start in the workspace as it is. */
+const workBranch = (branch: string | null): QuickOp["branch"] => (branch ? { kind: "work", name: branch } : null);
+
+/** The start of `action` on `pr`, from `cwd` and in the PR branch's worktree when the action changes it, through the pinned `skill` when one is pinned. */
 export const pullRequestStart = (pr: PullRequestSummary, action: PullRequestActionId, cwd: string, skill: string | null): QuickOp => ({
 	kind: "quick",
 	cwd,
+	branch: workBranch(PULL_REQUEST_ACTIONS[action].branch(pr)),
 	prompt: PULL_REQUEST_ACTIONS[action].prompt(pr),
 	subject: { kind: "pull-request", pr: { owner: pr.owner, repo: pr.repo, number: pr.number }, action },
 	skill,
 });
 
-/** The start of `action` on `ticket`, in `cwd`, through the pinned `skill` when one is pinned. */
+/** The start of `action` on `ticket`, from `cwd` and in the worktree of Linear's branch when it works on it, through the pinned `skill` when one is pinned. */
 export const ticketStart = (ticket: Ticket, action: WorkActionId, cwd: string, skill: string | null): QuickOp => ({
 	kind: "quick",
 	cwd,
+	branch: workBranch(TICKET_RULES[action].branch(ticket)),
 	prompt: TICKET_RULES[action].prompt(ticket),
 	subject: { kind: "ticket", id: ticket.id, action },
 	skill,
@@ -151,6 +160,7 @@ export const ticketStart = (ticket: Ticket, action: WorkActionId, cwd: string, s
 export const todoStart = (todo: UserTodo, action: WorkActionId, cwd: string, skill: string | null): QuickOp => ({
 	kind: "quick",
 	cwd,
+	branch: null,
 	prompt: TODO_RULES[action].prompt(todo),
 	subject: { kind: "todo", id: todo.id, text: todo.text, action },
 	skill,

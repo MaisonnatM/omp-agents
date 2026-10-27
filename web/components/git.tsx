@@ -85,7 +85,7 @@ const chosenBranch = (checkout: GitCheckout, choice: BranchChoice | null): strin
 /** The directory a new session on `choice` runs in, and whether starting it adds that worktree. */
 export function targetOf(checkout: GitCheckout, cwd: string, choice: BranchChoice | null): { dir: string; creates: boolean } {
 	if (choice === null || choice.name === checkout.branch) return { dir: cwd, creates: false };
-	const worktree = choice.kind === "existing" ? checkout.branches.find(branch => branch.name === choice.name)?.worktree : null;
+	const worktree = choice.kind === "new" ? null : checkout.branches.find(branch => branch.name === choice.name)?.worktree;
 	return worktree ? { dir: worktree, creates: false } : { dir: worktreeDir(checkout.mainWorktree, choice.name), creates: true };
 }
 

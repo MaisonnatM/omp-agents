@@ -23,7 +23,11 @@ export const worktreeDir = (mainWorktree: string, branch: string): string => `${
  * The branch a new session works on: an existing one, in the worktree that has it checked out (a new worktree beside
  * the main one when none has), or a new branch from `base`, always in a new worktree.
  */
-export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; name: string; base: string };
+export type BranchChoice =
+	| { kind: "existing"; name: string }
+	| { kind: "new"; name: string; base: string }
+	/** The branch a pull request or ticket names: the local one, else origin's, else a new one from the default branch. */
+	| { kind: "work"; name: string };
 
 /**
  * What `PUT /api/worktree/release` did with the linked worktree that has a branch checked out: `none` when no linked worktree

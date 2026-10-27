@@ -40,6 +40,10 @@ One helper in `src/server/start.ts` owns the claim for `new` and `resume`: it re
 A `start` of kind `new` carries a `branch`, `null` for the directory as it is.
 For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`.
 For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`.
+A quick action that changes a pull request's branch, or works on a Linear issue, sends a `work` branch: the pull request's head or Linear's branch name (`branch` in each action's rule).
+The server treats it as an existing branch when a local branch has the name; otherwise `git ls-remote --exit-code --heads origin` decides: origin's branch is fetched and `git worktree add --track -b` follows it, and a name origin lacks starts from origin's default branch, fetched, with `--no-track`; a repository without origin starts from the main worktree's branch.
+An origin that cannot be reached fails the start, so a pull request's branch never restarts from the default branch.
+A `work` branch from a directory outside any git checkout starts the session in that directory, since a Linear issue names no repository.
 `<dir>` is `worktreeDir` in `src/shared/git.ts`, beside the main worktree.
 The server refuses a `<dir>` that already exists, because `git worktree add -b` creates the branch before it checks the path.
 A branch that git refuses answers the `start` with git's reason, and no omp spawns.

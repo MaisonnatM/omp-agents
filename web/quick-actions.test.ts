@@ -54,7 +54,7 @@ describe("ticketStart", () => {
 describe("a pull request start", () => {
 	test("Review saves a review draft; the thermonuclear review does not", () => {
 		const pr = { owner: "acme", repo: "app", number: 7 };
-		const start = (action: "review" | "thermonuclear-review") => messageOf({ kind: "quick", cwd: "/tmp", prompt: "x", subject: { kind: "pull-request", pr, action }, skill: null }, 1);
+		const start = (action: "review" | "thermonuclear-review") => messageOf({ kind: "quick", cwd: "/tmp", branch: null, prompt: "x", subject: { kind: "pull-request", pr, action }, skill: null }, 1);
 		expect(start("review")).toMatchObject({ kind: "new", subject: { kind: "pull-request", pr }, todoId: null, reviewDraft: true });
 		expect(start("thermonuclear-review")).toMatchObject({ kind: "new", subject: { kind: "pull-request", pr }, todoId: null, reviewDraft: false });
 	});

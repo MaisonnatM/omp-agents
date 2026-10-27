@@ -159,7 +159,9 @@
   The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the list does not include that pull request, a note says why, and the details still show.
   `#pull-requests/<owner>/<repo>/<number>/files` opens the details on the **Code** tab at the first file, and `#pull-requests/<owner>/<repo>/<number>/files/<path>` at the file at that path, encoded; choosing **Code** puts that address in the location bar, and another tab takes it out.
-- The quick actions in a row's `⋯` menu on the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
+- The quick actions in a row's `⋯` menu on the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, from the repository's most recently used workspace, with a prompt that names the pull request and its branch.
+  An action that changes the branch, every one but **Review** and a **Thermonuclear review** of someone else's pull request, starts the session in a git worktree on the branch: the worktree that has it checked out, else a new one beside the main worktree on the local branch, else on origin's branch, fetched.
+  When origin cannot be reached, or the branch is in a fork the workspace's origin lacks, the start fails and the note says why.
   The page stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
   The session also shows in the sessions sidebar.

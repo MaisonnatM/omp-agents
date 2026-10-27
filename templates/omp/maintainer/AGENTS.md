@@ -6,13 +6,15 @@ If `PI_CODING_AGENT_DIR` is set, substitute that directory for `~/.omp/agent` in
 ## Git safety
 
 Where to edit follows the branch of the checkout the session runs in, its cwd.
-On the default branch (`main`), create a dedicated worktree on a new branch off it before making changes, do all edits, checks, and commits there, and reuse an existing worktree for the same task; every subagent that edits files uses `isolated: true`, since its cwd is still the checkout on `main`.
+On the default branch (`main`), a session that will edit starts by creating its worktree with a literal absolute path, `git worktree add -b <branch> ~/code/<repo>-wt/<topic> <base>`, or reuses an existing worktree for the same task.
+Name that absolute path in every later edit, check, and commit, written out with no shell variable or `cd -`: a relative path resolves to the session's cwd on `main`, and the worktree guard reads directories only as written.
+Every subagent that edits files uses `isolated: true`, since its cwd is still the checkout on `main`.
 On any other local branch, including a linked worktree, work in place while your session is the one changing that checkout: edit, check, and commit on that branch alongside its existing local changes, and spawn editing subagents without `isolated` in the same checkout, in parallel only on disjoint files.
 When another live session has uncommitted work in that checkout, make a worktree of your own; the worktree guard enforces this, and its reason names the recovery when another process switches your branch.
 Read-only subagents, such as a scout or the thermonuclear reviewer, run without `isolated`; competing attempts at the same change, such as several runners given one task to compare, always use it.
 Isolation fails when the session's cwd is not a Git repository: create a worktree for the subagent instead and name its path in the task.
 Read-only investigation needs no worktree; a request to work in place on `main` still needs a branch, which `git switch -c <branch>` in the main checkout gives.
-Before creating a branch, opening a PR, adopting an existing PR, or auditing Graphite registration, read `~/.omp/agent/docs/git-workflow.md`.
+Before opening or adopting a PR, auditing Graphite registration, or branching in a Graphite repository, read `~/.omp/agent/docs/git-workflow.md`.
 
 After merging or committing into local `main`, immediately run `git push origin main` and confirm `git status -sb` has no ahead count.
 Force-pushes and rewriting `main` still require explicit approval.
