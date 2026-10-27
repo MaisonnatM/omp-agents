@@ -8,7 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { QUICK_ACTIONS, type QuickActionId, type QuickSubject } from "../quick-actions";
 import type { OpenMode } from "../routing";
 import type { StartOf } from "../starts";
-import { LiveSessionChips } from "./session-chip";
+import { LiveSessionsMenu } from "./session-chip";
 
 const ICON: Record<QuickActionId, LucideIcon> = {
 	"fix-ci-and-conflicts": Wrench,
@@ -124,13 +124,13 @@ interface DetailActionsProps extends QuickActionsProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-/** A details view's buttons for `actions`, then the sessions that work on its item; nothing when there is neither. */
+/** A details view's buttons for `actions`, then a dropdown of the sessions that work on its item; nothing when there is neither. */
 export function DetailQuickActions({ actions, pending, onRun, sessions, onOpen }: DetailActionsProps) {
 	if (actions.length === 0 && sessions.length === 0) return null;
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<QuickActionButtons actions={actions} pending={pending} onRun={onRun} />
-			<LiveSessionChips hosts={sessions} onOpen={onOpen} />
+			<LiveSessionsMenu hosts={sessions} onOpen={onOpen} />
 		</div>
 	);
 }
