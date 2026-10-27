@@ -74,7 +74,7 @@ function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | 
 		return [
 			{ t: "items", view, reset: true, items: [], removed: [] },
 			{ t: "work", view, reset: true, files: [] },
-			{ t: "media", view, reset: true, media: [] },
+			{ t: "media", view, reset: true, media: [], sources: [] },
 		];
 	}
 	const { tail, media } = resources;
@@ -85,7 +85,7 @@ function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | 
 					{ t: "work", view, reset: true, files: tail.files },
 				] satisfies ServerMsg[])
 			: []),
-		...(media.loaded ? [{ t: "media", view, reset: true, media: media.media } as const] : []),
+		...(media.loaded ? [{ t: "media", view, reset: true, media: media.media, sources: media.sources } as const] : []),
 	];
 }
 
@@ -154,7 +154,7 @@ export class Views {
 				(reset, items, removed) => this.#publish(viewTopic(key), { t: "items", view, reset, items, removed }),
 				(reset, files) => this.#publish(viewTopic(key), { t: "work", view, reset, files }),
 			);
-			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, (reset, list) => this.#publish(viewTopic(key), { t: "media", view, reset, media: list }));
+			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, (reset, list, sources) => this.#publish(viewTopic(key), { t: "media", view, reset, media: list, sources }));
 			this.#resources.set(key, { tail, media });
 			tail.poke();
 			media.poke(path);

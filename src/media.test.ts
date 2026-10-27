@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSy
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { MediaTree } from "./media";
-import type { AgentMedia } from "./shared/transcript";
+import type { AgentMedia, AgentSource } from "./shared/transcript";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -39,12 +39,12 @@ function session(): { path: string; artifacts: string } {
 	return { path: `${artifacts}.jsonl`, artifacts };
 }
 
-type Emit = { reset: boolean; media: AgentMedia[] };
+type Emit = { reset: boolean; media: AgentMedia[]; sources: AgentSource[] };
 
 /** A tree over `path` whose `read` pokes it with a change at `changedPath` and resolves with what that poke emits. */
 function treeOf(path: string): { tree: MediaTree; read: (changedPath?: string) => Promise<Emit> } {
 	let resolve: ((emit: Emit) => void) | null = null;
-	const tree = new MediaTree(path, null, (reset, media) => resolve?.({ reset, media }));
+	const tree = new MediaTree(path, null, (reset, media, sources) => resolve?.({ reset, media, sources }));
 	const read = (changedPath = path): Promise<Emit> => {
 		const next = Promise.withResolvers<Emit>();
 		resolve = next.resolve;
@@ -80,7 +80,7 @@ describe("MediaTree", () => {
 		const { path, artifacts } = session();
 		writeFileSync(path, "");
 		const { tree, read } = treeOf(path);
-		expect(await read()).toEqual({ reset: true, media: [] });
+		expect(await read()).toEqual({ reset: true, media: [], sources: [] });
 
 		const later = join(artifacts, "Later.jsonl");
 		expect(tree.covers(later)).toBe(true);
@@ -173,5 +173,32 @@ describe("MediaTree", () => {
 
 		expect([appended.reset, appended.media.map(item => item.src)]).toEqual([false, [src(HASH_B)]]);
 		expect(tree.media.map(item => item.src)).toEqual([src(HASH_B), fileSrc(shot)]);
+	});
+
+	test("collects the pages the session's and its subagents' tools opened, each URL once and oldest first, leaving out failed calls and this computer", async () => {
+		const { path, artifacts } = session();
+		const errorResult = line({ type: "message", timestamp: "2026-10-05T10:03:00Z", message: { role: "toolResult", toolCallId: "c4", toolName: "read", isError: true, content: [{ type: "text", text: "404" }] } });
+		writeFileSync(
+			path,
+			call("c1", "read", { path: "https://docs.example.com/guide?x=1" }) +
+				textResult("c1", "read", "guide", "2026-10-05T10:01:00Z") +
+				call("c2", "read", { path: "pr://acme/app/42/diff" }) +
+				textResult("c2", "read", "diff", "2026-10-05T10:02:00Z") +
+				call("c3", "eval", { code: 'await browser.open({ url: "http://localhost:3000/" }); await browser.open("https://docs.example.com/guide?x=1")' }) +
+				textResult("c3", "eval", "ok", "2026-10-05T10:04:00Z") +
+				call("c4", "read", { path: "https://gone.example.com/" }) +
+				errorResult +
+				call("c5", "read", { path: "pr://42" }) +
+				textResult("c5", "read", "pr", "2026-10-05T10:05:00Z"),
+		);
+		writeFileSync(join(artifacts, "Smoke.jsonl"), call("c6", "web_fetch", { url: "https://news.example.org/a" }) + textResult("c6", "web_fetch", "a", "2026-10-05T10:00:00Z"));
+
+		const { sources } = await treeOf(path).read();
+
+		expect(sources.map(({ url, agentId }) => [url, agentId])).toEqual([
+			["https://news.example.org/a", "Smoke"],
+			["https://docs.example.com/guide?x=1", null],
+			["https://github.com/acme/app/pull/42", null],
+		]);
 	});
 });
