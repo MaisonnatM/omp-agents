@@ -23,6 +23,8 @@
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it remembers that.
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
+  The conversation reads as a chat: it shows your messages and the Bot's replies, never its tool calls or thinking, whatever **Show tool calls** and **Show thinking** say.
+  The Bot's conversation is not listed in the **Sessions** tab, the command palette, or the workspace list; only its Bot's page shows it.
   A new Bot greets you and offers three starters, built from its job, or asking what its job should be while it has none, which the composer lists under its action bar as it lists suggested prompts.
   The composer reads **Message** and the Bot's name.
   While its session runs, the conversation and its composer work as in a pane.

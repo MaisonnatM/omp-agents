@@ -13,8 +13,15 @@ export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boole
 /** The running sessions that work on `item`: their tool calls named it, or a quick action on it started them. */
 export const sessionsOn = (item: WorkItem, hosts: RosterHost[]): RosterHost[] => hosts.filter(host => worksOn(host, item));
 
-export function discoverableSessions(hosts: RosterHost[], past: PastSession[], hidden: ReadonlySet<string>): { hosts: RosterHost[]; past: PastSession[] } {
-	const listed = <T extends { cwd: string }>(rows: T[]): T[] => rows.filter(row => discoverableCwd(row.cwd, hidden));
+/** The sessions the sidebar, the palette, and the pages list: none in a temporary or hidden directory, and none that is a Bot's conversation, which only its Bot's page shows. */
+export function discoverableSessions(
+	hosts: RosterHost[],
+	past: PastSession[],
+	hidden: ReadonlySet<string>,
+	botSessions: ReadonlySet<string>,
+): { hosts: RosterHost[]; past: PastSession[] } {
+	const listed = <T extends { cwd: string; sessionId: string }>(rows: T[]): T[] =>
+		rows.filter(row => discoverableCwd(row.cwd, hidden) && !botSessions.has(row.sessionId));
 	return { hosts: listed(hosts), past: listed(past) };
 }
 

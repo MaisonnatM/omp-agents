@@ -147,6 +147,9 @@ export const ActivityVisibility = createContext<ActivityVisibility>({
 	toggleThinking: () => {},
 });
 
+/** Whether the transcript draws its tool and thinking groups; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
+export const ActivityShown = createContext(true);
+
 export const HIDE_TOOL_CALLS_KEY = "omp-agents.hide-tool-calls";
 export const HIDE_THINKING_KEY = "omp-agents.hide-thinking";
 
@@ -324,9 +327,8 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 });
 
 /** A chip under an activity group for each tool `chips` names that finished in it, once per tool. */
-function ToolChips({ entries, chips }: { entries: ActivityItem[]; chips: ToolChipLabels }) {
-	const names = new Set(entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(chips, entry.name) ? [entry.name] : [])));
-	return [...names].map(name => {
+function ToolChips({ names, chips }: { names: string[]; chips: ToolChipLabels }) {
+	return names.map(name => {
 		const { label, icon: Icon } = chips[name]!;
 		return (
 			<p key={name} className="mt-1.5 inline-flex items-center gap-1.5 self-start rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground" data-tool-chip={name}>
@@ -608,6 +610,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
 	const revealId = useReveal(view);
 	const toolChips = useContext(ToolChipsContext);
+	const activityShown = useContext(ActivityShown);
 	const { scrollToMessage } = useMessageScroller();
 	// The command palette opened this view at a match. Scroll once the whole transcript has loaded, a frame after the
 	// scroller places it at its end, so that placement does not undo the scroll. The reveal ends when the scroll lands,
@@ -628,10 +631,12 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					<MessageScrollerContent className="mx-auto max-w-conversation gap-3 p-3" aria-relevant="additions text" data-transcript>
 						{visibleBlocks.map(block => {
 							if (block.kind === "activity") {
+								const chips = [...new Set(block.entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(toolChips, entry.name) ? [entry.name] : [])))];
+								if (!activityShown && chips.length === 0) return null;
 								return (
 									<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
-										<ActivityGroup entries={block.entries} />
-										<ToolChips entries={block.entries} chips={toolChips} />
+										{activityShown && <ActivityGroup entries={block.entries} />}
+										<ToolChips names={chips} chips={toolChips} />
 									</MessageScrollerItem>
 								);
 							}

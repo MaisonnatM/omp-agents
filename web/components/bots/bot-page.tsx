@@ -27,6 +27,7 @@ import type { PromptEditorHandle } from "../prompt-editor";
 import { SidebarToggle } from "../sidebar-panel";
 import { DirectoryPicker } from "../workspace-picker";
 import { type ToolChipLabels, ToolChipsContext } from "../tool-chips";
+import { ActivityShown } from "../transcript";
 import { RoutineDetail } from "../routines/routine-detail";
 import { RoutineEditor } from "../routines/routine-editor";
 import { BotAvatar } from "./bot-avatar";
@@ -201,19 +202,21 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 			/>
 			<div className="relative flex min-h-0 flex-1 flex-col">
 				{view ? (
-					<ToolChipsContext.Provider value={toolChips}>
-						<ViewConversation
-							view={view}
-							focused
-							host={host}
-							lastHost={instanceId !== null ? (lastHosts.get(instanceId) ?? null) : null}
-							session={bot.sessionId !== null ? (past.find(({ sessionId }) => sessionId === bot.sessionId) ?? null) : null}
-							models={(instanceId !== null && models.get(instanceId)) || UNREAD}
-							workspaces={workspaces}
-							header={false}
-							placeholder={`Message ${bot.name}`}
-						/>
-					</ToolChipsContext.Provider>
+					<ActivityShown.Provider value={false}>
+						<ToolChipsContext.Provider value={toolChips}>
+							<ViewConversation
+								view={view}
+								focused
+								host={host}
+								lastHost={instanceId !== null ? (lastHosts.get(instanceId) ?? null) : null}
+								session={bot.sessionId !== null ? (past.find(({ sessionId }) => sessionId === bot.sessionId) ?? null) : null}
+								models={(instanceId !== null && models.get(instanceId)) || UNREAD}
+								workspaces={workspaces}
+								header={false}
+								placeholder={`Message ${bot.name}`}
+							/>
+						</ToolChipsContext.Provider>
+					</ActivityShown.Provider>
 				) : (
 					<div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
 						<BotAvatar look={bot} size="hero" />
