@@ -26,6 +26,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [One server runs the unattended work](architecture/routines.md#one-server-runs-the-unattended-work)
   - [Isolation sandboxes](architecture/routines.md#isolation-sandboxes)
 - [Scheduled sends](architecture/scheduled-sends.md)
+- [Bots](architecture/bots.md)
 - [Pins](architecture/pins.md)
 - [Preferences](architecture/preferences.md)
 - [User notes](architecture/user-notes.md)

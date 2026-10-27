@@ -33,6 +33,7 @@ A smoke server reads and writes the user's own state: `calendars.json`, `token`,
 When a check changes that state, such as hiding a calendar, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
 Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`.
 The omp sessions it starts still use the user's omp directory, so they still run with the user's models and sign-ins.
+Each session's socket lives under `$XDG_CONFIG_HOME/omp-agents/sessions/<port>/`, and the server refuses a socket path past 103 bytes (`MAX_SOCKET_PATH_BYTES` in `src/keeper-link.ts`), so a smoke that starts sessions needs a short `XDG_CONFIG_HOME` such as `mktemp -d /tmp/oa-c.XXXX`; under macOS's default `$TMPDIR`, starting a session fails with "The session socket path is too long".
 
 The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shells, and commands it starts (`childEnv` in `src/proc.ts`), so a smoke server an agent starts takes the port it is given and does not exit when its stdin ends.
 

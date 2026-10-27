@@ -1,0 +1,23 @@
+# Bots
+
+A Bot is a named, long-lived teammate: one conversation, a job, and a memory.
+`src/shared/bots.ts` holds the model, `Bot` and `BotChange`, and `applyBot`, the reducer that the page and the server share.
+`src/server/bots-file.ts` keeps the list in `bots.json` beside the access token.
+A save keeps the Bot's `sessionId`, and a remove forgets the Bot but leaves its session file and its memory directory.
+
+`Bots` in `src/server/bots.ts` binds each Bot to the session its conversation runs in.
+A start that `Bots` asked for, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, and its `memory.md` path.
+Any other start launches plain, so no other session loads the extension.
+Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
+
+The extension adds to the main agent's system prompt on every turn the Bot's name, its job, and its memory, read again each turn, so a saved job reaches the next turn.
+Its `remember` tool appends `- YYYY-MM-DD fact` to `$XDG_DATA_HOME/omp-agents/bots/<id>/memory.md`, and nothing else writes that file.
+
+A `bot` socket message carries one `BotChange`.
+`save` and `remove` go through the list registry, so every socket hears the new list as a `bots` message, with each Bot's memory file's text.
+`message` calls `Bots.message`, which answers once omp took the text: a follow-up in the live session, else a resume of the Bot's session followed by the text, else a new session in the Bot's workspace that starts with it.
+Messages to one Bot wait on one another, so two at once never start two conversations.
+
+A routine whose `target` is `{kind: "bot", botId}` sends its prompt through `Bots.message` and records a `bot` outcome with the session id; the routine neither tracks nor ends that session.
+
+The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).

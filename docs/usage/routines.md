@@ -8,6 +8,7 @@
 - **New routine** opens the editor: a name, the workspace it runs in, its task, its schedules, and its skill.
   The task is a prompt you write, or a shell command.
   A prompt task can also **Pin the session when it finishes**.
+  **Send to** picks where a prompt goes: **A new session** each run, or a [Bot](bots.md)'s conversation, as if you wrote it there; a Bot's routine takes no pin or skill, and its page shows **Sends to** in place of the workspace.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
   The skill starts as the one pinned in **Settings › Preferences**, and **None** starts the sessions without one.
 - A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.

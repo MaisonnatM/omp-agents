@@ -32,6 +32,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Calendar](usage/calendar.md)
 - [Inbox](usage/inbox.md)
 - [Routines](usage/routines.md)
+- [Bots](usage/bots.md)
 - [Settings](usage/settings.md)
 - [Settings sync](usage/settings-sync.md)
 - [Notifications](usage/notifications.md)

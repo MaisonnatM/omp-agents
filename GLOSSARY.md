@@ -85,6 +85,10 @@ _Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
 A task the dashboard runs on one or more schedules: a prompt or a shell command.
 _Avoid_: Cron job, automation
 
+**Bot**:
+A named teammate with one conversation you come back to, a job, and a memory that only its `remember` tool writes.
+_Avoid_: Agent, assistant, persona
+
 **Scheduled send**:
 One message to a session, or one new session's start, that waits for a time.
 _Avoid_: Delayed message, routine
