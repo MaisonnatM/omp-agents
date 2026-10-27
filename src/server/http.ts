@@ -48,9 +48,10 @@ export interface Guards {
 	admitSocket(req: Request): Response | null;
 	/**
 	 * The headers that accept a socket that `admitSocket` admitted. Offered any subprotocol, it answers with its own,
-	 * since Bun would otherwise pick the first offered, which may be the token.
+	 * since Bun would otherwise pick the first offered, which may be the token. Offered none, it gives no headers:
+	 * Bun's `upgrade` throws on an empty object, which would answer a client signed in by header with a 500.
 	 */
-	socketHeaders(req: Request): Record<string, string>;
+	socketHeaders(req: Request): Record<string, string> | undefined;
 	/** A write's JSON body, or the response refusing it. Only this app's own page may write, and only with a JSON body, which a cross-site form cannot send. */
 	writeBody(req: Request): Promise<{ body: unknown } | Response>;
 	/** The answer to `GET /api/hello?nonce=`, which needs no token: {@link helloProof} for the nonce. */
@@ -87,7 +88,7 @@ export function guardsFor(port: number, token: string): Guards {
 			const subprotocol = offered.find(protocol => protocol.startsWith(SOCKET_TOKEN_PREFIX))?.slice(SOCKET_TOKEN_PREFIX.length);
 			return bearer(req) || tokenMatches(token, subprotocol) ? null : fail(401, NOT_SIGNED_IN);
 		},
-		socketHeaders: (req): Record<string, string> => (req.headers.has("sec-websocket-protocol") ? { "sec-websocket-protocol": SOCKET_PROTOCOL } : {}),
+		socketHeaders: req => (req.headers.has("sec-websocket-protocol") ? { "sec-websocket-protocol": SOCKET_PROTOCOL } : undefined),
 		async writeBody(req) {
 			const refused = admit(req);
 			if (refused) return refused;

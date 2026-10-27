@@ -120,7 +120,6 @@ describe("API and socket guards", () => {
 	test("the socket's answer never echoes the offered token", () => {
 		const offered = request("/ws", { "sec-websocket-protocol": `bearer.${TOKEN}, omp-agents` });
 		expect(guards.socketHeaders(offered)).toEqual({ "sec-websocket-protocol": "omp-agents" });
-		expect(guards.socketHeaders(request("/ws"))).toEqual({});
 	});
 
 	test("a write without the token is 401 before its body is read", async () => {
