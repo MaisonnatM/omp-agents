@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../bots-model";
 import { hashForBotRoutine, hashForBots } from "../../routing";
-import { startsWords } from "../../routines-model";
+import { age } from "../../labels";
+import { runWords, startsWords } from "../../routines-model";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { TEXT_AREA } from "../form-field";
 import { RunDot } from "../routines/routine-marks";
@@ -199,21 +200,28 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 				<p className="text-xs text-muted-foreground">No routine yet. A routine messages {bot.name} or runs a command in its workspace on its schedules, its triggers, or both.</p>
 			) : (
 				<ul className="space-y-1.5">
-					{routines.map(routine => (
-						<li key={routine.id}>
-							<a
-								href={hashForBotRoutine(bot.id, { kind: "open", id: routine.id })}
-								aria-current={openId === routine.id ? "page" : undefined}
-								className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
-							>
-								<RunDot run={routine.runs[0]} />
-								<span className="min-w-0">
-									<span className={cn("block truncate font-medium", !routine.enabled && "text-muted-foreground")}>{routine.name}</span>
-									<span className="block truncate text-xs text-muted-foreground">{routine.enabled ? startsWords(routine) : "Paused"}</span>
-								</span>
-							</a>
-						</li>
-					))}
+					{routines.map(routine => {
+						const starts = routine.enabled ? startsWords(routine) : "Paused";
+						const last = routine.runs[0];
+						return (
+							<li key={routine.id}>
+								<a
+									href={hashForBotRoutine(bot.id, { kind: "open", id: routine.id })}
+									aria-current={openId === routine.id ? "page" : undefined}
+									className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
+								>
+									<RunDot run={last} />
+									<span className="min-w-0">
+										<span className={cn("block truncate font-medium", !routine.enabled && "text-muted-foreground")}>{routine.name}</span>
+										<span className="block truncate text-xs text-muted-foreground" title={starts}>
+											{starts}
+										</span>
+										<span className="block truncate text-xs text-muted-foreground">{last ? `Ran ${age(last.at, { compact: true })} ago · ${runWords(last)}` : "Not run yet"}</span>
+									</span>
+								</a>
+							</li>
+						);
+					})}
 				</ul>
 			)}
 		</section>

@@ -2,14 +2,14 @@
 import { BookmarkCheck } from "lucide-react";
 import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import type { RoutineSpec } from "../../../src/routines";
-import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, REMEMBER_TOOL } from "../../../src/shared/bots";
+import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botAsking, type OpenBot, starterPrompts } from "../../bots-model";
+import { botAsking, JOB_TEMPLATES, jobLine, type OpenBot, starterPrompts } from "../../bots-model";
 import { botDraftKey, useComposerDraft } from "../../composer-drafts";
 import type { Completions } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
@@ -19,7 +19,7 @@ import { useAction } from "../../use-action";
 import { useCompletion } from "../completion-popup";
 import { useSuggestions } from "../composer-suggestions";
 import { useDashboardActions } from "../dashboard-context";
-import { Field, FIELD } from "../form-field";
+import { Field, FIELD, TEXT_AREA } from "../form-field";
 import { PageFrame } from "../list-page";
 import { ViewConversation } from "../pane";
 import { Header } from "../page-header";
@@ -196,6 +196,7 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 						<span className="truncate">{bot.name}</span>
 					</button>
 				}
+				meta={jobLine(bot.job) || undefined}
 				end={<SidebarToggle side="right" open={detailsOpen} onToggle={onToggleDetails} />}
 			/>
 			<div className="relative flex min-h-0 flex-1 flex-col">
@@ -232,25 +233,29 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 
 const randomOf = <T,>(values: readonly T[]): T => values[Math.floor(Math.random() * values.length)]!;
 
-/** The New Bot form, as Grok's: a name, a shape and a color, and the workspace its conversation runs in, the sidebar's by default; its job comes in its first message. */
+/**
+ * The New Bot form, as Grok's: a name, a shape and a color, a job to start from or write, and the workspace its conversation runs in,
+ * the sidebar's by default. A template fills the job, and the name while the form has none; a Bot made with no job learns it in its first message.
+ */
 export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Workspace[]; defaultCwd: string; connected: boolean }) {
 	const { changeBot } = useDashboardActions();
 	const id = useId();
 	const [name, setName] = useState("");
 	const [look, setLook] = useState<BotLook>(() => ({ shape: randomOf(BOT_SHAPES), hue: randomOf(BOT_HUES) }));
+	const [job, setJob] = useState("");
 	const [cwd, setCwd] = useState(defaultCwd);
 	const [tried, setTried] = useState(false);
 	const fix = !name.trim() ? "Name the Bot." : !cwd.trim() ? "Pick the workspace it works in." : null;
 	return (
 		<PageFrame title="New Bot" meta="A teammate with one conversation you come back to, a job, and a memory">
 			<form
-				className="mx-auto flex w-full max-w-sm flex-col items-center gap-6 px-6 py-10"
+				className="mx-auto flex w-full max-w-md flex-col items-center gap-6 px-6 py-10"
 				onSubmit={event => {
 					event.preventDefault();
 					setTried(true);
 					if (fix) return;
 					const botId = crypto.randomUUID() as BotId;
-					changeBot({ op: "save", bot: { id: botId, name: name.trim(), job: "", cwd, model: null, skill: null, ...look } });
+					changeBot({ op: "save", bot: { id: botId, name: name.trim(), job: job.trim(), cwd, model: null, skill: null, ...look } });
 					location.hash = hashForBots(botId);
 				}}
 			>
@@ -266,6 +271,38 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 				/>
 				<div className="w-full space-y-6">
 					<BotLookPicker name={id} look={look} onLook={setLook} />
+					<Field label="Job" hint="Optional. Leave it empty and tell it in your first message.">
+						<div className="space-y-2">
+							<div role="group" aria-label="Start from a job" className="flex flex-wrap gap-1.5">
+								{JOB_TEMPLATES.map(template => (
+									<Button
+										key={template.label}
+										{...activityControl("bots.job.template")}
+										type="button"
+										variant="outline"
+										size="compact"
+										active={job === template.job}
+										aria-pressed={job === template.job}
+										onClick={() => {
+											setJob(template.job);
+											if (!name.trim()) setName(template.name);
+										}}
+									>
+										{template.label}
+									</Button>
+								))}
+							</div>
+							<textarea
+								aria-label="Job"
+								value={job}
+								rows={4}
+								maxLength={MAX_JOB_LENGTH}
+								placeholder="What it does for you, where it looks, and what it asks before acting."
+								onChange={event => setJob(event.target.value)}
+								className={TEXT_AREA}
+							/>
+						</div>
+					</Field>
 					<Field label="Workspace" hint="Its conversation runs in this directory.">
 						<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={setCwd} />
 					</Field>
@@ -279,7 +316,6 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 							{fix}
 						</p>
 					)}
-					<p className="text-center text-xs text-pretty text-muted-foreground">Then tell it its job in your first message.</p>
 				</div>
 			</form>
 		</PageFrame>

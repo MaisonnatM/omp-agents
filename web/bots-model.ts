@@ -117,6 +117,36 @@ export function jobLine(job: string): string {
 	return /^.+?[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
 }
 
+/** A job the New Bot form offers to start from, and the name it suggests while the form has none. */
+export interface JobTemplate {
+	label: string;
+	name: string;
+	job: string;
+}
+
+export const JOB_TEMPLATES: readonly JobTemplate[] = [
+	{
+		label: "PR reviewer",
+		name: "Reviewer",
+		job: "Review the pull requests I open for correctness, security, and performance.\nList findings worst first, each with its file and line.\nAsk before you comment on GitHub.",
+	},
+	{
+		label: "Daily retro",
+		name: "Retro",
+		job: "Write a short retro of today's sessions.\nSay what shipped, what stalled, and what to pick up tomorrow.\nKeep it under ten lines.",
+	},
+	{
+		label: "Worktree janitor",
+		name: "Janitor",
+		job: "Find worktrees and sessions nobody touched in a week.\nList them with their branch and last change.\nRemove only the ones I approve.",
+	},
+	{
+		label: "Release watcher",
+		name: "Watcher",
+		job: "Check for new omp releases.\nSummarize what changed and what in this repository it could break.\nAsk before you bump a version.",
+	},
+];
+
 /** The prompts a Bot offers before its first message: its job's first sentence as a task, a question about what it needs, and a fact for its memory. */
 export function starterPrompts(job: string): string[] {
 	const task = jobLine(job);
