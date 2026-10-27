@@ -26,9 +26,10 @@ import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
+import { CalendarNav } from "./calendar/calendar-nav";
 import { InboxNav } from "./inbox/inbox-nav";
 import { NotesNav } from "./notes/nav";
+import { RoutinesNav } from "./routines/routines-nav";
 import { SessionList } from "./session-list";
 import { SettingsNav } from "./settings/settings-nav";
 import { workspaceItems } from "./workspace-picker";
@@ -161,8 +162,10 @@ interface RosterProps {
 	/** The list the Notes page shows. */
 	notesView: NotesListView;
 	routines: Routine[];
-	/** The page under the Calendar tab that is open. */
-	calendarTab: CalendarTabPage;
+	/** The routine the Routines page shows, `null` for its list, `undefined` while another page is open. */
+	routinesOpen: string | null | undefined;
+	/** The Calendar page is open. */
+	calendarOpen: boolean;
 	/** The settings section and workspace the sidebar's settings links keep. */
 	settingsRoute: SettingsRoute;
 	/** The tickets section a sidebar link last chose. */
@@ -197,7 +200,8 @@ export function Roster({
 	userNotes,
 	notesView,
 	routines,
-	calendarTab,
+	routinesOpen,
+	calendarOpen,
 	settingsRoute,
 	sectionTarget,
 	onSectionTarget,
@@ -287,6 +291,11 @@ export function Roster({
 					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
 				</SidebarContent>
 			</TabPanel>
+			<TabPanel value="routines" asChild>
+				<SidebarContent>
+					<RoutinesNav routines={routines} current={routinesOpen} />
+				</SidebarContent>
+			</TabPanel>
 			<TabPanel value="notes" asChild>
 				<SidebarContent>
 					<NotesNav list={userNotes} view={notesView} />
@@ -294,7 +303,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="calendar" asChild>
 				<SidebarContent>
-					<CalendarNav routines={routines} current={calendarTab} workspace={workspace} />
+					<CalendarNav open={calendarOpen} workspace={workspace} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="inbox" asChild>

@@ -1,13 +1,13 @@
 # Calendar
 
 - The **Calendar** tab, or a `#calendar` address, shows a month in place of the panes, Monday first.
-  The sidebar then lists **Calendar**, then, once Google Calendar is connected, your Google calendars under **My calendars** and **Other calendars**, then **Show routines**, **All**, and each routine by name.
+  The sidebar then lists **Calendar**, then, once Google Calendar is connected, your Google calendars under **My calendars** and **Other calendars**, then **Show routines**.
 - Each day lists its routine runs, the todos due on it, the events you keep on this computer, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
   A violet dot is a todo, an amber one a ticket, a timed Google event uses its calendar's color, and an event on this computer is slate gray; an all-day event is a band in that color; a done or canceled todo or ticket is struck through.
 - **Show routines** starts checked.
   Uncheck it to hide past, planned, and interval routine entries from the month, day previews, and selected-day list.
-  This does not pause routines or hide their sidebar links.
+  This does not pause routines or change the **Routines** tab.
   The app keeps the choice across reloads and shares it between windows on the same dashboard address.
 - Planned runs follow each routine's schedules from its last run.
   A time that passed without a run shows as now, since the next minute's check runs it.

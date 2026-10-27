@@ -1,7 +1,6 @@
-/** The sidebar's Calendar tab: the calendar, the Google calendars it can show by account, and every routine (`CalendarNav`). */
+/** The sidebar's Calendar tab: the calendar, the Google calendars it can show by account, and whether it shows routine runs (`CalendarNav`). */
 import { Check } from "lucide-react";
 import { useState } from "react";
-import type { Routine } from "../../../src/routines";
 import { type CalendarShownInput, calendarKey, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/calendar";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -9,11 +8,8 @@ import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { activityControl } from "../../activity";
 import { calendarEventsStore, googleStore, monthSpan, useGoogleCalendars } from "../../reads";
-import { hashForCalendar, hashForRoutines } from "../../routing";
+import { hashForCalendar } from "../../routing";
 import { useCalendarRoutines } from "../../use-calendar-display";
-
-/** The page under the Calendar tab that is open: the calendar, or the Routines page on a routine or, `null`, the list; `null` for another page. */
-export type CalendarTabPage = { kind: "calendar" } | { kind: "routines"; target: string | null } | null;
 
 /** Google Calendar's own groups of its calendar list, in its sidebar's order. */
 const CALENDAR_GROUPS = [
@@ -117,24 +113,22 @@ function GoogleCalendarGroups({ workspace }: { workspace: string | null }) {
 }
 
 /**
- * The Calendar tab of the sidebar: the calendar, the Google calendars of the accounts `workspace` shows, then every
- * routine, then each one by name, a paused one muted.
+ * The Calendar tab of the sidebar: the calendar, active while `open`, the Google calendars of the accounts `workspace`
+ * shows, then whether the calendar shows routine runs.
  */
-export function CalendarNav({ routines, current, workspace }: { routines: Routine[]; current: CalendarTabPage; workspace: string | null }) {
+export function CalendarNav({ open, workspace }: { open: boolean; workspace: string | null }) {
 	const [showRoutines, setShowRoutines] = useCalendarRoutines();
-	const link = (href: string, active: boolean, name: string, muted = false) => (
-		<SidebarMenuButton asChild isActive={active}>
-			<a href={href} aria-current={active ? "page" : undefined}>
-				<span className={muted ? "truncate text-muted-foreground" : "truncate"}>{name}</span>
-			</a>
-		</SidebarMenuButton>
-	);
-	const routine = current?.kind === "routines" ? current.target : undefined;
 	return (
 		<>
 			<SidebarGroup>
 				<SidebarMenu aria-label="Calendar">
-					<SidebarMenuItem>{link(hashForCalendar(), current?.kind === "calendar", "Calendar")}</SidebarMenuItem>
+					<SidebarMenuItem>
+						<SidebarMenuButton asChild isActive={open}>
+							<a href={hashForCalendar()} aria-current={open ? "page" : undefined}>
+								<span className="truncate">Calendar</span>
+							</a>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
 				</SidebarMenu>
 			</SidebarGroup>
 			<GoogleCalendarGroups workspace={workspace} />
@@ -155,10 +149,6 @@ export function CalendarNav({ routines, current, workspace }: { routines: Routin
 							</label>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
-					<SidebarMenuItem>{link(hashForRoutines(null), routine === null, "All")}</SidebarMenuItem>
-					{routines.map(({ id, name, enabled }) => (
-						<SidebarMenuItem key={id}>{link(hashForRoutines(id), routine === id, name, !enabled)}</SidebarMenuItem>
-					))}
 				</SidebarMenu>
 			</SidebarGroup>
 		</>

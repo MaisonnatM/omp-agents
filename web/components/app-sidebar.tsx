@@ -81,10 +81,7 @@ export const AppSidebar = memo(function AppSidebar({
 		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
 	}, [listed, page, pullRequestsView, workspace, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
-	const calendarTab = useMemo(
-		() => (page?.kind === "calendar" ? page : page?.kind === "routines" ? ({ kind: "routines", target: routinesTarget } as const) : null),
-		[page, routinesTarget],
-	);
+	const routinesOpen = page?.kind === "routines" ? routinesTarget : undefined;
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
 	return (
 		<Roster
@@ -106,7 +103,8 @@ export const AppSidebar = memo(function AppSidebar({
 			notesView={notesView}
 			todoSessions={todoSessions}
 			routines={routines}
-			calendarTab={calendarTab}
+			routinesOpen={routinesOpen}
+			calendarOpen={page?.kind === "calendar"}
 			settingsRoute={settings}
 			sectionTarget={sectionTarget}
 			onSectionTarget={onSectionTarget}

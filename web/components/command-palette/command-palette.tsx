@@ -16,7 +16,6 @@ import {
 	PanelRight,
 	Plus,
 	RefreshCw,
-	Repeat,
 	Search,
 	SquareTerminal,
 	Wrench,
@@ -85,7 +84,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	notes: PAGE_ICON.notes,
 	calendar: PAGE_ICON.calendar,
 	inbox: PAGE_ICON.inbox,
-	routines: Repeat,
+	routines: PAGE_ICON.routines,
 	terminal: SquareTerminal,
 };
 

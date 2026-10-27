@@ -26,12 +26,13 @@ export const SIDEBAR_TABS = [
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, group: "dev", integration: "linear" },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, group: "dev" },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, group: "dev" },
+	{ value: "routines", label: "Routines", icon: PAGE_ICON.routines, group: "dev" },
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, group: "ops" },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, group: "ops" },
 	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox, group: "ops", integration: "gmail" },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: TabGroup; integration?: McpIntegrationId }[];
 
-/** A tab of the sidebar's bar; the tickets, todo, notes, calendar, and inbox tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A tab of the sidebar's bar; the tickets, todo, routines, notes, calendar, and inbox tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** What the sidebar shows: a tab's panel, or the settings sections while the Settings page is open. */

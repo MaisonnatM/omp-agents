@@ -1,15 +1,16 @@
-import { ArrowLeft, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pause, Pencil, Play, Plus, Repeat, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
-import { modeOf, readTime, SPLIT_CLICK } from "../../labels";
+import { age, modeOf, readTime, SPLIT_CLICK } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { hashForRoutines } from "../../routing";
-import { draftOf, lastRunWords, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
+import { draftOf, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useMinute } from "../../use-minute";
 import { useDashboardActions } from "../dashboard-context";
@@ -18,6 +19,7 @@ import { SessionChip } from "../session-chip";
 import { statusLabel } from "../status-dot";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { RoutineEditor } from "./routine-editor";
+import { RunDot, TaskIcon } from "./routine-marks";
 
 interface RoutineActionsProps {
 	routine: Routine;
@@ -117,32 +119,38 @@ function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; h
 	const { open } = useDashboardActions();
 	const { outcome } = run;
 	const started = outcome.kind === "session" ? sessionView(outcome, hosts) : null;
+	const output = outcome.kind === "command" && "output" in outcome.run ? outcome.run.output : "";
 	return (
-		<li className="space-y-1.5 px-3 py-2.5">
-			<p className="flex items-baseline gap-2 text-sm">
+		<li className="space-y-2 px-3 py-2.5">
+			<div className="flex min-h-7 items-center gap-2.5 text-sm">
+				<RunDot run={run} />
 				<span className="font-medium tabular-nums">{readTime(run.at)}</span>
-				<span className="text-xs text-muted-foreground">{runWords(run)}</span>
-			</p>
-			{started && (
-				<div role="group" aria-label="Session it started" className="flex flex-wrap gap-1.5 text-xs">
-					<SessionChip
-						label={routine.name}
-						status={started.host?.status ?? null}
-						title={`Open the session${started.host ? `, ${statusLabel(started.host.status)}` : ", which ended"} (${SPLIT_CLICK} to split)`}
-						filled={false}
-						onClick={event => open(started.view, modeOf(event))}
-					/>
+				<span className="min-w-0 truncate text-xs text-muted-foreground">{runWords(run)}</span>
+				{started && (
+					<div role="group" aria-label="Session it started" className="ml-auto flex shrink-0 text-xs">
+						<SessionChip
+							label={routine.name}
+							status={started.host?.status ?? null}
+							title={`Open the session${started.host ? `, ${statusLabel(started.host.status)}` : ", which ended"} (${SPLIT_CLICK} to split)`}
+							filled={false}
+							onClick={event => open(started.view, modeOf(event))}
+						/>
+					</div>
+				)}
+			</div>
+			{(output.trim() !== "" || run.errors.length > 0) && (
+				<div className="space-y-2 pl-[1.375rem]">
+					{output.trim() !== "" && <CommandOutput output={output} />}
+					{run.errors.length > 0 && (
+						<ul aria-label="Errors" className="space-y-0.5 text-xs text-red-600 dark:text-red-400">
+							{run.errors.map((error, index) => (
+								<li key={index} className="break-words">
+									{error}
+								</li>
+							))}
+						</ul>
+					)}
 				</div>
-			)}
-			{outcome.kind === "command" && "output" in outcome.run && outcome.run.output.trim() !== "" && <CommandOutput output={outcome.run.output} />}
-			{run.errors.length > 0 && (
-				<ul aria-label="Errors" className="space-y-0.5 text-xs text-red-600 dark:text-red-400">
-					{run.errors.map((error, index) => (
-						<li key={index} className="break-words">
-							{error}
-						</li>
-					))}
-				</ul>
 			)}
 		</li>
 	);
@@ -157,13 +165,13 @@ interface DetailProps {
 	onEdit: () => void;
 }
 
-/** What a routine's task row shows: the prompt or the command, whole. */
+/** What a routine's task card shows: the prompt or the command, whole. */
 function TaskValue({ task }: { task: RoutineTask }) {
 	switch (task.kind) {
 		case "prompt":
-			return <span className="whitespace-pre-wrap break-words">{task.prompt}</span>;
+			return <p className="whitespace-pre-wrap break-words">{task.prompt}</p>;
 		case "command":
-			return <code className="font-mono text-xs whitespace-pre-wrap break-words">{task.command}</code>;
+			return <code className="block font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">{task.command}</code>;
 		default: {
 			const unhandled: never = task;
 			return unhandled;
@@ -171,9 +179,8 @@ function TaskValue({ task }: { task: RoutineTask }) {
 	}
 }
 
-/** The schedules, one line each when there are several. */
+/** The schedules, one line each. */
 function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
-	if (schedules.length === 1) return schedulesWords(schedules);
 	return (
 		<ul>
 			{schedules.map((schedule, index) => (
@@ -183,16 +190,26 @@ function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
 	);
 }
 
-/** One routine's settings, then its runs, newest first. */
+/** One routine: its task and runs, newest first, beside its settings. */
 function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: DetailProps) {
 	const { task } = routine;
 	const { request } = useDashboardActions();
 	const run = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
 	const settings: [string, ReactNode][] = [
-		["Task", <TaskValue task={task} />],
-		["Workspace", <span className="font-mono text-xs">{routine.cwd}</span>],
+		[
+			"Status",
+			<Badge variant="dot" size="compact" color={routine.enabled ? "green" : "gray"}>
+				{routine.enabled ? "Active" : "Paused"}
+			</Badge>,
+		],
 		["Schedule", <ScheduleValue schedules={routine.schedules} />],
-		["Next run", nextRunWords(routine, now)],
+		["Next run", <span className={cn("tabular-nums", !routine.enabled && "text-muted-foreground")}>{nextRunWords(routine, now)}</span>],
+		[
+			"Workspace",
+			<span className="block truncate font-mono text-xs" title={routine.cwd}>
+				{routine.cwd}
+			</span>,
+		],
 	];
 	if (task.kind === "prompt") {
 		settings.push(["Skill", routine.skill ?? "None"], ["Pin", task.pin ? "When it finishes, in place of the previous session" : "No"]);
@@ -223,32 +240,44 @@ function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: Det
 				</>
 			}
 		>
-			<div className="mx-auto w-full max-w-3xl space-y-8 px-6 py-6">
-				<section aria-label={`Settings of ${routine.name}`}>
-					<dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
+			<div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
+				<div className="min-w-0 space-y-8">
+					<section aria-labelledby="routine-task" className="space-y-2">
+						<h3 id="routine-task" className="flex items-center gap-2 text-sm font-medium">
+							<TaskIcon task={task} className="size-4 text-muted-foreground" />
+							{task.kind === "prompt" ? "Prompt" : "Command"}
+						</h3>
+						<div className="rounded-lg border border-border bg-card px-4 py-3 text-sm leading-relaxed">
+							<TaskValue task={task} />
+						</div>
+					</section>
+					<section aria-labelledby="routine-runs" className="space-y-2">
+						<h3 id="routine-runs" className="flex items-baseline gap-2 text-sm font-medium">
+							Runs
+							<span className="tabular-nums text-muted-foreground">{routine.runs.length}</span>
+							<span className="ml-auto text-xs font-normal text-muted-foreground">The last 10 runs stay here.</span>
+						</h3>
+						{routine.runs.length === 0 ? (
+							<p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">No runs yet. Run now starts one.</p>
+						) : (
+							<ul className="divide-y divide-border rounded-lg border border-border">
+								{routine.runs.map(run => (
+									<RunItem key={run.at} run={run} routine={routine} hosts={hosts} />
+								))}
+							</ul>
+						)}
+					</section>
+				</div>
+				<aside aria-label={`Settings of ${routine.name}`} className="lg:sticky lg:top-6 lg:self-start">
+					<dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm lg:grid-cols-1 lg:gap-y-4">
 						{settings.map(([term, value]) => (
-							<div key={term} className="contents">
-								<dt className="text-muted-foreground">{term}</dt>
-								<dd className={cn(term === "Next run" && !routine.enabled && "text-muted-foreground")}>{value}</dd>
+							<div key={term} className="contents lg:block lg:space-y-1">
+								<dt className="text-muted-foreground lg:text-xs">{term}</dt>
+								<dd className="min-w-0">{value}</dd>
 							</div>
 						))}
 					</dl>
-				</section>
-				<section aria-labelledby="routine-runs" className="space-y-2">
-					<h3 id="routine-runs" className="text-sm font-medium">
-						Runs
-					</h3>
-					{routine.runs.length === 0 ? (
-						<p className="text-sm text-muted-foreground">No runs yet. Run now starts one.</p>
-					) : (
-						<ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
-							{routine.runs.map(run => (
-								<RunItem key={run.at} run={run} routine={routine} hosts={hosts} />
-							))}
-						</ul>
-					)}
-					<p className="text-xs text-muted-foreground">The last 10 runs stay here.</p>
-				</section>
+				</aside>
 			</div>
 		</PageFrame>
 	);
@@ -262,30 +291,72 @@ interface RowProps {
 	onEdit: () => void;
 }
 
+/** The widths the rows' columns and their group heading's labels share. */
+const COLUMN = { schedule: "w-48", last: "w-20", next: "w-32" } as const;
+
+/** One line: the task's icon, the name and the task, the schedules, the last run's dot and age, and the next run; its menu shows on hover or focus. */
 function RoutineRow({ routine, now, connected, onChange, onEdit }: RowProps) {
-	const next = nextRunWords(routine, now);
-	const last = routine.runs[0];
+	const { name, enabled, task, runs } = routine;
+	const last = runs[0];
+	const schedule = schedulesWords(routine.schedules);
+	const preview = taskWords(task);
 	return (
-		<li className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50">
-			<div className="min-w-0 flex-1 space-y-0.5">
+		<li className="group/routine relative flex h-11 items-center gap-3 rounded-md px-2 text-sm hover:bg-accent/50 has-[a:focus-visible]:bg-accent/50">
+			<span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
+				{enabled ? <TaskIcon task={task} className="size-3.5" /> : <Pause aria-label="Paused" className="size-3.5" />}
+			</span>
+			<div className="flex min-w-0 flex-1 items-baseline gap-2">
+				{/* The link's ::after covers the row, so a click anywhere opens the routine. */}
 				<a
 					href={hashForRoutines(routine.id)}
-					className="block truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+					className={cn(
+						"max-w-full shrink-0 truncate font-medium outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-ring",
+						!enabled && "text-muted-foreground",
+					)}
 				>
-					{routine.name}
+					{name}
 				</a>
-				<p className="truncate text-xs text-muted-foreground">
-					{schedulesWords(routine.schedules)} · {taskWords(routine.task)}
-				</p>
+				<span className={cn("min-w-0 flex-1 truncate text-xs text-muted-foreground", task.kind === "command" && "font-mono")} title={preview}>
+					{preview}
+				</span>
 			</div>
-			<div className="shrink-0 space-y-0.5 text-right text-xs">
-				<p className={cn(!routine.enabled && "text-muted-foreground")}>{routine.enabled ? `Next run: ${next}` : next}</p>
-				<p className={cn(last && last.errors.length > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-					{last ? `Last run: ${lastRunWords(routine)}` : lastRunWords(routine)}
-				</p>
-			</div>
-			<RoutineActions routine={routine} disabled={!connected} onChange={onChange} onEdit={onEdit} />
+			<span className={cn("hidden shrink-0 items-center gap-1.5 text-xs text-muted-foreground lg:flex", COLUMN.schedule)} title={schedule}>
+				<Repeat aria-hidden className="size-3.5 shrink-0" />
+				<span className="truncate">{schedule}</span>
+			</span>
+			<span className={cn("flex shrink-0 items-center gap-2 text-xs tabular-nums text-muted-foreground", COLUMN.last)} title={last ? `${readTime(last.at)}: ${runWords(last)}` : undefined}>
+				<RunDot run={last} />
+				<span>
+					<span className="sr-only">Last run </span>
+					{last ? `${age(last.at, { compact: true, now })} ago` : "Never"}
+				</span>
+			</span>
+			<span className={cn("hidden shrink-0 text-right text-xs tabular-nums sm:block", COLUMN.next, !enabled && "text-muted-foreground")}>
+				<span className="sr-only">Next run: </span>
+				{nextRunWords(routine, now)}
+			</span>
+			<span className="relative z-10 flex shrink-0 items-center opacity-0 group-hover/routine:opacity-100 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100">
+				<RoutineActions routine={routine} disabled={!connected} onChange={onChange} onEdit={onEdit} />
+			</span>
 		</li>
+	);
+}
+
+/** A group's sticky heading: its name and count, then the labels of the columns under it. */
+function GroupHeading({ id, label, count }: { id: string; label: string; count: number }) {
+	return (
+		<h3 id={id} className="sticky top-0 z-20 flex h-9 items-center gap-3 rounded-md bg-muted px-2 text-xs font-medium">
+			<span className="flex flex-1 items-center gap-2 pl-1 text-sm">
+				{label}
+				<span className="tabular-nums text-muted-foreground">{count}</span>
+			</span>
+			<span aria-hidden className="contents font-normal text-muted-foreground">
+				<span className={cn("hidden shrink-0 lg:block", COLUMN.schedule)}>Schedule</span>
+				<span className={cn("shrink-0", COLUMN.last)}>Last run</span>
+				<span className={cn("hidden shrink-0 text-right sm:block", COLUMN.next)}>Next run</span>
+				<span className="w-7 shrink-0" />
+			</span>
+		</h3>
 	);
 }
 
@@ -331,11 +402,15 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 	const shown = target === null ? undefined : routines.find(routine => routine.id === target);
 	if (shown) return <RoutineDetail routine={shown} hosts={hosts} now={now} connected={connected} onChange={onChange} onEdit={edit(shown)} />;
 
-	const paused = routines.filter(routine => !routine.enabled).length;
+	const paused = routines.filter(routine => !routine.enabled);
+	const groups = [
+		{ key: "active", label: "Active", routines: routines.filter(routine => routine.enabled) },
+		{ key: "paused", label: "Paused", routines: paused },
+	].filter(group => group.routines.length > 0);
 	const meta =
 		routines.length === 0
 			? "Sessions and commands that run on a schedule"
-			: `${routines.length} ${routines.length === 1 ? "routine" : "routines"}${paused > 0 ? `, ${paused} paused` : ""}`;
+			: `${routines.length} ${routines.length === 1 ? "routine" : "routines"}${paused.length > 0 ? `, ${paused.length} paused` : ""}`;
 	return (
 		<PageFrame
 			title="Routines"
@@ -349,9 +424,12 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 			}
 		>
 			{routines.length === 0 ? (
-				<div className="mx-auto max-w-md space-y-3 px-6 py-16 text-center">
+				<div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-16 text-center">
+					<span className="flex size-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground">
+						<Repeat aria-hidden className="size-5" />
+					</span>
 					<p className="text-sm font-medium">No routines yet</p>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-sm text-balance text-muted-foreground">
 						A routine runs on one or more schedules. It starts a session with a prompt you write, or runs a command.
 					</p>
 					<Button size="compact" leadingIcon={Plus} disabled={!connected} onClick={startNew}>
@@ -359,12 +437,17 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 					</Button>
 				</div>
 			) : (
-				<div className="mx-auto w-full max-w-3xl px-6 py-6">
-					<ul aria-label="Routines" className="divide-y divide-border overflow-hidden rounded-md border border-border">
-						{routines.map(routine => (
-							<RoutineRow key={routine.id} routine={routine} now={now} connected={connected} onChange={onChange} onEdit={edit(routine)} />
-						))}
-					</ul>
+				<div className="mx-auto w-full max-w-5xl space-y-4 px-3 py-2">
+					{groups.map(group => (
+						<section key={group.key} aria-labelledby={`routines-${group.key}`}>
+							<GroupHeading id={`routines-${group.key}`} label={group.label} count={group.routines.length} />
+							<ul aria-label={`${group.label} routines`} className="flex flex-col gap-0.5 py-1">
+								{group.routines.map(routine => (
+									<RoutineRow key={routine.id} routine={routine} now={now} connected={connected} onChange={onChange} onEdit={edit(routine)} />
+								))}
+							</ul>
+						</section>
+					))}
 				</div>
 			)}
 		</PageFrame>
