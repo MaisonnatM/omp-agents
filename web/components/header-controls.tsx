@@ -1,6 +1,6 @@
-/** The Dev and Ops switch, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header. */
-import { Search } from "lucide-react";
-import { createContext, memo, type ReactNode, useContext } from "react";
+/** The Dev and Ops switch, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { createContext, memo, type ReactNode, useContext, useSyncExternalStore } from "react";
 import type { Notice } from "../../src/shared/notices";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -68,11 +68,38 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 	);
 });
 
-/** The window's title bar: a drag strip with the window's buttons inset at its left, the document title centered, and the controls at its right. */
-export function DesktopTitleBar({ title, controls }: { title: string; controls: ReactNode }) {
+/** Follows the Navigation API that Electron's Chromium provides; the buttons act through `history`, as the shortcuts do in any browser. */
+function subscribeHistory(onChange: () => void) {
+	navigation.addEventListener("currententrychange", onChange);
+	return () => navigation.removeEventListener("currententrychange", onChange);
+}
+
+function HistoryButtons() {
+	const canGoBack = useSyncExternalStore(subscribeHistory, () => navigation.canGoBack);
+	const canGoForward = useSyncExternalStore(subscribeHistory, () => navigation.canGoForward);
 	return (
-		<div className="relative flex h-9 shrink-0 items-center justify-end border-b border-border bg-sidebar px-3 select-none [-webkit-app-region:drag]">
+		<div className="flex items-center gap-0.5 [-webkit-app-region:no-drag]">
+			<Tooltip content="Back" shortcut={shortcutLabels("back")} side="bottom">
+				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!canGoBack} onClick={() => history.back()}>
+					<ChevronLeft />
+				</Button>
+			</Tooltip>
+			<Tooltip content="Forward" shortcut={shortcutLabels("forward")} side="bottom">
+				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!canGoForward} onClick={() => history.forward()}>
+					<ChevronRight />
+				</Button>
+			</Tooltip>
+		</div>
+	);
+}
+
+/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward, the document title centered, and the controls at its right. */
+export function DesktopTitleBar({ title, controls }: { title: string; controls: ReactNode }) {
+	// pl-[78px] clears the window's buttons: `trafficLightPosition.x` 14 in desktop/main.ts, their 52px, and a 12px gap.
+	return (
+		<div className="relative flex h-9 shrink-0 items-center justify-between border-b border-border bg-sidebar pr-3 pl-[78px] select-none [-webkit-app-region:drag]">
 			<p className="pointer-events-none absolute inset-x-40 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>
+			<HistoryButtons />
 			<div className="[-webkit-app-region:no-drag]">{controls}</div>
 		</div>
 	);

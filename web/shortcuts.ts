@@ -29,6 +29,8 @@ export type ShortcutId =
 	| "sessionsSidebar"
 	| "detailsSidebar"
 	| "settings"
+	| "back"
+	| "forward"
 	| "help"
 	| "restore"
 	| "focusComposer"
@@ -170,9 +172,15 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		category: "sessions",
 		label: "Open the previous session in the sidebar",
 		command: "Open previous session",
-		keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }],
+		keys: [{ chord: { key: "ArrowUp", mod: true, alt: true }, scope: "anywhere" }],
 	},
-	{ id: "nextSession", category: "sessions", label: "Open the next session in the sidebar", command: "Open next session", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
+	{
+		id: "nextSession",
+		category: "sessions",
+		label: "Open the next session in the sidebar",
+		command: "Open next session",
+		keys: [{ chord: { key: "ArrowDown", mod: true, alt: true }, scope: "anywhere" }],
+	},
 	{ id: "sessionsNext", category: "sessions", label: "Sessions: open the next session in the sidebar", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "sessionsPrevious", category: "sessions", label: "Sessions: open the previous session in the sidebar", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "model", category: "sessions", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
@@ -208,6 +216,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
 	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ goTo: "," }] },
+	{ id: "back", category: "general", label: "Go back", command: "Go back", keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }] },
+	{ id: "forward", category: "general", label: "Go forward", command: "Go forward", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{
