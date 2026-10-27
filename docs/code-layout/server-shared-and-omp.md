@@ -10,7 +10,7 @@
   `mcp-servers.ts` holds the rows and bodies of Settings › MCP servers, and `mcp-catalog.ts` the catalog of remote servers it offers.
   `mcp-status.ts` holds `McpRemoteStatus` and `McpTool`, where omp stands with a remote MCP server, which an integration's `McpConnection` in `accounts.ts` and a server's `McpServerStatus` in `mcp-servers.ts` both build on.
   `gmail.ts` holds `MailThread` and `InboxAnswer`, the Inbox page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
-  `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, the routine runner, and their tests.
+  `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, a Bot's first message, and their tests.
   `SessionFacts` in `sessions.ts` declares a session's pull requests, Linear issues, /ship stage, worktree, and branch once, and `RosterHost` and `PastSession` extend it.
   `parseNewSessionRequest` there checks one, with `parseImages`, `parseModel`, `parseThinking`, and `parseSkill`, for the socket's `start` and a start kept in `scheduled.json`; `parsePullRequest` in `github.ts` checks a pull request's owner, repository, and number.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.

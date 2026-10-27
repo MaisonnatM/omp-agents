@@ -41,7 +41,7 @@ The same update carries `failure`, how a provider's error ended the run, or `nul
 A message flagged `UsageLimit` is a `usage-limit`, which keeps the wait the error names, such as `retry-after-ms=…`, through omp's `extractRetryHint`, and wins over `Transient`, which omp also sets on a `429`.
 A message flagged only `Transient`, such as a failed DNS lookup, a stalled stream, or a dropped connection that omp's own retries gave up on, is a `transient`; an abort, or an error with neither flag, such as `Usage preflight blocked`, is `null`.
 See [Scheduled sends](scheduled-sends.md) for the continue the server schedules for a session it started, including one it attached to after a restart.
-A dashboard session reports `turn-ended` before the roster update that shows it idle, so the server holds a session the failure stopped before the routine runner sees it idle.
+A dashboard session reports `turn-ended` before the roster update that shows it idle, so the server holds a session the failure stopped before the cleanup after a merge sees it idle.
 Each main-agent `agent_start` makes the session report `turn-started` once its status reads working, whoever prompted it, which cancels a continue the session waits on.
 A session keeps running when the server stops, restarts, or crashes; only **End session**, or omp exiting on its own, ends it.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one that ended.

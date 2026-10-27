@@ -29,6 +29,6 @@ A page loaded before page ids tags its requests with no `floor`, so the server d
 `Dashboard` registers each typed message builder once, beside its store's edit function when it has synchronous edits.
 `Broadcasts.open` iterates these registrations, so a new list needs no separate opening-snapshot or push method.
 `Broadcasts.pushList(kind)` uses that same builder and suppresses an identical whole-list message; roster and past messages still send their row-level deltas.
-Socket edits, workspace HTTP edits, todo inbox changes, and routine pin changes go through the registry's typed `apply`.
+Socket edits, workspace HTTP edits, and todo inbox changes go through the registry's typed `apply`.
 An edit that changes the list publishes it to every listener; one that changes nothing instead resends the authoritative snapshot to its requesting peer, if there is one.
 Routine and scheduled runner actions and asynchronous notice actions remain separate, publishing their list through `pushList` when they change it.

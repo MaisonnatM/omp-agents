@@ -23,6 +23,8 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Context sources](architecture/analytics.md#context-sources)
 - [Activity](architecture/activity.md)
 - [Routines](architecture/routines.md)
+  - [Routines from before Bots](architecture/routines.md#routines-from-before-bots)
+  - [The runner](architecture/routines.md#the-runner)
   - [One server runs the unattended work](architecture/routines.md#one-server-runs-the-unattended-work)
   - [Isolation sandboxes](architecture/routines.md#isolation-sandboxes)
 - [Scheduled sends](architecture/scheduled-sends.md)

@@ -73,7 +73,7 @@ Besides a live session's own hash, the routes are:
 - `#tickets`, `#tickets/<identifier>`;
 - `#inbox`, `#inbox/<thread id>`;
 - `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
-- `#calendar`, `#routines`, `#routines/<id>`;
+- `#calendar`, `#bots/<id>/routines/<routine id>`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `files`, or `worktrees`.
 

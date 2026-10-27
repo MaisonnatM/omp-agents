@@ -76,8 +76,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
   - Inbox: `web/components/inbox/inbox-page.tsx`.
-  - Routines: `web/components/routines/routines-page.tsx`, with its sidebar list in `web/components/routines/routines-nav.tsx`.
-  - Bots: a Bot's page and the New Bot form in `web/components/bots/bot-page.tsx`, with the sidebar's **Bots** tab in `web/components/bots/bots-nav.tsx` and each Bot's face in `web/components/bots/bot-avatar.tsx`.
+  - Bots: a Bot's page, with its routines in the details popover and one routine's page from `web/components/routines/routine-detail.tsx` in place of the conversation, and the New Bot form in `web/components/bots/bot-page.tsx`, with the sidebar's **Bots** tab in `web/components/bots/bots-nav.tsx` and each Bot's face in `web/components/bots/bot-avatar.tsx`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
     Settings › Activity, with its never-used, most-used, navigation, and active-time reports: `ActivityTab` in `web/components/settings/activity-tab.tsx`.
@@ -108,6 +107,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Routines, Calendar, and Inbox](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Bots, Routines, Calendar, and Inbox](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

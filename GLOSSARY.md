@@ -82,7 +82,8 @@ _Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
 ## Unattended work
 
 **Routine**:
-A task the dashboard runs on one or more schedules: a prompt or a shell command.
+A task a Bot does on one or more schedules: a message into its conversation, or a shell command in its workspace.
+Every routine belongs to one Bot.
 _Avoid_: Cron job, automation
 
 **Bot**:

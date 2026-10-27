@@ -33,7 +33,7 @@
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Sessions**, **Todo**, and **Routines** in the header's **Dev** group, **Notes**, **Calendar**, and **Inbox** in its **Ops** group.
+- Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo** in the header's **Dev** group, **Notes**, **Calendar**, and **Inbox** in its **Ops** group.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
   **Inbox** shows only once Gmail is connected; see [Inbox](inbox.md).
@@ -41,7 +41,7 @@
   The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the workspace that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
   Choosing **Sessions**, by click or by its number, while no pane is open opens the selected workspace's live session started last, else its past session saved last; with a pane open it keeps the panes.
   Closing that session leaves the panes empty until you choose **Sessions** again.
-  **Routines** opens the Routines page, with each routine listed in the sidebar; see [Routines](routines.md).
+  **Bots** lists your Bots, each with its routines; see [Bots](bots.md) and [Routines](routines.md).
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets; see [Calendar](calendar.md).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone, the row only as wide as its tabs; hover an icon for its name.
   The tabs never spill past the sidebar.
