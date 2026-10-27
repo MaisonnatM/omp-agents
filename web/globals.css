@@ -492,8 +492,13 @@
 .message-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .message-markdown th, .message-markdown td { border: 1px solid var(--border); padding: .35em .65em; text-align: left; }
 .message-markdown th { background: var(--muted); font-weight: 600; }
-/* The notes editor keeps each line a block and each blank line an empty paragraph, which already spaces the blocks. */
+/* The notes editor keeps each line a block and each blank line an empty paragraph, so paragraphs stay tight;
+   headings, lists, quotes, and code blocks still get room to separate sections. */
 .message-markdown.notes-editor > * { margin-block: 0; }
+.message-markdown.notes-editor > :is(h1, h2, h3, h4, h5, h6) { margin-block: 1.1em .35em; }
+.message-markdown.notes-editor > :is(ul, ol, blockquote, .notes-code) { margin-block: .5em; }
+.message-markdown.notes-editor > :first-child { margin-top: 0; }
+.message-markdown.notes-editor > :last-child { margin-bottom: 0; }
 .message-markdown .notes-code { display: block; white-space: pre; }
 .message-markdown .notes-checklist { list-style: none; padding-left: 0; }
 /* Lexical toggles a check item on a click within its `::before` width from the item's left edge. */
