@@ -538,7 +538,7 @@ export class Dashboard {
 				checkOutPullRequest: checkout => checkOutPullRequest(checkout, this.#startSession),
 				rebasePullRequest,
 			},
-			dashboard: { build, status: () => this.#selfUpdate.status(), update: () => this.#selfUpdate.update() },
+			dashboard: { build, status: () => this.#selfUpdate.status(), update: () => this.#selfUpdate.update(), changelog: () => this.#selfUpdate.changelog() },
 			sync: this.#settingsSync,
 			activity: this.#activity,
 			processes: {

@@ -101,6 +101,7 @@ export const CONTROLS = [
 	{ id: "header.forward", label: "Forward button", area: "Header" },
 	{ id: "header.group", label: "Dev and Ops switch", area: "Header" },
 	{ id: "header.settings", label: "Settings button", area: "Header" },
+	{ id: "header.whats-new", label: "What's new button", area: "Header" },
 	{ id: "notices.open", label: "Notification bell", area: "Notifications" },
 	{ id: "notices.filter", label: "Notifications source filter", area: "Notifications" },
 	{ id: "notices.read-all", label: "Notifications, mark all as read", area: "Notifications" },

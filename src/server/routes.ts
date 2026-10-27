@@ -64,7 +64,7 @@ import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
-import type { DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
+import type { DashboardChangelog, DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
 import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
@@ -121,6 +121,7 @@ export interface DashboardRoutesEnv {
 	build: ServedBuild;
 	status(): Promise<DashboardUpdateStatus>;
 	update(): Promise<DashboardUpdateOutcome>;
+	changelog(): Promise<DashboardChangelog>;
 }
 
 /** What the settings sync routes read and run: Settings › Sync. */
@@ -929,6 +930,8 @@ function dashboardRoutes({ get, write }: RouteKit, env: DashboardRoutesEnv): Rou
 			GET: get(() => answer(() => env.status())),
 			PUT: write(() => null, () => env.update(), err => (err instanceof UpdateRefused ? fail(409, err.message) : null)),
 		},
+		/** Settings › What's new: `DashboardChangelog`, read from the checkout without asking origin. */
+		"/api/dashboard/changelog": { GET: get(() => answer(() => env.changelog())) },
 	};
 }
 

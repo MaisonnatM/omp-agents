@@ -147,6 +147,26 @@ describe("SelfUpdate", () => {
 		return { update, installs, restarted };
 	}
 
+	test("lists feature commits newest first, marking those only origin holds as not installed", async () => {
+		const { build, pusher } = await checkout();
+		const say = async (message: string): Promise<string> => {
+			await git(pusher, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "--allow-empty", "-m", message);
+			await git(pusher, "push", "--quiet", "origin", "main");
+			return head(pusher);
+		};
+		const shown = await say("feat(ui): show the bell (#12)");
+		await say("fix: keep the bell");
+		const added = await say("Add a What's new page");
+		const { update } = recorded({ kind: "checkout", build });
+		await update.newCommits();
+		const changelog = await update.changelog();
+		if (changelog.kind !== "checkout") throw new Error(changelog.reason);
+		expect(changelog.entries.map(({ commit, title, area, pr, installed }) => ({ commit, title, area, pr, installed }))).toEqual([
+			{ commit: added, title: "Add a What's new page", area: null, pr: null, installed: false },
+			{ commit: shown, title: "Show the bell", area: "ui", pr: 12, installed: false },
+		]);
+	});
+
 	test("counts origin's new commits past the running build", async () => {
 		const { build, pusher } = await checkout();
 		const { update } = recorded({ kind: "checkout", build });
