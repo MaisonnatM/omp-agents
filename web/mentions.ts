@@ -1,7 +1,7 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
-import { CalendarDays, File, Folder, GitPullRequest, ListTodo, type LucideIcon, Mail, MessageSquare, Slash, Sparkles, Ticket } from "lucide-react";
+import { CalendarDays, File, Folder, GitPullRequest, ListTodo, type LucideIcon, Mail, MessageSquare, Slash, Sparkles, Ticket, UserRound } from "lucide-react";
 import { everyWord } from "../src/shared/every-word";
-import { pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
+import { isBotAuthor, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { Ticket as LinearTicket } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
@@ -13,7 +13,7 @@ import { hostLabel, pastLabel } from "./labels";
 import { listedPullRequests } from "./pull-requests-model";
 import type { MentionEvent } from "./reads";
 
-export type CategoryId = "file" | "todo" | "ticket" | "pull-request" | "mail" | "event" | "session";
+export type CategoryId = "file" | "todo" | "ticket" | "pull-request" | "person" | "mail" | "event" | "session";
 
 /** The page's lists that every composer shares. */
 export interface MentionLists {
@@ -118,6 +118,28 @@ function eventTime(event: MentionEvent): string {
 	return new Date(event.when.start).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+/**
+ * The people and teams on the listed pull requests, their authors and reviewers, each with the pull requests they are on,
+ * by the handle GitHub mentions them by; bots and you, the author of those whose role is `author`, are left out.
+ */
+function pullRequestPeople(repos: RepoPullRequests[]): Mention[] {
+	const pullRequests = listedPullRequests(repos);
+	const you = new Set(pullRequests.filter(pr => pr.role === "author").map(pr => pr.author.login));
+	const on = new Map<string, { profile: string; names: string[] }>();
+	for (const pr of pullRequests) {
+		const name = pullRequestName(pr);
+		for (const person of [pr.author, ...pr.reviewers]) {
+			if (isBotAuthor(person) || you.has(person.login)) continue;
+			// A team's slug is unique only within its organization, which owns the repository.
+			const handle = person.isTeam ? `${pr.owner}/${person.login}` : person.login;
+			const seen = on.get(handle) ?? { profile: person.isTeam ? `https://github.com/orgs/${pr.owner}/teams/${person.login}` : `https://github.com/${person.login}`, names: [] };
+			if (!seen.names.includes(name)) seen.names.push(name);
+			on.set(handle, seen);
+		}
+	}
+	return [...on].map(([handle, { profile, names }]) => ({ label: `@${handle}`, detail: names.join(", "), reference: `[@${handle}](${profile})` }));
+}
+
 const CATEGORIES: readonly Category[] = [
 	{ id: "file", prefix: "file", title: "Files & Folders", icon: Folder, searchLimit: 5, options: ({ files }) => files.map(completionOption) },
 	source({
@@ -150,6 +172,7 @@ const CATEGORIES: readonly Category[] = [
 				return { label: pr.title, detail: name, reference: `[${linkText(`${name} ${pr.title}`)}](${pullRequestUrl(pr)})` };
 			}),
 	}),
+	source({ id: "person", prefix: "person", title: "People", icon: UserRound, list: ({ pullRequestRepos }) => pullRequestPeople(pullRequestRepos) }),
 	source({
 		id: "mail",
 		prefix: "mail",

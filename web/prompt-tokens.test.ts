@@ -6,7 +6,7 @@ const kinds = (text: string, options?: Parameters<typeof promptTokens>[1]) => pr
 test("each reference the composer inserts reads back as its chip", () => {
 	expect(
 		kinds(
-			'/skill:poteto-mode fix @web/app.tsx in @"docs/my notes.md" and @src/ for [ENG-12 Fix \\[x\\]](https://linear.app/acme/issue/ENG-12/fix) and [acme/app#7 Ship](https://github.com/acme/app/pull/7), todo "say \\"hi\\"" (id t-1) and omp session "Old run" (id s9)',
+			'/skill:poteto-mode fix @web/app.tsx in @"docs/my notes.md" and @src/ for [ENG-12 Fix \\[x\\]](https://linear.app/acme/issue/ENG-12/fix) and [acme/app#7 Ship](https://github.com/acme/app/pull/7) with [@ana-b](https://github.com/ana-b) and [@acme/design](https://github.com/orgs/acme/teams/design), todo "say \\"hi\\"" (id t-1) and omp session "Old run" (id s9)',
 		),
 	).toEqual([
 		{ kind: "skill", label: "Poteto Mode", target: "poteto-mode" },
@@ -15,6 +15,8 @@ test("each reference the composer inserts reads back as its chip", () => {
 		{ kind: "directory", label: "src/", target: "src/" },
 		{ kind: "ticket", label: "ENG-12 Fix [x]", target: "https://linear.app/acme/issue/ENG-12/fix" },
 		{ kind: "pull-request", label: "acme/app#7 Ship", target: "https://github.com/acme/app/pull/7" },
+		{ kind: "person", label: "@ana-b", target: "https://github.com/ana-b" },
+		{ kind: "person", label: "@acme/design", target: "https://github.com/orgs/acme/teams/design" },
 		{ kind: "todo", label: 'say "hi"', target: "t-1" },
 		{ kind: "session", label: "Old run", target: "s9" },
 	]);
@@ -33,5 +35,5 @@ test("a reference that ends at the caret is still being typed", () => {
 });
 
 test("the @ menu's category prefixes and mid-word @ are not paths", () => {
-	expect(kinds("@todo: @ticket:ENG user@host.com")).toEqual([]);
+	expect(kinds("@todo: @ticket:ENG @person:ana @mail:x @event:y user@host.com")).toEqual([]);
 });

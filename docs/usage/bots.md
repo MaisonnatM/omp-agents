@@ -20,6 +20,7 @@
   The composer reads **Message** and the Bot's name.
   While its session runs, the conversation and its composer work as in a pane.
   Otherwise the composer writes to the Bot: the first message starts its conversation in its workspace, and a later one resumes the same session.
+  Its `/` and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, ticket, pull request, person, email, event, or session.
   Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.

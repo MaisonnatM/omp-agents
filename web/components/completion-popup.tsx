@@ -90,8 +90,8 @@ interface Completion {
 
 /**
  * omp's `/` completion and the `@` menu for a composer: suggestions follow the caret, and the open list owns Esc, the
- * arrows, Tab, and Enter. Live sessions and the new-session draft share it, so both offer the same commands and skills.
- * The `@` menu adds todos, tickets, pull requests, and sessions to omp's files; it asks the server only for files.
+ * arrows, Tab, and Enter. Live sessions, the new-session draft, and a Bot's composer share it, so all offer the same commands and skills.
+ * The `@` menu adds todos, tickets, pull requests, people, email, events, and sessions to omp's files; it asks the server only for files.
  */
 export function useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
 	/** The `@` token the open list answers, `null` for `/`, and the `complete` request whose answer it shows, if it sent one. */

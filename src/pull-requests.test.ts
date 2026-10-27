@@ -249,7 +249,7 @@ describe("parseListAnswer", () => {
 		);
 		expect(pr?.reviewers).toEqual([
 			{ login: "bsaintot", avatarUrl: "https://avatars.example/bsaintot", state: "requested" },
-			{ login: "frontend", avatarUrl: "https://avatars.example/frontend", state: "requested" },
+			{ login: "frontend", avatarUrl: "https://avatars.example/frontend", isTeam: true, state: "requested" },
 			{ login: "lencshu", avatarUrl: "https://avatars.example/lencshu", state: "approved" },
 		]);
 	});

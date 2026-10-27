@@ -13,6 +13,10 @@ test("bot identity comes from GitHub rather than a hardcoded login list", () => 
 	expect(parsePerson({ __typename: "User", login: "cursor", avatarUrl: null })).toEqual({ login: "cursor", avatarUrl: null });
 });
 
+test("a team is named by its slug and marked a team", () => {
+	expect(parsePerson({ slug: "frontend", avatarUrl: null })).toEqual({ login: "frontend", avatarUrl: null, isTeam: true });
+});
+
 describe("ghMutation", () => {
 	const refused = {
 		data: { resolveReviewThread: null },

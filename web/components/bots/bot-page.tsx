@@ -1,6 +1,6 @@
 /** A Bot's page, its one conversation under a header whose name shows or hides its details in the right sidebar, a routine's settings and runs or editor in place of the conversation, and the New Bot form. */
 import { BookmarkCheck } from "lucide-react";
-import { useId, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, REMEMBER_TOOL } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
@@ -10,10 +10,12 @@ import { InputMessage } from "@/components/ui/input-message";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { botHost, botView, starterPrompts } from "../../bots-model";
+import type { Completions } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForBotRoutine, hashForBots, hashForView, NEW_ROUTINE } from "../../routing";
 import { draftOf, newDraft, type RoutineDraft } from "../../routines-model";
 import { useAction } from "../../use-action";
+import { useCompletion } from "../completion-popup";
 import { useSuggestions } from "../composer-suggestions";
 import { useDashboardActions } from "../dashboard-context";
 import { Field, FIELD } from "../form-field";
@@ -32,32 +34,56 @@ import { BotLookPicker } from "./bot-look-picker";
 
 const NO_STARTERS: string[] = [];
 
-/** The composer while no omp runs the Bot's conversation: a message resumes it, or starts it when it has none, and a new Bot offers its starters. */
-function BotComposer({ bot, connected, starters }: { bot: Bot; connected: boolean; starters: string[] }) {
-	const { request } = useDashboardActions();
+/**
+ * The composer while no omp runs the Bot's conversation: a message resumes it, or starts it when it has none, and a new Bot offers its starters.
+ * Its `/` and `@` menus resolve in the Bot's workspace, as a new session's there would.
+ */
+function BotComposer({ bot, connected, starters, completions }: { bot: Bot; connected: boolean; starters: string[]; completions: Completions | null }) {
+	const { request, send: post } = useDashboardActions();
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [text, setText] = useState("");
 	const send = useAction(async (value: string) => {
 		await request({ t: "bot", change: { op: "message", id: bot.id, text: value } });
 		setText("");
 	}, `Could not send to ${bot.name}`);
+	const completion = useCompletion({
+		editorRef,
+		draft: text,
+		setDraft: setText,
+		completions,
+		onComplete: (reqId, value, cursor) => post({ t: "complete", reqId, scope: { kind: "new", cwd: bot.cwd }, text: value, cursor }),
+		composer: { sessionId: bot.sessionId, changed: [] },
+	});
 	const suggestions = useSuggestions({
 		prompts: connected && !send.pending ? starters : NO_STARTERS,
 		draft: text,
 		onSend: value => send.run(value),
 		onFill: value => {
-			setText(value);
+			completion.onValueChange(value);
 			requestAnimationFrame(() => editorRef.current?.select(Number.POSITIVE_INFINITY));
 		},
 	});
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+		if (!completion.onMenuKeyDown(event)) suggestions.onKeyDown(event);
+	};
 	return (
-		<div className="mx-auto w-full max-w-conversation px-3 pb-3">
+		<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
+			{completion.popup}
 			<InputMessage
 				editorRef={editorRef}
 				value={text}
-				onValueChange={setText}
-				onSend={value => value && send.run(value)}
-				editorProps={{ "aria-activedescendant": suggestions.activeId, onKeyDown: suggestions.onKeyDown, onBlur: suggestions.onBlur }}
+				onValueChange={completion.onValueChange}
+				onSend={value => {
+					if (!value) return;
+					completion.close();
+					send.run(value);
+				}}
+				editorProps={{
+					...completion.editorProps,
+					"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
+					onKeyDown,
+					onBlur: suggestions.onBlur,
+				}}
 				placeholder={`Message ${bot.name}`}
 				disabled={!connected}
 				sending={send.pending}
@@ -84,10 +110,12 @@ interface BotPageProps {
 	/** Whether the right sidebar, which shows the Bot's details, is open. */
 	detailsOpen: boolean;
 	onToggleDetails: () => void;
+	/** The server's last answer to a `complete` of the new-session scope, which the composer asks while the Bot's session is not running. */
+	completions: Completions | null;
 }
 
 /** The Bot's header and its conversation, live, ended, or not begun, its name showing or hiding its details in the right sidebar; or one of its routines, or the routine editor, in its place. */
-export function BotPage({ bot, routine, routines, hosts, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails }: BotPageProps) {
+export function BotPage({ bot, routine, routines, hosts, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
 	const { send } = useDashboardActions();
 	const [editing, setEditing] = useState<RoutineDraft | null>(null);
 	// The route remounts the page, so a new routine's id holds while its editor shows.
@@ -168,7 +196,7 @@ export function BotPage({ bot, routine, routines, hosts, past, lastHosts, models
 					</div>
 				)}
 			</div>
-			{!host && <BotComposer bot={bot} connected={connected} starters={starters} />}
+			{!host && <BotComposer bot={bot} connected={connected} starters={starters} completions={completions} />}
 		</div>
 	);
 }

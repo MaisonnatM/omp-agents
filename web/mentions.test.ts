@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { MailThread } from "../src/shared/gmail";
-import type { PullRequestSummary } from "../src/shared/github";
+import type { Person, PullRequestSummary, Reviewer } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { ChangedFile, FileChange } from "../src/shared/transcript";
@@ -28,6 +28,8 @@ const todo = (id: string, text: string, fields: Partial<UserTodo> = {}): UserTod
 	...fields,
 });
 const host = (sessionId: string, sessionName: string | null) => ({ sessionId, sessionName, cwdDisplay: "~/code/webapp" }) as RosterHost;
+const person = (login: string, isBot = false): Person => ({ login, avatarUrl: null, ...(isBot ? { isBot } : {}) });
+const reviewer = (login: string, isBot = false): Reviewer => ({ ...person(login, isBot), state: "requested" });
 
 const data: MentionData = {
 	todos: [
@@ -38,7 +40,15 @@ const data: MentionData = {
 	],
 	tickets: [{ id: "ENG-12", title: "Login [beta] flag", url: "https://linear.app/acme/issue/ENG-12" } as Ticket],
 	pullRequestRepos: [
-		{ owner: "acme", repo: "webapp", cwds: ["/code/webapp"], pullRequests: [{ owner: "acme", repo: "webapp", number: 7, title: "Fix login" } as PullRequestSummary] },
+		{
+			owner: "acme",
+			repo: "webapp",
+			cwds: ["/code/webapp"],
+			pullRequests: [
+				{ owner: "acme", repo: "webapp", number: 7, title: "Fix login", role: "author", author: person("me"), reviewers: [reviewer("ana"), reviewer("ci-bot", true)] },
+				{ owner: "acme", repo: "webapp", number: 9, title: "Theme", role: "reviewer", author: person("bo"), reviewers: [reviewer("me"), reviewer("ana"), { ...reviewer("design"), isTeam: true }, reviewer("lint[bot]")] },
+			] as PullRequestSummary[],
+		},
 		{ owner: "acme", repo: "api", cwds: ["/code/api"], error: "GitHub is down" },
 	],
 	hosts: [host("s-self", "Login work"), host("s-live", null)],
@@ -107,7 +117,7 @@ describe("mentionMenu", () => {
 		{ path: "my notes.md", changes: [change(20)] },
 		{ path: "src/c.ts", changes: [change(10)] },
 	];
-	const categories = ["Files & Folders", "Todos", "Tickets", "Pull requests", "Email", "Calendar", "Sessions"];
+	const categories = ["Files & Folders", "Todos", "Tickets", "Pull requests", "People", "Email", "Calendar", "Sessions"];
 
 	test("home offers the last three files the agent changed inside its directory, then every category", () => {
 		expect(labels(menu("Read @", { changed }))).toEqual([
@@ -130,6 +140,7 @@ describe("mentionMenu", () => {
 			["Ask @todo:", true],
 			["Ask @ticket:", true],
 			["Ask @pr:", true],
+			["Ask @person:", true],
 			["Ask @mail:", true],
 			["Ask @event:", true],
 			["Ask @session:", true],
@@ -173,6 +184,14 @@ describe("mentionMenu", () => {
 		expect(pick("See @mail:alert", "Login [alert]")?.text).toBe('See [email "Login \\[alert\\]" from Ana](https://mail.google.com/t1) ');
 		expect(pick("See @event:review", "Login review")?.text).toMatch(/^See \[event "Login review", .+ · Work\]\(https:\/\/calendar\.google\.com\/e1\) $/);
 		expect(pick("See @event:retro", "Login retro")?.text).toMatch(/^See calendar event "Login retro", .+ · This computer $/);
+	});
+
+	test("People lists the listed pull requests' authors, reviewers, and teams once each, without you or bots", () => {
+		expect(labels(menu("@person:"))).toEqual([["People", ["@ana", "@bo", "@acme/design"]]]);
+		expect(menu("@person:")[0].options.map(option => option.detail)).toEqual(["acme/webapp#7, acme/webapp#9", "acme/webapp#9", "acme/webapp#9"]);
+		expect(labels(menu("@person:#7"))).toEqual([["People", ["@ana"]]]);
+		expect(pick("Ask @person:bo", "@bo")).toEqual({ text: "Ask [@bo](https://github.com/bo) ", cursor: 33 });
+		expect(pick("Ask @person:design", "@acme/design")?.text).toBe("Ask [@acme/design](https://github.com/orgs/acme/teams/design) ");
 	});
 
 	test("a prefix shows only its source, up to fifty", () => {

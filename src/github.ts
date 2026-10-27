@@ -126,8 +126,10 @@ export async function ghMutation(mutation: string, vars: Record<string, string |
 /** A user, bot, or mannequin by `login`, a team by `slug`. */
 export function parsePerson(value: unknown): Person | null {
 	if (!isObject(value)) return null;
-	const login = str(value.login) ?? str(value.slug);
-	return login === undefined ? null : { login, avatarUrl: str(value.avatarUrl) ?? null, ...(value.__typename === "Bot" ? { isBot: true } : {}) };
+	const user = str(value.login);
+	const login = user ?? str(value.slug);
+	if (login === undefined) return null;
+	return { login, avatarUrl: str(value.avatarUrl) ?? null, ...(value.__typename === "Bot" ? { isBot: true } : {}), ...(user === undefined ? { isTeam: true } : {}) };
 }
 
 /** The avatar field every query asks for a person. */

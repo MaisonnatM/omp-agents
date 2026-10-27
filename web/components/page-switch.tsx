@@ -208,6 +208,7 @@ export const PageSwitch = memo(function PageSwitch({
 					models={models}
 					workspaces={workspaces}
 					connected={connected}
+					completions={newSessionCompletions}
 				/>
 			);
 		}

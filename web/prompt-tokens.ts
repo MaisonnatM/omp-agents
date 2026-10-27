@@ -4,7 +4,7 @@
  */
 import { skillLabel } from "./labels";
 
-export type ChipKind = "skill" | "command" | "file" | "directory" | "ticket" | "pull-request" | "todo" | "session";
+export type ChipKind = "skill" | "command" | "file" | "directory" | "ticket" | "pull-request" | "person" | "todo" | "session";
 
 export interface PromptToken {
 	kind: ChipKind;
@@ -47,11 +47,15 @@ const PATTERNS: readonly Pattern[] = [
 		re: /\[([\w.-]+\/[\w.-]+#\d+ (?:[^\]\\\n]|\\.)*)\]\((https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+)\)/g,
 		token: m => ({ kind: "pull-request", label: unescapeLink(m[1]), target: m[2] }),
 	},
+	{
+		re: /\[@([\w-]+(?:\/[\w-]+)?)\]\((https:\/\/github\.com\/(?:orgs\/[\w-]+\/teams\/[\w-]+|[\w-]+))\)/g,
+		token: m => ({ kind: "person", label: `@${m[1]}`, target: m[2] }),
+	},
 	{ re: new RegExp(String.raw`(?<![\w-])todo (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "todo", label: quoted(m[1]), target: m[2] }) },
 	{ re: new RegExp(String.raw`(?<![\w-])omp session (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "session", label: quoted(m[1]), target: m[2] }) },
 	{
 		// The `@` menu's category prefixes are a query still being typed, not a path.
-		re: /(?<=^|\s)@(?!(?:file|todo|ticket|pr|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
+		re: /(?<=^|\s)@(?!(?:file|todo|ticket|pr|person|mail|event|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
 		token: m => {
 			const path = m[1].replace(/^"(.*)"$/, "$1");
 			const directory = path.endsWith("/");

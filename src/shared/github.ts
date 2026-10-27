@@ -129,6 +129,8 @@ export interface Person {
 	login: string;
 	avatarUrl: string | null;
 	isBot?: boolean;
+	/** A team, whose `login` is its slug within the repository owner's organization. */
+	isTeam?: boolean;
 }
 
 /** Whether a bot wrote it, such as Cursor Bugbot, CodeRabbit, or Copilot: GitHub says so, or its login ends in GitHub's `[bot]`. */
@@ -186,7 +188,7 @@ export interface PullRequestList {
 	unmatched: string[];
 }
 
-const PERSON_FIELDS: Shape<Person> = { login: isString, avatarUrl: nullable(isString), isBot: optional(isBoolean) };
+const PERSON_FIELDS: Shape<Person> = { login: isString, avatarUrl: nullable(isString), isBot: optional(isBoolean), isTeam: optional(isBoolean) };
 const isPerson = fields<Person>(PERSON_FIELDS);
 
 const isSummary = fields<PullRequestSummary>({
