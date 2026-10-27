@@ -31,7 +31,7 @@ const PR_FIELDS = `... on PullRequest {
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 	comments { totalCount }
-	reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved comments(first: 1) { nodes { author { __typename login } } } } }
+	reviewThreads(first: ${THREADS}) { totalCount nodes { id isResolved } }
 }`;
 
 const QUERY = `query($authored: String!, $reviewing: String!, $merged: String!) {
@@ -39,6 +39,17 @@ const QUERY = `query($authored: String!, $reviewing: String!, $merged: String!) 
 	reviewing: search(type: ISSUE, query: $reviewing, first: 50) { nodes { ${PR_FIELDS} } }
 	merged: search(type: ISSUE, query: $merged, first: 20) { nodes { ${PR_FIELDS} } }
 }`;
+
+/**
+ * The author of each listed thread's first comment. GitHub bills a connection inside the search's for every node the
+ * search may return: reading each thread's first comment in `QUERY` cost 125 points a call, against 5 without it, so the
+ * list reads a thread's starter once, here, a point for each 100 threads.
+ */
+const startersQuery = (ids: readonly string[]): string =>
+	`query { nodes(ids: ${JSON.stringify(ids)}) { ... on PullRequestReviewThread { id comments(first: 1) { nodes { author { __typename login } } } } } }`;
+
+/** The most thread ids one {@link startersQuery} asks for, GitHub's limit for `nodes`. */
+const STARTERS_PAGE = 100;
 
 /** Each search's alias in `QUERY`, with the viewer's role in what it finds. */
 const SEARCHES: [alias: string, role: PullRequestRole][] = [
@@ -75,16 +86,35 @@ function reviewOf(decision: string | undefined, reviewers: Reviewer[]): ReviewDe
 	return review === "changes-requested" && reRequested ? "review-required" : review;
 }
 
-/** The unresolved threads among those GitHub listed, and how many a bot started: the author of a thread's first comment. */
-function parseUnresolved(threads: unknown): PullRequestSummary["unresolved"] {
+/** The unresolved threads among those GitHub listed, and how many a bot started, by each thread's id in `botStarted`. */
+function parseUnresolved(threads: unknown, botStarted: ReadonlyMap<string, boolean>): PullRequestSummary["unresolved"] {
 	const nodes = nodesOf(threads);
 	const total = isObject(threads) && typeof threads.totalCount === "number" ? threads.totalCount : nodes.length;
 	const open = nodes.filter(thread => isObject(thread) && thread.isResolved === false);
-	const starters = open.map(thread => {
-		const [first] = nodesOf(isObject(thread) ? thread.comments : null);
-		return isObject(first) ? parsePerson(first.author) : null;
-	});
-	return { count: open.length, exact: total <= nodes.length, bots: starters.filter(person => person !== null && isBotAuthor(person)).length };
+	const bots = open.filter(thread => isObject(thread) && typeof thread.id === "string" && botStarted.get(thread.id) === true).length;
+	return { count: open.length, exact: total <= nodes.length, bots };
+}
+
+/** The ids of the unresolved threads in `gh api graphql`'s answer to `QUERY`, each once. */
+export function openThreadIds(answer: unknown): string[] {
+	const data = dataOf(answer);
+	const ids = SEARCHES.flatMap(([alias]) =>
+		nodesOf(data[alias]).flatMap(node => (isObject(node) ? nodesOf(node.reviewThreads) : [])).flatMap(thread => (isObject(thread) && thread.isResolved === false && typeof thread.id === "string" ? [thread.id] : [])),
+	);
+	return [...new Set(ids)];
+}
+
+/** Whether a bot wrote the first comment of each thread in `gh api graphql`'s answer to {@link startersQuery}; a thread without one is left out. */
+export function parseStartersAnswer(answer: unknown): Map<string, boolean> {
+	const nodes = dataOf(answer).nodes;
+	const starters = new Map<string, boolean>();
+	for (const thread of Array.isArray(nodes) ? nodes : []) {
+		if (!isObject(thread) || typeof thread.id !== "string") continue;
+		const [first] = nodesOf(thread.comments);
+		const author = isObject(first) ? parsePerson(first.author) : null;
+		if (author) starters.set(thread.id, isBotAuthor(author));
+	}
+	return starters;
 }
 
 /** A connection's `totalCount`, 0 when GitHub left it out. */
@@ -98,7 +128,7 @@ function stateOf(node: Record<string, unknown>): PullRequestDetail["state"] {
 }
 
 /** What a pull request's row in the list and its details share, or `null` when GitHub left out its title or branches. */
-function parsePullRequestHead(node: Record<string, unknown>) {
+function parsePullRequestHead(node: Record<string, unknown>, botStarted: ReadonlyMap<string, boolean> = new Map()) {
 	const title = str(node.title);
 	const head = str(node.headRefName);
 	const base = str(node.baseRefName);
@@ -122,13 +152,13 @@ function parsePullRequestHead(node: Record<string, unknown>) {
 		conflicts: (state === "open" || state === "draft") && node.mergeable === "CONFLICTING",
 		additions: num(node.additions) ?? 0,
 		deletions: num(node.deletions) ?? 0,
-		unresolved: parseUnresolved(node.reviewThreads),
+		unresolved: parseUnresolved(node.reviewThreads, botStarted),
 	};
 }
 
-function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullRequestRole): PullRequestSummary | null {
+function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullRequestRole, botStarted: ReadonlyMap<string, boolean>): PullRequestSummary | null {
 	if (!isObject(node) || typeof node.number !== "number") return null;
-	const parsed = parsePullRequestHead(node);
+	const parsed = parsePullRequestHead(node, botStarted);
 	const updatedAt = Date.parse(str(node.mergedAt) ?? str(node.updatedAt) ?? "");
 	if (!parsed || Number.isNaN(updatedAt)) return null;
 	const { state, ...head } = parsed;
@@ -150,17 +180,33 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 	};
 }
 
-/** The pull requests in `gh api graphql`'s answer to `QUERY`, each once, in search order. */
-export function parseListAnswer(answer: unknown, repo: Repo): PullRequestSummary[] {
+/** The pull requests in `gh api graphql`'s answer to `QUERY`, each once, in search order; `botStarted` says which threads a bot started, by id. */
+export function parseListAnswer(answer: unknown, repo: Repo, botStarted: ReadonlyMap<string, boolean>): PullRequestSummary[] {
 	const data = dataOf(answer);
 	const found = new Map<number, PullRequestSummary>();
 	for (const [alias, role] of SEARCHES) {
 		for (const node of nodesOf(data[alias])) {
-			const pr = parsePullRequest(node, repo, role);
+			const pr = parsePullRequest(node, repo, role, botStarted);
 			if (pr && !found.has(pr.number)) found.set(pr.number, pr);
 		}
 	}
 	return [...found.values()];
+}
+
+/** Per repository, whether a bot started each thread its last list showed unresolved: a thread's starter never changes, so each is read once. */
+const threadStarters = new Map<string, ReadonlyMap<string, boolean>>();
+
+/** Whether a bot started each of `ids`, reading from GitHub only the threads `repo`'s last list did not show open, then keeping just `ids`. */
+async function readThreadStarters(repo: Repo, ids: readonly string[]): Promise<ReadonlyMap<string, boolean>> {
+	const known = threadStarters.get(repoKey(repo)) ?? new Map<string, boolean>();
+	const missing = ids.filter(id => !known.has(id));
+	const read = new Map<string, boolean>();
+	for (let start = 0; start < missing.length; start += STARTERS_PAGE) {
+		for (const [id, bot] of parseStartersAnswer(await ghPolledGraphql(startersQuery(missing.slice(start, start + STARTERS_PAGE)), {}))) read.set(id, bot);
+	}
+	const kept = new Map(ids.map(id => [id, known.get(id) ?? read.get(id) ?? false]));
+	threadStarters.set(repoKey(repo), kept);
+	return kept;
 }
 
 async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
@@ -171,7 +217,7 @@ async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
 		reviewing: `${scope} is:open review-requested:@me sort:updated-desc`,
 		merged: `${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
 	});
-	return parseListAnswer(answer, repo);
+	return parseListAnswer(answer, repo, await readThreadStarters(repo, openThreadIds(answer)));
 }
 
 const loaded = createCache<PullRequestSummary[]>();

@@ -72,6 +72,8 @@ While fewer than `GRAPHQL_RESERVE` (1000) points are left, those reads ask GitHu
 `GitHubAccess` still pauses every GraphQL call, these and the user's, once GitHub reports the budget spent, and a refusal leaves `remaining` under the reserve, so the gate needs no refusal handling of its own.
 `loadPullRequests` throws either error for the whole list rather than answering a repository with an error, so the page keeps the list it has and shows it as **Cannot refresh pull requests:**, as for any failed refresh, and the merge cleanup skips a look either error stops without logging it.
 Everything a click asks for, a pull request's details, files, pickers, and title, each change and its mutations, and the merge queue's reads for a merge the user queued, runs through `ghGraphql`, below the reserve too, until `GitHubAccess` finds the budget spent.
+GitHub bills a nested connection for every node its parents may return, so the list's query costs 5 points a call: asking each of a search's 100 threads for its first comment made it 125, which at one poll a minute spent the hour's budget down to the reserve on its own.
+The list reads a thread's starter once instead, at a point for each 100 new open threads; check a query's cost with `rateLimit(dryRun: true) { cost }` before polling it.
 
 `GET /api/github-media?url=<HTTPS URL>` reads GitHub images and videos through `src/github-media.ts`.
 The allowlist is `github.com/user-attachments/`, `private-user-images.githubusercontent.com`, `user-images.githubusercontent.com`, and `camo.githubusercontent.com`; credentials, alternate ports, and every other host or scheme are rejected.
