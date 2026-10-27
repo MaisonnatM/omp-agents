@@ -15,9 +15,11 @@ Its `remember` tool appends `- YYYY-MM-DD fact` to `$XDG_DATA_HOME/omp-agents/bo
 
 A `bot` socket message carries one `BotChange`.
 `save` and `remove` go through the list registry, so every socket hears the new list as a `bots` message, with each Bot's memory file's text.
+The same message carries each Bot's last words, which `lastMessage` reads from the end of its session file, and the server sends it again as each turn of a Bot's conversation starts and ends, so the sidebar's previews and times follow the conversation.
 `message` calls `Bots.message`, which answers once omp took the text: a follow-up in the live session, else a resume of the Bot's session followed by the text, else a new session in the Bot's workspace that starts with it.
 Messages to one Bot wait on one another, so two at once never start two conversations.
 
 A routine whose `target` is `{kind: "bot", botId}` sends its prompt through `Bots.message` and records a `bot` outcome with the session id; the routine neither tracks nor ends that session.
 
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).
+`useAttention` in `web/use-attention.ts` counts that view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.

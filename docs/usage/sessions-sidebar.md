@@ -2,7 +2,8 @@
 
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The **Dev** and **Ops** switch at the right end of the header picks which tabs the sidebar's tab bar shows.
-  **Dev** shows **Pull requests**, **Tickets**, **Sessions**, **Todo**, and **Routines**; **Ops** shows **Notes**, **Calendar**, and **Inbox**.
+  **Dev** shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Todo**, and **Routines**; **Ops** shows **Notes**, **Calendar**, and **Inbox**.
+  The **Bots** tab lists your Bots, which the **Sessions** tab does not; see [Bots](bots.md).
   Switching opens the tab you last left in that group, else its first tab, and the switch follows any page you open, so G then N or a link to a note turns it to **Ops**.
   A side whose tabs are all hidden or signed out is disabled.
 - The dot before each session shows its state.
