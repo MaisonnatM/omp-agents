@@ -68,7 +68,7 @@ function parseTriggerEvent(value: unknown): TriggerEvent | null {
 
 /**
  * A run's `outcome`, or the fields it had before: `queued` or `queue`, `started` sessions, and `command`. Of several sessions, only a pull request routine's run started more than one, and the first stays.
- * A run from before every routine had a Bot that started a session or messaged a Bot sent its prompt into that session.
+ * A run from before every routine had a Bot that started a session sent its prompt into that session.
  */
 function parseRun(value: unknown): RoutineRun | null {
 	if (!isObject(value) || !isSafeInteger(value.at) || !isTexts(value.errors)) return null;
@@ -79,7 +79,7 @@ function parseRun(value: unknown): RoutineRun | null {
 		const { outcome } = value;
 		let parsed: RoutineOutcome | null = null;
 		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = { kind: "pending", queued: outcome.queued };
-		if ((outcome.kind === "sent" || outcome.kind === "session" || outcome.kind === "bot") && typeof outcome.sessionId === "string") parsed = { kind: "sent", sessionId: outcome.sessionId };
+		if ((outcome.kind === "sent" || outcome.kind === "session") && typeof outcome.sessionId === "string") parsed = { kind: "sent", sessionId: outcome.sessionId };
 		if (outcome.kind === "command") {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
@@ -104,17 +104,15 @@ interface Migration {
 const shellWord = (text: string): string => `'${text.replaceAll("'", `'\\''`)}'`;
 
 /**
- * A routine from before every routine had a Bot, in the current shape: one that messaged a Bot belongs to it, and the
- * rest to the Routines Bot working in `workspace`, with their own workspace and skill folded into the task, so each run
- * does what it did before. `toRoutinesBot` says whether the routine went to the Routines Bot.
+ * A routine from before every routine had a Bot, in the current shape: it belongs to the Routines Bot working in
+ * `workspace`, with its own workspace and skill folded into the task, so each run does what it did before.
+ * `toRoutinesBot` says whether the routine went to the Routines Bot, which a task kind routines no longer run does not.
  */
 function adoptLegacy(value: Record<string, unknown>, workspace: string): { fields: Record<string, unknown>; toRoutinesBot: boolean } {
 	const { task, skill } = value;
 	const elsewhere = typeof value.cwd === "string" && value.cwd !== workspace ? value.cwd : null;
 	if (!isObject(task)) return { fields: value, toRoutinesBot: false };
 	switch (task.kind) {
-		case "bot":
-			return { fields: { ...value, botId: task.botId, task: { kind: "prompt", prompt: task.prompt } }, toRoutinesBot: false };
 		case "command": {
 			const command = elsewhere !== null && typeof task.command === "string" ? `cd ${shellWord(resolve(HOME, expandHome(elsewhere.trim())))} && ${task.command}` : task.command;
 			return { fields: { ...value, botId: ROUTINES_BOT_ID, task: { kind: "command", command } }, toRoutinesBot: true };
@@ -157,7 +155,7 @@ function parseRoutines(value: unknown, migration: Migration): Routine[] | null {
 	migration.moved = false;
 	migration.workspace = null;
 	if (!isObject(value) || !Array.isArray(value.routines)) return null;
-	const firstCwd = value.routines.find((entry): entry is Record<string, unknown> => isLegacy(entry) && isNonEmpty(entry.cwd) && !(isObject(entry.task) && entry.task.kind === "bot"))?.cwd;
+	const firstCwd = value.routines.find((entry): entry is Record<string, unknown> => isLegacy(entry) && isNonEmpty(entry.cwd))?.cwd;
 	const workspace = typeof firstCwd === "string" ? firstCwd : HOME;
 	const routines: Routine[] = [];
 	for (const entry of value.routines) {

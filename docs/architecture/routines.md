@@ -24,8 +24,7 @@ A run stays queued from its claim until the drain sends its message or starts it
 A routine from before Bots has no `botId`, and `RoutinesFile` gives it one as it reads the file.
 Only the server that owns routines saves that and creates the Bot it needs, through `RoutinesFile.migrate`: as it takes ownership at start, before the runner recovers, and again as it takes over routines and rereads the file.
 Another server reads the migrated routines in memory and leaves both files alone.
-A `bot` task becomes a prompt of the Bot it named.
-Every other routine goes to one Bot named **Routines**, `ROUTINES_BOT_ID`, whose workspace is the first such routine's workspace, else the home directory, and whose job says it runs the routines moved there.
+Each routine goes to one Bot named **Routines**, `ROUTINES_BOT_ID`, whose workspace is the first routine's workspace, else the home directory, and whose job says it runs the routines moved there.
 A command whose workspace differs from that Bot's runs `cd` into its old workspace first, so it acts where it did.
 A prompt whose workspace differs starts with **Work in** and that workspace, and a prompt with a skill starts with `/skill:` and the skill's name.
 The pin goes, since a Bot's conversation is never ended.

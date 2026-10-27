@@ -108,7 +108,7 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 	expect(saved.routines[0]?.schedule).toBeUndefined();
 });
 
-test("a file from before Bots gives each routine a Bot: a Bot's message to that Bot, the rest to one Routines Bot in the first one's workspace, each still doing what it did", () => {
+test("a file from before Bots moves every routine to one Routines Bot in the first one's workspace, each still doing what it did", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -117,7 +117,6 @@ test("a file from before Bots gives each routine a Bot: a Bot's message to that 
 	const routines = [
 		{ ...base, id: "r1", name: "Retro", cwd: "~/code", task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, skill: "retro", runs: [{ at: 2, outcome: { kind: "session", instanceId: "i1", sessionId: "s1" }, errors: [] }] },
 		{ ...base, id: "r2", name: "Prune", cwd: "~/it's", task: { kind: "command", command: "git worktree prune" }, runs: [] },
-		{ ...base, id: "r3", name: "Standup", cwd: "~/code", task: { kind: "bot", botId: "scout", prompt: "Post the standup." }, runs: [{ at: 3, outcome: { kind: "bot", botId: "scout", sessionId: "s2" }, errors: [] }] },
 		{ ...base, id: "r4", name: "Notes", cwd: "~/notes", task: { kind: "prompt", prompt: "Tidy the notes." }, runs: [] },
 		{ ...base, id: "r5", name: "Lint", cwd: "~/code", task: { kind: "command", command: "bun run lint" }, runs: [] },
 	];
@@ -126,7 +125,6 @@ test("a file from before Bots gives each routine a Bot: a Bot's message to that 
 	expect(file.value.map(({ id, botId, task, runs }) => ({ id, botId, task, outcomes: runs.map(run => run.outcome) }))).toEqual([
 		{ id: "r1", botId: ROUTINES_BOT_ID, task: { kind: "prompt", prompt: "/skill:retro Write the daily retro." }, outcomes: [{ kind: "sent", sessionId: "s1" }] },
 		{ id: "r2", botId: ROUTINES_BOT_ID, task: { kind: "command", command: `cd '${HOME}/it'\\''s' && git worktree prune` }, outcomes: [] },
-		{ id: "r3", botId: "scout" as BotId, task: { kind: "prompt", prompt: "Post the standup." }, outcomes: [{ kind: "sent", sessionId: "s2" }] },
 		{ id: "r4", botId: ROUTINES_BOT_ID, task: { kind: "prompt", prompt: "Work in ~/notes.\n\nTidy the notes." }, outcomes: [] },
 		{ id: "r5", botId: ROUTINES_BOT_ID, task: { kind: "command", command: "bun run lint" }, outcomes: [] },
 	]);
@@ -137,26 +135,26 @@ test("a file from before Bots gives each routine a Bot: a Bot's message to that 
 	expect(adopted).toEqual([routinesBot("~/code")]);
 	flushJsonFiles();
 	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: Record<string, unknown>[] };
-	expect(saved.routines.map(routine => [routine.botId, "cwd" in routine, "skill" in routine])).toEqual(routines.map(({ id }) => [id === "r3" ? "scout" : ROUTINES_BOT_ID, false, false]));
+	expect(saved.routines.map(routine => [routine.botId, "cwd" in routine, "skill" in routine])).toEqual(routines.map(() => [ROUTINES_BOT_ID, false, false]));
 
 	const next = new RoutinesFile(path);
 	next.migrate(bot => void adopted.push(bot));
 	expect([adopted.length, next.value]).toEqual([1, file.value]);
 });
 
-test("a file from before Bots whose routines all messaged Bots creates no Routines Bot", () => {
+test("a file from before Bots whose routines are all dropped creates no Routines Bot", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
 	mkdirSync(join(dir, "omp-agents"));
-	const routine = { id: "r1", name: "Standup", cwd: "~/code", schedules: [{ kind: "every", minutes: 60 }], task: { kind: "bot", botId: "scout", prompt: "Post the standup." }, skill: null, enabled: true, createdAt: 1, runs: [] };
+	const routine = { id: "r1", name: "Reviews", cwd: "~/code", schedules: [{ kind: "every", minutes: 60 }], task: { kind: "pull-requests", action: "review" }, skill: null, enabled: true, createdAt: 1, runs: [] };
 	writeFileSync(path, JSON.stringify({ routines: [routine] }));
 	const file = new RoutinesFile(path);
 	const adopted: BotSpec[] = [];
 	file.migrate(bot => void adopted.push(bot));
 	flushJsonFiles();
-	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: { botId: string }[] };
-	expect([adopted, saved.routines[0]?.botId]).toEqual([[], "scout"]);
+	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: unknown[] };
+	expect([adopted, saved.routines]).toEqual([[], []]);
 });
 
 test("deleting a Bot's routines leaves the other Bots' routines", () => {

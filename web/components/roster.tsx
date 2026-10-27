@@ -146,8 +146,8 @@ interface RosterProps {
 	newSessionOpen: boolean;
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;
-	/** Every Bot's row, whatever the workspace, the most recent conversation first. */
-	bots: readonly BotRow[];
+	/** Every Bot's row, whatever the workspace, the most recent conversation first; `null` until the server sends the Bots. */
+	bots: readonly BotRow[] | null;
 	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while another page or the panes show. */
 	botsOpen: string | null | undefined;
 	/** The tabs the bar draws, the header switch's group's shown tabs, in order, which the position keys count. */
@@ -218,7 +218,7 @@ export function Roster({
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
-		bots: { count: bots.filter(({ host }) => botAsking(host) !== null).length, meaning: "asking you" },
+		bots: { count: bots?.filter(({ host }) => botAsking(host) !== null).length ?? 0, meaning: "asking you" },
 		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);

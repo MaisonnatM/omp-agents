@@ -2,7 +2,7 @@
 import { CircleStop, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
-import { type Bot, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
+import { type Bot, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
 import type { RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -53,12 +53,20 @@ function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
 	);
 }
 
-/** The Bot's avatar, which opens its shape and color, each saved as you pick it. */
+/** The Bot's avatar, which opens its shape and color: the avatar follows each pick, and closing the popover saves the last one. */
 function LookButton({ bot, host, connected }: { bot: Bot; host: RosterHost | null; connected: boolean }) {
 	const { changeBot } = useDashboardActions();
 	const id = useId();
+	const [picked, setPicked] = useState<BotLook | null>(null);
+	const look = picked ?? bot;
 	return (
-		<Popover>
+		<Popover
+			onOpenChange={open => {
+				if (open || picked === null) return;
+				if (picked.shape !== bot.shape || picked.hue !== bot.hue) changeBot({ op: "save", bot: { ...botSpec(bot), ...picked } });
+				setPicked(null);
+			}}
+		>
 			<PopoverTrigger asChild>
 				<button
 					{...activityControl("bots.look")}
@@ -66,11 +74,11 @@ function LookButton({ bot, host, connected }: { bot: Bot; host: RosterHost | nul
 					aria-label={`Change ${bot.name}'s shape and color`}
 					className="shrink-0 rounded-xl p-1 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
 				>
-					<BotAvatar look={bot} size="hero" working={host?.status === "working"} asking={botAsking(host) !== null} />
+					<BotAvatar look={look} size="hero" working={host?.status === "working"} asking={botAsking(host) !== null} />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent align="start" collisionPadding={8} aria-label={`${bot.name}'s shape and color`} className="w-auto max-w-72 p-3">
-				<BotLookPicker name={id} look={bot} disabled={!connected} onLook={look => changeBot({ op: "save", bot: { ...botSpec(bot), ...look } })} />
+				<BotLookPicker name={id} look={look} disabled={!connected} onLook={setPicked} />
 			</PopoverContent>
 		</Popover>
 	);

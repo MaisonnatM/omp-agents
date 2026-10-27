@@ -11,6 +11,7 @@
   The avatar bobs and glances while the Bot works, or pulses gently when your system asks for reduced motion, and an amber dot marks a question waiting on you.
 - The search field at the top of the tab filters the Bots by name, job, or the line under the name.
   The **+** beside it, or a `#bots` address, opens the New Bot form.
+  Until the server sends the Bots, the tab reads **Loading your Bots…**.
 - New Bot follows Grok's: name the Bot, pick a shape and a color, and choose **Create**; the form starts on a random shape and color.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
   **Create** saves it and opens its page, `#bots/<id>`.
@@ -26,7 +27,8 @@
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
   The details start with the avatar, the name, whether the Bot's session runs, and its workspace.
-  Click the avatar to change its shape and color, and click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
+  Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
+  Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
   Below come its **Job**, its **Memory**, its **Routines**, **End session** while its session runs, and **Delete**.
   Editing the job shows **Save job** and **Revert**; every turn's system prompt carries the saved job.
   **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date; for a long memory it lists the newest 16 KB, the part the Bot reads.

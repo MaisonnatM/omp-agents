@@ -13,7 +13,6 @@ import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pu
 import { Roster } from "./roster";
 
 const NO_VIEWS: View[] = [];
-const NO_BOTS: Bot[] = [];
 const NO_PULL_REQUESTS_ROUTE: PullRequestsRoute = { target: null };
 
 interface AppSidebarProps {
@@ -85,7 +84,7 @@ export const AppSidebar = memo(function AppSidebar({
 		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
 	}, [listed, page, pullRequestsView, workspace, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
-	const botList = useMemo(() => botRows(bots ?? NO_BOTS, hosts, botLasts), [bots, hosts, botLasts]);
+	const botList = useMemo(() => (bots === null ? null : botRows(bots, hosts, botLasts)), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
 	return (
 		<Roster

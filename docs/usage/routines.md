@@ -46,8 +46,7 @@
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
 - Routines made before every routine had a Bot move to Bots as the dashboard that runs the routines starts or takes over.
-  A routine that messaged a Bot stays with that Bot.
-  Every other one goes to one Bot named **Routines**, made once, which works in the first such routine's workspace, else your home directory.
+  Each one goes to one Bot named **Routines**, made once, which works in the first routine's workspace, else your home directory.
   A command that ran in another workspace now starts with `cd` into it, and a prompt that did starts by naming it; a prompt's skill moves into the message as `/skill:` and its name.
   Pinning a finished session is gone, since a Bot keeps its one conversation.
 - When more than one dashboard runs, such as a second one on another port, only one runs the routines and takes the todos that agents add; it is the first one started, and the server on another port says so in its log when it starts.

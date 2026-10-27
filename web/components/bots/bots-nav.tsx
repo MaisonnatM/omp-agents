@@ -12,7 +12,8 @@ import { SidebarSearch } from "../sidebar-search";
 import { BotAvatar } from "./bot-avatar";
 
 interface BotsNavProps {
-	rows: readonly BotRow[];
+	/** `null` until the server sends the Bots. */
+	rows: readonly BotRow[] | null;
 	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while another page or the panes show. */
 	openId: string | null | undefined;
 }
@@ -20,7 +21,7 @@ interface BotsNavProps {
 export function BotsNav({ rows, openId }: BotsNavProps) {
 	const [query, setQuery] = useState("");
 	const needle = query.trim().toLowerCase();
-	const shown = needle ? rows.filter(({ bot, preview }) => [bot.name, bot.job, preview].some(text => text.toLowerCase().includes(needle))) : rows;
+	const shown = rows === null ? [] : needle ? rows.filter(({ bot, preview }) => [bot.name, bot.job, preview].some(text => text.toLowerCase().includes(needle))) : rows;
 	return (
 		<>
 			<SidebarGroup className="flex-row items-center gap-1">
@@ -37,7 +38,9 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 			</SidebarGroup>
 			<SidebarContent>
 				<SidebarGroup>
-					{rows.length === 0 ? (
+					{rows === null ? (
+						<p className="px-2 py-1 text-xs text-muted-foreground">Loading your Bots…</p>
+					) : rows.length === 0 ? (
 						<p className="px-2 py-1 text-xs text-muted-foreground">No Bots yet. Make one with the + button.</p>
 					) : shown.length === 0 ? (
 						<p className="px-2 py-1 text-xs text-muted-foreground">{`No Bots match “${query.trim()}”`}</p>
