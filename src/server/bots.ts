@@ -42,9 +42,9 @@ export function lastMessage(path: string): BotLast | null {
 		const tail = Buffer.alloc(length);
 		readSync(fd, tail, 0, length, size - length);
 		const lines = tail.toString("utf8").split("\n");
-		if (length < size) lines.shift();
-		for (const line of lines.toReversed()) {
-			const last = messageOf(line);
+		// A cut tail's first line is the end of an earlier one.
+		for (let i = lines.length - 1; i >= (length < size ? 1 : 0); i--) {
+			const last = messageOf(lines[i]!);
 			if (last) return last;
 		}
 		return null;

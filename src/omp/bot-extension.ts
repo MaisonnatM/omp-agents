@@ -3,7 +3,7 @@
 // (`Bots.join` in src/server/bots.ts), so no other session reads it.
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { errorText } from "../json";
+import { errorText, parseJson } from "../json";
 import { parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
 
 /** The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, and its `memory.md`. */
@@ -54,11 +54,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 		const botsPath = flag(BOT_FLAGS.bots);
 		const memoryPath = flag(BOT_FLAGS.memory);
 		if (ctx.agent.kind === "sub" || !id || !botsPath || !memoryPath) return undefined;
-		let json: unknown = null;
-		try {
-			json = JSON.parse(readText(botsPath));
-		} catch {}
-		const bot = parseBots(json)?.find(bot => bot.id === id);
+		const bot = parseBots(parseJson(readText(botsPath)))?.find(bot => bot.id === id);
 		if (!bot) return undefined;
 		const memory = readText(memoryPath).trim();
 		const prompt = [
