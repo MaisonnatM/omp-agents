@@ -6,6 +6,7 @@ import {
 	adjacentSession,
 	closePane,
 	endSession,
+	hashForBots,
 	hashForInbox,
 	hashForPullRequests,
 	hashForLayout,
@@ -177,6 +178,14 @@ describe("layout hash", () => {
 		expect(routeFromHash(`#routines/${id}`)).toEqual({ kind: "page", page: { kind: "routines", target: id } });
 		expect(routeFromHash("#routines/")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
 		expect(routeFromHash("#routinesx").kind).toBe("panes");
+	});
+
+	test("the bots hash opens the New Bot form or one Bot, and no bots hash is read as a layout", () => {
+		expect(hashForBots(null)).toBe("#bots");
+		expect(hashForBots("a b")).toBe("#bots/a%20b");
+		expect(routeFromHash("#bots")).toEqual({ kind: "page", page: { kind: "bots", target: null } });
+		expect(routeFromHash("#bots/a%20b")).toEqual({ kind: "page", page: { kind: "bots", target: "a b" } });
+		expect(routeFromHash("#botsx").kind).toBe("panes");
 	});
 
 	test("the inbox hash opens the list, a new mail, or one account's conversation, round-trips both ids, and is not read as a layout", () => {

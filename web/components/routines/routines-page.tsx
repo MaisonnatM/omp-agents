@@ -1,6 +1,7 @@
 import { ArrowLeft, Pause, Pencil, Play, Plus, Repeat, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
+import type { Bot } from "../../../src/shared/bots";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,7 @@ import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { age, modeOf, readTime, SPLIT_CLICK } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
-import { hashForRoutines } from "../../routing";
+import { hashForBots, hashForRoutines } from "../../routing";
 import { draftOf, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useMinute } from "../../use-minute";
@@ -137,6 +138,11 @@ function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; h
 						/>
 					</div>
 				)}
+				{outcome.kind === "bot" && (
+					<a href={hashForBots(outcome.botId)} className="ml-auto shrink-0 text-xs underline-offset-2 hover:underline">
+						Open the Bot
+					</a>
+				)}
 			</div>
 			{(output.trim() !== "" || run.errors.length > 0) && (
 				<div className="space-y-2 pl-[1.375rem]">
@@ -159,6 +165,7 @@ function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; h
 interface DetailProps {
 	routine: Routine;
 	hosts: RosterHost[];
+	bots: readonly Bot[];
 	now: number;
 	connected: boolean;
 	onChange: (change: RoutineChange) => void;
@@ -191,7 +198,7 @@ function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
 }
 
 /** One routine: its task and runs, newest first, beside its settings. */
-function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: DetailProps) {
+function RoutineDetail({ routine, hosts, bots, now, connected, onChange, onEdit }: DetailProps) {
 	const { task } = routine;
 	const { request } = useDashboardActions();
 	const run = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
@@ -204,15 +211,23 @@ function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: Det
 		],
 		["Schedule", <ScheduleValue schedules={routine.schedules} />],
 		["Next run", <span className={cn("tabular-nums", !routine.enabled && "text-muted-foreground")}>{nextRunWords(routine, now)}</span>],
-		[
+	];
+	if (routine.target.kind === "bot") {
+		const { botId } = routine.target;
+		settings.push([
+			"Sends to",
+			<a href={hashForBots(botId)} className="underline-offset-2 hover:underline">
+				{bots.find(({ id }) => id === botId)?.name ?? "A deleted Bot"}
+			</a>,
+		]);
+	} else {
+		settings.push([
 			"Workspace",
 			<span className="block truncate font-mono text-xs" title={routine.cwd}>
 				{routine.cwd}
 			</span>,
-		],
-	];
-	if (task.kind === "prompt") {
-		settings.push(["Skill", routine.skill ?? "None"], ["Pin", task.pin ? "When it finishes, in place of the previous session" : "No"]);
+		]);
+		if (task.kind === "prompt") settings.push(["Skill", routine.skill ?? "None"], ["Pin", task.pin ? "When it finishes, in place of the previous session" : "No"]);
 	}
 	return (
 		<PageFrame
@@ -370,10 +385,12 @@ interface RoutinesPageProps {
 	/** Where a new routine's sessions start until you pick another directory. */
 	defaultCwd: string;
 	connected: boolean;
+	/** The Bots a routine's prompt can go to. */
+	bots: readonly Bot[];
 }
 
 /** Your routines, one routine's settings and runs, or the editor for a new one or an edit. */
-export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, connected }: RoutinesPageProps) {
+export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, connected, bots }: RoutinesPageProps) {
 	const { send } = useDashboardActions();
 	const now = useMinute();
 	const [editing, setEditing] = useState<{ draft: RoutineDraft; isNew: boolean } | null>(null);
@@ -387,6 +404,7 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 				key={editing.draft.id}
 				initial={editing.draft}
 				isNew={editing.isNew}
+				bots={bots}
 				workspaces={workspaces}
 				connected={connected}
 				onCancel={() => setEditing(null)}
@@ -400,7 +418,7 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 	}
 
 	const shown = target === null ? undefined : routines.find(routine => routine.id === target);
-	if (shown) return <RoutineDetail routine={shown} hosts={hosts} now={now} connected={connected} onChange={onChange} onEdit={edit(shown)} />;
+	if (shown) return <RoutineDetail routine={shown} hosts={hosts} bots={bots} now={now} connected={connected} onChange={onChange} onEdit={edit(shown)} />;
 
 	const paused = routines.filter(routine => !routine.enabled);
 	const groups = [

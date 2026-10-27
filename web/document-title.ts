@@ -23,6 +23,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Notes";
 		case "routines":
 			return "Routines";
+		case "bots":
+			return page.target === null ? "New Bot" : "Bot";
 		case "calendar":
 			return "Calendar";
 		case "inbox":

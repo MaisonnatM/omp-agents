@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
+import type { Bot } from "../../src/shared/bots";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { newDraftKey } from "../composer-drafts";
@@ -21,6 +22,7 @@ import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
 import { RoutinesPage } from "./routines/routines-page";
+import { BotPage, NewBot } from "./bots/bot-page";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
@@ -56,10 +58,12 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 	return { text: todo.text, prompt: body ? `${todo.text}\n\n${body}` : todo.text };
 }
 
+const NO_BOTS: Bot[] = [];
+
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botMemories" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -100,6 +104,8 @@ export const PageSwitch = memo(function PageSwitch({
 	userTodos,
 	userNotes,
 	routines,
+	bots,
+	botMemories,
 	workspaceList,
 	pins,
 	newSessionCompletions,
@@ -203,8 +209,29 @@ export const PageSwitch = memo(function PageSwitch({
 					workspaces={workspaces}
 					defaultCwd={defaultWorkspace}
 					connected={connected}
+					bots={bots ?? NO_BOTS}
 				/>
 			);
+		case "bots": {
+			if (page.target === null) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
+			const bot = bots?.find(({ id }) => id === page.target);
+			if (!bot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
+			return (
+				// Keyed by the Bot, so another Bot's page starts with its own drafts.
+				<BotPage
+					key={bot.id}
+					bot={bot}
+					memory={botMemories[bot.id] ?? ""}
+					routines={routines}
+					hosts={hosts}
+					past={past}
+					lastHosts={lastHosts}
+					models={models}
+					workspaces={workspaces}
+					connected={connected}
+				/>
+			);
+		}
 		case "calendar":
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
 		case "inbox":

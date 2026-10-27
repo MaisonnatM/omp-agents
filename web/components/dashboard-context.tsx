@@ -22,6 +22,7 @@ export interface DashboardActions {
 	openNewSession: Dashboard["openNewSession"];
 	changeTodo: Dashboard["changeTodo"];
 	changeNote: Dashboard["changeNote"];
+	changeBot: Dashboard["changeBot"];
 	/** End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast. */
 	end: (instanceId: string) => void;
 	/** Open the text, image, or video file at an absolute or `~/` path in the file dialog. */

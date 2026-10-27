@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import type { BotChange } from "../src/shared/bots";
 import type { PinChange } from "../src/shared/pins";
 import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
@@ -92,6 +93,8 @@ export interface Dashboard {
 	changeNote: (change: UserNoteChange) => void;
 	/** Pin or unpin sessions, which shows at once and reaches the server and every other window. */
 	changePins: (change: PinChange) => void;
+	/** Add, change, or delete a Bot, which shows at once and reaches the server and every other window. */
+	changeBot: (change: Exclude<BotChange, { op: "message" }>) => void;
 }
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
@@ -104,8 +107,14 @@ export function useDashboard(): Dashboard {
 	const startsRef = useRef(state.starts);
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
-	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
-	const watched = useMemo<View[]>(() => (page ? NO_VIEWS : state.layout.panes), [page, state.layout.panes]);
+	// A page covering the panes shows none of them, so the server streams only a Bot page's conversation until the panes return.
+	const botSession = page?.kind === "bots" ? (state.bots?.find(({ id }) => id === page.target)?.sessionId ?? null) : null;
+	const botInstance = botSession === null ? null : (state.hosts.find(host => host.sessionId === botSession)?.instanceId ?? null);
+	const watched = useMemo<View[]>(() => {
+		if (!page) return state.layout.panes;
+		if (botSession === null) return NO_VIEWS;
+		return [botInstance === null ? { kind: "past", sessionId: botSession } : { kind: "live", instanceId: botInstance, agentId: null }];
+	}, [page, botSession, botInstance, state.layout.panes]);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 	const shownTrajectories = useShownTrajectories();
@@ -347,6 +356,13 @@ export function useDashboard(): Dashboard {
 		},
 		[send],
 	);
+	const changeBot = useCallback(
+		(change: Exclude<BotChange, { op: "message" }>) => {
+			dispatch({ t: "bot", change, now: new Date().toISOString() });
+			send({ t: "bot", change });
+		},
+		[send],
+	);
 
-	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins };
+	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot };
 }

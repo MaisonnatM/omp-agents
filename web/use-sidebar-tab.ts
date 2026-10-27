@@ -3,8 +3,8 @@ import type { View } from "../src/shared/sessions";
 import { type Layout, openView, type Page, type SettingsRoute, type TabGroup, type SidebarPanel, type SidebarTab } from "./routing";
 import { groupEntry, TAB_ROWS } from "./sidebar-tabs";
 
-/** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", routines: "routines", notes: "notes", calendar: "calendar", inbox: "inbox", settings: "settings" };
+/** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes and the Bots go with the sessions. */
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", routines: "routines", bots: "sessions", notes: "notes", calendar: "calendar", inbox: "inbox", settings: "settings" };
 
 /** The page each tab shows, but for Sessions, which shows the panes. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {

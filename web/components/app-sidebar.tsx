@@ -1,8 +1,10 @@
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
+import type { Bot } from "../../src/shared/bots";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
+import { botHost } from "../bots-model";
 import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarPanel, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
@@ -12,6 +14,7 @@ import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pu
 import { Roster } from "./roster";
 
 const NO_VIEWS: View[] = [];
+const NO_BOTS: Bot[] = [];
 const NO_PULL_REQUESTS_ROUTE: PullRequestsRoute = { target: null };
 
 interface AppSidebarProps {
@@ -33,6 +36,8 @@ interface AppSidebarProps {
 	hosts: RosterHost[];
 	past: PastSession[];
 	routines: Routine[];
+	/** The Bots, `null` until the server sends them. */
+	bots: Bot[] | null;
 	todoView: TodoListView;
 	routinesTarget: string | null;
 	settings: SettingsRoute;
@@ -61,6 +66,7 @@ export const AppSidebar = memo(function AppSidebar({
 	hosts,
 	past,
 	routines,
+	bots,
 	todoView,
 	routinesTarget,
 	settings,
@@ -82,6 +88,7 @@ export const AppSidebar = memo(function AppSidebar({
 	}, [listed, page, pullRequestsView, workspace, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const routinesOpen = page?.kind === "routines" ? routinesTarget : undefined;
+	const botEntries = useMemo(() => (bots ?? NO_BOTS).map(bot => ({ bot, status: botHost(bot, hosts)?.status ?? null })), [bots, hosts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
 	return (
 		<Roster
@@ -94,6 +101,8 @@ export const AppSidebar = memo(function AppSidebar({
 			open={page ? NO_VIEWS : panes}
 			newSessionOpen={page?.kind === "new"}
 			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
+			bots={botEntries}
+			botsOpen={page?.kind === "bots" ? page.target : undefined}
 			tabs={tabs}
 			tab={tab}
 			onTab={onTab}

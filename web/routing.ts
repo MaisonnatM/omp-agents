@@ -116,6 +116,11 @@ export interface RoutinesRoute {
 	target: string | null;
 }
 
+/** A Bot's page, its conversation beside its job, memory, and routines; `null` for the New Bot form. */
+export interface BotsRoute {
+	target: string | null;
+}
+
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. `todoId` names the todo it works on. */
 export interface NewSessionRoute {
 	cwd: string | null;
@@ -135,6 +140,7 @@ export type Page =
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "notes" } & NotesRoute)
 	| ({ kind: "routines" } & RoutinesRoute)
+	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "inbox" } & InboxRoute)
 	| ({ kind: "new" } & NewSessionRoute)
@@ -183,6 +189,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
  * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
+ * - `#bots` opens the New Bot form, and `#bots/<id>` that Bot's page.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#inbox` opens the Inbox page, your Gmail inboxes' latest conversations, `#inbox/new` a new mail, and
  *   `#inbox/<account>/<thread id>` that account's conversation in full in the main content.
@@ -211,6 +218,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 	notes: (rest, query) => ({ kind: "notes", list: rest === "agents" ? { kind: "agents" } : { kind: "all" }, open: query.get("open") || null }),
 	routines: rest => ({ kind: "routines", target: rest ? decodeSegment(rest) : null }),
+	bots: rest => ({ kind: "bots", target: rest ? decodeSegment(rest) : null }),
 	calendar: () => ({ kind: "calendar" }),
 	inbox: rest => {
 		if (rest === "new") return { kind: "inbox", target: "new" };
@@ -241,6 +249,7 @@ function restOfPage(page: Page): string | null {
 		case "notes":
 			return page.list.kind === "all" ? null : page.list.kind;
 		case "routines":
+		case "bots":
 			return page.target === null ? null : encodeURIComponent(page.target);
 		case "inbox":
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
@@ -267,6 +276,7 @@ function queryOfPage(page: Page): string | null {
 		case "pull-requests":
 		case "tickets":
 		case "routines":
+		case "bots":
 		case "calendar":
 		case "inbox":
 		case "scheduled":
@@ -300,6 +310,7 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 }
 export const hashForNotes = (list: NotesListView, open: string | null = null): string => hashForPage({ kind: "notes", list, open });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
+export const hashForBots = (target: string | null): string => hashForPage({ kind: "bots", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
@@ -363,7 +374,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `notes`, `routines`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `notes`, `routines`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));
