@@ -83,7 +83,7 @@ export class Bots {
 	readonly #deps: BotsDeps;
 	/** The Bot each live Bot session is, by instance id. */
 	readonly #live = new Map<string, BotId>();
-	/** Each Bot's last message, which the next waits on, so two at once never start two conversations. */
+	/** Each Bot's message under way, which the next waits on, so two at once never start two conversations. */
 	readonly #sending = new Map<BotId, Promise<unknown>>();
 
 	constructor(deps: BotsDeps) {
@@ -159,7 +159,12 @@ export class Bots {
 	 * as the first message of a new one in the Bot's workspace. Resolves to the conversation's session id once omp took it.
 	 */
 	message(id: BotId, text: string): Promise<string> {
-		const sent = (this.#sending.get(id) ?? Promise.resolve()).catch(() => {}).then(() => this.#send(id, text));
+		const sent = (this.#sending.get(id) ?? Promise.resolve())
+			.catch(() => {})
+			.then(() => this.#send(id, text))
+			.finally(() => {
+				if (this.#sending.get(id) === sent) this.#sending.delete(id);
+			});
 		this.#sending.set(id, sent);
 		return sent;
 	}
