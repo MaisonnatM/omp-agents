@@ -187,3 +187,16 @@ export interface AgentMedia {
 
 /** The media list's order: newest first. */
 export const newestMediaFirst = (a: AgentMedia, b: AgentMedia): number => b.at - a.at;
+
+/** One web page or remote item an agent's tool opened: a `read` or fetch of a URL, a browser it pointed at one, a GitHub `pr://` or `issue://` read, or a URL an MCP read named. */
+export interface AgentSource {
+	/** The `http:` or `https:` address, as the URL parser writes it. */
+	url: string;
+	/** The agent whose transcript holds it, by subagent id; `null` for a session's main agent. */
+	agentId: string | null;
+	tool: string;
+	/** What the tool call said it did, as one line; empty when it said nothing. */
+	summary: string;
+	/** When the tool returned, in ms since the epoch. */
+	at: number;
+}

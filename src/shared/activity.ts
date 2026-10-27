@@ -85,6 +85,8 @@ export const CONTROLS = [
 	{ id: "changes-card.image.clear", label: "Changes card image selection cleared", area: "Changes" },
 	{ id: "changes-card.image.to-pull-request", label: "Changes card images, pull request menu", area: "Changes" },
 	{ id: "changes-card.image.to-ticket", label: "Changes card images, Linear issue menu", area: "Changes" },
+	{ id: "changes-card.sources.fold", label: "Changes card Sources section, folded or unfolded", area: "Changes" },
+	{ id: "changes-card.source", label: "Changes card source opened", area: "Changes" },
 	{ id: "changes-dialog.scope.all", label: "Session changes, All changes tab", area: "Changes" },
 	{ id: "changes-dialog.scope.session", label: "Session changes, This session tab", area: "Changes" },
 	{ id: "changes-dialog.refresh", label: "Session changes, read again", area: "Changes" },

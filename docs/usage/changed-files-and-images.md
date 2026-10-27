@@ -1,9 +1,9 @@
 # Changed files and images
 
 - A changes card sits directly above each live session's or subagent's composer, and below a past session's transcript.
-  It has separate **Files** and **Images** sections, each shown only when it has items.
+  It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items.
   Click a section's header to fold or unfold it.
-  Both start open, and the app keeps each choice across sessions and reloads.
+  Each starts open, and the app keeps each choice across sessions and reloads.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows a file-type icon, the file's name, and its lines added and removed, which the header totals.
   When files share a name, muted parent folders distinguish them.
@@ -37,3 +37,8 @@
   An image with a file on this computer goes as that file, under its name and with its name as alt text; any other goes as shown, with the call's summary as alt text.
   **Attach to Linear issue** lists the session's issues, and attaches each image to the one you pick, as the new-issue dialog attaches files; the images Linear refused stay selected.
   Either button is disabled, with a tooltip saying why, when the session has no pull request or no issue; **Clear** empties the selection.
+- **Sources** lists the web pages and remote items the agent and its subagents at any depth opened, each address once, oldest first.
+  It counts a `read` or fetch of a web address, a page the browser opened from `eval`, a GitHub pull request or issue read through `pr://` or `issue://`, and the web addresses in the arguments of an MCP call that gets, reads, fetches, finds, or analyzes something.
+  A failed call, a page on this computer such as a dev server, and search results the agent never opened are left out, and so are the session's own pull requests and Linear issues, which the [session details sidebar](session-details-sidebar.md) shows.
+  Each row shows the site and the page's path; its tooltip names the full address, the agent and tool, what the call said it did, and how long ago.
+  Click a row to open the page in your browser; the list scrolls within the card.

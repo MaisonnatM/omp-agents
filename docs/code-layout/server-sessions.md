@@ -35,7 +35,7 @@
   `SessionFiles` hands it to `SessionFactsIndex` as one of its `OwnFileFolds`, so the index's read of each session file feeds both folds and no file is read twice; the index starts a fresh conversation when the file shrinks and forgets it once the session leaves the list.
   `Conversations.search` then matches those with `everyWord` and reads no file.
 - `src/work.ts`: folds session-file lines into the files changed.
-- `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, and the image files the session wrote that their calls or results named, for the `media` message.
+- `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, the image files the session wrote that their calls or results named, and the web pages and remote items their calls opened, for the `media` message.
 - `src/trajectory.ts`: folds a transcript's entries into turns, with their injections, requests, tool calls, and usage, for the `turns` message; `TrajectoryTail` reads the file through `FoldedFile` and `ReadQueue`.
   `src/shared/trajectory.ts` holds `Turn`, its steps, and `TokenUsage`.
 - `src/replay.ts`: source token pinning and revalidation, detached checkout preparation, owned failure cleanup, `ReplayFold`, and full replay comparison.
