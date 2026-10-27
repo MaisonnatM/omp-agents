@@ -24,3 +24,6 @@ export const keeperScript: string = packagedResources ? join(packagedResources, 
 export const sessionVisualsExtension: string = packagedResources
 	? join(packagedResources, "session-visuals-extension.js")
 	: join(import.meta.dir, "..", "omp", "session-visuals-extension.ts");
+
+/** The omp extension a Bot's session loads (`src/omp/bot-extension.ts`): its bundle in a packaged app. */
+export const botExtension: string = packagedResources ? join(packagedResources, "bot-extension.js") : join(import.meta.dir, "..", "omp", "bot-extension.ts");
