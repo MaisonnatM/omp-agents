@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId, BotSpec } from "../shared/bots";
-import type { StartRequest, StartResult } from "../shared/sessions";
+import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { Bots, lastMessage } from "./bots";
 import { BotsFile } from "./bots-file";
 
@@ -71,7 +71,7 @@ describe("Bots", () => {
 	test("a Bot's first message starts its conversation in its workspace with the Bot extension, and the next one follows up in it", async () => {
 		const { bots, file, sessions, requests, dir } = harness();
 		expect(await bots.message(scout.id, "Remember that I prefer short answers.")).toBe("s1");
-		expect(requests[0]).toMatchObject({ kind: "new", cwd: "/work/webapp", prompt: "Remember that I prefer short answers." });
+		expect(requests[0]).toMatchObject({ kind: "new", cwd: "/work/webapp", prompt: "Remember that I prefer short answers.", bot: scout.id });
 		expect(sessions[0]?.args).toEqual(["-e", "/ext/bot.ts", "--omp-agents-bot", "scout", "--omp-agents-bots", join(dir, "bots.json"), "--omp-agents-bot-memory", join(dir, "bots", "scout", "memory.md")]);
 		expect(file.value[0]?.sessionId).toBe("s1");
 
@@ -109,6 +109,7 @@ describe("Bots", () => {
 		await bots.message(scout.id, "Hello.");
 		expect(bots.join({ kind: "resume", sessionId: "s1" }).rpc.args).toContain("--omp-agents-bot");
 		expect(bots.join({ kind: "resume", sessionId: "s9" }).rpc.args).toEqual([]);
+		expect(bots.join(newSessionRequest("/work/webapp", "Hello.")).rpc.args).toEqual([]);
 	});
 
 	test("a /move or an edited prompt rebinds the Bot to the session it moved to", async () => {

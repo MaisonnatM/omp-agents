@@ -6,7 +6,8 @@ A Bot is a named, long-lived teammate: one conversation, a job, and a memory.
 A save keeps the Bot's `sessionId`, and a remove forgets the Bot but leaves its session file and its memory directory.
 
 `Bots` in `src/server/bots.ts` binds each Bot to the session its conversation runs in.
-A start that `Bots` asked for, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, and its `memory.md` path.
+A new session whose `StartRequest` names a `bot`, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, and its `memory.md` path.
+Only `Bots` sets `bot`, since `parseNewSessionRequest` never reads one, so a page cannot start a Bot's session.
 Any other start launches plain, so no other session loads the extension.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
 

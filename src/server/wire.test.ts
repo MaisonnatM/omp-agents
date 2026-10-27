@@ -308,6 +308,8 @@ describe("parseClientMsg", () => {
 			reviewDraft: true,
 		});
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi" })).toMatchObject({ reviewDraft: false });
+		// Only the server's Bots starts a Bot's session.
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", bot: "scout" })).toMatchObject({ bot: null });
 		expect(msg({ t: "start", reqId: 5, kind: "fork", view: { kind: "past", sessionId: "s1" }, entryId: "e1" })).toEqual({
 			t: "start",
 			reqId: 5,

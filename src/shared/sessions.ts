@@ -1,6 +1,7 @@
 /** Sessions as the roster, the panes, and the new-session draft see them: live hosts, past sessions, views, requests, and starts. */
 import { BASE64, isNonEmpty, isObject, type Parsed } from "../json";
 import { isTodoId } from "../user-todos-parse";
+import type { BotId } from "./bots";
 import type { BranchChoice } from "./git";
 import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
@@ -310,6 +311,8 @@ export type StartRequest =
 			taskId: string | null;
 			/** The session reviews `subject`, a pull request, as a review draft it saves through the dashboard's `save_review_draft` tool rather than posting on GitHub. */
 			reviewDraft: boolean;
+			/** The Bot whose conversation the session starts, which launches it with the Bot extension; only the server's `Bots` sets it, since {@link parseNewSessionRequest} never reads one. */
+			bot: BotId | null;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "replay"; view: View; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
@@ -330,6 +333,7 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	todoId: null,
 	taskId: null,
 	reviewDraft: false,
+	bot: null,
 	...options,
 });
 

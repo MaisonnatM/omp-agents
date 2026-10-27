@@ -83,8 +83,6 @@ export class Bots {
 	readonly #deps: BotsDeps;
 	/** The Bot each live Bot session is, by instance id. */
 	readonly #live = new Map<string, BotId>();
-	/** The Bot each start this module asked for is, so only it launches with the extension; the page never names one. */
-	readonly #starting = new WeakMap<StartRequest, BotId>();
 	/** Each Bot's last message, which the next waits on, so two at once never start two conversations. */
 	readonly #sending = new Map<BotId, Promise<unknown>>();
 
@@ -125,11 +123,11 @@ export class Bots {
 	}
 
 	/**
-	 * How `request` joins the server: a start this module asked for, or the resume of a Bot's conversation, launches with
+	 * How `request` joins the server: a new session that names a Bot, or the resume of a Bot's conversation, launches with
 	 * the Bot extension and binds the Bot to the session once it is live. Any other start launches plain.
 	 */
 	join(request: StartRequest): SessionJoin {
-		const id = this.#starting.get(request) ?? (request.kind === "resume" ? this.list.find(bot => bot.sessionId === request.sessionId)?.id : undefined);
+		const id = request.kind === "new" ? request.bot : request.kind === "resume" ? this.list.find(bot => bot.sessionId === request.sessionId)?.id : undefined;
 		if (!id) return { rpc: PLAIN_LAUNCH, attach() {} };
 		const { extension, botsFile } = this.#deps.paths;
 		return {
@@ -177,8 +175,7 @@ export class Bots {
 		const request: StartRequest =
 			bot.sessionId !== null && this.#deps.savedFile(bot.sessionId) !== null
 				? { kind: "resume", sessionId: bot.sessionId }
-				: newSessionRequest(bot.cwd, text, { model: bot.model === null ? null : modelOfSelector(bot.model), skill: bot.skill });
-		this.#starting.set(request, id);
+				: newSessionRequest(bot.cwd, text, { model: bot.model === null ? null : modelOfSelector(bot.model), skill: bot.skill, bot: id });
 		const result = await this.#deps.start(request);
 		if (!result.ok) throw new Error(result.error);
 		const session = this.#deps.session(result.instanceId);
