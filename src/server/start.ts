@@ -1,6 +1,6 @@
 /** Starting a dashboard session: a new one, a fork of a transcript, or a past session resumed. All three spawn omp the same way. */
 import { withPinnedSkill } from "../commands";
-import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
+import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
@@ -8,7 +8,8 @@ import { keptSessions, PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
 import { prepareReplay } from "../replay";
 import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
-import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
+import { type PromptImage, type SessionFacts, type StartRequest, type StartResult, type View } from "../shared/sessions";
+import { pullRequestTask, taskConflict, taskIdentity, ticketTask } from "../task-claims";
 import type { LiveSessions } from "./live-sessions";
 
 /** How a start joins the server: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
@@ -26,6 +27,8 @@ interface Started {
 	discard?: () => Promise<void>;
 }
 
+type Outcome = { started: Started } | { error: string };
+
 type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
 
 export interface StartEnv {
@@ -34,6 +37,8 @@ export interface StartEnv {
 	pathFor(view: View): string | null;
 	/** The file of past session `sessionId`, or `null` while it is not listed. */
 	savedFile(sessionId: string): string | null;
+	/** Saved explicit task links; a failed lookup must throw rather than launch unclaimed. */
+	factsFor(sessionId: string): SessionFacts;
 	/** Called once a started session is in the registry. */
 	onStarted(): void;
 	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
@@ -51,8 +56,8 @@ export function createStarter(env: StartEnv): Starter {
 	/** Past sessions being resumed, so a second click starts no second omp on the same file. */
 	const resuming = new Set<string>();
 
-	async function launch(failure: string, spawn: Spawn): Promise<{ started: Started } | { error: string }> {
-		const { instanceId, emit } = sessions.allocate();
+	async function launch(failure: string, spawn: Spawn, allocated = sessions.allocate()): Promise<Outcome> {
+		const { instanceId, emit } = allocated;
 		try {
 			return { started: await spawn(instanceId, emit) };
 		} catch (err) {
@@ -60,8 +65,42 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
+	/**
+	 * Owns a launch's task claim: reserves `identity` in `cwd`'s repository before `body` can check out or spawn, hands the
+	 * claim to the session `body` started, and releases it whenever `body` started none.
+	 */
+	async function claimed(identity: string | null, cwd: string, body: (allocated: ReturnType<LiveSessions["allocate"]>) => Promise<Outcome>): Promise<Outcome> {
+		const allocated = sessions.allocate();
+		if (!identity) return body(allocated);
+		try {
+			const claim = await sessions.reserveTask(identity, allocated.instanceId, cwd, env.factsFor);
+			if (claim) return { error: taskConflict(claim) };
+		} catch (error) {
+			return { error: `Cannot claim the task: ${errorText(error)}` };
+		}
+		const outcome = await body(allocated).catch((error: unknown) => {
+			sessions.releaseTask(allocated.instanceId);
+			throw error;
+		});
+		if (!("started" in outcome)) {
+			sessions.releaseTask(allocated.instanceId);
+			return outcome;
+		}
+		const { session, discard } = outcome.started;
+		try {
+			sessions.bindTask(session);
+			return outcome;
+		} catch (error) {
+			// Never leave a writer running when its durable ownership could not be established.
+			await session.end();
+			sessions.releaseTask(allocated.instanceId);
+			await discard?.();
+			return { error: `Cannot register the session's task ownership: ${errorText(error)}` };
+		}
+	}
+
 	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools. */
-	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<{ started: Started } | { error: string }> {
+	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<Outcome> {
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
@@ -69,25 +108,27 @@ export function createStarter(env: StartEnv): Starter {
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };
 				const { branch, model, thinking, skill, images } = request;
-				let cwd = dir;
-				if (branch) {
-					try {
-						cwd = await checkoutDir(dir, branch);
-					} catch (err) {
-						return { error: `Cannot check out ${branch.name}: ${errorText(err)}` };
+				return claimed(taskIdentity(request), dir, async allocated => {
+					let cwd = dir;
+					if (branch) {
+						try {
+							cwd = await checkoutDir(dir, branch);
+						} catch (err) {
+							return { error: `Cannot check out ${branch.name}: ${errorText(err)}` };
+						}
 					}
-				}
-				let text: string;
-				try {
-					text = await withPinnedSkill(cwd, skill, request.prompt);
-				} catch (err) {
-					return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
-				}
-				return launch("Cannot start omp", async (id, emit) => ({
-					session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
-					prompt: null,
-					first: { text, images },
-				}));
+					let text: string;
+					try {
+						text = await withPinnedSkill(cwd, skill, request.prompt);
+					} catch (err) {
+						return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
+					}
+					return launch("Cannot start omp", async (id, emit) => ({
+						session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
+						prompt: null,
+						first: { text, images },
+					}), allocated);
+				});
 			}
 			case "fork": {
 				const source = env.pathFor(request.view);
@@ -117,7 +158,18 @@ export function createStarter(env: StartEnv): Starter {
 				if (formatOf(path).source !== "omp") return { error: "Cannot resume: this session is read-only. Only omp sessions resume here." };
 				resuming.add(sessionId);
 				try {
-					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }));
+					let identity: string | null;
+					let cwd: string;
+					try {
+						const facts = env.factsFor(sessionId);
+						const ticket = facts.tickets[0];
+						const pr = facts.pullRequests[0];
+						identity = sessions.savedTask(sessionId) ?? (ticket ? ticketTask(ticket) : pr ? pullRequestTask(pr) : null);
+						cwd = await recordedCwd(path);
+					} catch (error) {
+						return { error: `Cannot resume: ${errorText(error)}` };
+					}
+					return await claimed(identity, cwd, allocated => launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }), allocated));
 				} finally {
 					resuming.delete(sessionId);
 				}
@@ -132,6 +184,7 @@ export function createStarter(env: StartEnv): Starter {
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
 		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) {
+			sessions.releaseTask(session.instanceId);
 			const cleanup = await Promise.resolve(outcome.started.discard?.()).then(() => "", error => `; ${errorText(error)}`);
 			return { ok: false, error: `omp exited as the session started.${cleanup}` };
 		}
@@ -184,6 +237,7 @@ export async function reattachAll(sessions: LiveSessions, joinFor: StartEnv["joi
 	);
 	recover(new Set(attached.map(({ session }) => session.sessionId)));
 	for (const { session, publish } of attached) {
+		sessions.bindTask(session);
 		sessions.add(session, null);
 		joinFor({ kind: "resume", sessionId: session.sessionId }).attach(session);
 		publish();

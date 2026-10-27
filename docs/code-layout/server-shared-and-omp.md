@@ -33,9 +33,10 @@
   A `JsonFile`'s `save` writes once per event-loop turn however many changes arrive in it, and `flushJsonFiles` retries every dirty value as the server stops or exits.
   `flush` reports success and retains a failed write for a later retry.
   `ReducerFile` wraps `JsonFile` for reducer-backed lists, loads the value or an empty one, and saves only when a change gives a new value.
-  A `shared` reducer holds `src/owner-lock.ts`'s `OwnerLock` at `<path>.lock` across reload, reduction, and immediate persistence.
+  A `shared` reducer holds `templates/omp/agent/extensions/github/owner-lock.ts`'s `OwnerLock` at `<path>.lock` across reload, reduction, and immediate persistence.
   A failed shared write rejects its caller and retains both the dirty value and ownership until a successful retry.
   `src/owner-lock.test.ts` covers ownership and takeover; `src/fs.test.ts` also races real processes over shared updates and scheduled claims.
+  `atomicWriteTextSync` also preserves private permissions when task ownership replaces `task-claims.json`.
   `src/json.ts` also holds `Parsed<T>`, the `{ ok }` or refusal every parser returns, and `BASE64`, which the socket's parsers and the domain parsers share.
   `src/paths.ts` names these files beside the access token, the old `google.json` the server deletes, the old `projects.json` an older version kept the workspaces in (`oldWorkspacesFile`), and, under the data directory, the settings sync's repository (`settingsSyncRepo`).
   `src/json.ts` also composes guards of whole shapes (`fields`, `tagged`, `arrayOf`, `nullable`), which `decoder` turns into decoders.

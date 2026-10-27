@@ -26,6 +26,7 @@
   `index.html` is `no-store`, and every other file of the build, which Bun names by the hash of its content, `private, max-age=31536000, immutable`, so a reload reads only `index.html` and a new build's renamed chunks.
   The server sends the files uncompressed, since it listens only on `127.0.0.1`.
   `src/shared/access.ts` holds the storage keys and socket subprotocol that the page and the server share.
+  `src/server/application-socket.test.ts` boots this actual application in a subprocess with isolated config and data and checks denied handshakes, authenticated roster delivery, and credential-free protocol negotiation.
 - `src/server/routes.ts`: the `/api/` endpoints, in groups (sessions, integrations, providers, calendar, Gmail, pull requests, files, todos, the dashboard's own update, settings sync, and session processes), each handed only its part of `RouteEnv`.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   A route that an image, a video, or a mail frame loads goes through `media` instead of `get`, which also takes the media key as `?key=`, since such a tag sends no header.
@@ -44,6 +45,10 @@
   The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
+- `src/task-claims.ts`: atomic ownership for one explicit task per repository before checkout/spawn, shared across dashboards through private `task-claims.json` beside the access token.
+  `start.ts` binds the owner to the session it spawned, `LiveSessions` releases it on removal, and a released or dead bound owner moves to `saved` by session id; surviving keepers keep ownership after a dashboard crash, and dead unbound launches are reclaimed.
+  Inactive session-bound records preserve the identity for resume without retaining ownership, including intentional `taskId` slices and the separate PR-review role.
+  A corrupt claim file refuses a launch rather than admitting a second writer.
 - `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, activity, pull, dashboard check, and process loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
   It keeps one recursive watcher per session format's root: it makes omp's when missing, and watches Claude Code's and Codex's only once they exist, trying a missing one again on each rescan.
   `Loops.stop` stops every loop, closes the watchers, and drops a pending re-read; a file change reported after it is ignored.

@@ -36,6 +36,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch 
    Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once, commit and push.
    Repeat the review if substantial changes invalidate it.
    Once all findings are resolved, add `- [x] Thermo-nuclear code quality review` to the current PR body without overwriting other content.
+   Read the description with `pr_description({repo:"<owner>/<repo>", pr:<number>, change:{kind:"read"}})` and use `append` or `replace-text` for the checkbox; do not turn unchecked `gh` stdout into a replacement body.
    Add the checkbox only AFTER the fixes are pushed.
    Call `ship_stage({stage:"ready_gate"})`.
 5. **Put live for review.** Show the issue, PR URL, checks, findings and dispositions before promotion.

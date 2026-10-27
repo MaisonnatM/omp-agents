@@ -52,6 +52,11 @@ Files, in `agent/`:
   A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
   `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the thermonuclear gate.
   A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live; the extension checks the box, not a screenshot.
+  Dashboard and CLI GitHub calls share separate GraphQL/REST reset cooldowns; exhausted quota is not reported as bad credentials or a fresh successful read, and stale `/ship` status cannot advance a gate.
+- `extensions/pr-description.ts`: the essential `pr_description` tool reads and edits descriptions with checked fresh reads, private original backups, and guards against accidental empty output, missing or ambiguous replacement anchors, and concurrent changes observed before the write.
+  Use `change: {kind:"append", text:"..."}` or `{kind:"replace-text", oldText:"...", newText:"..."}` for surgical edits; full replacement requires the exact `original` returned by `{kind:"read"}`, and clearing requires `allowEmpty: true`.
+  Original descriptions are kept with mode `0600` under `$XDG_CONFIG_HOME/omp-agents/pr-body-backups/`, defaulting to `~/.config/omp-agents/pr-body-backups/`.
+  `extensions/github/access.ts` stores only the budget cooldowns under the sibling `github/<credential SHA256>/` directory, never the raw credential, and uses the shared `github/owner-lock.ts` primitive.
 - `extensions/cache-tail.ts`: Anthropic caches the tools and system prompt for an hour and the conversation for five minutes.
   A five-minute cache write costs 1.25 times the input price and an hour-long one twice that, and a conversation tail is read again within seconds, so this cuts the write bill without losing the warm head after a pause.
   It also stops cache warming while the session is idle.

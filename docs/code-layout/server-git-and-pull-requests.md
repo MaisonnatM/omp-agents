@@ -5,7 +5,10 @@
   `mergedPullRequests` asks one `gh api graphql` call for the newest pull request from each of a repository's branches, with one alias per branch, and keeps the merged ones with their merge time, for `src/worktrees.ts`.
   `loadPullRequestTitle` reads only a linked PR's title through a separate 30-second cache, without loading its details.
   `src/github.ts`'s `repoOf` keeps each workspace's repository, or its lack of one, for ten minutes in a `createCache` from `src/cache.ts`, and runs at most eight `git remote` lookups at once through a `limit` gate from `src/map-limit.ts`.
-  The list's query, the stack's, and the merge cleanup's state reads go through `ghPolledGraphql` in `src/github.ts`, which asks `githubQuota` first; `src/github-quota.ts` holds `GithubQuota`, which pauses them while fewer than `GRAPHQL_RESERVE` GraphQL points are left or after GitHub refuses a call for its rate limit, until the quota resets, and `GithubQuotaPaused`, the error that names when.
+  `ghRest`, `ghGraphql`, and their write helpers run through the installed kit's `GitHubAccess`, which pauses only the exhausted REST or GraphQL budget until its reset, across processes; the `createCache` layers above them are the only answer caches.
+  Quota failures remain failures, not authentication diagnoses or stale successful answers.
+  `runJson` in `src/proc.ts` rejects a non-zero exit with the kit's `CommandError` even when stdout parses, keeping the parsed answer; `answered` in `src/github.ts` returns that answer, so GitHub's refusals and GraphQL's partial `data` still reach the caller that classifies them, such as a batched merge read that keeps the pull requests GitHub did answer.
+  On top of that, the list's query, the stack's, and the merge cleanup's state reads go through `ghPolledGraphql` in `src/github.ts`, which asks `githubQuota` first; `src/github-quota.ts` holds `GithubQuota`, which keeps them from spending the last `GRAPHQL_RESERVE` GraphQL points, until the quota resets, and `GithubQuotaPaused`, the error that names when.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
   The list leaves out a pull request whose own state says closed, which the open searches still return for up to a minute after a close, since GitHub's search index lags it.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either; the details count `unresolved` from the threads they keep, so their counts and threads agree.
@@ -37,6 +40,7 @@
   `src/pull-request-stack.ts` reads the stack for `GET /api/pull-request/stack`.
   `src/pull-request-edit.ts` saves titles, descriptions, labels, review requests, states, branch updates, and conversation changes for `PUT /api/pull-request`, and viewed files for `PUT /api/pull-request/viewed`.
   It also lists picker choices for `GET /api/pull-request/options`, the reviewers with their profile names through `parseAssigneesAnswer`, and appends images with `attachToPullRequest`.
+  Description changes use the shared checked transaction in `templates/omp/agent/extensions/github/description.ts`, preserving a private original and refusing observed concurrent changes before the REST write.
   `src/pull-request-checkout.ts` checks out a pull request for `PUT /api/pull-request/checkout`: with `gh pr checkout` in a checkout, or on its head branch in a worktree with a new session that the route's starter opens there.
   `src/pull-request-rebase.ts` rebases a pull request's branch onto its base for `PUT /api/pull-request/rebase`, in the worktree that has the branch or a temporary one, and force-pushes it with a lease through the repository's pre-push hook, one repository at a time.
   Both read the pull request's head and base branches through `headOf` in `src/pull-request-head.ts`, and refuse a workspace of another repository through `assertWorkspaceOf` there.

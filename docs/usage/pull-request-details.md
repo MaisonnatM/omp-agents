@@ -59,6 +59,7 @@
   **Description**, **Checks**, and **Comments** are collapsible sections with sticky headings.
   **Checks** starts collapsed and says **No checks reported.** when empty; otherwise it lists them as the tab bar's checks popover does, failing and running ones first, with each check's **Details** link.
   The pencil on **Description** opens a textarea with **Save** and **Cancel**; Escape cancels, and a failed save keeps the draft.
+  **Save** refuses when the description changed on GitHub since the editor opened, or when GitHub cannot be read, for example while its quota is spent; reopen the editor to start from the current description.
   Descriptions and comments render GitHub alerts, issue-number and full-commit autolinks, inline-code chips, attachment cards, and authenticated GitHub images and videos.
   Session transcripts keep their existing Markdown rendering.
 - **Comments** inside **Summary** mixes review threads, comments, and review verdicts in cards, newest first, showing ten conversations at a time.

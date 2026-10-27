@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node
 import { open, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { errorText, isObject } from "./json";
-import { OwnerLock } from "./owner-lock";
+import { OwnerLock } from "../templates/omp/agent/extensions/github/owner-lock";
 
 /** Where a replacement of `path` is staged: beside it, so the rename that publishes it stays on one file system. */
 const stagingFor = (path: string): string => join(dirname(path), `.${basename(path)}.${randomBytes(8).toString("hex")}.tmp`);
@@ -30,7 +30,7 @@ export async function atomicWriteText(path: string, text: string, mode?: number)
 }
 
 /** {@link atomicWriteText} for a caller that has no way to wait: the file is replaced when this returns. */
-function atomicWriteTextSync(path: string, text: string, mode?: number): void {
+export function atomicWriteTextSync(path: string, text: string, mode?: number): void {
 	const temp = stagingFor(path);
 	try {
 		writeFileSync(temp, text, { flag: "wx", mode });

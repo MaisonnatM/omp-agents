@@ -7,6 +7,7 @@ import { AVATAR, dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson
 import { runChecked } from "./proc";
 import { loadPullRequestDetail } from "./pull-requests";
 import { GITHUB_MERGES } from "./pull-request-merge";
+import { descriptionSnapshot, editDescription } from "../templates/omp/agent/extensions/github/description";
 import { isObject, str } from "./json";
 import { type Assignee, type PullRequest, type PullRequestAttachment, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, type PullRequestViewedEdit, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
 import { REVIEW_EVENTS } from "./shared/review-drafts";
@@ -100,9 +101,14 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 		case "title":
 			await ghRestWrite("PATCH", `${base}/pulls/${pr.number}`, [["title", change.title]]);
 			break;
-		case "body":
-			await ghRestWrite("PATCH", `${base}/pulls/${pr.number}`, [["body", change.body]]);
+		case "body": {
+			const path = `${base}/pulls/${pr.number}`;
+			await editDescription(`${pr.owner}-${pr.repo}-${pr.number}`, { kind: "replace", original: change.original, body: change.body, allowEmpty: change.allowEmpty }, {
+				read: async () => descriptionSnapshot(await ghRest(path)),
+				write: body => ghRestWrite("PATCH", path, [["body", body]]),
+			});
 			break;
+		}
 		case "update": {
 			const status = await GITHUB_MERGES.status(pr);
 			if (status.state !== "open") throw new Error("Only an open pull request can update its branch");

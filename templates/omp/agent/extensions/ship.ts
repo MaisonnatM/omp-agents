@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { commands } from "./shell/commands";
+import { GitHubAccess, quotaExhausted, quotaReset } from "./github/access";
+import { type Gh, ghJson, ghText } from "./github/command";
 
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
@@ -19,6 +21,8 @@ export const STAGES = ["ticket", "implement", "draft_pr", "thermonuclear", "read
 export type Stage = (typeof STAGES)[number];
 export const LIVE_WORK = ["rebase", "fix_comments", "fix_ci"] as const;
 export type LiveWork = (typeof LIVE_WORK)[number];
+/** Stages from the ready gate on, and all live work, decide from GitHub's current PR status, never a stale one. */
+const NEEDS_CURRENT_STATUS: readonly string[] = [...STAGES.slice(STAGES.indexOf("ready_gate")), ...LIVE_WORK];
 
 const LABEL: Record<Stage | LiveWork, string> = {
 	ticket: "Ticket",
@@ -281,8 +285,19 @@ export default function ship(pi: ExtensionAPI) {
 	let state: ShipState | undefined;
 	let lastRefresh = 0;
 	let lastSummary = "";
+	let refreshFailure: string | undefined;
+	const access = new GitHubAccess();
 
-	const gh = (ghArgs: string[], cwd: string) => pi.exec("gh", ghArgs, { cwd, timeout: 20_000 });
+	const gh = async (ghArgs: string[], cwd: string) => {
+		if (ghArgs[0] === "auth") return pi.exec("gh", ghArgs, { cwd, timeout: 20_000 });
+		const run: Gh = args => pi.exec("gh", args, { cwd, timeout: 20_000 });
+		const budget = ghArgs[0] === "api" && ghArgs[1] !== "graphql" ? "rest" : "graphql";
+		try {
+			return { code: 0, stdout: await access.request(budget, () => ghText(run, ghArgs), async () => quotaReset(await ghJson(run, ["api", "rate_limit"]), budget)), stderr: "" };
+		} catch (error) {
+			return { code: 1, stdout: "", stderr: error instanceof Error ? error.message : String(error) };
+		}
+	};
 	const authSchema = z.object({
 		hosts: z.record(z.string(), z.array(z.object({ host: z.string(), state: z.string(), active: z.boolean(), login: z.string().default(""), tokenSource: z.string() }))),
 	});
@@ -301,8 +316,8 @@ export default function ship(pi: ExtensionAPI) {
 
 	function render(ctx: ExtensionContext) {
 		if (!ctx.hasUI || ctx.agent?.kind === "sub") return;
-		ctx.ui.setStatus(WIDGET, state ? statusText(state) : undefined);
-		ctx.ui.setWidget(WIDGET, state ? renderLines(state) : undefined, { placement: "aboveEditor" });
+		ctx.ui.setStatus(WIDGET, state ? `${statusText(state)}${refreshFailure ? " · stale GitHub status" : ""}` : undefined);
+		ctx.ui.setWidget(WIDGET, state ? [...renderLines(state), ...(refreshFailure ? [`GitHub status unavailable; previous status is stale: ${refreshFailure}`] : [])] : undefined, { placement: "aboveEditor" });
 	}
 
 	function save(ctx: ExtensionContext, next: ShipState) {
@@ -320,6 +335,7 @@ export default function ship(pi: ExtensionAPI) {
 			}
 		}
 		lastSummary = state?.prStatus ? liveSummary(state.prStatus) : "";
+		refreshFailure = state?.prStatus && state.stage !== "merged" ? "Status restored from the session; awaiting a fresh GitHub read." : undefined;
 		render(ctx);
 	}
 
@@ -348,18 +364,26 @@ export default function ship(pi: ExtensionAPI) {
 		if (!state?.pr || !state.repo || state.stage === "merged") return render(ctx);
 		const [owner, name] = state.repo.split("/");
 		const r = await gh(["api", "graphql", "-f", `query=${PR_QUERY}`, "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `n=${state.pr}`], ctx.cwd);
-		if (r.code !== 0) return render(ctx);
+		if (r.code !== 0) {
+			refreshFailure = r.stderr.trim() || "GitHub status read failed.";
+			return render(ctx);
+		}
 		let response: unknown;
 		try {
 			response = JSON.parse(r.stdout);
 		} catch {
+			refreshFailure = "GitHub returned invalid JSON; previous status is stale.";
 			return render(ctx);
 		}
 		const raw = response && typeof response === "object" && "data" in response ? response.data : undefined;
 		const repository = raw && typeof raw === "object" && "repository" in raw ? raw.repository : undefined;
 		const payload = repository && typeof repository === "object" && "pullRequest" in repository ? repository.pullRequest : undefined;
 		const parsed = prSchema.safeParse(payload);
-		if (!parsed.success) return render(ctx);
+		if (!parsed.success) {
+			refreshFailure = "GitHub did not return a complete PR status; previous status is stale.";
+			return render(ctx);
+		}
+		refreshFailure = undefined;
 		const prStatus = parsePr(parsed.data);
 		const merged = prStatus.state === "MERGED";
 		const stage: Stage = merged ? "merged" : state.stage;
@@ -379,7 +403,7 @@ export default function ship(pi: ExtensionAPI) {
 			if (/^no pull requests found for branch\b/i.test(error)) {
 				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
 			}
-			const auth = await authProblem(sessionDir);
+			const auth = quotaExhausted(error) ? undefined : await authProblem(sessionDir);
 			// gh's hint after its first line, `gh auth login`, cannot replace a token an environment variable holds, and the diagnosis names the fix.
 			return `Could not read the PR body to check its review and proof boxes: ${auth ? `${error.split("\n")[0]}. ${auth}` : error}`;
 		}
@@ -476,6 +500,9 @@ export default function ship(pi: ExtensionAPI) {
 				save(ctx, { ...base, pr: pr ?? base.pr, repo: prRepo, prStatus: newPr ? undefined : base.prStatus });
 			}
 			await refreshNow(ctx);
+			if (refreshFailure && stage && NEEDS_CURRENT_STATUS.includes(stage)) {
+				return { content: [{ type: "text", text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
+			}
 			if (stage || issue || pr || repo || note !== undefined) {
 				if (stage === "ready_gate" && state?.prStatus?.reviewed !== true) {
 					return { content: [{ type: "text", text: "The PR must have the thermonuclear checkbox after the review fixes are pushed." }], isError: true };
@@ -496,7 +523,7 @@ export default function ship(pi: ExtensionAPI) {
 					note: note === undefined ? current.note : note || undefined,
 				});
 			}
-			return { content: [{ type: "text", text: report(state) }], details: { state } };
+			return { content: [{ type: "text", text: `${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
 		},
 	});
 }

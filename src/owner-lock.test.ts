@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isRunning, OwnerLock } from "./owner-lock";
+import { isRunning, OwnerLock } from "../templates/omp/agent/extensions/github/owner-lock";
 
 const dirs: string[] = [];
 afterEach(() => {

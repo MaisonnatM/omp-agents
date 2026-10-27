@@ -7,6 +7,7 @@ import { GithubQuota, GithubQuotaPaused, GRAPHQL_RESERVE, type GraphqlQuota, par
 import * as proc from "./proc";
 import { runChecked } from "./proc";
 import { loadPullRequests } from "./pull-requests";
+import { GitHubQuotaError } from "../templates/omp/agent/extensions/github/access";
 
 afterEach(() => {
 	mock.restore();
@@ -72,26 +73,6 @@ describe("GithubQuota", () => {
 		await quota.admit();
 		expect(reads.count).toBe(1);
 	});
-
-	test("a refusal pauses until the reset it reads, and refusals while paused read nothing", async () => {
-		setSystemTime(NOW);
-		const reset = NOW + 30 * MINUTE;
-		const { quota, reads } = gate(() => ({ remaining: 0, reset }));
-		const pauses = await Promise.all([quota.refused(), quota.refused()]);
-		expect(pauses.map(pause => pause.message)).toEqual([pausedText(reset), pausedText(reset)]);
-		expect(reads.count).toBe(1);
-		await quota.refused();
-		await expect(quota.admit()).rejects.toThrow(pausedText(reset));
-		expect(reads.count).toBe(1);
-	});
-
-	test("a refusal with no reset to read pauses for 15 minutes", async () => {
-		setSystemTime(NOW);
-		const { quota } = gate(() => null);
-		expect((await quota.refused()).message).toBe(pausedText(NOW + 15 * MINUTE));
-		setSystemTime(NOW + 16 * MINUTE);
-		await quota.admit();
-	});
 });
 
 /** The wiring to the server's one `githubQuota`, whose answers each test sets, so no test depends on what another left in it. */
@@ -124,26 +105,40 @@ describe("ghGraphql and ghPolledGraphql", () => {
 		expect(calls).toHaveLength(1);
 	});
 
-	test("GitHub refusing a call for its rate limit, in its answer or as gh's error, tells the quota once and throws its pause", async () => {
-		const refused = spyOn(githubQuota, "refused").mockResolvedValue(pause);
-		github(() => ({ errors: [{ type: "RATE_LIMITED", message: "API rate limit already exceeded for user ID 27284940." }] }));
-		await expect(ghGraphql("mutation", {})).rejects.toBe(pause);
-		spyOn(proc, "runJson").mockRejectedValue(new Error("gh: API rate limit exceeded for user ID 27284940."));
-		await expect(ghGraphql("mutation", {})).rejects.toBe(pause);
-		expect(refused).toHaveBeenCalledTimes(2);
-	});
-
-	test("while polling is paused, the pull request list fails whole, so the page keeps the list it has", async () => {
-		spyOn(githubQuota, "admit").mockRejectedValue(pause);
+	/** A workspace whose `origin` is a GitHub repository, removed after `run`. */
+	async function inWorkspace(run: (dir: string) => Promise<void>): Promise<void> {
 		const dir = mkdtempSync(join(tmpdir(), "omp-agents-github-quota-"));
 		try {
 			await runChecked(["git", "init", "-q", dir]);
 			await runChecked(["git", "-C", dir, "remote", "add", "origin", "git@github.com:acme/quota.git"]);
+			await run(dir);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	}
+
+	test("below the reserve, the pull request list fails whole, so the page keeps the list it has", async () => {
+		spyOn(githubQuota, "admit").mockRejectedValue(pause);
+		await inWorkspace(async dir => {
 			const calls = github();
 			await expect(loadPullRequests([dir], true)).rejects.toBe(pause);
 			expect(calls).toEqual([]);
+		});
+	});
+
+	test("a budget GitHub reports spent fails the pull request list whole too", async () => {
+		spyOn(githubQuota, "admit").mockResolvedValue();
+		spyOn(proc, "runJson").mockImplementation(async argv => {
+			if (argv.includes("rate_limit")) return rateLimit(0, Date.now() + 60 * MINUTE);
+			throw new Error("API rate limit exceeded");
+		});
+		try {
+			await inWorkspace(async dir => {
+				await expect(loadPullRequests([dir], true)).rejects.toBeInstanceOf(GitHubQuotaError);
+			});
 		} finally {
-			rmSync(dir, { recursive: true, force: true });
+			// GitHubAccess keeps the cooldown on disk, under the test run's XDG_CONFIG_HOME; later tests read GraphQL again.
+			rmSync(join(process.env.XDG_CONFIG_HOME!, "omp-agents", "github"), { recursive: true, force: true });
 		}
 	});
 });

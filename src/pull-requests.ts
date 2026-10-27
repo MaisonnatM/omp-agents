@@ -5,6 +5,7 @@
 import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghPolledGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { GithubQuotaPaused } from "./github-quota";
+import { GitHubQuotaError } from "../templates/omp/agent/extensions/github/access";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
 import { type CheckRunState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
@@ -420,7 +421,7 @@ export async function branchPullRequest(repo: Repo, branch: string): Promise<Pul
 /**
  * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.
- * While GitHub's quota is low it throws {@link GithubQuotaPaused} rather than answer a repository with no list, so the page keeps the list it has.
+ * While GitHub's quota is low, or spent, it throws {@link GithubQuotaPaused} or `GitHubQuotaError` rather than answer a repository with no list, so the page keeps the list it has.
  */
 export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<PullRequestList> {
 	const byRepo = new Map<string, Repo & { cwds: string[] }>();
@@ -443,7 +444,7 @@ export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<
 				const pullRequests = await loaded.get(repoKey(entry), () => queryRepo(entry), fresh);
 				return { ...entry, pullRequests };
 			} catch (err) {
-				if (err instanceof GithubQuotaPaused) throw err;
+				if (err instanceof GithubQuotaPaused || err instanceof GitHubQuotaError) throw err;
 				return { ...entry, error: errorText(err) };
 			}
 		}),

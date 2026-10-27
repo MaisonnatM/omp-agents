@@ -6,7 +6,7 @@
  */
 import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { errorText, isObject } from "./json";
+const isObject = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object";
 
 export interface LockHolder {
 	pid: number;
@@ -126,7 +126,7 @@ export class OwnerLock {
 			return "made";
 		} catch (err) {
 			if ((err as NodeJS.ErrnoException).code === "EEXIST") return "exists";
-			console.error(`omp-agents: cannot take the lock ${this.#file}: ${errorText(err)}`);
+			console.error(`omp-agents: cannot take the lock ${this.#file}: ${err instanceof Error ? err.message : String(err)}`);
 			return "failed";
 		} finally {
 			rmSync(draft, { force: true });

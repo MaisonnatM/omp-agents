@@ -1,4 +1,5 @@
 /** One place that runs a subprocess to completion and reads its output. */
+import { CommandError, parsedAnswer } from "../templates/omp/agent/extensions/github/command";
 
 /**
  * What the server sets for itself: a dev server an agent or a terminal starts would take the dashboard's `PORT`, and
@@ -118,14 +119,16 @@ export async function runChecked(argv: string[], opts?: RunOptions): Promise<str
 }
 
 /**
- * Runs `argv` and parses stdout as JSON. The exit code does not matter when stdout parses, as with `gh api graphql`
- * answering errors in JSON; otherwise @throws Error as {@link runChecked} does.
+ * Runs `argv` and parses stdout as JSON.
+ * @throws CommandError when the command exits non-zero, even beside parseable stdout, so a caller never mistakes a failed read's partial output for an answer; its `answer` is that stdout parsed, when it parses. Error as {@link runChecked} does when a successful command's stdout does not parse.
  */
 export async function runJson(argv: string[], opts?: RunOptions): Promise<unknown> {
 	const { stdout, stderr, code } = await run(argv, opts);
+	const failure = stderr.split("\n").findLast(line => line.trim())?.trim() || `${argv[0]} exited ${code}`;
+	if (code !== 0) throw new CommandError(failure, parsedAnswer(stdout));
 	try {
 		return JSON.parse(stdout);
 	} catch {
-		throw new Error(stderr.split("\n").findLast(line => line.trim())?.trim() || `${argv[0]} exited ${code}`);
+		throw new Error(failure);
 	}
 }

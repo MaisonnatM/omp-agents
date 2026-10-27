@@ -45,12 +45,30 @@ test.each([
 	{ body: "", field: "body=", refreshed: "" },
 ])("a description edit patches its exact body and returns the refreshed description: %j", async ({ body, field, refreshed }) => {
 	const write = spyOn(proc, "runChecked").mockResolvedValue("");
-	spyOn(proc, "runJson").mockImplementation(async argv => argv.includes("graphql") ? {
-		data: { repository: { pullRequest: { number: 7, title: "Feature", body, state: "OPEN", headRefName: "feature", headRefOid: "abc", baseRefName: "main", createdAt: "2026-10-01T00:00:00Z" } } },
-	} : { behind_by: 0 });
-	const detail = await savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "body", body } });
+	const read = spyOn(proc, "runJson").mockImplementation(async argv => {
+		if (argv.includes("repos/acme/app/pulls/7")) return { body: "Original description", updated_at: "2026-10-26T10:00:00Z" };
+		return argv.includes("graphql") ? {
+			data: { repository: { pullRequest: { number: 7, title: "Feature", body, state: "OPEN", headRefName: "feature", headRefOid: "abc", baseRefName: "main", createdAt: "2026-10-01T00:00:00Z" } } },
+		} : { behind_by: 0 };
+	});
+	const detail = await savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "body", body, original: "Original description", ...(!body ? { allowEmpty: true } : {}) } });
+	expect(read.mock.calls.filter(([argv]) => argv.includes("repos/acme/app/pulls/7"))).toHaveLength(2);
 	expect(write.mock.calls[0]?.[0]).toEqual(["gh", "api", "-X", "PATCH", "repos/acme/app/pulls/7", "-f", field]);
 	expect(detail.body).toBe(refreshed);
+});
+
+test("a failed original description read never patches the pull request", async () => {
+	const write = spyOn(proc, "runChecked").mockResolvedValue("");
+	spyOn(proc, "runJson").mockRejectedValue(new Error("HTTP 401: Bad credentials"));
+	await expect(savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "body", original: "Original", body: "Replacement" } })).rejects.toThrow("Bad credentials");
+	expect(write).not.toHaveBeenCalled();
+});
+
+test("a description changed since the editor opened is never overwritten", async () => {
+	const write = spyOn(proc, "runChecked").mockResolvedValue("");
+	spyOn(proc, "runJson").mockResolvedValue({ body: "Someone else's change", updated_at: "2026-10-26T10:00:00Z" });
+	await expect(savePullRequest({ owner: "acme", repo: "app", number: 7, change: { field: "body", original: "Original", body: "Replacement" } })).rejects.toThrow("changed since it was read");
+	expect(write).not.toHaveBeenCalled();
 });
 
 test("a branch update rebases the head read from GitHub, not a stale page", async () => {
