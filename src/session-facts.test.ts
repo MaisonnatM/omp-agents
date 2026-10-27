@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CachedCheckouts, type CheckoutReads } from "./git";
 import { runChecked } from "./proc";
-import { parseShipProgress, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
+import { parseShipProgress, type PullRequestRef, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
 
 /** No checkout anywhere, for tests that need no git. */
 const NO_GIT: CheckoutReads = { worktreeAt: async () => null, headHistory: async () => null, defaultBranchOf: async () => null };
@@ -122,7 +122,7 @@ describe("SessionFactsScan", () => {
 			prompt("[omp-agents] Project update. #19"),
 		];
 		const own = scanOf(lines);
-		expect([[...own.found.values()], [...own.named]]).toEqual([[worked("acme", "api", 5)], [12, 13, 14, 17]]);
+		expect([[...own.found.values()], [...own.named]]).toEqual([[{ ...worked("acme", "api", 5), named: true }], [12, 13, 14, 17]]);
 		const subagent = scanOf(lines, false);
 		expect([[...subagent.found.values()], [...subagent.named]]).toEqual([[], []]);
 	});
@@ -213,6 +213,15 @@ describe("resolveLinks", () => {
 		).toEqual([
 			{ owner: "acme", repo: "webapp", number: 6609, link: "worked" },
 			{ owner: "acme", repo: "webapp", number: 6610, link: "worked" },
+		]);
+	});
+
+	test("the PRs calls worked on come before those the prompt only links, each in the order found", () => {
+		const numbers = (lines: string[]) => resolveLinks(scanned(lines) as PullRequestRef[], { owner: "acme", repo: "webapp" }, heads).map(pr => pr.number);
+		const linking = prompt("help me finish https://github.com/acme/webapp/pull/7060 and https://github.com/acme/webapp/pull/7061");
+		expect(numbers([linking, bashCall("edit", "gh pr edit 7064 --title Follow-up")])).toEqual([7064, 7060, 7061]);
+		expect(numbers([linking, bashCall("edit", "gh pr edit 7064 --title Follow-up"), bashCall("view", "gh pr checkout https://github.com/acme/webapp/pull/7061")])).toEqual([
+			7061, 7064, 7060,
 		]);
 	});
 
