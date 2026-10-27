@@ -11,6 +11,7 @@ import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
 import type { Catalog, Editing } from "./editor";
+import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { McpServersTab } from "./mcp-servers-tab";
@@ -90,6 +91,12 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 	};
 }
 
+/** What a workspace section's header says it shows for `cwd`. */
+function workspaceMeta(section: SettingsSection, cwd: string | null): string {
+	if (section === "decisions") return cwd === null ? "Pick a workspace" : "The repository's decision records, read-only";
+	return cwd === null ? "Your user files only, for all workspaces" : "As a session in this workspace loads them";
+}
+
 /** One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place. */
 export function SettingsPage({
 	section,
@@ -138,6 +145,7 @@ export function SettingsPage({
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} />,
 		sync: <SyncTab active={section === "sync"} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
+		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
 	const body = SETTINGS_SECTIONS.map(({ value, label }) => (
@@ -150,7 +158,7 @@ export function SettingsPage({
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{scope === "workspace" ? (
-				<Header title={label} meta={cwd === null ? "Your user files only, for all workspaces" : "As a session in this workspace loads them"}>
+				<Header title={label} meta={workspaceMeta(section, cwd)}>
 					<WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={onPickWorkspace} />
 				</Header>
 			) : (

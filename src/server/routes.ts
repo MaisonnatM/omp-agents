@@ -7,6 +7,7 @@ import type { Server } from "bun";
 import { join } from "node:path";
 import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
+import { readDecisions } from "../decisions";
 import { readFavicon } from "../favicon";
 import { readGithubMedia } from "../github-media";
 import { errorText, type Parsed } from "../json";
@@ -257,6 +258,13 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			err => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
 		);
 
+	/** `GET /api/decisions?cwd=<dir>`: the decision records of a workspace's repository. */
+	const decisions = get(params => {
+		const cwd = workspaceCwd(params);
+		if (cwd instanceof Response) return cwd;
+		return cwd === null ? fail(400, "Expected ?cwd= naming a workspace") : answer(() => readDecisions(cwd));
+	});
+
 	/** `GET /api/models`: the models omp lists, for the settings page's pickers. */
 	const models = get(() => answer(async () => ({ models: await listModels() })));
 
@@ -376,6 +384,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/settings": { GET: settings },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
+		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
 		"/api/models/roles": { GET: roles },

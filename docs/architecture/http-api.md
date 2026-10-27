@@ -34,6 +34,10 @@ Edits go through two endpoints, each taking the same `?cwd=` and answering with 
   The server resolves symlinks, writes a temporary file beside the real file with its mode, and renames it over the real file, so a symlinked file stays a link and a crash cannot leave a truncated file.
   Saves run one at a time, so two saves of the same file cannot both pass the hash check.
 
+**Decisions** reads `GET /api/decisions?cwd=<directory>`, for a workspace only, and answers `{ dir, dirDisplay, records }`.
+`readDecisions` in `src/decisions.ts` finds the repository's top through git, else takes `cwd` itself, and reads the first of `docs/decisions`, docs/adr, and doc/adr that exists, or answers `dir: null`.
+Each record is its file name, title, `status`, `date`, `decision-makers`, `supersedes`, `superseded-by`, and the Markdown after its title, newest first; a file with no frontmatter or broken YAML still lists, with only what it holds.
+
 Every response from these endpoints is JSON.
 An error is `{ error, conflict? }` with the HTTP status.
 Any other `/api/` path answers a JSON 404.

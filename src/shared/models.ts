@@ -194,3 +194,28 @@ export interface OmpSettings {
 	routing: ModelRouting | { error: string };
 	files: OmpFile[];
 }
+
+/** One decision record, a Markdown file in a repository's records directory, as the `decision-records` skill writes them. */
+export interface DecisionRecord {
+	/** The file name without `.md`, which records cite each other by. */
+	name: string;
+	/** The `# ` title, else the file name. */
+	title: string;
+	/** The frontmatter's `status`; `null` when the file has none. */
+	status: string | null;
+	/** `YYYY-MM-DD`, from the frontmatter, else the file name's date prefix; `null` when neither has one. */
+	date: string | null;
+	decisionMakers: string[];
+	supersedes: string[];
+	supersededBy: string[];
+	/** The Markdown after the title. */
+	body: string;
+}
+
+/** `GET /api/decisions?cwd=<dir>`: the decision records of `cwd`'s repository, newest first. */
+export interface DecisionRecords {
+	/** The records directory, absolute; `null` when the repository keeps none. */
+	dir: string | null;
+	dirDisplay: string | null;
+	records: DecisionRecord[];
+}
