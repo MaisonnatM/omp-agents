@@ -1,4 +1,4 @@
-/** The Settings Decisions section: the workspace repository's decision records, listed newest first and read one at a time. */
+/** The Settings Decisions section: the workspace repository's decision records as a timeline, newest first, the ones in force by default. */
 import { useState } from "react";
 import type { DecisionRecord, DecisionRecords } from "../../../src/shared/models";
 import { Badge } from "@/components/ui/badge";
@@ -14,21 +14,14 @@ const STATUS_COLORS: Record<string, "green" | "blue" | "red" | "gray" | "amber">
 	deprecated: "gray",
 	superseded: "amber",
 };
+/** Statuses of a record that no longer applies, which **In force** hides. */
+const RETIRED: Record<string, true> = { superseded: true, deprecated: true, rejected: true };
 
-function StatusBadge({ status }: { status: string | null }) {
-	if (status === null) return null;
-	return (
-		<Badge variant="dot" size="compact" color={STATUS_COLORS[status] ?? "gray"} className="shrink-0">
-			{status}
-		</Badge>
-	);
-}
-
-/** Record names as buttons that open each record listed here, plain text for one that is not. */
+/** Record names as links that open each record listed here, plain text for one that is not. */
 function RecordLinks({ label, names, records, onOpen }: { label: string; names: string[]; records: DecisionRecord[]; onOpen: (name: string) => void }) {
 	if (names.length === 0) return null;
 	return (
-		<p>
+		<p className="text-xs text-muted-foreground">
 			{label}{" "}
 			{names.map((name, i) => {
 				const title = records.find(record => record.name === name)?.title;
@@ -49,37 +42,49 @@ function RecordLinks({ label, names, records, onOpen }: { label: string; names: 
 	);
 }
 
-function RecordView({ record, records, dir, onOpen }: { record: DecisionRecord; records: DecisionRecord[]; dir: string; onOpen: (name: string) => void }) {
+function RecordEntry({ record, records, dir, expanded, onToggle, onOpen }: { record: DecisionRecord; records: DecisionRecord[]; dir: string; expanded: boolean; onToggle: () => void; onOpen: (name: string) => void }) {
+	const retired = record.status !== null && RETIRED[record.status] === true;
 	return (
-		<article className="flex min-w-0 flex-col gap-3 self-start md:sticky md:top-6" aria-label={record.title}>
-			<header className="space-y-1.5">
-				<div className="flex items-start gap-2">
-					<h3 className="min-w-0 flex-1 text-base font-medium">{record.title}</h3>
-					<StatusBadge status={record.status} />
-				</div>
-				<div className="space-y-0.5 text-xs text-muted-foreground">
-					<p>
-						{[record.date, record.decisionMakers.length > 0 ? `decided by ${record.decisionMakers.join(", ")}` : null].filter(Boolean).join(" · ")}
-						{record.date || record.decisionMakers.length > 0 ? " · " : ""}
-						<span className="font-mono">{record.name}.md</span>
-					</p>
-					<RecordLinks label="Supersedes" names={record.supersedes} records={records} onOpen={onOpen} />
-					<RecordLinks label="Superseded by" names={record.supersededBy} records={records} onOpen={onOpen} />
-				</div>
-			</header>
-			<FileBaseContext.Provider value={dir}>
-				<div className="text-sm leading-relaxed">
-					<MessageMarkdown text={record.body} />
-				</div>
-			</FileBaseContext.Provider>
-		</article>
+		<li id={`decision-${record.name}`} className="grid scroll-mt-6 grid-cols-[6.5rem_minmax(0,1fr)] gap-6 py-6">
+			<time className="pt-0.5 text-xs tabular-nums text-muted-foreground">{record.date}</time>
+			<article className="min-w-0 space-y-2" aria-label={record.title}>
+				{record.status !== null ? (
+					<Badge variant="dot" size="compact" color={STATUS_COLORS[record.status] ?? "gray"}>
+						{record.status}
+					</Badge>
+				) : null}
+				<h3 className={cn("text-[15px] font-semibold", retired && "text-muted-foreground line-through")}>{record.title}</h3>
+				<RecordLinks label="Supersedes" names={record.supersedes} records={records} onOpen={onOpen} />
+				<RecordLinks label="Superseded by" names={record.supersededBy} records={records} onOpen={onOpen} />
+				{expanded ? (
+					<>
+						<p className="text-xs text-muted-foreground">
+							{record.decisionMakers.length > 0 ? `Decided by ${record.decisionMakers.join(", ")} · ` : ""}
+							<span className="font-mono">{record.name}.md</span>
+						</p>
+						<FileBaseContext.Provider value={dir}>
+							<div className="text-sm leading-relaxed">
+								<MessageMarkdown text={record.body} />
+							</div>
+						</FileBaseContext.Provider>
+					</>
+				) : (
+					// The first paragraph as plain text, since three clamped lines cut Markdown mid-syntax.
+					<p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">{(record.body.split(/\n\s*\n/)[0] ?? "").replace(/[`*_]/g, "")}</p>
+				)}
+				<button type="button" onClick={onToggle} aria-expanded={expanded} className="text-xs font-medium underline-offset-2 hover:underline">
+					{expanded ? "Show less" : "Read the record"}
+				</button>
+			</article>
+		</li>
 	);
 }
 
 export function DecisionsTab({ cwd, active }: { cwd: string | null; active: boolean }) {
 	const read = useRead<DecisionRecords>(active && cwd !== null ? `/api/decisions?cwd=${encodeURIComponent(cwd)}` : null);
-	const [selected, setSelected] = useState<string | null>(null);
 	const [query, setQuery] = useState("");
+	const [inForce, setInForce] = useState(true);
+	const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
 	if (cwd === null) return <p className="text-sm text-muted-foreground">Pick a workspace to read its repository's decision records.</p>;
 	if (read.error !== null && read.data === null) {
@@ -101,44 +106,51 @@ export function DecisionsTab({ cwd, active }: { cwd: string | null; active: bool
 	if (records.length === 0) return <p className="text-sm text-muted-foreground">{dirDisplay} holds no records yet.</p>;
 
 	const needle = query.trim().toLowerCase();
-	const shown = needle ? records.filter(record => `${record.title} ${record.name} ${record.status ?? ""}`.toLowerCase().includes(needle)) : records;
-	const open = records.find(record => record.name === selected) ?? shown[0] ?? records[0]!;
+	const matching = needle ? records.filter(record => `${record.title} ${record.name} ${record.status ?? ""} ${record.body}`.toLowerCase().includes(needle)) : records;
+	const shown = inForce ? matching.filter(record => record.status === null || RETIRED[record.status] !== true) : matching;
+	const hidden = matching.length - shown.length;
+	const toggle = (name: string) =>
+		setExpanded(current => {
+			const next = new Set(current);
+			if (!next.delete(name)) next.add(name);
+			return next;
+		});
+	// A supersede link shows every record, opens the one it names, and scrolls to it.
+	const open = (name: string) => {
+		setInForce(false);
+		setExpanded(current => new Set(current).add(name));
+		requestAnimationFrame(() => document.getElementById(`decision-${name}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+	};
+
 	return (
-		<div className="grid gap-6 md:grid-cols-[18rem_minmax(0,1fr)]">
-			<nav aria-label="Decision records" className="space-y-2">
-				<p className="px-2 text-xs text-muted-foreground">
-					{records.length} {records.length === 1 ? "record" : "records"} in {dirDisplay}
-				</p>
-				<label className="flex h-7 items-center rounded-md border border-border px-2 text-sm">
+		<div className="mx-auto max-w-3xl">
+			<p className="mb-2 text-xs text-muted-foreground">
+				{records.length} {records.length === 1 ? "record" : "records"} in {dirDisplay}
+			</p>
+			<div className="mb-2 flex items-center gap-2">
+				<label className="flex h-8 flex-1 items-center rounded-md border border-border px-2.5 text-sm focus-within:ring-2 focus-within:ring-ring">
 					<span className="sr-only">Search decision records</span>
 					<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search" className="w-full bg-transparent outline-none" />
 				</label>
-				{shown.length === 0 ? <p className="px-2 text-sm text-muted-foreground">No record matches.</p> : null}
-				<ul>
-					{shown.map(record => (
-						<li key={record.name}>
-							<button
-								type="button"
-								aria-current={record === open ? "true" : undefined}
-								onClick={() => setSelected(record.name)}
-								className={cn(
-									"flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-									record === open && "bg-muted",
-								)}
-							>
-								<span className={cn("line-clamp-2", record === open && "font-medium", record.status !== null && record.status !== "accepted" && record.status !== "proposed" && "text-muted-foreground")}>
-									{record.title}
-								</span>
-								<span className="flex items-center gap-2 text-xs text-muted-foreground">
-									{record.date}
-									<StatusBadge status={record.status} />
-								</span>
-							</button>
-						</li>
+				<div role="group" aria-label="Records shown" className="flex rounded-md border border-border p-0.5 text-xs">
+					{[true, false].map(value => (
+						<button key={String(value)} type="button" aria-pressed={inForce === value} onClick={() => setInForce(value)} className={cn("rounded px-2 py-1", inForce === value ? "bg-muted font-medium" : "text-muted-foreground hover:text-foreground")}>
+							{value ? "In force" : "All"}
+						</button>
 					))}
-				</ul>
-			</nav>
-			<RecordView key={open.name} record={open} records={records} dir={dir} onOpen={setSelected} />
+				</div>
+			</div>
+			{shown.length === 0 && hidden === 0 ? <p className="py-6 text-sm text-muted-foreground">No record matches.</p> : null}
+			<ol className="divide-y divide-border">
+				{shown.map(record => (
+					<RecordEntry key={record.name} record={record} records={records} dir={dir} expanded={expanded.has(record.name)} onToggle={() => toggle(record.name)} onOpen={open} />
+				))}
+			</ol>
+			{hidden > 0 ? (
+				<button type="button" onClick={() => setInForce(false)} className="mt-2 w-full rounded-md border border-dashed border-border py-2 text-xs text-muted-foreground hover:bg-muted">
+					Show {hidden} superseded, deprecated, or rejected {hidden === 1 ? "record" : "records"}
+				</button>
+			) : null}
 		</div>
 	);
 }
