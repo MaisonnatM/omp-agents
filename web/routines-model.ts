@@ -106,8 +106,23 @@ export function runWords(run: RoutineRun): string {
 	return parts.length > 0 ? parts.join(", ") : "Nothing started";
 }
 
-/** The last run's result, or that there was none. */
-export const lastRunWords = (routine: Routine): string => (routine.runs[0] ? runWords(routine.runs[0]) : "Not run yet");
+/** How a run went, for its dot: `failed` once it has an error, which a command that did not succeed records. */
+export type RunHealth = "ok" | "failed" | "running" | "waiting";
+
+export function runHealth({ outcome, errors }: RoutineRun): RunHealth {
+	if (errors.length > 0) return "failed";
+	switch (outcome.kind) {
+		case "pending":
+			return "waiting";
+		case "session":
+			return "ok";
+		case "command": {
+			const { run } = outcome;
+			if (run.phase === "running") return "running";
+			return run.phase === "exited" && run.code === 0 ? "ok" : "failed";
+		}
+	}
+}
 
 export type EveryUnit = "minutes" | "hours" | "days";
 

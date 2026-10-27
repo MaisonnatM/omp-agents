@@ -7,7 +7,7 @@
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed.
   Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace badge.
   The row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
-  `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.
+  `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories; `web/components/routines/routines-nav.tsx` its Routines tab: **All** with its count, then each routine by name with its task's icon, a paused one muted, and the last run's dot when it failed or runs; and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then **Show routines**.
   `web/components/inbox/inbox-nav.tsx` is its Inbox tab: the Gmail address over one **Inbox** row with its unread count.
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, its `ToastData`, a toast's optional source line, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
   `web/components/notices.tsx` holds `NoticesBell`, the header's bell, its source filters, and its list, and `NoticeOrigin`, the logo and name of where a notice came from.
@@ -33,8 +33,9 @@
   `web/components/notes/nav.tsx` draws its sidebar's **All** and **From agents** lists from `web/notes-views.ts`.
   A top-level todo's `detail.tsx` lists linked notes and creates a note with its todo id.
   `web/palette-records.ts` includes note titles and bodies in command-menu search.
-- `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
-  It, the Calendar page, and the session rows read the time through `web/use-minute.ts`, one timer renewed each minute for every component that reads it.
+- `web/components/routines/routines-page.tsx`: the Routines page, its routines grouped under **Active** and **Paused** in rows with each routine's menu, and one routine's task and runs beside its settings, the runs opening the sessions they started.
+  `web/components/routines/routine-marks.tsx` holds what the page and the sidebar both mark a routine with: `TaskIcon`, its task's icon, and `RunDot`, its run's dot, colored by `runHealth` in `web/routines-model.ts`.
+  The Routines page, the Calendar page, and the session rows read the time through `web/use-minute.ts`, one timer renewed each minute for every component that reads it.
   The session rows, the pull request rows, and the bell's notices show how long ago something was with `Age` from `web/components/age.tsx`, which words it with `age` from `web/labels.ts` and counts up on that timer.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
 - `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it, including Google events and the events kept on this computer read with `web/reads.ts`, and the delete button of each event in the day's list that is kept on this computer or in a Google calendar you may write to.

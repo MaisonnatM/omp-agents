@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Routine, RoutineRun, Schedule, Weekday } from "../src/routines";
-import { draftOf, lastRunWords, newDraft, nextRunWords, runWords, type RoutineDraft, schedulesWords, scheduleWords, specOf, taskWords, whenWords } from "./routines-model";
+import type { CommandRun, Routine, RoutineRun, Schedule, Weekday } from "../src/routines";
+import { draftOf, newDraft, nextRunWords, runHealth, runWords, type RoutineDraft, schedulesWords, scheduleWords, specOf, taskWords, whenWords } from "./routines-model";
 
 // Local times, so the expected words hold in any time zone. Oct 5 2026 is a Monday.
 const at = (day: number, hour: number, minute = 0): number => new Date(2026, 9, day, hour, minute).getTime();
@@ -94,10 +94,8 @@ describe("last run", () => {
 		expect(runWords(run({ outcome: { kind: "pending", queued: true } }))).toBe("Queued");
 	});
 
-	test("a run that started nothing says so, and a routine never run says so", () => {
+	test("a run that started nothing says so", () => {
 		expect(runWords(run({}))).toBe("Nothing started");
-		expect(lastRunWords(routine({}))).toBe("Not run yet");
-		expect(lastRunWords(routine({ runs: [run({ outcome: session }), run({ errors: ["old"] })] }))).toBe("1 session started");
 	});
 });
 
@@ -120,6 +118,17 @@ describe("command runs", () => {
 
 	test("a run that ran nothing because the last command still ran counts its error", () => {
 		expect(runWords(run({ errors: ["The last run's command is still running."] }))).toBe("1 error");
+	});
+
+	test("a run's health fails on any error or an unsuccessful command, runs while its command does, and waits while pending", () => {
+		const command = (commandRun: CommandRun) => runHealth(run({ outcome: { kind: "command", run: commandRun } }));
+		expect(command({ phase: "exited", code: 0, output: "", ...window })).toBe("ok");
+		expect(command({ phase: "exited", code: 3, output: "", ...window })).toBe("failed");
+		expect(command({ phase: "stopped", reason: "dashboard", output: "", ...window })).toBe("failed");
+		expect(command({ phase: "running", startedAt: at(5, 9) })).toBe("running");
+		expect(runHealth(run({ outcome: { kind: "session", instanceId: "i", sessionId: "s" } }))).toBe("ok");
+		expect(runHealth(run({ outcome: { kind: "session", instanceId: "i", sessionId: "s" }, errors: ["late"] }))).toBe("failed");
+		expect(runHealth(run({ outcome: { kind: "pending", queued: true } }))).toBe("waiting");
 	});
 });
 
