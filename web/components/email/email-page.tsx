@@ -7,8 +7,8 @@ import { threadUrl, type MailSend } from "../../../src/shared/gmail";
 import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
 import { type MailDocument, useMailDraft } from "../../mail-draft";
-import { gmailStore, mailThreadScope, mailThreadStore, useGmailInbox } from "../../reads";
-import { hashForInbox, type InboxRoute, routeFromHash } from "../../routing";
+import { gmailStore, mailThreadScope, mailThreadStore, useEmail } from "../../reads";
+import { hashForEmail, type EmailRoute, routeFromHash } from "../../routing";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useOpenLatest } from "../../use-open-latest";
 import { DisconnectedPage } from "../integrations/disconnected-page";
@@ -21,10 +21,10 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { MailEditor } from "./mail-editor";
 import { MailTime, ThreadDetail } from "./thread-view";
 
-const TITLE = "Inbox";
+const TITLE = "Email";
 const META = "Your Gmail inboxes";
 
-const rowId = (thread: Pick<MailThread, "account" | "id">): string => `inbox-row-${thread.account}-${thread.id}`;
+const rowId = (thread: Pick<MailThread, "account" | "id">): string => `email-row-${thread.account}-${thread.id}`;
 const rowOf = (thread: MailThread): HTMLElement | null => document.getElementById(rowId(thread));
 
 const accountLabel = (account: GoogleAccount): string => account.address ?? account.name;
@@ -34,8 +34,8 @@ const accountLabel = (account: GoogleAccount): string => account.address ?? acco
  * arrived; its subject; and its snippet, after the address of its inbox when the list holds several. Its link opens it
  * beside the list; right-click offers **Open**, **Open in Gmail**, and **Delete**.
  */
-function ThreadRow({ thread, open, inbox, onTrash }: { thread: MailThread; open: boolean; inbox: string | null; onTrash: (thread: MailThread) => void }) {
-	const href = hashForInbox({ account: thread.account, thread: thread.id });
+function ThreadRow({ thread, open, mailbox, onTrash }: { thread: MailThread; open: boolean; mailbox: string | null; onTrash: (thread: MailThread) => void }) {
+	const href = hashForEmail({ account: thread.account, thread: thread.id });
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger render={<li id={rowId(thread)} />}>
@@ -59,9 +59,9 @@ function ThreadRow({ thread, open, inbox, onTrash }: { thread: MailThread; open:
 					</span>
 					<span className={cn("block truncate pl-4", thread.unread && "font-semibold")}>{thread.subject || "(no subject)"}</span>
 					<span className="flex items-baseline gap-2 pl-4 text-muted-foreground">
-						{inbox && (
-							<span className="max-w-[45%] shrink-0 truncate rounded bg-muted px-1.5 text-xs" title={`In ${inbox}`}>
-								{inbox}
+						{mailbox && (
+							<span className="max-w-[45%] shrink-0 truncate rounded bg-muted px-1.5 text-xs" title={`In ${mailbox}`}>
+								{mailbox}
 							</span>
 						)}
 						<span className="min-w-0 flex-1 truncate">{thread.snippet}</span>
@@ -87,13 +87,13 @@ function ThreadRow({ thread, open, inbox, onTrash }: { thread: MailThread; open:
 	);
 }
 
-/** A new mail in the panel beside the list, from one of `accounts`, `from` first; sending it or throwing it away goes back to the inbox. */
+/** A new mail in the panel beside the list, from one of `accounts`, `from` first; sending it or throwing it away goes back to the list. */
 function ComposePage({ accounts, from }: { accounts: GoogleAccount[]; from: AccountId | null }) {
 	const mail = useMailDraft("new", NEW_MAIL);
 	const [picked, setPicked] = useState(from);
 	const sender = accounts.find(account => account.name === picked) ?? accounts[0];
 	const back = (): void => {
-		location.hash = hashForInbox(null);
+		location.hash = hashForEmail(null);
 	};
 	return (
 		<div className="flex h-full min-h-0 flex-col p-4">
@@ -149,11 +149,11 @@ const NEW_MAIL: MailDocument = { to: [], cc: [], bcc: [], subject: "", body: "" 
  * with one open, they open the next and previous one and focus its row, which they read ahead. Esc closes it, and O
  * opens the focused row in Gmail, else the open conversation.
  */
-export function InboxPage({ target, workspace }: { target: InboxRoute["target"]; workspace: string | null }) {
-	const { gmail, inbox, accounts, picked, pick, threads: shownThreads } = useGmailInbox(workspace);
+export function EmailPage({ target, workspace }: { target: EmailRoute["target"]; workspace: string | null }) {
+	const { gmail, poll, accounts, picked, pick, threads: shownThreads } = useEmail(workspace);
 	const threads = picked === null ? shownThreads : shownThreads.filter(thread => thread.account === picked);
 	const unread = threads.filter(thread => thread.unread).length;
-	const read = inbox.read;
+	const read = poll.read;
 	const open = target === null || target === "new" ? null : target;
 	const at = open === null ? -1 : threads.findIndex(thread => thread.account === open.account && thread.id === open.thread);
 	const addressOf = (account: AccountId): string | null => gmail?.accounts.find(candidate => candidate.name === account)?.address ?? null;
@@ -162,7 +162,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 	const tagged = picked === null && accounts.length > 1;
 	const openKey = open && rowId({ account: open.account, id: open.thread });
 	useReturnFocus(openKey, id => id, id => document.getElementById(id)?.querySelector<HTMLElement>("a"), read);
-	useOpenLatest(hashForInbox, target, threads[0] ? { account: threads[0].account, thread: threads[0].id } : null, read !== null);
+	useOpenLatest(hashForEmail, target, threads[0] ? { account: threads[0].account, thread: threads[0].id } : null, read !== null);
 
 	// A conversation opened from the address picks its own account, unless every inbox shows; a pick made while one is
 	// open changes no hash, so it leaves the conversation open.
@@ -170,7 +170,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 		const follow = (): void => {
 			const route = routeFromHash(location.hash);
 			const page = route.kind === "page" ? route.page : null;
-			const opened = page?.kind === "inbox" && page.target !== null && page.target !== "new" ? page.target.account : null;
+			const opened = page?.kind === "email" && page.target !== null && page.target !== "new" ? page.target.account : null;
 			if (opened !== null) pick(stored => (stored === null ? null : opened));
 		};
 		follow();
@@ -187,7 +187,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 	}, [previous, next]);
 
 	const openThread = (thread: MailThread): void => {
-		location.hash = hashForInbox({ account: thread.account, thread: thread.id });
+		location.hash = hashForEmail({ account: thread.account, thread: thread.id });
 		const row = rowOf(thread);
 		if (row) focusRow(row);
 	};
@@ -199,7 +199,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 	const leaveOpen = (): void => {
 		const after = next ?? previous;
 		if (after) openThread(after);
-		else location.hash = hashForInbox(null);
+		else location.hash = hashForEmail(null);
 	};
 	const [trashError, setTrashError] = useState<string | null>(null);
 	const trashRow = async (thread: MailThread): Promise<void> => {
@@ -218,17 +218,17 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 		return true;
 	};
 	useShortcuts({
-		inboxCompose: () => {
+		emailCompose: () => {
 			if (target === "new") return false;
-			location.hash = hashForInbox("new");
+			location.hash = hashForEmail("new");
 		},
-		inboxNext: () => step(1),
-		inboxPrevious: () => step(-1),
-		inboxClose: () => {
+		emailNext: () => step(1),
+		emailPrevious: () => step(-1),
+		emailClose: () => {
 			if (open === null) return false;
-			location.hash = hashForInbox(null);
+			location.hash = hashForEmail(null);
 		},
-		inboxOnGmail: () => {
+		emailOnGmail: () => {
 			const url = threads.find(thread => rowOf(thread)?.contains(document.activeElement))?.url ?? openUrl;
 			if (!url) return false;
 			window.open(url, "_blank", "noopener,noreferrer");
@@ -245,21 +245,21 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 		<PolledPageFrame
 			title={TITLE}
 			meta={read ? `${scope} · ${unread} unread` : META}
-			poll={inbox}
+			poll={poll}
 			onRefresh={() => void gmailStore.refresh(null, { fresh: true })}
 			actions={
-				<Tooltip content="New mail" shortcut={shortcutLabels("inboxCompose")}>
-					<Button variant="secondary" size="compact" leadingIcon={SquarePen} render={<a href={hashForInbox("new")} />}>
+				<Tooltip content="New mail" shortcut={shortcutLabels("emailCompose")}>
+					<Button variant="secondary" size="compact" leadingIcon={SquarePen} render={<a href={hashForEmail("new")} />}>
 						Compose
 					</Button>
 				</Tooltip>
 			}
 		>
 			<ListSplit
-				widthKey="omp-agents.inbox-list-width"
+				widthKey="omp-agents.email-list-width"
 				resizeLabel="Resize the conversation list"
 				detailLabel={target === "new" ? "New mail" : "Open conversation"}
-				empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("inboxNext")} and press Enter.` }}
+				empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("emailNext")} and press Enter.` }}
 				list={
 					<div className="space-y-2 p-2">
 						{failed.map(account => (
@@ -272,7 +272,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 								{trashError}
 							</p>
 						)}
-						<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={inbox}>
+						<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={poll}>
 							{() =>
 								threads.length === 0 ? (
 									<p className="px-3 text-sm text-muted-foreground">Your inbox is empty.</p>
@@ -283,7 +283,7 @@ export function InboxPage({ target, workspace }: { target: InboxRoute["target"];
 												key={rowId(thread)}
 												thread={thread}
 												open={open !== null && thread.account === open.account && thread.id === open.thread}
-												inbox={tagged ? (addressOf(thread.account) ?? thread.account) : null}
+												mailbox={tagged ? (addressOf(thread.account) ?? thread.account) : null}
 												onTrash={thread => void trashRow(thread)}
 											/>
 										))}

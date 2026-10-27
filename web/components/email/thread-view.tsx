@@ -1,4 +1,4 @@
-/** The Inbox's open conversation: its action bar, subject, messages folded as Gmail folds them, and the reply. */
+/** The Email page's open conversation: its action bar, subject, messages folded as Gmail folds them, and the reply. */
 import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw, Reply, ReplyAll, Trash2 } from "lucide-react";
 import { useReducer, useState } from "react";
 import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread, MailTrash } from "../../../src/shared/gmail";
@@ -8,11 +8,11 @@ import { putJson } from "../../api";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, personLabel, recipientsLine } from "../../inbox-model";
+import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, personLabel, recipientsLine } from "../../email-model";
 import { useReplyDraft } from "../../mail-draft";
 import { formatBytes, mailTime } from "../../labels";
 import { gmailStore, mailThreadScope, mailThreadStore, useMailThread } from "../../reads";
-import { hashForInbox, type InboxThread } from "../../routing";
+import { hashForEmail, type EmailThread } from "../../routing";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, type BarAction } from "../list-split";
 import { LoadNote } from "../sheet-details";
@@ -28,7 +28,7 @@ export function MailTime({ at }: { at: number }) {
 	);
 }
 
-/** Who sent `message`, `me` for the inbox's own `address`. */
+/** Who sent `message`, `me` for its account's own `address`. */
 const senderLabel = (message: MailMessage, address: string | null): string => personLabel(message.from, address) || "(no sender)";
 
 function Attachments({ attachments }: { attachments: MailAttachment[] }) {
@@ -46,7 +46,7 @@ function Attachments({ attachments }: { attachments: MailAttachment[] }) {
 	);
 }
 
-function Body({ message, thread, title }: { message: MailMessage; thread: InboxThread; title: string }) {
+function Body({ message, thread, title }: { message: MailMessage; thread: EmailThread; title: string }) {
 	const { body } = message;
 	switch (body.kind) {
 		case "html":
@@ -110,8 +110,8 @@ const ROW = "flex w-full min-w-0 gap-3 rounded-md px-2 text-left outline-none ho
 interface MessageProps {
 	message: MailMessage;
 	/** The conversation, which with the message's own id addresses its HTML. */
-	thread: InboxThread;
-	/** The inbox's own address, which reads as `me`. */
+	thread: EmailThread;
+	/** Its account's own address, which reads as `me`. */
 	address: string | null;
 	onToggle: () => void;
 }
@@ -177,8 +177,8 @@ function ReplyPrompt({ to, disabled, onReply }: { to: string; disabled: boolean;
 
 interface ThreadDetailProps {
 	/** The conversation, by its account and thread id. */
-	target: InboxThread;
-	/** The conversation as the inbox lists it, which titles the panel until its read arrives; `null` when the list does not hold it. */
+	target: EmailThread;
+	/** The conversation as the list shows it, which titles the panel until its read arrives; `null` when the list does not hold it. */
 	listed: MailThread | null;
 	/** Where it sits in the list, `null` when the list does not hold it. */
 	position: { at: number; of: number } | null;
@@ -232,9 +232,9 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 		}
 	};
 	useShortcuts({
-		inboxReply: () => compose(false),
-		inboxReplyAll: () => compose(true),
-		inboxTrash: () => {
+		emailReply: () => compose(false),
+		emailReplyAll: () => compose(true),
+		emailTrash: () => {
 			if (trashing) return false;
 			void trash();
 		},
@@ -247,9 +247,9 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 	const meta = [count === undefined ? "" : `${count} ${count === 1 ? "message" : "messages"}`, people.join(", ")].filter(Boolean).join(" · ");
 
 	const expandAll = rows.some(row => row.kind !== "open");
-	const previous: BarAction = { label: "Previous conversation", icon: CH_PREVIOUS, shortcut: "inboxPrevious", onClick: onPrevious };
-	const next: BarAction = { label: "Next conversation", icon: CH_NEXT, shortcut: "inboxNext", onClick: onNext };
-	const close: BarAction = { label: "Close", icon: CH_CLOSE, shortcut: "inboxClose", href: hashForInbox(null) };
+	const previous: BarAction = { label: "Previous conversation", icon: CH_PREVIOUS, shortcut: "emailPrevious", onClick: onPrevious };
+	const next: BarAction = { label: "Next conversation", icon: CH_NEXT, shortcut: "emailNext", onClick: onNext };
+	const close: BarAction = { label: "Close", icon: CH_CLOSE, shortcut: "emailClose", href: hashForEmail(null) };
 	return (
 		<section aria-label={subject || "Conversation"} className="flex h-full min-h-0 min-w-0 flex-col">
 			<DetailBar
@@ -258,17 +258,17 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 				next={next}
 				close={close}
 			>
-				<Tooltip content="Reply" shortcut={shortcutLabels("inboxReply")} disabled={!canReply}>
+				<Tooltip content="Reply" shortcut={shortcutLabels("emailReply")} disabled={!canReply}>
 					<Button variant="ghost" size="icon-compact" aria-label="Reply" disabled={!canReply} onClick={() => compose(false)}>
 						<Reply />
 					</Button>
 				</Tooltip>
-				<Tooltip content="Reply all" shortcut={shortcutLabels("inboxReplyAll")} disabled={!canReply}>
+				<Tooltip content="Reply all" shortcut={shortcutLabels("emailReplyAll")} disabled={!canReply}>
 					<Button variant="ghost" size="icon-compact" aria-label="Reply all" disabled={!canReply} onClick={() => compose(true)}>
 						<ReplyAll />
 					</Button>
 				</Tooltip>
-				<Tooltip content="Delete" shortcut={shortcutLabels("inboxTrash")} disabled={trashing}>
+				<Tooltip content="Delete" shortcut={shortcutLabels("emailTrash")} disabled={trashing}>
 					<Button variant="ghost" size="icon-compact" aria-label="Delete" disabled={trashing} onClick={() => void trash()}>
 						<Trash2 />
 					</Button>
@@ -283,7 +283,7 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 						<RefreshCw className={cn(refreshing && "animate-spin")} />
 					</Button>
 				</Tooltip>
-				<Tooltip content="Open in Gmail" shortcut={shortcutLabels("inboxOnGmail")} disabled={!url}>
+				<Tooltip content="Open in Gmail" shortcut={shortcutLabels("emailOnGmail")} disabled={!url}>
 					<Button variant="ghost" size="icon-compact" aria-label="Open in Gmail" disabled={!url} render={url ? <a href={url} target="_blank" rel="noreferrer" /> : undefined}>
 						<ExternalLink />
 					</Button>

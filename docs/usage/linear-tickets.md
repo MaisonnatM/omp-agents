@@ -18,7 +18,7 @@
   Each label's dot has the color Linear gives that label.
   Hover an icon to read what it means.
   Click a state's heading to fold it; the app keeps folded ones folded across reloads.
-- Click a row to show the issue's details on the right, beside the list, as the Inbox shows a conversation.
+- Click a row to show the issue's details on the right, beside the list, as the Email page shows a conversation.
   The open issue's row is highlighted, and drag the line between them to resize the list.
   A bar above the details shows the issue's place in the list, such as `10 of 63`, with the previous and next issues, sub-issues included, and **Close**, which returns to the list alone with its folded states preserved.
   On a page too narrow for both, the details take the list's place.

@@ -1,5 +1,5 @@
 /** The sidebar's tab bar as the user arranged it in Settings › Preferences: the tabs' order, which ones it leaves out, and the keys they take. */
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import { integrationsStore } from "./reads";
@@ -12,6 +12,9 @@ SIDEBAR_TABS satisfies readonly { value: ShortcutId }[];
 
 const KEY = "omp-agents.sidebar-tabs";
 
+/** The Email tab's id before its rename, which a layout stored before it still names; this goes when the new Inbox tab takes the id. */
+const LEGACY_EMAIL_TAB = "inbox";
+
 /** The user's sidebar tabs: every tab once, in the order the bar shows them, and whether the user hid it. */
 export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
@@ -21,7 +24,8 @@ export const DEFAULT_TAB_LAYOUT: TabLayout = SIDEBAR_TABS.map(({ value }) => ({ 
 export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, row])) as Record<SidebarTab, (typeof SIDEBAR_TABS)[number]>;
 
 /**
- * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out.
+ * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out,
+ * and reads a stored {@link LEGACY_EMAIL_TAB} as the Email tab, in its place and hidden as it was.
  * A tab missing from what is stored, such as one added since, takes its default place; anything unreadable gives the default.
  */
 export function decodeTabLayout(raw: string | null): TabLayout {
@@ -35,7 +39,8 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 	const layout: { tab: SidebarTab; hidden: boolean }[] = [];
 	for (const entry of stored as unknown[]) {
 		if (!isObject(entry)) continue;
-		const tab = SIDEBAR_TABS.find(({ value }) => value === entry.tab)?.value;
+		const id = entry.tab === LEGACY_EMAIL_TAB ? "email" : entry.tab;
+		const tab = SIDEBAR_TABS.find(({ value }) => value === id)?.value;
 		if (tab === undefined || layout.some(kept => kept.tab === tab)) continue;
 		layout.push({ tab, hidden: entry.hidden === true });
 	}
@@ -80,7 +85,8 @@ export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] |
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
  * `signedOut` stays the same set until a tab's service signs in or out, whatever the integrations' polls answer, and
- * `shown` stays with it until the layout changes.
+ * `shown` stays with it until the layout changes. A stored layout that still names {@link LEGACY_EMAIL_TAB} is stored
+ * again as it decodes, so the old id leaves this browser and Settings › Sync before the new Inbox tab takes it.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;
@@ -89,6 +95,9 @@ export function useSidebarTabs(): {
 	shown: readonly SidebarTab[];
 } {
 	const [layout, setLayout] = useStoredState(KEY, decodeTabLayout, encodeTabLayout);
+	useEffect(() => {
+		if (localStorage.getItem(KEY)?.includes(`"tab":"${LEGACY_EMAIL_TAB}"`)) setLayout(layout);
+	}, [layout, setLayout]);
 	const names = tabsSignedOut(integrationsStore.usePolling().read?.data.integrations);
 	const namesKey = names.join();
 	const signedOut = useMemo((): ReadonlySet<SidebarTab> => new Set(names), [namesKey]);
@@ -108,7 +117,7 @@ function tabBindings(id: ShortcutId, shown: readonly SidebarTab[]): readonly Bin
 	return position === undefined ? shortcutBindings(id) : [...shortcutBindings(position), ...shortcutBindings(id)];
 }
 
-/** {@link tabBindings} as a tooltip's chips draw them: `["⌘5", "G then I"]`. */
+/** {@link tabBindings} as a tooltip's chips draw them: `["⌘5", "G then M"]`. */
 export const tabShortcutLabels = (id: ShortcutId, shown: readonly SidebarTab[]): readonly string[] => tabBindings(id, shown).map(bindingLabel);
 
 const positions: readonly ShortcutId[] = TAB_SHORTCUTS;

@@ -1,5 +1,5 @@
 /**
- * Gmail: the latest conversations of your inbox, which the Inbox page lists, one conversation in full, which its details
+ * Gmail: the latest conversations of your inbox, which the Email page lists, one conversation in full, which its details
  * show, and the mail, replies, and trashing its actions send. It calls Google's Gmail API with the token omp holds for its Gmail
  * MCP server, the same sign-in and scope: the server's own tools answer only for OAuth clients in Google's Developer
  * Preview Program. Reading a conversation here never marks it read. A {@link GmailClient} reads one account;
@@ -11,12 +11,12 @@ import { errorText, isObject, nonEmptyStr, str } from "./json";
 import { mapLimit } from "./map-limit";
 import { ApiError, type SignedFetch } from "./signed-fetch";
 import type { AccountId } from "./shared/accounts";
-import type { InboxAnswer, MailAttachment, MailBody, MailDraft, MailMessage, MailPerson, MailReply, MailSend, MailThread, ThreadAnswer } from "./shared/gmail";
+import type { EmailAnswer, MailAttachment, MailBody, MailDraft, MailMessage, MailPerson, MailReply, MailSend, MailThread, ThreadAnswer } from "./shared/gmail";
 import { threadUrl } from "./shared/gmail";
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
-/** How many conversations the Inbox page lists. */
+/** How many conversations the Email page lists. */
 const INBOX_SIZE = 50;
 /** Threads read at once, well under the 25 thread reads a second Gmail allows a user. */
 const THREAD_READS = 8;
@@ -91,7 +91,7 @@ const hasLabel = (message: Record<string, unknown>, label: string): boolean => A
 /** When a message arrived, epoch ms, `NaN` when Gmail gives no time. */
 const arrivalOf = (message: Record<string, unknown>): number => (typeof message.internalDate === "string" ? Number(message.internalDate) : Number.NaN);
 
-/** A thread of `account` as the Inbox page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. */
+/** A thread of `account` as the Email page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. */
 function threadOf(thread: unknown, snippet: string, account: AccountId, address: string): MailThread | null {
 	if (!isObject(thread) || !Array.isArray(thread.messages)) return null;
 	const id = nonEmptyStr(thread.id);
@@ -183,13 +183,13 @@ const attachmentsOf = (part: MimePart): MailAttachment[] => [
 	...part.parts.flatMap(attachmentsOf),
 ];
 
-/** A message as read: what the Inbox page's details show, and its HTML when that is its body. */
+/** A message as read: what the Email page's details show, and its HTML when that is its body. */
 interface ReadMessage {
 	message: MailMessage;
 	html: string | undefined;
 }
 
-/** A message as the Inbox page's details show it, with its HTML, or `null` for one without an id or an arrival time. */
+/** A message as the Email page's details show it, with its HTML, or `null` for one without an id or an arrival time. */
 function messageOf(message: Record<string, unknown>): ReadMessage | null {
 	const id = nonEmptyStr(message.id);
 	const at = arrivalOf(message);
@@ -213,7 +213,7 @@ function messageOf(message: Record<string, unknown>): ReadMessage | null {
 	};
 }
 
-/** A conversation as read: what the Inbox page's details get, and the HTML of each message whose body is HTML, by message id. */
+/** A conversation as read: what the Email page's details get, and the HTML of each message whose body is HTML, by message id. */
 interface ReadThread {
 	answer: ThreadAnswer;
 	html: Map<string, string>;
@@ -417,7 +417,7 @@ export class GmailAccounts {
 	 * Each signed-in account, and their inboxes' latest conversations, newest first. An account whose read fails keeps
 	 * its error and the others still answer; only when every account fails is it an error.
 	 */
-	async inbox(fresh = false): Promise<InboxAnswer> {
+	async inbox(fresh = false): Promise<EmailAnswer> {
 		const clients = await this.#clients.signedIn();
 		const reads = await Promise.allSettled(clients.map(({ client }) => client.inbox(fresh)));
 		const failure = reads.find(read => read.status === "rejected");

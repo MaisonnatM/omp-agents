@@ -30,7 +30,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Notes](usage/notes.md)
   - [Notes from agents](usage/notes.md#notes-from-agents)
 - [Calendar](usage/calendar.md)
-- [Inbox](usage/inbox.md)
+- [Email](usage/email.md)
 - [Routines](usage/routines.md)
 - [Settings](usage/settings.md)
 - [Settings sync](usage/settings-sync.md)

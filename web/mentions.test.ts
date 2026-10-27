@@ -107,7 +107,7 @@ describe("mentionMenu", () => {
 		{ path: "my notes.md", changes: [change(20)] },
 		{ path: "src/c.ts", changes: [change(10)] },
 	];
-	const categories = ["Files & Folders", "Todos", "Tickets", "Pull requests", "Inbox", "Calendar", "Sessions"];
+	const categories = ["Files & Folders", "Todos", "Tickets", "Pull requests", "Email", "Calendar", "Sessions"];
 
 	test("home offers the last three files the agent changed inside its directory, then every category", () => {
 		expect(labels(menu("Read @", { changed }))).toEqual([
@@ -144,7 +144,7 @@ describe("mentionMenu", () => {
 			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
 			["Tickets", ["Login [beta] flag"]],
 			["Pull requests", ["Fix login"]],
-			["Inbox", ["Login [alert]"]],
+			["Email", ["Login [alert]"]],
 			["Calendar", ["Login review", "Login retro"]],
 			["Sessions", ["Login bug hunt"]],
 		]);
@@ -152,7 +152,7 @@ describe("mentionMenu", () => {
 			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
 			["Tickets", ["Login [beta] flag"]],
 			["Pull requests", ["Fix login"]],
-			["Inbox", ["Login [alert]"]],
+			["Email", ["Login [alert]"]],
 			["Calendar", ["Login review", "Login retro"]],
 			["Sessions", ["Login bug hunt"]],
 		]);

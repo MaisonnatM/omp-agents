@@ -8,7 +8,7 @@ A key never holds a title, a path, a session id, or anything the user typed; the
 
 `web/activity.ts` holds the recorder, which `web/use-dashboard.ts` installs once per page load under a fresh client id from `crypto.randomUUID()`.
 
-- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, or `inbox/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
+- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, or `email/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
   `viewOf` returns a `ViewKey`, so a view missing from `VIEWS` is a type error, and the hook records it whenever it changes.
 - A **command** is a shortcut that took its key, recorded in `dispatch` in `web/shortcuts.ts` with `via: "keyboard"`, or a palette command, recorded in `web/components/command-palette/command-palette.tsx` with `via: "palette"`.
   Its key is the shortcut id in kebab case, `newSession` as `new-session`, so both channels share one key.
@@ -34,6 +34,7 @@ A page load resends what an earlier one left under that load's own client id and
 ## Storage
 
 `src/server/activity-store.ts` keeps the events in `activity.db` in the dashboard's data directory, a SQLite table keyed by client id and sequence, so a batch sent twice is stored once.
+Opening the store once renames the old Inbox page's `inbox` views and commands to their `email` keys, in a transaction that sets SQLite's `user_version` to 1, so it never runs again and rows a later page stores under `inbox` keep their keys.
 Only the server holding `server.lock` stores events; another server, such as a smoke server on your state, acknowledges a batch and drops it.
 That server prunes rows older than 400 days at start and once a day.
 Deleting `activity.db` while the server is stopped clears the history; settings sync never carries it.
@@ -48,7 +49,7 @@ A visit starts after 30 minutes without use or on a new local day.
 `web/activity-report.ts` builds the inventory from `VIEWS`, `SETTINGS_SECTIONS`, `SHORTCUTS`, `CONTROLS`, `ACTION_MESSAGES`, and the server's `PUT` routes.
 It splits it into used, rarely used (once or twice), never used, and not set up, and lists the 20 most used.
 A feature is not set up while its tab is one `useSidebarTabs` reports signed out, which is every integration tab until the integrations answer.
-The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab; the Inbox views, the Inbox commands, and the `/api/gmail/` routes go with the Inbox tab.
+The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab; the Email views, the Email commands, and the `/api/gmail/` routes go with the Email tab.
 
 ## Coverage
 
@@ -90,7 +91,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Todo | view | `todo`, `todo/item` |
 | Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
-| Pages: Inbox | view | `inbox`, `inbox/new`, `inbox/item` |
+| Pages: Email | view | `email`, `email/new`, `email/item` |
 | Pages: Routines | view | `routines`, `routines/item` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |

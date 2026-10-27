@@ -33,13 +33,13 @@ const RARELY = 3;
 /** How many features **Most used** lists. */
 const MOST_USED = 20;
 
-/** The commands that go with a tab gated on a service, besides the Inbox page's own. */
-const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", inbox: "inbox" };
+/** The commands that go with a tab gated on a service, besides the Email page's own. */
+const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", email: "email" };
 
 /** The `PUT` routes that go with a tab gated on a service, by path prefix. */
-const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets", "/api/gmail/": "inbox" };
+const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets", "/api/gmail/": "email" };
 
-const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => (category === "inbox" ? "inbox" : COMMAND_TABS[id]);
+const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => (category === "email" ? "email" : COMMAND_TABS[id]);
 const routeTab = (path: string): SidebarTab | undefined => Object.entries(ROUTE_TABS).find(([prefix]) => path.startsWith(prefix))?.[1];
 
 /** Every feature the page has: views, commands, actions, and tagged controls, from the registries that define them. */

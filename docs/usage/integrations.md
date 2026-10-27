@@ -14,7 +14,7 @@
   **Remove** takes the account's server and sign-in out of omp; the last account on a service stays as a signed-out server, since it keeps the OAuth client.
   A new OAuth client ID or secret removes every added account and signs out the remaining one, since Google ties sign-ins to the client.
 - Each Google account's workspace picker links its address to workspaces, which covers that address's Gmail and Google Calendar accounts; a pick made before the one before it is saved adds to it rather than replacing it.
-  While the sidebar picks a workspace, the Inbox, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with **All workspaces** they show every account.
+  While the sidebar picks a workspace, the Email page, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with **All workspaces** they show every account.
   With the starter kit's `extensions/google-accounts.ts` installed (`bun run omp-template`), an omp session whose service has two or more accounts is told at each prompt each account's address and tool prefix, and, when its workspace has linked addresses, to use those for its mail and calendar unless you name another account.
   A session in a linked worktree counts as in its repository's main checkout when its own directory is in no linked workspace; every account's tools stay available to it.
 - omp's own `/mcp reauth` or `/mcp unauth` on an added account writes it back under its URL and can merge two accounts into one; reconnect it from this page instead.
@@ -66,8 +66,8 @@
 - Gmail shows **Not set up** and **Set up** until its OAuth client is saved, and its form is Google Calendar's.
   In a [Google Cloud project](https://console.cloud.google.com/apis/library/gmail.googleapis.com), turn on the Gmail API.
   Under [Credentials](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**, and add `http://localhost:3119/callback`, with your callback port, as an authorized redirect URI; the client you made for Google Calendar works too.
-  Paste the client ID and secret, then **Connect**; Google asks you to grant reading, sending, and deleting your email, which lets the Inbox page reply and move conversations to Trash.
-  A Gmail sign-in made before the Inbox page could reply only reads mail; **Reconnect** asks Google for the wider grant.
+  Paste the client ID and secret, then **Connect**; Google asks you to grant reading, sending, and deleting your email, which lets the Email page reply and move conversations to Trash.
+  A Gmail sign-in made before the Email page could reply only reads mail; **Reconnect** asks Google for the wider grant.
   omp stores the secret in the Gmail server's entry in `~/.omp/agent/mcp.json`, apart from Google Calendar's, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
   Gmail's MCP tools also need the Gmail MCP API on in that project; the row links to it when Google refuses them.
-  The Inbox page reads Google's Gmail API and does not need the MCP API.
+  The Email page reads Google's Gmail API and does not need the MCP API.

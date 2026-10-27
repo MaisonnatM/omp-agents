@@ -70,9 +70,9 @@
   Dashboard sessions report them after each turn and after each model or thinking change.
   Terminal sessions report them through Collab `state` frames.
 - Type `/` to complete discovered file commands and `/skill:<name>` skills; a skill whose name has a space is left out, since omp cannot invoke it.
-  Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, Inbox, Calendar, and Sessions.
+  Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, Email, Calendar, and Sessions.
   Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, `@mail:`, `@event:`, or `@session:`.
-  Inbox lists your Gmail inbox's latest conversations while Gmail is connected; Calendar lists the events from today through the next 14 days, from your Google calendars while Google Calendar is connected and from this computer.
+  Email lists your Gmail inbox's latest conversations while Gmail is connected; Calendar lists the events from today through the next 14 days, from your Google calendars while Google Calendar is connected and from this computer.
   Type `@` and a word to search everything at once: up to five files from the selected session's working directory, then up to three matches from each category.
   Every word must appear in a row's name or the detail beside it, such as a ticket's ID, in any order; quote several words, as in `@"login page` or `@ticket:"login page`.
   A file inserts its path, as in omp's terminal.

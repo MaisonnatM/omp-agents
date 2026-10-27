@@ -1,12 +1,12 @@
 /**
- * The Inbox page as pure transforms: which account its picker narrows to, and which messages of a conversation show
+ * The Email page as pure transforms: which account its picker narrows to, and which messages of a conversation show
  * open, closed, or stacked, and what an open one renders.
  */
 import type { AccountId, GoogleAccount } from "../src/shared/accounts";
 import type { MailMessage, MailPerson } from "../src/shared/gmail";
 
-/** The account the Inbox's picker narrows to: `stored` while it is one of two or more `shown` accounts, else `null` for every shown inbox. */
-export const pickedInbox = (stored: AccountId | null, shown: readonly GoogleAccount[]): AccountId | null =>
+/** The account the Email page's picker narrows to: `stored` while it is one of two or more `shown` accounts, else `null` for every shown account. */
+export const pickedAccount = (stored: AccountId | null, shown: readonly GoogleAccount[]): AccountId | null =>
 	shown.length > 1 && shown.some(account => account.name === stored) ? stored : null;
 
 /** A row of a conversation: a message in full, a message on one line, or a run of closed messages folded into one. */
@@ -76,7 +76,7 @@ export function foldsAfter(folds: Folds, event: FoldEvent): Folds {
 	}
 }
 
-/** Who someone is to the reader: `me` for `address`, the inbox's own, else their name, else their address. */
+/** Who someone is to the reader: `me` for `address`, the account's own, else their name, else their address. */
 export const personLabel = (person: MailPerson, address: string | null): string =>
 	address !== null && person.address.toLowerCase() === address.toLowerCase() ? "me" : person.name || person.address;
 

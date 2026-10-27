@@ -30,9 +30,9 @@ Alt is Option on macOS.
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
 | Cmd+1 … Cmd+5 | Anywhere | Go to the first … fifth tab the sidebar's bar draws, in the group the header's switch shows |
-| C | Outside text fields, except on the Todo, Notes, Calendar, and Inbox pages | Create a Linear ticket, when connected |
+| C | Outside text fields, except on the Todo, Notes, Calendar, and Email pages | Create a Linear ticket, when connected |
 | G then N | Outside text fields | Go to your notes |
-| G then I | Outside text fields | Go to your Gmail inbox, when connected |
+| G then M | Outside text fields | Go to your email, when connected |
 | G then R | Outside text fields | Go to your routines |
 | G then , | Outside text fields | Open or close Settings |
 | G then W | Outside text fields | Choose the sidebar's workspace |
@@ -57,25 +57,25 @@ Alt is Option on macOS.
 | C | Notes page, outside text fields | Add a note and open it |
 | Esc | Notes page, outside text fields | Close the open note |
 | C | Calendar page, outside text fields | Add an event |
-| ↓ / ↑ | Inbox page, outside text fields | Focus the next or previous conversation, or open it while one is open |
-| Esc | Inbox page, outside text fields | Close the open conversation |
-| O | Inbox page, outside text fields | Open the focused or open conversation in Gmail |
-| R / A | Inbox page, outside text fields | Reply, or reply to all, to the open conversation's last message |
-| # | Inbox page, outside text fields | Move the open conversation to Gmail's Trash |
-| C | Inbox page, outside text fields | Write a new mail |
+| ↓ / ↑ | Email page, outside text fields | Focus the next or previous conversation, or open it while one is open |
+| Esc | Email page, outside text fields | Close the open conversation |
+| O | Email page, outside text fields | Open the focused or open conversation in Gmail |
+| R / A | Email page, outside text fields | Reply, or reply to all, to the open conversation's last message |
+| # | Email page, outside text fields | Move the open conversation to Gmail's Trash |
+| C | Email page, outside text fields | Write a new mail |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Notes, Inbox, Calendar, and Changes.
+  The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Notes, Email, Calendar, and Changes.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
 - Cmd+1 through Cmd+5 go to the first through fifth tab the sidebar's bar draws, even while typing.
-  The numbers count only the tabs of the group the header's **Dev** and **Ops** switch shows, in the order **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
+  The numbers count only the tabs of the group the header's **Dev** and **Ops** switch shows, in the order **Settings › Preferences** sets: a tab you hide, or Tickets or Email without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
-  In the default order, Cmd+1 opens **Pull requests** under **Dev** and **Notes** under **Ops**, Cmd+3 opens **Sessions** under **Dev**, with Linear connected, and the **Inbox** under **Ops**, and Cmd+5 opens **Routines** under **Dev**.
-  The **Inbox** takes its number like any tab and keeps G then I.
+  In the default order, Cmd+1 opens **Pull requests** under **Dev** and **Notes** under **Ops**, Cmd+3 opens **Sessions** under **Dev**, with Linear connected, and **Email** under **Ops**, and Cmd+5 opens **Routines** under **Dev**.
+  The **Email** tab takes its number like any tab and keeps G then M.
   Cmd with T, W, L, R, D, Q, O, P, S, Tab, or 6 through 0 is left to the window, whose menu takes Cmd+W, Cmd+R, Cmd+Q, and Cmd+0; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
@@ -119,8 +119,8 @@ Alt is Option on macOS.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
 - The number of the **Pull requests** tab opens the Pull requests page, and that of **Tickets** opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
-  The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the inbox, the routines, Settings, or the new-session draft to the panes.
-  The numbers of **Todo**, **Routines**, and **Calendar** open those pages, G then I or the Inbox's number the **Inbox** page when connected to Gmail, and G then R the **Routines** page.
+  The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the email, the routines, Settings, or the new-session draft to the panes.
+  The numbers of **Todo**, **Routines**, and **Calendar** open those pages, G then M or the Email tab's number the **Email** page when connected to Gmail, and G then R the **Routines** page.
   G then ,, like the header's gear button, opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

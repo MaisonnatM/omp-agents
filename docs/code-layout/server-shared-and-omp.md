@@ -1,7 +1,7 @@
 # Server: shared types, omp facades, analytics, and subprocesses
 
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
-  Each answer a polled store keeps in localStorage has its decoder beside its type: `decodePullRequestList`, `decodeTicketsAnswer`, `decodeIntegrationsAnswer`, `decodeAnalytics`, `decodeGoogleStatus`, `decodeCalendarEventsAnswer`, `decodeLocalEventsAnswer`, and `decodeInboxAnswer`, which check every field of the type.
+  Each answer a polled store keeps in localStorage has its decoder beside its type: `decodePullRequestList`, `decodeTicketsAnswer`, `decodeIntegrationsAnswer`, `decodeAnalytics`, `decodeGoogleStatus`, `decodeCalendarEventsAnswer`, `decodeLocalEventsAnswer`, and `decodeEmailAnswer`, which check every field of the type.
   `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and pull request list shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups; `calendar.ts` the Google calendars, their events, a new event, and the events kept on this computer; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
   `accounts.ts` also holds `AccountId`, `GoogleAccount`, the `accounts` column of `MCP_SERVICES`, and `visibleAccounts`, the Google accounts a workspace shows: those linked to it and those linked to none.
   `transcript.ts` also holds `isDashboardPrompt`, which tells a prompt the dashboard sent in the user's place, which the page hides.
@@ -9,7 +9,7 @@
   `transcript.ts` also holds `MEDIA_FILE_TYPES` and `mediaUrl`, the `GET /api/media` address of an image or video on this computer, which the media tree and the page both build.
   `mcp-servers.ts` holds the rows and bodies of Settings › MCP servers, and `mcp-catalog.ts` the catalog of remote servers it offers.
   `mcp-status.ts` holds `McpRemoteStatus` and `McpTool`, where omp stands with a remote MCP server, which an integration's `McpConnection` in `accounts.ts` and a server's `McpServerStatus` in `mcp-servers.ts` both build on.
-  `gmail.ts` holds `MailThread` and `InboxAnswer`, the Inbox page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
+  `gmail.ts` holds `MailThread` and `EmailAnswer`, the Email page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
   `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, the routine runner, and their tests.
   `SessionFacts` in `sessions.ts` declares a session's pull requests, Linear issues, /ship stage, worktree, and branch once, and `RosterHost` and `PastSession` extend it.
   `parseNewSessionRequest` there checks one, with `parseImages`, `parseModel`, `parseThinking`, and `parseSkill`, for the socket's `start` and a start kept in `scheduled.json`; `parsePullRequest` in `github.ts` checks a pull request's owner, repository, and number.

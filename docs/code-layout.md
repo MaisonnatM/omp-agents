@@ -75,7 +75,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Todo: `web/components/todo/page.tsx`.
   - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
-  - Inbox: `web/components/inbox/inbox-page.tsx`.
+  - Email: `web/components/email/email-page.tsx`.
   - Routines: `web/components/routines/routines-page.tsx`, with its sidebar list in `web/components/routines/routines-nav.tsx`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
@@ -107,6 +107,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Routines, Calendar, and Inbox](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Routines, Calendar, and Email](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

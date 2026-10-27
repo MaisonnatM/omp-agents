@@ -19,7 +19,7 @@ import {
 	type GoogleStatus,
 	type LocalEventsAnswer,
 } from "../src/shared/calendar";
-import { decodeInboxAnswer, type InboxAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
+import { decodeEmailAnswer, type EmailAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
 import { type ActivityRead, decodeActivity } from "../src/shared/activity";
 import { decodePullRequestList, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestEdit, type PullRequestList, type PullRequestViewedEdit, type RepoPullRequests } from "../src/shared/github";
@@ -34,7 +34,7 @@ import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 import { withPullRequestReviewers, withPullRequestState } from "./pull-requests-model";
-import { pickedInbox } from "./inbox-model";
+import { pickedAccount } from "./email-model";
 import { useStoredState } from "./stored-state";
 
 export interface ReadState<T> {
@@ -166,7 +166,7 @@ const startOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.fir
 const endOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.lastDay}T00:00`).getTime() + 86_400_000 : when.end);
 
 /**
- * What the `@` menu offers from your inbox and calendars, of the accounts `workspace` shows: the inbox's latest
+ * What the `@` menu offers from your email and calendars, of the accounts `workspace` shows: their inboxes' latest
  * conversations while `mailWanted` and Gmail is callable, and the events from today's midnight over the next
  * {@link MENTION_EVENT_DAYS} days while `eventsWanted`, earliest first: Google's while Google Calendar is callable, and this computer's.
  */
@@ -276,26 +276,26 @@ export function useGoogleCalendars(workspace: string | null): GoogleCalendars {
 	}, [all, connected, read, workspace]);
 }
 
-/** Every signed-in Gmail account's inbox, merged, which the Inbox page and its sidebar tab share. */
-export const gmailStore = createPolledStore<InboxAnswer>({
+/** Every signed-in Gmail account's inbox, merged, which the Email page and its sidebar tab share. */
+export const gmailStore = createPolledStore<EmailAnswer>({
 	url: (_, fresh) => `/api/gmail/inbox${fresh ? "?fresh" : ""}`,
-	cache: { key: "omp-agents.gmail-cache", decode: decodeInboxAnswer },
+	cache: { key: "omp-agents.gmail-cache", decode: decodeEmailAnswer },
 });
 
-/** The Gmail account the Inbox's picker narrows to; absent for every account. */
-const INBOX_ACCOUNT_KEY = "omp-agents.gmail-account";
+/** The Gmail account the Email page's picker narrows to; absent for every account. */
+const EMAIL_ACCOUNT_KEY = "omp-agents.gmail-account";
 
 const decodeAccount = (raw: string | null): AccountId | null => raw || null;
 const encodeAccount = (account: AccountId | null): string => account ?? "";
 
-/** The Inbox as a workspace shows it. */
-export interface GmailInbox {
+/** The Email page as a workspace shows it. */
+export interface Email {
 	/** Gmail's integration, `null` before the first read. */
 	gmail: McpIntegration<"gmail"> | null;
-	inbox: PolledEntry<InboxAnswer>;
+	poll: PolledEntry<EmailAnswer>;
 	/** The Gmail accounts the workspace shows. */
 	accounts: GoogleAccount[];
-	/** The account the picker narrows to, as {@link pickedInbox} reads the stored choice; `null` for every shown account. */
+	/** The account the picker narrows to, as {@link pickedAccount} reads the stored choice; `null` for every shown account. */
 	picked: AccountId | null;
 	/** Stores the picker's choice, or what `next` makes of the stored one, `null` for every account. */
 	pick: (next: AccountId | null | ((stored: AccountId | null) => AccountId | null)) => void;
@@ -303,25 +303,25 @@ export interface GmailInbox {
 	threads: MailThread[];
 }
 
-/** The inboxes of the Gmail accounts `workspace` shows, `null` for all workspaces, read every minute while one is callable, and the Inbox's account picker. */
-export function useGmailInbox(workspace: string | null): GmailInbox {
+/** The inboxes of the Gmail accounts `workspace` shows, `null` for all workspaces, read every minute while one is callable, and the Email page's account picker. */
+export function useEmail(workspace: string | null): Email {
 	const gmail = integrationsStore.usePolling().read?.data.integrations.gmail ?? null;
 	const all = gmail?.accounts ?? NO_ACCOUNTS;
-	const inbox = gmailStore.usePolling(null, anyCallable(all));
-	const [stored, pick] = useStoredState(INBOX_ACCOUNT_KEY, decodeAccount, encodeAccount);
-	const listed = inbox.read?.data.threads;
+	const poll = gmailStore.usePolling(null, anyCallable(all));
+	const [stored, pick] = useStoredState(EMAIL_ACCOUNT_KEY, decodeAccount, encodeAccount);
+	const listed = poll.read?.data.threads;
 	return useMemo(() => {
 		const shown = visibleAccounts(all, workspace);
 		const accounts = all.filter(account => shown.has(account.name));
 		const threads = (listed ?? NO_THREADS).filter(thread => shown.has(thread.account));
-		return { gmail, inbox, accounts, picked: pickedInbox(stored, accounts), pick, threads };
-	}, [gmail, all, inbox, stored, pick, listed, workspace]);
+		return { gmail, poll, accounts, picked: pickedAccount(stored, accounts), pick, threads };
+	}, [gmail, all, poll, stored, pick, listed, workspace]);
 }
 
 /** The {@link mailThreadStore} scope of conversation `id` of Gmail account `account`. */
 export const mailThreadScope = (account: AccountId, id: string): string => new URLSearchParams({ account, id }).toString();
 
-/** The conversations read since the page loaded, by {@link mailThreadScope}, in memory only: unlike the inbox's list, their bodies are large and private. */
+/** The conversations read since the page loaded, by {@link mailThreadScope}, in memory only: unlike the Email page's list, their bodies are large and private. */
 export const mailThreadStore = createPolledStore<ThreadAnswer>({
 	url: (scope, fresh) => `/api/gmail/thread?${scope ?? ""}${fresh ? "&fresh" : ""}`,
 });
@@ -331,7 +331,7 @@ export type MailThreadRead = PolledEntry<ThreadAnswer>;
 
 /**
  * Conversation `id` of Gmail account `account`, read the first time it is asked for, and again from Gmail once
- * `arrived`, when its last message arrived as the inbox lists it, is later than that read: a reply came since.
+ * `arrived`, when its last message arrived as the Email page lists it, is later than that read: a reply came since.
  */
 export function useMailThread(account: AccountId, id: string, arrived: number | null): MailThreadRead {
 	const scope = mailThreadScope(account, id);

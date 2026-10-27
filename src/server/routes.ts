@@ -599,17 +599,17 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 	};
 }
 
-/** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Inbox page sends. */
+/** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Email page sends. */
 function gmailRoutes({ get, media, write }: RouteKit, gmail: GmailAccounts): Routes {
 	/** `GET /api/gmail/inbox[?fresh]`: each signed-in account and their inboxes' latest conversations, newest first. */
 	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
-	/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
+	/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: that conversation in full, for the Email page's details. */
 	const thread = get(params => {
 		const account = params.get("account");
 		const id = params.get("id");
 		return account && id ? answer(() => gmail.thread(account, id, params.has("fresh"))) : fail(400, "Expected ?account= and ?id= naming a Gmail conversation");
 	});
-	/** `GET /api/gmail/message?account=<account>&thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Inbox page frames. */
+	/** `GET /api/gmail/message?account=<account>&thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Email page frames. */
 	const message = media(async params => {
 		const account = params.get("account");
 		const threadId = params.get("thread");

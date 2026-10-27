@@ -1,14 +1,14 @@
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import type { AccountId } from "../../../src/shared/accounts";
-import { useGmailInbox } from "../../reads";
+import { useEmail } from "../../reads";
 
 /**
- * The Inbox tab of the sidebar, for the Gmail accounts `workspace` shows: with one, its address over the Inbox; with
- * several, every inbox and then each account's, the one the Inbox page narrows to marked, each with its unread count.
+ * The Email tab of the sidebar, for the Gmail accounts `workspace` shows: with one, its address over its Inbox row;
+ * with several, All inboxes and then each account's, the one the Email page narrows to marked, each with its unread count.
  * Picking one narrows the list and leaves an open conversation open.
  */
-export function InboxNav({ workspace }: { workspace: string | null }) {
-	const { accounts, picked, pick, threads } = useGmailInbox(workspace);
+export function EmailNav({ workspace }: { workspace: string | null }) {
+	const { accounts, picked, pick, threads } = useEmail(workspace);
 	const unreadOf = (account: AccountId | null): number => threads.filter(thread => thread.unread && (account === null || thread.account === account)).length;
 	const [only] = accounts;
 	const entries: { account: AccountId | null; label: string }[] =

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { GoogleAccount } from "../src/shared/accounts";
 import type { MailMessage } from "../src/shared/gmail";
-import { colorIndex, type FoldEvent, type Folds, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, pickedInbox, recipientsLine } from "./inbox-model";
+import { colorIndex, type FoldEvent, type Folds, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, pickedAccount, recipientsLine } from "./email-model";
 
 const account = (name: string): GoogleAccount => ({
 	name,
@@ -11,11 +11,11 @@ const account = (name: string): GoogleAccount => ({
 	workspaces: [],
 });
 
-test("the Inbox picker keeps an account it shows among several, and reads as every inbox once one account or none is shown", () => {
-	expect(pickedInbox("gmail-2", [account("gmail"), account("gmail-2")])).toBe("gmail-2");
-	expect(pickedInbox("gmail-2", [account("gmail-2")])).toBeNull();
-	expect(pickedInbox("gmail-2", [account("gmail"), account("gmail-3")])).toBeNull();
-	expect(pickedInbox(null, [account("gmail"), account("gmail-2")])).toBeNull();
+test("the Email picker keeps an account it shows among several, and reads as every account once one account or none is shown", () => {
+	expect(pickedAccount("gmail-2", [account("gmail"), account("gmail-2")])).toBe("gmail-2");
+	expect(pickedAccount("gmail-2", [account("gmail-2")])).toBeNull();
+	expect(pickedAccount("gmail-2", [account("gmail"), account("gmail-3")])).toBeNull();
+	expect(pickedAccount(null, [account("gmail"), account("gmail-2")])).toBeNull();
 });
 
 const message = (id: string, unread = false): MailMessage => ({
@@ -73,7 +73,7 @@ test("unstacking shows each message of the stack closed, and Expand all opens ev
 	expect(shape(SIX, closedAgain)).toEqual(["open:m1", "closed:m2", "closed:m3", "closed:m4", "open:m5", "open:m6"]);
 });
 
-test("the recipients line names the inbox's own address as me, then each name, else address, with cc after", () => {
+test("the recipients line names the account's own address as me, then each name, else address, with cc after", () => {
 	const sent: MailMessage = {
 		...message("m1"),
 		to: [
@@ -88,7 +88,7 @@ test("the recipients line names the inbox's own address as me, then each name, e
 	expect(recipientsLine(message("m2"), null)).toBe("");
 });
 
-test("participants lists each sender once in the order they first wrote, the inbox's own address as me, and skips a missing sender", () => {
+test("participants lists each sender once in the order they first wrote, the account's own address as me, and skips a missing sender", () => {
 	const from = (name: string, address: string): MailMessage => ({ ...message(address), from: { name, address } });
 	const messages = [from("Bob", "bob@example.com"), from("Max", "MAX@example.com"), from("Bob", "bob@example.com"), from("", ""), from("", "carol@example.com")];
 	expect(participants(messages, "max@example.com")).toEqual(["Bob", "me", "carol@example.com"]);

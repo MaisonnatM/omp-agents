@@ -27,7 +27,7 @@ import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav } from "./calendar/calendar-nav";
-import { InboxNav } from "./inbox/inbox-nav";
+import { EmailNav } from "./email/email-nav";
 import { NotesNav } from "./notes/nav";
 import { RoutinesNav } from "./routines/routines-nav";
 import { SessionList } from "./session-list";
@@ -306,9 +306,9 @@ export function Roster({
 					<CalendarNav open={calendarOpen} workspace={workspace} />
 				</SidebarContent>
 			</TabPanel>
-			<TabPanel value="inbox" asChild>
+			<TabPanel value="email" asChild>
 				<SidebarContent>
-					<InboxNav workspace={workspace} />
+					<EmailNav workspace={workspace} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="settings" asChild>

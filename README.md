@@ -54,10 +54,10 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Save a dedicated internal Slack app in **Settings › Integrations**, then connect it.
 - **Calendar.**
   A month of routine runs, due todos and Linear tickets, and your Google Calendar's events, read with omp's sign-in to Google Calendar's MCP server.
-- **Inbox.**
+- **Email.**
   Your Gmail inbox's latest conversations, with a rich-text editor to reply and write new mail, and Delete to Trash, each opening in Gmail, read with omp's sign-in to Gmail's MCP server.
 - **Several Google accounts.**
-  Connect more than one Gmail and Google Calendar account; the Inbox and the Calendar merge them, tagged by address, and an address you link to workspaces shows only in those and under **All workspaces**.
+  Connect more than one Gmail and Google Calendar account; the Email page and the Calendar merge them, tagged by address, and an address you link to workspaces shows only in those and under **All workspaces**.
   omp sessions are told, through the starter kit's `google-accounts` extension, which account each MCP server signs in as and which one their workspace links.
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
@@ -89,7 +89,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - Optional, for the Linear tickets: Linear's MCP server added to omp (`/mcp add` with `https://mcp.linear.app/mcp`) and signed in.
 - Optional, for Slack in omp sessions: a dedicated internal Slack app, with the MCP server and token rotation turned on, an HTTPS redirect, and the user scopes you choose, saved from **Settings › Integrations**.
 - Optional, for Google Calendar: a Google OAuth client of type Web application, with the Google Calendar API turned on, saved from **Settings › Integrations**.
-- Optional, for the Inbox: a Google OAuth client of type Web application, with the Gmail API turned on, saved from **Settings › Integrations**; the Google Calendar client works too.
+- Optional, for the Email page: a Google OAuth client of type Web application, with the Gmail API turned on, saved from **Settings › Integrations**; the Google Calendar client works too.
 
 ## Quick start
 
