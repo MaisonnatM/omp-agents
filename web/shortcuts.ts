@@ -2,7 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 import { commandKey, record } from "./activity";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the bar draws, whichever it is; one per tab of the larger group. */
-export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
+export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6"] as const;
 
 export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
 
@@ -38,6 +38,7 @@ export type ShortcutId =
 	| "tickets"
 	| "newTicket"
 	| "ticketsNew"
+	| "bots"
 	| "sessions"
 	| "todo"
 	| "notes"
@@ -241,6 +242,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
 	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Notes, Calendar, and Inbox pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] },
+	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
 	{ id: "notes", category: "general", label: "Go to your notes", command: "Go to notes", keys: [{ goTo: "n" }] },

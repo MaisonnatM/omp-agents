@@ -8,7 +8,6 @@ import type { SidebarSessions } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
 import { ShortcutChip } from "./kbd";
-import { BotsGroup, type BotEntry } from "./bots/bots-nav";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ScheduledGroup } from "./scheduled";
 import { HostRow, PastRow } from "./session-row";
@@ -36,14 +35,10 @@ interface SessionListProps {
 	scheduledOpen: string | null;
 	/** The New session button's label, naming the selected workspace. */
 	newSessionLabel: string;
-	/** Every Bot, whatever the workspace, with its running session's status. */
-	bots: readonly BotEntry[];
-	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while another page or the panes show. */
-	botsOpen: string | null | undefined;
 }
 
-/** The Sessions tab: New session, the search field, then the Bots, the scheduled sends, and the pinned, idle, running, interrupted, and past groups. */
-export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel, bots, botsOpen }: SessionListProps) {
+/** The Sessions tab: New session, the search field, then the scheduled sends, and the pinned, idle, running, interrupted, and past groups. */
+export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
@@ -80,7 +75,6 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
 					<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
 				)}
-				{!filtering && <BotsGroup bots={bots} openId={botsOpen} open={!collapsed.has("bots")} onOpenChange={() => toggleGroup("bots")} />}
 				{!filtering && <ScheduledGroup openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
 				{pinned.hosts.length + pinned.past.length > 0 && (
 					<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>

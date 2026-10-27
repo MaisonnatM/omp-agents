@@ -1,10 +1,10 @@
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
-import type { Bot } from "../../src/shared/bots";
+import type { Bot, BotId, BotLast } from "../../src/shared/bots";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import { botHost } from "../bots-model";
+import { botRows } from "../bots-model";
 import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarPanel, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
@@ -38,6 +38,8 @@ interface AppSidebarProps {
 	routines: Routine[];
 	/** The Bots, `null` until the server sends them. */
 	bots: Bot[] | null;
+	/** Each Bot's conversation's last words, `null` for a Bot with none yet. */
+	botLasts: Readonly<Record<BotId, BotLast | null>>;
 	todoView: TodoListView;
 	routinesTarget: string | null;
 	settings: SettingsRoute;
@@ -67,6 +69,7 @@ export const AppSidebar = memo(function AppSidebar({
 	past,
 	routines,
 	bots,
+	botLasts,
 	todoView,
 	routinesTarget,
 	settings,
@@ -88,7 +91,7 @@ export const AppSidebar = memo(function AppSidebar({
 	}, [listed, page, pullRequestsView, workspace, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const routinesOpen = page?.kind === "routines" ? routinesTarget : undefined;
-	const botEntries = useMemo(() => (bots ?? NO_BOTS).map(bot => ({ bot, status: botHost(bot, hosts)?.status ?? null })), [bots, hosts]);
+	const botList = useMemo(() => botRows(bots ?? NO_BOTS, hosts, botLasts), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
 	return (
 		<Roster
@@ -101,7 +104,7 @@ export const AppSidebar = memo(function AppSidebar({
 			open={page ? NO_VIEWS : panes}
 			newSessionOpen={page?.kind === "new"}
 			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
-			bots={botEntries}
+			bots={botList}
 			botsOpen={page?.kind === "bots" ? page.target : undefined}
 			tabs={tabs}
 			tab={tab}

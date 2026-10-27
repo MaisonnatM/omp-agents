@@ -1,27 +1,33 @@
-/** A Bot's page, its one conversation beside its job, memory, and routines, and the New Bot form. */
-import { Trash2 } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+/** A Bot's page, its one conversation under a header whose name opens its job, memory, and routines, and the New Bot form. */
+import { BookmarkCheck, ChevronDown, CircleStop, Trash2 } from "lucide-react";
+import { useId, useMemo, useRef, useState } from "react";
 import type { Routine } from "../../../src/routines";
-import { type Bot, type BotId, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
+import { type Bot, type BotId, type BotSpec, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botHost, botRoutines, memoryEntries } from "../../bots-model";
+import { botHost, botRoutines, memoryEntries, starterPrompts } from "../../bots-model";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForBots, hashForRoutines } from "../../routing";
 import { schedulesWords } from "../../routines-model";
 import { useAction } from "../../use-action";
-import { useDashboardActions } from "../dashboard-context";
+import { useSuggestions } from "../composer-suggestions";
+import { type ConversationChrome, ConversationChromeContext } from "../conversation-chrome";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Field, FIELD, TEXT_AREA } from "../form-field";
 import { PageFrame } from "../list-page";
 import { ViewConversation } from "../pane";
 import { Header } from "../page-header";
+import type { PromptEditorHandle } from "../prompt-editor";
 import { statusLabel } from "../status-dot";
 import { DirectoryPicker } from "../workspace-picker";
-import { BotAvatar } from "./bots-nav";
+import { BotAvatar } from "./bot-avatar";
+
+const NO_STARTERS: string[] = [];
 
 const specOf = ({ id, name, job, cwd, model, skill }: Bot): BotSpec => ({ id, name, job, cwd, model, skill });
 
@@ -56,24 +62,37 @@ function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
 	);
 }
 
-/** The composer while no omp runs the Bot's conversation: a message resumes it, or starts it when it has none. */
-function BotComposer({ bot, connected }: { bot: Bot; connected: boolean }) {
+/** The composer while no omp runs the Bot's conversation: a message resumes it, or starts it when it has none, and a new Bot offers its starters. */
+function BotComposer({ bot, connected, starters }: { bot: Bot; connected: boolean; starters: string[] }) {
 	const { request } = useDashboardActions();
+	const editorRef = useRef<PromptEditorHandle>(null);
 	const [text, setText] = useState("");
 	const send = useAction(async (value: string) => {
 		await request({ t: "bot", change: { op: "message", id: bot.id, text: value } });
 		setText("");
 	}, `Could not send to ${bot.name}`);
+	const suggestions = useSuggestions({
+		prompts: connected && !send.pending ? starters : NO_STARTERS,
+		draft: text,
+		onSend: value => send.run(value),
+		onFill: value => {
+			setText(value);
+			requestAnimationFrame(() => editorRef.current?.select(Number.POSITIVE_INFINITY));
+		},
+	});
 	return (
 		<div className="mx-auto w-full max-w-conversation px-3 pb-3">
 			<InputMessage
+				editorRef={editorRef}
 				value={text}
 				onValueChange={setText}
 				onSend={value => value && send.run(value)}
-				placeholder={`Message ${bot.name}…`}
+				editorProps={{ "aria-activedescendant": suggestions.activeId, onKeyDown: suggestions.onKeyDown, onBlur: suggestions.onBlur }}
+				placeholder={`Message ${bot.name}`}
 				disabled={!connected}
 				sending={send.pending}
 				sendLabel={`Send to ${bot.name}`}
+				afterActions={suggestions.list}
 			/>
 		</div>
 	);
@@ -191,48 +210,27 @@ interface BotPageProps {
 	connected: boolean;
 }
 
-/** The Bot's header and its conversation, live, ended, or not begun, beside its job, memory, and routines. */
-export function BotPage({ bot, memory, routines, hosts, past, lastHosts, models, workspaces, connected }: BotPageProps) {
-	const host = botHost(bot, hosts);
-	const instanceId = host?.instanceId ?? null;
-	const view = useMemo<View | null>(
-		() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : bot.sessionId !== null ? { kind: "past", sessionId: bot.sessionId } : null),
-		[instanceId, bot.sessionId],
-	);
-	const status = host ? statusLabel(host.status) : null;
-	const state = status ? `${status[0]!.toUpperCase()}${status.slice(1)}` : bot.sessionId ? "Not running, a message resumes it" : "No conversation yet";
+/** The Bot's details, which its name in the header opens: where it works, its job, memory, and routines, then End session while it runs and Delete. */
+function BotDetails({ bot, host, memory, routines, connected }: { bot: Bot; host: RosterHost | null; memory: string; routines: readonly Routine[]; connected: boolean }) {
+	const { end } = useDashboardActions();
+	const { ending } = useDashboardStatus();
+	const status = host ? statusLabel(host.status) : bot.sessionId ? "not running" : "no conversation yet";
 	return (
-		<div className="flex h-full min-h-0 flex-1">
-			<div className="flex min-w-0 flex-1 flex-col">
-				<Header leading={<BotAvatar bot={bot} size="header" />} title={bot.name} meta={state}>
-					<DeleteBot bot={bot} connected={connected} />
-				</Header>
-				<div className="relative flex min-h-0 flex-1 flex-col">
-					{view ? (
-						<ViewConversation
-							view={view}
-							focused
-							host={host}
-							lastHost={instanceId !== null ? (lastHosts.get(instanceId) ?? null) : null}
-							session={bot.sessionId !== null ? (past.find(({ sessionId }) => sessionId === bot.sessionId) ?? null) : null}
-							models={(instanceId !== null && models.get(instanceId)) || UNREAD}
-							workspaces={workspaces}
-							resumable={false}
-						/>
-					) : (
-						<div className="m-auto max-w-sm space-y-2 px-6 text-center">
-							<BotAvatar bot={bot} size="panel" />
-							<p className="text-sm text-muted-foreground">
-								Write to {bot.name} to start its conversation. It works in <span className="font-mono text-xs">{bot.cwd}</span>, and you come back to this same conversation every time.
-							</p>
-						</div>
-					)}
-				</div>
-				{!host && <BotComposer bot={bot} connected={connected} />}
-			</div>
-			<aside aria-label={`About ${bot.name}`} className="hidden w-80 shrink-0 flex-col gap-6 overflow-y-auto border-l border-border px-4 py-4 lg:flex">
+		<Popover>
+			<PopoverTrigger asChild>
+				<button
+					{...activityControl("bots.details")}
+					type="button"
+					aria-label={`${bot.name}, ${status}. Show its details`}
+					className="flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-semibold outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
+				>
+					<span className="truncate">{bot.name}</span>
+					<ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				</button>
+			</PopoverTrigger>
+			<PopoverContent align="start" collisionPadding={8} aria-label={`About ${bot.name}`} className="max-h-(--radix-popover-content-available-height) w-96 max-w-[calc(100vw-2rem)] space-y-5 overflow-y-auto p-4">
 				<div className="flex items-center gap-3">
-					<BotAvatar bot={bot} size="panel" />
+					<BotAvatar id={bot.id} size="sheet" working={host?.status === "working"} asking={host?.status === "needs-input"} />
 					<div className="min-w-0">
 						<p className="truncate text-sm font-semibold">{bot.name}</p>
 						<p className="truncate font-mono text-xs text-muted-foreground" title={bot.cwd}>
@@ -243,12 +241,66 @@ export function BotPage({ bot, memory, routines, hosts, past, lastHosts, models,
 				<JobEditor key={bot.job} bot={bot} connected={connected} />
 				<MemoryList bot={bot} memory={memory} />
 				<BotRoutines bot={bot} routines={routines} />
-			</aside>
+				<div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+					{host && (
+						<Button variant="ghost" size="compact" leadingIcon={CircleStop} loading={ending.has(host.instanceId)} disabled={!connected} onClick={() => end(host.instanceId)}>
+							End session
+						</Button>
+					)}
+					<DeleteBot bot={bot} connected={connected} />
+				</div>
+			</PopoverContent>
+		</Popover>
+	);
+}
+
+/** The Bot's header and its conversation, live, ended, or not begun, with its details behind its name. */
+export function BotPage({ bot, memory, routines, hosts, past, lastHosts, models, workspaces, connected }: BotPageProps) {
+	const host = botHost(bot, hosts);
+	const instanceId = host?.instanceId ?? null;
+	const view = useMemo<View | null>(
+		() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : bot.sessionId !== null ? { kind: "past", sessionId: bot.sessionId } : null),
+		[instanceId, bot.sessionId],
+	);
+	const chrome = useMemo<ConversationChrome>(
+		() => ({ placeholder: `Message ${bot.name}`, toolChips: { [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } } }),
+		[bot.name],
+	);
+	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
+	return (
+		<div className="flex h-full min-h-0 flex-1 flex-col">
+			<Header
+				leading={<BotAvatar id={bot.id} size="header" working={host?.status === "working"} asking={host?.status === "needs-input"} />}
+				title={<BotDetails bot={bot} host={host} memory={memory} routines={routines} connected={connected} />}
+			/>
+			<div className="relative flex min-h-0 flex-1 flex-col">
+				{view ? (
+					<ConversationChromeContext.Provider value={chrome}>
+						<ViewConversation
+							view={view}
+							focused
+							host={host}
+							lastHost={instanceId !== null ? (lastHosts.get(instanceId) ?? null) : null}
+							session={bot.sessionId !== null ? (past.find(({ sessionId }) => sessionId === bot.sessionId) ?? null) : null}
+							models={(instanceId !== null && models.get(instanceId)) || UNREAD}
+							workspaces={workspaces}
+							resumable={false}
+						/>
+					</ConversationChromeContext.Provider>
+				) : (
+					<div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
+						<BotAvatar id={bot.id} size="hero" />
+						<p className="text-lg font-semibold text-balance">Hi, I'm {bot.name}.</p>
+						<p className="text-sm text-pretty text-muted-foreground">I keep one conversation with you and remember what matters. Pick a starter below, or write your own.</p>
+					</div>
+				)}
+			</div>
+			{!host && <BotComposer bot={bot} connected={connected} starters={starters} />}
 		</div>
 	);
 }
 
-/** The New Bot form: its name, the workspace its conversation runs in, and its job. */
+/** The New Bot form: its name and job, then the workspace its conversation runs in, the sidebar's by default. */
 export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Workspace[]; defaultCwd: string; connected: boolean }) {
 	const { changeBot } = useDashboardActions();
 	const id = useId();
@@ -273,9 +325,6 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 				<Field label="Name" htmlFor={`${id}-name`}>
 					<input id={`${id}-name`} autoFocus value={name} placeholder="Scout" onChange={event => setName(event.target.value)} className={cn(FIELD, "w-full")} />
 				</Field>
-				<Field label="Workspace" hint="Its conversation runs in this directory.">
-					<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={setCwd} />
-				</Field>
 				<Field label="Job" htmlFor={`${id}-job`} hint="Every turn's system prompt carries it. You can change it later.">
 					<textarea
 						id={`${id}-job`}
@@ -286,6 +335,9 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 						onChange={event => setJob(event.target.value)}
 						className={TEXT_AREA}
 					/>
+				</Field>
+				<Field label="Workspace" hint="Its conversation runs in this directory.">
+					<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={setCwd} />
 				</Field>
 				<div className="flex items-center gap-3 border-t border-border pt-4">
 					<Button type="submit" disabled={!connected}>

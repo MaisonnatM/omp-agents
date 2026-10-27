@@ -57,9 +57,9 @@ test("browser-reserved chords stay the browser's, apart from the app's new-sessi
 	}
 });
 
-test("Cmd+1–5 go to the sidebar's tabs by position on macOS, Ctrl+1–5 elsewhere, including AZERTY", () => {
-	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
-	const azerty = ["&", "é", "\"", "'", "("];
+test("Cmd+1–6 go to the sidebar's tabs by position on macOS, Ctrl+1–6 elsewhere, including AZERTY", () => {
+	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6"] as const;
+	const azerty = ["&", "é", "\"", "'", "(", "-"];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
 		for (const [index, id] of positions.entries()) {

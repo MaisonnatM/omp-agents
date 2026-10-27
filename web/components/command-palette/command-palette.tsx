@@ -79,6 +79,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	"pull-requests": PAGE_ICON["pull-requests"],
 	tickets: PAGE_ICON.tickets,
 	newTicket: PAGE_ICON.tickets,
+	bots: PAGE_ICON.bots,
 	sessions: PAGE_ICON.sessions,
 	todo: PAGE_ICON.todo,
 	notes: PAGE_ICON.notes,

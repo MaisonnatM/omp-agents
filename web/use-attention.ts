@@ -68,8 +68,13 @@ export function useAttention(state: DashboardState, page: Page | null, send: (ms
 		if (raising.current) for (const alert of raise) desktop?.alert(alert);
 	}, [hosts]);
 
-	// A maximized pane hides the others, and a page hides them all.
-	const shown = useMemo(() => (page ? NO_VIEWS : layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes), [page, layout]);
+	// A maximized pane hides the others, and a page hides them all, but a Bot's page shows its conversation.
+	const botSession = page?.kind === "bots" && page.target !== null ? (state.bots?.find(({ id }) => id === page.target)?.sessionId ?? null) : null;
+	const botInstance = botSession === null ? null : (hosts.find(({ sessionId }) => sessionId === botSession)?.instanceId ?? null);
+	const shown = useMemo<View[]>(
+		() => (botInstance !== null ? [{ kind: "live", instanceId: botInstance, agentId: null }] : page ? NO_VIEWS : layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes),
+		[botInstance, page, layout],
+	);
 	useEffect(() => {
 		if (focused) for (const instanceId of unreadShown(hosts, shown)) send({ t: "read", instanceId });
 	}, [focused, hosts, shown, send]);

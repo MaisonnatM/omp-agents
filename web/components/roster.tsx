@@ -25,7 +25,8 @@ import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
-import type { BotEntry } from "./bots/bots-nav";
+import { BotsNav } from "./bots/bots-nav";
+import type { BotRow } from "../bots-model";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { InboxNav } from "./inbox/inbox-nav";
@@ -147,8 +148,8 @@ interface RosterProps {
 	newSessionOpen: boolean;
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;
-	/** Every Bot, whatever the workspace, with its running session's status. */
-	bots: readonly BotEntry[];
+	/** Every Bot's row, whatever the workspace, the most recent conversation first. */
+	bots: readonly BotRow[];
 	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while another page or the panes show. */
 	botsOpen: string | null | undefined;
 	/** The tabs the bar draws, the header switch's group's shown tabs, in order, which the position keys count. */
@@ -224,6 +225,7 @@ export function Roster({
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
+		bots: { count: bots.filter(({ asking }) => asking !== null).length, meaning: "asking you" },
 		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
@@ -280,10 +282,11 @@ export function Roster({
 					showWorkspace={workspace === null}
 					newSessionOpen={newSessionOpen}
 					scheduledOpen={scheduledOpen}
-					bots={bots}
-					botsOpen={botsOpen}
 					newSessionLabel={newSessionLabel}
 				/>
+			</TabPanel>
+			<TabPanel value="bots" className="flex min-h-0 flex-1 flex-col">
+				<BotsNav rows={bots} openId={botsOpen} />
 			</TabPanel>
 			<TabPanel value="pull-requests" asChild>
 				<SidebarContent>

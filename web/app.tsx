@@ -233,6 +233,7 @@ export function App() {
 											past={state.past}
 											routines={state.routines}
 											bots={state.bots}
+											botLasts={state.botLasts}
 											todoView={todoView}
 											routinesTarget={routinesTarget}
 											settings={settings}

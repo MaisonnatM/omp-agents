@@ -20,6 +20,7 @@ import {
 const DEFAULT: TabLayout = [
 	{ tab: "pull-requests", hidden: false },
 	{ tab: "tickets", hidden: false },
+	{ tab: "bots", hidden: false },
 	{ tab: "sessions", hidden: false },
 	{ tab: "todo", hidden: false },
 	{ tab: "routines", hidden: false },
@@ -50,6 +51,7 @@ test("decoding keeps each known tab once, drops a stored Settings tab, and puts 
 	expect(decodeTabLayout(raw)).toEqual([
 		{ tab: "pull-requests", hidden: false },
 		{ tab: "tickets", hidden: false },
+		{ tab: "bots", hidden: false },
 		{ tab: "inbox", hidden: true },
 		{ tab: "todo", hidden: false },
 		{ tab: "routines", hidden: false },
@@ -57,6 +59,11 @@ test("decoding keeps each known tab once, drops a stored Settings tab, and puts 
 		{ tab: "calendar", hidden: false },
 		{ tab: "sessions", hidden: false },
 	]);
+});
+
+test("a layout stored before the Bots tab gets it at its default place, before Sessions", () => {
+	const before = ["pull-requests", "tickets", "sessions", "todo", "routines", "notes", "calendar", "inbox"].map(tab => ({ tab, hidden: false }));
+	expect(decodeTabLayout(JSON.stringify(before))).toEqual(DEFAULT);
 });
 
 test("a stored layout decodes back to itself", () => {
@@ -67,24 +74,24 @@ test("a stored layout decodes back to itself", () => {
 test("moveTab swaps a tab with its neighbor and leaves a tab at either end where it is", () => {
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", -1)).toBe(DEFAULT_TAB_LAYOUT);
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "inbox", 1)).toBe(DEFAULT_TAB_LAYOUT);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "inbox", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "tickets", "sessions", "todo", "routines", "notes", "inbox", "calendar"]);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "sessions", "todo", "routines", "notes", "calendar", "inbox"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "inbox", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "tickets", "bots", "sessions", "todo", "routines", "notes", "inbox", "calendar"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "bots", "sessions", "todo", "routines", "notes", "calendar", "inbox"]);
 });
 
 test("hideTab hides and shows any tab", () => {
-	expect(hideTab(DEFAULT_TAB_LAYOUT, "todo", true)[3]).toEqual({ tab: "todo", hidden: true });
-	expect(hideTab(DEFAULT_TAB_LAYOUT, "inbox", true)[7]).toEqual({ tab: "inbox", hidden: true });
+	expect(hideTab(DEFAULT_TAB_LAYOUT, "todo", true)[4]).toEqual({ tab: "todo", hidden: true });
+	expect(hideTab(DEFAULT_TAB_LAYOUT, "inbox", true)[8]).toEqual({ tab: "inbox", hidden: true });
 	expect(hideTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "todo", false)).toEqual(DEFAULT);
 });
 
 test("shownTabs drops hidden and signed-out tabs and keeps the order", () => {
 	const layout = moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "inbox", -1);
-	expect(shownTabs(layout, new Set(["tickets"]))).toEqual(["pull-requests", "sessions", "routines", "notes", "inbox", "calendar"]);
+	expect(shownTabs(layout, new Set(["tickets"]))).toEqual(["pull-requests", "bots", "sessions", "routines", "notes", "inbox", "calendar"]);
 });
 
 test("groupTabs keeps the shown tabs of one group, in their order: Notes, Calendar, and Inbox are Ops, the rest Dev", () => {
 	const shown = shownTabs(moveTab(DEFAULT_TAB_LAYOUT, "inbox", -1), new Set());
-	expect(groupTabs(shown, "dev")).toEqual(["pull-requests", "tickets", "sessions", "todo", "routines"]);
+	expect(groupTabs(shown, "dev")).toEqual(["pull-requests", "tickets", "bots", "sessions", "todo", "routines"]);
 	expect(groupTabs(shown, "ops")).toEqual(["notes", "inbox", "calendar"]);
 	expect(groupTabs(["sessions", "todo"], "ops")).toEqual([]);
 });
@@ -114,7 +121,8 @@ test("positionKey takes the position among the tabs the bar draws, or none", () 
 	const dev = groupTabs(shown, "dev");
 	const ops = groupTabs(shown, "ops");
 	expect(positionKey("pull-requests", dev)).toBe("tab1");
-	expect(positionKey("sessions", dev)).toBe("tab2");
+	expect(positionKey("bots", dev)).toBe("tab2");
+	expect(positionKey("sessions", dev)).toBe("tab3");
 	expect(positionKey("notes", ops)).toBe("tab1");
 	expect(positionKey("inbox", ops)).toBe("tab2");
 	expect(positionKey("calendar", ops)).toBe("tab3");

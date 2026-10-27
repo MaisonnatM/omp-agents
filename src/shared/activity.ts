@@ -96,6 +96,7 @@ export const CONTROLS = [
 	{ id: "calendar.routines.toggle", label: "Calendar routine visibility", area: "Calendar" },
 	{ id: "routine-editor.target", label: "Routine prompt target picker", area: "Routines" },
 	{ id: "bots.delete", label: "Bot Delete, before it is confirmed", area: "Bots" },
+	{ id: "bots.details", label: "Bot details, opened from its name", area: "Bots" },
 	{ id: "bots.job.revert", label: "Bot job edit reverted", area: "Bots" },
 	{ id: "header.back", label: "Back button", area: "Header" },
 	{ id: "header.command-menu", label: "Command menu button", area: "Header" },

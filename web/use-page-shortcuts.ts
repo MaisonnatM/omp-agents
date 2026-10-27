@@ -71,6 +71,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				latest.current.showTab("pull-requests");
 			},
 			tickets: goToTab("tickets"),
+			bots: goToTab("bots"),
 			sessions: () => {
 				const { tab, page } = latest.current;
 				if (tab === "sessions" && !page) return;
@@ -114,6 +115,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (!linearCallable) return false;
 				setNewTicket(current => current ?? "");
 			},
+			bots: goTo.bots,
 			sessions: goTo.sessions,
 			todo: goTo.todo,
 			routines: goTo.routines,
