@@ -106,6 +106,7 @@ Files, in `agent/`:
 `bun run omp-template --maintainer` also copies [`maintainer/`](maintainer) on top of the same relative paths.
 The profile includes `AGENTS.md` for local-main pushing and worktree cleanup, `docs/git-workflow.md` for draft-first Graphite shipping, `skills/mma-mode/` for maintainer steering, and `skills/best-in-class-approach/`, the quality bar mma-mode stacks for build and review.
 Mma-mode resolves poteto by URI and loads only references matching the current task instead of a monolithic contract.
+It also includes two scripts, run with `python3 ~/.omp/agent/scripts/<name>`: `prune-git-branches.py`, which with `--apply` removes merged worktrees and local branches whose upstream is gone (a dry run without it), and `session-speed.py`, which compares agent time per prompt before and after a config cutover.
 The default install does not copy those files.
 `--force` still overwrites a file you already have, including one the profile replaces.
 

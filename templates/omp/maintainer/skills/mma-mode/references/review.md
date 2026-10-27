@@ -9,7 +9,7 @@ Read this when reviewing a PR, triaging review comments, writing PR metadata, or
   Never post a reply to a human; commands saying "reply + close" do not override this.
   Assess Bugbot and security-review comments per Poteto skeptical triage: fix, dismiss, or ask with a concrete reason.
 - **PR metadata:** **mma-pr-voice** for title + Summary/Awareness/Testing (**pr**, `gt submit`). Summary = plain-language TL;DR a near non-tech reader can follow; then what/why/how. Never mention "phases".
-- **Reply to review threads:** **answer-gh-comments**. Never reply to a human, but it can write the draft. mma posts.
+- **Review comments and thread replies:** draft in **maxence-voice** (`~/.omp/agent/skills/maxence-voice/SKILL.md`). Never reply to a human, but it can write the draft. mma posts.
 - **Quality pass:** **thermo-nuclear-code-quality-review** when invoked or stacked before **go**. On frontend diffs the pass also audits UI/UX against [frontend.md](frontend.md): design-system reuse, full state coverage (loading/empty/error), density, keyboard nav, a11y. UI/UX findings rank alongside structural ones, not as optional polish.
 - **Large diffs:** when a change is too big for one careful pass, fan the review out to subagents (per slice, layer, or concern) and synthesize the findings yourself.
 - **Feedback loop:** on review threads, synthesize with **wdyt?** before applying drive-by fixes.

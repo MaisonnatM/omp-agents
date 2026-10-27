@@ -82,3 +82,19 @@ Slack needs a dedicated app and an HTTPS redirect, so it takes the most setup.
    An HTTP localhost address does not work as the redirect.
 6. On the Slack row, click **Set up**, paste the client ID and client secret, and save.
 7. Click **Connect**.
+
+## Set up a new computer
+
+Two sources rebuild your setup: this repository's [starter kit](../templates/omp/README.md) and [Settings sync](usage/settings-sync.md).
+Neither carries a sign-in, a session, or anything that names this machine, so a few steps stay by hand.
+
+1. Install omp and Bun, clone this repository, and run `bun run omp-template` (add `--maintainer` for the maintainer profile).
+   This installs the extensions, the `docs/` references, the kit's skills, agents, and commands, and the profile's scripts.
+2. Open the dashboard, enter your remote in **Settings › Sync**, and sync.
+   This brings omp's `config.yml`, `AGENTS.md`, `APPEND_SYSTEM.md`, your own skills, agents, and commands, and the dashboard's notes, todos, preferences, workspaces, source control settings, and hidden calendars.
+3. The first sync has no shared base, so a file both the kit and the remote hold, such as `AGENTS.md`, conflicts when they differ; choose the remote side to keep the version you use.
+4. Sign in again: model providers with `/login`, each integration under **Settings › Integrations**, `gh auth login`, and your SSH keys.
+5. Recreate what stays on one machine: routines, scheduled sends, pins, and Google accounts, and reinstall omp plugins such as pstack.
+
+Settings sync skips a skill folder that is a link, so keep each skill as a real folder under `~/.omp/agent/skills/`, and link to it from other tools instead.
+Sessions and their history stay on the old computer; a todo's session link opens only there.
