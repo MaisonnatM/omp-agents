@@ -1,8 +1,11 @@
-/** What a Bot's details and its routine's page mark a routine with: its task's icon and its last run's dot. */
-import { type LucideIcon, MessageSquareText, SquareTerminal } from "lucide-react";
-import type { RoutineRun, RoutineTask } from "../../../src/routines";
+/** What a Bot's details and its routines card mark a routine with: its task's icon, its triggers' logos, and its runs' dots, icons, and ticks. */
+import { CalendarClock, CircleCheck, CircleDashed, CircleX, LoaderCircle, type LucideIcon, MessageSquareText, SquareTerminal } from "lucide-react";
+import type { ReactNode } from "react";
+import type { RoutineRun, RoutineTask, TriggerKind } from "../../../src/routines";
 import { cn } from "@/lib/utils";
 import { type RunHealth, runHealth, runWords } from "../../routines-model";
+import { BrandMark, GMAIL_LOGO, SLACK_LOGO } from "../integrations/brand-logos";
+import { OrgIcon } from "../org-icon";
 
 const TASK_ICON: Record<RoutineTask["kind"], LucideIcon> = { prompt: MessageSquareText, command: SquareTerminal };
 
@@ -28,3 +31,30 @@ export function RunDot({ run }: { run: RoutineRun | undefined }) {
 		</span>
 	);
 }
+
+/** Each health's icon, so a run's result reads by its shape as well as its colour. */
+const HEALTH_ICON: Record<RunHealth, { icon: LucideIcon; tone: string }> = {
+	ok: { icon: CircleCheck, tone: "text-emerald-600 dark:text-emerald-400" },
+	failed: { icon: CircleX, tone: "text-red-600 dark:text-red-400" },
+	running: { icon: LoaderCircle, tone: "text-blue-600 dark:text-blue-400" },
+	waiting: { icon: CircleDashed, tone: "text-amber-600 dark:text-amber-400" },
+};
+
+/** A run's result as an icon, labelled with the run's words. */
+export function RunIcon({ run, className }: { run: RoutineRun; className?: string }) {
+	const { icon: Icon, tone } = HEALTH_ICON[runHealth(run)];
+	return <Icon role="img" aria-label={runWords(run)} className={cn("size-3.5 shrink-0", tone, className)} />;
+}
+
+/** Each health's tick on a routine's run strip. */
+export const HEALTH_TICK: Record<RunHealth, string> = { ok: "bg-emerald-500", failed: "bg-red-500", running: "bg-blue-500", waiting: "bg-amber-500" };
+
+const MARK = "size-3.5 shrink-0";
+
+/** Each trigger's name and logo, the ones the notices bell marks the same sources with. */
+export const TRIGGER_MARKS: Record<TriggerKind, { name: string; logo: ReactNode }> = {
+	slack: { name: "Slack", logo: <BrandMark logo={SLACK_LOGO} className={MARK} /> },
+	"pull-request": { name: "GitHub pull requests", logo: <OrgIcon org="github" className={MARK} /> },
+	event: { name: "calendar events", logo: <CalendarClock aria-hidden className={MARK} /> },
+	gmail: { name: "Gmail", logo: <BrandMark logo={GMAIL_LOGO} className={MARK} /> },
+};

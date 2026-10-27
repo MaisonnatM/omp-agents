@@ -27,8 +27,8 @@ Messages to one Bot wait on one another, so two at once never start two conversa
 
 Every routine belongs to one Bot through its `botId`; see [Routines](routines.md).
 A prompt routine sends its prompt through `Bots.message` and records a `sent` outcome with the session id, and a command routine runs in the Bot's workspace, then posts how it ended the same way; the routine neither tracks nor ends that session.
-The details in the right sidebar, `BotDetails`, list its routines, `#bots/<id>/routines/<routine id>` shows one routine's `RoutineDetail` in place of the conversation, `#bots/<id>/routines/<routine id>/edit` its editor, and `#bots/<id>/routines/new` the editor of a new one.
+The details in the right sidebar, `BotDetails`, list its routines, `#bots/<id>/routines` shows the card of them all, `RoutinesCard`, in place of the conversation, `#bots/<id>/routines/<routine id>` the same card with that routine's row open, `#bots/<id>/routines/<routine id>/edit` its editor, and `#bots/<id>/routines/new` the editor of a new one.
 
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts that view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.
-`useDashboard` works out the open Bot once with `openBot` in `web/bots-model.ts` and hands it to the page, the details, `watched`, and `useAttention`: its conversation's view is the live session that runs it, else its saved one, and none while the page shows a routine, a routine editor, or a routine its address names but the Bot does not have.
+`useDashboard` works out the open Bot once with `openBot` in `web/bots-model.ts` and hands it to the page, the details, `watched`, and `useAttention`: its conversation's view is the live session that runs it, else its saved one, and none while the page shows the routines card, a routine editor, or a routine its address names but the Bot does not have.

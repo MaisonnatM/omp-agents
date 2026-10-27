@@ -33,6 +33,7 @@ describe("Bots", () => {
 			return open && { view: open.view, routine: open.routine, routines: open.routines.map(({ id }) => id) };
 		};
 		expect(shown(null)).toEqual({ view: { kind: "past", sessionId: "s2" }, routine: { kind: "conversation" }, routines: ["r1"] });
+		expect(shown({ kind: "list" })).toMatchObject({ view: null, routine: { kind: "list" } });
 		expect(shown({ kind: "new" })).toMatchObject({ view: null, routine: { kind: "new" } });
 		expect(shown({ kind: "open", id: "r1" })).toMatchObject({ view: null, routine: { kind: "open", routine: { id: "r1" } } });
 		expect(shown({ kind: "edit", id: "r1" })).toMatchObject({ view: null, routine: { kind: "edit", routine: { id: "r1" } } });
