@@ -14,6 +14,12 @@ The rest of the file stays.
 A file that is not a list of routines still moves aside.
 `parseRoutineSpec` in `src/routines.ts` checks each routine's fields both for the file and for the socket's `routine` save, so the two hold the same limits.
 The `Dashboard` refuses a save whose `botId` names no Bot, and sends the routines back to the page that asked.
+A Bot can also create, change, and delete its own routines through its `save_routine` and `delete_routine` tools; see [Bots](bots.md).
+They leave one `BotRoutineRequest` each in `routine-inbox/` beside `routines.json`, and `RoutineInbox` in `src/server/routine-inbox.ts` applies them through the list registry, oldest name first, so every page hears the change and the same check refuses a save for a Bot that is gone.
+`parseBotRoutineRequest` reads each file with `parseRoutineSpec`, and the inbox checks ownership against the routines as each file applies: a save must name the requesting Bot and, for an id that exists, change a routine of that Bot, and a remove must name an existing routine of that Bot.
+Any other file moves aside as `<name>.invalid` with a logged reason, and so does a change the routines refuse, such as a save for a Bot deleted since, with `the routines refused it; its Bot may be gone`.
+A save the routines already hold, as when a Bot saved the same edit twice while the dashboard was stopped, is done and deleted.
+Only the server that owns routines drains the inbox, so a request waits there while the dashboard is stopped.
 Each routine holds its last 10 runs, newest first.
 A run holds its slot time, its errors, `triggeredBy`, the events that started it, empty for a slot's or **Run now**'s run, and one `outcome`: `pending` from its claim, with whether it is still `queued`; `sent` with the session its message went to; or a `command` with the command's result once it ran.
 A run from before `outcome` migrates as the file loads, in `parseRun`, and nothing else sees the old fields: its `command` becomes a `command` outcome, a started session or a Bot's message `sent`, and otherwise `pending`, queued when its `queued` is set or its `queue` list holds an entry.
@@ -91,16 +97,16 @@ Calendar events are checked on the minute tick.
 ## One server runs the unattended work
 
 Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
-Routines, the todo inbox, the daily clean-up of checked todos, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
+Routines, the todo, note, routine, and bot inboxes, the daily clean-up of checked todos, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
 `OwnerLock` in `templates/omp/agent/extensions/github/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it.
 Taking over a dead or invalid owner holds a short ownership lock at `<path>.reap` and rereads the original file before removal, so competing reclaimers cannot remove a new owner's lock.
 The same mechanism recovers a crashed reclaimer's lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json` and `todos.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo inbox.
+On a takeover the server logs it, reads `routines.json` and `todos.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo, note, routine, and bot inboxes.
 A server that exits normally deletes its lock.
-The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo inbox, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo, note, routine, and bot inboxes, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 `scheduled.json` is the exception: `ScheduledFile` is a `shared` `ReducerFile`, so a send added on any server reaches the owner and only one process can claim it.
 Each mutation holds an `OwnerLock` at `<path>.lock` across reload, reduction, and the immediate JSON replacement, so independent server processes keep one another's changes.

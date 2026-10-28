@@ -58,6 +58,12 @@ export type BotChange =
 /** What edits `bots.json`: a page's save or remove, or the server binding a Bot to the session its conversation runs in. */
 export type BotEdit = Exclude<BotChange, { op: "message" }> | { op: "bind"; id: BotId; sessionId: string };
 
+/** What a Bot's `set_job` tool asks of the server: Bot `botId`'s job becomes `job`, empty to clear it. */
+export interface BotJobRequest {
+	botId: BotId;
+	job: string;
+}
+
 /** The longest job a Bot keeps, since every turn's system prompt carries it. */
 export const MAX_JOB_LENGTH = 20_000;
 
@@ -159,4 +165,12 @@ export function parseBotChange(value: unknown): BotChange | null {
 		default:
 			return null;
 	}
+}
+
+/** A request a Bot's `set_job` tool leaves for the server, with the same limit as a job the page saves, or `null`. */
+export function parseBotJobRequest(value: unknown): Parsed<BotJobRequest> {
+	if (!isObject(value)) return null;
+	const botId = parseBotId(value.botId);
+	const { job } = value;
+	return botId && typeof job === "string" && job.length <= MAX_JOB_LENGTH ? { ok: { botId, job } } : null;
 }

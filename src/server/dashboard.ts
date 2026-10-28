@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -48,6 +48,7 @@ import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
+import { BotInbox } from "./bot-inbox";
 import { Bots } from "./bots";
 import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
@@ -73,6 +74,7 @@ import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
 import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
+import { RoutineInbox } from "./routine-inbox";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
@@ -147,6 +149,8 @@ export class Dashboard {
 	readonly #lists: ListRegistry;
 	readonly #todoInbox: TodoInbox;
 	readonly #noteInbox: NoteInbox;
+	readonly #routineInbox: RoutineInbox;
+	readonly #botInbox: BotInbox;
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -317,6 +321,8 @@ export class Dashboard {
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), { active: () => ownerLock.held });
 		this.#noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
+		this.#routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
+		this.#botInbox = new BotInbox(botInboxDir, () => this.#botsFile.value, change => lists.apply("bots", change), { active: () => ownerLock.held });
 		const starter = createStarter({
 			sessions,
 			pathFor,
@@ -372,7 +378,7 @@ export class Dashboard {
 			live: sessionId => sessions.bySessionId(sessionId),
 			session: instanceId => sessions.get(instanceId),
 			savedFile: files.pathOf,
-			paths: { extension: botExtension, botsFile, botsDir },
+			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir },
 			now: () => new Date().toISOString(),
 			onChange: () => broadcasts.pushList("bots"),
 		});
@@ -631,6 +637,8 @@ export class Dashboard {
 		}
 		this.#todoInbox.watch();
 		this.#noteInbox.watch();
+		this.#routineInbox.watch();
+		this.#botInbox.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
@@ -656,6 +664,8 @@ export class Dashboard {
 		this.#stopMergeQueue();
 		this.#todoInbox.stop();
 		this.#noteInbox.stop();
+		this.#routineInbox.stop();
+		this.#botInbox.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
 		this.terminals.dispose();
@@ -823,6 +833,8 @@ export class Dashboard {
 			this.#scheduledRunner.recover();
 			void this.#todoInbox.drain();
 			void this.#noteInbox.drain();
+			void this.#routineInbox.drain();
+			void this.#botInbox.drain();
 			// It learned what the triggers see while another server ran routines, which that server fired.
 			this.#triggerWatch.forget();
 		}

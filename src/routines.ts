@@ -92,6 +92,15 @@ export type RoutineChange =
 	/** Claims a run now, whatever the schedule says. */
 	| { op: "run-now"; id: string };
 
+/** The changes a Bot makes to its own routines through its `save_routine` and `delete_routine` tools. */
+export type BotRoutineChange = Extract<RoutineChange, { op: "save" | "remove" }>;
+
+/** What a Bot's routine tools ask of the server: one change from `botId`, the Bot that asks; a save's routine must have that same `botId`. */
+export interface BotRoutineRequest {
+	botId: BotId;
+	change: BotRoutineChange;
+}
+
 /** A command routine's command: the longest one a routine saves, how long it may run, and how much of its output a run keeps. */
 export const MAX_COMMAND_LENGTH = 10_000;
 export const COMMAND_TIMEOUT_MS = 600_000;
@@ -139,7 +148,7 @@ export const isTriggeredBy = (routine: Routine, kind: TriggerKind): boolean => r
 export const watchedKinds = (routines: readonly Routine[]): TriggerKind[] => TRIGGER_KINDS.filter(kind => routines.some(routine => isTriggeredBy(routine, kind)));
 
 /** Whether `routine` already holds every field the page edits of `spec`. */
-function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
+export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 	return (
 		routine.botId === spec.botId &&
 		routine.name === spec.name &&
@@ -243,4 +252,22 @@ export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isNonEmpty(id) || !botId || !isNonEmpty(name) || typeof enabled !== "boolean" || !schedules || !triggers || !task) return null;
 	if (schedules.ok.length === 0 && triggers.ok.length === 0) return null;
 	return { ok: { id, botId, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled } };
+}
+
+/** A request a Bot's routine tools leave for the server, with the same limits as a routine the page saves, or `null`. */
+export function parseBotRoutineRequest(value: unknown): Parsed<BotRoutineRequest> {
+	if (!isObject(value) || !isObject(value.change)) return null;
+	const botId = parseBotId(value.botId);
+	const { change } = value;
+	if (!botId) return null;
+	switch (change.op) {
+		case "save": {
+			const routine = parseRoutineSpec(change.routine);
+			return routine ? { ok: { botId, change: { op: "save", routine: routine.ok } } } : null;
+		}
+		case "remove":
+			return isNonEmpty(change.id) ? { ok: { botId, change: { op: "remove", id: change.id } } } : null;
+		default:
+			return null;
+	}
 }

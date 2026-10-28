@@ -22,7 +22,7 @@
   Its optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it, and the name while the name is empty.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
   **Create** saves it and opens its page, `#bots/<id>`.
-  A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it remembers that.
+  A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
   The conversation reads as a chat: it shows your messages and the Bot's replies, never its tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
   The Bot's conversation is not listed in the **Sessions** tab, the command palette, or the workspace list; only its Bot's page shows it.
@@ -40,6 +40,7 @@
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
   Below come its **Job**, its **Memory**, its **Routines**, and **Delete**.
   Editing the job shows **Save job** and **Revert**; every turn's system prompt carries the saved job.
+  You can also tell the Bot in its conversation to change its job, and it saves the new one to its **Job** field once the dashboard applies it.
   **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date; for a long memory it lists the newest 16 KB, the part the Bot reads.
   Only the Bot writes it, with its `remember` tool, when you tell it something worth keeping.
   **Routines** lists the Bot's routines, each with its last run's dot, its schedules and triggers, and when it last ran and what that run did, or **Not run yet**; **New routine** opens the editor of a new one, `#bots/<id>/routines/new`.
@@ -50,4 +51,7 @@
 - **Delete**, in red, asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
 - Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, a calendar event, or unread mail triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
+  You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees a short line for each of its own routines on every turn, with the start of its prompt or command, and what it saves shows under its **Routines** once the dashboard applies it.
+  A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
+  A Bot can change only its own routines, never another Bot's.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.

@@ -60,8 +60,8 @@ export interface BotsDeps {
 	live(sessionId: string): BotSession | undefined;
 	session(instanceId: string): BotSession | undefined;
 	savedFile(sessionId: string): string | null;
-	/** The extension a Bot's session loads, the `bots.json` it reads, and the directory of the Bots' memories. */
-	paths: { extension: string; botsFile: string; botsDir: string };
+	/** The extension a Bot's session loads, the `bots.json` it reads and the inbox its `set_job` tool writes, the directory of the Bots' memories, and the `routines.json` and routine inbox its routine tools read and write. */
+	paths: { extension: string; botsFile: string; botInboxDir: string; botsDir: string; routinesFile: string; routineInboxDir: string };
 	now(): string;
 	/** A Bot's conversation moved to another session, which the list registry did not publish. */
 	onChange(): void;
@@ -127,9 +127,17 @@ export class Bots {
 	join(request: StartRequest): SessionJoin {
 		const id = request.kind === "new" ? request.bot : request.kind === "resume" ? this.list.find(bot => bot.sessionId === request.sessionId)?.id : undefined;
 		if (!id) return { rpc: PLAIN_LAUNCH, attach() {} };
-		const { extension, botsFile } = this.#deps.paths;
+		const { extension, botsFile, botInboxDir, routinesFile, routineInboxDir } = this.#deps.paths;
+		const flags = {
+			[BOT_FLAGS.bot]: id,
+			[BOT_FLAGS.bots]: botsFile,
+			[BOT_FLAGS.botInbox]: botInboxDir,
+			[BOT_FLAGS.memory]: this.#memoryPath(id),
+			[BOT_FLAGS.routines]: routinesFile,
+			[BOT_FLAGS.routineInbox]: routineInboxDir,
+		};
 		return {
-			rpc: { ...PLAIN_LAUNCH, args: ["-e", extension, `--${BOT_FLAGS.bot}`, id, `--${BOT_FLAGS.bots}`, botsFile, `--${BOT_FLAGS.memory}`, this.#memoryPath(id)] },
+			rpc: { ...PLAIN_LAUNCH, args: ["-e", extension, ...Object.entries(flags).flatMap(([name, value]) => [`--${name}`, value])] },
 			attach: session => {
 				this.#live.set(session.instanceId, id);
 				this.#bind(id, session.sessionId);
