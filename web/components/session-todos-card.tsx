@@ -11,6 +11,10 @@ import { latestTodos } from "../transcript-view";
 
 /** Whether the card shows the whole list, kept for every transcript; it starts folded to its summary. */
 const OPEN_KEY = "omp-agents.todos-card-open";
+const SHOWN_KEY = "omp-agents.todos-card-shown";
+
+/** Whether transcripts show the card at all, which Settings → Preferences toggles. */
+export const useTodosCardShown = () => useStoredState(SHOWN_KEY, raw => raw !== "false");
 
 const STATUS_LABEL: Record<TodoTask["status"], string> = {
 	pending: "To do",
@@ -176,7 +180,8 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 export function SessionTodosCard({ items }: { items: readonly Item[] }) {
 	const phases = useMemo(() => latestTodos(items), [items]);
 	const [open, setOpen] = useStoredState(OPEN_KEY, raw => raw === "true");
-	if (phases.length === 0) return null;
+	const [shown] = useTodosCardShown();
+	if (!shown || phases.length === 0) return null;
 	const all = phases.flatMap(phase => phase.tasks);
 	const done = all.filter(isClosed).length;
 	const current = all.find(task => task.status === "in_progress");
@@ -185,7 +190,7 @@ export function SessionTodosCard({ items }: { items: readonly Item[] }) {
 			open={open}
 			onOpenChange={setOpen}
 			aria-label="Todos"
-			className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-5rem)] w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur"
+			className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-5rem)] w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-sm backdrop-blur"
 		>
 			<CollapsibleTrigger {...activityControl("transcript.todos")} className="grid shrink-0 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 pt-2.5 pb-3 text-left outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
 				<ListChecks aria-hidden className="size-4 text-muted-foreground" />

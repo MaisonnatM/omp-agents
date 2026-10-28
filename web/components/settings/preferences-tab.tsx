@@ -13,6 +13,7 @@ import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
+import { useTodosCardShown } from "../session-todos-card";
 import { OrderButton, Section } from "./editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { putJson } from "../../api";
@@ -26,12 +27,12 @@ const THEME_OPTIONS: Record<Theme, [string, LucideIcon]> = {
 	dark: ["Dark", Moon],
 };
 
-function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string; shortcut: ShortcutId; checked: boolean; onToggle: () => void }) {
+function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string; shortcut?: ShortcutId; checked: boolean; onToggle: () => void }) {
 	return (
 		<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
 			<ToggleSwitch checked={checked} onCheckedChange={onToggle} />
 			{label}
-			<span className="text-muted-foreground">{shortcutKeys(shortcut)}</span>
+			{shortcut && <span className="text-muted-foreground">{shortcutKeys(shortcut)}</span>}
 		</label>
 	);
 }
@@ -182,6 +183,7 @@ function IdleProcessStop() {
 export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspace: string | null }) {
 	const [theme, setTheme] = useTheme();
 	const { hideTools, hideThinking, toggleTools, toggleThinking } = useContext(ActivityVisibility);
+	const [todosShown, setTodosShown] = useTodosCardShown();
 	return (
 		<>
 			<Section title="Theme" meta="System follows your computer's light or dark setting. Saved in this app.">
@@ -206,10 +208,11 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 					})}
 				</RadioGroup>
 			</Section>
-			<Section title="Transcript" meta="What each activity group shows under its heading, in every pane. Saved in this app.">
+			<Section title="Transcript" meta="What each activity group shows under its heading, and whether the agent's todo list floats at the top right, in every pane. Saved in this app.">
 				<div className="space-y-2">
 					<ActivitySwitch label="Show tool calls" shortcut="hideTools" checked={!hideTools} onToggle={toggleTools} />
 					<ActivitySwitch label="Show thinking" shortcut="hideThinking" checked={!hideThinking} onToggle={toggleThinking} />
+					<ActivitySwitch label="Show todos card" checked={todosShown} onToggle={() => setTodosShown(shown => !shown)} />
 				</div>
 			</Section>
 			<SidebarTabs />

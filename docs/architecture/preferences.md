@@ -1,7 +1,7 @@
 # Preferences
 
 The page's choices that describe the user rather than the machine follow the user through [Settings sync](settings-sync.md), so the server keeps them, and each page keeps its localStorage as the copy it paints from first.
-`PORTABLE_PREFERENCES` in `src/shared/preferences.ts` names them by localStorage key: the theme, **Show tool calls** and **Show thinking**, the sidebar tabs, the pinned skill, session notifications with their finished-turn, sound, and focused-sound choices, the default merge method, the Code tab's layout, wrap, and whitespace choices, and whether the Calendar shows routines.
+`PORTABLE_PREFERENCES` in `src/shared/preferences.ts` names them by localStorage key: the theme, **Show tool calls**, **Show thinking**, and **Show todos card**, the sidebar tabs, the pinned skill, session notifications with their finished-turn, sound, and focused-sound choices, the default merge method, the Code tab's layout, wrap, and whitespace choices, and whether the Calendar shows routines.
 Every other key stays on its machine: widths, splits, open panels, folds, drafts, caches, the command palette's frecency, the last merge method, team, and calendar, and the pull requests already seen.
 
 `src/server/preferences-file.ts` keeps them in `preferences.json` beside the access token, as `{ values }`, each value the raw string the page stores, and moves a file that holds anything else, a key this version does not carry included, to `preferences.json.invalid`.
