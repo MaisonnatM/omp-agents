@@ -105,9 +105,9 @@
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show todos card** shows or hides the agent's todo list in the Todos card beside or above the messages of every transcript; the card's **Files**, **Images**, and **Sources** sections stay.
-  **Sidebar tabs** lists the eight sidebar tabs in the order the sidebar shows them, each with its group, **Dev** or **Ops**, the Cmd+number it takes while its group shows, a switch that shows or hides it, and buttons that move it up or down.
-  A hidden tab only leaves the sidebar and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
-  Hiding every tab of a group disables its side of the header's **Dev** and **Ops** switch; the gear button always leads back here.
+  **Sidebar tabs** lists the eight sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
+  **Notes**, **Calendar**, and **Email** say **Header**: they sit in the header beside the command menu and take no number, and Cmd+1 goes to the first tab the sidebar's bar draws.
+  A hidden tab only leaves the sidebar's bar or the header and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.

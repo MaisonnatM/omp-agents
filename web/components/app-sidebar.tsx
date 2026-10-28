@@ -23,7 +23,7 @@ interface AppSidebarProps {
 	panes: View[];
 	tab: SidebarPanel;
 	onTab: (tab: SidebarTab) => void;
-	/** The tabs the bar draws, the header switch's group's shown tabs, in order. */
+	/** The shown tabs the bar draws, in order. */
 	tabs: readonly SidebarTab[];
 	/** The server has sent the session lists. */
 	listed: boolean;
