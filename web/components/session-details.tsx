@@ -28,7 +28,7 @@ export interface SessionWork {
 	live: LiveView | null;
 }
 
-/** The **PRs** tab, the **Browser** tab for a live session in the desktop app, and the **Tickets** tab once the session worked on any. */
+/** The **PRs** tab, the **Tickets** tab once the session worked on any, and the **Browser** tab for a live session in the desktop app. */
 export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets">[] {
 	return [
 		{
@@ -40,6 +40,9 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspa
 			scrollsItself: true,
 			content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={live?.instanceId ?? null} />,
 		},
+		...(tickets.length > 0
+			? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, scrollsItself: true, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
+			: []),
 		...(BROWSER_AVAILABLE && live !== null
 			? [
 					{
@@ -53,9 +56,6 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspa
 						content: <BrowserPanel key={scope} view={live} sessionId={scope} />,
 					} as const,
 				]
-			: []),
-		...(tickets.length > 0
-			? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, scrollsItself: true, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
 			: []),
 	];
 }
