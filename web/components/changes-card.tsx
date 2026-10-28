@@ -96,7 +96,7 @@ export const ChangesCard = memo(function ChangesCard({ view, sessionId, cwd, wor
 	if (!useContext(ActivityShown) || (!files?.length && !media?.length && sources.length === 0)) return null;
 	return (
 		<>
-			<section aria-label="Changes" className={cn("mx-3 -mb-3 divide-y divide-border/60 rounded-t-xl bg-muted pb-3", className)}>
+			<section aria-label="Changes" className={cn("mx-3 -mb-3 divide-y divide-border/60 rounded-t-xl border border-border bg-muted pb-3", className)}>
 				{files && files.length > 0 && (
 					<CardSection
 						title={
