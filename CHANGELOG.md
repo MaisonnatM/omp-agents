@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- Fixed: a running session's name in the sidebar still sat a little to the right of the others; it now lines up.
 - The Preview tab in the desktop app is now called Browser.
 - The Browser has a Start dev server button, which asks the session to start its app so the Browser can show it.
 - The Browser has a Full screen button; press it again or Escape to put it back in the sidebar.

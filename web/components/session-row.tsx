@@ -49,7 +49,8 @@ export const ROW_END = "ml-auto shrink-0 text-xs tabular-nums text-muted-foregro
 export function RowLine({ dot, badge, label, facts, end }: RowLineProps) {
 	return (
 		<span className="flex min-w-0 flex-1 items-baseline gap-2">
-			{dot && <span className="flex shrink-0 self-center">{dot}</span>}
+			{/* `contents` makes the dot itself the flex item, so a running session's `sr-only` label takes no gap. */}
+			{dot && <span className="contents *:self-center">{dot}</span>}
 			<span className="truncate font-medium text-foreground">{label}</span>
 			{facts && (
 				<span className={cn("shrink-0 text-xs", facts.alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} title={facts.title}>
