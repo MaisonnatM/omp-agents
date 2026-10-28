@@ -171,4 +171,36 @@ Drive the window through the Chrome DevTools Protocol: `osascript` keys go to th
   `BrowserWindow.getAllWindows()[0].close()` is what Cmd+W does, `app.emit("activate")` a Dock click, which shows the window only without `OMP_AGENTS_HEADLESS`, and `app.quit()` Cmd+Q.
   Replace `shell.openExternal` with a function recording its address to verify links without opening the user's browser.
 
+Evaluate through a helper that throws when the script throws.
+`Runtime.evaluate` reports a page exception in `exceptionDetails` and still answers, so a helper returning `result.result.value ?? result` hands the caller an object instead of the value.
+
+```ts
+const target = (await (await fetch(`http://127.0.0.1:${pagePort}/json`)).json()).find((t) => t.type === "page");
+const ws = new WebSocket(target.webSocketDebuggerUrl);
+await new Promise((resolve) => ws.addEventListener("open", resolve, { once: true }));
+const replies = new Map<number, (reply: any) => void>();
+ws.addEventListener("message", (event) => {
+	const reply = JSON.parse(String(event.data));
+	replies.get(reply.id)?.(reply);
+	replies.delete(reply.id);
+});
+let nextId = 0;
+const send = (method: string, params = {}) =>
+	new Promise<any>((resolve) => {
+		const id = ++nextId;
+		replies.set(id, resolve);
+		ws.send(JSON.stringify({ id, method, params }));
+	});
+async function ev(expression: string) {
+	const { result, error } = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+	if (error) throw new Error(error.message);
+	const thrown = result.exceptionDetails;
+	if (thrown) throw new Error(thrown.exception?.description ?? thrown.text);
+	return result.result.value;
+}
+```
+
+The page's content security policy limits `fetch` to its own origin, so `fetch` of a `blob:` image URL fails.
+Read such an image by drawing it on a canvas and calling `toDataURL()`.
+
 The page's `window.close()` destroys the window and quits the app, unlike Cmd+W.
