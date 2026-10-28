@@ -39,7 +39,7 @@ export async function startOwnedService(dir: string, owner: string, spec: Daemon
 		const { daemon } = await client.request({ op: "start", spec, owner, replace: true, awaitReady: true });
 		if (!psTable.TERMINAL_STATES[daemon.state]) return { running: true };
 		const logs = await client.request({ op: "logs", name: spec.name, lines: ENDED_LOG_LINES, head: false, follow: false, renderTerminalRows: true, timeoutMs: 1_000 });
-		return { ended: (logs.terminalRows?.join("\n") ?? Bun.stripANSI(logs.text)).trim() };
+		return { ended: Bun.stripANSI(logs.terminalRows?.join("\n") ?? logs.text).trim() };
 	} finally {
 		client.close();
 	}
