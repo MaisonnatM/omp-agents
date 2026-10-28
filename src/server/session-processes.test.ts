@@ -34,10 +34,18 @@ function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON
 		sessions: [A, B],
 		owner: true,
 		minutes: 30 as number | null,
+		/** What `lsof` finds listening, by pid; `null` when it fails. */
+		listeners: new Map([
+			[111, [5173, 24678]],
+			[110, [5173]],
+			[300, [9222]],
+			[100, [4000]],
+		]) as Map<number, number[]> | null,
 	};
 	const stopped: string[] = [];
 	const watch = new SessionProcessWatch({
 		readTable: async () => parsePs(state.ps.join("\n")),
+		readPorts: async () => state.listeners,
 		readDaemons: async () => state.reports,
 		projectDir: async cwd => (cwd.startsWith("/repo") ? "/repo" : cwd),
 		stopService: async (_scope, name, id) => {
@@ -71,17 +79,23 @@ describe("SessionProcessWatch", () => {
 				instanceId: "a",
 				omp: { memoryBytes: 73_400_320, cpuPercent: 2.5, processCount: 2 },
 				processes: [
-					{ id: DEV_ID, kind: "job", shared: false, label: "bun run dev", memoryBytes: 14_680_064, cpuPercent: 31, processCount: 2, startedAt: T0, stopsAt: minutes(30) },
-					{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, startedAt: T0, stopsAt: null },
-					{ id: API_ID, kind: "service", shared: false, label: "api: bun api.ts", memoryBytes: 0, cpuPercent: 0, processCount: 0, startedAt: T0, stopsAt: minutes(30) },
+					{ id: DEV_ID, kind: "job", shared: false, label: "bun run dev", memoryBytes: 14_680_064, cpuPercent: 31, processCount: 2, ports: [5173, 24678], startedAt: T0, stopsAt: minutes(30) },
+					{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, ports: [9222], startedAt: T0, stopsAt: null },
+					{ id: API_ID, kind: "service", shared: false, label: "api: bun api.ts", memoryBytes: 0, cpuPercent: 0, processCount: 0, ports: [], startedAt: T0, stopsAt: minutes(30) },
 				],
 			},
 			{
 				instanceId: "b",
 				omp: { memoryBytes: 52_428_800, cpuPercent: 4, processCount: 1 },
-				processes: [{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, startedAt: T0, stopsAt: null }],
+				processes: [{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, ports: [9222], startedAt: T0, stopsAt: null }],
 			},
 		]);
+	});
+
+	test("a failed lsof lists every process with no ports", async () => {
+		const { state, processesOf } = computer();
+		state.listeners = null;
+		expect((await processesOf("a"))?.map(item => item.ports)).toEqual([[], [], []]);
 	});
 
 	test("a busy session's processes never stop", async () => {

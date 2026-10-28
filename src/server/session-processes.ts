@@ -6,7 +6,7 @@
  */
 import type { DaemonReport, DaemonScope } from "../omp/modules";
 import { run } from "../proc";
-import { descendants, parsePs, PS_ARGV, PS_ENV, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
+import { descendants, LISTENERS_ARGV, parseListeners, parsePs, PS_ARGV, PS_ENV, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";
 import type { LiveSessionProcesses, SessionProcess, SessionProcesses } from "../shared/processes";
 import type { HostStatus } from "../shared/sessions";
@@ -29,6 +29,8 @@ export interface WatchedSession {
 export interface SessionProcessWatchDeps {
 	/** Every process now; `null` when `ps` failed. */
 	readTable(): Promise<ProcessTable | null>;
+	/** The TCP ports each process listens on, by pid; `null` when `lsof` failed. */
+	readPorts(): Promise<Map<number, number[]> | null>;
 	/** The daemons every broker scope runs now, without the ones that ended or that no live broker supervises. */
 	readDaemons(): Promise<DaemonReport[]>;
 	/** The project directory a broker scope names for `cwd`. */
@@ -107,12 +109,14 @@ export class SessionProcessWatch {
 
 	async #sample(): Promise<Sample> {
 		const sessions = this.#deps.sessions();
-		const [table, reports, projectDirs] = await Promise.all([
+		const [table, reports, projectDirs, listeners] = await Promise.all([
 			this.#deps.readTable(),
 			this.#deps.readDaemons(),
 			Promise.all(sessions.map(session => this.#deps.projectDir(session.cwd))),
+			this.#deps.readPorts(),
 		]);
 		if (!table) throw new Error("ps failed, so no session's processes are known");
+		const portsOf = (rows: ProcessRow[]): number[] => [...new Set(rows.flatMap(row => listeners?.get(row.pid) ?? []))].sort((a, b) => a - b);
 		const now = this.#deps.now();
 		const owner = this.#deps.owner();
 		const timeout = this.#deps.stopIdleAfterMinutes();
@@ -125,7 +129,7 @@ export class SessionProcessWatch {
 		const found: Sample = new Map();
 		for (const session of sessions) {
 			const groups = sessionGroups(table, session.pid);
-			const jobs = groups ? [...groups.jobs].map(([pgid, rows]) => jobItem(session, pgid, rows)) : [];
+			const jobs = groups ? [...groups.jobs].map(([pgid, rows]) => jobItem(session, pgid, rows, portsOf(rows))) : [];
 			const ompRow = table.get(session.pid);
 			this.#seen.set(session.instanceId, {
 				owners: new Set([...(previous.get(session.instanceId)?.owners ?? []), session.sessionId]),
@@ -167,6 +171,7 @@ export class SessionProcessWatch {
 					memoryBytes: memoryOf(tree),
 					cpuPercent: cpuOf(tree),
 					processCount: tree.length,
+					ports: portsOf(tree),
 					startedAt: snapshot.startedAt,
 					stopsAt: null,
 					target,
@@ -205,7 +210,7 @@ export class SessionProcessWatch {
 }
 
 /** Job `pgid` of `session`, named by its top process: the group's leader, else the first under omp. */
-function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[]): Item {
+function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[], ports: number[]): Item {
 	const top = rows.find(row => row.pid === pgid) ?? rows[0];
 	return {
 		id: JSON.stringify(["job", pgid, top.started]),
@@ -215,6 +220,7 @@ function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[]): Ite
 		memoryBytes: memoryOf(rows),
 		cpuPercent: cpuOf(rows),
 		processCount: rows.length,
+		ports,
 		startedAt: Date.parse(top.started),
 		stopsAt: null,
 		target: { kind: "job", members: new Map(rows.map(row => [row.pid, row.started])) },
@@ -230,6 +236,17 @@ function answerOf(sample: Sample): LiveSessionProcesses[] {
 export async function readProcessTable(): Promise<ProcessTable | null> {
 	const ps = await run(PS_ARGV, { env: PS_ENV, timeoutMs: 10_000 });
 	return ps.code === 0 ? parsePs(ps.stdout) : null;
+}
+
+/** The TCP ports each process listens on, read without blocking the server; `null` when `lsof` failed. */
+export async function readListeningPorts(): Promise<Map<number, number[]> | null> {
+	try {
+		const lsof = await run(LISTENERS_ARGV, { timeoutMs: 10_000 });
+		// lsof exits 1 when it finds no listener.
+		return lsof.code === 0 || lsof.code === 1 ? parseListeners(lsof.stdout) : null;
+	} catch {
+		return null;
+	}
 }
 
 /** Stops `processes` by {@link terminate}, reading `ps` without blocking the server. */

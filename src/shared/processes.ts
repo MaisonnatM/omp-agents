@@ -16,6 +16,8 @@ export interface SessionProcess {
 	/** The summed `ps` CPU percent of the same processes, each a percent of one core. */
 	cpuPercent: number;
 	processCount: number;
+	/** The TCP ports its processes listen on, sorted, such as a dev server's. */
+	ports: number[];
 	/** In ms since the epoch. */
 	startedAt: number;
 	/** When the idle stop ends it; null while a session it serves is busy, the idle stop is off, or this server does not run unattended work. */

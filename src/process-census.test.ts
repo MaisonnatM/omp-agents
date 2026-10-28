@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { descendants, parsePs, sessionGroups, stopTree } from "./process-census";
+import { descendants, parseListeners, parsePs, sessionGroups, stopTree } from "./process-census";
 
 /** omp (100) with an MCP server in its process group, two jobs, and a shared worker it spawned, which has a child of its own. */
 const PS = `
@@ -40,6 +40,15 @@ test("a session's groups are omp's own group and one job per other group under i
 		[120, [120]],
 	]);
 	expect(sessionGroups(parsePs(PS), 999)).toBeNull();
+});
+
+test("lsof's listeners read as each pid's ports, sorted and unique across IPv4 and IPv6", () => {
+	const lsof = ["p111", "f23", "n*:5173", "f24", "n[::1]:5173", "f25", "n127.0.0.1:24678", "p300", "f9", "n127.0.0.1:9222", ""].join("\n");
+	expect([...parseListeners(lsof)]).toEqual([
+		[111, [5173, 24678]],
+		[300, [9222]],
+	]);
+	expect(parseListeners("").size).toBe(0);
 });
 
 /** A root that exits on SIGTERM, with a child that ignores it, which prints its pid once it ignores it. */

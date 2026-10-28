@@ -58,6 +58,23 @@ export function parsePs(text: string): ProcessTable {
 	return table;
 }
 
+/** `lsof` listing every TCP port this user's processes listen on, in the fields {@link parseListeners} reads. */
+export const LISTENERS_ARGV = ["lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-Fpn"];
+
+/** The ports each pid listens on, sorted and unique, from {@link LISTENERS_ARGV}'s output: a `p<pid>` line, then an `n<address>:<port>` line per socket. */
+export function parseListeners(text: string): Map<number, number[]> {
+	const ports = new Map<number, Set<number>>();
+	let pid: number | null = null;
+	for (const line of text.split("\n")) {
+		if (line.startsWith("p")) pid = Number(line.slice(1));
+		else if (line.startsWith("n") && pid !== null) {
+			const port = Number(line.slice(line.lastIndexOf(":") + 1));
+			if (Number.isInteger(port) && port > 0) ports.set(pid, (ports.get(pid) ?? new Set()).add(port));
+		}
+	}
+	return new Map([...ports].map(([each, set]) => [each, [...set].sort((a, b) => a - b)]));
+}
+
 /** Every process now; `null` when `ps` failed. */
 function processTable(): ProcessTable | null {
 	const ps = Bun.spawnSync(PS_ARGV, { env: { ...process.env, ...PS_ENV } });
