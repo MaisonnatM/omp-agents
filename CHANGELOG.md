@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
-- Fixed: /ship no longer refuses to put a pull request live when a project's settings file holds an old GitHub token; it uses your GitHub sign-in instead.
+- Fixed: /ship no longer refuses to put a pull request live, or to check its review boxes, when a project's settings file holds an old GitHub token; it uses your GitHub sign-in instead.
 - A session running /ship now shows a Ship section in its todos card, with the current stage and a progress bar; unfold it to see every stage as a step.
 - In the Browser, Select element now opens a field on the element you click, so you can type a note at once; sending it adds the note and the element to the composer, and you can go on to the next element.
 - The Browser's Start dev server button now starts your app itself and opens it in the Browser; when it cannot, it asks the session as before.

@@ -30,10 +30,19 @@ function load(extension) {
 		appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
 		// input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.response answers the rest.
 		async exec(command, args) {
-			const gh = command === "env" ? args.findIndex((arg, i) => arg !== "-u" && args[i - 1] !== "-u") : -1;
-			const words = gh < 0 ? args : ["env", ...args.slice(0, gh), ...args.slice(gh + 1)];
-			executed.push(words);
-			const key = words.slice(0, gh < 0 ? 2 : gh + 3).join(" ");
+			// gh run as "env -u NAME… gh args" is recorded as "env -u NAME… args".
+			const unset = [];
+			let rest = args;
+			if (command === "env") {
+				while (rest[0] === "-u") {
+					unset.push(...rest.slice(0, 2));
+					rest = rest.slice(2);
+				}
+				rest = rest.slice(1);
+			}
+			const prefix = unset.length ? ["env", ...unset] : [];
+			executed.push([...prefix, ...rest]);
+			const key = [...prefix, ...rest.slice(0, 2)].join(" ");
 			return input.sequence?.shift() ?? input.responses?.[key] ?? input.response;
 		},
 	});
@@ -314,6 +323,24 @@ describe("checked PR description CLI", () => {
 			["api", "repos/acme/app/pulls/7"],
 			["api", "-X", "PATCH", "repos/acme/app/pulls/7", "-f", "body=Original summary.\n- [x] Reviewed\n"],
 		]);
+	});
+
+	test("a rejected GITHUB_TOKEN ahead of a working login is dropped, and the tool reads the PR with that login", () => {
+		const snapshot = { body: "Summary.", updated_at: "2026-10-26T12:00:00Z" };
+		const result = exercise("pr-description", {
+			run: true,
+			params: { repo: "acme/app", pr: 7, change: { kind: "read" } },
+			responses: {
+				"api repos/acme/app/pulls/7": { code: 1, stdout: "", stderr: "gh: Bad credentials (HTTP 401)" },
+				"auth status": { code: 0, stdout: JSON.stringify({ hosts: { "github.com": [
+					{ host: "github.com", state: "error", active: true, login: "", tokenSource: "GITHUB_TOKEN" },
+					{ host: "github.com", state: "success", active: false, login: "octocat", tokenSource: "keyring" },
+				] } }), stderr: "" },
+				"env -u GITHUB_TOKEN api repos/acme/app/pulls/7": { code: 0, stdout: JSON.stringify(snapshot), stderr: "" },
+			},
+		}, quotaConfig());
+		expect(result.run.isError).toBeFalsy();
+		expect(result.text).toContain("Summary.");
 	});
 });
 

@@ -52,7 +52,7 @@ Files, in `agent/`:
   When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.
   The interface review has the opposite default: the gate asks for the `- [x] Interface review` checkbox only when the repository commits `.omp/ui-paths` and a changed file matches one of its globs.
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
-  When GitHub rejects a token that gh reads from an environment variable, such as `GITHUB_TOKEN` from a project `.env`, while a stored gh login works, the extension runs gh without that variable for the rest of the session, which the agent's own `env -u` cannot do for omp's process.
+  When GitHub rejects a token that gh reads from an environment variable, such as `GITHUB_TOKEN` from a project `.env`, while a stored gh login works, this extension and `pr_description` run gh without that variable for the rest of the session, which the agent's own `env -u` cannot do for omp's process.
   When no stored login works, the gate names the rejected credential and the project `.env` file omp read it from at startup, never the token itself.
   A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
   `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the review gates.

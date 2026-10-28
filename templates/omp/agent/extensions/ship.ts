@@ -6,8 +6,8 @@ import { dirname, join } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { commands } from "./shell/commands";
-import { cooldownDirectory, GitHubAccess, quotaExhausted, quotaReset } from "./github/access";
-import { CommandError, GH, type Gh, ghJson, ghText } from "./github/command";
+import { quotaExhausted } from "./github/access";
+import { type GhCredential, GhRunner, rejectedCredential, TOKEN_VARIABLE } from "./github/runner";
 
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
@@ -298,27 +298,12 @@ export function publishBlocker(body: string, reviews: Reviews): string | undefin
 	return undefined;
 }
 
-/** A credential gh holds for a host, as `gh auth status --json hosts` reports it; the report carries no token. */
-export interface GhCredential {
-	host: string;
-	/** `success`, `error` when GitHub rejects it, or `timeout`. */
-	state: string;
-	/** Whether gh uses it for the host. */
-	active: boolean;
-	login: string;
-	/** The environment variable gh read it from, such as `GITHUB_TOKEN`, or the store it sits in, such as `keyring`. */
-	tokenSource: string;
-}
-
-/** How `gh auth status` names a token source that is an environment variable, such as `GITHUB_TOKEN`, rather than a store such as `keyring`. */
-const TOKEN_VARIABLE = /^[A-Z][A-Z0-9_]*$/;
-
 /**
  * Why GitHub rejects gh, or `undefined` when it accepts every credential gh uses: the credential and where it comes from, never a token.
  * `dotenvFiles` maps an environment variable to the project dotenv file its value came from.
  */
 export function authDiagnosis(credentials: GhCredential[], dotenvFiles: Record<string, string>): string | undefined {
-	const rejected = credentials.find(c => c.active && c.state === "error");
+	const rejected = rejectedCredential(credentials);
 	if (!rejected) return undefined;
 	const login = `\`gh auth login -h ${rejected.host}\``;
 	if (!TOKEN_VARIABLE.test(rejected.tokenSource)) {
@@ -330,12 +315,6 @@ export function authDiagnosis(credentials: GhCredential[], dotenvFiles: Record<s
 		file ? `omp read it from \`${file}\` when it started.` : "It is set in the environment omp started with.",
 		`Ask the user to replace it there, or remove it and run ${login}, then restart the session.`,
 	].join(" ");
-}
-
-/** The environment variable holding a token GitHub rejects ahead of a stored gh login it accepts, else `undefined`. */
-function overriddenLogin(credentials: GhCredential[]): string | undefined {
-	const rejected = credentials.find(c => c.active && c.state === "error" && TOKEN_VARIABLE.test(c.tokenSource));
-	return rejected && credentials.some(c => c.host === rejected.host && c.state === "success") ? rejected.tokenSource : undefined;
 }
 
 /** The dotenv file in `dir` each environment variable's current value came from: Bun loads `.env` and its variants from the directory omp starts in, except variables the launch environment already set. */
@@ -382,53 +361,14 @@ export default function ship(pi: ExtensionAPI) {
 	let lastRefresh = 0;
 	let lastSummary = "";
 	let refreshFailure: string | undefined;
-	/** Variables in omp's environment, such as a project `.env`'s `GITHUB_TOKEN`, whose token GitHub rejects while a stored login works; gh runs without them, which the agent's own `env -u` cannot do for omp's process. */
-	const rejectedTokens: string[] = [];
-	/** Keyed on the credential gh runs with, so a dropped token's cooldowns give way to those the stored login shares with the dashboard. */
-	let access = new GitHubAccess();
-	const runGh = (args: string[], cwd: string) => rejectedTokens.length
-		? pi.exec("env", [...rejectedTokens.flatMap(name => ["-u", name]), GH, ...args], { cwd, timeout: 20_000 })
-		: pi.exec(GH, args, { cwd, timeout: 20_000 });
-
-	const gh = async (ghArgs: string[], cwd: string) => {
-		if (ghArgs[0] === "auth") return runGh(ghArgs, cwd);
-		const run: Gh = args => runGh(args, cwd);
-		const budget = ghArgs[0] === "api" && ghArgs[1] !== "graphql" ? "rest" : "graphql";
-		const load = () => access.request(budget, () => ghText(run, ghArgs), async () => quotaReset(await ghJson(run, ["api", "rate_limit"]), budget));
-		const dropped = rejectedTokens.length;
+	const runner = new GhRunner((command, args, options) => pi.exec(command, args, options));
+	const gh = async (args: string[], cwd: string) => {
 		try {
-			const stdout = await load().catch(async error => {
-				if (!(error instanceof CommandError && /\bHTTP 401\b/.test(error.message))) throw error;
-				// A concurrent call may have dropped the token since this one ran; its retry needs no second report.
-				if (rejectedTokens.length === dropped) {
-					const variable = overriddenLogin((await credentials(cwd)) ?? []);
-					if (!variable) throw error;
-					rejectedTokens.push(variable);
-					access = new GitHubAccess(cooldownDirectory(rejectedTokens));
-				}
-				return load();
-			});
-			return { code: 0, stdout, stderr: "" };
+			return { code: 0, stdout: await runner.text(args, cwd), stderr: "" };
 		} catch (error) {
 			return { code: 1, stdout: "", stderr: error instanceof Error ? error.message : String(error) };
 		}
 	};
-	const authSchema = z.object({
-		hosts: z.record(z.string(), z.array(z.object({ host: z.string(), state: z.string(), active: z.boolean(), login: z.string().default(""), tokenSource: z.string() }))),
-	});
-
-	/** Each credential gh holds, as `gh auth status` reports it, else `undefined` when gh's answer is not that report. */
-	async function credentials(cwd: string): Promise<GhCredential[] | undefined> {
-		const r = await gh(["auth", "status", "--json", "hosts"], cwd);
-		let report: unknown;
-		try {
-			report = JSON.parse(r.stdout);
-		} catch {
-			return undefined;
-		}
-		const parsed = authSchema.safeParse(report);
-		return parsed.success ? Object.values(parsed.data.hosts).flat() : undefined;
-	}
 
 	function render(ctx: ExtensionContext) {
 		if (!ctx.hasUI || ctx.agent?.kind === "sub") return;
@@ -519,7 +459,7 @@ export default function ship(pi: ExtensionAPI) {
 			if (/^no pull requests found for branch\b/i.test(error)) {
 				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run each review stage the change needs, commit and push its fixes, add its box, and pass the ready gate before publishing.";
 			}
-			const held = quotaExhausted(error) ? undefined : await credentials(sessionDir);
+			const held = quotaExhausted(error) ? undefined : await runner.credentials(sessionDir);
 			const auth = held && authDiagnosis(held, dotenvFiles(sessionDir));
 			// gh's hint after its first line, `gh auth login`, cannot replace a token an environment variable holds, and the diagnosis names the fix.
 			return `Could not read the PR body to check its review and proof boxes: ${auth ? `${error.split("\n")[0]}. ${auth}` : error}`;

@@ -1,6 +1,5 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { GitHubAccess, quotaReset } from "./github/access";
-import { GH, type Gh, ghJson } from "./github/command";
+import { GhRunner } from "./github/runner";
 import { descriptionSnapshot, editDescription } from "./github/description";
 import { commands } from "./shell/commands";
 
@@ -16,7 +15,7 @@ export function descriptionWriteCommand(words: string[]): boolean {
 
 export default function prDescription(pi: ExtensionAPI) {
 	const z = pi.zod;
-	const access = new GitHubAccess();
+	const runner = new GhRunner((command, args, options) => pi.exec(command, args, options));
 	const parameters = z.object({
 		repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/).describe("GitHub owner/repository"),
 		pr: z.number().int().positive(),
@@ -38,9 +37,7 @@ export default function prDescription(pi: ExtensionAPI) {
 			if (!parsed.success) return { content: [{ type: "text", text: "Invalid PR description input." }], isError: true };
 			const { repo, pr, change } = parsed.data;
 			const path = `repos/${repo}/pulls/${pr}`;
-			const gh: Gh = args => pi.exec(GH, args, { cwd: ctx.cwd, timeout: 20_000 });
-			const reset = async () => quotaReset(await ghJson(gh, ["api", "rate_limit"]), "rest");
-			const read = async () => descriptionSnapshot(await access.request("rest", () => ghJson(gh, ["api", path]), reset));
+			const read = async () => descriptionSnapshot(await runner.json(["api", path], ctx.cwd));
 			try {
 				if (change.kind === "read") {
 					const snapshot = await read();
@@ -49,7 +46,7 @@ export default function prDescription(pi: ExtensionAPI) {
 				const result = await editDescription(`${repo}-${pr}`, change, {
 					read,
 					write: async body => {
-						await access.request("rest", () => ghJson(gh, ["api", "-X", "PATCH", path, "-f", `body=${body}`]), reset);
+						await runner.json(["api", "-X", "PATCH", path, "-f", `body=${body}`], ctx.cwd);
 					},
 				});
 				return { content: [{ type: "text", text: `${result.changed ? "Updated" : "Unchanged"} PR #${pr}. Original description preserved at ${result.originalFile}.` }], details: result };
