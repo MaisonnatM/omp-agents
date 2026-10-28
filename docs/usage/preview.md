@@ -9,7 +9,8 @@ It is in the [desktop app](desktop-app.md) only; a browser tab has no Preview.
 - The Preview opens on the address you last loaded for that session in the last 30 days, else on the first dev server the session runs.
   A dev server is a job or a service of the session, as the status bar's CPU card lists them, that listens on a port; omp's shared browser is never one.
   The server button lists every dev server the session runs, with its port, and picking one loads it.
-  With none, the Preview says so; start one in the session, or type its address.
+  With none, the Preview says so; start one with **Start dev server** below, or type its address.
+  **Start dev server**, under that message and at the bottom of the server menu, asks the session to run its dev server as a long-lived service in the worktree it works in; a running turn gets it as a follow-up, and the Preview finds the server once it listens.
 - The address field loads what you type when you press Enter; `localhost:5173` reads as `http://localhost:5173`.
   The Preview loads only addresses on this computer, `localhost`, `127.0.0.1`, and `[::1]`.
   A link in the app to any other address, and any link that opens a new window, opens in your default browser.

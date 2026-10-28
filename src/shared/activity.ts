@@ -125,6 +125,7 @@ export const CONTROLS = [
 	{ id: "preview.forward", label: "Preview forward", area: "Preview" },
 	{ id: "preview.reload", label: "Preview reload", area: "Preview" },
 	{ id: "preview.server", label: "Preview dev server menu", area: "Preview" },
+	{ id: "preview.start-server", label: "Preview Start dev server", area: "Preview" },
 	{ id: "preview.select-element", label: "Preview Select element", area: "Preview" },
 	{ id: "preview.open-in-browser", label: "Preview Open in browser", area: "Preview" },
 	{ id: "pull-requests.view.list", label: "Pull requests list view", area: "Pull requests" },

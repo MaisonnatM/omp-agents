@@ -2,13 +2,13 @@
  * `PreviewPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Preview
  * tab, where an element picked with react-grab lands in the session's composer.
  */
-import { ArrowLeft, ArrowRight, ExternalLink, MousePointerClick, RotateCw, Server } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
 import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
+import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { appendToComposer, liveDraftKey } from "../composer-drafts";
@@ -16,7 +16,12 @@ import { expiringStrings } from "../expiring-strings";
 import { initialAddress, previewCandidates } from "../preview-model";
 import { sessionProcessesStore } from "../reads";
 import { useWebview } from "../use-webview";
+import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
+
+/** What Start dev server sends the session: a long-lived server it owns, so its port joins the Preview's candidates. */
+const START_SERVER_PROMPT =
+	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Preview can show it. Reply with its address.";
 
 /** The window can show a Preview: the desktop app, from the build that added it. */
 export const PREVIEW_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
@@ -59,6 +64,11 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		onNavigate: url => addresses.set(sessionId, url),
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
+	const { request } = useDashboardActions();
+	const startServer = () => {
+		request({ t: "prompt", view, text: START_SERVER_PROMPT, images: [], delivery: "followUp" });
+		toasts.add({ title: "Asked the session to start its dev server" });
+	};
 	// The candidates choose the first address and fill the server menu, so `ps` and `lsof` run only for those.
 	sessionProcessesStore.usePolling(null, webview.src === null || menuOpen);
 	const mounted = webview.src !== null;
@@ -107,6 +117,11 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 								<span className="font-mono text-xs text-muted-foreground">:{candidate.port}</span>
 							</MenuItem>
 						))}
+						<MenuSeparator />
+						<MenuItem {...activityControl("preview.start-server")} onClick={startServer}>
+							<Play />
+							Start dev server
+						</MenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<ToolbarButton label="Select element" control="preview.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
@@ -134,7 +149,11 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
 					<Server aria-hidden className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
-					<p className="text-xs text-muted-foreground/80">Start one in the session, or type its address above.</p>
+					<p className="text-xs text-muted-foreground/80">Ask the session to start one, or type its address above.</p>
+					<Button {...activityControl("preview.start-server")} variant="outline" size="sm" className="mt-1" onClick={startServer}>
+						<Play />
+						Start dev server
+					</Button>
 				</div>
 			) : (
 				<webview
