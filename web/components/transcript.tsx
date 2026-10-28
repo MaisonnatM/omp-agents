@@ -630,11 +630,11 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 
 	return (
 		<OpenToolImage.Provider value={openImage}>
-			<div className="@container/transcript relative flex min-h-0 flex-1 flex-col">
+			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
 				<SessionTodosCard items={items} view={view} working={working} changes={activityShown ? changes : undefined} />
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>
-						<MessageScrollerContent className="mx-auto max-w-conversation gap-3 p-3" aria-relevant="additions text" data-transcript>
+						<MessageScrollerContent className="conversation-lane gap-3 p-3" aria-relevant="additions text" data-transcript>
 							{visibleBlocks.map(block => {
 								if (block.kind === "activity") {
 									const chips = [...new Set(block.entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(toolChips, entry.name) ? [entry.name] : [])))];

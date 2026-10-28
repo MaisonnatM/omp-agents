@@ -333,6 +333,26 @@
   }
 }
 
+/* The conversation column. Beside the floating todos card it moves left, as t3code's chat lane does: on a narrow
+   pane it centers between the pane's left edge and the card, and the shift eases to zero as the pane widens, so a
+   resize never jumps it. The 22.75rem is the card's 20rem, its 0.75rem edge gap, and 2rem clearance before it. */
+@utility conversation-lane {
+  width: 100%;
+  max-width: var(--container-conversation);
+  margin-inline: auto;
+
+  @container conversation (min-width: 62.75rem) {
+    :where([data-conversation]:has([data-todos-card])) & {
+      --lane-width: min(var(--container-conversation), 100cqw - 22.75rem);
+      --lane-centered: calc((100cqw - var(--lane-width)) / 2);
+      --lane-shift: min(10.375rem, max(0rem, 10.375rem - (100cqw - 22.75rem - var(--lane-centered) - var(--lane-width))));
+      width: var(--lane-width);
+      max-width: none;
+      margin-inline: clamp(0rem, var(--lane-centered) - var(--lane-shift), 100cqw - 22.75rem - var(--lane-width)) auto;
+    }
+  }
+}
+
 @utility surface-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
