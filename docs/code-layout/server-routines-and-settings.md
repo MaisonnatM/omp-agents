@@ -21,4 +21,4 @@
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.
 - `.env.test`: `bun test` loads it before any test, so every child a test starts, even through Bun's default spawn environment, runs git without the developer's global and system config, with a test identity and no auto-maintenance.
   A test's commit never signs through the developer's gpg-agent, which stalls past Bun's 5-second test timeout or fails while other sessions sign; `src/git.test.ts` checks it.
-- `.githooks/pre-push`: runs the checks `.github/workflows/checks.yml` runs before a push; the `prepare` script points `core.hooksPath` at `.githooks/` on `bun install`.
+- `.githooks/pre-push`: refuses a push to `main` that leaves `CHANGELOG.md` unchanged, then runs the checks `.github/workflows/checks.yml` runs; the `prepare` script points `core.hooksPath` at `.githooks/` on `bun install`.
