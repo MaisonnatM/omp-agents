@@ -27,9 +27,9 @@
   An issue counts when the session or one of its subagents changed or opened it (`save_issue`) or commented on it (`save_comment`), when the session names it in its `/ship` step, or when a Linear link to it is in the session's own prompt.
   Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
   So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
-- Sessions that use `/ship` show their current workflow step in the sidebar, for example `6/7 · Rebase`.
+- Sessions that use `/ship` show their current workflow step in the sidebar, for example `7/8 · Rebase`.
   Hover the badge to see the Linear issue.
-  The steps are ticket, implementation, draft PR, thermonuclear review, ready gate, live review, and merged.
+  The steps are ticket, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.

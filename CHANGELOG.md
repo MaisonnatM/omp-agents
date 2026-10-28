@@ -6,6 +6,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-10-28
 
 - While you are still trying out a design with an agent, it now also waits for your go on the direction before writing tests for it.
+- /ship now runs an interface review before the deep code review when a pull request changes files a project lists as interface files, and holds the pull request back from going live until its fixes are pushed.
+- Behind the scenes: omp-agents lists its page's components and styles as interface files, so its own pull requests that change them get the interface review.
 - The todos card in a session now has a lighter shadow, and you can hide it with the checklist button after the session's title or with Show todos card in Settings → Preferences.
 - The todos card in a session now has a lighter shadow, never covers the conversation, sitting above it when the pane is too narrow to keep it at the side, and you can hide it with Show todos card in Settings → Preferences.
 - While you are still trying out a design with an agent, it now waits for your go on the direction before running its deep code review, instead of reviewing every round of tweaks.

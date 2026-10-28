@@ -18,6 +18,7 @@ Then read the section for the work: [Changelog](#changelog), [omp imports](#omp-
   Bump Bun's version in both workflows together with the README's.
   Check a new omp release with `bun run omp-release` and the [omp release skill](.agents/skills/omp-release/SKILL.md) before you bump it.
 - A change to a file that [`.omp/review-paths`](.omp/review-paths) matches needs the thermonuclear review before it ships; add a file there when it becomes a shared contract or a central file.
+- A change to a file that [`.omp/ui-paths`](.omp/ui-paths) matches needs the interface review before the thermonuclear one.
 
 ## Changelog
 
