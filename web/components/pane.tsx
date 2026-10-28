@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Route, X } from "lucide-react";
+import { ListChecks, Maximize2, Minimize2, Route, X } from "lucide-react";
 import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -18,6 +18,7 @@ import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { ReplayCompareDialog } from "./replay-compare";
 import { SidebarToggle } from "./sidebar-panel";
+import { useTodosCardShown } from "./session-todos-card";
 import { SubagentLinks } from "./transcript";
 
 interface PaneProps {
@@ -88,20 +89,36 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 	const replay = view.kind === "past" ? session?.replay : view.agentId === null ? (host ?? lastHost)?.replay : undefined;
 	const [compareOf, setCompareOf] = useState<string | null>(null);
 
-	const trajectoryToggle = (
-		<Tooltip content={trajectory ? "Show the transcript" : "Show the trajectory: each turn's injected context, model requests, tool calls, and token usage"} side="bottom">
-			<Button
-				{...activityControl("trajectory.toggle")}
-				variant="ghost"
-				size="icon-compact"
-				aria-label="Trajectory"
-				aria-pressed={trajectory}
-				className={cn(trajectory && "bg-muted text-foreground")}
-				onClick={() => setTrajectoryOf(trajectory ? null : hashForView(view))}
-			>
-				<Route />
-			</Button>
-		</Tooltip>
+	const [todosShown, setTodosShown] = useTodosCardShown();
+	const titleActions = (
+		<>
+			<Tooltip content={trajectory ? "Show the transcript" : "Show the trajectory: each turn's injected context, model requests, tool calls, and token usage"} side="bottom">
+				<Button
+					{...activityControl("trajectory.toggle")}
+					variant="ghost"
+					size="icon-compact"
+					aria-label="Trajectory"
+					aria-pressed={trajectory}
+					className={cn(trajectory && "bg-muted text-foreground")}
+					onClick={() => setTrajectoryOf(trajectory ? null : hashForView(view))}
+				>
+					<Route />
+				</Button>
+			</Tooltip>
+			<Tooltip content={todosShown ? "Hide the todos card" : "Show the todos card"} side="bottom">
+				<Button
+					{...activityControl("todos-card.toggle")}
+					variant="ghost"
+					size="icon-compact"
+					aria-label="Todos card"
+					aria-pressed={todosShown}
+					className={cn(todosShown && "bg-muted text-foreground")}
+					onClick={() => setTodosShown(shown => !shown)}
+				>
+					<ListChecks />
+				</Button>
+			</Tooltip>
+		</>
 	);
 	const headerActions = (
 		<>
@@ -118,7 +135,7 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			resume={resume}
 			onResume={onResume}
 			actions={headerActions}
-			titleAction={trajectoryToggle}
+			titleAction={titleActions}
 			trajectory={trajectory}
 			header={header}
 		/>
@@ -133,7 +150,7 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			send={send}
 			onEnd={end}
 			actions={headerActions}
-			titleAction={trajectoryToggle}
+			titleAction={titleActions}
 			trajectory={trajectory}
 			focused={focused}
 			workspaces={workspaces}
