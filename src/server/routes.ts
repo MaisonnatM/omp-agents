@@ -75,16 +75,16 @@ import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * DAY_MS;
 
-/** What the session routes read: the directories sessions ran in, their files, and the workspaces Settings keeps. */
+/** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
-	/** Directories sessions ran in: live ones first, then saved ones newest first. */
+	/** The workspaces sessions count in: live ones first, then saved ones newest first. */
 	knownCwds(): string[];
 	/** The directories Settings → Workspaces added, which the page names as workspaces before any session runs there. */
 	addedCwds(): string[];
 	/** Apply `change` to the workspaces and send every socket the workspaces after it. */
 	changeWorkspaces(change: WorkspaceChange): void;
-	/** The listed file of a session, for Analytics' title and working directory. */
-	savedOf(sessionId: string): SessionSummary | null;
+	/** The listed file of a session, for Analytics' title and the workspace it counts in. */
+	summaryOf(sessionId: string): SessionSummary | null;
 	/** The requests Claude Code's and Codex's transcripts record, each transcript read past what earlier reads folded. */
 	foreignUsage(): Promise<FileUsage[]>;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
@@ -222,7 +222,7 @@ async function dirParam(params: URLSearchParams): Promise<string | Response> {
 function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes {
 	/**
 	 * The `cwd` a request names, `null` when it names none, or the response refusing it. `cwd` must be a
-	 * directory some session ran in or Settings → Workspaces added: the page names workspaces that way, as it names sessions by id.
+	 * workspace some session counts in or Settings → Workspaces added: the page names workspaces that way, as it names sessions by id.
 	 */
 	function workspaceCwd(params: URLSearchParams): string | null | Response {
 		const cwd = params.get("cwd");
@@ -286,7 +286,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		if (!isAnalyticsRange(value)) return fail(400, "Unknown analytics range");
 		return answer(async () => {
 			const [read, foreign] = await Promise.all([readStats(value), env.foreignUsage()]);
-			return buildAnalytics(value, withForeignUsage(read, foreign), sessionsDir, env.savedOf);
+			return buildAnalytics(value, withForeignUsage(read, foreign), sessionsDir, env.summaryOf);
 		});
 	});
 
@@ -301,7 +301,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			const index = contextIndex();
 			index.refresh();
 			const rows = index.read(windowOf(range, Date.now()).cutoff);
-			return buildContextReport({ range, cwd: params.get("cwd"), sessionId: params.get("session"), indexing: index.progress, ...rows, root: sessionsDir, factsOf: env.savedOf });
+			return buildContextReport({ range, cwd: params.get("cwd"), sessionId: params.get("session"), indexing: index.progress, ...rows, root: sessionsDir, factsOf: env.summaryOf });
 		});
 	});
 

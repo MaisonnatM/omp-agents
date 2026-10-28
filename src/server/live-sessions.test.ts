@@ -3,7 +3,7 @@ import type { LiveSession } from "../live-session";
 import type { SessionFacts } from "../shared/sessions";
 import { LiveSessions, withSubject } from "./live-sessions";
 
-const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, worktree: null, branch: null };
+const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, worktree: null, branch: null, workspace: null };
 
 describe("withSubject", () => {
 	test("puts a quick action's pull request or issue first among the session's links", () => {
@@ -56,7 +56,7 @@ describe("LiveSessions", () => {
 		const sessions = new LiveSessions(() => {});
 		const live = { instanceId: "i1", sessionId: "s1", cwd: "/work", row: () => ({ instanceId: "i1" }), follow() {}, finished: () => false } as unknown as LiveSession;
 		sessions.add(live, null);
-		const unread = () => sessions.rows(() => facts)[0]?.unread;
+		const unread = () => sessions.rows(() => facts, () => null)[0]?.unread;
 		expect(sessions.markRead("i1")).toBe(false);
 		sessions.markUnread("i1", "\n  Fixed the **flaky** test.  \nDetails follow.");
 		expect(unread()).toEqual({ at: expect.any(Number), reply: "Fixed the **flaky** test." });

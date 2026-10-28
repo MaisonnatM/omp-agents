@@ -11,6 +11,7 @@ import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
 import { hashForNotes, hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
 import { type SessionEntry, viewOf } from "./session-actions";
+import { workspaceOf } from "./sessions";
 import { TODO_STATUS } from "./todo-views";
 
 export interface PaletteRecords {
@@ -90,8 +91,8 @@ export function recordItems({ todos, notes, tickets, pullRequestRepos }: Palette
 	return [...todoItems, ...noteItems, ...ticketItems, ...pullRequestItems];
 }
 
-/** Open `view`, whose session ran in `cwd`, in the focused pane or a split, scrolled to message `messageId`. */
-export type OpenAt = (view: View, cwd: string, mode: OpenMode, messageId: string) => void;
+/** Open `view`, whose session counts in workspace `workspace`, in the focused pane or a split, scrolled to message `messageId`. */
+export type OpenAt = (view: View, workspace: string, mode: OpenMode, messageId: string) => void;
 
 /** The most conversation matches the palette lists. */
 const MAX_CONVERSATION_ITEMS = 30;
@@ -110,7 +111,7 @@ export function conversationItems(hits: readonly ConversationHit[], hosts: reado
 		const entry = entries.get(hit.sessionId);
 		if (!entry) return [];
 		const view = viewOf(entry);
-		const { cwd } = entry.kind === "live" ? entry.host : entry.session;
+		const { cwd } = workspaceOf(entry.kind === "live" ? entry.host : entry.session);
 		const matches: Accessory = { kind: "text", text: hit.matches === 1 ? "1 match" : `${hit.matches} matches` };
 		const state: Accessory = entry.kind === "live" ? { kind: "status", status: entry.host.status } : { kind: "age", at: entry.session.modifiedAt };
 		return [

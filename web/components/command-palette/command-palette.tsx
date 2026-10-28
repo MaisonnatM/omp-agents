@@ -56,6 +56,7 @@ import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
 import { hashForNotes, type OpenMode, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
+import { workspaceOf } from "../../sessions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { tabShortcutLabels } from "../../sidebar-tabs";
 import { useStoredState } from "../../stored-state";
@@ -101,8 +102,8 @@ interface CommandPaletteProps {
 	workspaces: Workspace[];
 	/** The sidebar's workspace, or `null` for all workspaces. */
 	workspace: string | null;
-	/** Open `view`, whose session ran in `cwd`, and keep it listed by switching the sidebar to its workspace. */
-	onOpenSession: (view: View, cwd: string, mode: OpenMode) => void;
+	/** Open `view`, whose session counts in workspace `workspace`, and keep it listed by switching the sidebar to that workspace. */
+	onOpenSession: (view: View, workspace: string, mode: OpenMode) => void;
 	onPickWorkspace: (cwd: string | null) => void;
 	/** Pinned sessions, by session ID. */
 	pinned: ReadonlySet<string>;
@@ -155,17 +156,18 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	const sessionItems = useMemo((): PaletteItem[] => {
 		const sessionItem = (entry: SessionEntry): PaletteItem => {
 			const row = entry.kind === "live" ? entry.host : entry.session;
+			const { cwd } = workspaceOf(row);
 			const actions = sessionActions(entry, {
 				onScreen: false,
 				pinned: pinned.has(row.sessionId),
 				resuming,
 				ending: entry.kind === "live" && ending.has(entry.host.instanceId),
-				open: (picked, mode) => onOpenSession(picked, row.cwd, mode),
+				open: (picked, mode) => onOpenSession(picked, cwd, mode),
 				togglePin: onTogglePin,
 				resume: sessionId => start({ kind: "resume", sessionId }),
 				dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
 				end,
-				workspaceSettings: workspaceSettings(row.cwd),
+				workspaceSettings: workspaceSettings(cwd),
 			});
 			const keywords = [...row.pullRequests.map(pr => `${pr.repo}#${pr.number}`), ...row.tickets];
 			return entry.kind === "live"

@@ -51,7 +51,7 @@ function harness() {
 			join.attach({ instanceId, sessionId: session.sessionId, cwd: "/work/webapp" });
 			if (request.kind === "new") session.heard.push(`steer ${request.prompt}`);
 			saved.add(session.sessionId);
-			return { ok: true, instanceId, cwd: "/work/webapp", prompt: null };
+			return { ok: true, instanceId, workspace: "/work/webapp", prompt: null };
 		},
 		live: sessionId => live(sessions.find(session => session.sessionId === sessionId && !session.ended)),
 		session: instanceId => live(sessions.find(session => session.instanceId === instanceId)),

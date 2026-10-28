@@ -11,6 +11,7 @@ import type { PaletteAction } from "../command-palette";
 import { folderName, hostLabel, modeOf, pastLabel, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
+import { workspaceOf } from "../sessions";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -75,7 +76,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, open, onOp
 	);
 }
 
-/** The workspace a titled row ran in, before its title, shown only under all workspaces. An untitled row's label is already the workspace's name. */
+/** The workspace a titled row counts in, before its title, shown only under all workspaces. An untitled row's label is already its directory's name. */
 export function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
 	const name = folderName(cwdDisplay);
 	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
@@ -108,7 +109,7 @@ function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProp
 		resume: sessionId => start({ kind: "resume", sessionId }),
 		dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
 		end,
-		workspaceSettings: workspaceSettings(entry.kind === "live" ? entry.host.cwd : entry.session.cwd),
+		workspaceSettings: workspaceSettings(workspaceOf(entry.kind === "live" ? entry.host : entry.session).cwd),
 	});
 	return (
 		<>
@@ -182,7 +183,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 				view={view}
 				label={label}
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-				badge={showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
+				badge={showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={workspaceOf(session).cwdDisplay} /> : null}
 				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted"])}
 				when={session.modifiedAt}
 				open={open}
@@ -210,7 +211,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				view={view}
 				label={label}
 				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-				badge={showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
+				badge={showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null}
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
 				when={host.startedAt}
 				dot={<HostStatus host={host} />}

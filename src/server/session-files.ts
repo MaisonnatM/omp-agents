@@ -16,7 +16,8 @@ const newestFirst = (a: SavedSession, b: SavedSession): number => b.modifiedAt -
 
 /** Whether two answers of `factsOf` are the same facts: each field keeps its identity until it changes. */
 const sameFacts = (a: SessionFacts, b: SessionFacts): boolean =>
-	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree && a.branch === b.branch && a.replay === b.replay;
+	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree && a.branch === b.branch && a.workspace === b.workspace &&
+	a.replay === b.replay;
 
 /** A past-list row and what it was built from. */
 interface PastRow {
@@ -55,15 +56,15 @@ export class SessionFiles {
 	/** Session `sessionId`'s listed file, or `null` while it is not listed. */
 	readonly savedOf = (sessionId: string): SavedSession | null => this.#byId.get(sessionId) ?? null;
 
-	/** What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, worktree, and branch. */
+	/** What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, worktree, branch, and workspace. */
 	readonly factsOf = (sessionId: string): SessionFacts => {
 		const path = this.pathOf(sessionId);
-		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null };
+		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null, workspace: null };
 	};
 
-	/** Directories sessions ran in, newest first. Sessions from old omp versions recorded none. */
+	/** The workspace each session counts in, newest first: its `SessionFacts.workspace`, else the directory it ran in. Sessions from old omp versions recorded none. */
 	cwds(): string[] {
-		return this.#files.map(session => session.cwd).filter(Boolean);
+		return this.#files.map(session => this.facts.factsOf(session.path).workspace?.cwd ?? session.cwd).filter(Boolean);
 	}
 
 	/** Session-file activity for the worktree inventory, including a session whose directory sits inside a checkout. */

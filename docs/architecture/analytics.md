@@ -25,7 +25,7 @@ Foreign rows carry their session id and subagent flag rather than using omp's fi
 Listed sessions take their title and working directory from the existing saved-session index and can open their read-only transcripts.
 Cache rates are recomputed after merging, and model output rates remain omp's measurement or `null` for foreign-only models.
 Tool statistics remain omp-only.
-`src/analytics.ts` folds nested subagent and advisor files into their top-level session, assigns the session's working directory from the saved-session index, and orders models, workspaces, and sessions by token usage.
+`src/analytics.ts` folds nested subagent and advisor files into their top-level session, assigns the workspace the session counts in from the saved-session index, its repository's main checkout when it ran in a linked worktree, and orders models, workspaces, and sessions by token usage.
 `src/omp/stats.ts` reads time buckets by recorded provider through omp-stats' rollup-aware `getProviderTimeSeries`, using the same source as the totals cards.
 `src/analytics.ts` derives chart totals and provider totals from those rows, fills missing buckets with zeros, and starts all time at the first request.
 `web/components/settings/provider-trend.tsx` renders Recharts stacked bars, bucket details, and an optional data table from that provider breakdown.

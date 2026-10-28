@@ -783,6 +783,66 @@ describe("SessionFactsIndex", () => {
 		index.learnHeads(repo, ["feature", "wip", "main", "done"].map((head, i) => ({ ...repo, number: i + 1, head })));
 		expect(index.factsOf(session).pullRequests).toEqual([1, 2, 4].map(number => ({ ...repo, number, link: "submitted" })));
 	});
+
+	test("counts a session in a linked worktree, or in a gone directory named after a known main checkout, in that checkout", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		const file = (name: string): string => {
+			const path = join(parent, `2026-10-01T00-00-00-000Z_${name}.jsonl`);
+			writeFileSync(path, `${prompt("hi")}\n`);
+			return path;
+		};
+		const [wip, home, gone, stray] = [file("wip"), file("home"), file("gone"), file("stray")];
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
+		const workspaceOf = (path: string) => index.factsOf(path).workspace;
+		const goneSessions = [
+			{ path: gone, cwd: join(parent, "app-gone"), modifiedAt: 1 },
+			{ path: stray, cwd: join(parent, "other-gone"), modifiedAt: 1 },
+		];
+
+		await index.refresh(goneSessions);
+		expect([gone, stray].map(workspaceOf)).toEqual([null, null]);
+		await index.refresh([...goneSessions, { path: wip, cwd: join(parent, "app-wip"), modifiedAt: 1 }, { path: home, cwd: main, modifiedAt: 1 }]);
+		const app = { cwd: main, cwdDisplay: main };
+		expect([wip, home, gone, stray].map(workspaceOf)).toEqual([app, null, app, null]);
+	});
+
+	test("places a live session's linked worktree in its main checkout before its file is scanned, and the scan reuses that answer", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		const wip = join(parent, "app-wip");
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
+
+		expect(index.workspaceAt(wip)).toBeNull();
+		expect(await index.place([wip, main])).toBe(true);
+		const app = index.workspaceAt(wip);
+		expect(app).toEqual({ cwd: main, cwdDisplay: main });
+		expect(index.workspaceAt(main)).toBeNull();
+		expect(await index.place([wip, main])).toBe(false);
+
+		const session = join(parent, "2026-10-01T00-00-00-000Z_wip.jsonl");
+		writeFileSync(session, `${prompt("hi")}\n`);
+		await index.refresh([{ path: session, cwd: wip, modifiedAt: 1 }]);
+		expect(index.factsOf(session).workspace).toBe(app);
+	});
+
+	test("counts a gone Codex worktree `<root>/<id>/<name>` in the one main checkout of that name, and in none when two share it", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		const codex = join(parent, "codex", "abcd", "app");
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
+
+		expect(await index.place([codex, main])).toBe(true);
+		expect(index.workspaceAt(codex)).toEqual({ cwd: main, cwdDisplay: main });
+
+		const other = join(parent, "other", "app");
+		mkdirSync(other, { recursive: true });
+		await git(other, "init", "-q", "-b", "main");
+		await git(other, "commit", "-q", "--allow-empty", "-m", "one");
+		const shared = join(parent, "codex", "efgh", "app");
+		expect(await index.place([other, shared])).toBe(false);
+		expect(index.workspaceAt(shared)).toBeNull();
+	});
 });
 
 describe("parseShipProgress", () => {

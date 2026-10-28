@@ -62,7 +62,7 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const { started } = state;
 	useEffect(() => {
 		if (!started) return;
-		const next = workspaceSwitch(workspace, started.cwd, hiddenCwds);
+		const next = workspaceSwitch(workspace, started.workspace, hiddenCwds);
 		if (next !== null) pickWorkspace(next);
 	}, [started]);
 	return useMemo(() => ({ visible, hiddenCwds, workspaces, workspace, pickWorkspace }), [visible, hiddenCwds, workspaces, workspace, pickWorkspace]);

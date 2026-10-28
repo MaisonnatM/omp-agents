@@ -24,7 +24,7 @@ export interface BroadcastDeps {
 	/** Publishes `json` on the `roster` topic. */
 	publish(topic: string, json: string): void;
 	subscriberCount(topic: string): number;
-	/** Runs before each roster push: a subagent may have registered for a view that waits on its file. */
+	/** Runs before each roster push: a subagent may have registered for a view that waits on its file, and a session that joined or moved may work in a directory git was not asked about. */
 	beforeRosterPush(): void;
 	/** Saves which dashboard sessions run now, and whether each one's turn runs. */
 	saveRunning(): void;

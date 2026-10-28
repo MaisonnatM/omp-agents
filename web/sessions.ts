@@ -14,19 +14,28 @@ export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boole
 /** The running sessions that work on `item`: their tool calls named it, or a quick action on it started them. */
 export const sessionsOn = (item: WorkItem, hosts: RosterHost[]): RosterHost[] => hosts.filter(host => worksOn(host, item));
 
-/** The sessions the sidebar, the palette, and the pages list: none in a temporary or hidden directory, and none that is a Bot's conversation, which only its Bot's page shows. */
+/** The workspace a session counts in: its repository's main checkout when it ran in a linked worktree, else the directory it ran in. */
+export const workspaceOf = (row: { cwd: string; cwdDisplay: string; workspace: Workspace | null }): Workspace => row.workspace ?? { cwd: row.cwd, cwdDisplay: row.cwdDisplay };
+
+/**
+ * The sessions the sidebar, the palette, and the pages list: none in a temporary directory, none counting in a hidden workspace,
+ * and none that is a Bot's conversation, which only its Bot's page shows.
+ */
 export function discoverableSessions(
 	hosts: RosterHost[],
 	past: PastSession[],
 	hidden: ReadonlySet<string>,
 	botSessions: ReadonlySet<string>,
 ): { hosts: RosterHost[]; past: PastSession[] } {
-	const listed = <T extends { cwd: string; sessionId: string }>(rows: T[]): T[] =>
-		rows.filter(row => discoverableCwd(row.cwd, hidden) && !botSessions.has(row.sessionId));
+	const listed = <T extends RosterHost | PastSession>(rows: T[]): T[] =>
+		rows.filter(row => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceOf(row).cwd) && !botSessions.has(row.sessionId));
 	return { hosts: listed(hosts), past: listed(past) };
 }
 
-/** The workspace a started or picked session switches to, so it stays listed. `null` keeps the current workspace; a temporary or hidden directory is not a switch. */
+/**
+ * The workspace a started or picked session switches to, so it stays listed: `cwd`, the workspace it counts in. `null` keeps the current
+ * workspace; a temporary or hidden directory is not a switch.
+ */
 export function workspaceSwitch(workspace: string | null, cwd: string, hidden: ReadonlySet<string>): string | null {
 	if (workspace === null || cwd === workspace || !discoverableCwd(cwd, hidden)) return null;
 	return cwd;
@@ -35,34 +44,35 @@ export function workspaceSwitch(workspace: string | null, cwd: string, hidden: R
 const newestFirst = (a: RosterHost, b: RosterHost): number => b.startedAt - a.startedAt;
 
 /**
- * The session the focused pane follows a picked workspace into: its most recently started running one, unless the pane
- * already shows a session from `cwd`. `null` for All workspaces, or when no session runs there.
+ * The session the focused pane follows a picked workspace into: its most recently started running one, unless `shownWorkspace`,
+ * the workspace of the session the pane shows, is `cwd` already. `null` for All workspaces, or when no session runs there.
  */
-export function workspaceSession(cwd: string | null, hosts: RosterHost[], shownCwd: string | undefined): View | null {
-	if (cwd === null || shownCwd === cwd) return null;
-	const newest = hosts.filter(host => host.cwd === cwd).toSorted(newestFirst)[0];
+export function workspaceSession(cwd: string | null, hosts: RosterHost[], shownWorkspace: string | undefined): View | null {
+	if (cwd === null || shownWorkspace === cwd) return null;
+	const newest = hosts.filter(host => workspaceOf(host).cwd === cwd).toSorted(newestFirst)[0];
 	return newest ? { kind: "live", instanceId: newest.instanceId, agentId: null } : null;
 }
 
 /**
- * Where a new session starts unless the user picks another directory: the open session's,
- * else the newest live one's, else the newest past one's, each only from `workspace` when one is selected.
+ * Where a new session starts unless the user picks another directory: the workspace of the open session,
+ * else of the newest live one, else of the newest past one, each only from `workspace` when one is selected.
+ * A session in a linked worktree hands on its repository's main checkout, not the worktree.
  */
 export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], workspace: string | null): string {
 	const open =
 		view?.kind === "live"
 			? hosts.find(host => host.instanceId === view.instanceId)
 			: past.find(session => session.sessionId === view?.sessionId);
-	const rows = [open, ...hosts.toSorted(newestFirst), ...past];
+	const rows = [...(open ? [open] : []), ...hosts.toSorted(newestFirst), ...past].map(workspaceOf);
 	// Sessions from old omp versions recorded no directory.
-	const chosen = rows.find(row => row?.cwdDisplay && (workspace === null || row.cwd === workspace));
+	const chosen = rows.find(row => row.cwdDisplay && (workspace === null || row.cwd === workspace));
 	return chosen?.cwdDisplay ?? "~";
 }
 
-/** Directories sessions ran in, live ones first, then past ones newest first, then the ones Settings → Workspaces added. The settings page reads a workspace from one. */
+/** The workspaces sessions count in, live ones first, then past ones newest first, then the ones Settings → Workspaces added. The settings page reads a workspace from one. */
 export function listWorkspaces(hosts: RosterHost[], past: PastSession[], added: readonly Workspace[]): Workspace[] {
 	const byCwd = new Map<string, string>();
-	for (const row of [...hosts.toSorted(newestFirst), ...past, ...added]) {
+	for (const row of [...[...hosts.toSorted(newestFirst), ...past].map(workspaceOf), ...added]) {
 		// Sessions from old omp versions recorded no directory.
 		if (row.cwd && !byCwd.has(row.cwd)) byCwd.set(row.cwd, row.cwdDisplay);
 	}
@@ -82,7 +92,7 @@ export interface SidebarSessions {
 }
 
 export function sidebarSessions(hosts: RosterHost[], past: PastSession[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
-	const listed = (row: { cwd: string }): boolean => workspace === null || row.cwd === workspace;
+	const listed = (row: RosterHost | PastSession): boolean => workspace === null || workspaceOf(row).cwd === workspace;
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
 	const shownHosts = hosts.filter(listed);
 	const unpinnedHosts = shownHosts.filter(host => !isPinned(host));

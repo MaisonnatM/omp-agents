@@ -45,7 +45,7 @@ function harness(path = scheduledPath()) {
 		const instanceId = `i${fake.requests.length}`;
 		const sessionId = request.kind === "resume" ? request.sessionId : `new-${instanceId}`;
 		fake.live.set(sessionId, []);
-		return { ok: true, instanceId, cwd: "/work/webapp", prompt: null };
+		return { ok: true, instanceId, workspace: "/work/webapp", prompt: null };
 	};
 	const runner = new ScheduledRunner({
 		file,

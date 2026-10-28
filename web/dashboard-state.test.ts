@@ -47,10 +47,10 @@ describe("dashboard state", () => {
 	test("a start's answer settles it and names the session it started, and an answer to no start changes nothing", () => {
 		const fork = { kind: "fork", view: { kind: "past", sessionId: "s" }, itemId: "u", point: { entryId: "e", prefill: true } } as const;
 		const waiting = reduce(blank(), { t: "start", reqId: 1, op: fork });
-		const started = reduce(waiting, { t: "started", reqId: 1, result: { ok: true, instanceId: "i", cwd: "/work", prompt: "hello" } });
-		expect(started.started).toEqual({ instanceId: "i", cwd: "/work" });
+		const started = reduce(waiting, { t: "started", reqId: 1, result: { ok: true, instanceId: "i", workspace: "/work", prompt: "hello" } });
+		expect(started.started).toEqual({ instanceId: "i", workspace: "/work" });
 		expect(started.starts.size).toBe(0);
-		expect(reduce(blank(), { t: "started", reqId: 9, result: { ok: true, instanceId: "z", cwd: "/", prompt: null } })).toEqual(blank());
+		expect(reduce(blank(), { t: "started", reqId: 9, result: { ok: true, instanceId: "z", workspace: "/", prompt: null } })).toEqual(blank());
 	});
 
 	test("a pin shows before the server answers, one that changes nothing keeps the state, and the server's pins replace them", () => {

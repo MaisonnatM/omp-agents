@@ -60,7 +60,7 @@ async function setup(headRepo = "acme/app") {
 	const starts: NewSessionRequest[] = [];
 	const start = async (request: NewSessionRequest): Promise<StartResult> => {
 		starts.push(request);
-		return { ok: true, instanceId: "i1", cwd: await checkoutDir(request.cwd, request.branch!), prompt: null };
+		return { ok: true, instanceId: "i1", workspace: await checkoutDir(request.cwd, request.branch!), prompt: null };
 	};
 	const checkOut = (place: CheckoutPlace) => checkOutPullRequest({ owner: "acme", repo: "app", number: 7, cwd: main, place, skill: null }, start);
 	return { parent, main, head, prCheckouts, starts, checkOut };

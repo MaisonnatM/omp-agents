@@ -5,7 +5,7 @@ const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
 const resume = { kind: "resume", sessionId: "s1" } as const;
 const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" }, skill: null } as const;
-const ok = { ok: true, instanceId: "i1", cwd: "/tmp", prompt: null } as const;
+const ok = { ok: true, instanceId: "i1", workspace: "/tmp", prompt: null } as const;
 
 describe("starts", () => {
 	test("a new start replaces the last of its kind and keeps the other kinds", () => {

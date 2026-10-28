@@ -22,19 +22,20 @@
  * session files does not read them a second time.
  */
 import { access } from "node:fs/promises";
-import { resolve } from "node:path";
-import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
+import { basename, resolve } from "node:path";
+import { branchAt, type CheckoutReads, type HeadHistory, mainCheckoutOf, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
-import { expandHome } from "./paths";
+import { displayPath, expandHome } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
 import { ReplayFold } from "./replay";
 import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
 import { TICKET_ID } from "./shared/tickets";
+import type { Workspace } from "./shared/workspaces";
 import { messageItemsOf } from "./transcript";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)`: the branch, then its PR. */
@@ -576,7 +577,22 @@ const SCAN_PARALLEL = PROBE_PARALLEL;
 const ASK_AGAIN_MS = 60_000;
 
 /** The facts of a session before its first scan: one value, so that a caller can tell by identity that they did not change. */
-const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null };
+const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null, workspace: null };
+
+/**
+ * The main checkout among `mains` whose worktrees a gone directory `cwd` was likely one of: worktree tools name them after it,
+ * as `<main>-<branch>` or `<main>-wt/<branch>`, where the longest match wins, so `app-web` beats `app` for `app-web-fix`.
+ * Else Codex's `<root>/<id>/<repository name>`: the one main checkout of that name, none when two share it.
+ */
+function mainCheckoutOfGone(cwd: string, mains: Iterable<string>): string | null {
+	let found: string | null = null;
+	const named: string[] = [];
+	for (const main of mains) {
+		if (cwd.startsWith(`${main}-`) && (found === null || main.length > found.length)) found = main;
+		if (basename(main) === basename(cwd)) named.push(main);
+	}
+	return found ?? (named.length === 1 ? named[0]! : null);
+}
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
@@ -592,6 +608,15 @@ export class SessionFactsIndex {
 	readonly #asked = new Map<string, number>();
 	/** Each directory's default branch as `origin/HEAD` last named it, read again whenever a session working there writes; `null` while git names none. */
 	readonly #defaultBranches = new Map<string, string | null>();
+	/**
+	 * Each session directory's `SessionFacts.workspace`, asked of git once, while the directory exists; a resolved workspace stays after
+	 * its worktree is removed. A directory that is gone before git was asked is in `#gone` instead, until a main checkout claims it.
+	 */
+	readonly #workspaces = new Map<string, Workspace | null>();
+	/** Session directories that were gone when git was asked, which no main checkout claimed yet. */
+	readonly #gone = new Set<string>();
+	/** The main checkout of every repository a session directory was in. */
+	readonly #mainCheckouts = new Set<string>();
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
 	readonly #git: CheckoutReads;
 	readonly #ownFileFolds: readonly OwnFileFolds[];
@@ -627,7 +652,19 @@ export class SessionFactsIndex {
 		if (!session) return NO_FACTS;
 		const own = this.#own(sessionPath);
 		const replay = own?.replay.facts();
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.ship ?? null, worktree: session.worktree, branch: session.branch, ...(replay ? { replay } : {}) };
+		return {
+			pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.ship ?? null, worktree: session.worktree, branch: session.branch,
+			workspace: this.workspaceAt(session.cwd), ...(replay ? { replay } : {}),
+		};
+	}
+
+	/** The workspace directory `cwd` counts in as git last answered, the same object until that answer changes; `null` while git was not asked, or when it counts in itself. */
+	readonly workspaceAt = (cwd: string): Workspace | null => this.#workspaces.get(cwd) ?? null;
+
+	/** Ask git which workspace each of `cwds` not asked about yet counts in, as a refresh does for session directories; returns whether any workspace changed. */
+	async place(cwds: readonly string[]): Promise<boolean> {
+		const placed = await this.#placeWorkspaces(cwds, dir => this.#git.worktreeAt(dir));
+		return this.#claimGone() || placed;
 	}
 
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
@@ -647,7 +684,7 @@ export class SessionFactsIndex {
 
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
-	 * Resolves whether any session's pull requests, Linear issues, /ship stage, headless mark, worktree, or branch changed.
+	 * Resolves whether any session's pull requests, Linear issues, /ship stage, headless mark, worktree, branch, or workspace changed.
 	 * Refreshes run one at a time, and the calls made while one runs share a single next refresh of the newest list.
 	 */
 	refresh(sessions: readonly ListedSession[]): Promise<boolean> {
@@ -761,6 +798,7 @@ export class SessionFactsIndex {
 			session.worktree = worktrees[i]!;
 			changed = true;
 		});
+		if (await this.#placeWorkspaces(touched.map(session => session.cwd), worktreeAt)) changed = true;
 		// A session that wrote to its transcript may have switched branch since: `git` reads its directory's HEAD again, and a main checkout's HEAD reflog, once a checkout changed either.
 		// The answers stay here until `#resolve` publishes each branch whole, since a roster push can read `branch` during the awaits below.
 		const reads = await mapLimit(scans, SCAN_PARALLEL, ({ session, writtenAt }) => gitBranch(workDirOf(session), writtenAt, worktreeAt, historyOf));
@@ -842,7 +880,41 @@ export class SessionFactsIndex {
 			answered = true;
 		});
 		if (printed || answered) for (const session of this.#sessions.values()) if (this.#resolve(session)) changed = true;
+		if (this.#claimGone()) changed = true;
 		return changed;
+	}
+
+	/** Ask git which workspace each of `cwds` not asked about yet counts in; returns whether one counts in another directory. */
+	async #placeWorkspaces(cwds: readonly string[], worktreeAt: (dir: string) => Promise<WorktreeAt | null>): Promise<boolean> {
+		const unplaced = [...new Set(cwds)].filter(cwd => !this.#workspaces.has(cwd));
+		let placed = false;
+		await mapLimit(unplaced, SCAN_PARALLEL, async cwd => {
+			const at = await worktreeAt(cwd);
+			const main = at && mainCheckoutOf(at);
+			if (main !== null) this.#mainCheckouts.add(main);
+			if (at === null && !(await exists(cwd))) {
+				this.#gone.add(cwd);
+				return;
+			}
+			this.#gone.delete(cwd);
+			const workspace = at?.linked && main !== null ? { cwd: main, cwdDisplay: displayPath(main) } : null;
+			this.#workspaces.set(cwd, workspace);
+			if (workspace) placed = true;
+		});
+		return placed;
+	}
+
+	/** Count each gone session directory that a known main checkout claims in that checkout; returns whether any was claimed. */
+	#claimGone(): boolean {
+		let claimed = false;
+		for (const cwd of this.#gone) {
+			const main = mainCheckoutOfGone(cwd, this.#mainCheckouts);
+			if (main === null) continue;
+			this.#gone.delete(cwd);
+			this.#workspaces.set(cwd, { cwd: main, cwdDisplay: displayPath(main) });
+			claimed = true;
+		}
+		return claimed;
 	}
 
 	/**

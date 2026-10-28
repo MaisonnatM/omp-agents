@@ -45,7 +45,7 @@ function terminal(cwd: string, agents: AgentRow[] = [agent("Child")], overrides:
 		instanceId: "room", sessionId: "parent", sessionName: "Checkout session", pid: 1, cwd, cwdDisplay: cwd,
 		model: null, thinkingLevel: null, context: null, startedAt: 0, status: "idle", control: { phase: "live", readOnly: false },
 		agents, requests: [], queue: { steering: [], followUp: [] }, unread: null,
-		pullRequests: [], tickets: [], ship: null, worktree: null, branch: null,
+		pullRequests: [], tickets: [], ship: null, worktree: null, branch: null, workspace: null,
 		source: "terminal", participants: 0, relayConnected: true, ...overrides,
 	};
 }

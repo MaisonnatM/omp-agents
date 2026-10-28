@@ -3,7 +3,7 @@ import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { documentTitle } from "./document-title";
 import { focusedView, type Page } from "./routing";
-import { workspaceSwitch } from "./sessions";
+import { workspaceOf, workspaceSwitch } from "./sessions";
 import type { WorkspaceScope } from "./use-workspace-scope";
 
 /** The session the focused pane shows, as the sidebar, the title, and the details read it. */
@@ -21,6 +21,8 @@ export interface FocusedSession {
 	row: RosterHost | PastSession | undefined;
 	/** The directory the view's session runs or ran in. */
 	cwd: string | undefined;
+	/** The workspace the view's session counts in, as {@link workspaceOf} names it. */
+	workspace: string | undefined;
 	/** The directory the session works in: its worktree, else its directory; `null` without a session. */
 	workDir: string | null;
 	/** The document title, which the desktop title bar shows too. */
@@ -40,16 +42,20 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { wo
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
-	const shown = useRef<{ instanceId: string; cwd: string; workspace: string | null } | null>(null);
+	const live = host && { instanceId: host.instanceId, countsIn: workspaceOf(host).cwd };
+	const shown = useRef<{ instanceId: string; countsIn: string; workspace: string | null } | null>(null);
 	// The workspace is the one shown before the move: the old directory may have no session left, which already shows all workspaces.
 	useEffect(() => {
 		const last = shown.current;
-		shown.current = host ? { instanceId: host.instanceId, cwd: host.cwd, workspace } : null;
-		if (!host || last?.instanceId !== host.instanceId || last.cwd === host.cwd) return;
-		const next = workspaceSwitch(last.workspace, host.cwd, hiddenCwds);
+		shown.current = live ? { ...live, workspace } : null;
+		if (!live || last?.instanceId !== live.instanceId || last.countsIn === live.countsIn) return;
+		const next = workspaceSwitch(last.workspace, live.countsIn, hiddenCwds);
 		if (next !== null) pickWorkspace(next);
-	}, [host?.instanceId, host?.cwd, workspace]);
+	}, [live?.instanceId, live?.countsIn, workspace]);
 	const session = host ?? past;
 	const sessionId = view?.kind === "past" ? view.sessionId : view?.kind === "live" && view.agentId === null ? ((host ?? lastHost)?.sessionId ?? null) : null;
-	return { view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workDir: session ? (session.worktree ?? session.cwd) : null, title };
+	return {
+		view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workspace: session && workspaceOf(session).cwd,
+		workDir: session ? (session.worktree ?? session.cwd) : null, title,
+	};
 }

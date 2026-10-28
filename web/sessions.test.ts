@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, searchSessions, sidebarSessions, waitingCount, workspaceSession, workspaceSwitch } from "./sessions";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sidebarSessions, waitingCount, workspaceSession, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
@@ -193,5 +193,21 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.pinned.past)).toEqual(["p1"]);
 		expect(ids([...lists.pinned.hosts, ...lists.ended])).toEqual([]);
 		expect(ids(searchSessions(sidebarSessions(live, saved, "~/b", new Set()), "webapp").running)).toEqual(["h3"]);
+	});
+});
+
+describe("a session in a linked worktree", () => {
+	const app = { cwd: "/code/app", cwdDisplay: "~/code/app" };
+	const inWorktree = { instanceId: "i-w", sessionId: "w", cwd: "/code/app-fix", cwdDisplay: "~/code/app-fix", workspace: app, startedAt: 2 } as RosterHost;
+	const inMain = { instanceId: "i-m", sessionId: "m", cwd: "/code/app", cwdDisplay: "~/code/app", workspace: null, startedAt: 1 } as RosterHost;
+
+	test("counts in its repository's workspace, which lists it, while its directory is no workspace", () => {
+		expect(listWorkspaces([inWorktree], [], [])).toEqual([app]);
+		expect(ids(sidebarSessions([inWorktree, inMain], [], "/code/app", new Set()).running)).toEqual(["w", "m"]);
+		expect(defaultCwd({ kind: "live", instanceId: "i-w", agentId: null }, [inWorktree], [], "/code/app")).toBe("~/code/app");
+	});
+
+	test("leaves the lists with its hidden workspace", () => {
+		expect(ids(discoverableSessions([inWorktree, inMain], [], new Set(["/code/app"]), none).hosts)).toEqual([]);
 	});
 });

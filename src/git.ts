@@ -95,6 +95,9 @@ export async function worktreeAt(dir: string): Promise<WorktreeAt | null> {
 	return { top, common, gitDir, linked: gitDir !== common, branch: head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null };
 }
 
+/** The main checkout of `at`'s repository, which holds the `.git` that is `common`; `null` for a bare repository, which has none. */
+export const mainCheckoutOf = (at: WorktreeAt): string | null => (basename(at.common) === ".git" ? dirname(at.common) : null);
+
 /** What a worktree has checked out now, and the checkouts its HEAD reflog records, newest first. */
 export interface HeadHistory {
 	/** `null` when HEAD is detached. */

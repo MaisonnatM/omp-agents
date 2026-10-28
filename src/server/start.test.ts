@@ -34,6 +34,7 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 		savedFile: () => claudeFile,
 		factsFor: () => { throw new Error("A read-only resume must not inspect omp facts."); },
 		onStarted: () => {},
+		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
 		mayDiscardReplay: async () => null,
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
@@ -122,13 +123,14 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 }, 15_000);
 
 /** Drives the production launcher and registry without starting an actual omp provider. */
-function claimedStarter(sessions: LiveSessions, savedFile: string | null = null, factsFor: () => SessionFacts = () => ({ tickets: [], pullRequests: [], worktree: null, branch: null, ship: null })) {
+function claimedStarter(sessions: LiveSessions, savedFile: string | null = null, factsFor: () => SessionFacts = () => ({ tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null })) {
 	return createStarter({
 		sessions,
 		pathFor: () => null,
 		savedFile: () => savedFile,
 		factsFor,
 		onStarted: () => {},
+		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
 		mayDiscardReplay: async () => null,
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
@@ -197,7 +199,7 @@ test("resuming a saved ticket claims the same task and refuses another session's
 		const file = join(dir, "saved.jsonl");
 		writeFileSync(file, `${JSON.stringify({ type: "session", cwd: dir })}\n`);
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")));
-		const start = claimedStarter(sessions, file, () => ({ tickets: ["ENG-2650"], pullRequests: [], worktree: null, branch: null, ship: null }));
+		const start = claimedStarter(sessions, file, () => ({ tickets: ["ENG-2650"], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null }));
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		expect(await sessions.reserveTask("ticket:ENG-2650", "already-working", dir, () => { throw new Error("no running sessions"); })).toBeNull();
 		const resume = spyOn(DashboardSession, "resume").mockImplementation(async (id) => sessionForStart(id, dir));
@@ -277,7 +279,7 @@ test("an explicit independent task survives reattachment and ended-session resum
 		expect((await afterRestart(newSessionRequest(dir, "/ship ENG2650", { taskId: "ENG-2650:tests-only" }))).ok).toBe(false);
 		restarted.remove("original");
 		const resumedRegistry = new LiveSessions(() => {}, new TaskClaims(path));
-		const resume = claimedStarter(resumedRegistry, file, () => ({ tickets: ["ENG-2650"], pullRequests: [], worktree: null, branch: null, ship: null }));
+		const resume = claimedStarter(resumedRegistry, file, () => ({ tickets: ["ENG-2650"], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null }));
 		spyOn(DashboardSession, "resume").mockImplementation(async id => sessionForStart(id, dir));
 		// The implementation ticket still has its own live claim, but this saved session owns the independent test slice.
 		expect((await resume({ kind: "resume", sessionId: "s-original" })).ok).toBe(true);

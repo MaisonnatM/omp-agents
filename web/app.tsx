@@ -91,8 +91,8 @@ export function App() {
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
-	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, cwd: focused.cwd });
-	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, cwd: focused.cwd };
+	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace });
+	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace };
 
 	const endHost = useCallback(
 		(instanceId: string): void => {
@@ -109,16 +109,16 @@ export function App() {
 		(cwd: string | null): void => {
 			pickWorkspace(cwd);
 			// A page such as the tickets stays; only the panes follow the sidebar into the workspace.
-			const { page, hosts, cwd: viewCwd } = latest.current;
-			const next = page ? null : workspaceSession(cwd, hosts, viewCwd);
+			const { page, hosts, shownWorkspace } = latest.current;
+			const next = page ? null : workspaceSession(cwd, hosts, shownWorkspace);
 			if (next) open(next, "replace");
 		},
 		[pickWorkspace, open],
 	);
 	/** The palette opens a session from any workspace, so the sidebar switches to that workspace to keep it listed. */
 	const openFromPalette = useCallback(
-		(picked: View, cwd: string, mode: OpenMode): void => {
-			const next = workspaceSwitch(workspace, cwd, hiddenCwds);
+		(picked: View, countsIn: string, mode: OpenMode): void => {
+			const next = workspaceSwitch(workspace, countsIn, hiddenCwds);
 			if (next !== null) pickWorkspace(next);
 			open(picked, mode);
 		},

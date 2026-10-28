@@ -7,6 +7,7 @@ import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullReq
 import type { ModelOption } from "./models";
 import type { ReplayFacts } from "./replay";
 import { TICKET_ID } from "./tickets";
+import type { Workspace } from "./workspaces";
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
@@ -76,7 +77,7 @@ export interface SessionBranch {
 	pullRequest: PullRequest | null;
 }
 
-/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, its worktree, and its branch. */
+/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, its worktree, its branch, and its workspace. */
 export interface SessionFacts {
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
@@ -96,6 +97,11 @@ export interface SessionFacts {
 	 * checkout the one checked out when the session last wrote; `null` on a detached HEAD, outside git, or once that directory is gone.
 	 */
 	branch: SessionBranch | null;
+	/**
+	 * The workspace the session counts in when that differs from its `cwd`: its repository's main checkout while `cwd` is in a linked
+	 * worktree, or was in one that is gone; `null` counts it in `cwd` itself.
+	 */
+	workspace: Workspace | null;
 	replay?: ReplayFacts;
 }
 
@@ -418,8 +424,12 @@ export interface SkillOption {
 	name: string;
 	description: string | null;
 }
-/** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */
-export type StartResult = { ok: true; instanceId: string; cwd: string; prompt: string | null } | { ok: false; error: string };
+/**
+ * `workspace` is the absolute directory of the workspace the session counts in: its repository's main checkout when it
+ * runs in a linked worktree, else the directory it runs in. `prompt` is the text of the prompt a fork branched at, for the
+ * composer; `null` for the other kinds.
+ */
+export type StartResult = { ok: true; instanceId: string; workspace: string; prompt: string | null } | { ok: false; error: string };
 /** Where `/` and `@` resolve: an open live view's session, or the directory the new-session draft will start omp in. */
 export type CompletionScope = { kind: "live"; view: LiveView } | { kind: "new"; cwd: string };
 /** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */

@@ -56,7 +56,7 @@ The list of running, interrupted, pinned, and past sessions in the sidebar.
 _Avoid_: Session list, inbox
 
 **Workspace**:
-A working directory that sessions run in, which the sidebar's picker filters by.
+A repository's main checkout, or a directory outside git, that sessions run in, which the sidebar's picker filters by; a session in a linked git worktree counts in its repository's workspace.
 _Avoid_: Project, repo, folder
 
 **Pin**:

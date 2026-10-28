@@ -41,6 +41,8 @@ export interface StartEnv {
 	factsFor(sessionId: string): SessionFacts;
 	/** Called once a started session is in the registry. */
 	onStarted(): void;
+	/** The workspace directory `cwd` counts in, asking git when it was not asked about yet. */
+	workspaceOf(cwd: string): Promise<string>;
 	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
 	linkTodo(todoId: string, sessionId: string): void;
 	/** How a start, or the resume of an attached session, joins the server. */
@@ -194,8 +196,10 @@ export function createStarter(env: StartEnv): Starter {
 		join.attach(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);
+		// Asked before the roster lists the session, so that its first row already counts in its workspace.
+		const workspace = await env.workspaceOf(session.cwd);
 		env.onStarted();
-		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
+		return { ok: true, instanceId: session.instanceId, workspace, prompt };
 	};
 }
 

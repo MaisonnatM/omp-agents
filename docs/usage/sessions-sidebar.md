@@ -8,16 +8,18 @@
   A side whose tabs are all hidden or signed out is disabled.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
-- Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of its working directory, on the right before its age.
+- Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows the workspace's name as its label, with no badge.
-- The workspace picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
-  It lists the directories that a live or saved session ran in, live sessions' directories first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces.
-  The session counts then count that directory's sessions only, such as `2 running` and `9 past`.
+- The workspace picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one workspace.
+  A workspace is a repository's main checkout, or a directory outside git: a session in a linked git worktree, such as `~/code/yampa-review-triage-3935ff7b`, counts in its repository's workspace, `~/code/yampa`, and still runs in its worktree.
+  A session whose worktree was removed counts in the repository whose main checkout's path, followed by `-`, starts its directory, such as `~/code/yampa-wt/fix` in `~/code/yampa`, else in the only repository whose main checkout has its directory's name, such as Codex's `~/.codex/worktrees/f5e7/yampa`.
+  The picker lists the workspaces that a live or saved session ran in, live sessions' first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces.
+  The session counts then count that workspace's sessions only, such as `2 running` and `9 past`.
   Picking a workspace also opens its most recently started running session in the focused pane, unless that pane already shows a session from the workspace or a page such as a pull request, Settings, or the new-session draft covers the panes.
   Choose **All workspaces** to list every session again.
   The app keeps the choice.
-  If no session from the saved directory is left, the sidebar lists every session.
+  If no session from the saved workspace is left, the sidebar lists every session.
 - **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
   It shows its key, Cmd+N, on its right.
 - The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
@@ -28,7 +30,7 @@
 - Sessions in `/tmp`, `/private/tmp`, or macOS's temp folders under `/var/folders` (where `mktemp -d` puts its directories), including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.
   Their saved transcripts remain available through a direct session link.
-- A workspace hidden in **Settings › Workspaces** is left out the same way, but only its own directory: sessions in a directory inside it stay listed.
+- A workspace hidden in **Settings › Workspaces** is left out the same way, with the sessions of its linked worktrees, but only its own directory: sessions in a directory inside it stay listed.
 - **Pin** in a row's menu moves the session to the **Pinned** group at the top of the list, and **Unpin** moves it back.
   The group lists pinned running sessions first, then pinned past ones, interrupted ones first, and shows only while it has a row.
   A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.

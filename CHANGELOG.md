@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-10-28
 
 - Fixed: plan usage failed because the app started on a Bun older than omp allows. It now starts on Bun 1.4.4.
+- The workspace picker now lists each repository once, with sessions in its worktrees, such as a review's, under it instead of one workspace each.
 - Sessions started in a Mac temporary folder, such as one `mktemp -d` made, are now hidden from the sidebar like those in `/tmp`.
 - An issue's header now stays at the top while its details scroll, and shrinks to its title and branch, as a pull request's does.
 - Fixed: the dashboard starts again after omp updates itself to a single program file.

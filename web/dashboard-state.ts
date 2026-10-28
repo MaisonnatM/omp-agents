@@ -39,8 +39,8 @@ export interface DashboardState extends PaneNavigation {
 	starts: Starts;
 	/** The server's last answer to the new-session draft's `complete`. */
 	newSessionCompletions: Completions | null;
-	/** The session this page last started, forked, or resumed, once it is ready. */
-	started: { instanceId: string; cwd: string } | null;
+	/** The session this page last started, forked, or resumed, once it is ready, and the workspace it counts in. */
+	started: { instanceId: string; workspace: string } | null;
 	/** `null` until the server's first `omp usage` run finishes. */
 	usage: { plans: PlanUsage[]; error: string | null } | null;
 	/** Last model list the server sent for each open live session, by instance id. */
@@ -203,8 +203,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			if (!pendingStart(state.starts, action.reqId)) return state;
 			const starts = settleStart(state.starts, action.reqId, action.result);
 			if (!action.result.ok) return { ...state, starts };
-			const { instanceId, cwd } = action.result;
-			return { ...state, starts, started: { instanceId, cwd } };
+			const { instanceId, workspace } = action.result;
+			return { ...state, starts, started: { instanceId, workspace } };
 		}
 		case "resumed-all": {
 			const starts = settleResumeAll(state.starts, action.reqId, action.errors);
