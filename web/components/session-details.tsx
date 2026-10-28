@@ -55,7 +55,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspa
 				]
 			: []),
 		...(tickets.length > 0
-			? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
+			? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, scrollsItself: true, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
 			: []),
 	];
 }

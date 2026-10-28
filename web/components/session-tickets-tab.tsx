@@ -20,9 +20,9 @@ export function SessionTicketsTab({ tickets, version }: SessionTicketsTabProps) 
 	const listed = ticketsStore.use().read?.data.tickets.find(ticket => ticket.id === shown) ?? null;
 	if (!shown) return null;
 	return (
-		<div className="pb-4">
+		<div className="flex min-h-0 flex-1 flex-col pt-2">
 			{tickets.length > 1 && (
-				<div role="group" aria-label="This session's Linear issues" className="flex flex-wrap gap-1 px-4 pb-2">
+				<div role="group" aria-label="This session's Linear issues" className="flex shrink-0 flex-wrap gap-1 px-4 pb-2">
 					{tickets.map(id => (
 						<Button key={id} variant="ghost" size="compact" active={id === shown} aria-pressed={id === shown} onClick={() => setPicked(id)} className="tabular-nums">
 							{id}

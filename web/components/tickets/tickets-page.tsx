@@ -160,7 +160,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 									next={at >= 0 ? stepTo(rows[at + 1], "Next issue", CH_NEXT) : stepTo(undefined, "Next issue", CH_NEXT)}
 									close={{ label: "Close", icon: CH_CLOSE, href: hashForTickets(null) }}
 								/>
-								<div className="min-h-0 flex-1 overflow-y-auto pb-6">
+								<div className="flex min-h-0 flex-1 flex-col">
 									<TicketDetailContent
 										id={target}
 										listed={rows[at] ?? null}

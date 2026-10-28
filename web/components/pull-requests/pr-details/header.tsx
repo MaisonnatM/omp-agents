@@ -211,7 +211,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 					merge={{ allowed, method, onPick: pick, queued, onCancel: cancel.run }} pending={pending} label="More pull request actions" />
 			</div>
 			<div className={cn("col-span-2 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
-				<div data-pr-condensed className={cn("min-h-0 overflow-hidden transition-[opacity,transform] duration-150 motion-reduce:transition-none", condensed ? "translate-y-0 opacity-100 delay-50" : "translate-y-1 opacity-0 duration-100")} inert={!condensed}>
+				<div data-condensed className={cn("min-h-0 overflow-hidden transition-[opacity,transform] duration-150 motion-reduce:transition-none", condensed ? "translate-y-0 opacity-100 delay-50" : "translate-y-1 opacity-0 duration-100")} inert={!condensed}>
 					{detail && <div className="flex min-w-0 items-center gap-2 px-4 pb-2 pt-1 text-2xs text-muted-foreground">
 						<Avatar person={detail.author} label={detail.author.login} />
 						<span className="shrink-0 @max-[30rem]/pr-header:hidden">updated {age(detail.updatedAt)} ago</span>

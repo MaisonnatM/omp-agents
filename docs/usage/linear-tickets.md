@@ -24,6 +24,7 @@
   On a page too narrow for both, the details take the list's place.
   The details are laid out as a pull request's **Summary** is.
   The header names the team and the identifier, a link to the issue on Linear tinted with its state, with the quick actions on the right; then the title, then who opened the issue, when it last changed, and Linear's branch name for it, which copies itself on click.
+  The header stays at the top while the details scroll; once they scroll past it, it condenses to the identifier and the title, with when the issue last changed and its branch on a short line below, and it expands again at the top.
   Under it come the fields, one row each with an icon and a label: the state, the priority, the assignee, the due date, the labels, and the project.
   Then **Description**, **Sub-issues**, **Links**, and **Comments** follow as sections that fold, each heading staying at the top while its section scrolls, with a count in its title: `Sub-issues (2/5)`, `Links (3)`, `Comments (7)`.
   **Links** lists the links Linear keeps for the issue, a pull request with its own icon.

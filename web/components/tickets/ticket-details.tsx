@@ -1,5 +1,5 @@
 import { CornerLeftUp, ExternalLink, GitPullRequest, Link2 } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { pullRequestOfUrl } from "../../../src/shared/github";
 import type { Ticket, TicketDetail, TicketRelative } from "../../../src/shared/tickets";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -10,7 +10,8 @@ import { hashForTickets } from "../../routing";
 import { PRIORITY_LABEL, subIssueOrder } from "../../tickets-model";
 import { CopyableCode } from "../copyable-code";
 import { IconTip } from "../pull-requests/avatars";
-import { SummarySection } from "../pull-requests/pr-details/section";
+import { DetailsScrollerContext, SummarySection } from "../pull-requests/pr-details/section";
+import { useCondensedHeader } from "../pull-requests/pr-details/use-condensed-header";
 import { Rail, RailRow } from "../rail";
 import { Comment, LoadNote, Markdown } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
@@ -31,29 +32,39 @@ interface TicketDetailContentProps {
 
 /**
  * A Linear issue laid out as a pull request's Summary is: a header with the team, the identifier, the quick actions,
- * the title, who opened it, and its branch; then its properties, and its description, sub-issues, links, and comments
- * in sections that fold.
+ * the title, who opened it, and its branch, fixed above its own scroller and condensed once that scrolls; then its
+ * properties, and its description, sub-issues, links, and comments in sections that fold.
  */
 export function TicketDetailContent({ id, listed, read, actions, placement = "page", onPick }: TicketDetailContentProps) {
 	const { data: detail, error } = read;
 	const ticket = detail ?? listed;
 	const page = placement === "page";
+	const [root, setRoot] = useState<HTMLDivElement | null>(null);
+	const foldRef = useRef<HTMLDivElement>(null);
+	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+	const condensed = useCondensedHeader(scroller, root, foldRef, id);
 	return (
-		<div className="min-w-0">
-			<TicketHeader id={id} ticket={ticket} detail={detail} actions={actions} page={page} onPick={onPick} />
-			<div className="border-t border-border/60">
-				{ticket && (
-					<div className="px-4 pt-2.5 pb-1">
-						<TicketFields ticket={ticket} detail={detail} edit={read.edit} saveError={read.saveError} />
+		<div ref={setRoot} className="flex min-h-0 min-w-0 flex-1 flex-col">
+			<div className="shrink-0 border-b border-border/60 bg-background">
+				<TicketHeader id={id} ticket={ticket} detail={detail} actions={actions} page={page} onPick={onPick} condensed={condensed} foldRef={foldRef} />
+			</div>
+			<div ref={setScroller} className="min-h-0 flex-1 overflow-y-auto">
+				<DetailsScrollerContext.Provider value={scroller}>
+					<div className={page ? "pb-6" : "pb-4"}>
+						{ticket && (
+							<div className="px-4 pt-2.5 pb-1">
+								<TicketFields ticket={ticket} detail={detail} edit={read.edit} saveError={read.saveError} />
+							</div>
+						)}
+						{detail ? (
+							<TicketBody detail={detail} page={page} onPick={onPick} />
+						) : (
+							<div className="px-4 py-4">
+								<LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />
+							</div>
+						)}
 					</div>
-				)}
-				{detail ? (
-					<TicketBody detail={detail} page={page} onPick={onPick} />
-				) : (
-					<div className="px-4 py-4">
-						<LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />
-					</div>
-				)}
+				</DetailsScrollerContext.Provider>
 			</div>
 		</div>
 	);
@@ -63,10 +74,15 @@ interface TicketHeaderProps extends Pick<TicketDetailContentProps, "id" | "actio
 	ticket: Ticket | null;
 	detail: TicketDetail | null;
 	page: boolean;
+	condensed: boolean;
+	foldRef: RefObject<HTMLDivElement | null>;
 }
 
-/** The pull request header's shape: the team and identifier with the actions beside them, the parent, the title, then who opened it and the branch. */
-function TicketHeader({ id, ticket, detail, actions, page, onPick }: TicketHeaderProps) {
+/**
+ * The pull request header's shape: the team and identifier with the actions beside them, the parent, the title, then who opened it and the branch.
+ * Condensed, the title moves beside the identifier and one line keeps when it was updated and the branch.
+ */
+function TicketHeader({ id, ticket, detail, actions, page, onPick, condensed, foldRef }: TicketHeaderProps) {
 	/** The page's title is its `h1`; the sidebar's tabs sit under its `h2`. */
 	const Heading = page ? "h1" : "h3";
 	const headingRef = useRef<HTMLHeadingElement>(null);
@@ -78,8 +94,8 @@ function TicketHeader({ id, ticket, detail, actions, page, onPick }: TicketHeade
 		<header className="min-w-0 pt-2">
 			<div className="flex min-h-7 min-w-0 items-center gap-2 px-4">
 				<div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground">
-					{ticket && <span className="min-w-0 truncate font-medium">{ticket.team}</span>}
-					{ticket && <span aria-hidden className="text-muted-foreground/50">/</span>}
+					{ticket && !condensed && <span className="min-w-0 truncate font-medium">{ticket.team}</span>}
+					{ticket && !condensed && <span aria-hidden className="text-muted-foreground/50">/</span>}
 					<a
 						href={ticket?.url ?? undefined}
 						target="_blank"
@@ -90,32 +106,47 @@ function TicketHeader({ id, ticket, detail, actions, page, onPick }: TicketHeade
 						{id}
 						<ExternalLink aria-hidden className="size-2.5 text-muted-foreground" />
 					</a>
+					{condensed && <span className="truncate font-medium text-foreground">{ticket?.title}</span>}
 				</div>
 				{ticket && actions && <div className="flex shrink-0 items-center justify-end">{actions(ticket)}</div>}
 			</div>
-			<div className="space-y-2 px-4 pt-1 pb-4">
-				{ticket?.parentId && <ParentLink id={ticket.parentId} parent={detail?.parent ?? null} onPick={onPick} />}
-				<Heading ref={headingRef} tabIndex={-1} className="text-base leading-snug font-semibold outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring">
-					{ticket?.title ?? id}
-				</Heading>
-				{ticket && (
-					<div className="flex min-h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground">
-						{detail && (
-							<>
-								<span className="min-w-0 truncate">
-									Opened by <span className="text-foreground">{detail.createdBy ?? "Linear"}</span>
-								</span>
-								<span aria-hidden className="text-muted-foreground/50">
-									·
-								</span>
-							</>
-						)}
-						<Tooltip content={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
+			<div className={cn("grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+				<div data-condensed className={cn("min-h-0 overflow-hidden transition-[opacity,transform] duration-150 motion-reduce:transition-none", condensed ? "translate-y-0 opacity-100 delay-50" : "translate-y-1 opacity-0 duration-100")} inert={!condensed}>
+					{ticket && (
+						<div className="flex min-w-0 items-center gap-2 px-4 pt-1 pb-2 text-2xs text-muted-foreground">
 							<span className="shrink-0">updated {age(Date.parse(ticket.updatedAt))} ago</span>
-						</Tooltip>
-						{ticket.branch && <CopyableCode value={ticket.branch} label="Copy branch" className="ml-auto font-mono text-muted-foreground/70" />}
+							{ticket.branch && <CopyableCode value={ticket.branch} label="Copy branch" className="ml-auto font-mono text-muted-foreground/70" />}
+						</div>
+					)}
+				</div>
+			</div>
+			<div className={cn("grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
+				<div ref={foldRef} className={cn("min-h-0 overflow-hidden transition-[opacity,transform] duration-150 motion-reduce:transition-none", condensed ? "-translate-y-1 opacity-0 duration-100" : "translate-y-0 opacity-100 delay-50")} inert={condensed}>
+					<div className="space-y-2 px-4 pt-1 pb-4">
+						{ticket?.parentId && <ParentLink id={ticket.parentId} parent={detail?.parent ?? null} onPick={onPick} />}
+						<Heading ref={headingRef} tabIndex={-1} className="text-base leading-snug font-semibold outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring">
+							{ticket?.title ?? id}
+						</Heading>
+						{ticket && (
+							<div className="flex min-h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground">
+								{detail && (
+									<>
+										<span className="min-w-0 truncate">
+											Opened by <span className="text-foreground">{detail.createdBy ?? "Linear"}</span>
+										</span>
+										<span aria-hidden className="text-muted-foreground/50">
+											·
+										</span>
+									</>
+								)}
+								<Tooltip content={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
+									<span className="shrink-0">updated {age(Date.parse(ticket.updatedAt))} ago</span>
+								</Tooltip>
+								{ticket.branch && <CopyableCode value={ticket.branch} label="Copy branch" className="ml-auto font-mono text-muted-foreground/70" />}
+							</div>
+						)}
 					</div>
-				)}
+				</div>
 			</div>
 		</header>
 	);

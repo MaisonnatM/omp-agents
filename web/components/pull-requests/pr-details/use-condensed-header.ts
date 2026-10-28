@@ -1,4 +1,4 @@
-/** Whether a pull request's header shows condensed, per tab, driven by the one vertical scroller its details placement names. */
+/** Whether a details header shows condensed, per pull request tab or per issue, driven by the one vertical scroller its details placement names. */
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const CONDENSE_PAST = 32;
@@ -16,7 +16,7 @@ export function condenseStep(condensed: boolean, scrollTop: number, fold: number
 
 /**
  * Listens to `scroller` alone, so a nested scroller inside the details, such as the file list or a diff scrolled sideways,
- * never condenses or expands the header. `root` holds the header's `[data-pr-condensed]` row, and `foldRef` the part it hides.
+ * never condenses or expands the header. `root` holds the header's `[data-condensed]` row, and `foldRef` the part it hides.
  */
 export function useCondensedHeader<T extends string>(scroller: HTMLElement | null, root: HTMLElement | null, foldRef: RefObject<HTMLElement | null>, tab: T): boolean {
 	const [condensedByTab, setCondensedByTab] = useState<Partial<Record<T, boolean>>>({});
@@ -31,7 +31,7 @@ export function useCondensedHeader<T extends string>(scroller: HTMLElement | nul
 		if (!scroller) return;
 		const onScroll = (): void => {
 			const fold = foldRef.current?.scrollHeight ?? 0;
-			const compact = root?.querySelector<HTMLElement>("[data-pr-condensed]")?.scrollHeight ?? 0;
+			const compact = root?.querySelector<HTMLElement>("[data-condensed]")?.scrollHeight ?? 0;
 			const step = condenseStep(condensed, scroller.scrollTop, fold, compact);
 			if (!step) return;
 			restore.current = step.top;
