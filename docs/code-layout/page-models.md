@@ -2,7 +2,7 @@
 
 - `web/pull-request-checks.ts`: `presentChecks`, the detail tab bar's checks text, popover heading, aggregate state, and stable attention, running, and completed groups.
 - `web/changes-model.ts`: `folderTree`, the tree of folders that the changes explorer and the notes list share, and `fileTree`, the explorer's, where a folder holding one folder and no file joins it, then the diff's folded runs, the file view's gutter marks, the diff list's sizes and `lastAtOrAbove`, which finds the file at the top of its scroll, and `changesPathOf`, which finds a card's file path in the session changes list.
-  `shortPaths` adds the fewest parent folders needed to tell files of one name apart in the changes card.
+  `shortPaths` adds the fewest parent folders needed to tell files of one name apart in the Todos card's **Files** section.
   `web/components/changes/file-tree.tsx` draws the explorer's tree; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines, for the changes view, recorded edit diffs, and a message's code blocks.
   `web/loaded-once.ts` holds `loadedOnce` and `useLoaded`, a value a dynamic import makes, loaded once on first need, which the grammars and `web/components/raw-html.ts`'s raw HTML plugins use.
 - `web/file-paths.ts`: which paths in agent text name a text file, an image, or a video (`linkedFile`), the absolute path each resolves to, and the `figure` that `remarkFilePaths` ends the text with, listing the images and videos it names.

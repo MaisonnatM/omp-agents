@@ -1,4 +1,4 @@
-/** The changes card's Sources section: a row per web page or remote item the view's agents opened, which opens it in the browser. */
+/** The Todos card's Sources section: a row per web page or remote item the view's agents opened, which opens it in the browser. */
 import { Globe } from "lucide-react";
 import { useState } from "react";
 import type { AgentSource } from "../../src/shared/transcript";
@@ -38,7 +38,7 @@ export function SourceList({ sources }: { sources: AgentSource[] }) {
 								href={source.url}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] outline-none hover:bg-background/70 focus-visible:ring-2 focus-visible:ring-ring"
+								className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 							>
 								<SiteIcon hostname={hostname} />
 								<span className="min-w-0 truncate">

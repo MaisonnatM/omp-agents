@@ -1,6 +1,6 @@
 # Session changes
 
-- Clicking a file in the changes card's **Files** section shows the session's changes in a dialog, at that file.
+- Clicking a file in the Todos card's **Files** section shows the session's changes in a dialog, at that file.
   **Review** opens the same dialog at the first file.
   Esc or the close button closes it.
 - The dialog knows two sets of files.

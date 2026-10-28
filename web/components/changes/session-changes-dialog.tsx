@@ -18,9 +18,9 @@ type Scope = "all" | "session";
 
 interface SessionChangesDialogProps {
 	sessionId: string;
-	/** The session's directory, which the changes card's paths are relative to. */
+	/** The session's directory, which the Todos card's paths are relative to. */
 	cwd: string | null;
-	/** The file to open first, as the changes card names it. */
+	/** The file to open first, as the Todos card names it. */
 	path: string;
 	/** The session's own changed files: each change reads the list again. */
 	work: ChangedFile[] | null;

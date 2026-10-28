@@ -62,7 +62,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Composer | action | `prompt` (sent, steered, or queued), `edit-prompt` |
 | Composer's directory, branch, and context ring | control, command, action | `composer.directory`, `composer.branch`, `composer.context-ring`; command `directory`; a move sends action `prompt` (`/move`) |
 | Rows above the composer | control, action | `composer-queue.send-now`, `composer-queue.edit`, `composer-queue.remove`, `composer-suggestions.pick`, `composer-suggestions.send-all`; actions `dequeue`, `promote`, `prompt`, `schedule`, `answer` |
-| Changes card (Files, Images, and Sources sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.sources.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.image.to-ticket`, `changes-card.source`; sending images is a `PUT` |
+| Todos card (Files, Images, and Sources sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.sources.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.image.to-ticket`, `changes-card.source`, ids kept from the card the sections came from so recorded use stays counted; sending images is a `PUT` |
 | `/` and `@` menus | control | `completion.pick` (a click; picking by keyboard records nothing) |
 | Model and thinking switch | control, command, action | `composer.model`; command `model`; actions `set-model`, `set-thinking`, `set-fast` |
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `replay-compare.open`; dragging the divider is not observed |
@@ -76,7 +76,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.tickets`, which a Bot's details share; images use the `media-viewer.*` controls |
 | Pull request details (tabs, composer, header, checkout menu, checks, timeline) | view, control, action | views `pull-requests/item`, `pull-requests/files`; `pr-details.tab.summary`, `pr-details.tab.timeline`, `pr-details.tab.code`, `pr-details.tab.review`, `pr-details.checkout`; on the page the Code tab also sets the hash, so it shows as view `pull-requests/files`; edits, comments, merges, and checkouts are `PUT`s or action `review-draft` |
 | Bottom bar | control, command, action | `status-bar.terminal`, `status-bar.cpu`; command `terminal`; a process's Stop is a `PUT`; plan quota is display only |
-| Files: the changes card's Files section | control | `changes-card.file`, `changes-card.files.fold` |
+| Files: the Todos card's Files section | control | `changes-card.file`, `changes-card.files.fold` |
 | Files: the session changes dialog | control | `changes-dialog.scope.all`, `changes-dialog.scope.session`, `changes-dialog.refresh` |
 | Files: Settings › Files | view | `settings/files` |
 | File dialog | control | `file-dialog.open`, `file-dialog.source`, `file-dialog.copy-path` |

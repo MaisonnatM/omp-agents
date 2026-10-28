@@ -27,7 +27,7 @@
 - A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large, with the tool and what the call said it did.
   The arrows, or the Left and Right keys, step to the previous and next tool image of the conversation, across calls, and the external-link button opens the image in your default browser.
   A tool group that returned images stays open.
-  Hiding tool calls hides them too; the changes card's **Images** section still lists every one.
+  Hiding tool calls hides them too; the Todos card's **Images** section still lists every one.
 - A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.
 - In a session's conversation, a `mermaid` or `chart` code block in a message draws as a diagram or a chart once the message settles; while a reply streams, it shows as code.
   A `mermaid` block draws a flowchart (`graph` or `flowchart` with a direction such as `TD` or `LR`), a `sequenceDiagram`, a `stateDiagram-v2`, a `classDiagram`, or an `erDiagram`, named on its first line, in up to 20,000 characters.
@@ -52,9 +52,11 @@
   Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
-- Once the view's agent made a todo list, a **Todos** card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
-  It floats at the conversation's top right, narrowing to fit the space beside the messages, and sits above them when that space is too narrow, so it never covers a message.
-  Click the card to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
+- The **Todos** card holds the agent's todo list and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
+  Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
+  It floats at the conversation's top right, narrowing to fit the space beside the messages, and sits above them when that space is too narrow, so it never covers a message; it scrolls as a whole when its sections outgrow it.
+  Click the todo summary to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
+  **Show todos card** in Settings › Preferences hides the todo list and keeps the other sections.
   Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
   Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
   A phase with every task done folds to one line; click it to open it.

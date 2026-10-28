@@ -83,7 +83,7 @@ Only image and video content types pass, up to 20 MiB streamed under one 15-seco
 Upstream cookies and headers do not pass through; responses have `nosniff` and a sandbox CSP.
 A `github.com` upload may redirect once into GitHub's signed upload bucket, `github-production-user-asset-6210df.s3.amazonaws.com`, which gets no token and which no other hop or request may reach.
 
-`GET /api/favicon?host=<host name>` reads a site's icon through `src/favicon.ts` for the changes card's Sources section, so the page's CSP keeps refusing outside images.
+`GET /api/favicon?host=<host name>` reads a site's icon through `src/favicon.ts` for the Todos card's Sources section, so the page's CSP keeps refusing outside images.
 It asks `https://<host>/favicon.ico`, then the first icon the home page's `<link rel="icon">` names, over HTTPS without ports or credentials.
 It refuses IP literals, single-label and local names, and any host or redirect hop whose DNS answers hold a loopback, private, link-local, or multicast address, so a page cannot steer it at this computer or its network.
 Only image types up to 256 KiB pass, and a home page up to 512 KiB, under one 8-second deadline; each host's answer, an icon or none, is cached for a day, up to 256 hosts.

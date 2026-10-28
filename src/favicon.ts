@@ -1,5 +1,5 @@
 /**
- * The icons of the web sites the changes card's Sources section lists, fetched by the server so the page's policy can
+ * The icons of the web sites the Todos card's Sources section lists, fetched by the server so the page's policy can
  * keep refusing outside images and no third-party icon service learns which sites a session opened.
  * A site's icon is its `/favicon.ico`, else the first icon its home page links; only public HTTPS hosts are asked.
  */
