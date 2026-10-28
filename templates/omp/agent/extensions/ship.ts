@@ -43,7 +43,7 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'implement', issue}).",
 	implement: "Implement and commit on the issue's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
-	thermonuclear: `If the status says no changed file matches \`${REVIEW_PATHS}\`, skip the review. Otherwise run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	thermonuclear: `If the status says no changed file matches \`${REVIEW_PATHS}\`, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, ask the user to approve, then run \`gh pr ready <N>\`.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",

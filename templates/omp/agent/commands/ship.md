@@ -31,7 +31,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"thermonuclear", pr:<number>})`.
    A successful `gh pr create` also records this transition.
 4. **Thermonuclear.** If the repository commits `.omp/review-paths` and the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"ready_gate"})` and say in one line of the report that the review was skipped and why.
-   Otherwise run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
+   Otherwise wait until the user approves the direction, as `# Before any pull request` in `APPEND_SYSTEM.md` says, then run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
    Review the actual PR including tests.
    Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once, commit and push.
    Repeat the review if substantial changes invalidate it.
