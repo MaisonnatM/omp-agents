@@ -28,10 +28,13 @@ function load(extension) {
 		on(name, handler) { hooks[name] = handler; },
 		registerTool(registered) { tool = registered; },
 		appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
-		// input.responses answers by subcommand, such as "pr view" or "repo view"; input.response answers the rest.
-		async exec(_command, args) {
-			executed.push(args);
-			return input.sequence?.shift() ?? input.responses?.[args.slice(0, 2).join(" ")] ?? input.response;
+		// input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.response answers the rest.
+		async exec(command, args) {
+			const gh = command === "env" ? args.findIndex((arg, i) => arg !== "-u" && args[i - 1] !== "-u") : -1;
+			const words = gh < 0 ? args : ["env", ...args.slice(0, gh), ...args.slice(gh + 1)];
+			executed.push(words);
+			const key = words.slice(0, gh < 0 ? 2 : gh + 3).join(" ");
+			return input.sequence?.shift() ?? input.responses?.[key] ?? input.response;
 		},
 	});
 	return hooks;
@@ -44,7 +47,7 @@ if (input.command) {
 		cwd: input.cwd ?? process.cwd(), hasUI: true,
 		ui: { async confirm() { confirmations++; return input.approve; } },
 	});
-	console.log(JSON.stringify({ result: result ?? null, confirmations }));
+	console.log(JSON.stringify({ result: result ?? null, confirmations, executed }));
 } else if (input.write) {
 	// attempts repeats the call, as an agent retrying after a block does; the last answer counts.
 	const ctx = {
@@ -229,30 +232,44 @@ describe("ship publication gate", () => {
 		expect(confirmations).toBe(0);
 	});
 
-	test.each([["the token", true], ["ghp_launchValue", false]])("a rejected GITHUB_TOKEN with %s in the project's .env blames that file: %p", (fileValue, blamed) => {
+	const rejectedToken = { state: "error", error: "non-200 OK status code: 401 Unauthorized", active: true, host: "github.com", login: "", tokenSource: "GITHUB_TOKEN", gitProtocol: "ssh" };
+	const keyringLogin = { state: "success", active: false, host: "github.com", login: "octocat", tokenSource: "keyring", scopes: "repo", gitProtocol: "ssh" };
+	const unauthorized = { code: 1, stdout: "", stderr: "HTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login -h github.com" };
+	const authStatus = (credentials: object[]) => ({ code: 0, stdout: JSON.stringify({ hosts: { "github.com": credentials } }), stderr: "" });
+
+	test("a rejected GITHUB_TOKEN ahead of a working login is dropped, and the gate reads the PR with that login", () => {
+		const { result, confirmations, executed } = exercise("ship", {
+			command: "gt submit --publish", approve: true, cwd: checkout(),
+			responses: {
+				"pr view": unauthorized,
+				"auth status": authStatus([rejectedToken, keyringLogin]),
+				"env -u GITHUB_TOKEN pr view": prView("- [x] Thermo-nuclear code quality review"),
+			},
+		}, { GITHUB_TOKEN: "ghp_rejectedTokenForTest0000000000000000" });
+		expect(result).toBeNull();
+		expect(confirmations).toBe(1);
+		expect(executed).toEqual([
+			["pr", "view", "--json", "body,changedFiles,files"],
+			["auth", "status", "--json", "hosts"],
+			["env", "-u", "GITHUB_TOKEN", "pr", "view", "--json", "body,changedFiles,files"],
+		]);
+	});
+
+	test.each([["the token", true], ["ghp_launchValue", false]])("a rejected GITHUB_TOKEN with no working login and %s in the project's .env blames that file: %p", (fileValue, blamed) => {
 		const project = mkdtempSync(join(tmpdir(), "ship-auth-"));
 		const token = "ghp_rejectedTokenForTest0000000000000000";
 		writeFileSync(join(project, ".env"), `GITHUB_TOKEN=${fileValue === "the token" ? token : fileValue}\n`);
-		const hosts = {
-			"github.com": [
-				{ state: "error", error: "non-200 OK status code: 401 Unauthorized", active: true, host: "github.com", login: "", tokenSource: "GITHUB_TOKEN", gitProtocol: "ssh" },
-				{ state: "success", active: false, host: "github.com", login: "octocat", tokenSource: "keyring", scopes: "repo", gitProtocol: "ssh" },
-			],
-		};
-		const { result } = exercise("ship", {
+		const { result, executed } = exercise("ship", {
 			command: "gt submit --publish", cwd: project,
-			responses: {
-				"pr view": { code: 1, stdout: "", stderr: "HTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login -h github.com" },
-				"auth status": { code: 0, stdout: JSON.stringify({ hosts }), stderr: "" },
-			},
+			responses: { "pr view": unauthorized, "auth status": authStatus([rejectedToken]) },
 		}, { GITHUB_TOKEN: token });
 		rmSync(project, { recursive: true, force: true });
 		expect(result?.block).toBe(true);
 		expect(result?.reason).toContain("`GITHUB_TOKEN`");
-		expect(result?.reason).toContain("octocat");
+		expect(result?.reason).toContain("gh auth login -h github.com");
 		expect(result?.reason.includes(join(project, ".env"))).toBe(blamed);
-		expect(result?.reason).not.toContain("gh auth login");
 		expect(result?.reason).not.toContain(token);
+		expect(executed.filter(words => words[0] === "pr")).toHaveLength(1);
 	});
 });
 
