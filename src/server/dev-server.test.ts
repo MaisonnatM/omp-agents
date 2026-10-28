@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { planDevServer } from "./dev-server";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { planDevServer, startDevServer } from "./dev-server";
 
 const pkg = (scripts: Record<string, string>): string => JSON.stringify({ name: "app", scripts });
 
@@ -85,5 +88,41 @@ describe("planDevServer", () => {
 			".env.local points VITE_API at http://127.0.0.1:9000, a server this start would not run",
 			"planned",
 		]);
+	});
+});
+
+describe("startDevServer", () => {
+	const project = async (files: Record<string, string>): Promise<string> => {
+		const dir = await mkdtemp(join(tmpdir(), "dev-server-"));
+		await Promise.all(Object.entries(files).map(([name, text]) => Bun.write(join(dir, name), text)));
+		return dir;
+	};
+
+	test("starts the planned command as the session's service on the picked port, and answers why when it ended", async () => {
+		const dir = await project({ "package.json": pkg({ dev: "vite" }), "bun.lock": "" });
+		const specs: { owner: string; name: string; args: string[]; port: number | undefined }[] = [];
+		const running = await startDevServer("session-1", dir, async (_dir, owner, spec) => {
+			specs.push({ owner, name: spec.name, args: spec.args, port: spec.ready?.port });
+			return { running: true };
+		});
+		if (!("started" in running)) throw new Error(running.fallback);
+		const { port } = running.started;
+		expect(running).toEqual({ started: { port, command: `bun run dev --port ${port}` } });
+		expect(specs).toEqual([{ owner: "session-1", name: `dev-${port}`, args: ["-lc", `bun run dev --port ${port}`], port }]);
+		expect(port >= 20_000 && port <= 39_999).toBe(true);
+
+		const ended = await startDevServer("session-1", dir, async () => ({ ended: "error: missing DATABASE_URL" }));
+		expect("fallback" in ended && ended.fallback.replace(/\d+/, "N")).toBe("bun run dev --port N exited: error: missing DATABASE_URL");
+	});
+
+	test("starts nothing when the plan leaves it to the session", async () => {
+		const dir = await project({ "package.json": pkg({ dev: "react-router dev" }), ".env": "PUBLIC_API_URL=http://localhost:8000\n" });
+		let started = false;
+		const answer = await startDevServer("session-1", dir, async () => {
+			started = true;
+			return { running: true };
+		});
+		expect(answer).toEqual({ fallback: ".env points PUBLIC_API_URL at http://localhost:8000, a server this start would not run" });
+		expect(started).toBe(false);
 	});
 });
