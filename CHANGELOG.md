@@ -7,6 +7,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Sessions started in a Mac temporary folder, such as one `mktemp -d` made, are now hidden from the sidebar like those in `/tmp`.
 - An issue's header now stays at the top while its details scroll, and shrinks to its title and branch, as a pull request's does.
+- Fixed: the dashboard starts again after omp updates itself to a single program file.
 - On a wide pane, the todos card now floats at the top right sooner, and the conversation moves left to make room for it.
 - Behind the scenes: agents test the desktop app in a hidden window, so their checks no longer open windows on your screen.
 - Fixed: a running session's name in the sidebar still sat a little to the right of the others; it now lines up.

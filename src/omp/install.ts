@@ -31,6 +31,9 @@ function findPackageDir(): string {
 		if (existsSync(manifest) && readManifest(manifest).name === PACKAGE_NAME) return dir;
 		dir = dirname(dir);
 	}
+	// `omp update` can replace Bun's link with a compiled binary in `$BUN_INSTALL/bin`, beside Bun's global packages.
+	const global = join(dirname(dirname(bin)), "install/global/node_modules", PACKAGE_NAME);
+	if (existsSync(join(global, "package.json"))) return global;
 	throw new Error(`could not find ${PACKAGE_NAME} above ${bin}; set OMP_PACKAGE_DIR`);
 }
 
