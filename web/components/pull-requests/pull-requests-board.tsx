@@ -55,6 +55,7 @@ import { type RowBase, type RowProps, rowElement, rowId, sameSessions, sessionsB
 const FOLDS_KEY = "omp-agents.inbox-collapsed";
 const ORDER_KEY = "omp-agents.inbox-order";
 const VIEW_KEY = "omp-agents.pull-requests-view";
+const PLACEMENT_KEY = "omp-agents.pull-request-details-placement";
 
 const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
 
@@ -72,11 +73,20 @@ const decodeView = (raw: string | null): PullRequestsView => (raw === "board" ? 
 /** The Pull requests page's view, which the browser keeps and the page and the sidebar both follow. */
 export const usePullRequestsView = () => useStoredState(VIEW_KEY, decodeView);
 
+/** Where the Pull requests page shows a pull request's details: docked beside the list or the board, or on a page of their own. */
+export type PullRequestDetailsPlacement = "beside" | "page";
+
+const decodePlacement = (raw: string | null): PullRequestDetailsPlacement => (raw === "page" ? "page" : "beside");
+
+/** Where the details show, which the browser keeps and the page and the sidebar both follow. */
+export const usePullRequestDetailsPlacement = () => useStoredState(PLACEMENT_KEY, decodePlacement);
+
 /**
- * What the Pull requests page shows for `route` in `view`: the list or the board, or, in the list view, the details of
- * the pull request `route` names, on a page of their own; the board docks them beside it instead.
+ * What the Pull requests page shows for `route`: the list or the board, with the details of the pull request `route`
+ * names docked beside it, or those details on a page of their own while `placement` is `page`.
  */
-export const pullRequestsPageShows = (view: PullRequestsView, route: PullRequestsRoute): PullRequestsView | "details" => (view === "list" && route.target !== null ? "details" : view);
+export const pullRequestsPageShows = (view: PullRequestsView, placement: PullRequestDetailsPlacement, route: PullRequestsRoute): PullRequestsView | "details" =>
+	placement === "page" && route.target !== null ? "details" : view;
 
 /** `order` with the repository `key` put on the `where` side of `beside`; the repositories a list does not show, `shown` being those it does, keep their place behind them. */
 export const withRepoMoved = (order: PullRequestOrder, shown: string[], key: string, beside: string, where: Where): PullRequestOrder => ({

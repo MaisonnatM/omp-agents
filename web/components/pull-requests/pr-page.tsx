@@ -99,30 +99,37 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 	);
 }
 
+/** Cmd+Shift+K copies `target`'s `#N` and Cmd+Shift+C its GitHub link, while the Pull requests page shows its details. */
+export function usePullRequestCopyShortcuts(target: PullRequest): void {
+	const clipboard = useClipboard();
+	useShortcuts({
+		copyPullRequestNumber: () => clipboard.run(`#${target.number}`),
+		copyPullRequestLink: () => clipboard.run(pullRequestUrl(target)),
+	});
+}
+
 interface PullRequestDetailPageProps extends Pick<PullRequestDetailsProps, "workspace" | "hosts" | "target"> {
 	/** The route's Code tab and the changed file it opens; `null` for another tab. */
 	files: { path: string | null } | null;
+	/** Brings the list or the board back, with these details docked beside it. */
+	onDock: () => void;
 }
 
 /**
  * A pull request from the Pull requests page in the main area, with the quick actions that start a session on it.
  * Its host keys it by the pull request, so another one starts on **Summary**; the route alone says whether it shows **Code**.
  */
-export function PullRequestDetailPage({ files, ...props }: PullRequestDetailPageProps) {
+export function PullRequestDetailPage({ files, onDock, ...props }: PullRequestDetailPageProps) {
 	const [kept, setKept] = useState<PullRequestDetailTab>("summary");
 	const tab = files !== null ? "code" : kept;
 	const choose = (next: PullRequestDetailTab): void => {
 		if (next !== "code") setKept(next);
 		if ((next === "code") !== (files !== null)) location.hash = next === "code" ? hashForPullRequestFiles(props.target) : hashForPullRequests(props.target);
 	};
-	const clipboard = useClipboard();
-	useShortcuts({
-		copyPullRequestNumber: () => clipboard.run(`#${props.target.number}`),
-		copyPullRequestLink: () => clipboard.run(pullRequestUrl(props.target)),
-	});
+	usePullRequestCopyShortcuts(props.target);
 	const back = (
 		<Tooltip content="Back to Pull requests" side="bottom">
-			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to Pull requests" render={<a href={hashForPullRequests(null)} />}>
+			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to Pull requests" onClick={onDock}>
 				<ArrowLeft />
 			</Button>
 		</Tooltip>

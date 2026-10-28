@@ -8,7 +8,7 @@ import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarPane
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
-import { pullRequestsPageShows, usePullRequestsView } from "./pull-requests/pull-requests-board";
+import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { Roster } from "./roster";
 
@@ -73,16 +73,17 @@ export const AppSidebar = memo(function AppSidebar({
 	setShortcutsOpen,
 }: AppSidebarProps) {
 	const [pullRequestsView] = usePullRequestsView();
+	const [detailsPlacement] = usePullRequestDetailsPlacement();
 	const pullRequestsTab = useMemo(() => {
 		// Until the sessions are listed, the saved workspace reads as all workspaces, which would ask GitHub about every repository.
 		if (!listed) return <p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>;
 		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab links to its sections or
 		// columns then, and lists them only beside a pull request's page or another page.
-		const shows = page?.kind === "pull-requests" ? pullRequestsPageShows(pullRequestsView, page) : "details";
+		const shows = page?.kind === "pull-requests" ? pullRequestsPageShows(pullRequestsView, detailsPlacement, page) : "details";
 		if (shows === "list") return <PullRequestsIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
 		if (shows === "board") return <PullRequestsBoardIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
 		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
-	}, [listed, page, pullRequestsView, workspace, visible, sectionTarget, onSectionTarget]);
+	}, [listed, page, pullRequestsView, detailsPlacement, workspace, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const botList = useMemo(() => (bots === null ? null : botRows(bots, hosts, botLasts)), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
