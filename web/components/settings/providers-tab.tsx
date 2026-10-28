@@ -359,7 +359,6 @@ export function ProvidersTab({ active }: { active: boolean }) {
 	const meta = "The model providers omp signs in to";
 	return (
 		<Section
-			title="Providers"
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}
 			actions={
 				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing && !running} onClick={() => void refresh()}>

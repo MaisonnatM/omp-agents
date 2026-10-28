@@ -92,7 +92,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 	return (
 		<>
 			<Section
-				title="Providers"
+				title="Command-line tools"
 				meta="The command-line tools the dashboard and your sessions reach GitHub and Graphite through."
 				actions={
 					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={read.reload}>
@@ -102,7 +102,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 			>
 				{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
 				{answer && (
-					<IntegrationList label="Source control providers">
+					<IntegrationList label="Command-line tools">
 						{answer.providers.map(status => (
 							<ProviderRow key={status.provider} status={status} />
 						))}

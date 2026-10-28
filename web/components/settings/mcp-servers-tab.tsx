@@ -52,7 +52,6 @@ export function McpServersTab({ active }: { active: boolean }) {
 	}, [active]);
 	return (
 		<Section
-			title="MCP servers"
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}
 			actions={
 				<>

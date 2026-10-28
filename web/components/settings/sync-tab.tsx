@@ -15,12 +15,19 @@ const SIDE_LABEL: Record<SyncSide, string> = { local: "This machine", remote: "R
 const ITEM_LABEL = Object.fromEntries(SYNC_ITEMS.map(item => [item.id, item.label]));
 const ago = (at: number): string => (Date.now() - at < 60_000 ? "just now" : `${age(at)} ago`);
 
-function Paths({ label, paths }: { label: string; paths: string[] }) {
+function Paths({ verb, paths }: { verb: string; paths: string[] }) {
 	if (paths.length === 0) return null;
 	return (
-		<p className="text-xs text-muted-foreground">
-			{label}: <span className="font-mono">{paths.join(", ")}</span>
-		</p>
+		<details className="text-xs">
+			<summary className="cursor-pointer text-muted-foreground">
+				{verb} {paths.length} {paths.length === 1 ? "file" : "files"}
+			</summary>
+			<ul className="mt-1 max-h-60 space-y-0.5 overflow-auto font-mono text-muted-foreground">
+				{paths.map(path => (
+					<li key={path}>{path}</li>
+				))}
+			</ul>
+		</details>
 	);
 }
 
@@ -90,8 +97,8 @@ function LastSync({ last }: { last: SyncOutcome | null }) {
 					<p role="status" className="text-xs text-muted-foreground">
 						Synced {ago(last.at)}.{last.received.length + last.sent.length === 0 && " Nothing changed."}
 					</p>
-					<Paths label="Received" paths={last.received} />
-					<Paths label="Sent" paths={last.sent} />
+					<Paths verb="Received" paths={last.received} />
+					<Paths verb="Sent" paths={last.sent} />
 					<Skipped skipped={last.skipped} />
 				</div>
 			);
@@ -157,7 +164,7 @@ export function SyncTab({ active }: { active: boolean }) {
 				</form>
 			</Section>
 			<Section
-				title="Sync"
+				title="Last sync"
 				meta="Fetches the remote, merges each file with this machine's against the last sync, sends what changed here, and writes what changed there."
 				actions={
 					<Button variant="secondary" size="compact" leadingIcon={RefreshCcw} loading={pending === "sync"} disabled={!answer || pending !== null || settings.remote === ""} onClick={() => void sync({})}>

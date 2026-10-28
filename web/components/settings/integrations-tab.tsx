@@ -72,7 +72,6 @@ export function IntegrationsTab({ active, workspaces }: { active: boolean; works
 	const meta = "Services omp and this dashboard connect to";
 	return (
 		<Section
-			title="Integrations"
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}
 			actions={
 				<Button

@@ -98,12 +98,13 @@ export function SaveError<T>({ editor }: { editor: Editor<T> }) {
 	);
 }
 
-export function Section({ title, meta, actions, children }: { title: string; meta?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+/** A settings block; leave out `title` when the page header already names it, so only `meta` and `actions` head it. */
+export function Section({ title, meta, actions, children }: { title?: string; meta?: ReactNode; actions?: ReactNode; children: ReactNode }) {
 	return (
 		<section className="space-y-3">
 			<div className="flex min-h-7 items-center justify-between gap-4">
 				<div className="min-w-0">
-					<h3 className="text-sm font-semibold">{title}</h3>
+					{title && <h3 className="text-sm font-semibold">{title}</h3>}
 					{meta && <p className="text-xs text-muted-foreground">{meta}</p>}
 				</div>
 				{actions}

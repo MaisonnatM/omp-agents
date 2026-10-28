@@ -237,15 +237,10 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 	const totalChosen = totalBytes(chosen, metrics);
 
 	return (
-		<section className="space-y-5" aria-labelledby="worktrees-heading">
-			<div className="space-y-1">
-				<h2 id="worktrees-heading" className="text-sm font-medium">
-					Worktrees
-				</h2>
-				<p className="text-sm text-muted-foreground">
-					{cwd === null ? "Repositories where an omp session ran." : "The repository of this workspace."} Last omp activity comes from session files. Disk use is approximate and may not become free.
-				</p>
-			</div>
+		<section className="space-y-5" aria-label="Worktrees">
+			<p className="text-sm text-muted-foreground">
+				{cwd === null ? "Repositories where an omp session ran." : "The repository of this workspace."} Last omp activity comes from session files. Disk use is approximate and may not become free.
+			</p>
 			{inventory ? (
 				<dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
 					<div>

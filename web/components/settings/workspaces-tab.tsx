@@ -55,7 +55,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden } }: Workspace
 	};
 	return (
 		<>
-			<Section title="Workspaces" meta="The directories the directory pickers and the sidebar's workspace picker offer. Hiding one also hides its sessions from the sidebar and search; a link to one still opens it.">
+			<Section meta="The directories the directory pickers and the sidebar's workspace picker offer. Hiding one also hides its sessions from the sidebar and search; a link to one still opens it.">
 				<form className="flex flex-wrap items-end gap-2" onSubmit={add}>
 					<label className="space-y-1 text-sm">
 						Directory
