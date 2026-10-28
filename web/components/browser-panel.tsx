@@ -10,12 +10,15 @@ import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { appendToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
 import { initialAddress, browserCandidates } from "../browser-model";
 import { sessionProcessesStore } from "../reads";
+import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useWebview } from "../use-webview";
+import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
 
@@ -27,20 +30,45 @@ const START_SERVER_PROMPT =
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
 
 /** A toolbar control of the Browser, named by its tooltip. */
-function ToolbarButton({ label, control, disabled, onClick, children }: {
+function ToolbarButton({ label, control, disabled, shortcut, onClick, children }: {
 	label: string;
 	control: ControlId;
 	disabled: boolean;
+	shortcut?: readonly string[];
 	onClick: () => void;
 	children: ReactNode;
 }) {
 	return (
-		<Tooltip content={label} side="bottom" disabled={disabled}>
+		<Tooltip content={label} shortcut={shortcut} side="bottom" disabled={disabled}>
 			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} disabled={disabled} onClick={onClick}>
 				{children}
 			</Button>
 		</Tooltip>
 	);
+}
+
+/**
+ * Makes what `kept` covers inert: each element of the page beside it or an ancestor that lies under its box, leaving
+ * alone what stays in view, such as the title bar, and what draws above it, such as toasts. Returns what undoes it.
+ */
+function inertAround(kept: HTMLElement): () => void {
+	const box = kept.getBoundingClientRect();
+	const covered = (element: HTMLElement): boolean => {
+		const rect = element.getBoundingClientRect();
+		const overlaps = rect.width > 0 && rect.height > 0 && rect.bottom > box.top && rect.top < box.bottom && rect.right > box.left && rect.left < box.right;
+		return overlaps && getComputedStyle(element).position !== "fixed";
+	};
+	const made: HTMLElement[] = [];
+	for (let node: HTMLElement = kept; node.parentElement; node = node.parentElement) {
+		for (const sibling of node.parentElement.children) {
+			if (sibling === node || !(sibling instanceof HTMLElement) || sibling.inert || !covered(sibling)) continue;
+			sibling.inert = true;
+			made.push(sibling);
+		}
+	}
+	return () => {
+		for (const element of made) element.inert = false;
+	};
 }
 
 /** The address each session's Browser last loaded, by omp session id, dropped once unused for 30 days. */
@@ -53,8 +81,10 @@ const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 *
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
 	const { read } = sessionProcessesStore.use();
 	const candidates = useMemo(() => browserCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
+	const sessionPorts = useMemo(() => candidates.map(candidate => candidate.port), [candidates]);
 	const [saved] = useState(() => addresses.get(sessionId));
 	const draftKey = liveDraftKey(view);
+	const [maximized, setMaximized] = useState(false);
 	const webview = useWebview({
 		initial: initialAddress(saved, candidates),
 		onPick: text => {
@@ -62,6 +92,9 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 			toasts.add({ title: "Added to the composer" });
 		},
 		onNavigate: url => addresses.set(sessionId, url),
+		// The app has the focus while maximized, so its Escape restores too.
+		onEscape: () => setMaximized(false),
+		sessionPorts,
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
@@ -69,23 +102,26 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		request({ t: "prompt", view, text: START_SERVER_PROMPT, images: [], delivery: "followUp" });
 		toasts.add({ title: "Asked the session to start its dev server" });
 	};
-	// The candidates choose the first address and fill the server menu, so `ps` and `lsof` run only for those.
-	sessionProcessesStore.usePolling(null, webview.src === null || menuOpen);
+	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
+	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
+	useShortcuts({
+		browserRestore: () => {
+			if (!maximized) return false;
+			setMaximized(false);
+		},
+	});
 	const sectionRef = useRef<HTMLElement>(null);
-	const [fullScreen, setFullScreen] = useState(false);
-	useEffect(() => {
-		const sync = () => setFullScreen(document.fullscreenElement !== null && document.fullscreenElement === sectionRef.current);
-		document.addEventListener("fullscreenchange", sync);
-		return () => document.removeEventListener("fullscreenchange", sync);
-	}, []);
-	const toggleFullScreen = () => {
-		const done = fullScreen ? document.exitFullscreen() : sectionRef.current?.requestFullscreen();
-		done?.catch(() => toasts.add({ title: "Could not change full screen" }));
-	};
+	// What the maximized Browser covers leaves the tab order and the accessibility tree.
+	useEffect(() => (maximized && sectionRef.current ? inertAround(sectionRef.current) : undefined), [maximized]);
 
 	return (
-		<section ref={sectionRef} aria-label="Browser" className="flex min-h-0 flex-1 flex-col bg-background">
+		<section
+			ref={sectionRef}
+			aria-label="Browser"
+			// Maximized, it covers the window below its title bar (`DesktopTitleBar`'s h-9), whose window buttons and drag strip stay usable.
+			className={cn("flex min-h-0 flex-col bg-background", maximized ? cn("fixed inset-x-0 bottom-0 z-30", DESKTOP_TITLE_BAR ? "top-9" : "top-0") : "flex-1")}
+		>
 			<div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border px-1.5">
 				<ToolbarButton label="Back" control="browser.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
 					<ArrowLeft />
@@ -138,8 +174,14 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<ToolbarButton label="Select element" control="browser.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
 					<MousePointerClick />
 				</ToolbarButton>
-				<ToolbarButton label={fullScreen ? "Exit full screen" : "Full screen"} control="browser.full-screen" disabled={false} onClick={toggleFullScreen}>
-					{fullScreen ? <Minimize2 /> : <Maximize2 />}
+				<ToolbarButton
+					label={maximized ? "Restore Browser" : "Maximize Browser"}
+					control="browser.maximize"
+					disabled={false}
+					shortcut={maximized ? shortcutLabels("browserRestore") : undefined}
+					onClick={() => setMaximized(!maximized)}
+				>
+					{maximized ? <Minimize2 /> : <Maximize2 />}
 				</ToolbarButton>
 				<Tooltip content="Open in default browser" side="bottom" disabled={!mounted}>
 					<Button
@@ -164,8 +206,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 					<Server aria-hidden className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
 					<p className="text-xs text-muted-foreground/80">Ask the session to start one, or type its address above.</p>
-					<Button {...activityControl("browser.start-server")} variant="outline" size="sm" className="mt-1" onClick={startServer}>
-						<Play />
+					<Button {...activityControl("browser.start-server")} variant="outline" size="sm" leadingIcon={Play} className="mt-1" onClick={startServer}>
 						Start dev server
 					</Button>
 				</div>

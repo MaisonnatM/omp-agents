@@ -6,7 +6,7 @@
 /// <reference lib="dom" />
 import { ipcRenderer, webFrame } from "electron";
 import { isObject } from "../src/json";
-import { PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
 import grab from "./dist/preview-grab.txt" with { type: "text" };
 
 // react-grab observes `document.body` as it starts, which the preload runs before the parser made.
@@ -15,4 +15,9 @@ document.addEventListener("DOMContentLoaded", () => void webFrame.executeJavaScr
 window.addEventListener("message", event => {
 	const content: unknown = event.source === window && isObject(event.data) ? event.data[PREVIEW_GRAB_CHANNEL] : undefined;
 	if (typeof content === "string") ipcRenderer.sendToHost(PREVIEW_GRAB_CHANNEL, content);
+});
+
+// The guest has the focus while the Browser is maximized, so an Escape the app left alone goes to the page, which restores it.
+window.addEventListener("keydown", event => {
+	if (event.key === "Escape" && !event.defaultPrevented) ipcRenderer.sendToHost(PREVIEW_ESCAPE_CHANNEL);
 });

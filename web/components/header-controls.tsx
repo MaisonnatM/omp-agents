@@ -93,6 +93,7 @@ function HistoryButtons() {
 /** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward, the document title centered, and the controls at its right. */
 export function DesktopTitleBar({ title, controls }: { title: string; controls: ReactNode }) {
 	// pl-[78px] clears the window's buttons: `trafficLightPosition.x` 14 in desktop/main.ts, their 52px, and a 12px gap.
+	// h-9 is also the `top-9` a maximized Browser leaves for it in browser-panel.tsx.
 	return (
 		<div className="relative flex h-9 shrink-0 items-center justify-between border-b border-border bg-sidebar pr-3 pl-[78px] select-none [-webkit-app-region:drag]">
 			<p className="pointer-events-none absolute inset-x-40 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>

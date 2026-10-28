@@ -29,11 +29,12 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { ACCESS_CHANNEL, isLoopbackUrl, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, isWebUrl, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
 import { showAttention } from "./attention";
+import { trackBrowserGuests } from "./browser-guests";
 import { startUpdates, type Updates } from "./updates";
 
 const PORT = portFromEnv();
@@ -205,8 +206,7 @@ async function connect(win: BrowserWindow): Promise<void> {
 
 /** Opens a web address in the default browser; any other scheme goes nowhere. */
 function openOutside(url: string): void {
-	const protocol = URL.parse(url)?.protocol;
-	if (protocol === "http:" || protocol === "https:") void shell.openExternal(url);
+	if (isWebUrl(url)) void shell.openExternal(url);
 }
 
 /** `url` as the window loads it when it names the dashboard's page, `${ORIGIN}/` with any hash, else `null`. */
@@ -297,25 +297,7 @@ function createWindow(): BrowserWindow {
 		const items = contextMenuItems(params, contents);
 		if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
 	});
-	// The Preview's webview: whatever the page asks, it gets our preload in the sandbox, its own session, and a loopback address.
-	contents.on("will-attach-webview", (event, prefs, params) => {
-		Object.assign(prefs, { preload: PREVIEW_PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, partition: PREVIEW_PARTITION });
-		params.partition = PREVIEW_PARTITION;
-		if (!isDashboard(contents.getURL()) || !isLoopbackUrl(params.src ?? "")) event.preventDefault();
-	});
-	contents.on("did-attach-webview", (_event, guest) => {
-		guest.setWindowOpenHandler(({ url }) => {
-			openOutside(url);
-			return { action: "deny" };
-		});
-		const keepLoopback = (navigation: Electron.Event<{ url: string }>): void => {
-			if (isLoopbackUrl(navigation.url)) return;
-			navigation.preventDefault();
-			openOutside(navigation.url);
-		};
-		guest.on("will-navigate", keepLoopback);
-		guest.on("will-redirect", keepLoopback);
-	});
+	trackBrowserGuests(win, { preload: PREVIEW_PRELOAD, isDashboard, openOutside });
 	/** The token the preload last wrote into the page, so a sign-in reloads the page only for a token it has not tried. */
 	let handedOut: string | null = null;
 	ipcMain.on(ACCESS_CHANNEL, event => {

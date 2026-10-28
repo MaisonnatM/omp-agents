@@ -12,11 +12,13 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   With none, the Browser says so; start one with **Start dev server** below, or type its address.
   **Start dev server**, under that message and at the bottom of the server menu, asks the session to run its dev server as a long-lived service in the worktree it works in; a running turn gets it as a follow-up, and the Browser finds the server once it listens.
 - The address field loads what you type when you press Enter; `localhost:5173` reads as `http://localhost:5173`.
-  The Browser loads only addresses on this computer, `localhost`, `127.0.0.1`, and `[::1]`.
-  A link in the app to any other address, and any link that opens a new window, opens in your default browser.
+  The address field loads only addresses on this computer, `localhost`, `127.0.0.1`, and `[::1]`.
+  The app itself can go anywhere on the web, so a sign-in that goes through Google or another provider and comes back finishes in the Browser, and a sign-in popup opens as a small window of the app with the same sign-ins.
+  When a sign-in comes back to `localhost` on a port the session runs nothing on, usually the port the app runs on day to day such as `3000`, the Browser loads the same address on the session's server instead, so the sign-in lands in the app you are testing.
+  A link that opens a new tab opens in your default browser.
   An address that fails to load says why under the address.
 - Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.
-- **Full screen**, the expand button, fills the screen with the Browser, toolbar included; the same button or Escape brings it back to the sidebar.
+- **Maximize Browser**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, the same button, or Escape, pressed in the app too, puts it back in the sidebar.
 - **Select element**, the pointer button, turns on react-grab's picking in the app, and a click on an element adds it to the session's composer: its HTML, the React component around it with its file, and a selector.
   React-grab's **Comment** adds the element with a note you type first; the composer gets the note and then the element.
   Each pick goes after what the composer already holds, and a message confirms it; nothing is sent until you send it.
