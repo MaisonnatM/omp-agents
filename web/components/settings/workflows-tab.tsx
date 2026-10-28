@@ -17,11 +17,11 @@ export function workflowSteps(text: string): string[] {
 	return [...text.matchAll(/^\d+\. \*\*(.+?)\.?\*\*/gm)].map(match => match[1]!.trim());
 }
 
-/** The steps as a left-to-right mermaid flowchart; `null` under two steps. */
+/** The steps as a top-to-bottom mermaid flowchart; `null` under two steps. */
 export function stepsFlowchart(steps: string[]): string | null {
 	if (steps.length < 2) return null;
 	const nodes = steps.map((step, i) => `  s${i}["${i + 1}. ${step.replaceAll('"', "'")}"]`);
-	return ["flowchart LR", ...nodes, `  ${steps.map((_, i) => `s${i}`).join(" --> ")}`].join("\n");
+	return ["flowchart TD", ...nodes, `  ${steps.map((_, i) => `s${i}`).join(" --> ")}`].join("\n");
 }
 
 export function Workflows({ workflows, files, editing }: { workflows: Workflow[]; files: OmpFile[]; editing: Editing }) {
