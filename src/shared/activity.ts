@@ -49,7 +49,6 @@ export const featureId = (kind: ActivityKind, key: string): string => `${kind}:$
  */
 export const CONTROLS = [
 	{ id: "trajectory.toggle", label: "Trajectory toggle", area: "Panes" },
-	{ id: "todos-card.toggle", label: "Todos card shown or hidden", area: "Panes" },
 	{ id: "trajectory.turn", label: "Trajectory turn, folded or unfolded", area: "Panes" },
 	{ id: "trajectory.step", label: "Trajectory step, folded or unfolded", area: "Panes" },
 	{ id: "replay.open", label: "Replay from here", area: "Panes" },
