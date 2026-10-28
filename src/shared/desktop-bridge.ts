@@ -18,6 +18,8 @@ export const ACCESS_CHANNEL = "omp-agents:access";
 export const PREVIEW_GRAB_CHANNEL = "omp-agents:preview-grab";
 /** The `ipc-message` channel on which the Browser's webview reports an Escape its app left unhandled. */
 export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
+/** The Preview's react-grab turning its picking on (`true`) or off, which the guest's preload hands to the page. */
+export const PREVIEW_GRAB_ACTIVE_CHANNEL = "omp-agents:preview-grab-active";
 /** The Preview webview's session, apart from the dashboard's, and kept across launches, so a sign-in to the app lasts. */
 export const PREVIEW_PARTITION = "persist:omp-preview";
 /** The page's report of a Browser's {@link BrowserPorts}, for the shell's {@link appAddress}. */

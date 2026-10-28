@@ -1,6 +1,6 @@
 /** The Browser's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
 import { useEffect, useRef, useState } from "react";
-import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_ACTIVE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
 
 /** What the Browser drives of Electron's `<webview>`, which the page has no types for. */
 export interface WebviewTag extends HTMLWebViewElement {
@@ -38,12 +38,14 @@ interface WebviewOptions {
 	onNavigate: (url: string) => void;
 	/** Takes an Escape the app left unhandled, which never reaches the page while the app has the focus. */
 	onEscape: () => void;
+	/** Takes react-grab turning its picking on or off in the page, such as by itself after a pick. */
+	onGrabActive: (active: boolean) => void;
 	/** The ports the session and other servers listen on, which decide where a sign-in back to the app's usual port goes. */
 	ports: BrowserPorts;
 }
 
 /** The `<webview>` to render with `ref` and `src` once `src` is not `null`, the address field's state, and the toolbar's actions. */
-export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: WebviewOptions) {
+export function useWebview({ initial, onPick, onNavigate, onEscape, onGrabActive, ports }: WebviewOptions) {
 	const ref = useRef<WebviewTag>(null);
 	// The webview's first address: later ones go through `loadURL`, since a changed `src` would load each page again.
 	const [src, setSrc] = useState(initial);
@@ -51,8 +53,8 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 	const [problem, setProblem] = useState<string | null>(null);
 	const [ready, setReady] = useState(false);
 	const [history, setHistory] = useState({ back: false, forward: false });
-	const latest = useRef({ onPick, onNavigate, onEscape });
-	latest.current = { onPick, onNavigate, onEscape };
+	const latest = useRef({ onPick, onNavigate, onEscape, onGrabActive });
+	latest.current = { onPick, onNavigate, onEscape, onGrabActive };
 
 	useEffect(() => {
 		if (src !== null || initial === null || address !== "") return;
@@ -84,6 +86,7 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 			const { channel, args } = event as IpcMessageEvent;
 			const content = args[0];
 			if (channel === PREVIEW_ESCAPE_CHANNEL) latest.current.onEscape();
+			else if (channel === PREVIEW_GRAB_ACTIVE_CHANNEL && typeof content === "boolean") latest.current.onGrabActive(content);
 			// A sign-in takes the guest to other sites, which must not write into the composer.
 			else if (channel === PREVIEW_GRAB_CHANNEL && typeof content === "string" && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
 		};
@@ -130,7 +133,8 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 		back: () => ref.current?.goBack(),
 		forward: () => ref.current?.goForward(),
 		reload: () => ref.current?.reload(),
-		selectElement: () => void ref.current?.executeJavaScript("window.__REACT_GRAB__?.toggle()", true).catch(() => {}),
+		/** Turns react-grab's picking on or off in the page. */
+		setGrab: (on: boolean) => void ref.current?.executeJavaScript(`window.__REACT_GRAB__?.${on ? "activate" : "deactivate"}()`, true).catch(() => {}),
 		/** A PNG of what the page shows, or `null` before it loaded or in an app whose shell takes no capture request. */
 		capture: async (): Promise<Uint8Array | null> => (ready && ref.current ? ((await window.ompDesktop?.captureBrowser?.(ref.current.getWebContentsId())) ?? null) : null),
 	};

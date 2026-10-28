@@ -4,9 +4,9 @@ date: 2026-10-28
 decision-makers: Maxence Maisonnat
 ---
 
-# Browser's Capture area crops a shell capture in the page
+# Browser's Region and Screenshot crop a shell capture in the page
 
-In the context of the Browser's **Capture area**, a macOS-style drag that attaches a picture of part of the app to the session's composer, facing a sandboxed page that cannot capture its `<webview>` itself, we chose a crosshair layer the page draws over the `<webview>`, a `capturePage()` of the whole guest from the shell, and a crop in the page, over a layer injected into the guest and over the shell cropping a rectangle the page sends.
+In the context of the Browser's **Region** pick mode, copied from T3 Code's Select and Region switch, and its **Screenshot**, a macOS-style drag that attaches a picture of part of the app to the session's composer, facing a sandboxed page that cannot capture its `<webview>` itself, we chose a crosshair layer the page draws over the `<webview>`, a `capturePage()` of the whole guest from the shell, and a crop in the page, over a layer injected into the guest and over the shell cropping a rectangle the page sends.
 It keeps the app's own page untouched and the crop correct at any zoom and pixel density, accepting one capture of the whole guest per area.
 
 ## Options considered
@@ -17,7 +17,7 @@ It keeps the app's own page untouched and the crop correct at any zoom and pixel
 
 ## Consequences
 
-The bridge gains an optional `captureBrowser`, so an app built before it shows no **Capture area** button.
+The bridge gains an optional `captureBrowser`, so an app built before it shows no **Screenshot** button and no **Region** mode.
 A capture attaches only to a mounted composer, since attachments live in its state, so the page says to open the conversation when none is mounted.
 
 ## Confirmation

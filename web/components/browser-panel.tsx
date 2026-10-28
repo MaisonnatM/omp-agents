@@ -2,7 +2,7 @@
  * `BrowserPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Browser
  * tab, where an element picked with react-grab, or an area captured as an image, lands in the session's composer.
  */
-import { ArrowLeft, ArrowRight, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Scan, Server } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
@@ -18,7 +18,7 @@ import { type Area, browserCandidates, initialAddress } from "../browser-model";
 import { sessionProcessesStore } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useWebview } from "../use-webview";
-import { CaptureLayer, captureFile } from "./browser-capture";
+import { CaptureLayer, captureFile, type PickMode, PickModes } from "./browser-capture";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
@@ -30,7 +30,7 @@ const START_SERVER_PROMPT =
 /** The window can show a Browser: the desktop app, from the build that added it. */
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
 
-/** The window's shell takes capture requests: the desktop app, from the build that added **Capture area**. */
+/** The window's shell takes capture requests: the desktop app, from the build that added **Screenshot** and Region picking. */
 const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.captureBrowser === "function";
 
 /** A toolbar control of the Browser, named by its tooltip. */
@@ -102,7 +102,8 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const [saved] = useState(() => addresses.get(sessionId));
 	const draftKey = liveDraftKey(view);
 	const [maximized, setMaximized] = useState(false);
-	const [capturing, setCapturing] = useState(false);
+	// Picking, as T3 Code's: Select picks an element with react-grab, Region drags over an area to attach its picture.
+	const [pick, setPick] = useState<PickMode | null>(null);
 	const webview = useWebview({
 		initial: initialAddress(saved, candidates),
 		onPick: text => {
@@ -110,8 +111,12 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 			toasts.add({ title: "Added to the composer" });
 		},
 		onNavigate: url => addresses.set(sessionId, url),
-		// The app has the focus while maximized, so its Escape cancels a capture or restores too.
-		onEscape: () => (capturing ? setCapturing(false) : setMaximized(false)),
+		// The app has the focus while maximized, so its Escape stops picking or restores too.
+		onEscape: () => (pick ? setPick(null) : setMaximized(false)),
+		onGrabActive: active => {
+			if (active && pick === null) setPick("select");
+			else if (!active && pick === "select") setPick(null);
+		},
 		ports,
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -123,15 +128,18 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
+	const choosePick = (mode: PickMode | null): void => {
+		setPick(mode);
+		webview.setGrab(mode === "select");
+	};
 	useShortcuts({
 		browserRestore: () => {
-			if (capturing) return setCapturing(false);
+			if (pick) return choosePick(null);
 			if (!maximized) return false;
 			setMaximized(false);
 		},
 	});
-	const captureArea = async (area: Area | null, pageWidth: number): Promise<void> => {
-		setCapturing(false);
+	const attachCapture = async (area: Area | null, pageWidth: number): Promise<void> => {
 		// A drag along an edge, outside the page, covers nothing.
 		if (area !== null && (area.width < 1 || area.height < 1)) return;
 		const png = await webview.capture();
@@ -200,12 +208,12 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						</MenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<ToolbarButton label="Select element" control="browser.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
+				<ToolbarButton label="Pick in the app" control="browser.select-element" disabled={!webview.ready} pressed={pick !== null} onClick={() => choosePick(pick ? null : "select")}>
 					<MousePointerClick />
 				</ToolbarButton>
 				{CAPTURE_AVAILABLE && (
-					<ToolbarButton label="Capture area" control="browser.capture-area" disabled={!webview.ready} pressed={capturing} onClick={() => setCapturing(!capturing)}>
-						<Scan />
+					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void attachCapture(null, 0)}>
+						<Camera />
 					</ToolbarButton>
 				)}
 				<ToolbarButton
@@ -255,7 +263,15 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						allowpopups={"" as unknown as boolean}
 						className="flex min-h-0 w-full flex-1"
 					/>
-					{capturing && <CaptureLayer onArea={(area, pageWidth) => void captureArea(area, pageWidth)} />}
+					{pick === "region" && (
+						<CaptureLayer
+							onArea={(area, pageWidth) => {
+								choosePick(null);
+								void attachCapture(area, pageWidth);
+							}}
+						/>
+					)}
+					{pick !== null && CAPTURE_AVAILABLE && <PickModes mode={pick} onChange={choosePick} />}
 				</div>
 			)}
 		</section>

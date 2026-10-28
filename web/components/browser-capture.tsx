@@ -1,9 +1,45 @@
 /**
- * The Browser's **Capture area**: a crosshair layer over its page where a drag picks an area and a click the whole
- * page, as macOS's Cmd+Shift+4 does, and the file the composer attaches of it.
+ * The Browser's picking modes, as T3 Code has them: the Select and Region switch over the page, the crosshair layer
+ * where Region's drag picks an area and a click the whole page, as macOS's Cmd+Shift+4 does, and the file the
+ * composer attaches of it.
  */
 import { type PointerEvent, useState } from "react";
+import { cn } from "@/lib/utils";
+import type { ControlId } from "../../src/shared/activity";
+import { activityControl } from "../activity";
 import { type Area, dragArea, type Point } from "../browser-model";
+
+/** Select picks an element with react-grab; Region drags over an area to attach its picture. */
+export type PickMode = "select" | "region";
+
+const MODES: { mode: PickMode; label: string; control: ControlId }[] = [
+	{ mode: "select", label: "Select", control: "browser.pick.select" },
+	{ mode: "region", label: "Region", control: "browser.pick.region" },
+];
+
+/** The switch between the modes, floating at the top of the page while picking. */
+export function PickModes({ mode, onChange }: { mode: PickMode; onChange: (mode: PickMode) => void }) {
+	return (
+		<div role="radiogroup" aria-label="Pick mode" className="absolute top-3 left-1/2 z-20 flex -translate-x-1/2 gap-0.5 rounded-xl border border-border bg-popover p-1 shadow-md">
+			{MODES.map(item => (
+				<button
+					key={item.mode}
+					{...activityControl(item.control)}
+					type="button"
+					role="radio"
+					aria-checked={item.mode === mode}
+					className={cn(
+						"h-7 rounded-lg px-3 text-xs font-medium text-popover-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40",
+						item.mode === mode && "bg-primary/10 text-primary hover:bg-primary/10",
+					)}
+					onClick={() => onChange(item.mode)}
+				>
+					{item.label}
+				</button>
+			))}
+		</div>
+	);
+}
 
 /** `png`, the whole page at the screen's density, cut to `area` of a page `pageWidth` CSS pixels wide, as an image file to attach. */
 export async function captureFile(png: Uint8Array, area: Area | null, pageWidth: number): Promise<File> {
@@ -60,9 +96,7 @@ export function CaptureLayer({ onArea }: { onArea: (area: Area | null, pageWidth
 					</span>
 				</div>
 			) : (
-				<div className="pointer-events-none absolute inset-0 flex justify-center bg-black/10 px-3 pt-3">
-					<p className="h-fit rounded-md bg-popover px-2.5 py-1 text-center text-xs text-balance text-popover-foreground shadow-md">Drag over an area, or click to capture the whole page. Esc cancels.</p>
-				</div>
+				<div className="pointer-events-none absolute inset-0 bg-black/10" />
 			)}
 		</div>
 	);
