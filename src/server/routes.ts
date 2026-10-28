@@ -943,7 +943,7 @@ function dashboardRoutes({ get, write }: RouteKit, env: DashboardRoutesEnv): Rou
 			GET: get(() => answer(() => env.status())),
 			PUT: write(() => null, () => env.update(), err => (err instanceof UpdateRefused ? fail(409, err.message) : null)),
 		},
-		/** Settings › What's new: `DashboardChangelog`, read from the checkout without asking origin. */
+		/** The header's What's new: `DashboardChangelog`, the checkout's `CHANGELOG.md` read without asking origin. */
 		"/api/dashboard/changelog": { GET: get(() => answer(() => env.changelog())) },
 	};
 }

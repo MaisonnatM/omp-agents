@@ -147,24 +147,53 @@ describe("SelfUpdate", () => {
 		return { update, installs, restarted };
 	}
 
-	test("lists feature commits newest first, marking those only origin holds as not installed", async () => {
+	test("lists CHANGELOG.md's lines newest day first, marking those only origin holds as not installed", async () => {
 		const { build, pusher } = await checkout();
-		const say = async (message: string): Promise<string> => {
-			await git(pusher, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "--allow-empty", "-m", message);
-			await git(pusher, "push", "--quiet", "origin", "main");
-			return head(pusher);
+		const entriesOf = async (running: RunningBuild) => {
+			const update = new SelfUpdate({ kind: "checkout", build: running }, () => {});
+			await update.newCommits();
+			const changelog = await update.changelog();
+			if (changelog.kind !== "checkout") throw new Error(changelog.reason);
+			return changelog.entries;
 		};
-		const shown = await say("feat(ui): show the bell (#12)");
-		await say("fix: keep the bell");
-		await say("Add failing tests for the bell");
-		const added = await say("Add a What's new page");
-		const { update } = recorded({ kind: "checkout", build });
-		await update.newCommits();
-		const changelog = await update.changelog();
-		if (changelog.kind !== "checkout") throw new Error(changelog.reason);
-		expect(changelog.entries.map(({ commit, title, area, pr, installed }) => ({ commit, title, area, pr, installed }))).toEqual([
-			{ commit: added, title: "Add a What's new page", area: null, pr: null, installed: false },
-			{ commit: shown, title: "Show the bell", area: "ui", pr: 12, installed: false },
+		expect(await entriesOf(build)).toEqual([]);
+
+		await push(pusher, "CHANGELOG.md", ["# What's new in omp-agents", "", "Plain words.", "", "## 2026-10-27", "", "- You can rename a session.", "- Fixed: the list kept scrolling.", ""].join("\n"));
+		expect(await entriesOf(build)).toEqual([
+			{ day: "2026-10-27", text: "You can rename a session.", installed: false },
+			{ day: "2026-10-27", text: "Fixed: the list kept scrolling.", installed: false },
+		]);
+
+		await git(build.dir, "pull", "--quiet", "--ff-only");
+		await push(
+			pusher,
+			"CHANGELOG.md",
+			[
+				"# What's new in omp-agents",
+				"",
+				"- A line before any day.",
+				"",
+				"## 2026-10-28",
+				"",
+				"- You can approve a pull request in one click.",
+				"",
+				"## 2026-10-27",
+				"",
+				"Some prose under a day.",
+				"- You can rename a session.",
+				"- You can rename a session.",
+				"",
+				"## 2026-10-28",
+				"",
+				"- Behind the scenes: the dashboard reads GitHub less often.",
+				"",
+			].join("\n"),
+		);
+		expect(await entriesOf(await buildIn(build.dir))).toEqual([
+			{ day: "2026-10-28", text: "You can approve a pull request in one click.", installed: false },
+			{ day: "2026-10-28", text: "Behind the scenes: the dashboard reads GitHub less often.", installed: false },
+			{ day: "2026-10-27", text: "You can rename a session.", installed: true },
+			{ day: "2026-10-27", text: "Fixed: the list kept scrolling.", installed: true },
 		]);
 	});
 

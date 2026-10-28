@@ -1,0 +1,2 @@
+# Branches each add lines at the top of the changelog; keep both sides instead of conflicting.
+CHANGELOG.md merge=union

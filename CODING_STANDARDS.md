@@ -1,12 +1,13 @@
 # Coding standards
 
 Every change meets [Every change](#every-change).
-Then read the section for the work: [omp imports](#omp-imports), [omp internals](#omp-internals), [Where changes go](#where-changes-go), [Markdown](#markdown), or [Template sync](#template-sync).
+Then read the section for the work: [Changelog](#changelog), [omp imports](#omp-imports), [omp internals](#omp-internals), [Where changes go](#where-changes-go), [Markdown](#markdown), or [Template sync](#template-sync).
 
 ## Every change
 
 - Keep each pull request to one change, and explain why it is needed.
 - Add or update tests for behavior you change.
+- Add lines to `CHANGELOG.md` in every change that reaches `main`, as [Changelog](#changelog) says.
 - Run `bun test` and `bun run typecheck` and fix what they report.
   After you change `desktop/`, run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
 - Update `docs/usage/` when the interface changes, `docs/architecture/` when the server or a protocol changes, and `docs/code-layout/` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
@@ -17,6 +18,23 @@ Then read the section for the work: [omp imports](#omp-imports), [omp internals]
   Bump Bun's version in both workflows together with the README's.
   Check a new omp release with `bun run omp-release` and the [omp release skill](.agents/skills/omp-release/SKILL.md) before you bump it.
 - A change to a file that [`.omp/review-paths`](.omp/review-paths) matches needs the thermonuclear review before it ships; add a file there when it becomes a shared contract or a central file.
+
+## Changelog
+
+`CHANGELOG.md` is what the header's What's new lists, so every change that reaches `main` adds lines to it.
+Put them in the top day section, `## YYYY-MM-DD` for today, and add that heading above the others when it is missing.
+Each line is one `- ` bullet on one line, in plain text, with no Markdown formatting, backticks, or links.
+Only those bullets under a day heading show; the title and the prose under it do not.
+
+- Write for someone who uses the dashboard but doesn't code.
+  Say what they can now do or see, or what got better or was fixed: "You can …", "The Bots tab now …", "Fixed: …".
+- Name things by the words on screen, such as a button's label or a tab's name, never by a file, function, API, commit, branch, or pull request number.
+- Use no jargon, such as "endpoint", "socket", "refactor", "typecheck", "migration", "props", or "worktree", unless the screen shows that word.
+- Write short sentences, one idea per line, each ending with a period.
+- Work nobody notices, such as tests, agent docs, or internal cleanup, still gets one line that starts "Behind the scenes:" and names the benefit.
+
+The pre-push hook refuses a push to `main` whose commits leave `CHANGELOG.md` unchanged.
+`.gitattributes` merges `CHANGELOG.md` with git's union driver, which keeps both sides' lines instead of conflicting, so the same day heading can appear twice; What's new reads both as one day.
 
 ## omp imports
 
