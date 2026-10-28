@@ -1,6 +1,6 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a header of counted tabs, and each tab's panel. */
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
@@ -30,6 +30,8 @@ export interface DetailsTab<T extends string> {
 	count: number;
 	/** The content scrolls itself inside the panel's full height, as a pull request's details do below their header and tabs. */
 	scrollsItself?: boolean;
+	/** Once first shown, the content stays mounted, hidden behind another tab, so a page loaded in it survives the switch. */
+	keepMounted?: boolean;
 	content: ReactNode;
 }
 
@@ -70,6 +72,8 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 	// Resolved each render, not when read: a tab that shows only once its items arrive, such as Tickets, takes the stored choice then, and with none stored a default that changes, such as Todos once the agent makes a list, takes over.
 	const [stored, setTab] = useStoredState<string | null>(storageKey, raw => raw);
 	const tab = tabs.find(each => each.value === stored)?.value ?? defaultTab;
+	const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set([tab]));
+	if (!shown.has(tab)) setShown(new Set(shown).add(tab));
 	const crowded = tabs.length > 4;
 	return (
 		<FileBaseContext.Provider value={cwd}>
@@ -92,17 +96,19 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 						</TabsList>
 					</SizeProvider>
 				</SidebarHeader>
-				{tabs.map(each =>
-					each.scrollsItself ? (
-						<TabPanel key={each.value} value={each.value} className="flex min-h-0 flex-1 flex-col">
+				{tabs.map(each => {
+					// A kept panel stays drawn while inactive, so its class hides it.
+					const panel = { value: each.value, forceMount: each.keepMounted && shown.has(each.value) ? (true as const) : undefined };
+					return each.scrollsItself ? (
+						<TabPanel key={each.value} {...panel} className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
 							{each.content}
 						</TabPanel>
 					) : (
-						<TabPanel key={each.value} value={each.value} asChild>
+						<TabPanel key={each.value} {...panel} asChild className="data-[state=inactive]:hidden">
 							<SidebarContent viewportClassName={PANEL_VIEWPORT}>{each.content}</SidebarContent>
 						</TabPanel>
-					),
-				)}
+					);
+				})}
 			</Tabs>
 		</FileBaseContext.Provider>
 	);

@@ -295,7 +295,7 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 					tickets: session?.tickets ?? [],
 					workspace,
 					hosts,
-					current: host?.instanceId ?? null,
+					live: host ? { kind: "live", instanceId: host.instanceId, agentId: null } : null,
 				}),
 			]}
 		/>

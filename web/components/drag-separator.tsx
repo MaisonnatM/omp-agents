@@ -65,6 +65,8 @@ export function useDragSeparator({ value, onValue, axis, read, keyStep, shiftSte
 }
 
 interface SeparatorProps extends DragSeparatorEvents {
+	/** Ends a caller's own drag state when the capture goes without a pointerup or pointercancel. */
+	onLostPointerCapture?: () => void;
 	axis: Axis;
 	label: string;
 	min: number;

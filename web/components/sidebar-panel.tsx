@@ -150,9 +150,10 @@ interface SidebarResizeHandleProps {
 	side: SidebarSide;
 	width: number;
 	onWidth: (width: number) => void;
+	onDragging: (dragging: boolean) => void;
 }
 
-function SidebarResizeHandle({ side, width, onWidth }: SidebarResizeHandleProps) {
+function SidebarResizeHandle({ side, width, onWidth, onDragging }: SidebarResizeHandleProps) {
 	const { name, defaultWidth } = SIDEBARS[side];
 	// The handle sits on the sidebar's inner edge: moving it toward the page widens the left sidebar and narrows the right one.
 	const direction = side === "left" ? 1 : -1;
@@ -171,6 +172,19 @@ function SidebarResizeHandle({ side, width, onWidth }: SidebarResizeHandleProps)
 	return (
 		<Separator
 			{...events}
+			onPointerDown={event => {
+				onDragging(true);
+				events.onPointerDown(event);
+			}}
+			onPointerUp={event => {
+				onDragging(false);
+				events.onPointerUp(event);
+			}}
+			onPointerCancel={() => {
+				onDragging(false);
+				events.onPointerCancel();
+			}}
+			onLostPointerCapture={() => onDragging(false)}
 			axis="vertical"
 			label={`Resize the ${name.toLowerCase()} sidebar`}
 			min={MIN_WIDTH}
@@ -208,6 +222,8 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, children }: 
 		const timer = window.setTimeout(() => setMoving(false), MOTION_MS);
 		return () => window.clearTimeout(timer);
 	}, [moving, panel.open]);
+	// While a resize drag runs: a page in a `<webview>`, the Preview's, would take the pointer from the handle's capture once it crosses into it.
+	const [dragging, setDragging] = useState(false);
 	return (
 		<div
 			className={cn(
@@ -220,9 +236,9 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, children }: 
 			style={{ width: panel.open ? panel.width : rail, transitionDuration: `${MOTION_MS}ms` }}
 		>
 			{/* Closing, it turns inert at once so focus and clicks leave it, and hidden once the width has slid shut. */}
-			<Sidebar id={id} side={side} hidden={!panel.open && !moving} inert={!panel.open} className="relative h-full" style={{ width: panel.width }}>
+			<Sidebar id={id} side={side} hidden={!panel.open && !moving} inert={!panel.open} className={cn("relative h-full", dragging && "[&_webview]:pointer-events-none")} style={{ width: panel.width }}>
 				{children}
-				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} />
+				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} onDragging={setDragging} />
 			</Sidebar>
 			{rail > 0 && (
 				<div className="absolute top-[calc((var(--page-header-height)-1.75rem)/2)] right-[9px] z-10">

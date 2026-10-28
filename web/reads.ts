@@ -120,7 +120,7 @@ export async function writeMergeQueue(workspace: string | null, change: MergeQue
 	return answer;
 }
 
-/** What every live session runs besides omp, in roster order, read every 5 seconds while the status bar's CPU card is open. */
+/** What every live session runs besides omp, in roster order, read every 5 seconds while the status bar's CPU card is open, or a Preview has no address yet or shows its server menu. */
 export const sessionProcessesStore = createPolledStore<LiveSessionProcesses[]>({ url: () => "/api/session-processes", pollMs: 5_000 });
 
 /** Stops live session `instanceId`'s process `id`, and shows what every live session runs after. */
