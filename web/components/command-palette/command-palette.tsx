@@ -3,6 +3,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import {
 	ArrowDown,
 	ArrowLeft,
+	ArrowRight,
 	ArrowUp,
 	Command,
 	Folder,
@@ -70,6 +71,8 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	newSession: Plus,
 	previousSession: ArrowUp,
 	nextSession: ArrowDown,
+	back: ArrowLeft,
+	forward: ArrowRight,
 	openPullRequest: GitPullRequestCreate,
 	tools: Wrench,
 	sessionsSidebar: PanelLeft,

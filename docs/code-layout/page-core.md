@@ -7,6 +7,7 @@
   `web/use-session-lists.ts` holds the Sessions tab's lists and search, the session `latestSession` from `web/sessions.ts` picks from the selected workspace's rows, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`, whose Sessions tab opens that session when no pane shows one, and the header's group with `showGroup`, which reopens the tab a group was left on.
   `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
   `web/use-transcript-display.ts` holds how transcripts show tool calls and thinking, and `web/use-page-shortcuts.ts` the page-wide shortcuts and the commands the palette runs.
+  `web/use-history-position.ts` follows whether history can go back and forward, which the title bar's Back and Forward buttons and the palette's Go back and Go forward read.
   `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.
   `#pull-requests` alone shows the Pull requests page, and the sidebar's Pull requests tab then lists its sections.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.

@@ -4,6 +4,7 @@ import type { PaletteEvent, PaletteState } from "./command-palette";
 import { adjacentSession, type Layout, type Page, type SettingsRoute, type SidebarPanel, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { positionHandlers } from "./sidebar-tabs";
+import { useHistoryPosition } from "./use-history-position";
 
 /** What the page-wide shortcuts read when a key arrives, and what they call. */
 export interface PageShortcutInput {
@@ -137,6 +138,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 	useShortcuts(handlers);
 	const { signedOutTabs, linearCallable, hasDetails } = input;
 	const canOpenPullRequest = input.openPullRequest !== null;
+	const { canGoBack, canGoForward } = useHistoryPosition();
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
 		() =>
@@ -146,8 +148,10 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				...(linearCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
 				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
+				...(canGoBack ? [] : ["back" as const]),
+				...(canGoForward ? [] : ["forward" as const]),
 			]),
-		[signedOutTabs, linearCallable, hasDetails, canOpenPullRequest],
+		[signedOutTabs, linearCallable, hasDetails, canOpenPullRequest, canGoBack, canGoForward],
 	);
 	return { handlers, unavailable };
 }

@@ -1,6 +1,6 @@
 /** The Dev and Ops switch, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { createContext, memo, type ReactNode, useContext, useSyncExternalStore } from "react";
+import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -8,6 +8,7 @@ import { activityControl } from "../activity";
 import { PAGE_ICON } from "../page-icons";
 import { TAB_GROUPS, type TabGroup } from "../routing";
 import { shortcutLabels } from "../shortcuts";
+import { useHistoryPosition } from "../use-history-position";
 import { NoticesBell } from "./notices";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "./segmented-tabs";
 import { WhatsNew } from "./whats-new";
@@ -70,23 +71,17 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 	);
 });
 
-/** Follows the Navigation API that Electron's Chromium provides; the buttons act through `history`, as the shortcuts do in any browser. */
-function subscribeHistory(onChange: () => void) {
-	navigation.addEventListener("currententrychange", onChange);
-	return () => navigation.removeEventListener("currententrychange", onChange);
-}
-
+/** The buttons act through `history`, as the shortcuts do in any browser. */
 function HistoryButtons() {
-	const canGoBack = useSyncExternalStore(subscribeHistory, () => navigation.canGoBack);
-	const canGoForward = useSyncExternalStore(subscribeHistory, () => navigation.canGoForward);
+	const { canGoBack, canGoForward } = useHistoryPosition();
 	return (
-		<div className="flex items-center gap-0.5 [-webkit-app-region:no-drag]">
-			<Tooltip content="Back" shortcut={shortcutLabels("back")} side="bottom">
+		<div className="flex items-center gap-1 [-webkit-app-region:no-drag]">
+			<Tooltip content="Back" shortcut={shortcutLabels("back")} side="bottom" disabled={!canGoBack}>
 				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!canGoBack} onClick={() => history.back()}>
 					<ChevronLeft />
 				</Button>
 			</Tooltip>
-			<Tooltip content="Forward" shortcut={shortcutLabels("forward")} side="bottom">
+			<Tooltip content="Forward" shortcut={shortcutLabels("forward")} side="bottom" disabled={!canGoForward}>
 				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!canGoForward} onClick={() => history.forward()}>
 					<ChevronRight />
 				</Button>
