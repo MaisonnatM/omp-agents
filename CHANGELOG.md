@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- The Browser's Start dev server button now starts your app itself and opens it in the Browser; when it cannot, it asks the session as before.
 - Fixed: plan usage failed because the app started on a Bun older than omp allows. It now starts on Bun 1.4.4.
 - Sessions started in a Mac temporary folder, such as one `mktemp -d` made, are now hidden from the sidebar like those in `/tmp`.
 - An issue's header now stays at the top while its details scroll, and shrinks to its title and branch, as a pull request's does.

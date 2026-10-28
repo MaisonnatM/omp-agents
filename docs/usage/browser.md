@@ -10,7 +10,12 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   A dev server is a job or a service of the session, as the status bar's CPU card lists them, that listens on a port; omp's shared browser is never one.
   The server button lists every dev server the session runs, with its port, and picking one loads it.
   With none, the Browser says so; start one with **Start dev server** below, or type its address.
-  **Start dev server**, under that message and at the bottom of the server menu, asks the session to run its dev server as a long-lived service in the worktree it works in; a running turn gets it as a follow-up, and the Browser finds the server once it listens.
+  **Start dev server**, under that message and at the bottom of the server menu, starts the project's dev server itself, in the worktree the session works in, as a service the session owns, and loads it in the Browser.
+  It runs the `dev` script of the project's `package.json`, else its `start` script, with the package manager its lockfile names, bun, pnpm, yarn, or else npm, on a free port from 20000 to 39999, passed as `PORT` and, to a server that takes it, such as Vite, Next, Astro, or Nuxt, as `--port`.
+  A message says what it ran, such as `bun run dev --port 23456`; a server that starts but does not listen within 30 seconds still counts as started, and the server menu lists it once it listens.
+  The server is a service of the session, named `dev-` and its port, so the status bar's CPU card lists it, its **Stop** stops it, and the idle stop and the session's end stop it as any other.
+  While it starts, both **Start dev server** controls wait, and a message says so.
+  When it cannot, because the project has no `package.json` or no `dev` or `start` script, or the server exits as it starts, it asks the session to run its dev server instead, with the reason and the server's last output; a running turn gets it as a follow-up, and the Browser finds the server once it listens.
 - The address field loads what you type when you press Enter; `localhost:5173` reads as `http://localhost:5173`.
   The address field loads only addresses on this computer, `localhost`, `127.0.0.1`, and `[::1]`.
   The app itself can go anywhere on the web, so a sign-in that goes through Google or another provider and comes back finishes in the Browser, and a sign-in popup opens as a small window of the app with the same sign-ins.
