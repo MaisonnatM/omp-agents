@@ -120,49 +120,55 @@ async function bunInstall(dir: string): Promise<void> {
 	}
 }
 
-/** The most feature commits What's new lists. */
-const CHANGELOG_LIMIT = 300;
-/** A feature subject: `feat:`, `feat(area):`, `feat!:`, or one that starts with `Add `. */
-const FEATURE_GREP = "^(feat(\\([^)]*\\))?!?:|Add )";
-const FEAT_PREFIX = /^feat(?:\(([^)]*)\))?!?:\s*/;
-const PR_SUFFIX = /\s*\(#(\d+)\)$/;
-/** A subject that only adds tests, as `Add failing tests for ...`, which ships no feature. */
-const TESTS_ONLY = /^add (?:(?:a|more|missing|failing|regression|unit|e2e) )*tests?\b/i;
+const CHANGELOG = "CHANGELOG.md";
+const DAY_HEADING = /^## (\d{4}-\d{2}-\d{2})\s*$/;
+const HEADING = /^#{1,6}\s/;
+const BULLET = /^- (.*\S)\s*$/;
+
+type ChangelogLine = Pick<ChangelogEntry, "day" | "text">;
 
 /**
- * Reads `git log --format=%H%x1f%ct%x1f%s` lines into entries; `pending` holds the commits the running build lacks.
- * A subject that is not a feature, as a line `--grep` let through, or that only adds tests, is dropped.
+ * The `- ` lines under each `## YYYY-MM-DD` heading of a `CHANGELOG.md`, newest day first and in file order within a
+ * day. A day's headings count as one, since the union merge can leave the same day twice, and so does a repeated line.
  */
-function parseChangelog(log: string, pending: ReadonlySet<string>): ChangelogEntry[] {
-	const entries: ChangelogEntry[] = [];
-	for (const line of log.split("\n")) {
-		const [commit, seconds, subject] = line.split("\x1f");
-		if (!commit || !seconds || subject === undefined) continue;
-		const feat = FEAT_PREFIX.exec(subject);
-		if (!feat && !subject.startsWith("Add ")) continue;
-		let title = feat ? subject.slice(feat[0].length) : subject;
-		const pr = PR_SUFFIX.exec(title);
-		if (pr) title = title.slice(0, pr.index);
-		if (!title || TESTS_ONLY.test(title)) continue;
-		entries.push({
-			commit,
-			at: Number(seconds) * 1000,
-			title: title[0]!.toUpperCase() + title.slice(1),
-			area: feat?.[1] || null,
-			pr: pr ? Number(pr[1]) : null,
-			installed: !pending.has(commit),
-		});
+function parseChangelog(markdown: string): ChangelogLine[] {
+	const days = new Map<string, Set<string>>();
+	let lines: Set<string> | null = null;
+	for (const line of markdown.split("\n")) {
+		const day = DAY_HEADING.exec(line)?.[1];
+		const text = BULLET.exec(line)?.[1];
+		if (day) {
+			lines = days.get(day) ?? new Set();
+			days.set(day, lines);
+		} else if (HEADING.test(line)) lines = null;
+		else if (text) lines?.add(text);
 	}
-	return entries;
+	return [...days].sort(([a], [b]) => b.localeCompare(a)).flatMap(([day, lines]) => [...lines].map(text => ({ day, text })));
 }
 
-/** The feature commits on the running build and on `origin/<branch>` as last fetched, newest first. */
+/** `CHANGELOG.md` as commit `rev` holds it, empty when it holds none. */
+async function changelogAt(dir: string, rev: string): Promise<string> {
+	const listed = (await gitIn(dir, ["ls-tree", "--name-only", rev, "--", CHANGELOG])).stdout.trim();
+	return listed ? (await gitIn(dir, ["show", `${rev}:${CHANGELOG}`])).stdout : "";
+}
+
+/**
+ * The lines of `CHANGELOG.md` on `origin/<branch>` as last fetched, each installed when the running build's file holds
+ * it too, then those only the running build's file holds, newest day first.
+ */
 async function readChangelog({ dir, branch, commit }: RunningBuild): Promise<ChangelogEntry[]> {
 	const remote = await commitOf(dir, originRef(branch));
-	const heads = remote === null ? [commit] : [commit, remote];
-	const pending = remote === null ? "" : (await gitIn(dir, ["rev-list", `${commit}..${remote}`])).stdout;
-	const log = await gitIn(dir, ["log", "--no-merges", "-E", `--grep=${FEATURE_GREP}`, `--max-count=${CHANGELOG_LIMIT}`, "--format=%H%x1f%ct%x1f%s", ...heads]);
-	return parseChangelog(log.stdout, new Set(pending.split("\n").filter(Boolean)));
+	const [running, origin] = await Promise.all([changelogAt(dir, commit), remote === null ? "" : changelogAt(dir, remote)]);
+	const key = ({ day, text }: ChangelogLine): string => `${day}\n${text}`;
+	const runningLines = parseChangelog(running);
+	const originLines = parseChangelog(origin);
+	const installed = new Set(runningLines.map(key));
+	const onOrigin = new Set(originLines.map(key));
+	const entries = [
+		...originLines.map(line => ({ ...line, installed: installed.has(key(line)) })),
+		...runningLines.filter(line => !onOrigin.has(key(line))).map(line => ({ ...line, installed: true })),
+	];
+	return entries.sort((a, b) => b.day.localeCompare(a.day));
 }
 
 /** The server's own update: the build it runs, or why it cannot update; one git call chain at a time; and the restart it ends with. */
@@ -215,7 +221,7 @@ export class SelfUpdate {
 		});
 	}
 
-	/** Settings › What's new: the feature commits the checkout holds, as of the last fetch; this asks origin nothing. */
+	/** The header's What's new: the lines of `CHANGELOG.md` the checkout holds, as of the last fetch; this asks origin nothing. */
 	changelog(): Promise<DashboardChangelog> {
 		return this.#lane.run(async () => {
 			const checkout = this.#checkout;
