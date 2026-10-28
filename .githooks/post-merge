@@ -1,0 +1,9 @@
+#!/bin/sh
+# A fast-forward into main skips pre-merge-commit, so warn here instead; the merge already happened, so this cannot refuse it.
+[ "$(git symbolic-ref -q --short HEAD)" = main ] || exit 0
+git rev-parse -q --verify HEAD^2 >/dev/null && exit 0
+git rev-parse -q --verify ORIG_HEAD >/dev/null || exit 0
+if git diff --quiet ORIG_HEAD HEAD -- CHANGELOG.md; then
+	echo "Warning: this fast-forward into main leaves CHANGELOG.md unchanged, so the pre-push hook will refuse the push. See CODING_STANDARDS.md#changelog." >&2
+	echo "Run git reset --hard ORIG_HEAD, add the lines on the branch, commit, and merge again." >&2
+fi

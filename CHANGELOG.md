@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- Behind the scenes: merging a branch into main without a line here now stops at the merge, and a fast-forward without one warns, so the line goes on the branch instead of a fix-up after it.
 - A session running /ship now shows a Ship section in its todos card, with the current stage and a progress bar; unfold it to see every stage as a step.
 - Notes, Calendar, and Email moved to buttons in the header beside the command menu, replacing the Dev and Ops switch.
 - Cmd+1 through Cmd+5 now count the tabs of the sidebar's bar: Pull requests, Tickets, Bots, Sessions, and Todo.

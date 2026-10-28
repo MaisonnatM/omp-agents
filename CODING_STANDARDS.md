@@ -34,6 +34,7 @@ Only those bullets under a day heading show; the title and the prose under it do
 - Write short sentences, one idea per line, each ending with a period.
 - Work nobody notices, such as tests, agent docs, or internal cleanup, still gets one line that starts "Behind the scenes:" and names the benefit.
 
+The pre-merge-commit hook refuses a merge into `main` that leaves `CHANGELOG.md` unchanged, so add the lines on the branch before you merge it; a fast-forward skips that hook, and the post-merge hook warns after one instead.
 The pre-push hook refuses a push to `main` whose commits leave `CHANGELOG.md` unchanged.
 `.gitattributes` merges `CHANGELOG.md` with git's union driver, which keeps both sides' lines instead of conflicting, so the same day heading can appear twice; What's new reads both as one day.
 

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Refuses a merge into main that leaves CHANGELOG.md unchanged, so the branch gets its lines before main has the merge
+# the pre-push hook would refuse. A fast-forward or a conflicted merge skips this hook; the pre-push hook still checks.
+# Skip once with `git merge --no-verify`.
+[ "$(git symbolic-ref -q --short HEAD)" = main ] || exit 0
+if git diff --cached --quiet HEAD -- CHANGELOG.md; then
+	echo "Merging into main needs new lines in CHANGELOG.md that say, in everyday words, what changed. See CODING_STANDARDS.md#changelog." >&2
+	echo "Run git merge --abort, add the lines on the branch, commit, and merge again." >&2
+	exit 1
+fi
