@@ -12,8 +12,8 @@ afterEach(() => {
 
 const git = async (cwd: string, ...args: string[]): Promise<string> => (await runChecked(["git", ...args], { cwd })).trim();
 
-/** A repository on `main` that runs this repository's hooks, with a `feature` branch and a commit on `main` since, so merging `feature` makes a merge commit. */
-async function setup(featureFiles: Record<string, string>) {
+/** A repository on `main` that runs this repository's hooks, with a `feature` branch; unless `fastForward`, a commit on `main` since makes merging `feature` a merge commit. */
+async function setup(featureFiles: Record<string, string>, fastForward = false) {
 	const dir = realpathSync(mkdtempSync(join(tmpdir(), "omp-agents-githooks-")));
 	dirs.push(dir);
 	const commit = async (files: Record<string, string>, subject: string) => {
@@ -27,7 +27,7 @@ async function setup(featureFiles: Record<string, string>) {
 	await git(dir, "switch", "-q", "-c", "feature");
 	await commit(featureFiles, "the change");
 	await git(dir, "switch", "-q", "main");
-	await commit({ "main.txt": "main\n" }, "two");
+	if (!fastForward) await commit({ "main.txt": "main\n" }, "two");
 	return { dir, head: () => git(dir, "rev-parse", "HEAD") };
 }
 
@@ -52,5 +52,29 @@ describe("pre-merge-commit", () => {
 		await git(dir, "switch", "-q", "feature");
 		await git(dir, "merge", "-q", "--no-edit", "main");
 		expect(await git(dir, "rev-parse", "HEAD^2")).toBe(await git(dir, "rev-parse", "main"));
+	});
+});
+
+describe("post-merge", () => {
+	const WARNING = "this fast-forward into main leaves CHANGELOG.md unchanged";
+
+	test("warns after a fast-forward into main that leaves CHANGELOG.md unchanged", async () => {
+		const { dir } = await setup({ "feature.txt": "feature\n" }, true);
+		const merge = await run(["git", "merge", "--ff-only", "feature"], { cwd: dir });
+		expect(merge.code).toBe(0);
+		expect(merge.stderr).toContain(WARNING);
+	});
+
+	test("stays quiet after a fast-forward into main that adds CHANGELOG.md lines", async () => {
+		const { dir } = await setup({ "CHANGELOG.md": "# Changelog\n\n## 2026-10-28\n\n- A new change\n" }, true);
+		const merge = await run(["git", "merge", "--ff-only", "feature"], { cwd: dir });
+		expect(merge.stderr).not.toContain(WARNING);
+	});
+
+	test("stays quiet after a fast-forward of a branch other than main", async () => {
+		const { dir } = await setup({ "feature.txt": "feature\n" }, true);
+		await git(dir, "switch", "-q", "-c", "other", "main");
+		const merge = await run(["git", "merge", "--ff-only", "feature"], { cwd: dir });
+		expect(merge.stderr).not.toContain(WARNING);
 	});
 });

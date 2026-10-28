@@ -24,3 +24,4 @@
   A test's commit never signs through the developer's gpg-agent, which stalls past Bun's 5-second test timeout or fails while other sessions sign; `src/git.test.ts` checks it.
 - `.githooks/pre-push`: refuses a push to `main` that leaves `CHANGELOG.md` unchanged, then runs the checks `.github/workflows/checks.yml` runs; the `prepare` script points `core.hooksPath` at `.githooks/` on `bun install`.
 - `.githooks/pre-merge-commit`: refuses a merge commit on `main` that leaves `CHANGELOG.md` unchanged, so a branch gets its lines before the merge rather than at the push; `src/githooks.test.ts` tests it.
+- `.githooks/post-merge`: warns after a fast-forward into `main` that leaves `CHANGELOG.md` unchanged, which pre-merge-commit never sees; `src/githooks.test.ts` tests it.
