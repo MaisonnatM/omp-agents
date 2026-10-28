@@ -12,7 +12,7 @@ body:
     attributes:
       label: Bun version
       description: The output of `bun --version`.
-      placeholder: "1.4.2"
+      placeholder: "1.4.4"
     validations:
       required: true
   - type: input

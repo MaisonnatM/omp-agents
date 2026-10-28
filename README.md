@@ -3,7 +3,7 @@
 A desktop app for every [omp](https://omp.sh) session and subagent on your machine: an Electron window over a local server.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Bun](https://img.shields.io/badge/bun-%E2%89%A51.4-black?logo=bun)](https://bun.sh)
+[![Bun](https://img.shields.io/badge/bun-%E2%89%A51.4.4-black?logo=bun)](https://bun.sh)
 [![omp](https://img.shields.io/badge/omp-tested%2018.12.6-informational)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
 
 omp-agents lists the sessions that run in your terminals and the ones it starts itself, streams each conversation as it happens, and lets you message, steer, interrupt, resume, or fork any of them from one window.
@@ -76,8 +76,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 
 ## Requirements
 
-- [Bun](https://bun.sh) 1.4 or later.
-  Tested with Bun 1.4.2.
+- [Bun](https://bun.sh) 1.4.4 or later.
+  Tested with Bun 1.4.4.
 - omp installed with Bun and on your `PATH`, signed in to at least one model provider with `/login`.
   Tested with omp 18.12.6.
 

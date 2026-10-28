@@ -4,7 +4,7 @@
  */
 import { errorText } from "./json";
 
-const MIN_BUN = "1.4.0";
+const MIN_BUN = "1.4.4";
 
 function fail(message: string): never {
 	console.error(`omp-agents: ${message}`);
