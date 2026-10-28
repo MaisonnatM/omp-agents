@@ -1,5 +1,5 @@
-/** `BotDetails`, the right sidebar on a Bot's page: its look and name, both editable in place, where it works, its job, memory, and routines, then End session and Delete. */
-import { CircleStop, Plus, Trash2 } from "lucide-react";
+/** `BotDetails`, the right sidebar on a Bot's page: its look and name, both editable in place, where it works, its job, memory, and routines, then Delete. */
+import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { type Bot, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
@@ -13,7 +13,7 @@ import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../
 import { hashForBotRoutine, hashForBots } from "../../routing";
 import { age } from "../../labels";
 import { runWords, startsWords } from "../../routines-model";
-import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { useDashboardActions } from "../dashboard-context";
 import { TEXT_AREA } from "../form-field";
 import { RunDot } from "../routines/routine-marks";
 import { BotAvatar } from "./bot-avatar";
@@ -31,6 +31,7 @@ function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
 				<p>Delete {bot.name}? Its routines are deleted too, and its conversation stays in your sessions.</p>
 				<div className="flex items-center gap-2">
 					<Button
+						variant="destructive-outline"
 						size="compact"
 						disabled={!connected}
 						onClick={() => {
@@ -48,7 +49,7 @@ function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
 		);
 	}
 	return (
-		<Button {...activityControl("bots.delete")} variant="ghost" size="compact" leadingIcon={Trash2} disabled={!connected} onClick={() => setConfirming(true)}>
+		<Button {...activityControl("bots.delete")} variant="destructive-outline" size="compact" leadingIcon={Trash2} disabled={!connected} onClick={() => setConfirming(true)}>
 			Delete
 		</Button>
 	);
@@ -243,8 +244,6 @@ interface BotDetailsProps {
 }
 
 export function BotDetails({ open: { bot, host, routines, routine, status }, memory, connected }: BotDetailsProps) {
-	const { end } = useDashboardActions();
-	const { ending } = useDashboardStatus();
 	return (
 		<>
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center border-b border-border px-4 py-0">
@@ -265,12 +264,7 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, mem
 					<JobEditor key={bot.job} bot={bot} connected={connected} />
 					<MemoryList bot={bot} memory={memory} />
 					<BotRoutines bot={bot} routines={routines} open={routine} connected={connected} />
-					<div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-						{host && (
-							<Button variant="ghost" size="compact" leadingIcon={CircleStop} loading={ending.has(host.instanceId)} disabled={!connected} onClick={() => end(host.instanceId)}>
-								End session
-							</Button>
-						)}
+					<div className="border-t border-border pt-4">
 						<DeleteBot bot={bot} connected={connected} />
 					</div>
 				</div>

@@ -14,9 +14,11 @@ import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { useRebasing } from "../../pull-request-rebases";
+import { useStoredState } from "../../stored-state";
 import { DROP_LINE } from "../../use-drag-order";
 import { useInlineConfirm } from "../../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { Separator, useDragSeparator } from "../drag-separator";
 import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
@@ -44,6 +46,15 @@ import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts 
 import { PullRequestTableRow } from "./pr-row";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
+
+const DETAILS_WIDTH = 480;
+const MIN_DETAILS = 360;
+const MAX_DETAILS = 1200;
+/** Narrowest the list or board gets beside the details: a narrower page takes the width from the details. */
+const MIN_LIST = 320;
+const STEP = 16;
+
+const clampDetails = (width: number, room: number): number => Math.round(Math.max(MIN_DETAILS, Math.min(MAX_DETAILS, room - MIN_LIST, width)));
 
 function SectionCard({ repo, view }: { repo: string; view: SectionView }) {
 	const { section, listId, open, toggle, drag, moveId, rows } = view;
@@ -118,18 +129,39 @@ function RepoTables({ pulls, section }: { pulls: PullRequests; section: SectionT
 	return repos.map(each => <RepoTable key={each.key} view={each} />);
 }
 
-/** The details of the pull request `route` names, docked beside the list or the board, with buttons that show them as a page or close them. */
+/** The details of the pull request `route` names, docked beside the list or the board at the width you drag their edge to, with buttons that show them as a page or close them. */
 function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: string | null; hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
 	// The docked details keep their own tab, starting on Code when the route opens a file.
 	const [tab, setTab] = useState<PullRequestDetailTab>(route.files ? "code" : "summary");
 	usePullRequestCopyShortcuts(route.target);
+	const [width, setWidth] = useStoredState("omp-agents.pr-details-width", raw => {
+		const stored = Number(raw);
+		return stored >= MIN_DETAILS && stored <= MAX_DETAILS ? stored : DETAILS_WIDTH;
+	});
+	const room = (element: HTMLElement): number => (element.closest("aside")?.parentElement as HTMLElement).clientWidth;
+	// The line sits on the details' left edge: dragging it left widens them.
+	const resize = useDragSeparator({
+		value: width,
+		onValue: setWidth,
+		axis: "vertical",
+		direction: -1,
+		keyStep: STEP,
+		shiftSteps: 4,
+		min: MIN_DETAILS,
+		max: MAX_DETAILS,
+		reset: DETAILS_WIDTH,
+		size: room,
+		clamp: (next, element) => clampDetails(next, room(element)),
+		read: (event, start) => clampDetails(start.value - (event.clientX - start.coordinate), start.size),
+	});
 	const expand = (): void => {
 		// The page takes Code from the route alone, so expanding on Code puts it in the address.
 		if (tab === "code" && !route.files) location.hash = hashForPullRequestFiles(route.target);
 		onExpand();
 	};
 	return (
-		<aside aria-label="Pull request details" className="flex w-[30rem] max-w-[45%] shrink-0 flex-col border-l border-border">
+		<aside aria-label="Pull request details" style={{ width }} className="relative flex max-w-[calc(100%-20rem)] shrink-0 flex-col border-l border-border">
+			<Separator {...resize} axis="vertical" label="Resize the pull request details" min={MIN_DETAILS} max={MAX_DETAILS} now={width} className="inset-y-0 -left-1.5 w-3 cursor-col-resize select-none" />
 			<TooltipProvider>
 				<div className="flex h-(--page-header-height) shrink-0 items-center justify-end gap-1 border-b border-border px-3">
 					<Tooltip content="Open as a page" side="bottom">

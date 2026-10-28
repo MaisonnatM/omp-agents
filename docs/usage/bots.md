@@ -38,7 +38,7 @@
   The details start with the avatar, the name, whether the Bot's session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
-  Below come its **Job**, its **Memory**, its **Routines**, **End session** while its session runs, and **Delete**.
+  Below come its **Job**, its **Memory**, its **Routines**, and **Delete**.
   Editing the job shows **Save job** and **Revert**; every turn's system prompt carries the saved job.
   **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date; for a long memory it lists the newest 16 KB, the part the Bot reads.
   Only the Bot writes it, with its `remember` tool, when you tell it something worth keeping.
@@ -46,8 +46,8 @@
   Click a routine to open it in place of the conversation, `#bots/<id>/routines/<routine id>`, and the details mark it; **Edit** in its menu opens its editor at `#bots/<id>/routines/<routine id>/edit`, so Back returns to the routine.
   An address that names a routine the Bot does not have, such as one deleted, shows that, with a link back to the conversation.
   Saving a routine opens it once the server has saved it; a save it refuses says why and keeps the editor open.
-  Ending the session keeps the page open.
-- **Delete** asks first, and says that the Bot's routines go with it.
+  The page offers no **End session**, and Cmd+Shift+X does nothing there, so the Bot's one conversation stays open; a session that ended another way resumes with your next message.
+- **Delete**, in red, asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
 - Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, a calendar event, or unread mail triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.

@@ -75,7 +75,8 @@ export function AskAboutSelection({ origin, children }: { origin: Omit<Discussio
 							variant="secondary"
 							size="compact"
 							leadingIcon={MessageCircleQuestion}
-							className="shadow-md"
+							// Under the secondary variant's translucent tint, so the text under the button never shows through.
+							className="bg-popover shadow-md"
 							aria-label="Ask about this selection"
 							// Pressing would otherwise move focus and clear the selection before the click reads them.
 							onMouseDown={event => event.preventDefault()}

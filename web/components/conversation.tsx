@@ -66,7 +66,7 @@ interface ConversationProps {
 	focused: boolean;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the directory picker offers. */
 	workspaces: Workspace[];
-	/** Draw the session's header; a Bot's page draws its own. */
+	/** Draw the session's header, with End session and its shortcut; a Bot's page draws its own, and a Bot's session never ends from the page. */
 	header: boolean;
 	/** The composer's placeholder while the session waits on a message, in place of "Message this session…". */
 	placeholder?: string;
@@ -224,7 +224,7 @@ function LiveConversation({
 						interrupt();
 					},
 					endSession: () => {
-						if (!session || !subject.live) return false;
+						if (!header || !session || !subject.live) return false;
 						onEnd(view.instanceId);
 					},
 					// As ↑ edits the last message in a chat app; with a draft, ↑ keeps moving the caret.

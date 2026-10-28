@@ -111,6 +111,7 @@
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
   Click the row to show the pull request's details docked at the right of the table, with the row highlighted; session chips, move badges, the reviewers, and the `⋯` menu keep their own clicks.
+  Drag the details' left edge to resize them, or focus it and press ← or →, with Shift for larger steps; double-click it to reset the width, which the app keeps for the table and the board alike.
   The title remains a link for keyboard and modifier-click navigation.
   **Open as a page** in the docked details shows them on a page of their own, on the tab they showed, and the close button hides them.
   The app keeps that choice, so the next pull request you open shows as a page too, until the back arrow at the start of the page header, **Back to Pull requests**, brings the list back with the details docked beside it.
