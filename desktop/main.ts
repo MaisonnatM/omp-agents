@@ -75,6 +75,8 @@ const PREVIEW_PRELOAD = join(app.getAppPath(), "dist", "preview-preload.cjs");
 const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
 /** Brings the window up with the command palette open on Create todo, from any app. */
 const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
+/** `OMP_AGENTS_HEADLESS=1` keeps the window hidden and the app out of the Dock, for agents' smoke checks, which drive it over CDP. */
+const HEADLESS = process.env.OMP_AGENTS_HEADLESS === "1";
 
 // Each port is its own server, so each gets its own localStorage, window bounds, and single-instance lock.
 app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
@@ -260,7 +262,7 @@ function createWindow(): BrowserWindow {
 		icon: ICON,
 		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD, webviewTag: true },
 	});
-	win.once("ready-to-show", () => win.show());
+	if (!HEADLESS) win.once("ready-to-show", () => win.show());
 
 	const contents = win.webContents;
 	const sendTargetURL = (url: string): void => {
@@ -430,7 +432,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
 	let win: BrowserWindow | null = null;
 	const reveal = (): void => {
-		if (!win) return;
+		if (!win || HEADLESS) return;
 		win.show();
 		win.focus();
 	};
@@ -458,7 +460,8 @@ if (!app.requestSingleInstanceLock()) {
 		removeOldLoginAgents();
 		if (app.isPackaged) updates = startUpdates(() => Menu.setApplicationMenu(applicationMenu()));
 		// The app runs from Electron's own bundle, so without this the Dock shows Electron's icon.
-		app.dock?.setIcon(ICON);
+		if (HEADLESS) app.dock?.hide();
+		else app.dock?.setIcon(ICON);
 		win = createWindow();
 		void connect(win);
 		showAttention(win, isDashboard, reveal);

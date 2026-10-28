@@ -157,8 +157,10 @@ Chromium is the `playwright-core` build that `~/Library/Caches/ms-playwright` ho
 
 ## Desktop smoke
 
-The desktop shell opens a real window on the user's screen.
-After `bun run build` in `desktop/`, start a named service on your smoke port with `PORT=<port> bun launch.ts --remote-debugging-port=<page port> --inspect=<main port>`.
+The desktop shell opens a real window on the user's screen unless `OMP_AGENTS_HEADLESS=1` keeps it hidden and out of the Dock, so every desktop smoke sets it.
+After `bun run build` in `desktop/`, start a named service on your smoke port with `OMP_AGENTS_HEADLESS=1 PORT=<port> bun launch.ts --remote-debugging-port=<page port> --inspect=<main port>`.
+The hidden window still renders, and `Page.captureScreenshot` captures it.
+Only a check of what the window shows on screen, such as its position or full screen, runs without `OMP_AGENTS_HEADLESS`, and only once the user agrees to a window opening.
 Wait for its server's `The access token is in` line, or the listening line `omp-agents (omp v…) on http://127.0.0.1:<port>`, when it starts its own server.
 The window signs itself in, so it needs no token from you.
 Pick both debugging ports the same way as the smoke port, each free.
@@ -166,7 +168,7 @@ Drive the window through the Chrome DevTools Protocol: `osascript` keys go to th
 
 - Page: `http://127.0.0.1:<page port>/json` lists it; `Runtime.evaluate` runs JS and `Page.captureScreenshot` captures it.
 - Main process: `http://127.0.0.1:<main port>/json` lists it; evaluate `process.mainModule.require("electron")` to reach `app`, `BrowserWindow`, and `Menu`.
-  `BrowserWindow.getAllWindows()[0].close()` is what Cmd+W does, `app.emit("activate")` a Dock click, and `app.quit()` Cmd+Q.
+  `BrowserWindow.getAllWindows()[0].close()` is what Cmd+W does, `app.emit("activate")` a Dock click, which shows the window only without `OMP_AGENTS_HEADLESS`, and `app.quit()` Cmd+Q.
   Replace `shell.openExternal` with a function recording its address to verify links without opening the user's browser.
 
 The page's `window.close()` destroys the window and quits the app, unlike Cmd+W.
