@@ -175,6 +175,8 @@ export interface PullRequestSummary extends PullRequest {
 	unresolved: { count: number; exact: boolean; bots: number };
 	/** Comments and review threads, resolved ones too, as GitHub's own list counts its conversation. */
 	conversations: number;
+	/** Whether your latest review of it approves it. */
+	viewerApproved: boolean;
 	/** Last update, or the merge for a merged PR, in ms since the epoch. */
 	updatedAt: number;
 }
@@ -211,6 +213,7 @@ const isSummary = fields<PullRequestSummary>({
 	behind: isBoolean,
 	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean, bots: isNumber }),
 	conversations: isNumber,
+	viewerApproved: isBoolean,
 	updatedAt: isNumber,
 });
 
@@ -396,6 +399,8 @@ export interface PullRequestDetail extends PullRequest {
 	canComment: boolean;
 	/** Whether you opened it: GitHub lets its author review it only with a comment. */
 	byViewer: boolean;
+	/** Whether your latest review of it approves it, as on {@link PullRequestSummary}. */
+	viewerApproved: boolean;
 }
 
 /** The states the details can set; a merge goes through the merge queue. */

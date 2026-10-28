@@ -17,6 +17,7 @@
   **In this repository** runs `gh pr checkout <number>` in that checkout, and refuses while tracked files have uncommitted changes.
   A toast follows the checkout, and warns when the branch is not at the pull request's latest commit, as a reused branch with local commits is not.
   On an open or draft pull request you did not open, **Approve** comes before the primary control and posts an approval with no summary at once.
+  It goes away once your latest review approves the pull request, and comes back after a later review of yours that does not.
   GitHub refuses an approval from the pull request's author, so your own pull requests do not offer it.
   The primary control shows **Merged** or **Closed** for a finished pull request, **Resolve conflicts** for conflicts, and **Ready for review** for a draft.
   Otherwise it offers the selected merge method, such as **Squash and merge**, or that method **when ready** while GitHub holds the merge.

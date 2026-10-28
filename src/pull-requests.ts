@@ -23,7 +23,8 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 	reviewRequests(first: 10) { nodes { requestedReviewer {
 		... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
 	} } }
-	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }`;
+	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }
+	viewerLatestReview { state }`;
 
 const PR_FIELDS = `... on PullRequest {
 	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName updatedAt mergedAt additions deletions
@@ -153,6 +154,7 @@ function parsePullRequestHead(node: Record<string, unknown>, botStarted: Readonl
 		additions: num(node.additions) ?? 0,
 		deletions: num(node.deletions) ?? 0,
 		unresolved: parseUnresolved(node.reviewThreads, botStarted),
+		viewerApproved: isObject(node.viewerLatestReview) && node.viewerLatestReview.state === "APPROVED",
 	};
 }
 

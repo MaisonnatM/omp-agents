@@ -94,7 +94,7 @@
   Its tooltip says so in words, and adds that it counts only the threads GitHub listed when it listed only the first 100.
   The row's `⋯` menu is always visible in the table; in the sidebar it shows while you hover or focus the row, while a session starts on it, or while a change goes to GitHub.
   It holds the quick actions that apply, then **Approve** on an open or draft pull request you did not open, **Convert to draft** on an open pull request or **Ready for review** on a draft, the **Reviewers** submenu, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change and no **Reviewers**.
-  **Approve** posts an approval with no summary at once, and the list is read again after GitHub takes it.
+  **Approve** posts an approval with no summary at once, and the list is read again after GitHub takes it; it is gone while your latest review approves the pull request.
   **Reviewers** lists the repository's people, read from GitHub when it first opens, each with their picture and name as the details' **Reviewers** field shows them, with a check on each one asked for a review; choose one to ask them or withdraw the request.
   Right-click a row or a card, or focus its title and press the context-menu key or Shift+F10, for the same menu.
   On your own open pull request without merge conflicts whose base has commits its branch lacks, **Rebase on main**, named after its base, follows the quick actions.

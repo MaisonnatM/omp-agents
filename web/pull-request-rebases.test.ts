@@ -23,6 +23,7 @@ const pr = (number: number, stackedOn: number | null = null): PullRequestSummary
 	behind: true,
 	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
+	viewerApproved: false,
 	updatedAt: number,
 });
 

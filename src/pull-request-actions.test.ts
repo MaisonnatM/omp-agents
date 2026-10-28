@@ -23,6 +23,7 @@ describe("pullRequestActions", () => {
 		behind: false,
 		unresolved: { count: 0, exact: true, bots: 0 },
 		conversations: 0,
+		viewerApproved: false,
 		updatedAt: 1,
 		...fields,
 	});

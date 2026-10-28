@@ -56,6 +56,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	behind: false,
 	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
+	viewerApproved: false,
 	updatedAt: number,
 	...fields,
 });
@@ -440,6 +441,7 @@ describe("pull request details", () => {
 		behindBy: null,
 		canComment: false,
 		byViewer: false,
+		viewerApproved: false,
 		...fields,
 	});
 	test("the details' facts, not the list's older ones, decide the move and quick actions", () => {

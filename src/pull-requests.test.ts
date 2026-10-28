@@ -150,6 +150,7 @@ describe("parseListAnswer", () => {
 				behind: true,
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
+				viewerApproved: false,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -171,6 +172,7 @@ describe("parseListAnswer", () => {
 				behind: false,
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
+				viewerApproved: false,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -192,6 +194,7 @@ describe("parseListAnswer", () => {
 				behind: false,
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
+				viewerApproved: false,
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -213,6 +216,7 @@ describe("parseListAnswer", () => {
 				behind: false,
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
+				viewerApproved: false,
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
 			},
 		]);
@@ -252,6 +256,15 @@ describe("parseListAnswer", () => {
 			{ login: "frontend", avatarUrl: "https://avatars.example/frontend", isTeam: true, state: "requested" },
 			{ login: "lencshu", avatarUrl: "https://avatars.example/lencshu", state: "approved" },
 		]);
+	});
+
+	test("marks a pull request approved by you only while your latest review approves it", () => {
+		const prs = parseListAnswer(
+			{ data: { authored: { nodes: [node(1, { viewerLatestReview: { state: "APPROVED" } }), node(2, { viewerLatestReview: { state: "COMMENTED" } }), node(3, {})] } } },
+			repo,
+			noStarters,
+		);
+		expect(prs.map(pr => [pr.number, pr.viewerApproved])).toEqual([[1, true], [2, false], [3, false]]);
 	});
 
 	test("a change request waits on review again once every reviewer who asked for changes is asked for a new review", () => {

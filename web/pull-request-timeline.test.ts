@@ -38,6 +38,7 @@ const detail = (fields: Partial<PullRequestDetail> = {}): PullRequestDetail => (
 	behindBy: null,
 	canComment: false,
 	byViewer: false,
+	viewerApproved: false,
 	...fields,
 });
 

@@ -467,7 +467,7 @@ function rowMenuItems({ pr, change, review, options, pending, cwd, onQuickAction
 		quick: { actions: pullRequestActions(pr), pending, onRun: action => onQuickAction(pr, cwd, action as PullRequestActionId) },
 		rebase: { facts: pr, run: () => onRebase(pr, cwd) },
 		onState: to => change.run({ field: "state", state: to }),
-		onApprove: canApprove({ state: pr.state, byViewer: pr.role === "author" }) ? () => change.run({ field: "review", verdict: "approve", body: "" }) : undefined,
+		onApprove: canApprove({ state: pr.state, byViewer: pr.role === "author" }) && !pr.viewerApproved ? () => change.run({ field: "review", verdict: "approve", body: "" }) : undefined,
 		reviewers: { pr: review.shown, options, onChange: review.send },
 		pending: change.pending,
 	};
