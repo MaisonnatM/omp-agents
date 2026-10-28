@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildSkillPromptMessage } from "./omp/prompts";
 import { withFiles } from "./shared/prompt-files";
+import type { TodoPhase } from "./shared/transcript";
 import { messageItemsOf, splitSuggestions, Transcript } from "./transcript";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
@@ -268,6 +269,20 @@ describe("Transcript", () => {
 		const t = new Transcript();
 		t.applyEntry({ type: "message", id: "e1", message: { role: "toolResult", timestamp: 1, toolCallId: "b1", toolName: "bash", details: { results: [{ id: "x" }] } } });
 		expect(t.items()).toEqual([{ id: "tool:b1", kind: "tool", name: "bash", summary: "", status: "ok", agents: [] }]);
+	});
+
+	test("a todo row carries the whole list its successful result records, live or from the file, and a failed one none", () => {
+		const phases = [{ name: "Fix", tasks: [{ content: "Repro", status: "completed" }, { content: "Patch", status: "blocked", blocker: "needs go" }, { content: "Bad", status: "weird" }] }];
+		const todos: TodoPhase[] = [{ name: "Fix", tasks: [{ content: "Repro", status: "completed" }, { content: "Patch", status: "blocked", blocker: "needs go" }] }];
+		const live = new Transcript();
+		live.applyEvent({ type: "tool_execution_start", toolCallId: "t1", toolName: "todo", args: {} });
+		live.applyEvent({ type: "tool_execution_end", toolCallId: "t1", toolName: "todo", isError: false, result: { details: { op: "update", phases } } });
+		live.applyEvent({ type: "tool_execution_end", toolCallId: "t2", toolName: "todo", isError: true, result: { details: { phases } } });
+		expect(live.items().map(item => item.kind === "tool" && item.todos)).toEqual([todos, undefined]);
+
+		const saved = new Transcript();
+		saved.applyEntry({ type: "message", id: "e1", message: { role: "toolResult", timestamp: 1, toolCallId: "t1", toolName: "todo", details: { phases } } });
+		expect(saved.items()).toEqual([{ id: "tool:t1", kind: "tool", name: "todo", summary: "", status: "ok", agents: [], todos }]);
 	});
 
 	test("a steer and a follow-up show where the agent took them, though omp stamps them when they were queued", () => {

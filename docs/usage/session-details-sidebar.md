@@ -1,13 +1,17 @@
 # Session details sidebar
 
-- The right sidebar shows the focused session's pull requests and Linear issues, including those of its subagents.
+- The right sidebar shows the focused view's own todo list, and its session's pull requests and Linear issues, including those of its subagents.
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
-- Its tabs are **PRs** and **Tickets**, which shows only for a session with a Linear issue.
-  Each tab shows its name and a badge with its item count.
-  The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
-  A saved choice of the former **Files**, **Media**, or **Processes** tab falls back to **PRs**.
+- Its tabs are **Todos**, which shows only once the view's agent made a todo list, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
+  Each tab shows its name and a badge with its item count; **Todos** counts the tasks still open.
+  The sidebar remembers the tab you chose, for every view, and defaults to **Todos** when the view has a todo list, else to **PRs**.
+  A saved choice of the former **Files**, **Media**, or **Processes** tab falls back to that default.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
+- **Todos** shows the agent's todo list as its latest `todo` call left it, phase by phase, each phase with its done count.
+  Each task has an icon for to do, in progress, done, blocked, or dropped; done and dropped tasks are struck through, and a blocked task shows why under it.
+  It follows the agent's calls while the turn runs, and a subagent's view shows that subagent's own list.
+  This list is the agent's own and is separate from your Todo page.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A pull request the session only read shows only when the session's own prompt names it, as `#7049` or `PR 7049`; see [Pull requests](pull-requests.md).
   The pull requests the session worked on, such as one it opened, pushed, or edited, come before those its prompt only links or names, so the one it opened shows before the one the prompt linked.

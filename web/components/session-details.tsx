@@ -1,11 +1,15 @@
-/** The right sidebar for a session: its pull requests and, once it has any, its Linear issues; a Bot's details share those tabs. */
-import { GitPullRequest } from "lucide-react";
+/** The right sidebar for a session: its agent's todo list once it has one, its pull requests and, once it has any, its Linear issues; a Bot's details share the last two. */
+import { GitPullRequest, ListChecks } from "lucide-react";
+import { useMemo } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { PAGE_ICON } from "../page-icons";
+import { useTranscript } from "../pane-store";
+import { latestTodos } from "../transcript-view";
 import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
+import { openTodos, SessionTodosTab } from "./session-todos-tab";
 
 /** The right sidebar's tab, kept across views; the key keeps its old name, and a tab that no longer exists reads as PRs. */
 const TAB_KEY = "omp-agents.plan-tab";
@@ -51,16 +55,15 @@ interface SessionDetailsProps extends Omit<SessionWork, "scope" | "current"> {
 	cwd: string | null;
 }
 
-/** The right sidebar's content for the focused view: its session's pull requests, and its Linear issues when it has any. */
+/** The right sidebar's content for the focused view: its agent's todo list when it has one, its session's pull requests, and its Linear issues when it has any. */
 export function SessionDetails({ view, working, cwd, pullRequests, tickets, workspace, hosts }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(host => host.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
-	return (
-		<DetailsSidebarFrame
-			label="Session details"
-			storageKey={TAB_KEY}
-			defaultTab="pull-requests"
-			cwd={cwd}
-			tabs={sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, current: view.kind === "live" ? view.instanceId : null })}
-		/>
-	);
+	const items = useTranscript(view);
+	const todos = useMemo(() => latestTodos(items), [items]);
+	const workTabs = sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, current: view.kind === "live" ? view.instanceId : null });
+	const tabs: DetailsTab<"todos" | "pull-requests" | "tickets">[] =
+		todos.length > 0
+			? [{ value: "todos", icon: ListChecks, name: "Todos", control: "session-details.tab.todos", count: openTodos(todos), content: <SessionTodosTab phases={todos} /> }, ...workTabs]
+			: workTabs;
+	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab={todos.length > 0 ? "todos" : "pull-requests"} cwd={cwd} tabs={tabs} />;
 }

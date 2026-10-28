@@ -11,7 +11,7 @@ import { isObject, str } from "./json";
 import { imagesOf, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
 import { splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
-import { isDashboardPrompt, type Item } from "./shared/transcript";
+import { isDashboardPrompt, type Item, type TodoPhase, type TodoTask } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -96,16 +96,34 @@ function spawnedAgents(toolName: unknown, result: unknown): string[] {
 	return [...new Set(rows.flatMap(row => (isObject(row) && typeof row.id === "string" && row.id ? [row.id] : [])))];
 }
 
+const TODO_STATUSES: Record<TodoTask["status"], true> = { pending: true, in_progress: true, completed: true, abandoned: true, blocked: true };
+const isTodoStatus = (status: unknown): status is TodoTask["status"] => typeof status === "string" && Object.hasOwn(TODO_STATUSES, status);
+
+/** The whole todo list a successful `todo` result records in `details.phases`; absent for any other result. */
+function todoList(toolName: unknown, result: unknown): { todos?: TodoPhase[] } {
+	if (toolName !== "todo" || !isObject(result) || result.isError || !isObject(result.details) || !Array.isArray(result.details.phases)) return {};
+	const todos = result.details.phases.flatMap((phase): TodoPhase[] => {
+		if (!isObject(phase) || !Array.isArray(phase.tasks)) return [];
+		const tasks = phase.tasks.flatMap((task): TodoTask[] => {
+			if (!isObject(task) || typeof task.content !== "string" || !isTodoStatus(task.status)) return [];
+			const blocker = str(task.blocker);
+			return [{ content: task.content, status: task.status, ...(blocker ? { blocker } : {}) }];
+		});
+		return [{ name: str(phase.name) ?? "", tasks }];
+	});
+	return { todos };
+}
+
 /** `next` merged after `prev`, without repeats; `prev` itself when `next` adds nothing. */
 function union(prev: string[], next: string[]): string[] {
 	const added = next.filter(id => !prev.includes(id));
 	return added.length === 0 ? prev : [...prev, ...added];
 }
 
-/** Whether two field values are equal: primitives by value, string lists (a tool's `agents`, a reply's `suggestions`) item by item. */
+/** Whether two field values are equal: primitives by value, lists (a tool's `agents` or `todos`, a reply's `suggestions`) by their contents. */
 function sameValue(a: unknown, b: unknown): boolean {
 	if (a === b) return true;
-	return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, i) => value === b[i]);
+	return Array.isArray(a) && Array.isArray(b) && a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Whether two items show the same thing, field by field. */
@@ -260,7 +278,7 @@ export class Transcript {
 				// A running `task` reports its subagents as they spawn, long before its result reaches the file.
 				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, undefined, spawnedAgents(event.toolName, event.partialResult));
 			case "tool_execution_end":
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result));
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result), todoList(event.toolName, { ...(isObject(event.result) ? event.result : {}), isError: event.isError }));
 			case "agent_end":
 				// An interrupted turn ends without tool_execution_end for the call it cut off, or message_end for thinking still streaming.
 				return [...this.#items.values()].flatMap(item => {
@@ -331,7 +349,7 @@ export class Transcript {
 			case "toolResult": {
 				const callId = str(message.toolCallId);
 				if (callId) this.#settled.add(`tool:${callId}`);
-				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), imagesOf(message.content));
+				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), { ...imagesOf(message.content), ...todoList(message.toolName, message) });
 			}
 			case "bashExecution":
 				return this.#upsert({ id: key, kind: "user", text: shellRun(message), skill: null, from: null, entryId: null });
@@ -367,9 +385,10 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[] = [],
+		result: { todos?: TodoPhase[] } = {},
 	): Item[] {
 		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
-		return this.#upsertTool(callId, name, summary, status, agents);
+		return this.#upsertTool(callId, name, summary, status, agents, result);
 	}
 
 	/** Tool calls show up as content blocks, execution events, and result messages; merge them by call id. */
@@ -379,7 +398,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[],
-		result: { images?: string[] } = {},
+		result: { images?: string[]; todos?: TodoPhase[] } = {},
 	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;

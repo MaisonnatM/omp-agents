@@ -67,9 +67,24 @@ export type Item =
 	/**
 	 * `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool.
 	 * `images`: the addresses of the images its result returned, such as a screenshot, as a prompt's; absent when none.
+	 * `todos`: the agent's whole todo list after a successful `todo` call; absent for every other call.
 	 */
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[] }
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; todos?: TodoPhase[] }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
+
+/** A task on the agent's todo list, as omp's `todo` tool records it. */
+export interface TodoTask {
+	content: string;
+	status: "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
+	/** Why a blocked task waits; absent otherwise. */
+	blocker?: string;
+}
+
+/** One named phase of the agent's todo list. */
+export interface TodoPhase {
+	name: string;
+	tasks: TodoTask[];
+}
 
 /** One successful `edit` or `write` result on a file; `at` is when omp recorded it, in ms since the epoch, or `null` when its entry carries no time. */
 export type FileChange =

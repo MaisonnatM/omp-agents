@@ -67,8 +67,8 @@ export function DetailsEmpty({ icon: Icon, title, description }: { icon: LucideI
 }
 
 export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs }: DetailsSidebarFrameProps<T>) {
-	// Resolved each render, not when read: a tab that shows only once its items arrive, such as Tickets, takes the stored choice then.
-	const [stored, setTab] = useStoredState<string>(storageKey, raw => raw ?? defaultTab);
+	// Resolved each render, not when read: a tab that shows only once its items arrive, such as Tickets, takes the stored choice then, and with none stored a default that changes, such as Todos once the agent makes a list, takes over.
+	const [stored, setTab] = useStoredState<string | null>(storageKey, raw => raw);
 	const tab = tabs.find(each => each.value === stored)?.value ?? defaultTab;
 	const crowded = tabs.length > 4;
 	return (

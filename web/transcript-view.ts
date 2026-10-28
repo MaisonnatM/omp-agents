@@ -1,5 +1,5 @@
 /** Pure transforms from the server's `items` messages to the blocks a transcript renders. */
-import type { Item } from "../src/shared/transcript";
+import type { Item, TodoPhase } from "../src/shared/transcript";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 /** A tool call or the thinking that sits with it. Consecutive ones render as one activity group between messages. */
@@ -202,3 +202,12 @@ export const toolImages = (items: readonly Item[]): ToolImage[] =>
 	items.flatMap(item =>
 		item.kind === "tool" && item.images ? item.images.map((src, at) => ({ id: item.id, at, src, caption: [item.name, item.summary].filter(Boolean).join(" · ") })) : [],
 	);
+
+/** The agent's todo list as its latest successful `todo` call left it; empty before its first one. */
+export function latestTodos(items: readonly Item[]): TodoPhase[] {
+	for (let at = items.length - 1; at >= 0; at--) {
+		const item = items[at]!;
+		if (item.kind === "tool" && item.todos) return item.todos;
+	}
+	return [];
+}
