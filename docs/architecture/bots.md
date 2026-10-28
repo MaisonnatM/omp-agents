@@ -14,17 +14,21 @@ Any other start launches plain, so no other session loads the extension.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
 
 The extension adds to the main agent's system prompt on every turn the Bot's name, its job, its memory, and its routines, read again each turn, so a saved job or routine reaches the next turn.
-Each routine of the Bot is one line of JSON in the fields `save_routine` takes, its id, name, `enabled`, schedules, trigger kinds, and task, or **None yet.**, followed by one sentence on how a run acts and which tool creates, changes, or deletes one.
-The extension parses `routines.json` with `parseRoutineSpec` and keeps the entries whose `botId` is the Bot's; a missing or unreadable file reads as no routines.
+Each routine of the Bot is one short line, or **None yet.**, followed by one sentence on how a run acts and which tool creates, changes, or deletes one.
+The line holds the routine's id, name, `enabled`, schedules, and triggers as one JSON object in the shapes `save_routine` takes, then its task's kind and the first 80 characters of its prompt or command, its whitespace collapsed, with `…` when it was cut.
+The extension parses `routines.json` with `parseRoutineSpec` and keeps the entries whose `botId` is the Bot's; a missing or unreadable file, or a session started without the `routines.json` flag, reads as no routines.
+The name, job, and memory need only the Bot's id, `bots.json`, and `memory.md` flags.
 Its `remember` tool appends `- YYYY-MM-DD fact` to `$XDG_DATA_HOME/omp-agents/bots/<id>/memory.md`, and nothing else writes that file.
 It refuses a fact longer than `MAX_FACT_LENGTH`, 500 characters, so each fact stays one short sentence.
 `readTail` in `src/read-tail.ts` reads only the file's newest whole lines within `MAX_MEMORY_BYTES`, 16 KB, of its end, so a memory that grows for months costs each turn the same; when it left older lines out, the prompt says so before the memory.
 
 The extension's `save_routine` and `delete_routine` tools change only the Bot's own routines, and never write `routines.json`.
-`save_routine` takes an optional `id`, a `name`, `schedules` (each `every` some `minutes`, or `weekly` on `days` at a `time`), `triggers` as a list of trigger kinds, a `task` (a `prompt` or a `command`), and an optional `enabled`.
-Without `id` it creates a routine with a new random id; with one, the id must name a routine of the Bot in `routines.json`, and the save replaces its fields, keeping its `enabled` when the call leaves it out.
+`save_routine` takes an optional `id`, `name`, `schedules` (each `every` some `minutes`, or `weekly` on `days` at a `time`), `triggers` (each `{ kind }`, one of `TRIGGER_KINDS`), `task` (a `prompt` or a `command`), and `enabled`, the fields of a `RoutineSpec` but its `botId`.
+With an `id`, the id must name a routine of the Bot in `routines.json`, and every field the call leaves out keeps the routine's value, so a change names only what changes.
+Without one it creates a routine with a new random id, and needs a `name`, a `task`, and at least one schedule or trigger; it runs unless `enabled` is false.
+The tool merges against `routines.json` as it reads it and the request carries the whole routine, so a page edit saved between that read and the request's apply is overwritten.
 `delete_routine` takes the `id` of one of the Bot's routines.
-Both check the routine with `parseRoutineSpec`, so they hold the page's limits, refuse an id that is not the Bot's with an error, and otherwise write one `BotRoutineRequest` (`src/routines.ts`), the Bot's id and a `save` or `remove` change, into `routine-inbox/` under a `.tmp` name and rename it to `<time>-<uuid>.json`.
+Both check the routine with `parseRoutineSpec`, so they hold the page's limits, refuse an id that is not the Bot's with an error, and otherwise write one `BotRoutineRequest` (`src/routines.ts`), the requesting Bot's id, which a saved routine's `botId` must match, and a `save` or `remove` change, into `routine-inbox/` under a `.tmp` name and rename it to `<time>-<uuid>.json`.
 The server's `RoutineInbox` applies it, and checks ownership again; see [Routines](routines.md).
 Both tools load as `essential` and ask approval as writes, as `remember` does.
 

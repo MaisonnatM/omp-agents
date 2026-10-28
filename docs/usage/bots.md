@@ -50,6 +50,7 @@
 - **Delete** asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
 - Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, a calendar event, or unread mail triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
-  You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees its own routines on every turn, and what it saves shows under its **Routines** once the dashboard applies it.
+  You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees a short line for each of its own routines on every turn, with the start of its prompt or command, and what it saves shows under its **Routines** once the dashboard applies it.
+  A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.

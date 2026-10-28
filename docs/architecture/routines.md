@@ -17,7 +17,8 @@ The `Dashboard` refuses a save whose `botId` names no Bot, and sends the routine
 A Bot can also create, change, and delete its own routines through its `save_routine` and `delete_routine` tools; see [Bots](bots.md).
 They leave one `BotRoutineRequest` each in `routine-inbox/` beside `routines.json`, and `RoutineInbox` in `src/server/routine-inbox.ts` applies them through the list registry, oldest name first, so every page hears the change and the same check refuses a save for a Bot that is gone.
 `parseBotRoutineRequest` reads each file with `parseRoutineSpec`, and the inbox checks ownership against the routines as each file applies: a save must name the requesting Bot and, for an id that exists, change a routine of that Bot, and a remove must name an existing routine of that Bot.
-Any other file moves aside as `<name>.invalid` with a logged reason, and a change the routines refuse is deleted rather than retried.
+Any other file moves aside as `<name>.invalid` with a logged reason, and so does a change the routines refuse, such as a save for a Bot deleted since, with `the routines refused it; its Bot may be gone`.
+A save the routines already hold, as when a Bot saved the same edit twice while the dashboard was stopped, is done and deleted.
 Only the server that owns routines drains the inbox, so a request waits there while the dashboard is stopped.
 Each routine holds its last 10 runs, newest first.
 A run holds its slot time, its errors, `triggeredBy`, the events that started it, empty for a slot's or **Run now**'s run, and one `outcome`: `pending` from its claim, with whether it is still `queued`; `sent` with the session its message went to; or a `command` with the command's result once it ran.

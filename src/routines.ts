@@ -95,7 +95,7 @@ export type RoutineChange =
 /** The changes a Bot makes to its own routines through its `save_routine` and `delete_routine` tools. */
 export type BotRoutineChange = Extract<RoutineChange, { op: "save" | "remove" }>;
 
-/** What a Bot's routine tools ask of the server: one change to a routine of Bot `botId`. */
+/** What a Bot's routine tools ask of the server: one change from `botId`, the Bot that asks; a save's routine must have that same `botId`. */
 export interface BotRoutineRequest {
 	botId: BotId;
 	change: BotRoutineChange;
@@ -148,7 +148,7 @@ export const isTriggeredBy = (routine: Routine, kind: TriggerKind): boolean => r
 export const watchedKinds = (routines: readonly Routine[]): TriggerKind[] => TRIGGER_KINDS.filter(kind => routines.some(routine => isTriggeredBy(routine, kind)));
 
 /** Whether `routine` already holds every field the page edits of `spec`. */
-function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
+export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 	return (
 		routine.botId === spec.botId &&
 		routine.name === spec.name &&

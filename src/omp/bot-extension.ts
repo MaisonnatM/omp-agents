@@ -7,7 +7,7 @@ import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } fr
 import { dirname, join } from "node:path";
 import { errorText, isObject, parseJson } from "../json";
 import { readTail } from "../read-tail";
-import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, type RoutineTask, type Schedule, TRIGGER_KINDS, type TriggerKind } from "../routines";
+import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
 import { type BotId, MAX_FACT_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
 
 /**
@@ -22,17 +22,8 @@ export const BOT_FLAGS = {
 	routineInbox: "omp-agents-routine-inbox",
 } as const;
 
-/** What `save_routine` takes: a routine in the fields the page edits, with its triggers as their kinds. */
-export interface SaveRoutineParams {
-	/** One of the Bot's routines to change; none creates one. */
-	id?: string;
-	name: string;
-	schedules: Schedule[];
-	triggers: TriggerKind[];
-	task: RoutineTask;
-	/** None keeps a changed routine's, and enables a new one. */
-	enabled?: boolean;
-}
+/** What `save_routine` takes: `id` names one of the Bot's routines to change, and every field left out keeps its value; without `id` it creates one. */
+export type SaveRoutineParams = Partial<Omit<RoutineSpec, "botId">>;
 
 interface ToolResult {
 	content: { type: "text"; text: string }[];
@@ -82,16 +73,15 @@ function readText(path: string): string {
 	}
 }
 
-/** The routines the `routines.json` at `path` holds; none when it is missing or unreadable. */
-function readRoutines(path: string): RoutineSpec[] {
-	const value = parseJson(readText(path));
-	if (!isObject(value) || !Array.isArray(value.routines)) return [];
-	return value.routines.flatMap(entry => parseRoutineSpec(entry)?.ok ?? []);
-}
+/** How much of a routine's prompt or command its line in the system prompt shows. */
+const TASK_PREVIEW_LENGTH = 80;
 
-/** `routine` as one line of JSON in `save_routine`'s fields, so the Bot can pass it back with its edits. */
-const routineLine = ({ id, name, enabled, schedules, triggers, task }: RoutineSpec): string =>
-	JSON.stringify({ id, name, enabled, schedules, triggers: triggers.map(({ kind }) => kind), task });
+/** `routine` as one short line: its fields as `save_routine` takes them, then its task's kind and the start of its prompt or command. */
+function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSpec): string {
+	const text = (task.kind === "prompt" ? task.prompt : task.command).replace(/\s+/g, " ").trim();
+	const preview = text.length > TASK_PREVIEW_LENGTH ? `${text.slice(0, TASK_PREVIEW_LENGTH)}…` : text;
+	return `${JSON.stringify({ id, name, enabled, schedules, triggers })} ${task.kind}: ${preview}`;
+}
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
 function leave(dir: string, request: BotRoutineRequest): void {
@@ -109,6 +99,16 @@ function leave(dir: string, request: BotRoutineRequest): void {
 const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }], details: undefined });
 
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
+const NO_ROUTINES = "This session is not an omp-agents Bot, so it has no routines.";
+
+/** A Bot's session as its flags name it: the Bot, its `bots.json` and `memory.md`, and its routine files, `null` when the dashboard passed none. */
+interface ThisBot {
+	botId: BotId;
+	botsPath: string;
+	memoryPath: string;
+	routinesPath: string | null;
+	routineInbox: string | null;
+}
 
 export default function botExtension(pi: BotExtensionApi): void {
 	pi.registerFlag(BOT_FLAGS.bot, { type: "string", description: "The omp-agents Bot this session is." });
@@ -122,30 +122,34 @@ export default function botExtension(pi: BotExtensionApi): void {
 		return typeof value === "string" && value !== "" ? value : null;
 	};
 
-	/** This Bot, its routines as the file holds them now, and where its routine tools leave their changes. */
-	const ownRoutines = (): { botId: BotId; mine: RoutineSpec[]; inbox: string } => {
+	/** This session's Bot, or `null` when it is not one. */
+	const thisBot = (): ThisBot | null => {
 		const botId = parseBotId(flag(BOT_FLAGS.bot));
-		const routinesPath = flag(BOT_FLAGS.routines);
-		const inbox = flag(BOT_FLAGS.routineInbox);
-		if (!botId || !routinesPath || !inbox) throw new Error("This session is not an omp-agents Bot, so it has no routines.");
-		return { botId, mine: readRoutines(routinesPath).filter(routine => routine.botId === botId), inbox };
+		const botsPath = flag(BOT_FLAGS.bots);
+		const memoryPath = flag(BOT_FLAGS.memory);
+		if (!botId || !botsPath || !memoryPath) return null;
+		return { botId, botsPath, memoryPath, routinesPath: flag(BOT_FLAGS.routines), routineInbox: flag(BOT_FLAGS.routineInbox) };
+	};
+
+	/** The Bot's routines as `routines.json` holds them now; none when the file is missing or unreadable, or the dashboard named none. */
+	const ownRoutines = ({ botId, routinesPath }: ThisBot): RoutineSpec[] => {
+		const value = routinesPath === null ? null : parseJson(readText(routinesPath));
+		if (!isObject(value) || !Array.isArray(value.routines)) return [];
+		return value.routines.flatMap(entry => parseRoutineSpec(entry)?.ok ?? []).filter(routine => routine.botId === botId);
 	};
 
 	pi.on("before_agent_start", (event, ctx) => {
-		const id = parseBotId(flag(BOT_FLAGS.bot));
-		const botsPath = flag(BOT_FLAGS.bots);
-		const memoryPath = flag(BOT_FLAGS.memory);
-		const routinesPath = flag(BOT_FLAGS.routines);
-		if (ctx.agent.kind === "sub" || !id || !botsPath || !memoryPath || !routinesPath) return undefined;
-		const bot = parseBots(parseJson(readText(botsPath)))?.find(bot => bot.id === id);
+		const me = thisBot();
+		if (ctx.agent.kind === "sub" || !me) return undefined;
+		const bot = parseBots(parseJson(readText(me.botsPath)))?.find(bot => bot.id === me.botId);
 		if (!bot) return undefined;
 		let memory: { text: string; cut: boolean } | null = null;
 		try {
-			memory = readTail(memoryPath, MAX_MEMORY_BYTES);
+			memory = readTail(me.memoryPath, MAX_MEMORY_BYTES);
 		} catch {
 			// An unreadable memory leaves this turn without it rather than stopping it.
 		}
-		const routines = readRoutines(routinesPath).filter(routine => routine.botId === id);
+		const routines = ownRoutines(me);
 		const prompt = [
 			`You are ${bot.name}, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.`,
 			"Your job, and what you ask before doing:",
@@ -154,9 +158,9 @@ export default function botExtension(pi: BotExtensionApi): void {
 			...(memory?.cut ? ["(Older memory was cut to keep this prompt short; only the newest facts follow.)"] : []),
 			memory?.text.trim() || "Nothing yet.",
 			"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
-			"Your routines, one per line in the fields `save_routine` takes:",
+			`Your routines, one per line: its fields as \`save_routine\` takes them, then its task's kind and its prompt or command, cut at ${TASK_PREVIEW_LENGTH} characters:`,
 			...(routines.length > 0 ? routines.map(routineLine) : ["None yet."]),
-			"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create or change one, and `delete_routine` to delete one.",
+			"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
 		].join("\n");
 		return { systemPrompt: [...event.systemPrompt, prompt] };
 	});
@@ -169,7 +173,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 		loadMode: "essential",
 		approval: "write",
 		async execute(_toolCallId, { fact }) {
-			const memoryPath = flag(BOT_FLAGS.memory);
+			const memoryPath = thisBot()?.memoryPath;
 			const line = fact.replace(/\s+/g, " ").trim();
 			if (!memoryPath) throw new Error("This session is not an omp-agents Bot, so it has no memory.");
 			if (!line) throw new Error("fact is empty.");
@@ -205,47 +209,42 @@ export default function botExtension(pi: BotExtensionApi): void {
 				command: Type.String({ minLength: 1, maxLength: MAX_COMMAND_LENGTH, description: "The shell command each run runs in this Bot's workspace; its output is posted here." }),
 			}),
 		],
-		{ description: "What each run does." },
+		{ description: "What each run does; a new routine needs one." },
 	);
 
 	pi.registerTool<SaveRoutineParams>({
 		name: "save_routine",
 		label: "Save routine",
 		description:
-			"Creates one of this Bot's routines, or changes one, replacing all its fields: pass the routine's line from the system prompt with your edits. The user sees it under the Bot's Routines. A routine needs at least one schedule or trigger.",
+			"Creates one of this Bot's routines, or changes one. To change a routine, pass its `id` from the system prompt and only the fields that change; the rest keep their values. To create one, leave out `id` and pass a `name`, a `task`, and at least one schedule or trigger. The user sees it under the Bot's Routines.",
 		parameters: Type.Object({
 			id: Type.Optional(Type.String({ minLength: 1, description: "The id of one of your routines, to change it; omit it to create a routine." })),
-			name: Type.String({ minLength: 1, description: "A short name the user knows the routine by." }),
-			schedules: Type.Array(schedule, { description: "When it runs; empty when only its triggers run it." }),
-			triggers: Type.Array(Type.Union(TRIGGER_KINDS.map(kind => Type.Literal(kind))), {
-				uniqueItems: true,
-				description:
-					"What else runs it, each at most once: slack, a Slack message that waits on the user; pull-request, a pull request that becomes the user's move; event, a calendar event about to start; gmail, unread mail in a Gmail inbox.",
-			}),
-			task,
-			enabled: Type.Optional(Type.Boolean({ description: "Whether it runs; omit it to keep a routine's as it is, or to enable a new one." })),
+			name: Type.Optional(Type.String({ minLength: 1, description: "A short name the user knows the routine by; a new routine needs one." })),
+			schedules: Type.Optional(Type.Array(schedule, { description: "When it runs; empty when only its triggers run it." })),
+			triggers: Type.Optional(
+				Type.Array(Type.Object({ kind: Type.Union(TRIGGER_KINDS.map(kind => Type.Literal(kind))) }), {
+					uniqueItems: true,
+					description:
+						"What else runs it, each kind at most once: slack, a Slack message that waits on the user; pull-request, a pull request that becomes the user's move; event, a calendar event about to start; gmail, unread mail in a Gmail inbox.",
+				}),
+			),
+			task: Type.Optional(task),
+			enabled: Type.Optional(Type.Boolean({ description: "Whether it runs; a new routine runs unless this is false." })),
 		}),
 		loadMode: "essential",
 		approval: "write",
-		async execute(_toolCallId, params) {
-			const { botId, mine, inbox } = ownRoutines();
-			const stored = params.id === undefined ? undefined : mine.find(routine => routine.id === params.id);
-			if (params.id !== undefined && !stored) throw new Error(`None of your routines has id ${params.id}; omit id to create a routine.`);
-			const spec = parseRoutineSpec({
-				id: params.id ?? randomUUID(),
-				botId,
-				name: params.name,
-				schedules: params.schedules,
-				triggers: params.triggers.map(kind => ({ kind })),
-				task: params.task,
-				enabled: params.enabled ?? stored?.enabled ?? true,
-			});
+		async execute(_toolCallId, { id, ...fields }) {
+			const bot = thisBot();
+			if (!bot?.routineInbox) throw new Error(NO_ROUTINES);
+			const stored = id === undefined ? undefined : ownRoutines(bot).find(routine => routine.id === id);
+			if (id !== undefined && !stored) throw new Error(`None of your routines has id ${id}; omit id to create a routine.`);
+			const spec = parseRoutineSpec({ schedules: [], triggers: [], enabled: true, ...stored, ...fields, id: id ?? randomUUID(), botId: bot.botId });
 			if (!spec) {
 				throw new Error(
-					`The routine is not valid: it needs a name, at least one schedule or trigger, schedules in range, each trigger kind at most once, and a prompt or a command that is not empty, a command at most ${MAX_COMMAND_LENGTH} characters.`,
+					`The routine is not valid: a new routine needs a name and a task, and every routine needs at least one schedule or trigger, schedules in range, each trigger kind at most once, and a prompt or a command that is not empty, a command at most ${MAX_COMMAND_LENGTH} characters.`,
 				);
 			}
-			leave(inbox, { botId, change: { op: "save", routine: spec.ok } });
+			leave(bot.routineInbox, { botId: bot.botId, change: { op: "save", routine: spec.ok } });
 			return reply(`${stored ? "Changed" : "Created"} routine "${spec.ok.name}". ${APPLIES}\n${routineLine(spec.ok)}`);
 		},
 	});
@@ -258,10 +257,11 @@ export default function botExtension(pi: BotExtensionApi): void {
 		loadMode: "essential",
 		approval: "write",
 		async execute(_toolCallId, { id }) {
-			const { botId, mine, inbox } = ownRoutines();
-			const stored = mine.find(routine => routine.id === id);
+			const bot = thisBot();
+			if (!bot?.routineInbox) throw new Error(NO_ROUTINES);
+			const stored = ownRoutines(bot).find(routine => routine.id === id);
 			if (!stored) throw new Error(`None of your routines has id ${id}.`);
-			leave(inbox, { botId, change: { op: "remove", id } });
+			leave(bot.routineInbox, { botId: bot.botId, change: { op: "remove", id } });
 			return reply(`Deleted routine "${stored.name}". ${APPLIES}`);
 		},
 	});

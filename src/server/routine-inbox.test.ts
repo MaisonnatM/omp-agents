@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,10 +24,21 @@ const T0 = 1_000;
 const spec = (id: string, botId: BotId, name: string): RoutineSpec => ({ id, botId, name, schedules: [{ kind: "every", minutes: 60 }], triggers: [], task: { kind: "prompt", prompt: "Check in." }, enabled: true });
 const stored = (routine: RoutineSpec): Routine => ({ ...routine, createdAt: T0, scheduledAt: null, runs: [] });
 
-/** An inbox over routines that start as `initial`, which each change it applies edits as the dashboard's would. */
+/** An inbox over routines that start as `initial`, which each change it applies edits as the dashboard's would, refusing a save for a Bot other than Scout and Relay. */
 function harness(dir: string, initial: Routine[], active = () => true) {
 	let routines = initial;
-	const inbox = new RoutineInbox(dir, () => routines, change => void (routines = applyRoutine(routines, change, T0)), { active });
+	const inbox = new RoutineInbox(
+		dir,
+		() => routines,
+		change => {
+			if (change.op === "save" && change.routine.botId !== SCOUT && change.routine.botId !== RELAY) return false;
+			const next = applyRoutine(routines, change, T0);
+			const changed = next !== routines;
+			routines = next;
+			return changed;
+		},
+		{ active },
+	);
 	return { inbox, routines: () => routines };
 }
 
@@ -50,6 +61,21 @@ describe("RoutineInbox", () => {
 		await inbox.drain();
 		expect(routines()).toEqual([relayMail, stored(spec("r1", SCOUT, "Daily standup"))]);
 		expect(readdirSync(dir).sort()).toEqual(["5-x.json.invalid", "6-x.json.invalid", "7-x.json.invalid", "8-x.json.invalid", "9-x.json.invalid", "a-x.json.invalid", "b-x.tmp"]);
+	});
+
+	test("a save the routines refuse, as for a Bot deleted since, moves aside with why, and a save they already hold is done", async () => {
+		const dir = inboxDir();
+		const gone = "gone" as BotId;
+		const standup = stored(spec("r1", SCOUT, "Standup"));
+		writeFileSync(join(dir, "1-x.json"), JSON.stringify({ botId: gone, change: { op: "save", routine: spec("r5", gone, "Orphan") } }));
+		writeFileSync(join(dir, "2-x.json"), JSON.stringify({ botId: SCOUT, change: { op: "save", routine: spec("r1", SCOUT, "Standup") } }));
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		const { inbox, routines } = harness(dir, [standup]);
+		await inbox.drain();
+		expect(routines()).toEqual([standup]);
+		expect(readdirSync(dir)).toEqual(["1-x.json.invalid"]);
+		expect(logged.mock.calls).toEqual([[`omp-agents: set aside ${join(dir, "1-x.json")}: applying it failed: the routines refused it; its Bot may be gone`]]);
+		logged.mockRestore();
 	});
 
 	test("a server that does not own the unattended work leaves the changes for the one that does", async () => {

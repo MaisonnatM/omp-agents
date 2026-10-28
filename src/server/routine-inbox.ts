@@ -4,7 +4,7 @@
  * routines while the dashboard is down. A Bot may save or delete only its own routines, which the inbox checks against
  * the routines as each file applies, so a request a Bot's tool let through still cannot touch another Bot's routine.
  */
-import { type BotRoutineChange, parseBotRoutineRequest, type Routine } from "../routines";
+import { type BotRoutineChange, isSameSpec, parseBotRoutineRequest, type Routine } from "../routines";
 import { type InboxEntry, type InboxOptions, JsonInboxDir } from "./json-inbox";
 
 /** `value` as a change its Bot may make to `routines`, or why not. */
@@ -20,15 +20,17 @@ function parseOwnChange(value: unknown, routines: readonly Routine[]): InboxEntr
 }
 
 export class RoutineInbox extends JsonInboxDir<BotRoutineChange> {
-	constructor(dir: string, routines: () => readonly Routine[], apply: (change: BotRoutineChange) => void, options?: InboxOptions) {
+	/** `apply` returns whether the routines changed, and a change they refuse, such as a save for a Bot deleted since, moves its file aside with the reason. */
+	constructor(dir: string, routines: () => readonly Routine[], apply: (change: BotRoutineChange) => boolean, options?: InboxOptions) {
 		super(
 			dir,
 			{
 				parse: (_name, value) => parseOwnChange(value, routines()),
 				apply(change) {
-					// A change the routines refuse, such as a save for a Bot deleted since, is done too: it would be refused on every drain.
-					apply(change);
-					return true;
+					// `apply` is false for a save the routines already hold too, as when the Bot saved the same edit twice while the dashboard was stopped, and that one is done.
+					const held = change.op === "save" && routines().some(routine => routine.id === change.routine.id && isSameSpec(routine, change.routine));
+					if (held || apply(change)) return true;
+					throw new Error("the routines refused it; its Bot may be gone");
 				},
 			},
 			options,
