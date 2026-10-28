@@ -4,7 +4,7 @@
  */
 import { skillLabel } from "./labels";
 
-export type ChipKind = "skill" | "command" | "file" | "directory" | "ticket" | "pull-request" | "person" | "todo" | "session" | "element";
+export type ChipKind = "skill" | "command" | "file" | "directory" | "ticket" | "pull-request" | "person" | "todo" | "session" | "annotation";
 
 export interface PromptToken {
 	kind: ChipKind;
@@ -30,11 +30,12 @@ const unescapeLink = (text: string): string => text.replace(/\\([[\]])/g, "$1");
 const STRING = String.raw`"(?:[^"\\\n]|\\.)*"`;
 
 /**
- * An element picked in the Browser as one line of the prompt: its label and react-grab's text as JSON strings, in a
- * code span, so markdown keeps the HTML and escapes in it as written. The span's backticks outnumber any run inside.
+ * An annotation of the Browser as one line of the prompt: its label and its text, the comment and the picked elements,
+ * as JSON strings in a code span, so markdown keeps the HTML and escapes in it as written. The span's backticks
+ * outnumber any run inside.
  */
-export function elementReference(label: string, content: string): string {
-	const inner = `browser element ${JSON.stringify(label)} ${JSON.stringify(content)}`;
+export function annotationReference(label: string, content: string): string {
+	const inner = `browser annotation ${JSON.stringify(label)} ${JSON.stringify(content)}`;
 	const fence = "`".repeat(Math.max(0, ...(inner.match(/`+/g) ?? []).map(run => run.length)) + 1);
 	return `${fence}${inner}${fence}`;
 }
@@ -65,8 +66,8 @@ const PATTERNS: readonly Pattern[] = [
 	{ re: new RegExp(String.raw`(?<![\w-])omp session (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "session", label: quoted(m[1]), target: m[2] }) },
 	{ re: new RegExp(String.raw`(?<![\w-])Linear user (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "person", label: quoted(m[1]), target: m[2] }) },
 	{
-		re: new RegExp(String.raw`(?<![\w\x60])(\x60+)browser element (${STRING}) (${STRING})\1(?!\x60)`, "g"),
-		token: m => ({ kind: "element", label: quoted(m[2]), target: quoted(m[3]) }),
+		re: new RegExp(String.raw`(?<![\w\x60])(\x60+)browser annotation (${STRING}) (${STRING})\1(?!\x60)`, "g"),
+		token: m => ({ kind: "annotation", label: quoted(m[2]), target: quoted(m[3]) }),
 	},
 	{
 		// The `@` menu's category prefixes are a query still being typed, not a path.
@@ -133,7 +134,7 @@ function chipTree(parent: MdNode, source: string): void {
 	parent.children = parent.children.flatMap(node => {
 		if (node.type === "text") return chipText(node);
 		if (node.type === "link" || node.type === "inlineCode") {
-			// A ticket or pull request is a markdown link, and a Browser element a code span, which the parser has already taken apart: match its source.
+			// A ticket or pull request is a markdown link, and a Browser annotation a code span, which the parser has already taken apart: match its source.
 			const written = source.slice(node.position?.start.offset, node.position?.end.offset);
 			const [token] = promptTokens(written, { leading: false });
 			return token && token.start === 0 && token.end === written.length ? [chipNode(token)] : [node];

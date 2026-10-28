@@ -8,7 +8,7 @@
   "private": true,
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "bun build preview-grab.ts --target=browser --format=iife --minify --outfile dist/preview-grab.txt && bun build main.ts preload.ts preview-preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming [name].cjs",
+    "build": "bun build preview-pick.ts --target=browser --format=iife --minify --outfile dist/preview-pick.txt && bun build main.ts preload.ts preview-preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming [name].cjs",
     "start": "bun run build && bun launch.ts",
     "typecheck": "tsc --noEmit"
   },

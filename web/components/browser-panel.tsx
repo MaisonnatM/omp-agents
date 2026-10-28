@@ -1,12 +1,13 @@
 /**
  * `BrowserPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Browser
- * tab, where an element picked with react-grab lands in the session's composer as a chip, and a marked or whole page as an image.
+ * tab, where the elements selected and the marks drawn on the page land in the session's composer as one chip and its
+ * picture, and a whole page as an image.
  */
 import { ArrowLeft, ArrowRight, Camera, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
-import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
+import { PREVIEW_PARTITION, type PreviewElementBox } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -14,8 +15,8 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { appendToComposer, attachToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { browserCandidates, initialAddress, type Mark } from "../browser-model";
-import { elementReference } from "../prompt-tokens";
+import { annotationText, browserCandidates, initialAddress, type Mark } from "../browser-model";
+import { annotationReference } from "../prompt-tokens";
 import { sessionProcessesStore } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useWebview } from "../use-webview";
@@ -31,7 +32,7 @@ const START_SERVER_PROMPT =
 /** The window can show a Browser: the desktop app, from the build that added it. */
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
 
-/** The window's shell takes capture requests: the desktop app, from the build that added **Screenshot** and Region picking. */
+/** The window's shell takes capture requests and picks in the app: the desktop app, from the build that added **Screenshot** and T3 Code's picking. */
 const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.captureBrowser === "function";
 
 /** A toolbar control of the Browser, named by its tooltip. */
@@ -91,7 +92,7 @@ const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 *
 
 /**
  * Live session `view`'s app in a `<webview>`, opened on the address last loaded for `sessionId`, else on the first port
- * its jobs and services listen on. Each element react-grab copies in it is appended to the view's composer.
+ * its jobs and services listen on. Each **Attach** of what was picked in it is appended to the view's composer.
  */
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
 	const { read } = sessionProcessesStore.use();
@@ -103,21 +104,15 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const [saved] = useState(() => addresses.get(sessionId));
 	const draftKey = liveDraftKey(view);
 	const [maximized, setMaximized] = useState(false);
-	// Picking, as T3 Code's: Select picks an element with react-grab; Region, Draw, and Erase mark the page to attach its picture.
+	// Picking, as T3 Code's: Select picks elements in the app; Region, Draw, and Erase mark the page; one Attach sends them all.
 	const [pick, setPick] = useState<PickMode | null>(null);
+	const [elements, setElements] = useState<PreviewElementBox[]>([]);
 	const webview = useWebview({
 		initial: initialAddress(saved, candidates),
-		onPick: ({ label, content }) => {
-			appendToComposer(draftKey, elementReference(label, content));
-			toasts.add({ title: "Added to the composer" });
-		},
+		onSelection: setElements,
 		onNavigate: url => addresses.set(sessionId, url),
 		// The app has the focus while maximized, so its Escape stops picking or restores too.
-		onEscape: () => (pick ? setPick(null) : setMaximized(false)),
-		onGrabActive: active => {
-			if (active && pick === null) setPick("select");
-			else if (!active && pick === "select") setPick(null);
-		},
+		onEscape: () => (pick ? choosePick(null) : setMaximized(false)),
 		ports,
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -131,9 +126,11 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const mounted = webview.src !== null;
 	const choosePick = (mode: PickMode | null): void => {
 		setPick(mode);
-		webview.setGrab(mode === "select");
+		// The outlines take the dashboard's accent, as the marks do.
+		if (mode === null) webview.clearSelection();
+		else webview.select(mode === "select", getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
 	};
-	// T3 Code's keys switch the mode while picking; the app hands them over while react-grab has its focus.
+	// T3 Code's keys switch the mode while picking; the app hands them over while Select has its focus.
 	const pickKey = (mode: PickMode) => () => (pick === null || !CAPTURE_AVAILABLE ? false : choosePick(mode));
 	useShortcuts({
 		browserPickSelect: pickKey("select"),
@@ -155,12 +152,16 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
 		attachImage(screenshotFile(png));
 	};
-	const attachMarks = async (marks: Mark[], comment: string, pageWidth: number, color: string): Promise<void> => {
-		choosePick(null);
+	const attachAnnotation = async (marks: Mark[], comment: string, pageWidth: number, color: string): Promise<void> => {
+		const picked = await webview.resolveSelection();
+		const boxes = elements.filter(box => picked.some(element => element.id === box.id));
 		const png = await webview.capture();
+		choosePick(null);
 		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-		attachImage(await annotationFile(png, marks, pageWidth, color));
-		if (comment) appendToComposer(draftKey, comment);
+		const regions = marks.filter(mark => mark.kind === "region").length;
+		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions });
+		attachImage(await annotationFile(png, marks, boxes, pageWidth, color));
+		appendToComposer(draftKey, annotationReference(label, content));
 	};
 	const sectionRef = useRef<HTMLElement>(null);
 	// What the maximized Browser covers leaves the tab order and the accessibility tree.
@@ -222,9 +223,11 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						</MenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<ToolbarButton label="Pick in the app" control="browser.select-element" disabled={!webview.ready} pressed={pick !== null} onClick={() => choosePick(pick ? null : "select")}>
-					<MousePointerClick />
-				</ToolbarButton>
+				{CAPTURE_AVAILABLE && (
+					<ToolbarButton label="Pick in the app" control="browser.select-element" disabled={!webview.ready} pressed={pick !== null} onClick={() => choosePick(pick ? null : "select")}>
+						<MousePointerClick />
+					</ToolbarButton>
+				)}
 				{CAPTURE_AVAILABLE && (
 					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void screenshot()}>
 						<Camera />
@@ -277,7 +280,9 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						allowpopups={"" as unknown as boolean}
 						className="flex min-h-0 w-full flex-1"
 					/>
-					{pick !== null && CAPTURE_AVAILABLE && <AnnotationLayer mode={pick} onAttach={(...args) => void attachMarks(...args)} />}
+					{pick !== null && CAPTURE_AVAILABLE && (
+						<AnnotationLayer mode={pick} elements={elements} onDeselect={webview.deselect} onAttach={(...args) => void attachAnnotation(...args)} />
+					)}
 					{pick !== null && CAPTURE_AVAILABLE && <PickModes mode={pick} onChange={choosePick} />}
 				</div>
 			)}

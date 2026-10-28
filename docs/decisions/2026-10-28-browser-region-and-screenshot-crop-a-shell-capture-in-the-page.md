@@ -13,12 +13,13 @@ It keeps the app's own page untouched and the marks and crop correct at any zoom
 
 - A layer in the page over the `<webview>`, the shell's `capturePage()` of the whole guest, and the marks drawn and cropped on an `OffscreenCanvas` in the page by the ratio of the picture's width to the layer's: no script in the app, and the ratio holds whatever the zoom or density; chosen.
 - The same layer, with the shell capturing only the rectangle: a smaller picture, but `capturePage(rect)` takes the guest's own coordinates, which drift from the page's when either is zoomed.
-- A layer injected into the guest by `desktop/preview-grab.ts`, as react-grab is and as T3 Code draws its marks: the capture holds the marks as drawn, but the app's styles and scripts can break the layer, and every message from the guest is one any script there can forge.
+- A layer injected into the guest by `desktop/preview-pick.ts`, as T3 Code draws its marks: the capture holds the marks as drawn, but the app's styles and scripts can break the layer, and every message from the guest is one any script there can forge.
 
 ## Consequences
 
-The bridge gains an optional `captureBrowser`, so an app built before it shows no **Screenshot** button and no **Region**, **Draw**, or **Erase** mode.
+The bridge gains an optional `captureBrowser`, so an app built before it shows no **Screenshot** or **Pick in the app** button.
 The marks live in the page, so the guest's scroll moves under them; they mark the page as it showed when drawn.
+**Select** outlines its elements in the app instead, since only there can it find them (see [Browser's Select runs in the app with react-grab's primitives](2026-10-28-browser-select-runs-in-the-app-with-react-grab-primitives.md)), so the capture shows those outlines and the crop covers them with the marks.
 A picture attaches only to a mounted composer, since attachments live in its state, so the page says to open the conversation when none is mounted.
 
 ## Confirmation

@@ -14,18 +14,45 @@ export const SOUND_CHANNEL = "omp-agents:sound";
 export const SIGN_IN_CHANNEL = "omp-agents:sign-in";
 /** Asked synchronously by the preload before the page's scripts run: the localStorage entries that sign the page in, or `null`. */
 export const ACCESS_CHANNEL = "omp-agents:access";
-/** The `ipc-message` channel of the Preview's webview, which carries each element react-grab copied in it as a {@link PreviewPick}, and the key of the page's message to its preload. */
-export const PREVIEW_GRAB_CHANNEL = "omp-agents:preview-grab";
-/** An element react-grab copied: what it copied, a typed comment included, and the label its composer chip reads. */
-export interface PreviewPick {
-	content: string;
-	label: string;
+/**
+ * Where `desktop/preview-grab.ts` puts its {@link PreviewPicker} in the main world of the Browser's app, which the page
+ * reaches through the webview's `executeJavaScript`.
+ */
+export const PREVIEW_PICKER_GLOBAL = "__OMP_PICK__";
+/** The Browser's Select, run in the app's page, since only there can it find elements and their React components. */
+export interface PreviewPicker {
+	/** Turns Select on, drawing the outlines in `color`, or off, keeping the elements already selected. */
+	select(on: boolean, color: string): void;
+	deselect(id: number): void;
+	/** Drops every selected element and turns Select off. */
+	clear(): void;
+	/** What the selected elements are, read through react-grab's `getElementContext`, with the hover outline hidden for the capture. */
+	resolve(): Promise<PreviewElement[]>;
+}
+/** A selected element as the prompt gets it: the name of its React component or tag, and react-grab's text of it. */
+export interface PreviewElement {
+	id: number;
+	name: string;
+	snippet: string;
+}
+/** Where a selected element shows in the app, in its CSS pixels from the top left of what the webview shows. */
+export interface PreviewElementBox {
+	id: number;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+/** The `ipc-message` channel, and the key of the app's message to its preload, of each change to Select, as a {@link PreviewSelection}. */
+export const PREVIEW_SELECTION_CHANNEL = "omp-agents:preview-selection";
+/** Whether Select is on, and where the selected elements show, sent again as the app scrolls. */
+export interface PreviewSelection {
+	selecting: boolean;
+	boxes: PreviewElementBox[];
 }
 /** The `ipc-message` channel on which the Browser's webview reports an Escape its app left unhandled. */
 export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
-/** The Preview's react-grab turning its picking on (`true`) or off, which the guest's preload hands to the page. */
-export const PREVIEW_GRAB_ACTIVE_CHANNEL = "omp-agents:preview-grab-active";
-/** The pick mode keys, V, R, D, and E, pressed in the app while react-grab picks, which never reach the page otherwise. */
+/** The pick mode keys, V, R, D, and E, pressed in the app while Select is on, which never reach the page otherwise. */
 export const PREVIEW_PICK_KEY_CHANNEL = "omp-agents:preview-pick-key";
 /** The keys the guest hands over on {@link PREVIEW_PICK_KEY_CHANNEL}, the shortcuts of T3 Code's pick modes. */
 export const PICK_MODE_KEYS: readonly string[] = ["v", "r", "d", "e"];

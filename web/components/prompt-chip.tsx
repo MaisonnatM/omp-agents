@@ -1,5 +1,5 @@
 /** `PromptChip`, a skill, file, ticket, or other reference in a prompt drawn as one chip, in the composer and transcript. */
-import { File, Folder, GitPullRequest, ListTodo, type LucideIcon, MessageSquare, MousePointer2, Slash, Sparkles, Ticket, UserRound } from "lucide-react";
+import { File, Folder, GitPullRequest, ListTodo, type LucideIcon, MessageSquare, Slash, Sparkles, SquareDashedMousePointer, Ticket, UserRound } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ChipKind, PromptToken } from "../prompt-tokens";
@@ -14,7 +14,7 @@ const CHIP: Record<ChipKind, { icon: LucideIcon; name: string }> = {
 	person: { icon: UserRound, name: "Person" },
 	todo: { icon: ListTodo, name: "Todo" },
 	session: { icon: MessageSquare, name: "Session" },
-	element: { icon: MousePointer2, name: "Element" },
+	annotation: { icon: SquareDashedMousePointer, name: "Browser annotation" },
 };
 
 export const isChipKind = (value: unknown): value is ChipKind => typeof value === "string" && Object.hasOwn(CHIP, value);
@@ -23,13 +23,13 @@ export type ChipProps = Pick<PromptToken, "kind" | "label" | "target">;
 
 const truncate = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
-/** What the tooltip names: the path a file chip shortens, the command a skill runs, the start of what a Browser element copied, or the words a long label truncates. */
+/** What the tooltip names: the path a file chip shortens, the command a skill runs, the start of a Browser annotation's text, or the words a long label truncates. */
 const detail = ({ kind, label, target }: ChipProps): string =>
 	kind === "file" || kind === "directory"
 		? target
 		: kind === "skill"
 			? `/skill:${target}`
-			: kind === "element"
+			: kind === "annotation"
 				? truncate(target.replace(/\s+/g, " "), 240)
 				: label;
 

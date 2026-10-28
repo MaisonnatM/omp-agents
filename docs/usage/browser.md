@@ -21,12 +21,12 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.
 - **Maximize Browser**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, the same button, or Escape, pressed in the app too, puts it back in the sidebar.
 - **Pick in the app**, the pointer button, starts picking, as in T3 Code: a **Select**, **Region**, **Draw**, and **Erase** switch floats at the top of the app, and the button or Escape stops it.
-  **Select**, where picking starts, turns on react-grab, and a click on an element adds it to the session's composer as a chip named after its React component, or its tag, with the element's HTML, the React component around it with its file, and a selector inside; hover the chip to read them.
-  React-grab's **Comment** names the chip after the note you type first, and the note goes in with the element.
-  Each pick goes after what the composer already holds, and a message confirms it; nothing is sent until you send it.
-  **Region** drags a box over part of the app, and **Draw** draws a line on it; marks add up across modes, and **Erase** removes the box or line you click.
-  A card beside the marks takes a comment; **Attach**, or Enter, attaches a picture of the marked part with the marks drawn on it, adds the comment after it, and stops picking.
-  Escape drops the marks.
+  **Select**, where picking starts, outlines the element under the pointer, and a click selects it without pressing it in the app; Shift+click adds another, and a click on a selected element drops it.
+  **Region** drags a box over part of the app, and **Draw** draws a line on it; selected elements and marks add up across modes, and **Erase** removes the box, line, or selected element you click.
+  A card beside them takes a comment; **Attach**, or Enter, stops picking and adds one chip to the session's composer, named after the comment, else the first element's React component or tag, else the page's title, with a picture of the marked part.
+  The chip holds the comment, the page's address, and each element's HTML, React component with its file, and selector; hover it to read them.
+  It goes after what the composer already holds, and nothing is sent until you send it.
+  Escape drops the selection and the marks.
   V, R, D, and E switch to **Select**, **Region**, **Draw**, and **Erase** while picking, as in T3 Code, pressed in the app too.
 - **Screenshot**, the camera button, attaches a picture of all the app shows to the composer at once.
   A picture needs the session's conversation open, since attachments live in its composer.

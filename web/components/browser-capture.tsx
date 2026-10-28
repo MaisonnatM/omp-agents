@@ -1,6 +1,7 @@
 /**
  * The Browser's picking, as T3 Code has it: the Select, Region, Draw, and Erase switch over the page, the layer where
- * Region boxes and Draw lines mark the page until **Attach**, and the image files the composer attaches of the page.
+ * Region boxes and Draw lines mark the page and the card that attaches them with the selected elements, and the image
+ * files the composer attaches of the page.
  */
 import { type PointerEvent, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,16 +9,17 @@ import { cn } from "@/lib/utils";
 import type { ControlId } from "../../src/shared/activity";
 import { activityControl } from "../activity";
 import { type Area, cardPlace, dragArea, type Mark, markAt, type Point, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
+import type { PreviewElementBox } from "../../src/shared/desktop-bridge";
 import { type ShortcutId, shortcutKeys } from "../shortcuts";
 
-/** Select picks an element with react-grab; Region and Draw mark the page; Erase removes a mark. */
+/** Select picks elements in the app; Region and Draw mark the page; Erase removes a mark or a selected element. */
 export type PickMode = "select" | "region" | "draw" | "erase";
 
 const MODES: { mode: PickMode; label: string; hint: string; control: ControlId; shortcut: ShortcutId }[] = [
 	{ mode: "select", label: "Select", hint: "Select an element", control: "browser.pick.select", shortcut: "browserPickSelect" },
 	{ mode: "region", label: "Region", hint: "Draw a box around an area", control: "browser.pick.region", shortcut: "browserPickRegion" },
 	{ mode: "draw", label: "Draw", hint: "Draw freehand", control: "browser.pick.draw", shortcut: "browserPickDraw" },
-	{ mode: "erase", label: "Erase", hint: "Remove a box or a line", control: "browser.pick.erase", shortcut: "browserPickErase" },
+	{ mode: "erase", label: "Erase", hint: "Remove a box, a line, or an element", control: "browser.pick.erase", shortcut: "browserPickErase" },
 ];
 
 /** The space kept around the marks in the attached image, in the page's CSS pixels. */
@@ -58,14 +60,15 @@ const fileName = (what: string): string => `Browser ${what} ${new Date().toLocal
 export const screenshotFile = (png: Uint8Array): File => new File([new Uint8Array(png)], fileName("screenshot"), { type: "image/png" });
 
 /**
- * `png`, all the page shows at the screen's density, with `marks` drawn on it in `color`, cut to the marks and a margin
- * around them, as an image file to attach. `pageWidth` is the page's CSS width, which gives the density.
+ * `png`, all the page shows at the screen's density, with `marks` drawn on it in `color`, cut to the marks, the
+ * `elements`, whose outlines the app drew itself, and a margin around them, as an image file to attach. `pageWidth` is
+ * the page's CSS width, which gives the density.
  */
-export async function annotationFile(png: Uint8Array, marks: readonly Mark[], pageWidth: number, color: string): Promise<File> {
+export async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements: readonly Area[], pageWidth: number, color: string): Promise<File> {
 	const bitmap = await createImageBitmap(new Blob([new Uint8Array(png)], { type: "image/png" }));
 	const scale = bitmap.width / pageWidth;
 	const bounds = unionArea(
-		marks.map(mark => mark.area),
+		[...marks.map(mark => mark.area), ...elements],
 		IMAGE_MARGIN,
 		pageWidth,
 		bitmap.height / scale,
@@ -106,15 +109,25 @@ type Drawing = { kind: "region"; from: Point; to: Point } | { kind: "stroke"; po
 
 interface AnnotationLayerProps {
 	mode: PickMode;
+	/** Where the elements Select picked show, which the card sits beside and Erase removes. */
+	elements: readonly PreviewElementBox[];
+	onDeselect: (id: number) => void;
 	/** Takes the marks, the comment typed beside them, the page's CSS width, and the color they were drawn in. */
 	onAttach: (marks: Mark[], comment: string, pageWidth: number, color: string) => void;
 }
 
+/** The smallest selected element under `at`, as the innermost of nested ones is the one meant. */
+const elementAt = (elements: readonly PreviewElementBox[], at: Point): PreviewElementBox | undefined =>
+	elements
+		.filter(box => at.x >= box.x && at.x <= box.x + box.width && at.y >= box.y && at.y <= box.y + box.height)
+		.sort((a, b) => a.width * a.height - b.width * b.height)[0];
+
 /**
- * Covers the page while picking: Region drags a box, Draw a line, and Erase removes the mark it clicks, until
- * **Attach** in the card beside them. Under Select, it lets the pointer through to react-grab and still shows the marks.
+ * Covers the page while picking: Region drags a box, Draw a line, and Erase removes the mark or selected element it
+ * clicks, until **Attach** in the card beside them. Under Select, it lets the pointer through to the app and still
+ * shows the marks.
  */
-export function AnnotationLayer({ mode, onAttach }: AnnotationLayerProps) {
+export function AnnotationLayer({ mode, elements, onDeselect, onAttach }: AnnotationLayerProps) {
 	const [marks, setMarks] = useState<Mark[]>([]);
 	const [drawing, setDrawing] = useState<Drawing | null>(null);
 	const [comment, setComment] = useState("");
@@ -127,7 +140,7 @@ export function AnnotationLayer({ mode, onAttach }: AnnotationLayerProps) {
 		return { x: event.clientX - box.left, y: event.clientY - box.top };
 	};
 	const bounds = unionArea(
-		marks.map(mark => mark.area),
+		[...marks.map(mark => mark.area), ...elements],
 		0,
 		Number.POSITIVE_INFINITY,
 		Number.POSITIVE_INFINITY,
@@ -144,7 +157,7 @@ export function AnnotationLayer({ mode, onAttach }: AnnotationLayerProps) {
 
 	const attach = (): void => {
 		const layer = layerRef.current;
-		if (marks.length === 0 || !layer) return;
+		if ((marks.length === 0 && elements.length === 0) || !layer) return;
 		onAttach(marks, comment.trim(), layer.clientWidth, getComputedStyle(layer).color);
 	};
 	const drawingArea = drawing?.kind === "region" && layerRef.current ? dragArea(drawing.from, drawing.to, layerRef.current.clientWidth, layerRef.current.clientHeight) : null;
@@ -162,7 +175,9 @@ export function AnnotationLayer({ mode, onAttach }: AnnotationLayerProps) {
 				const at = pointOf(event);
 				if (mode === "erase") {
 					const hit = markAt(marks, at);
+					const element = hit ? undefined : elementAt(elements, at);
 					if (hit) setMarks(marks.filter(mark => mark !== hit));
+					else if (element) onDeselect(element.id);
 					return;
 				}
 				event.currentTarget.setPointerCapture(event.pointerId);
@@ -199,7 +214,7 @@ export function AnnotationLayer({ mode, onAttach }: AnnotationLayerProps) {
 					<path d={pathOf(drawing.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
 				)}
 			</svg>
-			{marks.length > 0 && (
+			{(marks.length > 0 || elements.length > 0) && (
 				<div
 					ref={cardRef}
 					className={cn(
@@ -209,7 +224,7 @@ export function AnnotationLayer({ mode, onAttach }: AnnotationLayerProps) {
 					style={{ left: place?.x ?? 0, top: place?.y ?? 0 }}
 				>
 					<textarea
-						// Focused once the first mark is drawn, as in T3 Code, so the comment is typed next.
+						// Focused once the first mark is drawn or element selected, as in T3 Code, so the comment is typed next.
 						autoFocus
 						rows={1}
 						value={comment}

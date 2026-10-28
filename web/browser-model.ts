@@ -99,3 +99,34 @@ export function cardPlace(bounds: Area, size: { width: number; height: number },
 		y: Math.min(Math.max(gap, best.y), Math.max(gap, height - size.height - gap)),
 	};
 }
+
+/** What one **Attach** sends: the comment, the page, the selected elements, and how many boxes and lines it marked. */
+export interface Annotation {
+	comment: string;
+	page: { url: string; title: string };
+	elements: readonly { name: string; snippet: string }[];
+	regions: number;
+	strokes: number;
+}
+
+const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
+
+/**
+ * The chip's label and the text the prompt gets of `annotation`. The label is the comment, else the first element's
+ * name, else the page's title; the text holds the comment, the page, react-grab's text of each element, and what the
+ * attached picture marks.
+ */
+export function annotationText({ comment, page, elements, regions, strokes }: Annotation): { label: string; content: string } {
+	const [first] = elements;
+	const label =
+		comment.replace(/\s+/g, " ").trim() || (first ? (elements.length > 1 ? `${first.name} +${elements.length - 1}` : first.name) : page.title.trim() || "Browser annotation");
+	const marked = [elements.length > 0 && plural(elements.length, "outlined element", "outlined elements"), regions > 0 && plural(regions, "box", "boxes"), strokes > 0 && plural(strokes, "line", "lines")].filter(Boolean);
+	const lines = [
+		...(comment ? [comment, ""] : []),
+		`Annotated in the Browser on ${page.url}${page.title.trim() ? ` (${page.title.trim()})` : ""}.`,
+		...elements.flatMap((element, index) => ["", `Element ${index + 1}, ${element.name}:`, element.snippet]),
+		"",
+		`The attached picture shows ${marked.join(", ")}.`,
+	];
+	return { label, content: lines.join("\n") };
+}

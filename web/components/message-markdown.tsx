@@ -165,7 +165,7 @@ const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) =
 	);
 };
 
-/** Where a chip opens in the dashboard; `null` for a skill, command, file, folder, person, or Browser element, which have no page of their own, and for a todo not found. */
+/** Where a chip opens in the dashboard; `null` for a skill, command, file, folder, person, or Browser annotation, which have no page of their own, and for a todo not found. */
 function chipHref({ kind, label, target }: ChipProps, todos: UserTodoList | null): string | null {
 	switch (kind) {
 		case "todo":
@@ -183,7 +183,7 @@ function chipHref({ kind, label, target }: ChipProps, todos: UserTodoList | null
 		case "file":
 		case "directory":
 		case "person":
-		case "element":
+		case "annotation":
 			return null;
 		default: {
 			const unhandled: never = kind;
