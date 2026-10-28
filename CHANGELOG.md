@@ -5,6 +5,11 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- The Preview tab in the desktop app is now called Browser.
+- The Browser has a Start dev server button, which asks the session to start its app so the Browser can show it.
+- The Browser has a Full screen button; press it again or Escape to put it back in the sidebar.
+- The Browser's Open in browser button is now called Open in default browser.
+- A running session's name in the sidebar no longer leaves an empty gap where its green dot used to be.
 - In the desktop app, the greyed Back and Forward buttons still show their tooltip, and the command menu offers Go back and Go forward, now with arrow icons, only when there is somewhere to go.
 - Past sessions no longer list the quick one-off agent runs that other sessions start in the background, only sessions you had a conversation in.
 - The Files, Images, and Sources sections moved from above the message box into the Todos card, at the top right of the conversation or above its messages when the window is narrow.
