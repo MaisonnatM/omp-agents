@@ -1,5 +1,5 @@
 /**
- * `PreviewPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Preview
+ * `BrowserPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Browser
  * tab, where an element picked with react-grab lands in the session's composer.
  */
 import { ArrowLeft, ArrowRight, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
@@ -13,20 +13,20 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { appendToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { initialAddress, previewCandidates } from "../preview-model";
+import { initialAddress, browserCandidates } from "../browser-model";
 import { sessionProcessesStore } from "../reads";
 import { useWebview } from "../use-webview";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
 
-/** What Start dev server sends the session: a long-lived server it owns, so its port joins the Preview's candidates. */
+/** What Start dev server sends the session: a long-lived server it owns, so its port joins the Browser's candidates. */
 const START_SERVER_PROMPT =
-	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Preview can show it. Reply with its address.";
+	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Browser can show it. Reply with its address.";
 
-/** The window can show a Preview: the desktop app, from the build that added it. */
-export const PREVIEW_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
+/** The window can show a Browser: the desktop app, from the build that added it. */
+export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
 
-/** A toolbar control of the Preview, named by its tooltip. */
+/** A toolbar control of the Browser, named by its tooltip. */
 function ToolbarButton({ label, control, disabled, onClick, children }: {
 	label: string;
 	control: ControlId;
@@ -43,16 +43,16 @@ function ToolbarButton({ label, control, disabled, onClick, children }: {
 	);
 }
 
-/** The address each session's Preview last loaded, by omp session id, dropped once unused for 30 days. */
+/** The address each session's Browser last loaded, by omp session id, dropped once unused for 30 days. */
 const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 * 60 * 1000);
 
 /**
  * Live session `view`'s app in a `<webview>`, opened on the address last loaded for `sessionId`, else on the first port
  * its jobs and services listen on. Each element react-grab copies in it is appended to the view's composer.
  */
-export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
+export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
 	const { read } = sessionProcessesStore.use();
-	const candidates = useMemo(() => previewCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
+	const candidates = useMemo(() => browserCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
 	const [saved] = useState(() => addresses.get(sessionId));
 	const draftKey = liveDraftKey(view);
 	const webview = useWebview({
@@ -85,15 +85,15 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	};
 
 	return (
-		<section ref={sectionRef} aria-label="Preview" className="flex min-h-0 flex-1 flex-col bg-background">
+		<section ref={sectionRef} aria-label="Browser" className="flex min-h-0 flex-1 flex-col bg-background">
 			<div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border px-1.5">
-				<ToolbarButton label="Back" control="preview.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
+				<ToolbarButton label="Back" control="browser.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
 					<ArrowLeft />
 				</ToolbarButton>
-				<ToolbarButton label="Forward" control="preview.forward" disabled={!webview.ready || !webview.history.forward} onClick={webview.forward}>
+				<ToolbarButton label="Forward" control="browser.forward" disabled={!webview.ready || !webview.history.forward} onClick={webview.forward}>
 					<ArrowRight />
 				</ToolbarButton>
-				<ToolbarButton label="Reload" control="preview.reload" disabled={!webview.ready} onClick={webview.reload}>
+				<ToolbarButton label="Reload" control="browser.reload" disabled={!webview.ready} onClick={webview.reload}>
 					<RotateCw />
 				</ToolbarButton>
 				<form
@@ -115,7 +115,7 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				</form>
 				<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
 					<Tooltip content="Dev servers this session runs" side="bottom">
-						<DropdownMenuTrigger {...activityControl("preview.server")} render={<Button variant="ghost" size="icon-compact" aria-label="Dev servers" />}>
+						<DropdownMenuTrigger {...activityControl("browser.server")} render={<Button variant="ghost" size="icon-compact" aria-label="Dev servers" />}>
 							<Server />
 						</DropdownMenuTrigger>
 					</Tooltip>
@@ -129,21 +129,21 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 							</MenuItem>
 						))}
 						<MenuSeparator />
-						<MenuItem {...activityControl("preview.start-server")} onClick={startServer}>
+						<MenuItem {...activityControl("browser.start-server")} onClick={startServer}>
 							<Play />
 							Start dev server
 						</MenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<ToolbarButton label="Select element" control="preview.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
+				<ToolbarButton label="Select element" control="browser.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
 					<MousePointerClick />
 				</ToolbarButton>
-				<ToolbarButton label={fullScreen ? "Exit full screen" : "Full screen"} control="preview.full-screen" disabled={false} onClick={toggleFullScreen}>
+				<ToolbarButton label={fullScreen ? "Exit full screen" : "Full screen"} control="browser.full-screen" disabled={false} onClick={toggleFullScreen}>
 					{fullScreen ? <Minimize2 /> : <Maximize2 />}
 				</ToolbarButton>
 				<Tooltip content="Open in browser" side="bottom" disabled={!mounted}>
 					<Button
-						{...activityControl("preview.open-in-browser")}
+						{...activityControl("browser.open-in-browser")}
 						variant="ghost"
 						size="icon-compact"
 						aria-label="Open in browser"
@@ -164,7 +164,7 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 					<Server aria-hidden className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
 					<p className="text-xs text-muted-foreground/80">Ask the session to start one, or type its address above.</p>
-					<Button {...activityControl("preview.start-server")} variant="outline" size="sm" className="mt-1" onClick={startServer}>
+					<Button {...activityControl("browser.start-server")} variant="outline" size="sm" className="mt-1" onClick={startServer}>
 						<Play />
 						Start dev server
 					</Button>

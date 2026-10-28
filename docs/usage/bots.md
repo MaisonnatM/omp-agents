@@ -35,9 +35,9 @@
   Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  Its tabs are **Details**, **PRs**, **Preview**, and **Tickets**, and it remembers the one you last picked, apart from a session's.
+  Its tabs are **Details**, **PRs**, **Browser**, and **Tickets**, and it remembers the one you last picked, apart from a session's.
   **PRs** and **Tickets** show the pull requests and Linear issues the Bot's conversation worked on, as a session's do; **Tickets** shows only once the conversation worked on one.
-  **Preview**, in the desktop app while the Bot's session runs, shows the app that session runs; see [Preview](preview.md).
+  **Browser**, in the desktop app while the Bot's session runs, shows the app that session runs; see [Browser](browser.md).
   **Details** starts with the avatar, the name, whether the Bot's session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.

@@ -3,7 +3,7 @@
 - The right sidebar shows the focused view's session's pull requests and Linear issues, including those of its subagents, and in the desktop app the app a live session runs.
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
-- Its tabs are **PRs**, **Preview**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Tickets**, which shows only for a session with a Linear issue.
+- Its tabs are **PRs**, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Tickets**, which shows only for a session with a Linear issue.
   Each tab shows its name, and **PRs** and **Tickets** a badge with their item count.
   The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
   A saved choice of the former **Todos**, **Files**, **Media**, or **Processes** tab falls back to that default.
@@ -17,7 +17,7 @@
   The header and the tab bar stay at the top of the sidebar, and only the tab's content scrolls below them, as on the page.
   The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
-- **Preview** shows the app the session runs and adds an element you pick in it to the session's composer; see [Preview](preview.md).
+- **Browser** shows the app the session runs and adds an element you pick in it to the session's composer; see [Browser](browser.md).
 - **Tickets** shows the Linear issues the session and its subagents worked on, as its header lists them, the session's own first.
   An issue the session only read, or that its prompt or its branch names, shows once two of those agree; see [Pull requests](pull-requests.md).
   The first one shows until you click another identifier above it, or the issue's **Sub-issue of** link or one of its **Sub-issues**, which show it in place.

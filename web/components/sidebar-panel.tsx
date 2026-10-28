@@ -222,7 +222,7 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, children }: 
 		const timer = window.setTimeout(() => setMoving(false), MOTION_MS);
 		return () => window.clearTimeout(timer);
 	}, [moving, panel.open]);
-	// While a resize drag runs: a page in a `<webview>`, the Preview's, would take the pointer from the handle's capture once it crosses into it.
+	// While a resize drag runs: a page in a `<webview>`, the Browser's, would take the pointer from the handle's capture once it crosses into it.
 	const [dragging, setDragging] = useState(false);
 	return (
 		<div

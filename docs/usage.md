@@ -12,7 +12,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Session changes](usage/session-changes.md)
 - [Panes, splits, and links](usage/panes-splits-and-links.md)
 - [Conversations](usage/conversations.md)
-- [Preview](usage/preview.md)
+- [Browser](usage/browser.md)
 - [Ask about this](usage/ask-about-this.md)
 - [Composer](usage/composer.md)
 - [Send later](usage/send-later.md)

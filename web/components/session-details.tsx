@@ -4,16 +4,16 @@ import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
 import { PAGE_ICON } from "../page-icons";
 import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
-import { PREVIEW_AVAILABLE, PreviewPanel } from "./preview-panel";
+import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
 
 /** The right sidebar's tab, kept across views; the key keeps its old name, and a tab that no longer exists reads as PRs. */
 const TAB_KEY = "omp-agents.plan-tab";
 
-/** What a session worked on and runs, which its **PRs**, **Preview**, and **Tickets** tabs show. */
+/** What a session worked on and runs, which its **PRs**, **Browser**, and **Tickets** tabs show. */
 export interface SessionWork {
-	/** The session the tabs show; a change starts the PRs and Preview tabs afresh. */
+	/** The session the tabs show; a change starts the PRs and Browser tabs afresh. */
 	scope: string;
 	/** Marks the last turn as still running; a change also reads the shown pull request again. */
 	working: boolean;
@@ -24,12 +24,12 @@ export interface SessionWork {
 	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
 	workspace: string | null;
 	hosts: RosterHost[];
-	/** The live session or subagent the sidebar belongs to, whose composer the Preview's picks go to; `null` for a past one. */
+	/** The live session or subagent the sidebar belongs to, whose composer the Browser's picks go to; `null` for a past one. */
 	live: LiveView | null;
 }
 
-/** The **PRs** tab, the **Preview** tab for a live session in the desktop app, and the **Tickets** tab once the session worked on any. */
-export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live }: SessionWork): DetailsTab<"pull-requests" | "preview" | "tickets">[] {
+/** The **PRs** tab, the **Browser** tab for a live session in the desktop app, and the **Tickets** tab once the session worked on any. */
+export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets">[] {
 	return [
 		{
 			value: "pull-requests",
@@ -40,17 +40,17 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspa
 			scrollsItself: true,
 			content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={live?.instanceId ?? null} />,
 		},
-		...(PREVIEW_AVAILABLE && live !== null
+		...(BROWSER_AVAILABLE && live !== null
 			? [
 					{
-						value: "preview",
+						value: "browser",
 						icon: AppWindow,
-						name: "Preview",
-						control: "session-details.tab.preview",
+						name: "Browser",
+						control: "session-details.tab.browser",
 						count: 0,
 						scrollsItself: true,
 						keepMounted: true,
-						content: <PreviewPanel key={scope} view={live} sessionId={scope} />,
+						content: <BrowserPanel key={scope} view={live} sessionId={scope} />,
 					} as const,
 				]
 			: []),

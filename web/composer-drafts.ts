@@ -1,6 +1,6 @@
 /**
  * Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across
- * reloads, and the channel that appends text to it from elsewhere on the page, such as the session's Preview.
+ * reloads, and the channel that appends text to it from elsewhere on the page, such as the session's Browser.
  */
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import type { BotId } from "../src/shared/bots";

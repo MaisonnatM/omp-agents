@@ -34,7 +34,7 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
   Session notifications come from the main process, so the page needs no notification permission.
 - The app keeps its data, its localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
-- The page's **Preview** is a `<webview>` of a session's dev server, which `webviewTag` allows ([Preview](../usage/preview.md)).
+- The page's **Browser** is a `<webview>` of a session's dev server, which `webviewTag` allows ([Browser](../usage/browser.md)).
   `will-attach-webview` refuses one that a page other than the dashboard adds, or whose address is not on this computer (`isLoopbackUrl` in `src/shared/desktop-bridge.ts`), and forces its preload, context isolation, the sandbox, no Node, and the `persist:omp-preview` partition, so the app's cookies and storage outlive a launch apart from the dashboard's.
   Each attached guest hands a new window, and a navigation or redirect off this computer, to `shell.openExternal`; the page sets `allowpopups`, without which the guest drops a new window instead of asking.
   The partition's permission handlers grant only `clipboard-sanitized-write`, and only to a guest of the dashboard.

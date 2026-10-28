@@ -1,8 +1,8 @@
-/** The Preview's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
+/** The Browser's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
 import { useEffect, useRef, useState } from "react";
 import { isLoopbackUrl, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
 
-/** What the Preview drives of Electron's `<webview>`, which the page has no types for. */
+/** What the Browser drives of Electron's `<webview>`, which the page has no types for. */
 export interface WebviewTag extends HTMLWebViewElement {
 	canGoBack(): boolean;
 	canGoForward(): boolean;
@@ -18,7 +18,7 @@ type FailLoadEvent = Event & { errorCode: number; errorDescription: string; vali
 
 /** Chromium's code for a load that another one replaced, which is no failure to show. */
 const ERR_ABORTED = -3;
-const NOT_LOOPBACK = "The Preview loads only addresses on this computer, such as http://localhost:5173.";
+const NOT_LOOPBACK = "The Browser loads only addresses on this computer, such as http://localhost:5173.";
 
 /** `typed` as the address to load, with `http://` when it names no scheme, or `null` when it is not on this computer. */
 function addressOf(typed: string): string | null {
