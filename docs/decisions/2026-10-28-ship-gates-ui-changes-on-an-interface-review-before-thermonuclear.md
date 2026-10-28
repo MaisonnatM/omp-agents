@@ -26,6 +26,7 @@ The user keeps an `interface-review` skill that hands off to `better-interface` 
 
 `ship.ts` keeps a `REVIEWS` registry keyed by the stage that runs each review, and the publish gate, the widget, and the `ship_stage` gates loop over it, so a later review is one entry.
 Recording `thermonuclear` or `ready_gate` is refused while a needed interface box is missing.
+Recording `thermonuclear` now also needs a current PR status, since the interface review precedes it, so it is refused during a GitHub quota outage.
 With `.omp/ui-paths` committed, a change list GitHub cut short counts as needing the review, as it does for thermonuclear.
 The interface review waits for the user's go on the direction, like thermonuclear, since its findings can redesign the UI.
 The `interface-reviewer` agent reports a missing `interface-review` or `better-interface` skill and stops rather than improvising a review.

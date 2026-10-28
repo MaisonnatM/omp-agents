@@ -2,9 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { commands } from "./agent/extensions/shell/commands";
 
-type ReviewStage = "interface_review" | "thermonuclear";
-type Review = { label: string; box: string; paths: string; withoutPaths: boolean };
-type Reviews = Record<ReviewStage, { needed: boolean; done: boolean }>;
+type Review = { label: string; box: string; pathsFile: string; withoutPaths: boolean };
+type Reviews = Record<string, { needed: boolean; done: boolean }>;
 // Imported by path, not statically: a static import pulls the extension into `tsc`, where its `@oh-my-pi/pi-coding-agent` import does not resolve.
 const extension: {
 	ghPr(words: string[], sub: "create" | "ready"): string[] | undefined;
@@ -12,10 +11,10 @@ const extension: {
 	selectorOwner(selector: string[]): string | undefined;
 	otherOwner(owner: string | undefined, repo: string | undefined): boolean;
 	publishBlocker(body: string, reviews: Reviews): string | undefined;
-	reviewsOf(body: string, files: string[], changedFiles: number, read: (paths: string) => string | undefined): Reviews;
+	reviewsOf(body: string, files: string[], changedFiles: number, read: (pathsFile: string) => string | undefined): Reviews;
 	reviewNeeded(review: Review, paths: string | undefined, files: string[], changedFiles: number): boolean;
 	authDiagnosis(credentials: { host: string; state: string; active: boolean; login: string; tokenSource: string }[], dotenvFiles: Record<string, string>): string | undefined;
-	REVIEWS: Record<ReviewStage, Review>;
+	REVIEWS: Record<string, Review>;
 	PROOF_BOX: string;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
 const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewsOf, reviewNeeded, authDiagnosis, REVIEWS, PROOF_BOX } = extension;

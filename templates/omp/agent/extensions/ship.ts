@@ -27,14 +27,14 @@ interface Review {
 	label: string;
 	box: string;
 	/** The repository's file of globs whose changes need the review; see `reviewNeeded`. */
-	paths: string;
-	/** Needed when the repository commits no `paths` file. */
+	pathsFile: string;
+	/** Needed when the repository commits no `pathsFile`. */
 	withoutPaths: boolean;
 }
 /** Each review by the stage that runs it. */
 export const REVIEWS = {
-	interface_review: { label: "Interface review", box: "- [x] Interface review", paths: ".omp/ui-paths", withoutPaths: false },
-	thermonuclear: { label: "Thermonuclear", box: "- [x] Thermo-nuclear code quality review", paths: ".omp/review-paths", withoutPaths: true },
+	interface_review: { label: "Interface review", box: "- [x] Interface review", pathsFile: ".omp/ui-paths", withoutPaths: false },
+	thermonuclear: { label: "Thermonuclear", box: "- [x] Thermo-nuclear code quality review", pathsFile: ".omp/review-paths", withoutPaths: true },
 } as const satisfies Partial<Record<Stage, Review>>;
 export type ReviewStage = keyof typeof REVIEWS;
 const isReviewStage = (stage: string): stage is ReviewStage => Object.hasOwn(REVIEWS, stage);
@@ -68,8 +68,8 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'implement', issue}).",
 	implement: "Implement and commit on the issue's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
-	interface_review: `If the status says no changed file matches \`${REVIEWS.interface_review.paths}\`, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
-	thermonuclear: `If the status says no changed file matches \`${REVIEWS.thermonuclear.paths}\`, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
+	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, ask the user to approve, then run \`gh pr ready <N>\`.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
@@ -124,7 +124,7 @@ interface PrResponse {
 }
 
 /** The PR's status; `read` returns the text of a paths file in the checkout, `undefined` when it has none. */
-export function parsePr(pr: PrResponse, read: (paths: string) => string | undefined): PrStatus {
+export function parsePr(pr: PrResponse, read: (pathsFile: string) => string | undefined): PrStatus {
 	const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup?.state;
 	const threads = pr.reviewThreads.nodes;
 	return {
@@ -173,9 +173,9 @@ export function renderLines(s: ShipState): string[] {
 	if (s.stage === "live" && s.work) lines.push(`Working on: ${LABEL[s.work]}`);
 	for (const stage of REVIEW_STAGES) {
 		const review = s.prStatus?.reviews[stage];
-		const { label, paths } = REVIEWS[stage];
-		if (review?.needed && !review.done && at >= STAGES.indexOf(stage) && at <= STAGES.indexOf("ready_gate")) lines.push(`${label} checkbox missing from the PR body`);
-		if (review && !review.needed && s.stage === stage) lines.push(`${label} not needed: no changed file matches ${paths}`);
+		const { label, pathsFile } = REVIEWS[stage];
+		if (review?.needed && !review.done && reviewsBefore(s.stage).includes(stage) && at <= STAGES.indexOf("ready_gate")) lines.push(`${label} checkbox missing from the PR body`);
+		if (review && !review.needed && s.stage === stage) lines.push(`${label} not needed: \`${pathsFile}\` lists no changed file`);
 	}
 	if (s.note) lines.push(`Note: ${s.note}`);
 	return lines;
@@ -242,7 +242,7 @@ export function otherOwner(owner: string | undefined, repo: string | undefined):
 }
 
 /**
- * Whether a PR needs `review`: when the repository commits no `review.paths` (`paths` is `undefined`), only if the review has `withoutPaths`;
+ * Whether a PR needs `review`: when the repository commits no `review.pathsFile` (`paths` is `undefined`), only if the review has `withoutPaths`;
  * else always when GitHub listed fewer `files` than the PR's `changedFiles`, and otherwise when a changed repository-relative path matches one of its globs.
  * The file lists one glob per line; `#` starts a comment and blank lines are ignored.
  */
@@ -254,24 +254,35 @@ export function reviewNeeded(review: Review, paths: string | undefined, files: s
 }
 
 /** Each review's state for a PR with this body that changes `files`; `read` returns the text of a paths file in the checkout, `undefined` when it has none. */
-export function reviewsOf(body: string, files: string[], changedFiles: number, read: (paths: string) => string | undefined): Reviews {
-	return byReview(stage => ({ needed: reviewNeeded(REVIEWS[stage], read(REVIEWS[stage].paths), files, changedFiles), done: body.includes(REVIEWS[stage].box) }));
+export function reviewsOf(body: string, files: string[], changedFiles: number, read: (pathsFile: string) => string | undefined): Reviews {
+	return byReview(stage => ({ needed: reviewNeeded(REVIEWS[stage], read(REVIEWS[stage].pathsFile), files, changedFiles), done: body.includes(REVIEWS[stage].box) }));
+}
+
+/** The reviews whose stages come before `stage`. */
+function reviewsBefore(stage: Stage): ReviewStage[] {
+	return REVIEW_STAGES.filter(review => STAGES.indexOf(review) < STAGES.indexOf(stage));
 }
 
 /** The first review, in stage order, that runs before `stage` and that the PR needs without its box. */
 function missingReview(reviews: Reviews, stage: Stage): ReviewStage | undefined {
-	return REVIEW_STAGES.find(review => STAGES.indexOf(review) < STAGES.indexOf(stage) && reviews[review].needed && !reviews[review].done);
+	return reviewsBefore(stage).find(review => reviews[review].needed && !reviews[review].done);
 }
 
-/** The text of the file at `paths` from the top of the checkout holding `dir`, or `undefined` when it has none. */
-function readPaths(dir: string, paths: string): string | undefined {
+/** A reader returning the text of a paths file from the top of the checkout holding `dir`, or `undefined` when it has none. */
+function checkoutReader(dir: string): (pathsFile: string) => string | undefined {
+	let root: string | undefined;
 	for (let at = dir; ; at = dirname(at)) {
 		if (existsSync(join(at, ".git"))) {
-			const file = join(at, paths);
-			return existsSync(file) ? readFileSync(file, "utf8") : undefined;
+			root = at;
+			break;
 		}
-		if (dirname(at) === at) return undefined;
+		if (dirname(at) === at) break;
 	}
+	return pathsFile => {
+		if (root === undefined) return undefined;
+		const file = join(root, pathsFile);
+		return existsSync(file) ? readFileSync(file, "utf8") : undefined;
+	};
 }
 
 /** Why a PR with this body may not go live, or `undefined` when it may: it needs the box of every review `reviews` calls for, and no unchecked proof box. */
@@ -350,13 +361,13 @@ export default function ship(pi: ExtensionAPI) {
 		state: z.enum(["OPEN", "MERGED", "CLOSED"]), draft: z.boolean(), conflicts: z.boolean(), behind: z.boolean(),
 		unresolvedThreads: z.number().int(), moreThreads: z.boolean(), changesRequested: z.boolean(), approved: z.boolean(),
 		checks: z.enum(["pass", "fail", "pending", "none"]),
-		// A status recorded before the reviews were per stage needed the thermonuclear review; the next poll replaces a restored status.
-		reviews: z.object(byReview(() => z.object({ needed: z.boolean(), done: z.boolean() }))).default(() => byReview(stage => ({ needed: stage === "thermonuclear", done: false }))),
+		reviews: z.object(byReview(() => z.object({ needed: z.boolean(), done: z.boolean() }))),
 	});
 	const stateSchema = z.object({
 		stage: z.enum(STAGES), work: z.enum(LIVE_WORK).optional(), issue: z.string().optional(),
 		repo: z.string().optional(), pr: z.number().int().optional(), note: z.string().optional(),
-		prStatus: prStatusSchema.optional(), updatedAt: z.string(),
+		// A status recorded before the reviews were per stage is dropped; the next poll refetches it.
+		prStatus: prStatusSchema.optional().catch(undefined), updatedAt: z.string(),
 	});
 	const viewSchema = z.object({ body: z.string(), changedFiles: z.number().int(), files: z.array(z.object({ path: z.string() })) });
 	let state: ShipState | undefined;
@@ -461,7 +472,7 @@ export default function ship(pi: ExtensionAPI) {
 			return render(ctx);
 		}
 		refreshFailure = undefined;
-		const prStatus = parsePr(parsed.data, paths => readPaths(ctx.cwd, paths));
+		const prStatus = parsePr(parsed.data, checkoutReader(ctx.cwd));
 		const merged = prStatus.state === "MERGED";
 		const stage: Stage = merged ? "merged" : state.stage;
 		if (JSON.stringify(prStatus) === JSON.stringify(state.prStatus) && stage === state.stage) return render(ctx);
@@ -493,7 +504,7 @@ export default function ship(pi: ExtensionAPI) {
 		const parsed = viewSchema.safeParse(view);
 		if (!parsed.success) return "Could not read the PR body and changed files to check its review and proof boxes: gh returned an unexpected answer.";
 		const { body, files, changedFiles } = parsed.data;
-		return publishBlocker(body, reviewsOf(body, files.map(file => file.path), changedFiles, paths => readPaths(cwd, paths)));
+		return publishBlocker(body, reviewsOf(body, files.map(file => file.path), changedFiles, checkoutReader(cwd)));
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -592,13 +603,13 @@ export default function ship(pi: ExtensionAPI) {
 			if (stage || issue || pr || repo || note !== undefined) {
 				if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
 					const reviews = state?.prStatus?.reviews;
-					if (!reviews && REVIEW_STAGES.some(review => STAGES.indexOf(review) < STAGES.indexOf(stage))) {
+					if (!reviews && reviewsBefore(stage).length > 0) {
 						return { content: [{ type: "text", text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
 					}
 					const missing = reviews && missingReview(reviews, stage);
 					if (missing) {
-						const { label, box, paths, withoutPaths } = REVIEWS[missing];
-						return { content: [{ type: "text", text: `The PR must have \`${box}\` after the ${label} fixes are pushed, since a changed file matches \`${paths}\`${withoutPaths ? ` or the repository has no \`${paths}\`` : ""}.` }], isError: true };
+						const { label, box, pathsFile, withoutPaths } = REVIEWS[missing];
+						return { content: [{ type: "text", text: `The PR must have \`${box}\` after the ${label} fixes are pushed, since a changed file matches \`${pathsFile}\`${withoutPaths ? ` or the repository has no \`${pathsFile}\`` : ""}.` }], isError: true };
 					}
 				}
 				if ((stage === "live" || stage === "rebase" || stage === "fix_comments" || stage === "fix_ci") && (!state?.prStatus || state.prStatus.draft || state.prStatus.state !== "OPEN")) {

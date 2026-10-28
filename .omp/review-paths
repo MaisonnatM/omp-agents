@@ -1,5 +1,6 @@
 # A pull request touching a file these globs match needs the thermonuclear review; see templates/omp/agent/APPEND_SYSTEM.md.
 .omp/review-paths
+.omp/ui-paths
 
 # Shared contracts between the server, the page, and transports.
 src/shared/protocol.ts
