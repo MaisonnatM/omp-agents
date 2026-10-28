@@ -1,4 +1,4 @@
-import { ChevronRight, Circle, CircleAlert, CircleCheck, CircleSlash, ListChecks, LoaderCircle, type LucideIcon } from "lucide-react";
+import { ChevronRight, ListChecks } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,13 +12,52 @@ import { latestTodos } from "../transcript-view";
 /** Whether the card shows the whole list, kept for every transcript; it starts folded to its summary. */
 const OPEN_KEY = "omp-agents.todos-card-open";
 
-const STATUS: Record<TodoTask["status"], { icon: LucideIcon; label: string; className: string }> = {
-	pending: { icon: Circle, label: "To do", className: "text-muted-foreground/60" },
-	in_progress: { icon: LoaderCircle, label: "In progress", className: "text-blue-500 motion-safe:animate-spin" },
-	completed: { icon: CircleCheck, label: "Done", className: "text-emerald-500" },
-	blocked: { icon: CircleAlert, label: "Blocked", className: "text-amber-500" },
-	abandoned: { icon: CircleSlash, label: "Dropped", className: "text-muted-foreground/60" },
+const STATUS_LABEL: Record<TodoTask["status"], string> = {
+	pending: "To do",
+	in_progress: "In progress",
+	completed: "Done",
+	blocked: "Blocked",
+	abandoned: "Dropped",
 };
+
+/** Each status has its own shape, so none rests on color: a ring, a spinning arc, a checked disc, a disc with a bang, a dashed ring. */
+function StatusGlyph({ status }: { status: TodoTask["status"] }) {
+	const shape = (() => {
+		switch (status) {
+			case "pending":
+				return <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/50" />;
+			case "in_progress":
+				return (
+					<g className="origin-center text-foreground [transform-box:fill-box] motion-safe:animate-spin">
+						<circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.2" />
+						<path d="M8 1.75a6.25 6.25 0 0 1 6.25 6.25" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+					</g>
+				);
+			case "completed":
+				return (
+					<>
+						<circle cx="8" cy="8" r="7" className="fill-emerald-500" />
+						<path d="M5 8.25 7.1 10.3 11 6" fill="none" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="stroke-popover" />
+					</>
+				);
+			case "blocked":
+				return (
+					<>
+						<circle cx="8" cy="8" r="7" className="fill-amber-500" />
+						<path d="M8 4.5v4" fill="none" strokeWidth="1.6" strokeLinecap="round" className="stroke-popover" />
+						<circle cx="8" cy="11.25" r="0.9" className="fill-popover" />
+					</>
+				);
+			case "abandoned":
+				return <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.2 2.2" className="text-muted-foreground/50" />;
+		}
+	})();
+	return (
+		<svg viewBox="0 0 16 16" role="img" aria-label={STATUS_LABEL[status]} className="size-4 shrink-0">
+			{shape}
+		</svg>
+	);
+}
 
 const isClosed = (task: TodoTask): boolean => task.status === "completed" || task.status === "abandoned";
 
@@ -43,29 +82,41 @@ function TaskText({ text }: { text: string }) {
 }
 
 function TaskRow({ task }: { task: TodoTask }) {
-	const { icon: Icon, label, className } = STATUS[task.status];
-	const current = task.status === "in_progress" || task.status === "blocked";
+	const active = task.status === "in_progress";
 	return (
-		<li className={cn("flex items-start gap-2 rounded-md px-2 py-1 text-sm", current && "bg-muted/60 py-1.5")}>
-			<Icon aria-label={label} role="img" className={cn("mt-0.5 size-4 shrink-0", className)} />
-			<span className="min-w-0 flex-1">
-				<span className={cn("break-words", isClosed(task) ? "text-muted-foreground" : "text-foreground", current && "font-medium")}>
+		<li className="grid grid-cols-[1rem_minmax(0,1fr)] gap-x-3 px-3 py-1.5 text-sm leading-5">
+			<span className="flex h-5 items-center">
+				<StatusGlyph status={task.status} />
+			</span>
+			<span className="min-w-0">
+				<span
+					className={cn(
+						"break-words",
+						isClosed(task) ? "text-muted-foreground" : "text-foreground",
+						task.status === "abandoned" && "line-through decoration-muted-foreground/50",
+						active && "shimmer motion-reduce:shimmer-none [&_code]:[-webkit-text-fill-color:currentColor]",
+					)}
+				>
 					<TaskText text={task.content} />
 				</span>
-				{task.blocker && <span className="mt-0.5 block text-xs text-amber-600 dark:text-amber-400">{task.blocker}</span>}
+				{task.blocker && (
+					<span className="mt-0.5 block text-xs text-muted-foreground">
+						<span className="font-medium text-amber-600 dark:text-amber-400">Blocked</span> {task.blocker}
+					</span>
+				)}
 			</span>
 		</li>
 	);
 }
 
-/** A fold with a chevron; `summary` stays visible while it is shut. */
-function Fold({ summary, children, className }: { summary: ReactNode; children: ReactNode; className?: string }) {
+/** A fold with a chevron in the glyph column; `summary` stays visible while it is shut. */
+function Fold({ summary, children }: { summary: ReactNode; children: ReactNode }) {
 	const [open, setOpen] = useState(false);
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
-			<CollapsibleTrigger className={cn("flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted/60", className)}>
-				<ChevronRight aria-hidden className={cn("size-3.5 shrink-0 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
-				{summary}
+			<CollapsibleTrigger className="grid w-full grid-cols-[1rem_minmax(0,1fr)] items-center gap-x-3 px-3 py-1.5 text-left text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+				<ChevronRight aria-hidden className={cn("mx-auto size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+				<span className="flex min-w-0 items-center gap-2">{summary}</span>
 			</CollapsibleTrigger>
 			<CollapsibleContent>{children}</CollapsibleContent>
 		</Collapsible>
@@ -84,11 +135,11 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 	const closed = phase.tasks.filter(isClosed);
 	const open = phase.tasks.filter(task => !isClosed(task));
 	const tasks = (list: readonly TodoTask[]) => (
-		<ul className="flex flex-col">
+		<ol className="flex flex-col">
 			{list.map((task, at) => (
 				<TaskRow key={`${at}:${task.content}`} task={task} />
 			))}
-		</ul>
+		</ol>
 	);
 	if (open.length === 0) {
 		return (
@@ -96,7 +147,6 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 				<Fold
 					summary={
 						<>
-							<CircleCheck aria-hidden className="size-3.5 shrink-0 text-emerald-500" />
 							<span className="truncate font-medium">{phase.name}</span>
 							<PhaseCount done={closed.length} total={phase.tasks.length} />
 						</>
@@ -108,13 +158,13 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 		);
 	}
 	return (
-		<section aria-label={label} className="flex flex-col gap-0.5">
-			<h3 className="flex items-baseline gap-2 px-2 text-xs font-medium text-muted-foreground">
+		<section aria-label={label} className="flex flex-col">
+			<h3 className="flex items-baseline gap-2 py-1 pr-3 pl-10 text-xs font-medium text-muted-foreground">
 				<span className="truncate">{phase.name}</span>
 				<PhaseCount done={closed.length} total={phase.tasks.length} />
 			</h3>
 			{tasks(open)}
-			{closed.length > 0 && <Fold summary={`${closed.length} completed`}>{tasks(closed)}</Fold>}
+			{closed.length > 0 && <Fold summary={`${closed.length} done`}>{tasks(closed)}</Fold>}
 		</section>
 	);
 }
@@ -135,28 +185,37 @@ export function SessionTodosCard({ items }: { items: readonly Item[] }) {
 			open={open}
 			onOpenChange={setOpen}
 			aria-label="Todos"
-			className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-5rem)] w-72 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur"
+			className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-5rem)] w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur"
 		>
-			<CollapsibleTrigger {...activityControl("transcript.todos")} className="flex shrink-0 flex-col gap-1.5 px-3 py-2 text-left outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
-				<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-					<ListChecks aria-hidden className="size-3.5 shrink-0" />
+			<CollapsibleTrigger {...activityControl("transcript.todos")} className="relative grid shrink-0 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 pt-2.5 pb-3 text-left outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+				<ListChecks aria-hidden className="size-4 text-muted-foreground" />
+				<span className="truncate text-sm">
 					<span className="font-medium text-foreground">Todos</span>
-					<span className="ml-auto tabular-nums">
-						{done} of {all.length}
-					</span>
-					<ChevronRight aria-hidden className={cn("size-3.5 shrink-0 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+					<span className="text-muted-foreground"> · {all.length} tasks</span>
 				</span>
-				<span role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={all.length} aria-valuenow={done} className="block h-px w-full bg-border">
-					<span className="block h-px bg-foreground transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${all.length === 0 ? 0 : (done / all.length) * 100}%` }} />
+				<span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+					{done} of {all.length}
+					<ChevronRight aria-hidden className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
 				</span>
 				{current && (
-					<span className="truncate text-xs text-muted-foreground">
+					<span className="col-start-2 col-end-4 truncate text-sm text-foreground/80">
 						<TaskText text={current.content} />
 					</span>
 				)}
+				<span
+					role="progressbar"
+					aria-label="Tasks done"
+					aria-valuemin={0}
+					aria-valuemax={all.length}
+					aria-valuenow={done}
+					aria-valuetext={`${done} of ${all.length} tasks done`}
+					className="absolute inset-x-0 bottom-0 h-0.5 bg-border/70"
+				>
+					<span className="block h-full rounded-r-full bg-foreground/70 transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${all.length === 0 ? 0 : (done / all.length) * 100}%` }} />
+				</span>
 			</CollapsibleTrigger>
-			<CollapsibleContent className="min-h-0 overflow-y-auto border-t border-border [scrollbar-width:thin]">
-				<div className="flex flex-col gap-3 p-1.5 pb-2">
+			<CollapsibleContent className="min-h-0 overflow-y-auto [scrollbar-width:thin]">
+				<div className="flex flex-col gap-2 py-1.5">
 					{phases.map((phase, index) => (
 						<Phase key={`${index}:${phase.name}`} phase={phase} label={phase.name || `Phase ${index + 1}`} />
 					))}

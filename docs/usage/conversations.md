@@ -54,8 +54,9 @@
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
 - Once the view's agent made a todo list, a **Todos** card floats at the conversation's top right with the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
   Click the card to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
-  Unfolded, each phase shows its done count and its open tasks first, with the in-progress or blocked task highlighted and a blocked task's reason under it; its done and dropped tasks fold into an **N completed** row.
-  A phase with every task done folds to one line with a check; click it to open it.
+  Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
+  Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
+  A phase with every task done folds to one line; click it to open it.
   Task text shows its Markdown, such as code and bold.
   It follows the agent's calls while the turn runs, and a subagent's view shows that subagent's own list.
   This list is the agent's own and is separate from your Todo page.
