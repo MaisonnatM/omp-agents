@@ -10,6 +10,7 @@ export interface WebviewTag extends HTMLWebViewElement {
 	goForward(): void;
 	reload(): void;
 	loadURL(url: string): Promise<void>;
+	getURL(): string;
 	executeJavaScript(code: string, userGesture?: boolean): Promise<unknown>;
 }
 type IpcMessageEvent = Event & { channel: string; args: unknown[] };
@@ -77,7 +78,8 @@ export function useWebview({ initial, onPick, onNavigate }: WebviewOptions) {
 		const onMessage = (event: Event): void => {
 			const { channel, args } = event as IpcMessageEvent;
 			const content = args[0];
-			if (channel === PREVIEW_GRAB_CHANNEL && typeof content === "string") latest.current.onPick(content);
+			// A sign-in takes the guest to other sites, which must not write into the composer.
+			if (channel === PREVIEW_GRAB_CHANNEL && typeof content === "string" && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
 		};
 		const listeners: [string, (event: Event) => void][] = [
 			["dom-ready", onReady],

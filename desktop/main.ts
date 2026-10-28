@@ -201,10 +201,15 @@ async function connect(win: BrowserWindow): Promise<void> {
 	win.loadURL(`${ORIGIN}/`).catch(() => {});
 }
 
+/** Whether `url` is an http or https address. */
+function isWebUrl(url: string): boolean {
+	const protocol = URL.parse(url)?.protocol;
+	return protocol === "http:" || protocol === "https:";
+}
+
 /** Opens a web address in the default browser; any other scheme goes nowhere. */
 function openOutside(url: string): void {
-	const protocol = URL.parse(url)?.protocol;
-	if (protocol === "http:" || protocol === "https:") void shell.openExternal(url);
+	if (isWebUrl(url)) void shell.openExternal(url);
 }
 
 /** `url` as the window loads it when it names the dashboard's page, `${ORIGIN}/` with any hash, else `null`. */
@@ -296,24 +301,28 @@ function createWindow(): BrowserWindow {
 		const items = contextMenuItems(params, contents);
 		if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
 	});
-	// The Preview's webview: whatever the page asks, it gets our preload in the sandbox, its own session, and a loopback address.
+	// The Browser's webview: whatever the page asks, it gets our preload in the sandbox, its own session, and a loopback address to start on.
 	contents.on("will-attach-webview", (event, prefs, params) => {
 		Object.assign(prefs, { preload: PREVIEW_PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, partition: PREVIEW_PARTITION });
 		params.partition = PREVIEW_PARTITION;
 		if (!isDashboard(contents.getURL()) || !isLoopbackUrl(params.src ?? "")) event.preventDefault();
 	});
 	contents.on("did-attach-webview", (_event, guest) => {
-		guest.setWindowOpenHandler(({ url }) => {
+		// A sign-in popup stays in the app, in the Browser's session, so it can hand its result back to its opener; a link opened as a tab goes to the browser.
+		guest.setWindowOpenHandler(({ url, disposition }) => {
+			if (disposition === "new-window" && isWebUrl(url)) {
+				return { action: "allow", overrideBrowserWindowOptions: { parent: win, webPreferences: { partition: PREVIEW_PARTITION, contextIsolation: true, sandbox: true, nodeIntegration: false } } };
+			}
 			openOutside(url);
 			return { action: "deny" };
 		});
-		const keepLoopback = (navigation: Electron.Event<{ url: string }>): void => {
-			if (isLoopbackUrl(navigation.url)) return;
+		// A sign-in leaves this computer for its provider and comes back, so the guest follows any web address in place.
+		const keepWeb = (navigation: Electron.Event<{ url: string }>): void => {
+			if (isWebUrl(navigation.url)) return;
 			navigation.preventDefault();
-			openOutside(navigation.url);
 		};
-		guest.on("will-navigate", keepLoopback);
-		guest.on("will-redirect", keepLoopback);
+		guest.on("will-navigate", keepWeb);
+		guest.on("will-redirect", keepWeb);
 	});
 	/** The token the preload last wrote into the page, so a sign-in reloads the page only for a token it has not tried. */
 	let handedOut: string | null = null;
