@@ -20,7 +20,7 @@
   Cmd+E still opens or closes the group.
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
   A tool group that spawned subagents stays open.
-  In a live session or subagent, each id is a link with the subagent's status dot (green running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
+  In a live session or subagent, each id is a link with the subagent's status dot (none while running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
   Click it to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in the app window in place of what it shows.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.

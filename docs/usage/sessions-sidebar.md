@@ -6,8 +6,8 @@
   The **Bots** tab lists your Bots, which the **Sessions** tab does not; see [Bots](bots.md).
   Switching opens the tab you last left in that group, else its first tab, and the switch follows any page you open, so G then N or a link to a note turns it to **Ops**.
   A side whose tabs are all hidden or signed out is disabled.
-- The dot before each session shows its state.
-  Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
+- The dot before each session shows when it waits on you.
+  A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of its working directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows the workspace's name as its label, with no badge.

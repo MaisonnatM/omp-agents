@@ -9,6 +9,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Past sessions show the Todos card too, with their files, images, and sources.
 - Show todos card in Settings → Preferences now hides only the todo list, so the card's Files, Images, and Sources sections stay.
 - Sections you folded stay folded after the move.
+- A working session no longer shows a green dot, so the blue dot alone marks a session waiting on you.
 - While you are still trying out a design with an agent, it now also waits for your go on the direction before writing tests for it.
 - /ship now runs an interface review before the deep code review when a pull request changes files a project lists as interface files, and holds the pull request back from going live until its fixes are pushed.
 - That interface review also checks that new screens reuse the app's existing components, colors, and sizes, and look like the screens next to them, and tells you when a pull request brings a new way of showing something, such as cards for a list in an app whose lists are all tables.

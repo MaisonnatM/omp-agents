@@ -5,8 +5,9 @@ import { cn } from "@/lib/utils";
 type Status = HostStatus | AgentStatus;
 
 const DOTS: Record<Status, { label: string; className: string }> = {
-	working: { label: "working", className: "bg-emerald-500 shadow-[0_0_0_2px] shadow-emerald-500/25" },
-	running: { label: "running", className: "bg-emerald-500 shadow-[0_0_0_2px] shadow-emerald-500/25" },
+	// A running agent needs nothing from you, so its slot stays empty and only an idle one, waiting on you, lights up.
+	working: { label: "working", className: "" },
+	running: { label: "running", className: "" },
 	"needs-input": { label: "needs input", className: "bg-amber-500 shadow-[0_0_0_2px] shadow-amber-500/30" },
 	idle: { label: "idle", className: "bg-blue-500 shadow-[0_0_0_2px] shadow-blue-500/25" },
 	parked: { label: "parked", className: "border border-muted-foreground/60" },

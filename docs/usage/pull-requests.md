@@ -81,7 +81,7 @@
   Within a section, a stack's pull requests sit together, top first, where its first one would, and a line joins each to the one below it.
   A row shows one session chip: a running session first, since one may be working on the pull request now, then one that submitted it, then one that worked on it.
   A submitter's chip is filled and a worker's chip is outlined, and a chip's tooltip says which it is.
-  A running session's chip starts with the sidebar's status dot: green while it works, amber while it waits on a question, blue once its turn ended.
+  A running session's chip starts with the sidebar's status dot: none while it works, amber while it waits on a question, blue once its turn ended.
   In the sidebar the chip shows only an agent icon and that dot, with the session's name in its tooltip; the table shows the name.
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
   A pull request whose **Review** session saved a review draft you have not posted shows a violet **Review draft** tag before its number, in the sidebar and in the table.
