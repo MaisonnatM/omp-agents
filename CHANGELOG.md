@@ -9,6 +9,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The session details sidebar, and the Browser in it, now widens to 960 pixels, as far as the conversation keeps 480.
 - Behind the scenes: merging a branch into main without a line here now stops at the merge, and a fast-forward without one warns, so the line goes on the branch instead of a fix-up after it.
 - Fixed: a todo an agent files under a category you don't have now lands in your list with no category instead of failing.
+- Fixed: /ship no longer refuses to put a pull request live, or to check its review boxes, when a project's settings file holds an old GitHub token; it uses your GitHub sign-in instead.
 - A session running /ship now shows a Ship section in its todos card, with the current stage and a progress bar; unfold it to see every stage as a step.
 - Notes, Calendar, and Email moved to buttons in the header beside the command menu, replacing the Dev and Ops switch.
 - Cmd+1 through Cmd+5 now count the tabs of the sidebar's bar: Pull requests, Tickets, Bots, Sessions, and Todo.
