@@ -1,7 +1,7 @@
 /**
  * What the desktop shell's preload (`desktop/preload.ts`) gives the page as `window.ompDesktop`: the Dock badge and the
  * system notifications of the sessions that need you, which the shell's main process (`desktop/attention.ts`) shows,
- * and the sign-in of a page that holds no token the server takes.
+ * the sign-in of a page that holds no token the server takes, and what the page's Preview and the shell agree on.
  */
 import { fields, type Guard, isString, oneOf, optional } from "../json";
 
@@ -14,6 +14,18 @@ export const SOUND_CHANNEL = "omp-agents:sound";
 export const SIGN_IN_CHANNEL = "omp-agents:sign-in";
 /** Asked synchronously by the preload before the page's scripts run: the localStorage entries that sign the page in, or `null`. */
 export const ACCESS_CHANNEL = "omp-agents:access";
+/** The `ipc-message` channel of the Preview's webview, which carries each element react-grab copied in it, and the key of the page's message to its preload. */
+export const PREVIEW_GRAB_CHANNEL = "omp-agents:preview-grab";
+/** The Preview webview's session, apart from the dashboard's, and kept across launches, so a sign-in to the app lasts. */
+export const PREVIEW_PARTITION = "persist:omp-preview";
+
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** Whether `url` is an http or https address on this computer, the only kind the Preview loads. */
+export function isLoopbackUrl(url: string): boolean {
+	const parsed = URL.parse(url);
+	return (parsed?.protocol === "http:" || parsed?.protocol === "https:") && LOOPBACK_HOSTS.has(parsed.hostname);
+}
 
 /** What a session notification plays: `off` for nothing, `default` for the system's sound, else one of macOS's sounds in `/System/Library/Sounds`. */
 export const NOTIFICATION_SOUNDS = ["off", "default", "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink"] as const;
@@ -45,4 +57,6 @@ export interface DesktopBridge {
 	signIn?(): void;
 	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
 	titleBar?: boolean;
+	/** The window's page can embed a session's app in a `<webview>` for its Preview; absent in an app built before it. */
+	preview?: true;
 }

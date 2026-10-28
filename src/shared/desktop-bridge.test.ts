@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isSessionAlert } from "./desktop-bridge";
+import { isLoopbackUrl, isSessionAlert } from "./desktop-bridge";
 
 describe("isSessionAlert", () => {
 	const alert = { hash: "#session/s", title: "Session", body: "Which branch?" };
@@ -15,4 +15,9 @@ describe("isSessionAlert", () => {
 		expect(isSessionAlert({ ...alert, sound: "glass" })).toBe(false);
 		expect(isSessionAlert({ ...alert, sound: null })).toBe(false);
 	});
+});
+
+test("the Preview loads only http and https addresses on this computer, on any port", () => {
+	expect(["http://localhost:5173/", "https://localhost/", "http://127.0.0.1:3000/app?x=1", "http://[::1]:8080/"].map(isLoopbackUrl)).toEqual([true, true, true, true]);
+	expect(["http://example.com/", "http://localhost.example.com/", "http://127.0.0.2/", "file:///etc/passwd", "ws://localhost:5173/", "javascript:alert(1)", "localhost:5173"].map(isLoopbackUrl)).toEqual([false, false, false, false, false, false, false]);
 });

@@ -29,7 +29,7 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { ACCESS_CHANNEL, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, isLoopbackUrl, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
@@ -70,6 +70,8 @@ const IS_MAC = process.platform === "darwin";
 const ICON = join(app.getAppPath(), "icon.png");
 /** `preload.ts` as `bun run build` bundles it. */
 const PRELOAD = join(app.getAppPath(), "dist", "preload.cjs");
+/** `preview-preload.ts` as `bun run build` bundles it, the preload of every webview the page attaches. */
+const PREVIEW_PRELOAD = join(app.getAppPath(), "dist", "preview-preload.cjs");
 const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
 /** Brings the window up with the command palette open on Create todo, from any app. */
 const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
@@ -94,6 +96,10 @@ const DASHBOARD_PERMISSIONS: ReadonlySet<string> = new Set(["clipboard-sanitized
 
 /** Whether `contents` may use `permission`: only the dashboard, and only what {@link DASHBOARD_PERMISSIONS} names. */
 const permitted = (contents: WebContents | null, permission: string): boolean => contents !== null && DASHBOARD_PERMISSIONS.has(permission) && isDashboard(contents.getURL());
+
+/** Whether `contents` may use `permission` in the Preview: only a webview the dashboard attached, and only to copy, which react-grab's copy needs. */
+const previewPermitted = (contents: WebContents | null, permission: string): boolean =>
+	permission === "clipboard-sanitized-write" && contents?.getType() === "webview" && isDashboard(contents.hostWebContents?.getURL() ?? "");
 
 /**
  * Who answers on the port. `ours`: an omp-agents server that holds this token, since only it can answer
@@ -252,7 +258,7 @@ function createWindow(): BrowserWindow {
 		...(IS_MAC ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 14, y: 12 } } : {}),
 		// macOS takes the app's icon from the Dock instead.
 		icon: ICON,
-		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD },
+		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD, webviewTag: true },
 	});
 	win.once("ready-to-show", () => win.show());
 
@@ -289,6 +295,25 @@ function createWindow(): BrowserWindow {
 	contents.on("context-menu", (_event, params) => {
 		const items = contextMenuItems(params, contents);
 		if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
+	});
+	// The Preview's webview: whatever the page asks, it gets our preload in the sandbox, its own session, and a loopback address.
+	contents.on("will-attach-webview", (event, prefs, params) => {
+		Object.assign(prefs, { preload: PREVIEW_PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, partition: PREVIEW_PARTITION });
+		params.partition = PREVIEW_PARTITION;
+		if (!isDashboard(contents.getURL()) || !isLoopbackUrl(params.src ?? "")) event.preventDefault();
+	});
+	contents.on("did-attach-webview", (_event, guest) => {
+		guest.setWindowOpenHandler(({ url }) => {
+			openOutside(url);
+			return { action: "deny" };
+		});
+		const keepLoopback = (navigation: Electron.Event<{ url: string }>): void => {
+			if (isLoopbackUrl(navigation.url)) return;
+			navigation.preventDefault();
+			openOutside(navigation.url);
+		};
+		guest.on("will-navigate", keepLoopback);
+		guest.on("will-redirect", keepLoopback);
 	});
 	/** The token the preload last wrote into the page, so a sign-in reloads the page only for a token it has not tried. */
 	let handedOut: string | null = null;
@@ -427,6 +452,9 @@ if (!app.requestSingleInstanceLock()) {
 		Menu.setApplicationMenu(applicationMenu());
 		session.defaultSession.setPermissionRequestHandler((contents, permission, grant) => grant(permitted(contents, permission)));
 		session.defaultSession.setPermissionCheckHandler((contents, permission) => permitted(contents, permission));
+		const preview = session.fromPartition(PREVIEW_PARTITION);
+		preview.setPermissionRequestHandler((contents, permission, grant) => grant(previewPermitted(contents, permission)));
+		preview.setPermissionCheckHandler((contents, permission) => previewPermitted(contents, permission));
 		removeOldLoginAgents();
 		if (app.isPackaged) updates = startUpdates(() => Menu.setApplicationMenu(applicationMenu()));
 		// The app runs from Electron's own bundle, so without this the Dock shows Electron's icon.

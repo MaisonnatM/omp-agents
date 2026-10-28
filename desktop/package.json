@@ -8,7 +8,7 @@
   "private": true,
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "bun build main.ts preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming [name].cjs",
+    "build": "bun build preview-grab.ts --target=browser --format=iife --minify --outfile dist/preview-grab.txt && bun build main.ts preload.ts preview-preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming [name].cjs",
     "start": "bun run build && bun launch.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -20,6 +20,7 @@
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
     "electron-updater": "^6.8.9",
+    "react-grab": "0.2.0",
     "typescript": "^7.0.2"
   }
 }

@@ -23,5 +23,6 @@ const bridge: DesktopBridge = {
 	},
 	signIn: () => ipcRenderer.send(SIGN_IN_CHANNEL),
 	titleBar: process.platform === "darwin",
+	preview: true,
 };
 contextBridge.exposeInMainWorld(DESKTOP_BRIDGE, bridge);
