@@ -60,19 +60,8 @@ export class GitHubAccess {
 		}
 	}
 
-	/** The cooldown's directory, named for the host and a hash of the credential, never the credential itself. */
 	get #dir(): string {
-		if (this.#directory !== undefined) return this.#directory;
-		let credential = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-		if (!credential) {
-			try {
-				credential = readFileSync(join(process.env.GH_CONFIG_DIR || join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "gh"), "hosts.yml"), "utf8");
-			} catch {
-				credential = "default";
-			}
-		}
-		const identity = createHash("sha256").update(process.env.GH_HOST || "github.com").update("\0").update(credential).digest("hex");
-		return (this.#directory = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents", "github", identity));
+		return (this.#directory ??= cooldownDirectory());
 	}
 
 	/** When `budget`'s recorded cooldown ends, 0 for none; a corrupt record refuses the request. */
@@ -103,6 +92,21 @@ export class GitHubAccess {
 			lock.release();
 		}
 	}
+}
+
+/** The directory of the cooldowns of the credential gh uses when it runs without the `unset` environment variables: named for the host and a hash of the credential, never the credential itself. */
+export function cooldownDirectory(unset: readonly string[] = []): string {
+	const env = (name: string) => (unset.includes(name) ? undefined : process.env[name]);
+	let credential = env("GH_TOKEN") || env("GITHUB_TOKEN");
+	if (!credential) {
+		try {
+			credential = readFileSync(join(process.env.GH_CONFIG_DIR || join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "gh"), "hosts.yml"), "utf8");
+		} catch {
+			credential = "default";
+		}
+	}
+	const identity = createHash("sha256").update(process.env.GH_HOST || "github.com").update("\0").update(credential).digest("hex");
+	return join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents", "github", identity);
 }
 
 /** GitHub's free rate-limit resource reports separate reset clocks for GraphQL and REST core. */

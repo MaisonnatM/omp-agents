@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { commands } from "./shell/commands";
-import { GitHubAccess, quotaExhausted, quotaReset } from "./github/access";
+import { cooldownDirectory, GitHubAccess, quotaExhausted, quotaReset } from "./github/access";
 import { CommandError, GH, type Gh, ghJson, ghText } from "./github/command";
 
 const ENTRY = "omp-ship.state";
@@ -382,9 +382,10 @@ export default function ship(pi: ExtensionAPI) {
 	let lastRefresh = 0;
 	let lastSummary = "";
 	let refreshFailure: string | undefined;
-	const access = new GitHubAccess();
 	/** Variables in omp's environment, such as a project `.env`'s `GITHUB_TOKEN`, whose token GitHub rejects while a stored login works; gh runs without them, which the agent's own `env -u` cannot do for omp's process. */
 	const rejectedTokens: string[] = [];
+	/** Keyed on the credential gh runs with, so a dropped token's cooldowns give way to those the stored login shares with the dashboard. */
+	let access = new GitHubAccess();
 	const runGh = (args: string[], cwd: string) => rejectedTokens.length
 		? pi.exec("env", [...rejectedTokens.flatMap(name => ["-u", name]), GH, ...args], { cwd, timeout: 20_000 })
 		: pi.exec(GH, args, { cwd, timeout: 20_000 });
@@ -403,6 +404,7 @@ export default function ship(pi: ExtensionAPI) {
 					const variable = overriddenLogin((await credentials(cwd)) ?? []);
 					if (!variable) throw error;
 					rejectedTokens.push(variable);
+					access = new GitHubAccess(cooldownDirectory(rejectedTokens));
 				}
 				return load();
 			});

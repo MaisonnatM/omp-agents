@@ -2,7 +2,7 @@ import { afterEach, expect, mock, test } from "bun:test";
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitHubAccess, GitHubQuotaError, quotaExhausted, quotaReset } from "./agent/extensions/github/access";
+import { cooldownDirectory, GitHubAccess, GitHubQuotaError, quotaExhausted, quotaReset } from "./agent/extensions/github/access";
 import { CommandError, ghJson, ghText } from "./agent/extensions/github/command";
 
 const directories: string[] = [];
@@ -105,4 +105,27 @@ test("a cooldown another process recorded fails fast here without loading", asyn
 	const load = mock(async () => "answer");
 	await expect(new GitHubAccess(dir).request("graphql", load, noReset)).rejects.toBeInstanceOf(GitHubQuotaError);
 	expect(load).not.toHaveBeenCalled();
+});
+
+test("without a rejected token, cooldowns are those of the stored login gh falls back to", async () => {
+	const saved = { GH_TOKEN: process.env.GH_TOKEN, GITHUB_TOKEN: process.env.GITHUB_TOKEN, GH_CONFIG_DIR: process.env.GH_CONFIG_DIR, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, GH_HOST: process.env.GH_HOST };
+	const config = directory();
+	await Bun.write(join(config, "gh", "hosts.yml"), "github.com:\n    user: octocat\n");
+	Object.assign(process.env, { XDG_CONFIG_HOME: config, GH_CONFIG_DIR: join(config, "gh") });
+	delete process.env.GH_TOKEN;
+	delete process.env.GH_HOST;
+	try {
+		delete process.env.GITHUB_TOKEN;
+		await expect(new GitHubAccess(undefined, () => 1000).request("graphql", async () => { throw new Error("API rate limit exceeded"); }, async () => 10_000)).rejects.toBeInstanceOf(GitHubQuotaError);
+		process.env.GITHUB_TOKEN = "ghp_rejected";
+		const load = mock(async () => "answer");
+		expect(await new GitHubAccess(undefined, () => 1000).request("graphql", load, noReset)).toBe("answer");
+		await expect(new GitHubAccess(cooldownDirectory(["GITHUB_TOKEN"]), () => 1000).request("graphql", load, noReset)).rejects.toThrow("1970-01-01T00:00:10.000Z");
+		expect(load).toHaveBeenCalledTimes(1);
+	} finally {
+		for (const [name, value] of Object.entries(saved)) {
+			if (value === undefined) delete process.env[name];
+			else process.env[name] = value;
+		}
+	}
 });
