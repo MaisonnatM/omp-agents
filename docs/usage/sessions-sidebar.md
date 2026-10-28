@@ -67,7 +67,8 @@
   The server keeps the list in `interrupted.json` beside its access token, so it survives a restart.
   Sessions started in a terminal keep running when the dashboard stops too, and never show here.
 - The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under the header, and the bottom fades while more rows sit below.
-- Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, or the left edge of the session details sidebar.
+- Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, between 240 and 560 pixels, or the left edge of the session details sidebar, between 240 and 960 pixels, so the Browser can show an app at a laptop's width.
+  The session details sidebar stops where the conversation would get narrower than 480 pixels, and takes its width back once the window or the sessions sidebar leaves room.
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
   Double-click the edge to reset the width.
   Resize handles show no tooltip on hover or while dragging.

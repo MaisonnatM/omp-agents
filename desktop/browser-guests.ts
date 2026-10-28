@@ -1,10 +1,10 @@
 /**
  * The Browser's `<webview>` guests of the dashboard window: what each gets when it attaches, where its navigations and
- * new windows go, and the ports its session and other servers listen on, which the page reports so a sign-in comes back
- * to the session's server.
+ * new windows go, the ports its session and other servers listen on, which the page reports so a sign-in comes back
+ * to the session's server, and the captures of what it shows that the page asks for.
  */
-import { type BrowserWindow, ipcMain, type WebContents, type WebPreferences } from "electron";
-import { appAddress, BROWSER_PORTS_CHANNEL, type BrowserPorts, isLoopbackUrl, isWebUrl, PREVIEW_PARTITION } from "../src/shared/desktop-bridge";
+import type { BrowserWindow, WebContents, WebPreferences } from "electron";
+import { appAddress, BROWSER_CAPTURE_CHANNEL, BROWSER_PORTS_CHANNEL, type BrowserPorts, isLoopbackUrl, isWebUrl, PREVIEW_PARTITION } from "../src/shared/desktop-bridge";
 
 /** A guest of the Browser, and the ports its session and other servers listen on. */
 interface BrowserApp {
@@ -62,11 +62,17 @@ export function trackBrowserGuests(win: BrowserWindow, { preload, isDashboard, o
 		guest.once("destroyed", () => apps.delete(guest.id));
 		keepInBrowser(guest, app, win, openOutside);
 	});
-	ipcMain.on(BROWSER_PORTS_CHANNEL, (event, guestId: unknown, ports: unknown) => {
+	contents.ipc.on(BROWSER_PORTS_CHANNEL, (event, guestId: unknown, ports: unknown) => {
 		const app = typeof guestId === "number" ? apps.get(guestId) : undefined;
-		if (!app || event.sender !== contents || !isDashboard(event.senderFrame?.url ?? "")) return;
+		if (!app || !isDashboard(event.senderFrame?.url ?? "")) return;
 		if (typeof ports === "object" && ports !== null && "session" in ports && "other" in ports && isPorts(ports.session) && isPorts(ports.other)) {
 			app.ports = { session: ports.session, other: ports.other };
 		}
+	});
+	contents.ipc.handle(BROWSER_CAPTURE_CHANNEL, async (event, guestId: unknown) => {
+		const app = typeof guestId === "number" ? apps.get(guestId) : undefined;
+		if (!app || !isDashboard(event.senderFrame?.url ?? "")) return null;
+		const image = await app.guest.capturePage();
+		return image.isEmpty() ? null : image.toPNG();
 	});
 }

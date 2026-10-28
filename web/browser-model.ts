@@ -24,3 +24,126 @@ export function browserCandidates(sessions: readonly LiveSessionProcesses[] | nu
 /** The address the Browser opens on: the one last loaded for the session, else the first candidate, else none. */
 export const initialAddress = (saved: string | null, candidates: readonly BrowserCandidate[]): string | null =>
 	saved !== null && isLoopbackUrl(saved) ? saved : (candidates[0]?.url ?? null);
+
+export interface Point {
+	x: number;
+	y: number;
+}
+
+/** An area of the Browser's page, in its CSS pixels from the top left. */
+export interface Area extends Point {
+	width: number;
+	height: number;
+}
+
+/** A drag shorter than this either way is a click, which marks no region. */
+const CLICK_SLOP = 4;
+
+/**
+ * The area a drag from `from` to `to` covers on a `width` by `height` page, kept inside it, or `null` for a click or a
+ * drag that covers less than a pixel of the page either way.
+ */
+export function dragArea(from: Point, to: Point, width: number, height: number): Area | null {
+	if (Math.abs(to.x - from.x) < CLICK_SLOP && Math.abs(to.y - from.y) < CLICK_SLOP) return null;
+	const clampX = (x: number): number => Math.min(Math.max(x, 0), width);
+	const clampY = (y: number): number => Math.min(Math.max(y, 0), height);
+	const left = clampX(Math.min(from.x, to.x));
+	const top = clampY(Math.min(from.y, to.y));
+	const area = { x: left, y: top, width: clampX(Math.max(from.x, to.x)) - left, height: clampY(Math.max(from.y, to.y)) - top };
+	return area.width >= 1 && area.height >= 1 ? area : null;
+}
+
+/** What Region and Draw leave on the Browser's page until **Attach**: a box, or a freehand line, with the area it covers. */
+export type Mark = { kind: "region"; id: number; area: Area } | { kind: "stroke"; id: number; points: Point[]; area: Area };
+
+/** The width of a Draw line, in the page's CSS pixels. */
+export const STROKE_WIDTH = 4;
+
+/** The smallest area holding every one of `areas`, grown by `margin` on each side, or `null` for none. */
+export function boundsOf(areas: readonly Area[], margin = 0): Area | null {
+	if (areas.length === 0) return null;
+	const x = Math.min(...areas.map(area => area.x)) - margin;
+	const y = Math.min(...areas.map(area => area.y)) - margin;
+	return { x, y, width: Math.max(...areas.map(area => area.x + area.width)) + margin - x, height: Math.max(...areas.map(area => area.y + area.height)) + margin - y };
+}
+
+/** {@link boundsOf} `areas`, grown by `margin` and kept inside a `width` by `height` page, or `null` for none. */
+export function unionArea(areas: readonly Area[], margin: number, width: number, height: number): Area | null {
+	const bounds = boundsOf(areas, margin);
+	if (bounds === null) return null;
+	const x = Math.max(0, bounds.x);
+	const y = Math.max(0, bounds.y);
+	return { x, y, width: Math.min(width, bounds.x + bounds.width) - x, height: Math.min(height, bounds.y + bounds.height) - y };
+}
+
+/** The area a line through `points` covers, its width included, or `null` for no points. */
+export const strokeArea = (points: readonly Point[]): Area | null => boundsOf(points.map(point => ({ ...point, width: 0, height: 0 })), STROKE_WIDTH / 2);
+
+/** The mark Erase removes at `point`: the last drawn of those whose area holds it. */
+export const markAt = (marks: readonly Mark[], point: Point): Mark | null =>
+	marks.findLast(({ area }) => point.x >= area.x && point.x <= area.x + area.width && point.y >= area.y && point.y <= area.y + area.height) ?? null;
+
+/** The selected element Erase removes at `point`: the smallest of those that hold it, as the innermost of nested ones is the one meant. */
+export const elementAt = <T extends Area>(elements: readonly T[], point: Point): T | undefined =>
+	elements
+		.filter(box => point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height)
+		.sort((a, b) => a.width * a.height - b.width * b.height)[0];
+
+/**
+ * Where the comment card of `size` goes beside the marks covering `bounds` on a `width` by `height` page, as T3 Code
+ * places it: right of them, else left, else below, else above, whichever spills least, then kept inside the page.
+ */
+export function cardPlace(bounds: Area, size: { width: number; height: number }, width: number, height: number): Point {
+	const gap = 8;
+	const candidates: Point[] = [
+		{ x: bounds.x + bounds.width + gap, y: bounds.y },
+		{ x: bounds.x - size.width - gap, y: bounds.y },
+		{ x: bounds.x + bounds.width - size.width, y: bounds.y + bounds.height + gap },
+		{ x: bounds.x + bounds.width - size.width, y: bounds.y - size.height - gap },
+	];
+	const spill = ({ x, y }: Point): number =>
+		Math.max(0, -x) + Math.max(0, -y) + Math.max(0, x + size.width - width) + Math.max(0, y + size.height - height);
+	const best = candidates.reduce((current, candidate) => (spill(candidate) < spill(current) ? candidate : current));
+	return {
+		x: Math.min(Math.max(gap, best.x), Math.max(gap, width - size.width - gap)),
+		y: Math.min(Math.max(gap, best.y), Math.max(gap, height - size.height - gap)),
+	};
+}
+
+/** What one **Attach** sends: the comment, the page, the selected elements, and how many boxes and lines it marked. */
+export interface Annotation {
+	comment: string;
+	page: { url: string; title: string };
+	elements: readonly { name: string; snippet: string }[];
+	regions: number;
+	strokes: number;
+}
+
+const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
+
+/** The chip's label of an annotation: its comment on one line, else its first element's name with how many more, else the page's title. */
+function chipLabel({ comment, page, elements }: Annotation): string {
+	const said = comment.replace(/\s+/g, " ").trim();
+	if (said) return said;
+	const [first] = elements;
+	if (first) return elements.length > 1 ? `${first.name} +${elements.length - 1}` : first.name;
+	return page.title.trim() || "Browser annotation";
+}
+
+/**
+ * The chip's label and the text the prompt gets of `annotation`. The label is the comment, else the first element's
+ * name, else the page's title; the text holds the comment, the page, react-grab's text of each element, and what the
+ * attached picture marks.
+ */
+export function annotationText(annotation: Annotation): { label: string; content: string } {
+	const { comment, page, elements, regions, strokes } = annotation;
+	const marked = [elements.length > 0 && plural(elements.length, "outlined element", "outlined elements"), regions > 0 && plural(regions, "box", "boxes"), strokes > 0 && plural(strokes, "line", "lines")].filter(Boolean);
+	const lines = [
+		...(comment ? [comment, ""] : []),
+		`Annotated in the Browser on ${page.url}${page.title.trim() ? ` (${page.title.trim()})` : ""}.`,
+		...elements.flatMap((element, index) => ["", `Element ${index + 1}, ${element.name}:`, element.snippet]),
+		"",
+		`The attached picture shows ${marked.join(", ")}.`,
+	];
+	return { label: chipLabel(annotation), content: lines.join("\n") };
+}

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { promptTokens } from "./prompt-tokens";
+import { annotationReference, promptTokens } from "./prompt-tokens";
 
 const kinds = (text: string, options?: Parameters<typeof promptTokens>[1]) => promptTokens(text, options).map(({ kind, label, target }) => ({ kind, label, target }));
 
@@ -37,4 +37,11 @@ test("a reference that ends at the caret is still being typed", () => {
 
 test("the @ menu's category prefixes and mid-word @ are not paths", () => {
 	expect(kinds("@todo: @ticket:ENG @person:ana @mail:x @event:y user@host.com")).toEqual([]);
+});
+
+test("a Browser annotation reads back as one chip, whatever backticks, quotes, and lines its text holds", () => {
+	const content = 'fix this\n\nElement 1, Code:\n<code class="x">``a`b``</code>';
+	const reference = annotationReference('the "code" bit', content);
+	expect(reference).not.toContain("\n");
+	expect(kinds(`before ${reference} after`)).toEqual([{ kind: "annotation", label: 'the "code" bit', target: content }]);
 });

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
-import { liveDraftKey, useComposerDraft } from "../composer-drafts";
+import { liveDraftKey, useComposerDraft, useComposerFiles } from "../composer-drafts";
 import { folderName, hostLabel } from "../labels";
 import { useChangedFiles, useComposerData, useNextSuggestions } from "../pane-store";
 import type { ModelList } from "../reads";
@@ -117,6 +117,7 @@ function LiveConversation({
 	const subject = subjectOf(view, host, lastHost);
 	const { shown, agent, writable, working, requests, shell } = subject;
 	const attachments = usePromptAttachments(subject.images);
+	useComposerFiles(writable ? liveDraftKey(view) : null, file => attachments.onFilesChange([...attachments.files, file]));
 
 	const session = subject.kind === "session";
 	const switchable = subject.kind === "session" ? subject.switchable : null;

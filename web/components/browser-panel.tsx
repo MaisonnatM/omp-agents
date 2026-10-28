@@ -1,8 +1,9 @@
 /**
  * `BrowserPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Browser
- * tab, where an element picked with react-grab lands in the session's composer.
+ * tab, where the elements selected and the marks drawn on the page land in the session's composer as one chip and its
+ * picture, and a whole page as an image.
  */
-import { ArrowLeft, ArrowRight, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
@@ -12,13 +13,14 @@ import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, 
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { appendToComposer, liveDraftKey } from "../composer-drafts";
+import { liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { initialAddress, browserCandidates } from "../browser-model";
+import { browserCandidates, initialAddress } from "../browser-model";
 import { sessionProcessesStore, writeStartServer } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
+import { Picking, usePicking } from "./browser-capture";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
@@ -29,6 +31,9 @@ const START_SERVER_PROMPT =
 
 /** The window can show a Browser: the desktop app, from the build that added it. */
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
+
+/** The window's shell takes capture requests and picks in the app: the desktop app, from the build that added **Screenshot** and T3 Code's picking. */
+const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.captureBrowser === "function";
 
 /** A toolbar control of the Browser, named by its tooltip. */
 function ToolbarButton({ label, control, disabled, shortcut, pressed, onClick, children }: {
@@ -79,7 +84,7 @@ const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 *
 
 /**
  * Live session `view`'s app in a `<webview>`, opened on the address last loaded for `sessionId`, else on the first port
- * its jobs and services listen on. Each element react-grab copies in it is appended to the view's composer.
+ * its jobs and services listen on. Each **Attach** of what was picked in it is appended to the view's composer.
  */
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
 	const { read } = sessionProcessesStore.use();
@@ -89,19 +94,17 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		[candidates, read, view.instanceId],
 	);
 	const [saved] = useState(() => addresses.get(sessionId));
-	const draftKey = liveDraftKey(view);
 	const [maximized, setMaximized] = useState(false);
 	const webview = useWebview({
 		initial: initialAddress(saved, candidates),
-		onPick: text => {
-			appendToComposer(draftKey, text);
-			toasts.add({ title: "Added to the composer" });
-		},
+		onSelection: boxes => picking.onSelection(boxes),
 		onNavigate: url => addresses.set(sessionId, url),
-		// The app has the focus while maximized, so its Escape restores too.
-		onEscape: () => setMaximized(false),
+		// The app has the focus while maximized, so its Escape stops picking or restores too.
+		onEscape: () => picking.stop() || setMaximized(false),
+		onPickKey: key => picking.pickKey(key),
 		ports,
 	});
+	const picking = usePicking(webview, liveDraftKey(view));
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
 	const startServer = useAction(async () => {
@@ -117,12 +120,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
-	useShortcuts({
-		browserRestore: () => {
-			if (!maximized) return false;
-			setMaximized(false);
-		},
-	});
+	useShortcuts({ browserRestore: () => picking.stop() || (maximized ? setMaximized(false) : false) });
 	const sectionRef = useRef<HTMLElement>(null);
 	// What the maximized Browser covers leaves the tab order and the accessibility tree.
 	useEffect(() => (maximized && sectionRef.current ? inertAround(sectionRef.current) : undefined), [maximized]);
@@ -183,15 +181,22 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						</MenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<ToolbarButton
-					label={webview.picking ? "Stop selecting" : "Select element"}
-					control="browser.select-element"
-					disabled={!webview.ready}
-					pressed={webview.picking}
-					onClick={webview.selectElement}
-				>
-					<MousePointerClick />
-				</ToolbarButton>
+				{CAPTURE_AVAILABLE && (
+					<ToolbarButton
+						label="Pick in the app"
+						control="browser.select-element"
+						disabled={!webview.ready}
+						pressed={picking.mode !== null}
+						onClick={() => picking.stop() || picking.choose("select")}
+					>
+						<MousePointerClick />
+					</ToolbarButton>
+				)}
+				{CAPTURE_AVAILABLE && (
+					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void picking.screenshot()}>
+						<Camera />
+					</ToolbarButton>
+				)}
 				<ToolbarButton
 					label={maximized ? "Restore Browser" : "Maximize Browser"}
 					control="browser.maximize"
@@ -237,15 +242,27 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 					</Button>
 				</div>
 			) : (
-				<webview
-					ref={webview.ref}
-					src={webview.src}
-					partition={PREVIEW_PARTITION}
-					// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
-					// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
-					allowpopups={"" as unknown as boolean}
-					className="flex min-h-0 w-full flex-1"
-				/>
+				<div className="relative flex min-h-0 flex-1">
+					<webview
+						ref={webview.ref}
+						src={webview.src}
+						partition={PREVIEW_PARTITION}
+						// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
+						// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
+						allowpopups={"" as unknown as boolean}
+						className="flex min-h-0 w-full flex-1"
+					/>
+					{picking.mode !== null && (
+						<Picking
+							mode={picking.mode}
+							color={picking.color}
+							elements={picking.elements}
+							onMode={picking.choose}
+							onDeselect={webview.deselect}
+							onAttach={picking.attach}
+						/>
+					)}
+				</div>
 			)}
 		</section>
 	);
