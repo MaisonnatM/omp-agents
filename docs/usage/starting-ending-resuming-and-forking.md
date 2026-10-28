@@ -9,7 +9,7 @@
   **Pull requests waiting** lists the Pull requests board's **Your move** column, keeping the pull requests that a quick action hands to an agent; clicking one runs that quick action, as its badge on the Pull requests page does.
   **All** opens the Todo page or the Pull requests page.
   A scheduled start shows no board.
-  The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker picks the worktree.
+  The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
   To start in another directory, under **All workspaces** or not, pick it in the composer's directory picker, or press Cmd+Alt+P.
   It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.

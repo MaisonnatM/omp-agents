@@ -56,7 +56,7 @@ describe("LiveSessions", () => {
 		const sessions = new LiveSessions(() => {});
 		const live = { instanceId: "i1", sessionId: "s1", cwd: "/work", row: () => ({ instanceId: "i1" }), follow() {}, finished: () => false } as unknown as LiveSession;
 		sessions.add(live, null);
-		const unread = () => sessions.rows(() => facts, () => null)[0]?.unread;
+		const unread = () => sessions.rows(() => facts)[0]?.unread;
 		expect(sessions.markRead("i1")).toBe(false);
 		sessions.markUnread("i1", "\n  Fixed the **flaky** test.  \nDetails follow.");
 		expect(unread()).toEqual({ at: expect.any(Number), reply: "Fixed the **flaky** test." });

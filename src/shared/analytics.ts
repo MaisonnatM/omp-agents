@@ -64,7 +64,8 @@ export interface AnalyticsSession {
 	title: string | null;
 	/** Whether its transcript is still on disk, so the dashboard can open it; omp-stats keeps deleted sessions' usage. */
 	listed: boolean;
-	cwd: string;
+	/** The directory of the workspace it counts in. */
+	workspace: string;
 	usage: Usage;
 	/** The part of `usage.tokens.total` its subagents used. */
 	subagentTokens: number;
@@ -108,7 +109,7 @@ export const decodeAnalytics = decoder(
 				sessionId: isString,
 				title: nullable(isString),
 				listed: isBoolean,
-				cwd: isString,
+				workspace: isString,
 				usage: isUsage,
 				subagentTokens: isNumber,
 				models: isTexts,

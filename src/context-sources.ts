@@ -300,7 +300,7 @@ export function buildContextReport({ range, cwd, sessionId, indexing, files, sou
 		const place = sessionOfFile(row.sessionFile, root);
 		sessionOf.set(row.sessionFile, place.sessionId);
 		const session = sessions.get(place.sessionId);
-		if (!session) sessions.set(place.sessionId, { cwd: factsOf(place.sessionId)?.cwd ?? row.cwd, own: !place.subagent, input: row.input });
+		if (!session) sessions.set(place.sessionId, { cwd: factsOf(place.sessionId)?.workspace ?? row.cwd, own: !place.subagent, input: row.input });
 		else {
 			session.input += row.input;
 			if (!session.own && !place.subagent && !factsOf(place.sessionId)) Object.assign(session, { cwd: row.cwd, own: true });

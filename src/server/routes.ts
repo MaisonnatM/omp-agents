@@ -78,7 +78,7 @@ const MAX_EVENT_SPAN_MS = 62 * DAY_MS;
 /** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
 	/** The workspaces sessions count in: live ones first, then saved ones newest first. */
-	knownCwds(): string[];
+	knownWorkspaces(): string[];
 	/** The directories Settings → Workspaces added, which the page names as workspaces before any session runs there. */
 	addedCwds(): string[];
 	/** Apply `change` to the workspaces and send every socket the workspaces after it. */
@@ -226,7 +226,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	 */
 	function workspaceCwd(params: URLSearchParams): string | null | Response {
 		const cwd = params.get("cwd");
-		return cwd === null || env.knownCwds().includes(cwd) || env.addedCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
+		return cwd === null || env.knownWorkspaces().includes(cwd) || env.addedCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
 	}
 
 	const replayRead = (compare: boolean) => get(params => answer(async () => {
@@ -320,7 +320,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		if (cwd instanceof Response) return cwd;
 		const fresh = params.has("fresh");
 		return answer(async () => {
-			const loaded = await loadPullRequests(cwd === null ? env.knownCwds() : [cwd], fresh);
+			const loaded = await loadPullRequests(cwd === null ? env.knownWorkspaces() : [cwd], fresh);
 			for (const repo of loaded.repos) if ("pullRequests" in repo) env.learnHeads(repo, repo.pullRequests);
 			return loaded;
 		});

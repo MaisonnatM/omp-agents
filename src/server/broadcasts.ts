@@ -24,8 +24,8 @@ export interface BroadcastDeps {
 	/** Publishes `json` on the `roster` topic. */
 	publish(topic: string, json: string): void;
 	subscriberCount(topic: string): number;
-	/** Runs before each roster push: a subagent may have registered for a view that waits on its file, and a session that joined or moved may work in a directory git was not asked about. */
-	beforeRosterPush(): void;
+	/** Runs on each roster push, before it syncs: catches up the views and the live sessions' workspaces. */
+	onRosterPush(): void;
 	/** Saves which dashboard sessions run now, and whether each one's turn runs. */
 	saveRunning(): void;
 }
@@ -108,7 +108,7 @@ export class Broadcasts {
 		clearTimeout(this.#rosterPush);
 		this.#rosterPush = undefined;
 		if (!this.listening()) return;
-		this.#deps.beforeRosterPush();
+		this.#deps.onRosterPush();
 		this.#syncRoster();
 	}
 

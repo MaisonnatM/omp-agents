@@ -11,7 +11,7 @@ import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
 import { hashForNotes, hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
 import { type SessionEntry, viewOf } from "./session-actions";
-import { workspaceOf } from "./sessions";
+import { workspaceCwd } from "./sessions";
 import { TODO_STATUS } from "./todo-views";
 
 export interface PaletteRecords {
@@ -111,7 +111,7 @@ export function conversationItems(hits: readonly ConversationHit[], hosts: reado
 		const entry = entries.get(hit.sessionId);
 		if (!entry) return [];
 		const view = viewOf(entry);
-		const { cwd } = workspaceOf(entry.kind === "live" ? entry.host : entry.session);
+		const cwd = workspaceCwd(entry.kind === "live" ? entry.host : entry.session);
 		const matches: Accessory = { kind: "text", text: hit.matches === 1 ? "1 match" : `${hit.matches} matches` };
 		const state: Accessory = entry.kind === "live" ? { kind: "status", status: entry.host.status } : { kind: "age", at: entry.session.modifiedAt };
 		return [

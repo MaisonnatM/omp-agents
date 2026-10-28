@@ -76,7 +76,7 @@ function setup(initial: PastSession[]) {
 		lists,
 		publish: (_topic, json) => void published.push(JSON.parse(json)),
 		subscriberCount: () => listeners,
-		beforeRosterPush: () => {},
+		onRosterPush: () => {},
 		saveRunning: () => {},
 	});
 	const sent: ServerMsg[] = [];

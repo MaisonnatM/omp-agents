@@ -8,7 +8,6 @@ import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
 import { oneLine } from "../session-entries";
 import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
-import type { Workspace } from "../shared/workspaces";
 import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
 
@@ -149,17 +148,13 @@ export class LiveSessions {
 		this.#bySessionId = index;
 	}
 
-	/**
-	 * Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it. Its
-	 * `workspace` is `workspaceAt` its directory now, which omp writes to its file only with the first reply, and after a `/move` only with the next.
-	 */
-	rows(factsOf: (sessionId: string) => SessionFacts, workspaceAt: (cwd: string) => Workspace | null): RosterHost[] {
+	/** Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it, asked with the directory it runs in now. */
+	rows(factsOf: (sessionId: string, cwd: string) => SessionFacts): RosterHost[] {
 		return [...this.#sessions.values()].map(session => ({
 			...session.row(),
 			cwdDisplay: displayPath(session.cwd),
 			unread: this.#unread.get(session.instanceId) ?? null,
-			...withSubject(factsOf(session.sessionId), this.#subjects.get(session.instanceId)),
-			workspace: workspaceAt(session.cwd),
+			...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
 		}));
 	}
 

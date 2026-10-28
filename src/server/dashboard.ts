@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -209,7 +209,7 @@ export class Dashboard {
 		const calendars = this.#calendars;
 		this.#google = new GoogleCalendars(accountClients("google-calendar", (fetch, account) => new GoogleCalendarClient(fetch, account, () => calendars.value.get(account) ?? NO_HIDDEN)));
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
-		const liveRows = () => sessions.rows(files.factsOf, files.facts.workspaceAt);
+		const { placement } = files.facts;
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
 		this.#pathFor = pathFor;
@@ -229,8 +229,8 @@ export class Dashboard {
 				dashboardCommits: () => selfUpdate.newCommits(),
 				updateDashboard: () => selfUpdate.update(),
 				pullRequests: async () => {
-					const list = await loadPullRequests(this.knownCwds(), false);
-					const agent = agentOn(liveRows());
+					const list = await loadPullRequests(this.knownWorkspaces(), false);
+					const agent = agentOn(sessions.rows(files.factsOf));
 					this.#triggerWatch.learn(pullRequestSightings(list, agent));
 					return { list, agent };
 				},
@@ -291,7 +291,7 @@ export class Dashboard {
 			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
-					const [added, hidden] = [workspaces.value.added, workspaces.value.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
+					const [added, hidden] = [workspaces.value.added, workspaces.value.hidden].map(cwds => cwds.map(workspaceFor));
 					return { t: "workspaces", list: { added, hidden } };
 				},
 				apply: change => workspaces.apply(change),
@@ -311,14 +311,14 @@ export class Dashboard {
 			},
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
-			roster: () => ({ hosts: liveRows(), error: this.#rosterError }),
+			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 			lists,
 			publish: (topic, json) => void this.#publisher?.publish(topic, json),
 			subscriberCount: topic => this.#publisher?.subscriberCount(topic) ?? 0,
-			beforeRosterPush: () => {
+			onRosterPush: () => {
 				views.sync();
-				void files.facts.place(sessions.cwds()).then(placed => {
+				void placement.place(sessions.cwds(), worktreeAt).then(placed => {
 					if (placed) broadcasts.pushAll();
 				});
 			},
@@ -342,8 +342,8 @@ export class Dashboard {
 			},
 			onStarted: () => broadcasts.syncRoster(),
 			workspaceOf: async cwd => {
-				await files.facts.place([cwd]);
-				return files.facts.workspaceAt(cwd)?.cwd ?? cwd;
+				await placement.place([cwd], worktreeAt);
+				return placement.cwdOf(cwd);
 			},
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
@@ -352,11 +352,11 @@ export class Dashboard {
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
-			knownCwds: () => this.knownCwds(),
+			knownCwds: () => this.knownWorkspaces(),
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
 			mergedPullRequests,
-			live: () => occupants.snapshot(liveRows(), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
+			live: () => occupants.snapshot(sessions.rows(files.factsOf), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
 		this.#processWatch = new SessionProcessWatch({
@@ -366,7 +366,7 @@ export class Dashboard {
 			readCwds,
 			appOf: readAppOf,
 			stopProcesses,
-			sessions: liveRows,
+			sessions: () => sessions.rows(files.factsOf),
 			now: Date.now,
 			owner: () => ownerLock.held,
 			stopIdleAfterMinutes: () => {
@@ -437,7 +437,7 @@ export class Dashboard {
 		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
 		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
 			sessions: () =>
-				liveRows().flatMap(host =>
+				sessions.rows(files.factsOf).flatMap(host =>
 					sessions.started(host.instanceId) !== undefined && this.#sourceControl.cleanUp
 						? [{ sessionId: host.sessionId, idle: host.status === "idle", occupied: occupiedBy(host.status, autoContinue.held(host.sessionId)), pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }]
 						: [],
@@ -556,12 +556,12 @@ export class Dashboard {
 		return createRoutes({
 			guards,
 			sessions: {
-				knownCwds: () => this.knownCwds(),
+				knownWorkspaces: () => this.knownWorkspaces(),
 				addedCwds: () => this.#workspaces.value.added,
 				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
 				summaryOf(sessionId) {
 					const saved = files.savedOf(sessionId);
-					return saved && { title: saved.title, cwd: files.factsOf(sessionId).workspace?.cwd ?? saved.cwd };
+					return saved && { title: saved.title, workspace: files.facts.placement.cwdOf(saved.cwd) };
 				},
 				foreignUsage: () => this.#foreignUsage.read(),
 				placeOf(sessionId) {
@@ -722,14 +722,14 @@ export class Dashboard {
 	}
 
 	/** The workspaces sessions count in: live ones first, then saved ones newest first. */
-	knownCwds(): string[] {
-		const live = this.#sessions.cwds().map(cwd => this.#files.facts.workspaceAt(cwd)?.cwd ?? cwd);
-		return [...new Set([...live, ...this.#files.cwds()].filter(Boolean))];
+	knownWorkspaces(): string[] {
+		const live = this.#sessions.cwds().map(this.#files.facts.placement.cwdOf);
+		return [...new Set([...live, ...this.#files.workspaces()].filter(Boolean))];
 	}
 
 	#workspaceCwds(): string[] {
 		const { added, hidden } = this.#workspaces.value;
-		return [...new Set([...this.knownCwds(), ...added])].filter(cwd => !hidden.includes(cwd));
+		return [...new Set([...this.knownWorkspaces(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 
 	/** Where every live session's update goes: the views, the broadcasts, the Bots, and the loops. */

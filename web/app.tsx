@@ -117,8 +117,8 @@ export function App() {
 	);
 	/** The palette opens a session from any workspace, so the sidebar switches to that workspace to keep it listed. */
 	const openFromPalette = useCallback(
-		(picked: View, countsIn: string, mode: OpenMode): void => {
-			const next = workspaceSwitch(workspace, countsIn, hiddenCwds);
+		(picked: View, sessionWorkspace: string, mode: OpenMode): void => {
+			const next = workspaceSwitch(workspace, sessionWorkspace, hiddenCwds);
 			if (next !== null) pickWorkspace(next);
 			open(picked, mode);
 		},

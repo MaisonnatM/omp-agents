@@ -11,7 +11,7 @@ function row(sessionFile: string, selector: string, total: number, lastAt: numbe
 }
 
 /** `beta`'s transcript was deleted, so only omp-stats remembers it. */
-const facts = (id: string) => (id === "alpha" ? { title: "Fix billing", cwd: "/work/app" } : null);
+const facts = (id: string) => (id === "alpha" ? { title: "Fix billing", workspace: "/work/app" } : null);
 
 describe("analytics session usage", () => {
 	test("a nested subagent folds into its parent, and a deleted session takes its workspace from a listed neighbor", () => {
@@ -25,12 +25,12 @@ describe("analytics session usage", () => {
 		const sessions = foldSessions(rows, root, facts);
 		expect(sessions).toEqual([
 			{
-				sessionId: "alpha", title: "Fix billing", listed: true, cwd: "/work/app",
+				sessionId: "alpha", title: "Fix billing", listed: true, workspace: "/work/app",
 				usage: { requests: 3, failed: 0, tokens: { input: 200, output: 200, cacheRead: 0, cacheWrite: 0, total: 400 }, cost: 4, cacheRate: 0 },
 				subagentTokens: 250, models: ["anthropic/claude-b", "openai/gpt-a"], lastAt: 30,
 			},
 			{
-				sessionId: "beta", title: null, listed: false, cwd: "/work/app",
+				sessionId: "beta", title: null, listed: false, workspace: "/work/app",
 				usage: { requests: 1, failed: 0, tokens: { input: 150, output: 150, cacheRead: 0, cacheWrite: 0, total: 300 }, cost: 3, cacheRate: 0 },
 				subagentTokens: 0, models: ["openai/gpt-a"], lastAt: 40,
 			},
@@ -216,7 +216,7 @@ test("foreign requests merge into the same totals, models, providers, buckets, w
 			{ provider: "openai", model: "gpt-a", timestamp: 2_100, failed: false, input: 3, output: 2, cacheRead: 5, cacheWrite: 0, cost: 4 },
 		] },
 	]);
-	const answer = buildAnalytics("7d", merged, root, id => id === "alpha" ? facts(id) : id === "beta" ? { title: "Codex fix", cwd: "/work/codex" } : null);
+	const answer = buildAnalytics("7d", merged, root, id => id === "alpha" ? facts(id) : id === "beta" ? { title: "Codex fix", workspace: "/work/codex" } : null);
 	expect(answer.totals).toEqual({ requests: 4, failed: 1, tokens: { input: 18, output: 12, cacheRead: 18, cacheWrite: 12, total: 60 }, cost: 10, cacheRate: 0.5 });
 	expect(answer.models).toEqual([
 		{ selector: "openai/gpt-a", tokensPerSecond: 20, requests: 2, failed: 0, tokens: { input: 13, output: 7, cacheRead: 10, cacheWrite: 0, total: 30 }, cost: 5, cacheRate: 10 / 23 },
@@ -237,10 +237,10 @@ test("foreign requests merge into the same totals, models, providers, buckets, w
 	]);
 	expect(answer.agents).toEqual({ main: 50, subagent: 10, advisor: 0 });
 	expect(answer.sessions).toEqual([
-		{ sessionId: "alpha", title: "Fix billing", listed: true, cwd: "/work/app",
+		{ sessionId: "alpha", title: "Fix billing", listed: true, workspace: "/work/app",
 			usage: { requests: 3, failed: 1, tokens: { input: 15, output: 10, cacheRead: 13, cacheWrite: 12, total: 50 }, cost: 6, cacheRate: 13 / 28 },
 			subagentTokens: 10, models: ["anthropic/claude-c", "openai/gpt-a"], lastAt: 1_500 },
-		{ sessionId: "beta", title: "Codex fix", listed: true, cwd: "/work/codex",
+		{ sessionId: "beta", title: "Codex fix", listed: true, workspace: "/work/codex",
 			usage: { requests: 1, failed: 0, tokens: { input: 3, output: 2, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 4, cacheRate: 5 / 8 },
 			subagentTokens: 0, models: ["openai/gpt-a"], lastAt: 2_100 },
 	]);
@@ -263,7 +263,7 @@ test("all time includes old foreign usage and an unknown model's tokens, even fo
 	}]), root, () => null);
 	expect(answer.totals).toEqual({ requests: 1, failed: 0, tokens: { input: 4, output: 1, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 0, cacheRate: 5 / 9 });
 	expect(answer.sessions).toEqual([{
-		sessionId: "orphan", listed: false, title: null, cwd: "/work/review",
+		sessionId: "orphan", listed: false, title: null, workspace: "/work/review",
 		usage: { requests: 1, failed: 0, tokens: { input: 4, output: 1, cacheRead: 5, cacheWrite: 0, total: 10 }, cost: 0, cacheRate: 5 / 9 },
 		subagentTokens: 10, models: ["openai/unknown"], lastAt: 999,
 	}]);

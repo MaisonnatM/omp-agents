@@ -5,7 +5,7 @@ import type { PastSession } from "../src/shared/sessions";
 import { isClosed, type UserTodo } from "../src/user-todos-shared";
 import type { PullRequestActionId } from "../src/pull-request-actions";
 import { boardColumns, DEFAULT_ORDER, moveAction } from "./pull-requests-model";
-import { workspaceOf } from "./sessions";
+import { workspaceCwd } from "./sessions";
 import { byStatus } from "./todo-views";
 
 /** How many rows each column shows. */
@@ -17,7 +17,7 @@ export const boardTodos = (todos: UserTodo[]): UserTodo[] => byStatus(todos.filt
 /** The omp sessions, which alone resume, in `workspace` (`null` for all): interrupted first, then the latest. */
 export function boardSessions(past: PastSession[], workspace: string | null): PastSession[] {
 	return past
-		.filter(session => session.source === "omp" && (workspace === null || workspaceOf(session).cwd === workspace))
+		.filter(session => session.source === "omp" && (workspace === null || workspaceCwd(session) === workspace))
 		.toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted) || b.modifiedAt - a.modifiedAt);
 }
 

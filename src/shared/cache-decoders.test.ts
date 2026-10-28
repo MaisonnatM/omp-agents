@@ -33,7 +33,7 @@ const analytics: Analytics = {
 	workspaces: [{ ...usage, cwd: "/tmp" }],
 	agents: { main: 3, subagent: 0, advisor: 0 },
 	tools: [{ name: "read", calls: 1, errors: 0, tokenShare: 3 }],
-	sessions: [{ sessionId: "s", title: null, listed: true, cwd: "/tmp", usage, subagentTokens: 0, models: ["anthropic/claude"], lastAt: 1 }],
+	sessions: [{ sessionId: "s", title: null, listed: true, workspace: "/tmp", usage, subagentTokens: 0, models: ["anthropic/claude"], lastAt: 1 }],
 };
 
 const google: GoogleStatus = { failed: [{ account: "google-calendar-2", error: "refused" }], calendars: [{ account: "google-calendar", id: "me@example.com", name: "Me", color: "#123456", group: "mine", writable: true, shown: true, error: null }] };

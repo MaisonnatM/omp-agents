@@ -2,6 +2,7 @@ import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { portFromEnv } from "./server/address";
+import type { Workspace } from "./shared/workspaces";
 
 export const HOME = homedir();
 
@@ -89,6 +90,9 @@ export const expandHome = (path: string): string => (path === "~" || path.starts
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>
 	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;
+
+/** Directory `cwd` as the page shows a workspace, with its {@link displayPath}. */
+export const workspaceFor = (cwd: string): Workspace => ({ cwd, cwdDisplay: displayPath(cwd) });
 
 /** The directory `input` names (absolute, `~`-relative, or relative to the home directory), or `null` when it is not one; stats without blocking the event loop. */
 export async function directoryOf(input: string): Promise<string | null> {

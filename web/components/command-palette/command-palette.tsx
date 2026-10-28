@@ -56,7 +56,7 @@ import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
 import { hashForNotes, type OpenMode, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
-import { workspaceOf } from "../../sessions";
+import { workspaceCwd } from "../../sessions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { tabShortcutLabels } from "../../sidebar-tabs";
 import { useStoredState } from "../../stored-state";
@@ -156,7 +156,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	const sessionItems = useMemo((): PaletteItem[] => {
 		const sessionItem = (entry: SessionEntry): PaletteItem => {
 			const row = entry.kind === "live" ? entry.host : entry.session;
-			const { cwd } = workspaceOf(row);
+			const cwd = workspaceCwd(row);
 			const actions = sessionActions(entry, {
 				onScreen: false,
 				pinned: pinned.has(row.sessionId),

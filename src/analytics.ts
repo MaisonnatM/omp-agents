@@ -11,7 +11,7 @@ export const TOP_SESSIONS = 20;
 /** What the dashboard knows of a session from its file for Analytics: its title and the workspace it counts in. */
 export interface SessionSummary {
 	title: string | null;
-	cwd: string;
+	workspace: string;
 }
 
 function tokenCounts(input: number, output: number, cacheRead: number, cacheWrite: number): TokenCounts {
@@ -79,15 +79,15 @@ export function foldSessions(rows: readonly SessionModelRow[], root: string, fac
 		fold.modelTokens.set(row.selector, (fold.modelTokens.get(row.selector) ?? 0) + tokens.total);
 	}
 	// omp keeps one folder per working directory, so a session the dashboard does not list takes a listed neighbor's
-	// directory, else the folder's own name.
-	const cwdOfFolder = new Map<string, string>();
-	for (const { facts, folder } of folds.values()) if (facts) cwdOfFolder.set(folder, facts.cwd);
+	// workspace, else the folder's own name.
+	const workspaceOfFolder = new Map<string, string>();
+	for (const { facts, folder } of folds.values()) if (facts) workspaceOfFolder.set(folder, facts.workspace);
 	return [...folds]
 		.map(([sessionId, { facts, folder, usage, subagentTokens, lastAt, modelTokens }]) => ({
 			sessionId,
 			title: facts?.title ?? null,
 			listed: facts !== null,
-			cwd: facts?.cwd ?? cwdOfFolder.get(folder) ?? folder,
+			workspace: facts?.workspace ?? workspaceOfFolder.get(folder) ?? folder,
 			usage,
 			subagentTokens,
 			models: [...modelTokens].sort((a, b) => b[1] - a[1]).map(([selector]) => selector),
@@ -96,10 +96,10 @@ export function foldSessions(rows: readonly SessionModelRow[], root: string, fac
 		.sort((a, b) => b.usage.tokens.total - a.usage.tokens.total || b.lastAt - a.lastAt);
 }
 
-/** Usage by working directory, most tokens first; a directory that used no tokens is left out. */
+/** Usage by workspace, most tokens first; a workspace that used no tokens is left out. */
 export function workspacesOf(sessions: readonly AnalyticsSession[]): Analytics["workspaces"] {
 	const workspaces = new Map<string, Usage & { cwd: string }>();
-	for (const { cwd, usage } of sessions) {
+	for (const { workspace: cwd, usage } of sessions) {
 		const workspace = workspaces.get(cwd) ?? { cwd, ...emptyUsage() };
 		addUsage(workspace, usage.requests, usage.failed, usage.tokens, usage.cost);
 		workspaces.set(cwd, workspace);

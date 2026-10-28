@@ -17,6 +17,9 @@ export const sessionsOn = (item: WorkItem, hosts: RosterHost[]): RosterHost[] =>
 /** The workspace a session counts in: its repository's main checkout when it ran in a linked worktree, else the directory it ran in. */
 export const workspaceOf = (row: { cwd: string; cwdDisplay: string; workspace: Workspace | null }): Workspace => row.workspace ?? { cwd: row.cwd, cwdDisplay: row.cwdDisplay };
 
+/** The directory of the workspace a session counts in, {@link workspaceOf}'s `cwd`. */
+export const workspaceCwd = (row: { cwd: string; workspace: Workspace | null }): string => row.workspace?.cwd ?? row.cwd;
+
 /**
  * The sessions the sidebar, the palette, and the pages list: none in a temporary directory, none counting in a hidden workspace,
  * and none that is a Bot's conversation, which only its Bot's page shows.
@@ -28,7 +31,7 @@ export function discoverableSessions(
 	botSessions: ReadonlySet<string>,
 ): { hosts: RosterHost[]; past: PastSession[] } {
 	const listed = <T extends RosterHost | PastSession>(rows: T[]): T[] =>
-		rows.filter(row => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceOf(row).cwd) && !botSessions.has(row.sessionId));
+		rows.filter(row => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceCwd(row)) && !botSessions.has(row.sessionId));
 	return { hosts: listed(hosts), past: listed(past) };
 }
 
@@ -49,7 +52,7 @@ const newestFirst = (a: RosterHost, b: RosterHost): number => b.startedAt - a.st
  */
 export function workspaceSession(cwd: string | null, hosts: RosterHost[], shownWorkspace: string | undefined): View | null {
 	if (cwd === null || shownWorkspace === cwd) return null;
-	const newest = hosts.filter(host => workspaceOf(host).cwd === cwd).toSorted(newestFirst)[0];
+	const newest = hosts.filter(host => workspaceCwd(host) === cwd).toSorted(newestFirst)[0];
 	return newest ? { kind: "live", instanceId: newest.instanceId, agentId: null } : null;
 }
 
@@ -63,10 +66,10 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 		view?.kind === "live"
 			? hosts.find(host => host.instanceId === view.instanceId)
 			: past.find(session => session.sessionId === view?.sessionId);
-	const rows = [...(open ? [open] : []), ...hosts.toSorted(newestFirst), ...past].map(workspaceOf);
+	const rows = [...(open ? [open] : []), ...hosts.toSorted(newestFirst), ...past];
 	// Sessions from old omp versions recorded no directory.
-	const chosen = rows.find(row => row.cwdDisplay && (workspace === null || row.cwd === workspace));
-	return chosen?.cwdDisplay ?? "~";
+	const chosen = rows.find(row => row.cwdDisplay && (workspace === null || workspaceCwd(row) === workspace));
+	return chosen ? workspaceOf(chosen).cwdDisplay : "~";
 }
 
 /** The workspaces sessions count in, live ones first, then past ones newest first, then the ones Settings → Workspaces added. The settings page reads a workspace from one. */
@@ -92,7 +95,7 @@ export interface SidebarSessions {
 }
 
 export function sidebarSessions(hosts: RosterHost[], past: PastSession[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
-	const listed = (row: RosterHost | PastSession): boolean => workspace === null || workspaceOf(row).cwd === workspace;
+	const listed = (row: RosterHost | PastSession): boolean => workspace === null || workspaceCwd(row) === workspace;
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
 	const shownHosts = hosts.filter(listed);
 	const unpinnedHosts = shownHosts.filter(host => !isPinned(host));

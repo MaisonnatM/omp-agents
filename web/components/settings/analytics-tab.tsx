@@ -59,8 +59,8 @@ function AgentSplit({ agents }: { agents: Analytics["agents"] }) {
 }
 
 function SessionRow({ session }: { session: AnalyticsSession }) {
-	const { sessionId, title, listed, cwd, usage, subagentTokens, models, lastAt } = session;
-	const name = title ?? (listed ? (folderName(cwd) ?? "Untitled session") : "Deleted session");
+	const { sessionId, title, listed, workspace, usage, subagentTokens, models, lastAt } = session;
+	const name = title ?? (listed ? (folderName(workspace) ?? "Untitled session") : "Deleted session");
 	return (
 		<tr>
 			<RowHead className="max-w-48">
@@ -70,7 +70,7 @@ function SessionRow({ session }: { session: AnalyticsSession }) {
 					<span className="block truncate font-normal text-muted-foreground" title={`${sessionId}: its transcript is no longer on disk`}>{name}</span>
 				)}
 			</RowHead>
-			<td className="max-w-32 truncate border-t border-border py-2 ps-4 text-muted-foreground" title={cwd}>{folderName(cwd) ?? cwd}</td>
+			<td className="max-w-32 truncate border-t border-border py-2 ps-4 text-muted-foreground" title={workspace}>{folderName(workspace) ?? workspace}</td>
 			<Count title={`${full.format(usage.tokens.total)} tokens`}>{compact.format(usage.tokens.total)}</Count>
 			<Count title={`${full.format(subagentTokens)} subagent tokens`}>{percent.format(usage.tokens.total ? subagentTokens / usage.tokens.total : 0)}</Count>
 			<Count>{dollars(usage.cost)}</Count>

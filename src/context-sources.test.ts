@@ -156,8 +156,8 @@ describe("buildContextReport", () => {
 		expect(ranked.map(source => source.name)).toEqual(["read"]);
 	});
 
-	test("a listed session's working directory wins over its file's", () => {
-		const facts: SessionSummary = { cwd: "/code/listed", title: "Listed" };
+	test("a listed session's workspace wins over its file's directory", () => {
+		const facts: SessionSummary = { workspace: "/code/listed", title: "Listed" };
 		const { input, sessions } = report("/code/listed", null, id => (id === "s2" ? facts : null));
 		expect(input).toBe(300);
 		expect(sessions).toEqual([{ sessionId: "s2", title: "Listed", input: 300 }]);

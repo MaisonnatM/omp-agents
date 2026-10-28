@@ -56,15 +56,15 @@ export class SessionFiles {
 	/** Session `sessionId`'s listed file, or `null` while it is not listed. */
 	readonly savedOf = (sessionId: string): SavedSession | null => this.#byId.get(sessionId) ?? null;
 
-	/** What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, worktree, branch, and workspace. */
-	readonly factsOf = (sessionId: string): SessionFacts => {
-		const path = this.pathOf(sessionId);
-		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null, workspace: null };
-	};
+	/**
+	 * What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, worktree, branch, and workspace.
+	 * `cwd` is the directory a live session runs in now, which names its workspace; its file's directory when omitted.
+	 */
+	readonly factsOf = (sessionId: string, cwd?: string): SessionFacts => this.facts.factsOf(this.pathOf(sessionId), cwd);
 
-	/** The workspace each session counts in, newest first: its `SessionFacts.workspace`, else the directory it ran in. Sessions from old omp versions recorded none. */
-	cwds(): string[] {
-		return this.#files.map(session => this.facts.factsOf(session.path).workspace?.cwd ?? session.cwd).filter(Boolean);
+	/** The workspace each session counts in, newest first. Sessions from old omp versions recorded no directory. */
+	workspaces(): string[] {
+		return this.#files.map(session => this.facts.placement.cwdOf(session.cwd)).filter(Boolean);
 	}
 
 	/** Session-file activity for the worktree inventory, including a session whose directory sits inside a checkout. */

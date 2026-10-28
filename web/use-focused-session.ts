@@ -3,7 +3,7 @@ import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { documentTitle } from "./document-title";
 import { focusedView, type Page } from "./routing";
-import { workspaceOf, workspaceSwitch } from "./sessions";
+import { workspaceCwd, workspaceSwitch } from "./sessions";
 import type { WorkspaceScope } from "./use-workspace-scope";
 
 /** The session the focused pane shows, as the sidebar, the title, and the details read it. */
@@ -42,20 +42,20 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { wo
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
-	const live = host && { instanceId: host.instanceId, countsIn: workspaceOf(host).cwd };
-	const shown = useRef<{ instanceId: string; countsIn: string; workspace: string | null } | null>(null);
+	const live = host && { instanceId: host.instanceId, sessionWorkspace: workspaceCwd(host) };
+	const shown = useRef<{ instanceId: string; sessionWorkspace: string; workspace: string | null } | null>(null);
 	// The workspace is the one shown before the move: the old directory may have no session left, which already shows all workspaces.
 	useEffect(() => {
 		const last = shown.current;
 		shown.current = live ? { ...live, workspace } : null;
-		if (!live || last?.instanceId !== live.instanceId || last.countsIn === live.countsIn) return;
-		const next = workspaceSwitch(last.workspace, live.countsIn, hiddenCwds);
+		if (!live || last?.instanceId !== live.instanceId || last.sessionWorkspace === live.sessionWorkspace) return;
+		const next = workspaceSwitch(last.workspace, live.sessionWorkspace, hiddenCwds);
 		if (next !== null) pickWorkspace(next);
-	}, [live?.instanceId, live?.countsIn, workspace]);
+	}, [live?.instanceId, live?.sessionWorkspace, workspace]);
 	const session = host ?? past;
 	const sessionId = view?.kind === "past" ? view.sessionId : view?.kind === "live" && view.agentId === null ? ((host ?? lastHost)?.sessionId ?? null) : null;
 	return {
-		view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workspace: session && workspaceOf(session).cwd,
+		view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workspace: session && workspaceCwd(session),
 		workDir: session ? (session.worktree ?? session.cwd) : null, title,
 	};
 }
