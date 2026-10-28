@@ -22,6 +22,15 @@ export interface PullRequest extends Repo {
  */
 export const GITHUB_NAME = /^(?!\.\.?$)(?!-)[\w.-]+$/;
 
+/** `git@github.com:o/r.git`, `ssh://git@github.com/o/r.git`, or `https://github.com/o/r`; `git push` prints `github.com:o/r.git`. */
+const GITHUB_REMOTE = /^(?:(?:[^@/:]+@)?github\.com:|(?:https|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
+
+/** The GitHub repository a git remote URL names, or `null` for another host. */
+export function parseRemote(url: string): Repo | null {
+	const match = GITHUB_REMOTE.exec(url.trim());
+	return match ? { owner: match[1]!, repo: match[2]! } : null;
+}
+
 /** A pull request named by an owner, repository, and number, as the routes and a new session's work item carry one. */
 export function parsePullRequest(owner: unknown, repo: unknown, number: unknown): Parsed<PullRequest> {
 	if (typeof owner !== "string" || typeof repo !== "string" || !GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo)) return null;

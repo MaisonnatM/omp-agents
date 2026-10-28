@@ -11,7 +11,7 @@ import { directoryOf } from "./paths";
 import { type CheckRunState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
 import { MERGE_METHODS, type MergeMethod } from "./shared/source-control";
 
-export { parseRemote, repoOf } from "./github";
+export { repoOf } from "./github";
 
 const MERGED_DAYS = 7;
 

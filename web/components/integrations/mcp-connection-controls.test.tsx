@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { McpServerRow } from "../../../src/shared/mcp-servers";
+import { type McpServerRow, type OwnServer, ownServers } from "../../../src/shared/mcp-servers";
 import type { SignInControls } from "../../use-sign-in";
 import { ConnectionCallout, type ConnectionCalloutProps } from "./mcp-connection-controls";
-import { McpServerItem, type OwnServer, ownServers } from "./mcp-server-row";
+import { McpServerItem } from "./mcp-server-row";
 
 const idle: SignInControls = { starting: false, waitingUrl: null, failure: null, connect: async () => {} };
 const failing = { message: "Server unreachable", checking: false, check: () => {} };

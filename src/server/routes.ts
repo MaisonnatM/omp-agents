@@ -10,12 +10,11 @@ import { buildContextReport } from "../context-sources";
 import { readDecisions } from "../decisions";
 import { readFavicon } from "../favicon";
 import { readGithubMedia } from "../github-media";
-import { errorText, type Parsed } from "../json";
+import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import type { FileUsage } from "../foreign/usage";
 import { gitCheckout } from "../git";
-import type { GoogleCalendars } from "../google-calendar";
 import type { GmailAccounts } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from "../pull-requests";
 import type { Integrations } from "../integrations";
@@ -34,8 +33,7 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { attachToTicket, createTicket, loadLinearUsers, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
-import { type AccountId, GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
-import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
+import { GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequest, type PullRequestCheckout, type PullRequestRebase, prKey, type RebasedPullRequest, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
@@ -52,12 +50,11 @@ import { findMediaFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
-import { answer, fail, type Guards } from "./http";
-import type { LocalEventsFile } from "./local-events-file";
+import { answer, checked, fail, type Guards } from "./http";
 import { mailDocument } from "./mail-document";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
-	MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseGraphiteToken, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
+	MAX_QUEUED_STACK, parseBranchRelease, parseGoogleClient, parseGoogleLinks, parseGraphiteToken, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
 	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRepoName, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
 } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
@@ -69,12 +66,9 @@ import type { DashboardChangelog, DashboardUpdateOutcome, DashboardUpdateStatus 
 import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
-import { DAY_MS } from "../shared/days";
 import { signInGraphite } from "../source-control";
 import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
-
-/** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
-const MAX_EVENT_SPAN_MS = 62 * DAY_MS;
+import { calendarRoutes, type CalendarRoutesEnv } from "./calendar-routes";
 
 /** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
@@ -99,14 +93,6 @@ export interface SessionRoutesEnv {
 	changeSourceControl(change: SourceControlChange): void;
 	replayDetail(view: View, turnId: string): Promise<ReplayDetail>;
 	replayComparison(view: View): Promise<ReplayComparison>;
-}
-
-/** What the calendar routes read: every Google Calendar account, the calendars each shows, and the events kept on this computer. */
-export interface CalendarRoutesEnv {
-	google: GoogleCalendars;
-	/** Show or hide calendar `id` of Google Calendar account `account` on the Calendar page, and save the choice. */
-	setCalendarShown(account: AccountId, id: string, shown: boolean): void;
-	localEvents: LocalEventsFile;
 }
 
 /** What the file routes read: the registered worktrees and the terminal panel's shells. */
@@ -208,14 +194,6 @@ function routeKit(guards: Guards): RouteKit {
 			return input instanceof Response ? input : answer(() => run(input), refuse);
 		},
 	};
-}
-
-/** The value `parsed` holds, or a 400 with the parser's own reason, else with `badRequest`. */
-function checked<T>(parsed: Parsed<T>, badRequest: string): T | Response;
-function checked<T>(parsed: Parsed<T, { error: string }>): T | Response;
-function checked<T>(parsed: Parsed<T, { error: string } | null>, badRequest = ""): T | Response {
-	if (parsed && "ok" in parsed) return parsed.ok;
-	return fail(400, parsed ? parsed.error : badRequest);
 }
 
 /** The directory `?cwd=` names, or the response refusing it. Like a new session, `cwd` may name any directory. */
@@ -552,81 +530,6 @@ function todoRoutes({ write }: RouteKit, env: TodoRoutesEnv): Routes {
 		err => (err instanceof TodoTicketRefused ? fail(409, err.message) : null),
 	);
 	return { "/api/todo/ticket": { PUT: todoTicket } };
-}
-
-/** Google Calendar's calendars and events of every account, the events the Calendar page adds and deletes, and the events kept on this computer. */
-function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Routes {
-	const { google, localEvents } = env;
-
-	/** `GET /api/google[?fresh]`: the calendars checked in each account's Google Calendar list, with why each one's last read failed. */
-	const googleStatus = get(params => answer(() => google.status(params.has("fresh"))));
-
-	/** `PUT /api/google/calendars` `{ account, id, shown }`: show or hide one calendar's events on the Calendar page; answers the calendars after it. */
-	const calendarShown = write(
-		body => checked(parseCalendarShown(body), "Expected { account, id, shown } naming a calendar"),
-		async ({ account, id, shown }) => {
-			env.setCalendarShown(account, id, shown);
-			return google.status();
-		},
-	);
-
-	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of every account's shown Google calendars in that span. */
-	const calendarEvents = get(params => {
-		const from = new Date(params.get("from") ?? "");
-		const to = new Date(params.get("to") ?? "");
-		const span = to.getTime() - from.getTime();
-		if (!(span > 0 && span <= MAX_EVENT_SPAN_MS)) return fail(400, "Expected ?from= and ?to= ISO times, at most 62 days apart");
-		return answer(() => google.events(from, to, params.has("fresh")));
-	});
-
-	/** `GET /api/calendar/local`: every event kept on this computer. */
-	const localCalendarEvents = get(() => answer(async (): Promise<LocalEventsAnswer> => ({ events: [...localEvents.value] })));
-
-	/** `PUT /api/calendar/events/new`: `NewEvent`, kept on this computer or added to a Google calendar you may write to; answers `NewEventAnswer`. */
-	const eventCreate = write(
-		body => checked(parseNewEvent(body), "Expected { title, when, calendar }: a title, an all-day span of days or a timed span that ends after it starts, and this computer or a Google calendar"),
-		async ({ title, when, calendar }): Promise<NewEventAnswer> => {
-			switch (calendar.kind) {
-				case "local":
-					return { kept: localEvents.add(title, when) };
-				case "google":
-					await google.create(calendar.account, calendar.calendarId, title, when);
-					return { kept: null };
-				default: {
-					const unhandled: never = calendar;
-					return unhandled;
-				}
-			}
-		},
-	);
-
-	/** `PUT /api/calendar/events/delete`: `EventRef`, deletes an event kept on this computer or of a Google calendar you may write to; answers `{}`. */
-	const eventDelete = write(
-		body => checked(parseEventRef(body), 'Expected { kind: "local", id } or { kind: "google", account, calendarId, eventId } naming an event'),
-		async (event): Promise<object> => {
-			switch (event.kind) {
-				case "local":
-					localEvents.apply({ op: "remove", id: event.id });
-					return {};
-				case "google":
-					await google.delete(event.account, event.calendarId, event.eventId);
-					return {};
-				default: {
-					const unhandled: never = event;
-					return unhandled;
-				}
-			}
-		},
-	);
-
-	return {
-		"/api/google": { GET: googleStatus },
-		"/api/google/calendars": { PUT: calendarShown },
-		"/api/calendar/events": { GET: calendarEvents },
-		"/api/calendar/events/new": { PUT: eventCreate },
-		"/api/calendar/events/delete": { PUT: eventDelete },
-		"/api/calendar/local": { GET: localCalendarEvents },
-	};
 }
 
 /** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Email page sends. */

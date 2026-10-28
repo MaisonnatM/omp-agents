@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "./git";
 import { applySourceControl, DEFAULT_SOURCE_CONTROL, startingMethod } from "./shared/source-control";
-import { pullDefaultBranch, repositoriesOf } from "./source-control";
+import { pullDefaultBranch, repositoriesOf, signInGraphite } from "./source-control";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -69,6 +69,21 @@ describe("repositoriesOf", () => {
 		const here = await repositoriesOf([import.meta.dir]);
 		expect(here).toHaveLength(1);
 		expect(await repositoriesOf([clone, import.meta.dir])).toEqual(here);
+	});
+});
+
+describe("signInGraphite", () => {
+	test("never shows the token in gt's error", async () => {
+		const bin = mkdtempSync(join(tmpdir(), "omp-gt-"));
+		dirs.push(bin);
+		writeFileSync(join(bin, "gt"), '#!/bin/sh\necho "gt refused $*" >&2\nexit 1\n', { mode: 0o755 });
+		const path = process.env.PATH;
+		process.env.PATH = `${bin}:${path}`;
+		try {
+			await expect(signInGraphite("secret-token-123")).rejects.toThrow(/^gt refused auth --no-interactive --token <token>$/);
+		} finally {
+			process.env.PATH = path;
+		}
 	});
 });
 

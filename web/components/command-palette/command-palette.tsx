@@ -53,7 +53,7 @@ import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
-import { hashForNotes, hashForSettings, type OpenMode, SETTINGS_GROUPS, SETTINGS_SECTIONS, type SidebarTab } from "../../routing";
+import { hashForNotes, hashForSettings, type OpenMode, SETTINGS_GROUP_LABEL, SETTINGS_SECTIONS, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { workspaceCwd } from "../../sessions";
@@ -140,7 +140,7 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, l
 	id: `settings:${value}`,
 	section: "settings",
 	title: label,
-	subtitle: SETTINGS_GROUPS.find(entry => entry.value === group)!.label,
+	subtitle: SETTINGS_GROUP_LABEL[group],
 	keywords: ["settings", ...keywords],
 	icon,
 	accessories: [],

@@ -1,5 +1,5 @@
 /** What every HTTP route shares: refusals, answers, and the checks that keep other sites and programs' pages out. */
-import { errorText } from "../json";
+import { errorText, type Parsed } from "../json";
 import { MEDIA_KEY_PARAM, SOCKET_PROTOCOL, SOCKET_TOKEN_PREFIX } from "../shared/access";
 import type { SettingsError } from "../shared/models";
 import { dashboardHosts } from "./address";
@@ -15,6 +15,14 @@ export async function answer(run: () => Promise<unknown>, refuse?: (err: unknown
 	} catch (err) {
 		return refuse?.(err) ?? fail(500, errorText(err));
 	}
+}
+
+/** The value `parsed` holds, or a 400 with the parser's own reason, else with `badRequest`. */
+export function checked<T>(parsed: Parsed<T>, badRequest: string): T | Response;
+export function checked<T>(parsed: Parsed<T, { error: string }>): T | Response;
+export function checked<T>(parsed: Parsed<T, { error: string } | null>, badRequest = ""): T | Response {
+	if (parsed && "ok" in parsed) return parsed.ok;
+	return fail(400, parsed ? parsed.error : badRequest);
 }
 
 /**

@@ -2,7 +2,8 @@ import { describe, expect, setSystemTime, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { branchPullRequest, loadPullRequests, openThreadIds, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseRemote, parseStartersAnswer, readBehindBy, repoOf } from "./pull-requests";
+import { branchPullRequest, loadPullRequests, openThreadIds, parseDetailAnswer, parseListAnswer, parseMergedAnswer, parseStartersAnswer, readBehindBy, repoOf } from "./pull-requests";
+import { parseRemote } from "./shared/github";
 import { runChecked } from "./proc";
 import * as proc from "./proc";
 

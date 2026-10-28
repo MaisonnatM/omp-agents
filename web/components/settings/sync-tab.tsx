@@ -1,5 +1,5 @@
 import { RefreshCcw } from "lucide-react";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DEFAULT_SYNC_REPO,
@@ -19,7 +19,7 @@ import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { age } from "../../labels";
 import { IntegrationList } from "../integrations/integration-row";
-import { FIELD, Section } from "./editor";
+import { ErrorText, FIELD, Section } from "./editor";
 import { ToggleSwitch } from "../toggle-switch";
 
 const SKIP_REASON: Record<SyncSkip["reason"], string> = { link: "a link", binary: "not text", large: "over 1 MB", credential: "looks like it holds a credential" };
@@ -28,14 +28,6 @@ const ITEM_LABEL = Object.fromEntries(SYNC_ITEMS.map(item => [item.id, item.labe
 const ago = (at: number): string => (Date.now() - at < 60_000 ? "just now" : `${age(at)} ago`);
 
 type Pending = "save" | "sync" | "create";
-
-function ErrorText({ children }: { children: ReactNode }) {
-	return (
-		<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-			{children}
-		</p>
-	);
-}
 
 function Paths({ verb, paths }: { verb: string; paths: string[] }) {
 	if (paths.length === 0) return null;
@@ -176,7 +168,7 @@ export function SyncTab({ active }: { active: boolean }) {
 	};
 	const changed = draft !== null && (draft.remote.trim() !== settings.remote || draft.branch.trim() !== settings.branch);
 	const decided = conflicted?.conflicts.every(conflict => choices[conflict.path]) ?? false;
-	const createError = error?.of === "create" && <ErrorText>{error.text}</ErrorText>;
+	const errorOf = (of: Pending) => error?.of === of && <ErrorText>{error.text}</ErrorText>;
 	return (
 		<>
 			<Section title="Remote" meta="A Git repository only you can read, such as a private GitHub repository. Sync uses this machine's git credentials and never asks for a password.">
@@ -193,19 +185,22 @@ export function SyncTab({ active }: { active: boolean }) {
 						Save
 					</Button>
 				</form>
+				{errorOf("save")}
 				{answer && settings.remote === "" && (
-					<form className="flex flex-wrap items-end gap-2" onSubmit={submitCreate}>
-						<label className="space-y-1 text-sm">
-							New repository
-							<input value={repoName} onChange={event => setRepoName(event.target.value)} autoCapitalize="none" spellCheck={false} className={`${FIELD} block w-56`} />
-						</label>
-						<Button type="submit" variant="secondary" size="compact" loading={pending === "create"} disabled={pending !== null || repoName.trim() === ""}>
-							Create private repository on GitHub
-						</Button>
-						<p className="basis-full text-xs text-muted-foreground">No repository yet? gh creates a private one under your GitHub account, or under an organization you name as owner/name.</p>
-					</form>
+					<>
+						<form className="flex flex-wrap items-end gap-2" onSubmit={submitCreate}>
+							<label className="space-y-1 text-sm">
+								New repository
+								<input value={repoName} onChange={event => setRepoName(event.target.value)} autoCapitalize="none" spellCheck={false} className={`${FIELD} block w-56`} />
+							</label>
+							<Button type="submit" variant="secondary" size="compact" loading={pending === "create"} disabled={pending !== null || repoName.trim() === ""}>
+								Create private repository on GitHub
+							</Button>
+							<p className="basis-full text-xs text-muted-foreground">No repository yet? gh creates a private one under your GitHub account, or under an organization you name as owner/name.</p>
+						</form>
+						{errorOf("create")}
+					</>
 				)}
-				{settings.remote === "" && createError}
 			</Section>
 			<Section
 				title="Last sync"
@@ -217,7 +212,7 @@ export function SyncTab({ active }: { active: boolean }) {
 				}
 			>
 				{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
-				{error && error.of !== "create" && <ErrorText>{error.text}</ErrorText>}
+				{errorOf("sync")}
 				{answer && settings.remote === "" && <p className="text-xs text-muted-foreground">Name or create a remote above to sync.</p>}
 				{answer && <LastSync last={last} />}
 				{missing && (
@@ -225,7 +220,7 @@ export function SyncTab({ active }: { active: boolean }) {
 						<Button variant="secondary" size="compact" loading={pending === "create"} disabled={pending !== null} onClick={() => void create(missing)}>
 							Create {missing} on GitHub
 						</Button>
-						{createError}
+						{errorOf("create")}
 					</div>
 				)}
 				{conflicted && (

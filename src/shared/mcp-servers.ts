@@ -1,5 +1,5 @@
 /** The MCP servers Settings › MCP servers lists: every server omp loads for you, and the servers you add there. */
-import type { McpIntegrationId, SignInState } from "./accounts";
+import { MCP_INTEGRATIONS, type McpIntegrationId, type SignInState } from "./accounts";
 import type { McpRemoteStatus } from "./mcp-status";
 
 /** How omp reaches a server: over streamable HTTP, over the older SSE transport, or by running a local command. */
@@ -47,6 +47,17 @@ export interface McpServersAnswer {
 	servers: McpServerRow[];
 	/** omp's user `mcp.json`, where the page adds servers. */
 	configPath: string;
+}
+
+/** A server omp loads that is not one of Settings › Integrations' services, which that section lists instead. */
+export type OwnServer = McpServerRow & { status: Exclude<McpServerStatus, { kind: "integration" }> };
+
+const isOwn = (server: McpServerRow): server is OwnServer => server.status.kind !== "integration";
+
+/** `servers` split into the ones Settings › MCP servers shows and the Settings › Integrations services the others belong to, in that section's order. */
+export function ownServers(servers: readonly McpServerRow[]): { own: OwnServer[]; integrations: McpIntegrationId[] } {
+	const integrations = new Set(servers.flatMap(({ status }) => (status.kind === "integration" ? [status.id] : [])));
+	return { own: servers.filter(isOwn), integrations: MCP_INTEGRATIONS.filter(id => integrations.has(id)) };
 }
 
 /** A server you add by its address, with a header such as an API key when it takes one. */

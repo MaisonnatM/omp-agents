@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
+import { cloneUrl, dataOf, ghGraphql, ghMutation, ghRest, ghRestWrite, parsePerson } from "./github";
 import * as proc from "./proc";
 
 afterEach(() => {
@@ -15,6 +15,12 @@ test("bot identity comes from GitHub rather than a hardcoded login list", () => 
 
 test("a team is named by its slug and marked a team", () => {
 	expect(parsePerson({ slug: "frontend", avatarUrl: null })).toEqual({ login: "frontend", avatarUrl: null, isTeam: true });
+});
+
+test("a repository clones over SSH when gh's git_protocol says ssh, and over HTTPS otherwise, gh's default", () => {
+	expect(cloneUrl("ann/omp-settings", "ssh\n")).toBe("git@github.com:ann/omp-settings.git");
+	expect(cloneUrl("ann/omp-settings", "https\n")).toBe("https://github.com/ann/omp-settings.git");
+	expect(cloneUrl("ann/omp-settings", "")).toBe("https://github.com/ann/omp-settings.git");
 });
 
 describe("ghMutation", () => {

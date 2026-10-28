@@ -3,6 +3,7 @@
  * The registry is data, so the server, the page, and the docs read one list.
  */
 import { arrayOf, fields, type Guard, isNumber, isObject, isString, nullable, oneOf, type Parsed, tagged } from "../json";
+import { parseRemote } from "./github";
 
 export const SYNC_ITEM_IDS = ["omp-config", "omp-agents-md", "omp-append-system", "omp-skills", "omp-rules", "omp-agents", "omp-commands", "source-control", "notes", "todos", "preferences", "workspaces", "calendars"] as const;
 export type SyncItemId = (typeof SYNC_ITEM_IDS)[number];
@@ -136,10 +137,11 @@ export const DEFAULT_SYNC_REPO = "omp-settings";
 /** Git's words for a remote repository that does not exist, or that this machine may not see. */
 export const MISSING_REPOSITORY = /Repository not found|does not appear to be a git repository/i;
 
-const GITHUB_REMOTE = /^(?:git@github\.com:|ssh:\/\/git@github\.com\/|https:\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/;
-
 /** The `owner/name` of the GitHub repository `remote` names, when `error`, a failed sync's, says it does not exist; `null` otherwise. */
-export const missingGithubRepo = (remote: string, error: string): string | null => (MISSING_REPOSITORY.test(error) ? (GITHUB_REMOTE.exec(remote)?.[1] ?? null) : null);
+export const missingGithubRepo = (remote: string, error: string): string | null => {
+	const repo = MISSING_REPOSITORY.test(error) ? parseRemote(remote) : null;
+	return repo && `${repo.owner}/${repo.repo}`;
+};
 
 const isSkip: Guard<SyncSkip> = fields<SyncSkip>({ path: isString, reason: oneOf(["link", "binary", "large", "credential"] as const) });
 const isConflict: Guard<SyncConflict> = fields<SyncConflict>({ path: isString, item: isSyncItemId, local: nullable(isString), remote: nullable(isString) });

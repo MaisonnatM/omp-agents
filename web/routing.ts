@@ -78,6 +78,9 @@ export const SETTINGS_GROUPS = [
 
 export type SettingsGroup = (typeof SETTINGS_GROUPS)[number]["value"];
 
+/** Each settings sidebar group's label. */
+export const SETTINGS_GROUP_LABEL = Object.fromEntries(SETTINGS_GROUPS.map(group => [group.value, group.label])) as Record<SettingsGroup, string>;
+
 /**
  * The settings page's sections, in the sidebar's order, each in the `group` that lists it, with `keywords` the command
  * menu also finds it by. A `workspace` section shows omp's files and config as a session in the chosen workspace loads

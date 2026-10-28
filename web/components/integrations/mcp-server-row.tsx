@@ -1,8 +1,8 @@
 import { Power, PowerOff, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { MCP_INTEGRATIONS, type McpIntegrationId, type SignInState } from "../../../src/shared/accounts";
+import type { SignInState } from "../../../src/shared/accounts";
 import { catalogEntry } from "../../../src/shared/mcp-catalog";
-import type { McpServerRow, McpServerStatus, McpTransport } from "../../../src/shared/mcp-servers";
+import type { McpServerRow, McpTransport, OwnServer } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { errorText } from "../../../src/json";
@@ -30,21 +30,6 @@ import { MCP_LOGOS } from "./mcp-logos";
 const refresh = (): Promise<void> => mcpServersStore.refresh();
 
 const TRANSPORT: Record<McpTransport, string> = { http: "HTTP", sse: "SSE", stdio: "Local command" };
-
-/** A server omp loads that is not one of Settings › Integrations' services, which that section lists instead. */
-export type OwnServer = McpServerRow & { status: Exclude<McpServerStatus, { kind: "integration" }> };
-
-/** `servers` split into the ones this list shows and the Settings › Integrations services the others belong to, in that section's order. */
-export function ownServers(servers: readonly McpServerRow[]): { own: OwnServer[]; integrations: McpIntegrationId[] } {
-	const own: OwnServer[] = [];
-	const integrations = new Set<McpIntegrationId>();
-	for (const server of servers) {
-		const { status } = server;
-		if (status.kind === "integration") integrations.add(status.id);
-		else own.push({ ...server, status });
-	}
-	return { own, integrations: MCP_INTEGRATIONS.filter(id => integrations.has(id)) };
-}
 
 const STATUS: Record<OwnServer["status"]["kind"], StatusLabel> = {
 	disabled: { label: "Disabled", color: "gray" },

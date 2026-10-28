@@ -89,13 +89,18 @@ export function EditBar<T>({ editor, label, start = "Edit" }: { editor: Editor<T
 	);
 }
 
-export function SaveError<T>({ editor }: { editor: Editor<T> }) {
-	if (editor.state.phase !== "editing" || !editor.state.error) return null;
+/** A settings error, announced as it appears. */
+export function ErrorText({ children }: { children: ReactNode }) {
 	return (
 		<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-			Not saved: {editor.state.error}
+			{children}
 		</p>
 	);
+}
+
+export function SaveError<T>({ editor }: { editor: Editor<T> }) {
+	if (editor.state.phase !== "editing" || !editor.state.error) return null;
+	return <ErrorText>Not saved: {editor.state.error}</ErrorText>;
 }
 
 /** A settings block; leave out `title` when the page header already names it, so only `meta` and `actions` head it. */

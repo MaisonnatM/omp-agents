@@ -1,7 +1,7 @@
 import { Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
-import type { McpServersAnswer } from "../../../src/shared/mcp-servers";
+import { type McpServersAnswer, type OwnServer, ownServers } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
 import { readTime } from "../../labels";
 import { mcpServersStore } from "../../reads";
@@ -9,7 +9,7 @@ import { hashForSettings } from "../../routing";
 import { IntegrationList } from "../integrations/integration-row";
 import { McpCatalog } from "../integrations/mcp-catalog";
 import { McpServerForm } from "../integrations/mcp-server-form";
-import { McpServerItem, type OwnServer, ownServers } from "../integrations/mcp-server-row";
+import { McpServerItem } from "../integrations/mcp-server-row";
 import { LoadNote } from "../sheet-details";
 import { Section } from "./editor";
 

@@ -1,4 +1,4 @@
-import { Bot, NotebookPen, Pencil, Plus, Search, SquareArrowOutUpRight, Trash2 } from "lucide-react";
+import { Bot, NotebookPen, Pencil, Plus, SquareArrowOutUpRight, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { everyWord } from "../../../src/shared/every-word";
@@ -20,6 +20,7 @@ import { FieldPicker } from "../field-picker";
 import { focusRow, PageFrame, stepRows, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { NotesEditor } from "../notes-editor";
+import { SearchField } from "../search-field";
 import { toasts } from "../toaster";
 import { AddedByChip } from "../todo/links";
 
@@ -95,9 +96,7 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	};
 	return (
 		<PageFrame title={view.kind === "all" ? "Notes" : text.name} meta={`${listed.length} ${listed.length === 1 ? "note" : "notes"}`} actions={<>
-			<label className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-muted-foreground focus-within:ring-2 focus-within:ring-ring [&>svg]:size-3.5">
-				<Search aria-hidden /><input ref={search} type="search" aria-label="Search notes" placeholder="Search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Escape") { setQuery(""); event.currentTarget.blur(); } }} className="w-32 bg-transparent text-foreground outline-none placeholder:text-muted-foreground" />
-			</label>
+			<SearchField ref={search} label="Search notes" placeholder="Search" query={query} onQuery={setQuery} className="w-32" />
 			<Tooltip content="Write a new note" shortcut={shortcutLabels("notesNew")}><Button variant="tertiary" size="compact" leadingIcon={Plus} disabled={disabled} onClick={create}>New note</Button></Tooltip>
 		</>}>
 			<ListSplit widthKey="omp-agents.notes-list-width" resizeLabel="Resize the note list" detailLabel="Open note" empty={{ icon: NotebookPen, title: "No note open", hint: "Click a note, or focus one with ↑ or ↓ and press Enter." }} list={

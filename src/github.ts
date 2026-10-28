@@ -1,6 +1,7 @@
 /**
- * GitHub on the server: the repository `origin` names, `gh api` calls, and GitHub's enum values in the dashboard's
- * terms. The repository and pull request keys, which the page uses too, live in `shared/github.ts`.
+ * GitHub on the server: the repository `origin` names, `gh api` calls, the private repository Settings › Sync creates,
+ * and GitHub's enum values in the dashboard's terms. The repository and pull request keys, which the page uses too, live
+ * in `shared/github.ts`.
  */
 import { createCache } from "./cache";
 import { GithubQuota, parseRateLimit } from "./github-quota";
@@ -8,23 +9,16 @@ import { errorText, isObject, str } from "./json";
 import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
-import { type CheckRunState, MERGE_STATES, type MergeState, type Person, type PullRequestEvent, type PullRequestFile, type Repo, type ReviewDecision, type ReviewerState } from "./shared/github";
+import { type CheckRunState, MERGE_STATES, type MergeState, parseRemote, type Person, type PullRequestEvent, type PullRequestFile, type Repo, type ReviewDecision, type ReviewerState } from "./shared/github";
 import { GitHubAccess, quotaReset, type GitHubBudget } from "../templates/omp/agent/extensions/github/access";
 import { CommandError } from "../templates/omp/agent/extensions/github/command";
+import { githubStatus } from "./source-control";
 
 const GH_TIMEOUT_MS = 20_000;
 const access = new GitHubAccess();
 
 async function resetOf(budget: GitHubBudget): Promise<number | undefined> {
 	return quotaReset(await runJson(["gh", "api", "rate_limit"], { timeoutMs: GH_TIMEOUT_MS }), budget);
-}
-
-/** `git@github.com:o/r.git`, `ssh://git@github.com/o/r.git`, or `https://github.com/o/r`; `git push` prints `github.com:o/r.git`. */
-const GITHUB_REMOTE = /^(?:(?:[^@/:]+@)?github\.com:|(?:https|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
-
-export function parseRemote(url: string): Repo | null {
-	const match = GITHUB_REMOTE.exec(url.trim());
-	return match ? { owner: match[1]!, repo: match[2]! } : null;
 }
 
 /** How long a workspace's repository is kept, so that a directory with no GitHub `origin` does not spawn `git` on every load. */
@@ -205,3 +199,35 @@ export const FILE_STATUS: Record<string, ChangeStatus> = {
 	unchanged: "modified",
 	renamed: "renamed",
 };
+
+/** `fullName`'s clone URL in the protocol gh's `git_protocol` names: SSH for `ssh`, else HTTPS, gh's default. */
+export const cloneUrl = (fullName: string, protocol: string): string => (protocol.trim() === "ssh" ? `git@github.com:${fullName}.git` : `https://github.com/${fullName}.git`);
+
+/** GitHub's repository `fullName`, or `null` when there is none by that name. */
+async function viewRepo(fullName: string): Promise<{ nameWithOwner: string; owner: string; isPrivate: boolean } | null> {
+	const value = await runJson(["gh", "repo", "view", fullName, "--json", "nameWithOwner,owner,isPrivate"], { timeoutMs: GH_TIMEOUT_MS }).catch((err: unknown) => {
+		if (err instanceof Error && err.message.includes("Could not resolve to a Repository")) return null;
+		throw err;
+	});
+	if (value === null) return null;
+	if (!isObject(value) || typeof value.nameWithOwner !== "string" || !isObject(value.owner) || typeof value.owner.login !== "string" || typeof value.isPrivate !== "boolean") {
+		throw new Error(`gh did not describe ${fullName}`);
+	}
+	return { nameWithOwner: value.nameWithOwner, owner: value.owner.login, isPrivate: value.isPrivate };
+}
+
+/**
+ * The clone URL of the private GitHub repository `name` names, `owner/name` or a name under the signed-in account,
+ * created when it does not exist; one that exists must be the account's own, and private.
+ */
+export async function ensurePrivateRepo(name: string): Promise<string> {
+	const github = await githubStatus();
+	if (github.state === "missing") throw new Error("gh is not installed: install the GitHub CLI to create a repository");
+	if (!github.account) throw new Error("gh is signed out: run gh auth login in a terminal, then try again");
+	const fullName = name.includes("/") ? name : `${github.account}/${name}`;
+	const [existing, protocol] = await Promise.all([viewRepo(fullName), run(["gh", "config", "get", "git_protocol"])]);
+	if (existing && existing.owner !== github.account) throw new Error(`${existing.nameWithOwner} already exists and belongs to ${existing.owner}`);
+	if (existing && !existing.isPrivate) throw new Error(`${existing.nameWithOwner} already exists and is public; make it private on GitHub or choose another name`);
+	if (!existing) await runChecked(["gh", "repo", "create", fullName, "--private"], { timeoutMs: GH_TIMEOUT_MS });
+	return cloneUrl(existing?.nameWithOwner ?? fullName, protocol.code === 0 ? protocol.stdout : "");
+}

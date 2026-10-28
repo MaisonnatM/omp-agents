@@ -4,6 +4,7 @@
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
   `web/components/sidebar-search.tsx` is the Sessions tab's search field; given a shortcut, as the Sessions tab gives Cmd+F, the key puts the cursor in it and the empty field shows the key on its right.
   `web/components/kbd.tsx` holds `Kbd`, the key chip the command palette draws, and `ShortcutChip`, the smaller chip with a shortcut's first key that **New session** and that search field show on their right.
+  `web/components/search-field.tsx` is the bordered search field the Notes page and Settings › Files share, which Escape clears and leaves.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed.
   Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace badge.
   The row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
