@@ -141,12 +141,12 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<ToolbarButton label={fullScreen ? "Exit full screen" : "Full screen"} control="browser.full-screen" disabled={false} onClick={toggleFullScreen}>
 					{fullScreen ? <Minimize2 /> : <Maximize2 />}
 				</ToolbarButton>
-				<Tooltip content="Open in browser" side="bottom" disabled={!mounted}>
+				<Tooltip content="Open in default browser" side="bottom" disabled={!mounted}>
 					<Button
 						{...activityControl("browser.open-in-browser")}
 						variant="ghost"
 						size="icon-compact"
-						aria-label="Open in browser"
+						aria-label="Open in default browser"
 						disabled={!mounted}
 						render={mounted ? <a href={webview.address} target="_blank" rel="noopener noreferrer" /> : undefined}
 					>

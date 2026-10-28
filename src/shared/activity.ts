@@ -128,7 +128,7 @@ export const CONTROLS = [
 	{ id: "browser.start-server", label: "Browser Start dev server", area: "Browser" },
 	{ id: "browser.select-element", label: "Browser Select element", area: "Browser" },
 	{ id: "browser.full-screen", label: "Browser Full screen", area: "Browser" },
-	{ id: "browser.open-in-browser", label: "Browser Open in browser", area: "Browser" },
+	{ id: "browser.open-in-browser", label: "Browser Open in default browser", area: "Browser" },
 	{ id: "pull-requests.view.list", label: "Pull requests list view", area: "Pull requests" },
 	{ id: "pull-requests.view.board", label: "Pull requests board view", area: "Pull requests" },
 	{ id: "pr-details.tab.summary", label: "Pull request Summary tab", area: "Pull requests" },
