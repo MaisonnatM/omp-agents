@@ -95,6 +95,8 @@
   Steers and follow-ups carry their files too, and a queued row shows the files' names when you typed nothing.
   The new-session draft takes files for its first message.
   omp gives a subagent text only, so a subagent's composer takes text, documents included, but no image.
+- Pasting more than 2,000 characters or 40 lines attaches the text as a file, `Pasted text.txt`, instead of filling the text field, as ChatGPT and Claude do; a second one is `Pasted text 2.txt`.
+  Its tile shows the text's first lines, and it goes to the model as a text file does.
 - A prompt's images show above it in the transcript, in live and past sessions, including images sent from omp's terminal, and its files show by name in chips above the text.
 - In a session that the dashboard started, omp's built-in `/` commands run as they do in its terminal, for example `/compact` or `/usage`, and what a command prints shows as a line in the conversation.
   `!<command>` runs a shell command in the session's directory, as in omp's terminal: the command and its output show as your message, and the agent sees them in its next turn.

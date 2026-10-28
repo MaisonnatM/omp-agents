@@ -56,6 +56,7 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
   const shape = useShape();
   const isImage = file.type.startsWith("image/");
   const isPdf = file.type === "application/pdf";
+  const isText = file.type.startsWith("text/");
   const dot = file.name.lastIndexOf(".");
   const extension = dot > 0 ? file.name.slice(dot + 1) : "";
 
@@ -105,6 +106,22 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
     };
   }, [file, isPdf, size]);
 
+  const [snippet, setSnippet] = useState<string | null>(null);
+  useEffect(() => {
+    setSnippet(null);
+    if (!isText) return;
+    let cancelled = false;
+    void file
+      .slice(0, 400)
+      .text()
+      .then((text) => {
+        if (!cancelled) setSnippet(text);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [file, isText]);
+
   const previewUrl = imageUrl ?? pdfUrl;
   // Spinner only while a preview is genuinely pending; anything that can't
   // produce one (failed PDF, unsupported type) gets the generic icon instead.
@@ -134,6 +151,18 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
           alt={file.name}
           className="absolute inset-0 w-full h-full object-cover"
         />
+      ) : snippet !== null ? (
+        // A text file shows its first lines, as Claude shows pasted text.
+        <div role="img" aria-label={file.name} className="absolute inset-0">
+          <p className="h-full overflow-hidden whitespace-pre-wrap break-all px-1.5 pt-1.5 font-mono text-[7px] leading-[9px] text-muted-foreground [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+            {snippet}
+          </p>
+          {extension && (
+            <span className="absolute bottom-1 left-1 rounded-sm bg-background px-1 text-[9px] font-medium uppercase leading-[14px] text-muted-foreground outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
+              {extension}
+            </span>
+          )}
+        </div>
       ) : isPending ? (
         // Circular spinner while we wait for the preview to be ready.
         // Used for both images (brief URL-creation gap) and PDFs (longer
