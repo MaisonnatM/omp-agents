@@ -34,6 +34,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from `outline` in `web/transcript-view.ts`.
+  The **Todos** card at its top right, the agent's own todo list, is `SessionTodosCard` in `web/components/session-todos-card.tsx`.
   **Chat history**, the blurred column of the session's prompts over it, is `PromptHistory` in `web/components/prompt-history.tsx`, opened by `PromptHistoryButton` from the same file in the live composer's `rightSlot` in `web/components/conversation.tsx`.
   A tool row's image thumbnails open one viewer that the transcript owns, `ImageViewer` from `web/components/media-viewer.tsx`, over every tool image of the conversation.
 - Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the road-icon toggle after the session's title in `web/components/pane.tsx` swaps for the transcript.
@@ -42,7 +43,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts.
-  Its tabs are **Todos** in `session-todos-tab.tsx`, **PRs** in `session-pull-requests-tab.tsx`, and **Tickets** in `session-tickets-tab.tsx`, all in `web/components/`.
+  Its tabs are **PRs** in `session-pull-requests-tab.tsx` and **Tickets** in `session-tickets-tab.tsx`, both in `web/components/`.
   The **Images** section and the transcript share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in the default browser, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
   The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.

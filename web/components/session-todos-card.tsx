@@ -1,10 +1,16 @@
-import { ChevronRight, Circle, CircleAlert, CircleCheck, CircleSlash, LoaderCircle, type LucideIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { ChevronRight, Circle, CircleAlert, CircleCheck, CircleSlash, ListChecks, LoaderCircle, type LucideIcon } from "lucide-react";
+import { type ReactNode, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { TodoPhase, TodoTask } from "../../src/shared/transcript";
+import type { Item, TodoPhase, TodoTask } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { activityControl } from "../activity";
+import { useStoredState } from "../stored-state";
+import { latestTodos } from "../transcript-view";
+
+/** Whether the card shows the whole list, kept for every transcript; it starts folded to its summary. */
+const OPEN_KEY = "omp-agents.todos-card-open";
 
 const STATUS: Record<TodoTask["status"], { icon: LucideIcon; label: string; className: string }> = {
 	pending: { icon: Circle, label: "To do", className: "text-muted-foreground/60" },
@@ -15,9 +21,6 @@ const STATUS: Record<TodoTask["status"], { icon: LucideIcon; label: string; clas
 };
 
 const isClosed = (task: TodoTask): boolean => task.status === "completed" || task.status === "abandoned";
-
-/** How many tasks of `phases` are still open, which the tab's badge counts. */
-export const openTodos = (phases: readonly TodoPhase[]): number => phases.reduce((open, phase) => open + phase.tasks.filter(task => !isClosed(task)).length, 0);
 
 // A task is one line of inline Markdown: code, bold, italics, strikes, and links, without blocks.
 const INLINE: Components = {
@@ -116,32 +119,49 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 	);
 }
 
-/** The agent's own todo list in the right sidebar, as its latest `todo` call left it: progress on top, open tasks first, finished work folded. */
-export function SessionTodosTab({ phases }: { phases: readonly TodoPhase[] }) {
+/**
+ * The agent's own todo list, as its latest `todo` call left it, floating at the top right of its transcript once it
+ * made one: a summary of progress and the task in progress, which unfolds into every phase, open tasks first.
+ */
+export function SessionTodosCard({ items }: { items: readonly Item[] }) {
+	const phases = useMemo(() => latestTodos(items), [items]);
+	const [open, setOpen] = useStoredState(OPEN_KEY, raw => raw === "true");
+	if (phases.length === 0) return null;
 	const all = phases.flatMap(phase => phase.tasks);
 	const done = all.filter(isClosed).length;
 	const current = all.find(task => task.status === "in_progress");
 	return (
-		<div className="flex flex-col gap-3 px-2 pb-4">
-			<div className="flex flex-col gap-1.5 px-2">
-				<div className="flex items-baseline justify-between text-xs text-muted-foreground">
-					<span className="font-medium text-foreground">Plan</span>
-					<span className="tabular-nums">
+		<Collapsible
+			open={open}
+			onOpenChange={setOpen}
+			aria-label="Todos"
+			className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-5rem)] w-72 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur"
+		>
+			<CollapsibleTrigger {...activityControl("transcript.todos")} className="flex shrink-0 flex-col gap-1.5 px-3 py-2 text-left outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+				<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+					<ListChecks aria-hidden className="size-3.5 shrink-0" />
+					<span className="font-medium text-foreground">Todos</span>
+					<span className="ml-auto tabular-nums">
 						{done} of {all.length}
 					</span>
-				</div>
-				<div role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={all.length} aria-valuenow={done} className="h-px w-full bg-border">
-					<div className="h-px bg-foreground transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${all.length === 0 ? 0 : (done / all.length) * 100}%` }} />
-				</div>
+					<ChevronRight aria-hidden className={cn("size-3.5 shrink-0 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+				</span>
+				<span role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={all.length} aria-valuenow={done} className="block h-px w-full bg-border">
+					<span className="block h-px bg-foreground transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${all.length === 0 ? 0 : (done / all.length) * 100}%` }} />
+				</span>
 				{current && (
-					<p className="truncate text-xs text-muted-foreground">
-						Working on: <TaskText text={current.content} />
-					</p>
+					<span className="truncate text-xs text-muted-foreground">
+						<TaskText text={current.content} />
+					</span>
 				)}
-			</div>
-			{phases.map((phase, index) => (
-				<Phase key={`${index}:${phase.name}`} phase={phase} label={phase.name || `Phase ${index + 1}`} />
-			))}
-		</div>
+			</CollapsibleTrigger>
+			<CollapsibleContent className="min-h-0 overflow-y-auto border-t border-border [scrollbar-width:thin]">
+				<div className="flex flex-col gap-3 p-1.5 pb-2">
+					{phases.map((phase, index) => (
+						<Phase key={`${index}:${phase.name}`} phase={phase} label={phase.name || `Phase ${index + 1}`} />
+					))}
+				</div>
+			</CollapsibleContent>
+		</Collapsible>
 	);
 }

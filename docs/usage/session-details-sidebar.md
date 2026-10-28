@@ -1,19 +1,14 @@
 # Session details sidebar
 
-- The right sidebar shows the focused view's own todo list, and its session's pull requests and Linear issues, including those of its subagents.
+- The right sidebar shows the focused view's session's pull requests and Linear issues, including those of its subagents.
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
-- Its tabs are **Todos**, which shows only once the view's agent made a todo list, **PRs**, and **Tickets**, which shows only for a session with a Linear issue.
-  Each tab shows its name and a badge with its item count; **Todos** counts the tasks still open.
-  The sidebar remembers the tab you chose, for every view, and defaults to **Todos** when the view has a todo list, else to **PRs**.
-  A saved choice of the former **Files**, **Media**, or **Processes** tab falls back to that default.
+- Its tabs are **PRs** and **Tickets**, which shows only for a session with a Linear issue.
+  Each tab shows its name and a badge with its item count.
+  The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
+  A saved choice of the former **Todos**, **Files**, **Media**, or **Processes** tab falls back to that default.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
-- **Todos** shows the agent's todo list as its latest `todo` call left it: on top, how many tasks are done of all, a thin progress line, and the task in progress.
-  Below, each phase shows its done count and its open tasks first, with the in-progress or blocked task highlighted and a blocked task's reason under it; its done and dropped tasks fold into an **N completed** row.
-  A phase with every task done folds to one line with a check; click it to open it.
-  Task text shows its Markdown, such as code and bold.
-  It follows the agent's calls while the turn runs, and a subagent's view shows that subagent's own list.
-  This list is the agent's own and is separate from your Todo page.
+  The agent's own todo list shows in the conversation's **Todos** card; see [Conversations](conversations.md).
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A pull request the session only read shows only when the session's own prompt names it, as `#7049` or `PR 7049`; see [Pull requests](pull-requests.md).
   The pull requests the session worked on, such as one it opened, pushed, or edited, come before those its prompt only links or names, so the one it opened shows before the one the prompt linked.

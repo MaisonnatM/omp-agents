@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
-- The right sidebar has a new Todos tab that shows the agent's own todo list for the session, with each task's progress, as it works.
+- A session's conversation now shows the agent's own todo list in a small card at its top right, with how many tasks are done and the one in progress; click the card to see every task.
 - A Bot can now create, change, pause, and delete its own routines when you ask it in its conversation, and it can't touch another Bot's routines.
 - A Bot can now save or change its own job when you tell it what to do, and the Job field on its page updates.
 - The Bots tab now also counts Bots with a reply you have not read, not only those asking you something.

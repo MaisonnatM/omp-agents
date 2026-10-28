@@ -76,6 +76,7 @@ import { ImageViewer } from "./media-viewer";
 import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { PromptHistory } from "./prompt-history";
+import { SessionTodosCard } from "./session-todos-card";
 import { TranscriptMinimap } from "./transcript-minimap";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
@@ -690,6 +691,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					</MessageScrollerContent>
 				</MessageScrollerViewport>
 				<TranscriptMinimap items={items} working={working} />
+				<SessionTodosCard items={items} />
 				<PromptHistory view={view} items={items} working={working} />
 				<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />
 			</MessageScroller>

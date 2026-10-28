@@ -52,6 +52,13 @@
   Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
+- Once the view's agent made a todo list, a **Todos** card floats at the conversation's top right with the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
+  Click the card to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
+  Unfolded, each phase shows its done count and its open tasks first, with the in-progress or blocked task highlighted and a blocked task's reason under it; its done and dropped tasks fold into an **N completed** row.
+  A phase with every task done folds to one line with a check; click it to open it.
+  Task text shows its Markdown, such as code and bold.
+  It follows the agent's calls while the turn runs, and a subagent's view shows that subagent's own list.
+  This list is the agent's own and is separate from your Todo page.
 - The clock button in the composer, shown once a session has two prompts, opens **Chat history**: it blurs the conversation and gathers every prompt you sent into one column over it, newest at the bottom.
   Prompts that were in view slide from their place into the column.
   Click a prompt to close the history, scroll the conversation to it, and briefly outline its bubble; the X in the button's place, Escape, or a click on the blur closes it where you were.

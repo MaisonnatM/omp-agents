@@ -67,13 +67,13 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Model and thinking switch | control, command, action | `composer.model`; command `model`; actions `set-model`, `set-thinking`, `set-fast` |
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `replay-compare.open`; dragging the divider is not observed |
 | Desktop link address | not observed | display only |
-| Transcript (code blocks, session visuals, minimap, chat history, image viewer) | control | `transcript.activity-group`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`; the viewer's arrow keys record nothing; code block copy and session visuals are not observed |
+| Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `transcript.todos`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`; the viewer's arrow keys record nothing; code block copy and session visuals are not observed |
 | Trajectory | control | `trajectory.toggle`, `trajectory.turn`, `trajectory.step` |
 | Replay from here | control, action | `replay.open`; starting the replay is the dialog's request |
 | Replay comparison | control | `replay-compare.open` |
 | Scroll-to-bottom arrow | control | `transcript.scroll-to-bottom` |
 | Left sidebar | view, command, control | each tab's page view; tab and toggle shortcuts; `sidebar.left.toggle`, `sidebar.workspace`, `shortcuts.open`; untagged roster rows open a session, which records its view |
-| Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.tickets`, which a Bot's details share, and `session-details.tab.todos`, a session's only; images use the `media-viewer.*` controls |
+| Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.tickets`, which a Bot's details share; images use the `media-viewer.*` controls |
 | Pull request details (tabs, composer, header, checkout menu, checks, timeline) | view, control, action | views `pull-requests/item`, `pull-requests/files`; `pr-details.tab.summary`, `pr-details.tab.timeline`, `pr-details.tab.code`, `pr-details.tab.review`, `pr-details.checkout`; on the page the Code tab also sets the hash, so it shows as view `pull-requests/files`; edits, comments, merges, and checkouts are `PUT`s or action `review-draft` |
 | Bottom bar | control, command, action | `status-bar.terminal`, `status-bar.cpu`; command `terminal`; a process's Stop is a `PUT`; plan quota is display only |
 | Files: the changes card's Files section | control | `changes-card.file`, `changes-card.files.fold` |
