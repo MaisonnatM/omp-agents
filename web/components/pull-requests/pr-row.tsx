@@ -3,7 +3,7 @@ import { CircleCheck, CircleX, ClipboardPen, Clock, Eye, GitCompareArrows, GitMe
 import { memo, type MouseEvent, type ReactElement, type ReactNode, useRef, useState } from "react";
 import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import { type MoveId, readyOnceChecksPass } from "../../../src/shared/moves";
-import { reviewDraftOf, waitsOnYou } from "../../../src/shared/review-drafts";
+import { canApprove, reviewDraftOf, waitsOnYou } from "../../../src/shared/review-drafts";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -467,6 +467,7 @@ function rowMenuItems({ pr, change, review, options, pending, cwd, onQuickAction
 		quick: { actions: pullRequestActions(pr), pending, onRun: action => onQuickAction(pr, cwd, action as PullRequestActionId) },
 		rebase: { facts: pr, run: () => onRebase(pr, cwd) },
 		onState: to => change.run({ field: "state", state: to }),
+		onApprove: canApprove({ state: pr.state, byViewer: pr.role === "author" }) ? () => change.run({ field: "review", verdict: "approve", body: "" }) : undefined,
 		reviewers: { pr: review.shown, options, onChange: review.send },
 		pending: change.pending,
 	};

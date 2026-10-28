@@ -4,7 +4,7 @@
  */
 import { arrayOf, fields, type Guard, isNumber, isString, nullable, oneOf } from "../json";
 import { parseFullDiff } from "./changes";
-import { type PullRequest, samePullRequest } from "./github";
+import { type PullRequest, type PullRequestDetail, samePullRequest } from "./github";
 
 /** The tool a Review session saves its draft through, which the server serves and the Review prompt names. */
 export const REVIEW_DRAFT_TOOL = "save_review_draft";
@@ -224,6 +224,11 @@ export function canSubmitReview(verdict: ReviewVerdict, summary: string, lineCom
 	if (verdict === "approve") return true;
 	if (verdict === "request-changes") return summary.trim() !== "";
 	return summary.trim() !== "" || lineComments > 0;
+}
+
+/** Whether you may approve a pull request in `state`: only an open or draft one, and not your own, since GitHub refuses an author's approval. */
+export function canApprove({ state, byViewer }: { state: PullRequestDetail["state"]; byViewer: boolean }): boolean {
+	return (state === "open" || state === "draft") && !byViewer;
 }
 
 /** A comment on a line or range on one side of the diff. */

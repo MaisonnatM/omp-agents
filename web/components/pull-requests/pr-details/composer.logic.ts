@@ -1,12 +1,12 @@
 import type { PullRequestDetail } from "../../../../src/shared/github";
-import { canSubmitReview, type ReviewVerdict } from "../../../../src/shared/review-drafts";
+import { canApprove, canSubmitReview, type ReviewVerdict } from "../../../../src/shared/review-drafts";
 
 export const VERDICT_LABELS: Record<ReviewVerdict, string> = { approve: "Approve", "request-changes": "Request changes", comment: "Comment" };
 
-/** The verdicts you may review with: none once it merged or closed, and only a comment on your own. */
+/** The verdicts you may review with: every one where you may approve, only a comment on your own, and none once it merged or closed. */
 export function reviewVerdicts(detail: Pick<PullRequestDetail, "state" | "byViewer">): ReviewVerdict[] {
-	if (detail.state !== "open" && detail.state !== "draft") return [];
-	return detail.byViewer ? ["comment"] : ["comment", "approve", "request-changes"];
+	if (canApprove(detail)) return ["comment", "approve", "request-changes"];
+	return canApprove({ state: detail.state, byViewer: false }) ? ["comment"] : [];
 }
 
 /** The floating button's name: a review with its pending line comments counted, or a comment. */

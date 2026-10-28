@@ -1,8 +1,9 @@
-import { ArrowLeft, ExternalLink, FileDiff, GitMerge, GitPullRequest, Layers, MessageSquare, Pencil, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, FileDiff, GitMerge, GitPullRequest, Layers, MessageSquare, Pencil, TriangleAlert } from "lucide-react";
 import { type RefObject, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, prKey, MAX_PULL_REQUEST_TITLE, samePullRequest, type StackedPullRequest, type UpdateMethod } from "../../../../src/shared/github";
 import type { RosterHost } from "../../../../src/shared/sessions";
 import { primaryControl } from "../../../../src/shared/moves";
+import { canApprove } from "../../../../src/shared/review-drafts";
 import { MERGE_METHOD_LABELS } from "../../../../src/shared/source-control";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -116,6 +117,8 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 	const control = detail ? primaryControl(detail, method, queued?.method ?? null) : { kind: "none" as const };
 	const confirm = useInlineConfirm(`${prKey(pr)}:${detail?.headOid}:${method}`);
 	const state = detail?.state ?? "open";
+	const approve = useAction(() => send({ field: "review", verdict: "approve", body: "" }), "GitHub did not take the approval");
+	const approvable = !!detail && canApprove(detail);
 	const [StateIcon, tone] = STATE_ICON[state];
 	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn("inline-flex h-6 shrink-0 items-center gap-1 rounded-md border px-[7px] text-xs font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><GitMerge aria-hidden className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
 	const mergeLabel = confirm.isArmed("merge") ? "Confirm merge?" : control.kind === "enable-auto-merge" ? `${method ? MERGE_METHOD_LABELS[method] : "Merge"} when ready` : method ? MERGE_METHOD_LABELS[method] : "Merge";
@@ -172,6 +175,13 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 					</span>
 				)}
 				<CheckoutMenu pr={pr} cwd={cwd} onOpen={onOpen} />
+				{approvable && (
+					<Tooltip content="Approve">
+						<Button size="xs" variant="outline" className={ACTION_BUTTON} leadingIcon={Check} aria-label="Approve" loading={approve.pending} onClick={() => approve.run()}>
+							<span className={ACTION_LABEL}>Approve</span>
+						</Button>
+					</Tooltip>
+				)}
 				{control.kind === "resolve-conflicts" && (
 					<Tooltip content="Resolve conflicts">
 						<span className="inline-flex">
@@ -197,7 +207,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 						</Button>
 					</Tooltip>
 				)}
-				<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={quick} rebase={rebase} onState={to => onSave({ field: "state", state: to }, { state: to })}
+				<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={quick} rebase={rebase} onState={to => onSave({ field: "state", state: to }, { state: to })} onApprove={approvable ? () => approve.run() : undefined}
 					merge={{ allowed, method, onPick: pick, queued, onCancel: cancel.run }} pending={pending} label="More pull request actions" />
 			</div>
 			<div className={cn("col-span-2 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>

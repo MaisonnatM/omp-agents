@@ -432,8 +432,8 @@ export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr:
 /** Every pull request `repos` lists, leaving out the repositories GitHub could not read. */
 export const listedPullRequests = (repos: readonly RepoPullRequests[]): PullRequestSummary[] => repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests));
 
-/** A change a row makes to its pull request in the list: a state change or a review request; a merge goes through the merge queue. */
-export type ListChange = Extract<PullRequestChange, { field: "state" | "reviewer" }>;
+/** A change a row makes to its pull request in the list: a state change, a review request, or an approval; a merge goes through the merge queue. */
+export type ListChange = Extract<PullRequestChange, { field: "state" | "reviewer" | "review" }>;
 
 /** The list with `changed` in place of `pr`'s row; every repository and row it leaves alone stays the same object. */
 function withRow(list: PullRequestList, pr: PullRequest, changed: (row: PullRequestSummary) => PullRequestSummary[]): PullRequestList {

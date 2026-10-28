@@ -45,6 +45,8 @@ export interface PullRequestMenuItemsProps {
 	state: PullRequestDetail["state"] | null;
 	quick: QuickActionsProps;
 	onState: (to: SettableState) => void;
+	/** **Approve**, offered only where the viewer may approve. */
+	onApprove?: () => void;
 	merge?: HeaderMergeMenu;
 	rebase?: MenuRebase | null;
 	reviewers?: MenuReviewers;
@@ -98,7 +100,7 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 }
 
 /** The pull request's actions, as its `⋯` menu and its row's right-click menu both list them. */
-export function PullRequestMenuItems({ pr, state, quick, onState, merge, rebase, reviewers, pending = false }: PullRequestMenuItemsProps) {
+export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, merge, rebase, reviewers, pending = false }: PullRequestMenuItemsProps) {
 	const confirm = useInlineConfirm(prKey(pr));
 	const rebasing = useRebaseState(pr);
 	const offersRebase = !!rebase && rebaseApplies(rebase.facts);
@@ -123,6 +125,7 @@ export function PullRequestMenuItems({ pr, state, quick, onState, merge, rebase,
 				</MenuRadioGroup>
 				<MenuSeparator />
 			</>}
+			{onApprove && <MenuItem disabled={pending} onClick={onApprove}><Check />Approve</MenuItem>}
 			{changesState && <MenuItem disabled={pending} onClick={() => onState(state === "draft" ? "open" : "draft")}>
 				{state === "draft" ? <GitPullRequest /> : <GitPullRequestDraft />}{state === "draft" ? "Ready for review" : "Convert to draft"}
 			</MenuItem>}

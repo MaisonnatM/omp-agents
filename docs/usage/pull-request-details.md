@@ -16,6 +16,8 @@
   A linked worktree that already has the branch is reused as it is, and one in the main checkout is refused.
   **In this repository** runs `gh pr checkout <number>` in that checkout, and refuses while tracked files have uncommitted changes.
   A toast follows the checkout, and warns when the branch is not at the pull request's latest commit, as a reused branch with local commits is not.
+  On an open or draft pull request you did not open, **Approve** comes before the primary control and posts an approval with no summary at once.
+  GitHub refuses an approval from the pull request's author, so your own pull requests do not offer it.
   The primary control shows **Merged** or **Closed** for a finished pull request, **Resolve conflicts** for conflicts, and **Ready for review** for a draft.
   Otherwise it offers the selected merge method, such as **Squash and merge**, or that method **when ready** while GitHub holds the merge.
   The first click arms **Confirm merge?**, and a second click within three seconds sends the merge to the server.
@@ -29,7 +31,7 @@
   The server keeps merges in `merges.json` beside its access token and resumes them after a restart.
   The `⋯` menu starts with the quick actions, including fixes for CI, conflicts, and review comments.
   On your own open pull request without conflicts that the Pull requests page lists as behind its base, **Rebase on main**, named after its base, follows them, as in a row's `⋯` menu, and the details read the pull request again once it ends.
-  Next come the merge methods, **Ready for review** or **Convert to draft**, links to GitHub and Graphite, **Copy link**, and **Copy PR number**.
+  Next come the merge methods, **Approve** where the header offers it, **Ready for review** or **Convert to draft**, links to GitHub and Graphite, **Copy link**, and **Copy PR number**.
   A method picked there applies to this pull request's merge button; **Last selected** in Settings remembers it only once you confirm a merge with it.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
   The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
