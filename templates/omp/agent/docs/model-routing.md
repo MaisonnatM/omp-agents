@@ -68,5 +68,5 @@ omp config get retry.paidFallback
 - `smol`: `scout`, `sonic`, memory phase 2, and prewalk target.
 - `slow`: `reviewer`.
 - `task`: the bundled `task` agent.
-- `plan`: plan mode and `thermonuclear-reviewer`.
+- `plan`: plan mode, `thermonuclear-reviewer`, and `interface-reviewer`.
 - `advisor`, `vision`, `commit`, `tiny`: advisor runtime, image turns, commit messages, and titles, memory, and auto-thinking.

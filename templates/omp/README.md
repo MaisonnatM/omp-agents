@@ -41,17 +41,19 @@ Files, in `agent/`:
 
 - `AGENTS.md`: worktree and force-push safety, plus conditional pointers for model routing, reviews, and decision records.
   Read the matching reference under `~/.omp/agent/docs/` before taking that branch of the workflow, regardless of the repository's working directory.
-- `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear review, proof boxes, PR descriptions, and PR screenshots.
+- `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear and interface reviews, proof boxes, PR descriptions, and PR screenshots.
   These references load on demand rather than in every session's context.
 - `APPEND_SYSTEM.md`: short final replies (Résumé, Action, Then) that end on up to three suggested next prompts, questions asked through the ask tool with the recommended option first, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
-- `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, thermonuclear review, and live review.
+- `agents/interface-reviewer.md`: a read-only reviewer that runs your `interface-review` skill in full mode on a PR, on the `plan` role's model, and stops naming the missing skill when `interface-review` or `better-interface` is not installed.
+- `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, interface review, thermonuclear review, and live review.
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
   When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.
+  The interface review has the opposite default: the gate asks for the `- [x] Interface review` checkbox only when the repository commits `.omp/ui-paths` and a changed file matches one of its globs.
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
   When GitHub rejects the credential gh uses, the gate also names it, such as `GITHUB_TOKEN`, the project `.env` file omp read it from at startup, and the working login it overrides, never the token itself.
   A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
-  `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the thermonuclear gate.
+  `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the review gates.
   A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live; the extension checks the box, not a screenshot.
   Dashboard and CLI GitHub calls share separate GraphQL/REST reset cooldowns; exhausted quota is not reported as bad credentials or a fresh successful read, and stale `/ship` status cannot advance a gate.
 - `extensions/pr-description.ts`: the essential `pr_description` tool reads and edits descriptions with checked fresh reads, private original backups, and guards against accidental empty output, missing or ambiguous replacement anchors, and concurrent changes observed before the write.
@@ -100,6 +102,8 @@ Files, in `agent/`:
   Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.
 - For `/ship`: the [GitHub CLI](https://cli.github.com) signed in, and the Linear MCP server connected to omp.
   [Graphite](https://graphite.dev) is used when a repository is set up for it.
+- For `/ship`'s interface review: your own `interface-review` skill, plus the `better-interface` and `better-*` skills it hands off to, under `~/.agents/skills/` or `~/.omp/agent/skills/`.
+  The kit does not ship them; a repository without `.omp/ui-paths` never runs the review.
 
 ## Maintainer git profile
 

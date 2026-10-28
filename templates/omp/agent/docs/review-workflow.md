@@ -20,6 +20,16 @@ The file lists one glob per line, matched against repository-relative paths; `#`
 When the file exists and the pull request touches none of its globs, skip the review and the Thermonuclear stage, and say so in one line of the report.
 The ship extension reads the file from the checkout and the changed files from GitHub, and asks for the checkbox only when the review applies; it asks for it whenever GitHub lists fewer files than the pull request changes.
 
+## Interface review
+
+A pull request needs the interface review only when its repository commits `.omp/ui-paths` and a file it changes matches a glob listed there; a repository without the file never needs it.
+`.omp/ui-paths` has the same format as `.omp/review-paths`, and the ship extension also asks for the checkbox whenever GitHub lists fewer files than the pull request changes.
+The `/ship` Interface review stage runs before the Thermonuclear one, so the code quality review sees the interface fixes.
+Spawn `task` with `agent: "interface-reviewer"` and `pr <N>` as the assignment; it is read-only and runs the user's `interface-review` skill in full mode, which hands off to `better-interface` and the `better-*` skills.
+The kit does not ship those skills: when one is missing, the agent names it and stops without reviewing, and the user installs it before the stage resumes.
+Apply the findings in a fresh agent, commit and push, then append `- [x] Interface review` to the PR body the way the thermonuclear checkbox is added.
+A review that was only run, not applied, does not earn the checkbox.
+
 ## Proof boxes
 
 A repository's PR template can declare `- [ ] Browser proof`.
