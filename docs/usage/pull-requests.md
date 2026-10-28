@@ -33,8 +33,8 @@
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo** in the header's **Dev** group, **Notes**, **Calendar**, and **Email** in its **Ops** group.
-  Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
+- Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo** in the sidebar's tab bar, and **Notes**, **Calendar**, and **Email** as buttons in the header beside the command menu.
+  Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
   **Email** shows only once Gmail is connected; see [Email](email.md).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](todo-list.md).

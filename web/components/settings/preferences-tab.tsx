@@ -6,8 +6,7 @@ import { useContext } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
-import { TAB_GROUPS } from "../../routing";
-import { groupTabs, hideTab, moveTab, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
+import { hideTab, moveTab, placedTabs, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
@@ -37,24 +36,25 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 	);
 }
 
-/** The sidebar's tabs in the order the bar shows them, each with the key it takes now, a switch to hide it, and buttons to move it. */
+/** The sidebar's tabs in the order they show, each with the key it takes now, a switch to hide it, and buttons to move it. */
 function SidebarTabs() {
 	const { layout, setLayout, signedOut, shown } = useSidebarTabs();
+	const barTabs = placedTabs(shown, "bar");
 	return (
 		<Section
 			title="Sidebar tabs"
-			meta={`The tabs the sidebar shows, in order. The header's Dev and Ops switch picks which group's tabs the bar draws, and ${shortcutKeys("tab1")} goes to the first one it draws. A hidden tab's page, command, and links still work. Saved in this app.`}
+			meta={`The tabs the sidebar shows, in order. Notes, Calendar, and Email sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
 		>
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
 					const row = TAB_ROWS[tab];
-					const position = positionKey(tab, groupTabs(shown, row.group));
+					const position = positionKey(tab, barTabs);
 					return (
 						<li key={tab} className="flex items-center gap-2">
 							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 							<div className="min-w-0 flex-1">
 								{row.label}
-								<span className="ml-1.5 text-xs text-muted-foreground">{TAB_GROUPS.find(({ value }) => value === row.group)?.label}</span>
+								{row.place === "header" && <span className="ml-1.5 text-xs text-muted-foreground">Header</span>}
 								{"integration" in row && signedOut.has(tab) && (
 									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}

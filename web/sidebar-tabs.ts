@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import { integrationsStore } from "./reads";
-import { SIDEBAR_TABS, type TabGroup, type SidebarTab } from "./routing";
+import { SIDEBAR_TABS, type SidebarTab, type TabPlace } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
@@ -15,12 +15,12 @@ const KEY = "omp-agents.sidebar-tabs";
 /** The Email tab's id before its rename, which a layout stored before it still names; this goes when the new Inbox tab takes the id. */
 const LEGACY_EMAIL_TAB = "inbox";
 
-/** The user's sidebar tabs: every tab once, in the order the bar shows them, and whether the user hid it. */
+/** The user's sidebar tabs: every tab once, in the order the bar and the header show them, and whether the user hid it. */
 export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
 export const DEFAULT_TAB_LAYOUT: TabLayout = SIDEBAR_TABS.map(({ value }) => ({ tab: value, hidden: false }));
 
-/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, group, and the integration it waits on. */
+/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, place, and the integration it waits on. */
 export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, row])) as Record<SidebarTab, (typeof SIDEBAR_TABS)[number]>;
 
 /**
@@ -65,18 +65,12 @@ export function moveTab(layout: TabLayout, tab: SidebarTab, by: -1 | 1): TabLayo
 /** `layout` with `tab` hidden or shown. */
 export const hideTab = (layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout => layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
 
-/** The tabs the bar shows, in order: those the user did not hide, less those whose service omp holds no sign-in to. */
+/** The tabs shown, in order: those the user did not hide, less those whose service omp holds no sign-in to. */
 export const shownTabs = (layout: TabLayout, signedOut: ReadonlySet<SidebarTab>): SidebarTab[] =>
 	layout.filter(({ tab, hidden }) => !hidden && !signedOut.has(tab)).map(({ tab }) => tab);
 
-/** The tabs of `shown` that the bar draws while the header's switch is on `group`, in their order. */
-export const groupTabs = (shown: readonly SidebarTab[], group: TabGroup): SidebarTab[] => shown.filter(tab => TAB_ROWS[tab].group === group);
-
-/** The tab the header's switch opens for `group`: `last`, the tab you left it on, while it shows, else the group's first shown tab; none when the group shows no tab. */
-export function groupEntry(shown: readonly SidebarTab[], group: TabGroup, last: SidebarTab): SidebarTab | undefined {
-	const tabs = groupTabs(shown, group);
-	return tabs.includes(last) ? last : tabs[0];
-}
+/** The tabs of `shown` whose triggers sit at `place`, in their order. */
+export const placedTabs = (shown: readonly SidebarTab[], place: TabPlace): SidebarTab[] => shown.filter(tab => TAB_ROWS[tab].place === place);
 
 /** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
