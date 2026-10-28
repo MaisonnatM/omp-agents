@@ -120,8 +120,8 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 
 /**
  * How the sidebar tabs fit its width, through container queries: labels while they fit, then icons alone, the row only as
- * wide as its tabs. Icons alone keep each name in the tooltip and for screen readers. The width fits the larger group's four
- * tabs, with room for counts on Pull requests and Sessions and the list's margins.
+ * wide as its tabs. Icons alone keep each name in the tooltip and for screen readers. The width fits the bar's tabs, with
+ * room for counts on Pull requests and Sessions and the list's margins.
  */
 const SIDEBAR_TAB_FIT = {
 	tab: "@min-[26rem]/sidebar:[&>svg]:hidden",
@@ -150,7 +150,7 @@ interface RosterProps {
 	bots: readonly BotRow[] | null;
 	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while the gallery, another page, or the panes show. */
 	botsOpen: string | null | undefined;
-	/** The tabs the bar draws, the header switch's group's shown tabs, in order, which the position keys count. */
+	/** The shown tabs the bar draws, in order, which the position keys count. */
 	tabs: readonly SidebarTab[];
 	/** The sidebar's panel, selected by the page or kept over the panes. */
 	tab: SidebarPanel;

@@ -101,8 +101,8 @@
   That covers skills sent from the dashboard, from omp's terminal, and to a subagent, in live and past sessions.
   Copy copies the prompt as typed.
   File commands show their expanded text, because omp records only that.
-- A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
-  Hover a chip for the full path or title.
+- A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, the todos, tickets, pull requests, and sessions the `@` menu inserted, and annotations attached from the Browser.
+  Hover a chip for the full path or title, or the start of a Browser annotation's comment and elements.
   A todo, session, ticket, or pull request chip opens it here in the dashboard: the todo in its list, or in **Archive** once put away; a deleted todo's chip opens nothing.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
   First among the controls on the right, before the ticket and pull request buttons and **End session**, or **Resume** for a past session, the header shows the branch the session works on, such as `me/fix-login`.

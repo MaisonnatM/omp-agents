@@ -1,7 +1,8 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { isTypingTarget } from "../src/shared/desktop-bridge";
 import { commandKey, record } from "./activity";
 
-/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the bar draws, whichever it is; one per tab of the larger group. */
+/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the bar draws, whichever it is; one per tab the bar can draw. */
 export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
 
 export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
@@ -34,6 +35,10 @@ export type ShortcutId =
 	| "help"
 	| "restore"
 	| "browserRestore"
+	| "browserPickSelect"
+	| "browserPickRegion"
+	| "browserPickDraw"
+	| "browserPickErase"
 	| "focusComposer"
 	| "pull-requests"
 	| "tickets"
@@ -222,6 +227,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{ id: "browserRestore", category: "sessions", label: "Put a maximized Browser back in the sidebar", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
+	{ id: "browserPickSelect", category: "sessions", label: "Browser, while picking: select an element", keys: [{ chord: { key: "v" }, scope: "outside-fields" }] },
+	{ id: "browserPickRegion", category: "sessions", label: "Browser, while picking: draw a box around an area", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
+	{ id: "browserPickDraw", category: "sessions", label: "Browser, while picking: draw freehand", keys: [{ chord: { key: "d" }, scope: "outside-fields" }] },
+	{ id: "browserPickErase", category: "sessions", label: "Browser, while picking: remove a box or a line", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{
 		id: "focusComposer",
 		category: "sessions",
@@ -400,9 +409,6 @@ export const shortcutLabels = (id: ShortcutId): readonly string[] => LABELS[id];
 /** Every key that runs `id`, as prose names them: `⌘/ or ?`. */
 export const shortcutKeys = (id: ShortcutId): string => EITHER.format(shortcutLabels(id));
 
-const typing = (target: EventTarget | null): boolean =>
-	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
-
 /**
  * What one shortcut does, given which of its keys was pressed, its place in the shortcut's `keys`. Returning `false`
  * means the action does not apply now, so the key keeps its usual meaning.
@@ -485,7 +491,7 @@ let ranks = 0;
 /** The page's one keydown listener, attached while any component registers shortcuts. */
 function onKeyDown(event: KeyboardEvent): void {
 	if (event.isComposing) return;
-	const outside = !typing(event.target);
+	const outside = !isTypingTarget(event.target);
 	stack.dispatch(event, outside, nextKey(event, outside));
 }
 

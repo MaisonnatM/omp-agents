@@ -1,8 +1,8 @@
-import { ChevronRight, ListChecks } from "lucide-react";
+import { ChevronRight, ListChecks, Ship } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { View } from "../../src/shared/sessions";
+import { SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
 import type { Item, TodoPhase, TodoTask } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -10,10 +10,29 @@ import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
 import { latestTodos } from "../transcript-view";
 import { type ChangesSession, ChangesSections, useChanges } from "./todos-card-changes";
+import { Stepper } from "./arc/stepper";
 
 /** Whether the card shows the whole todo list, kept for every transcript; it starts folded to its summary. */
 const OPEN_KEY = "omp-agents.todos-card-open";
 const SHOWN_KEY = "omp-agents.todos-card-shown";
+const SHIP_OPEN_KEY = "omp-agents.todos-card-ship-open";
+
+const STAGE_LABEL: Record<ShipProgress["stage"], string> = {
+	ticket: "Ticket",
+	implement: "Implement",
+	draft_pr: "Draft PR",
+	interface_review: "Interface review",
+	thermonuclear: "Thermonuclear review",
+	ready_gate: "Ready gate",
+	live: "Live review",
+	merged: "Merged",
+};
+
+const WORK_LABEL: Record<NonNullable<ShipProgress["work"]>, string> = {
+	rebase: "Rebasing",
+	fix_comments: "Fixing review comments",
+	fix_ci: "Fixing CI",
+};
 
 /** Whether transcripts show the card's todo list, which Settings → Preferences toggles. */
 export const useTodosCardShown = () => useStoredState(SHOWN_KEY, raw => raw !== "false");
@@ -220,12 +239,62 @@ function TodosSection({ phases }: { phases: TodoPhase[] }) {
 	);
 }
 
+/** The /ship run's stages in order: the ones before the current stage done, the current one in progress, and every one done once merged. */
+function ShipSection({ ship }: { ship: ShipProgress }) {
+	const [open, setOpen] = useStoredState(SHIP_OPEN_KEY, raw => raw === "true");
+	const at = SHIP_STAGES.indexOf(ship.stage);
+	const merged = ship.stage === "merged";
+	const done = merged ? SHIP_STAGES.length : at;
+	const refs = [ship.issue, ship.pr === undefined ? undefined : `#${ship.pr}`].filter(Boolean).join(" · ");
+	return (
+		<Collapsible open={open} onOpenChange={setOpen}>
+			<CollapsibleTrigger {...activityControl("transcript.ship")} className="grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 pt-2.5 pb-3 text-left outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+				<Ship aria-hidden className="size-4 text-muted-foreground" />
+				<span className="truncate text-sm">
+					<span className="font-medium text-foreground">Ship</span>
+					{refs && <span className="text-muted-foreground"> · {refs}</span>}
+				</span>
+				<span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+					{done} of {SHIP_STAGES.length}
+					<ChevronRight aria-hidden className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+				</span>
+				<span className="col-start-2 col-end-4 truncate text-sm text-foreground/80">
+					{STAGE_LABEL[ship.stage]}
+					{ship.work && <span className="text-muted-foreground"> · {WORK_LABEL[ship.work]}</span>}
+				</span>
+				<span
+					role="progressbar"
+					aria-label="Ship stages done"
+					aria-valuemin={0}
+					aria-valuemax={SHIP_STAGES.length}
+					aria-valuenow={done}
+					aria-valuetext={`${done} of ${SHIP_STAGES.length} stages done`}
+					className="col-start-2 col-end-4 mt-1.5 block h-1.5 overflow-hidden rounded-full bg-muted"
+				>
+					<span className="block h-full rounded-full bg-emerald-500 transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${(done / SHIP_STAGES.length) * 100}%` }} />
+				</span>
+			</CollapsibleTrigger>
+			<CollapsibleContent className="border-t border-border">
+				<Stepper
+					className="px-3 py-3"
+					label="Ship stages"
+					completeLabel="Merged"
+					current={done}
+					steps={SHIP_STAGES.map(stage => ({ id: stage, label: STAGE_LABEL[stage], ...(stage === ship.stage && ship.work ? { description: WORK_LABEL[ship.work] } : {}) }))}
+				/>
+			</CollapsibleContent>
+		</Collapsible>
+	);
+}
+
 interface SessionTodosCardProps {
 	items: readonly Item[];
 	view: View;
 	working: boolean;
 	/** The session whose files, images, and sources the card lists; omitted, it lists none. */
 	changes?: ChangesSession;
+	/** The session's /ship run, shown as its own section; `null` without one. */
+	ship: ShipProgress | null;
 }
 
 /**
@@ -234,18 +303,19 @@ interface SessionTodosCardProps {
  * and the task in progress, which unfolds into every phase, open tasks first. The card floats at the top right of its
  * transcript when the transcript is wide enough to keep it beside the messages, and otherwise sits above them.
  */
-export function SessionTodosCard({ items, view, working, changes }: SessionTodosCardProps) {
+export function SessionTodosCard({ items, view, working, changes, ship }: SessionTodosCardProps) {
 	const phases = useMemo(() => latestTodos(items), [items]);
 	const [todosShown] = useTodosCardShown();
 	const todos = todosShown && phases.length > 0;
 	const found = useChanges(view, changes);
-	if (!todos && !found) return null;
+	if (!ship && !todos && !found) return null;
 	return (
 		<section
 			aria-label="Todos"
 			data-todos-card
 			className="mx-auto mt-3 max-h-[45%] min-h-0 w-[calc(100%-1.5rem)] max-w-[calc(var(--container-conversation)-1.5rem)] shrink-0 divide-y divide-border overflow-y-auto rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-sm backdrop-blur [scrollbar-width:thin] @min-[65.75rem]/conversation:absolute @min-[65.75rem]/conversation:top-3 @min-[65.75rem]/conversation:right-3 @min-[65.75rem]/conversation:z-10 @min-[65.75rem]/conversation:m-0 @min-[65.75rem]/conversation:max-h-[calc(100%-5rem)] @min-[65.75rem]/conversation:w-80 @min-[65.75rem]/conversation:max-w-none"
 		>
+			{ship && <ShipSection ship={ship} />}
 			{todos && <TodosSection phases={phases} />}
 			{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}
 		</section>

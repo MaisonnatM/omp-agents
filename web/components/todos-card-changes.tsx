@@ -25,8 +25,8 @@ export interface ChangesSession {
 	sessionId: string | null;
 	/** The session's directory, which the files' relative paths resolve against. */
 	cwd: string | null;
-	/** The session's pull requests and Linear issues, which selected images can be sent to and the sources leave out. */
-	facts: Pick<SessionFacts, "pullRequests" | "tickets"> | null;
+	/** The session's pull requests and Linear issues, which selected images can be sent to and the sources leave out, and its /ship run. */
+	facts: Pick<SessionFacts, "pullRequests" | "tickets" | "ship"> | null;
 }
 
 /** What the view's agents changed, took, and opened, each list empty until the server sends it. */

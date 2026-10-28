@@ -4,7 +4,7 @@
  */
 import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
 import { isString, recordOf } from "../src/json";
-import { ACCESS_CHANNEL, ALERT_CHANNEL, BADGE_CHANNEL, BROWSER_PORTS_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, PICK_DIRECTORY_CHANNEL, SIGN_IN_CHANNEL, SOUND_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, ALERT_CHANNEL, BADGE_CHANNEL, BROWSER_CAPTURE_CHANNEL, BROWSER_PORTS_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, PICK_DIRECTORY_CHANNEL, SIGN_IN_CHANNEL, SOUND_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 
 // Main answers only the dashboard's own page, so any other page, such as the shell's own notice, gets nothing.
 const access: unknown = ipcRenderer.sendSync(ACCESS_CHANNEL);
@@ -23,6 +23,7 @@ const bridge: DesktopBridge = {
 	},
 	signIn: () => ipcRenderer.send(SIGN_IN_CHANNEL),
 	browserPorts: (guestId, ports) => ipcRenderer.send(BROWSER_PORTS_CHANNEL, guestId, ports),
+	captureBrowser: guestId => ipcRenderer.invoke(BROWSER_CAPTURE_CHANNEL, guestId),
 	pickDirectory: async () => {
 		const picked: unknown = await ipcRenderer.invoke(PICK_DIRECTORY_CHANNEL);
 		return typeof picked === "string" ? picked : null;

@@ -6,6 +6,7 @@
       "name": "omp-agents-desktop",
       "devDependencies": {
         "@types/node": "^24.9.0",
+        "bippy": "0.6.1",
         "electron": "^44.5.1",
         "electron-builder": "^26.15.3",
         "electron-updater": "^6.8.9",

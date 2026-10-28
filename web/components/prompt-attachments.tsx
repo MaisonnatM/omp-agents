@@ -1,11 +1,11 @@
 /** The composer's attach button and the hook that reads attached files into a prompt's images and text. */
 import { Paperclip } from "lucide-react";
-import { useState } from "react";
+import { type ClipboardEvent, useState } from "react";
 import { plainText, type PromptDocument } from "../../src/shared/prompt-files";
 import { PROMPT_IMAGE_TYPES, type PromptImage } from "../../src/shared/sessions";
 import { errorText } from "../../src/json";
 import { putJson } from "../api";
-import { type Attachment, type AttachmentRead, preparePrompt, screenFiles } from "../prompt-attachments-model";
+import { type Attachment, type AttachmentRead, pastedTextFile, preparePrompt, screenFiles } from "../prompt-attachments-model";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -26,6 +26,8 @@ export interface PromptAttachments {
 	read: (text: string, deliver: (prompt: string, images: PromptImage[]) => void) => Promise<void>;
 	/** Attach images a queued message carried, after the files already attached. */
 	restore: (images: PromptImage[]) => void;
+	/** The text field's paste handler: long pasted text attaches as a file, so the text field stays readable. */
+	onPaste: (event: ClipboardEvent<HTMLElement>) => void;
 }
 
 /** `file`'s bytes in base64, as the server's JSON bodies carry a file. */
@@ -107,7 +109,16 @@ export function usePromptAttachments(images: boolean): PromptAttachments {
 		);
 		onFilesChange([...attachments.map(attachment => attachment.file), ...restored]);
 	};
-	return { files: attachments.map(attachment => attachment.file), onFilesChange, note, take, read, restore };
+
+	const files = attachments.map(attachment => attachment.file);
+	const onPaste = (event: ClipboardEvent<HTMLElement>): void => {
+		if (event.clipboardData.files.length > 0) return;
+		const file = pastedTextFile(event.clipboardData.getData("text/plain"), files);
+		if (!file) return;
+		event.preventDefault();
+		onFilesChange([...files, file]);
+	};
+	return { files, onFilesChange, onPaste, note, take, read, restore };
 }
 
 /** Opens the file picker. Dropping or pasting a file into the composer attaches it too. */

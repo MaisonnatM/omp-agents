@@ -100,7 +100,7 @@ const DASHBOARD_PERMISSIONS: ReadonlySet<string> = new Set(["clipboard-sanitized
 /** Whether `contents` may use `permission`: only the dashboard, and only what {@link DASHBOARD_PERMISSIONS} names. */
 const permitted = (contents: WebContents | null, permission: string): boolean => contents !== null && DASHBOARD_PERMISSIONS.has(permission) && isDashboard(contents.getURL());
 
-/** Whether `contents` may use `permission` in the Preview: only a webview the dashboard attached, and only to copy, which react-grab's copy needs. */
+/** Whether `contents` may use `permission` in the Browser: only a webview the dashboard attached, and only to copy, for the app's own Copy buttons. */
 const previewPermitted = (contents: WebContents | null, permission: string): boolean =>
 	permission === "clipboard-sanitized-write" && contents?.getType() === "webview" && isDashboard(contents.hostWebContents?.getURL() ?? "");
 

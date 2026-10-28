@@ -37,10 +37,10 @@ import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { hashForRoute, hashForView, type NotesListView, type OpenMode, TAB_GROUPS, type TabGroup, type TodoListView } from "./routing";
+import { hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
-import { groupTabs, useSidebarTabs } from "./sidebar-tabs";
+import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
 import { startOf } from "./starts";
 import { useAttention } from "./use-attention";
 import { useDashboard } from "./use-dashboard";
@@ -81,10 +81,10 @@ export function App() {
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useSettingsRoute(page);
 	const latestBot = useMemo(() => (state.bots === null ? null : (botRows(state.bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [state.bots, state.hosts, state.botLasts]);
-	const { tab, showTab, group, showGroup } = useSidebarTab({ page, signedOutTabs, shown: tabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
-	const emptyGroups = useMemo((): ReadonlySet<TabGroup> => new Set(TAB_GROUPS.flatMap(({ value }) => (groupTabs(tabs, value).length === 0 ? [value] : []))), [tabs]);
+	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
-	const barTabs = useMemo(() => groupTabs(tabs, group), [tabs, group]);
+	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
+	const headerTabs = useMemo(() => placedTabs(tabs, "header"), [tabs]);
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
@@ -198,14 +198,14 @@ export function App() {
 			<HeaderControls
 				notices={state.notices}
 				onShowSearch={showSearch}
-				group={group}
-				emptyGroups={emptyGroups}
-				onGroup={showGroup}
+				tabs={headerTabs}
+				tab={tab}
+				onTab={showTab}
 				settingsOpen={page?.kind === "settings"}
 				onToggleSettings={toggleSettings}
 			/>
 		),
-		[state.notices, showSearch, group, emptyGroups, showGroup, page?.kind, toggleSettings],
+		[state.notices, showSearch, headerTabs, tab, showTab, page?.kind, toggleSettings],
 	);
 
 	return (

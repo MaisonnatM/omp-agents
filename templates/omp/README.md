@@ -52,7 +52,8 @@ Files, in `agent/`:
   When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.
   The interface review has the opposite default: the gate asks for the `- [x] Interface review` checkbox only when the repository commits `.omp/ui-paths` and a changed file matches one of its globs.
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
-  When GitHub rejects the credential gh uses, the gate also names it, such as `GITHUB_TOKEN`, the project `.env` file omp read it from at startup, and the working login it overrides, never the token itself.
+  When GitHub rejects a token that gh reads from an environment variable, such as `GITHUB_TOKEN` from a project `.env`, while a stored gh login works, this extension and `pr_description` run gh without that variable for the rest of the session, which the agent's own `env -u` cannot do for omp's process.
+  When no stored login works, the gate names the rejected credential and the project `.env` file omp read it from at startup, never the token itself.
   A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
   `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the review gates.
   A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live; the extension checks the box, not a screenshot.
@@ -89,7 +90,7 @@ Files, in `agent/`:
   When HEAD is no longer where a session left it, because another process switched the branch, that session's changes there are blocked until a switch it runs as its own command succeeds, back or to the new branch.
   Reads, files outside git, and the clones omp makes for `isolated: true` subagents pass, and a change in a directory that a variable names is blocked until the command writes the directory out.
   If a session's process dies and you know its work is done, delete the claim file it names; the guard also replaces a claim whose process has ended.
-- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, and delete changes; `add` and `edit` take the name of an existing section.
+- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, and delete changes; `add` and `edit` take the name of an existing section, and an `add` naming one that does not exist files the todo in none.
   On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
 - `extensions/notes.ts`: `user_note` lists and reads the dashboard's notes and queues add/append changes.
   An empty parameter reads as left out, and a session that adds a title it already added gets that note's id back.

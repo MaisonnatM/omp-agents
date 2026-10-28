@@ -1,6 +1,6 @@
 /**
  * The shapes the Todo page, the socket, and `todos.json` share.
- * The omp extension `templates/omp/agent/extensions/todos.ts` reads and writes the same file but cannot import `src/`, so it keeps its own copy of the file's shape: change it with this one.
+ * The omp extension `templates/omp/agent/extensions/todos.ts`, with its section shape in `todos/sections.ts`, reads and writes the same file but cannot import `src/`, so it keeps its own copy of the file's shape: change it with this one.
  */
 
 /** What a todo points to: a session it started or came from, a pull request, or a Linear issue. */

@@ -19,7 +19,7 @@ export interface PageShortcutInput {
 	view: View | null;
 	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
 	signedOutTabs: ReadonlySet<SidebarTab>;
-	/** The tabs the sidebar's bar draws, the header switch's group's, in order: Cmd+1 goes to the first. */
+	/** The shown tabs the sidebar's bar draws, in order: Cmd+1 goes to the first. */
 	tabs: readonly SidebarTab[];
 	/** The dashboard can create Linear issues, so the new-ticket shortcut applies. */
 	linearCallable: boolean;

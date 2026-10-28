@@ -1,8 +1,8 @@
 /**
  * Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across
- * reloads, and the channel that appends text to it from elsewhere on the page, such as the session's Browser.
+ * reloads, and the channels that append text and attach files to it from elsewhere on the page, such as the session's Browser.
  */
-import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
 import type { BotId } from "../src/shared/bots";
 import type { LiveView } from "../src/shared/sessions";
 import { expiringStrings } from "./expiring-strings";
@@ -27,15 +27,50 @@ export const clearDraft = (key: string): void => drafts.set(key, null);
 /** `text` added to `draft`, a blank line after what was typed; the mounted composer and the kept draft must append alike. */
 const withAppended = (draft: string, text: string): string => (draft.trim() ? `${draft}\n\n${text}` : text);
 
-/** The mounted composers by draft key, each taking appended text. */
-const appenders = new Map<string, Set<(text: string) => void>>();
+/** What the mounted composers take from elsewhere on the page, by draft key: `send` reaches each one and says whether any did. */
+function composerChannel<T>() {
+	const receivers = new Map<string, Set<(value: T) => void>>();
+	return {
+		send(key: string, value: T): boolean {
+			const mounted = receivers.get(key);
+			if (!mounted?.size) return false;
+			for (const receive of mounted) receive(value);
+			return true;
+		},
+		/**
+		 * Has the composer of `key` take what is sent to it while mounted; `null` takes nothing. A hook kept on the
+		 * channel, which the rules of hooks allow as `channel.useReceiver`.
+		 */
+		useReceiver(key: string | null, receive: (value: T) => void): void {
+			const latest = useRef(receive);
+			latest.current = receive;
+			useEffect(() => {
+				if (key === null) return;
+				const forward = (value: T): void => latest.current(value);
+				const mounted = receivers.get(key) ?? new Set();
+				receivers.set(key, mounted.add(forward));
+				return () => {
+					mounted.delete(forward);
+					if (mounted.size === 0) receivers.delete(key);
+				};
+			}, [key]);
+		},
+	};
+}
+
+const texts = composerChannel<string>();
+const files = composerChannel<File>();
 
 /** Appends `text` to the composer of `key`: in place when it is mounted, without taking focus, else to its kept draft. */
 export function appendToComposer(key: string, text: string): void {
-	const mounted = appenders.get(key);
-	if (mounted?.size) for (const append of mounted) append(text);
-	else putDraft(key, withAppended(drafts.get(key) ?? "", text));
+	if (!texts.send(key, text)) putDraft(key, withAppended(drafts.get(key) ?? "", text));
 }
+
+/** Attaches `file` to the mounted composer of `key`, without taking focus; `false` when none is mounted, since attachments live only in it. */
+export const attachToComposer = (key: string, file: File): boolean => files.send(key, file);
+
+/** Has the composer of `key` take the files {@link attachToComposer} sends it. */
+export const useComposerFiles = files.useReceiver;
 
 /**
  * A composer's text, starting from the draft kept under `key`, else from `seed`, and kept there as it changes. Empty
@@ -50,15 +85,6 @@ export function useComposerDraft(key: string | null, seed: string): [string, Dis
 	useEffect(() => {
 		if (slot !== null) drafts.set(slot, text === "" || text === start ? null : text);
 	}, [slot, start, text]);
-	useEffect(() => {
-		if (slot === null) return;
-		const append = (added: string): void => setText(current => withAppended(current, added));
-		const mounted = appenders.get(slot) ?? new Set();
-		appenders.set(slot, mounted.add(append));
-		return () => {
-			mounted.delete(append);
-			if (mounted.size === 0) appenders.delete(slot);
-		};
-	}, [slot]);
+	texts.useReceiver(slot, added => setText(current => withAppended(current, added)));
 	return [text, setText];
 }

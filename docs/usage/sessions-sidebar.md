@@ -1,11 +1,9 @@
 # Sessions sidebar
 
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
-- The **Dev** and **Ops** switch at the right end of the header picks which tabs the sidebar's tab bar shows.
-  **Dev** shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**; **Ops** shows **Notes**, **Calendar**, and **Email**.
+- The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**.
+  **Notes**, **Calendar**, and **Email** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar, and the open one's button stays pressed.
   The **Bots** tab lists your Bots, which the **Sessions** tab does not; see [Bots](bots.md).
-  Switching opens the tab you last left in that group, else its first tab, and the switch follows any page you open, so G then N or a link to a note turns it to **Ops**.
-  A side whose tabs are all hidden or signed out is disabled.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
@@ -69,7 +67,8 @@
   The server keeps the list in `interrupted.json` beside its access token, so it survives a restart.
   Sessions started in a terminal keep running when the dashboard stops too, and never show here.
 - The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under the header, and the bottom fades while more rows sit below.
-- Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, or the left edge of the session details sidebar.
+- Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, between 240 and 560 pixels, or the left edge of the session details sidebar, between 240 and 960 pixels, so the Browser can show an app at a laptop's width.
+  The session details sidebar stops where the conversation would get narrower than 480 pixels, and takes its width back once the window or the sessions sidebar leaves room.
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
   Double-click the edge to reset the width.
   Resize handles show no tooltip on hover or while dragging.
