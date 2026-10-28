@@ -227,7 +227,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						disabled={starting || !connected}
 						sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
 						sending={starting || save.pending}
-						editorProps={{ ...completion.editorProps, onKeyDown, autoFocus: true }}
+						editorProps={{ ...completion.editorProps, onKeyDown, onPaste: scheduled ? undefined : attachments.onPaste, autoFocus: true }}
 					/>
 				</ComposerEditor>
 				{directCommand && <ComposerNote text={directCommand} />}

@@ -14,6 +14,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   The completion list and the dashboard's composer shortcuts need the key before the submit and history handling.
 - `editorProps.onPaste`: runs first in the paste handler, and a pasted file that `accept` takes attaches instead of pasting its name as text.
   A screenshot or a copied file is the common paste.
+  The dashboard's composer attaches a long pasted text as a file there, in `usePromptAttachments`.
 - `accept` takes `*/*` as any file, as the browser's file picker does; the dashboard's composer reads or refuses each file itself.
 - `stopShortcut`: the keys that press Stop, shown in its tooltip.
 - `stopping`: the Stop button shows its spinner while the consumer's stop runs.

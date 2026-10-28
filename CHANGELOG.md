@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- Pasting a long text into the message box now attaches it as a file, Pasted text.txt, as ChatGPT and Claude do, so what you type stays readable. Its tile shows the first lines.
 - The Browser tab now picks as T3 Code does: the pointer button floats a Select, Region, Draw, and Erase switch over your app. Elements you select and boxes and lines you draw go in together with the comment you type beside them: one chip in the message box and one picture. The new camera button attaches a picture of the whole app.
 - The session details sidebar, and the Browser in it, now widens to 960 pixels, as far as the conversation keeps 480.
 - Behind the scenes: merging a branch into main without a line here now stops at the merge, and a fast-forward without one warns, so the line goes on the branch instead of a fix-up after it.

@@ -24,6 +24,19 @@ export interface PreparedPrompt {
 	refused: string[];
 }
 
+/** A paste over either limit attaches as a text file instead of filling the text field, as ChatGPT and Claude do. */
+export const LONG_PASTE_CHARS = 2_000;
+export const LONG_PASTE_LINES = 40;
+
+/** `text` as a file named `Pasted text.txt`, numbered past the names `attached` holds, when it is long enough to attach; else `null`. */
+export function pastedTextFile(text: string, attached: readonly File[]): File | null {
+	if (text.length <= LONG_PASTE_CHARS && text.split("\n").length <= LONG_PASTE_LINES) return null;
+	const taken = new Set(attached.map(file => file.name));
+	let name = "Pasted text.txt";
+	for (let n = 2; taken.has(name); n++) name = `Pasted text ${n}.txt`;
+	return new File([text], name, { type: "text/plain" });
+}
+
 /** Why `files` that their sizes alone keep out stayed out, and the rest in order; `images`: the subject takes images. */
 export function screenFiles(files: readonly File[], images: boolean): { kept: File[]; refused: string[] } {
 	const refused: string[] = [];

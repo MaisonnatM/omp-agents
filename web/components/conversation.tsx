@@ -307,6 +307,7 @@ function LiveConversation({
 							"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
 							onKeyDown,
 							onBlur: suggestions.onBlur,
+							onPaste: writable ? attachments.onPaste : undefined,
 						}}
 						onSend={sendText}
 						leftSlot={
