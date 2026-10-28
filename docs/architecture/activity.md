@@ -73,7 +73,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Replay comparison | control | `replay-compare.open` |
 | Scroll-to-bottom arrow | control | `transcript.scroll-to-bottom` |
 | Left sidebar | view, command, control | each tab's page view; tab and toggle shortcuts; `sidebar.left.toggle`, `sidebar.workspace`, `shortcuts.open`; untagged roster rows open a session, which records its view |
-| Right sidebar (session details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.tickets`; images use the `media-viewer.*` controls |
+| Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.tickets`, which a Bot's details share; images use the `media-viewer.*` controls |
 | Pull request details (tabs, composer, header, checkout menu, checks, timeline) | view, control, action | views `pull-requests/item`, `pull-requests/files`; `pr-details.tab.summary`, `pr-details.tab.timeline`, `pr-details.tab.code`, `pr-details.tab.review`, `pr-details.checkout`; on the page the Code tab also sets the hash, so it shows as view `pull-requests/files`; edits, comments, merges, and checkouts are `PUT`s or action `review-draft` |
 | Bottom bar | control, command, action | `status-bar.terminal`, `status-bar.cpu`; command `terminal`; a process's Stop is a `PUT`; plan quota is display only |
 | Files: the changes card's Files section | control | `changes-card.file`, `changes-card.files.fold` |
@@ -92,7 +92,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
 | Pages: Email | view | `email`, `email/new`, `email/item` |
-| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`; `bot`, `routine` |
+| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`; `bot`, `routine` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |

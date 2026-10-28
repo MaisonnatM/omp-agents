@@ -104,6 +104,7 @@ export const CONTROLS = [
 	{ id: "bots.routine.delete", label: "Bot routine Delete, before it is confirmed", area: "Bots" },
 	{ id: "bots.routine.new", label: "Bot New routine", area: "Bots" },
 	{ id: "bots.routine.run", label: "Bot routine run, picked on its strip", area: "Bots" },
+	{ id: "bots.tab.details", label: "Bot details Details tab", area: "Bots" },
 	{ id: "header.back", label: "Back button", area: "Header" },
 	{ id: "header.command-menu", label: "Command menu button", area: "Header" },
 	{ id: "header.forward", label: "Forward button", area: "Header" },

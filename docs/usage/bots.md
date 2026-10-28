@@ -5,7 +5,7 @@
   Each row shows the Bot's avatar, its name, the time of its last message, and that message on one muted line.
   The line reads **You:** before your own words, **Working…** while the Bot works, or the question it waits on you for, in amber.
   A blue dot marks a reply you have not read, and the most recent conversation comes first.
-  The tab counts the Bots that wait on your answer.
+  The tab counts the Bots that wait on you: those asking you something, and those with a reply you have not read.
 - Each Bot's avatar is a colored shape with two eyes, which you pick when you make it and can change later, so a rename keeps its face.
   A Bot made before you could pick keeps the shape and color its id gave it.
   The avatar bobs and glances while the Bot works, or pulses gently when your system asks for reduced motion, and an amber dot marks a question waiting on you.
@@ -35,7 +35,9 @@
   Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  The details start with the avatar, the name, whether the Bot's session runs, and its workspace.
+  Its tabs are **Details**, **PRs**, and **Tickets**, and it remembers the one you last picked, apart from a session's.
+  **PRs** and **Tickets** show the pull requests and Linear issues the Bot's conversation worked on, as a session's do; **Tickets** shows only once the conversation worked on one.
+  **Details** starts with the avatar, the name, whether the Bot's session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
   Below come its **Job**, its **Memory**, its **Routines**, and **Delete**.

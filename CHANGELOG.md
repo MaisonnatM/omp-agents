@@ -7,6 +7,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - A Bot can now create, change, pause, and delete its own routines when you ask it in its conversation, and it can't touch another Bot's routines.
 - A Bot can now save or change its own job when you tell it what to do, and the Job field on its page updates.
+- The Bots tab now also counts Bots with a reply you have not read, not only those asking you something.
+- A Bot's right sidebar now has PRs and Tickets tabs beside Details, showing the pull requests and tickets its conversation worked on, as a session's does.
+- Fixed: a short Bot name no longer shows cut off in the header of its page.
+- The Files, Images, and Sources card above a session's message box now has a border, so it stands apart from the conversation.
 - On the Todo page, each category in the sidebar now has a checkbox: uncheck one to hide its todos from All, Today, Needs you, and From agents, and the app remembers it when you come back.
 - A Bot's page no longer lets you end its conversation, and its Delete button is now red.
 - You can drag the edge of a pull request's details beside the list to make them wider or narrower, and the app keeps the width.

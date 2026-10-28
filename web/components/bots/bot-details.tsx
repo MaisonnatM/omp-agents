@@ -1,25 +1,30 @@
-/** `BotDetails`, the right sidebar on a Bot's page: its look and name, both editable in place, where it works, its job, memory, and routines, then Delete. */
+/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and routines, then Delete; and its conversation's PRs and Tickets tabs. */
 import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { type Bot, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
-import type { RosterHost } from "../../../src/shared/sessions";
+import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../bots-model";
+import { PAGE_ICON } from "../../page-icons";
 import { hashForBotRoutine, hashForBots } from "../../routing";
 import { age } from "../../labels";
 import { runWords, startsWords } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
+import { DetailsSidebarFrame } from "../details-sidebar-frame";
+import { sessionWorkTabs } from "../session-details";
 import { TEXT_AREA } from "../form-field";
 import { RunDot } from "../routines/routine-marks";
 import { BotAvatar } from "./bot-avatar";
 import { BotLookPicker } from "./bot-look-picker";
 
 const botSpec = ({ id, name, job, cwd, model, skill, shape, hue }: Bot): BotSpec => ({ id, name, job, cwd, model, skill, shape, hue });
+
+/** The sidebar's tab, kept across Bots apart from a session's. */
+const TAB_KEY = "omp-agents.bot-details-tab";
 
 /** **Delete**, which asks first in its place; the Bot's routines go with it, and its conversation stays a session of yours. */
 function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
@@ -238,37 +243,61 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 interface BotDetailsProps {
 	/** The Bot, and what its page shows. */
 	open: OpenBot;
+	/** Its conversation's session row, running or saved, `null` before its first message. */
+	session: RosterHost | PastSession | null;
 	/** Its `memory.md`, empty while it remembers nothing. */
 	memory: string;
 	connected: boolean;
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
+	hosts: RosterHost[];
 }
 
-export function BotDetails({ open: { bot, host, routines, routine, status }, memory, connected }: BotDetailsProps) {
+export function BotDetails({ open: { bot, host, routines, routine, status }, session, memory, connected, workspace, hosts }: BotDetailsProps) {
 	return (
-		<>
-			<SidebarHeader className="h-(--page-header-height) flex-row items-center border-b border-border px-4 py-0">
-				<h2 className="text-sm font-semibold">Details</h2>
-			</SidebarHeader>
-			<SidebarContent>
-				<div className="space-y-6 p-4">
-					<div className="flex items-center gap-3">
-						<LookButton bot={bot} host={host} connected={connected} />
-						<div className="min-w-0 flex-1">
-							<NameField key={bot.name} bot={bot} connected={connected} />
-							<p className="truncate text-xs text-muted-foreground first-letter:uppercase">{status}</p>
-							<p className="truncate font-mono text-xs text-muted-foreground" title={bot.cwd}>
-								{bot.cwd}
-							</p>
+		<DetailsSidebarFrame
+			label="Bot details"
+			storageKey={TAB_KEY}
+			defaultTab="details"
+			cwd={session?.cwd ?? bot.cwd}
+			tabs={[
+				{
+					value: "details",
+					icon: PAGE_ICON.bots,
+					name: "Details",
+					control: "bots.tab.details",
+					count: 0,
+					content: (
+						<div className="space-y-6 px-4 pt-2 pb-4">
+							<div className="flex items-center gap-3">
+								<LookButton bot={bot} host={host} connected={connected} />
+								<div className="min-w-0 flex-1">
+									<NameField key={bot.name} bot={bot} connected={connected} />
+									<p className="truncate text-xs text-muted-foreground first-letter:uppercase">{status}</p>
+									<p className="truncate font-mono text-xs text-muted-foreground" title={bot.cwd}>
+										{bot.cwd}
+									</p>
+								</div>
+							</div>
+							<JobEditor key={bot.job} bot={bot} connected={connected} />
+							<MemoryList bot={bot} memory={memory} />
+							<BotRoutines bot={bot} routines={routines} open={routine} connected={connected} />
+							<div className="border-t border-border pt-4">
+								<DeleteBot bot={bot} connected={connected} />
+							</div>
 						</div>
-					</div>
-					<JobEditor key={bot.job} bot={bot} connected={connected} />
-					<MemoryList bot={bot} memory={memory} />
-					<BotRoutines bot={bot} routines={routines} open={routine} connected={connected} />
-					<div className="border-t border-border pt-4">
-						<DeleteBot bot={bot} connected={connected} />
-					</div>
-				</div>
-			</SidebarContent>
-		</>
+					),
+				},
+				...sessionWorkTabs({
+					scope: bot.sessionId ?? bot.id,
+					working: host?.status === "working",
+					pullRequests: session?.pullRequests ?? [],
+					tickets: session?.tickets ?? [],
+					workspace,
+					hosts,
+					current: host?.instanceId ?? null,
+				}),
+			]}
+		/>
 	);
 }

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Routine } from "../src/routines";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { RosterHost } from "../src/shared/sessions";
-import { botHost, botRows, botStatus, botView, jobLine, memoryEntries, openBot, starterPrompts } from "./bots-model";
+import { botHost, botRows, botsNeedingYou, botStatus, botView, jobLine, memoryEntries, openBot, starterPrompts } from "./bots-model";
 import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
@@ -71,6 +71,17 @@ describe("Bots", () => {
 			["Worker", "s2", false, "Working…", 3_000],
 			["Talked", null, false, "You: Thanks.", 1_000],
 		]);
+	});
+
+	test("the Bots that need you are those asking you and those with a turn you have not read, never one at rest or without a running session", () => {
+		const named = (id: string, sessionId: string | null): Bot => ({ ...bot(sessionId), id: id as BotId, name: id });
+		const bots = [named("asker", "s1"), named("replied", "s2"), named("read", "s3"), named("stopped", "s4"), named("fresh", null)];
+		const hosts = [
+			{ sessionId: "s1", status: "needs-input", requests: [{ title: "Push to main?" }], unread: null },
+			{ sessionId: "s2", status: "idle", requests: [], unread: { at: 5_000, reply: "Done." } },
+			{ sessionId: "s3", status: "idle", requests: [], unread: null },
+		] as unknown as RosterHost[];
+		expect(botsNeedingYou(botRows(bots, hosts, {}))).toBe(2);
 	});
 
 	test("a Bot's status asks first, then names its session's status, else whether it ever talked", () => {

@@ -187,7 +187,7 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 						aria-expanded={detailsOpen}
 						aria-controls="details-sidebar"
 						onClick={onToggleDetails}
-						className="-mx-1.5 -my-0.5 inline-flex max-w-full items-center rounded-md px-1.5 py-0.5 text-sm font-semibold outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+						className="-mx-1.5 -my-0.5 inline-flex max-w-[calc(100%+--spacing(3))] items-center rounded-md px-1.5 py-0.5 text-sm font-semibold outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
 					>
 						<span className="truncate">{bot.name}</span>
 					</button>

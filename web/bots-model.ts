@@ -2,6 +2,7 @@
 import type { Routine } from "../src/routines";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
+import { needsYou } from "./attention";
 import { statusLabel } from "./components/status-dot";
 import { plainMarkdown } from "./labels";
 import type { BotRoutineRoute, Page } from "./routing";
@@ -115,6 +116,9 @@ export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], last
 		})
 		.sort((a, b) => b.at - a.at || a.bot.name.localeCompare(b.bot.name));
 }
+
+/** How many of `rows` need you: their running session asks you something, or ended a turn you have not read. */
+export const botsNeedingYou = (rows: readonly BotRow[]): number => rows.filter(({ host }) => host !== null && needsYou(host)).length;
 
 /** One fact of a memory: the day `remember` wrote it, when the line has one, and the fact. */
 export interface MemoryEntry {
