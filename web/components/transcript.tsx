@@ -627,74 +627,76 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 
 	return (
 		<OpenToolImage.Provider value={openImage}>
-			<MessageScroller className="@container flex-1">
-				<MessageScrollerViewport>
-					<MessageScrollerContent className="mx-auto max-w-conversation gap-3 p-3" aria-relevant="additions text" data-transcript>
-						{visibleBlocks.map(block => {
-							if (block.kind === "activity") {
-								const chips = [...new Set(block.entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(toolChips, entry.name) ? [entry.name] : [])))];
-								if (!activityShown && chips.length === 0) return null;
-								return (
-									<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
-										{activityShown && <ActivityGroup entries={block.entries} />}
-										<ToolChips names={chips} chips={toolChips} />
-									</MessageScrollerItem>
-								);
-							}
-							const item = block.item;
-							if (item.kind === "notice") {
-								return (
-									<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
-										<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-											{item.text}
-										</p>
-									</MessageScrollerItem>
-								);
-							}
-							const point = forks.get(item.id);
-							const edit = editing?.item.id === item.id ? editing : null;
-							return (
-								<MessageRow
-									key={item.id}
-									item={item}
-									copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
-									forkAt={point?.entryId ?? null}
-									prefill={point?.prefill ?? false}
-									forking={here?.phase === "starting" && here.op.itemId === item.id}
-									forkDisabled={fork?.phase === "starting"}
-									failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
-									editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
-									editor={edit ? (
-										<PromptEditor
-											initial={edit.item.text}
-											text={edit.text}
-											pending={resend.pending}
-											working={working}
-											error={edit.error}
-											onChange={text => setEditing(current => current ? { ...current, text, error: null } : current)}
-											onSave={() => resend.run(edit)}
-											onCancel={() => setEditing(null)}
-										/>
-									) : undefined}
-									replacing={item.id === replacing}
-									onFork={onFork}
-									onEditing={beginEditing}
-								/>
-							);
-						})}
-						{loaded && items.length === 0 && !working && !editing && empty}
-						{working && !streaming && (
-							<MessageScrollerItem messageId="thinking" className="flex flex-col">
-								<ThinkingIndicator className="self-start" />
-							</MessageScrollerItem>
-						)}
-					</MessageScrollerContent>
-				</MessageScrollerViewport>
-				<TranscriptMinimap items={items} working={working} />
+			<div className="@container/transcript relative flex min-h-0 flex-1 flex-col">
 				<SessionTodosCard items={items} />
-				<PromptHistory view={view} items={items} working={working} />
-				<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />
-			</MessageScroller>
+				<MessageScroller className="@container min-h-0 flex-1">
+					<MessageScrollerViewport>
+						<MessageScrollerContent className="mx-auto max-w-conversation gap-3 p-3" aria-relevant="additions text" data-transcript>
+							{visibleBlocks.map(block => {
+								if (block.kind === "activity") {
+									const chips = [...new Set(block.entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(toolChips, entry.name) ? [entry.name] : [])))];
+									if (!activityShown && chips.length === 0) return null;
+									return (
+										<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
+											{activityShown && <ActivityGroup entries={block.entries} />}
+											<ToolChips names={chips} chips={toolChips} />
+										</MessageScrollerItem>
+									);
+								}
+								const item = block.item;
+								if (item.kind === "notice") {
+									return (
+										<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
+											<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+												{item.text}
+											</p>
+										</MessageScrollerItem>
+									);
+								}
+								const point = forks.get(item.id);
+								const edit = editing?.item.id === item.id ? editing : null;
+								return (
+									<MessageRow
+										key={item.id}
+										item={item}
+										copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
+										forkAt={point?.entryId ?? null}
+										prefill={point?.prefill ?? false}
+										forking={here?.phase === "starting" && here.op.itemId === item.id}
+										forkDisabled={fork?.phase === "starting"}
+										failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
+										editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
+										editor={edit ? (
+											<PromptEditor
+												initial={edit.item.text}
+												text={edit.text}
+												pending={resend.pending}
+												working={working}
+												error={edit.error}
+												onChange={text => setEditing(current => current ? { ...current, text, error: null } : current)}
+												onSave={() => resend.run(edit)}
+												onCancel={() => setEditing(null)}
+											/>
+										) : undefined}
+										replacing={item.id === replacing}
+										onFork={onFork}
+										onEditing={beginEditing}
+									/>
+								);
+							})}
+							{loaded && items.length === 0 && !working && !editing && empty}
+							{working && !streaming && (
+								<MessageScrollerItem messageId="thinking" className="flex flex-col">
+									<ThinkingIndicator className="self-start" />
+								</MessageScrollerItem>
+							)}
+						</MessageScrollerContent>
+					</MessageScrollerViewport>
+					<TranscriptMinimap items={items} working={working} />
+					<PromptHistory view={view} items={items} working={working} />
+					<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />
+				</MessageScroller>
+			</div>
 			{shownImage && (
 				<ImageViewer
 					src={shownImage.src}

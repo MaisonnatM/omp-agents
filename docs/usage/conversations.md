@@ -52,7 +52,8 @@
   Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
-- Once the view's agent made a todo list, a **Todos** card floats at the conversation's top right with the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
+- Once the view's agent made a todo list, a **Todos** card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
+  It floats at the conversation's top right, narrowing to fit the space beside the messages, and sits above them when that space is too narrow, so it never covers a message.
   Click the card to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
   Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
   Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
