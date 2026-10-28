@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- On the Todo page, each category in the sidebar now has a checkbox: uncheck one to hide its todos from All, Today, Needs you, and From agents, and the app remembers it when you come back.
 - A Bot's page no longer lets you end its conversation, and its Delete button is now red.
 - You can drag the edge of a pull request's details beside the list to make them wider or narrower, and the app keeps the width.
 - The Ask about this button over selected text is now solid, so the text under it no longer shows through.

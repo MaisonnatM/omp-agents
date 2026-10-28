@@ -82,21 +82,25 @@ export function earliestDue(todo: UserTodo): string | null {
 	return days.length === 0 ? null : days.reduce((a, b) => (a < b ? a : b));
 }
 
-/** The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first. */
-export function todosOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): UserTodo[] {
+/**
+ * The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first.
+ * The lists that span categories leave out the todos of the categories in `hidden`; a category's own list shows them.
+ */
+export function todosOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>): UserTodo[] {
+	const shown = hidden.size === 0 ? list.todos : list.todos.filter(todo => todo.categoryId === null || !hidden.has(todo.categoryId));
 	switch (view.kind) {
 		case "all":
-			return list.todos;
+			return shown;
 		case "category":
 			return list.todos.filter(todo => todo.categoryId === view.id);
 		case "today":
-			return list.todos
+			return shown
 				.filter(todo => isDueBy(todo, day))
 				.toSorted((a, b) => Number(a.doneAt !== null) - Number(b.doneAt !== null) || earliestDue(a)!.localeCompare(earliestDue(b)!));
 		case "needs":
-			return list.todos.filter(todo => todo.doneAt === null && workStateOf(todo, sessions).kind === "needs-you");
+			return shown.filter(todo => todo.doneAt === null && workStateOf(todo, sessions).kind === "needs-you");
 		case "agents":
-			return list.todos.filter(todo => todo.addedBy !== null);
+			return shown.filter(todo => todo.addedBy !== null);
 		case "archive":
 			return list.archive;
 		default: {
@@ -107,8 +111,8 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 }
 
 /** How many top-level todos `view` lists still open; for Archive, how many it holds. */
-export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): number {
-	const todos = todosOf(list, view, day, sessions);
+export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>): number {
+	const todos = todosOf(list, view, day, sessions, hidden);
 	return view.kind === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
 }
 

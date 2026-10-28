@@ -1,5 +1,5 @@
 /** The sidebar's Todo tab: the todo views and categories, with counts left to do (`TodoCategories`). */
-import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
 import { localDay } from "../../../src/shared/days";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { categoryColor, leftIn, SIDEBAR_LISTS, sameTodoView } from "../../todo-views";
+import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
 import type { KnownSessions } from "./links";
 
 interface NameInputProps {
@@ -91,12 +92,35 @@ function CategoryMenu({ name, onRename, onDelete }: { name: string; onRename: ()
 	);
 }
 
+/** Whether a category's todos show in the lists that span categories; it sits over the category's link, in the place the link leaves for it. */
+function ShownCheckbox({ id, name, shown, onToggle }: { id: string; name: string; shown: boolean; onToggle: () => void }) {
+	const color = badgeColors[categoryColor(id)];
+	const lists = "All, Today, Needs you, and From agents";
+	return (
+		<Tooltip content={shown ? `Hide ${name} from ${lists}` : `Show ${name} in ${lists}`}>
+			<button
+				type="button"
+				role="checkbox"
+				aria-checked={shown}
+				aria-label={`Show ${name} in ${lists}`}
+				onClick={onToggle}
+				className="absolute left-[3px] top-1/2 z-20 flex size-6 -translate-y-1/2 items-center justify-center rounded-md outline-none hover:bg-hover focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
+			>
+				<span aria-hidden className="flex size-3.5 items-center justify-center rounded-[3px] border-2" style={{ borderColor: color, backgroundColor: shown ? color : undefined }}>
+					{shown && <Check className="size-2.5 text-white" strokeWidth={3.5} />}
+				</span>
+			</button>
+		</Tooltip>
+	);
+}
+
 export function TodoCategories({ list, view, disabled, onChange, sessions }: TodoCategoriesProps) {
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
+	const [hidden, toggleHidden] = useHiddenTodoCategories();
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = localDay();
 	const link = (target: TodoListView, name: string, icon: ReactNode) => {
-		const count = leftIn(list, target, day, sessions);
+		const count = leftIn(list, target, day, sessions, hidden);
 		const active = sameTodoView(view, target);
 		return (
 			<>
@@ -143,13 +167,15 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 							</li>
 						) : (
 							<SidebarMenuItem key={id}>
-								{link({ kind: "category", id }, name, <span aria-hidden className="mx-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: badgeColors[categoryColor(id)] }} />)}
+								<ShownCheckbox id={id} name={name} shown={!hidden.has(id)} onToggle={() => toggleHidden(id)} />
+								{link({ kind: "category", id }, name, <span aria-hidden className="size-3.5 shrink-0" />)}
 								{!disabled && (
 									<CategoryMenu
 										name={name}
 										onRename={() => setNaming({ kind: "rename", id })}
 										onDelete={() => {
 											onChange({ op: "remove-category", id });
+											if (hidden.has(id)) toggleHidden(id);
 											if (view.kind === "category" && view.id === id) location.hash = hashForTodo({ kind: "all" });
 										}}
 									/>

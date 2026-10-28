@@ -9,6 +9,7 @@ import { localDay } from "../../../src/shared/days";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
 import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
+import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, useTodoKeys } from "../../use-todo-keys";
@@ -66,7 +67,8 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const frozen = disabled || kind.readOnly;
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
-	const listed = todosOf(list, view, day, sessions);
+	const [hidden] = useHiddenTodoCategories();
+	const listed = todosOf(list, view, day, sessions, hidden);
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
 	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
 	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
@@ -75,7 +77,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
 	const title = titleOf(list, view);
-	const left = leftIn(list, view, day, sessions);
+	const left = leftIn(list, view, day, sessions, hidden);
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const empty = section.todos.length === 0 ? (query ? `No todo matches “${query}”.` : kind.empty) : null;
 	const groups = (kind.readOnly ? [] : byStatus(section.todos))

@@ -20,6 +20,7 @@ export const PORTABLE_PREFERENCES = [
 	"omp-agents.pr-diff-wrap",
 	"omp-agents.pr-diff-whitespace",
 	"omp-agents.calendar-routines",
+	"omp-agents.todo-hidden-categories",
 ] as const;
 
 const PORTABLE: ReadonlySet<string> = new Set(PORTABLE_PREFERENCES);

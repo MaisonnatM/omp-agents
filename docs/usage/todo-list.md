@@ -2,8 +2,9 @@
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a workspace, in place of the panes.
   The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Archive**, then your categories, each with how many top-level todos are open in it.
-  Each category has a color dot, and its todos carry a badge of that color.
+  Each category has a color checkbox, and its todos carry a badge of that color.
   Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, and `#todo/<category id>` address them.
+  Uncheck a category to keep its todos out of **All**, **Today**, **Needs you**, and **From agents**, and out of their counts; its own list still shows them, and the app keeps the choice, on every machine through Settings › Sync.
   **All** lists every todo in one list, each top-level todo with its category's badge; a category's own list shows no badges.
   **Today** lists the todos due today or before, or with a todo under them that is, earliest due first; **Add a todo due today** there adds one due today.
   **Needs you** lists open todos whose latest linked session has a question open or is idle, wherever that session ran.
