@@ -5,8 +5,16 @@
  * elements are, through react-grab's `getElementContext`, which finds their React components and source files.
  */
 /// <reference lib="dom" />
-import { getElementAtPoint, getElementContext } from "react-grab/primitives";
-import { PREVIEW_PICKER_GLOBAL, PREVIEW_SELECTION_CHANNEL, type PreviewElement, type PreviewPicker, type PreviewSelection } from "../src/shared/desktop-bridge";
+import { getDisplayName, getFiberFromHostInstance, isCompositeFiber, traverseFiber } from "bippy/core";
+import { getElementAtPoint, getElementBounds, getElementContext } from "react-grab/primitives";
+import {
+	PREVIEW_PICKER_GLOBAL,
+	PREVIEW_SELECTION_CHANNEL,
+	type PreviewElement,
+	type PreviewElementBox,
+	type PreviewPicker,
+	type PreviewSelection,
+} from "../src/shared/desktop-bridge";
 
 /** How long `getElementContext` may take for one element before the tag and HTML stand in, as in T3 Code. */
 const CONTEXT_TIMEOUT_MS = 1500;
@@ -20,7 +28,7 @@ const root = host.attachShadow({ mode: "closed" });
 let color = "#2563eb";
 let selecting = false;
 let nextId = 1;
-const selected = new Map<number, { element: Element; outline: HTMLDivElement }>();
+const selected = new Map<Element, { id: number; outline: HTMLDivElement }>();
 
 /** The height the label above an outline takes, in CSS pixels; an element closer to the top gets it inside instead. */
 const LABEL_HEIGHT = 20;
@@ -37,20 +45,10 @@ function outline(): HTMLDivElement {
 }
 const hover = outline();
 
-type Fiber = { type: unknown; return: Fiber | null };
-
-/** The name of the React component that renders `element`, read from the fiber React keeps on it, or `null` outside React. */
+/** The name of the nearest React component that renders `element` and has one, through bippy, which react-grab reads fibers with, or `null` outside React. */
 function componentName(element: Element): string | null {
-	const key = Object.keys(element).find(name => name.startsWith("__reactFiber$"));
-	let fiber = key ? (element as unknown as Record<string, Fiber>)[key] : null;
-	for (; fiber; fiber = fiber.return) {
-		// A memo or forwardRef component keeps its function under `type` or `render`.
-		const type = fiber.type as { displayName?: string; name?: string; type?: { name?: string }; render?: { name?: string } } | string | null;
-		if (type === null || typeof type === "string" || (typeof type !== "function" && typeof type !== "object")) continue;
-		const name = type.displayName || type.name || type.type?.name || type.render?.name;
-		if (name) return name;
-	}
-	return null;
+	const fiber = traverseFiber(getFiberFromHostInstance(element), node => isCompositeFiber(node) && getDisplayName(node.type) !== null, true);
+	return fiber && getDisplayName(fiber.type);
 }
 
 /** What an outline's label reads: the React component, else the tag with its id and first two classes, as T3 Code labels it. */
@@ -62,8 +60,9 @@ function labelOf(element: Element): string {
 	return `${element.tagName.toLowerCase()}${id}${classes}`;
 }
 
-function place(box: HTMLDivElement, element: Element, fill: number): void {
-	const { left, top, width, height } = element.getBoundingClientRect();
+/** Draws `box` over `element`, filled at `fill` percent, and returns where it shows in the top window, inside a same-origin iframe too. */
+function place(box: HTMLDivElement, element: Element, fill: number): Omit<PreviewElementBox, "id"> {
+	const { x: left, y: top, width, height } = getElementBounds(element);
 	Object.assign(box.style, {
 		display: "block",
 		left: `${left}px`,
@@ -77,24 +76,20 @@ function place(box: HTMLDivElement, element: Element, fill: number): void {
 	label.textContent = labelOf(element);
 	label.style.background = color;
 	label.style.top = top < LABEL_HEIGHT + 2 ? "0" : `${-LABEL_HEIGHT - 4}px`;
+	return { x: left, y: top, width, height };
 }
 
 /** Places every outline again and tells the page where the selected elements show. */
 function report(): void {
-	for (const [id, { element, outline: box }] of selected) {
-		if (element.isConnected) place(box, element, 10);
+	const boxes: PreviewElementBox[] = [];
+	for (const [element, { id, outline: box }] of selected) {
+		if (element.isConnected) boxes.push({ id, ...place(box, element, 10) });
 		else {
 			box.remove();
-			selected.delete(id);
+			selected.delete(element);
 		}
 	}
-	const selection: PreviewSelection = {
-		selecting,
-		boxes: Array.from(selected, ([id, { element }]) => {
-			const { left, top, width, height } = element.getBoundingClientRect();
-			return { id, x: left, y: top, width, height };
-		}),
-	};
+	const selection: PreviewSelection = { selecting, boxes };
 	window.postMessage({ [PREVIEW_SELECTION_CHANNEL]: selection }, "*");
 }
 
@@ -103,17 +98,16 @@ const reportSoon = (): void => {
 	if (frame === 0) frame = requestAnimationFrame(() => ((frame = 0), report()));
 };
 
-function remove(id: number): void {
-	selected.get(id)?.outline.remove();
-	selected.delete(id);
+function remove(element: Element): void {
+	selected.get(element)?.outline.remove();
+	selected.delete(element);
 }
 
 function toggle(element: Element, additive: boolean): void {
-	const existing = Array.from(selected).find(([, entry]) => entry.element === element);
-	if (existing) remove(existing[0]);
+	if (selected.has(element)) remove(element);
 	else {
-		if (!additive) for (const id of Array.from(selected.keys())) remove(id);
-		selected.set(nextId++, { element, outline: outline() });
+		if (!additive) for (const other of Array.from(selected.keys())) remove(other);
+		selected.set(element, { id: nextId++, outline: outline() });
 	}
 	report();
 }
@@ -166,17 +160,17 @@ const picker: PreviewPicker = {
 		report();
 	},
 	deselect(id) {
-		remove(id);
+		for (const [element, entry] of selected) if (entry.id === id) remove(element);
 		report();
 	},
 	clear() {
-		for (const id of Array.from(selected.keys())) remove(id);
+		for (const element of Array.from(selected.keys())) remove(element);
 		setSelecting(false);
 		report();
 	},
 	resolve() {
 		hover.style.display = "none";
-		return Promise.all(Array.from(selected, ([id, { element }]) => describe(id, element)));
+		return Promise.all(Array.from(selected, ([element, { id }]) => describe(id, element)));
 	},
 };
 

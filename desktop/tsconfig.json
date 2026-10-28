@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["main.ts", "launch.ts", "shell-env.ts", "updates.ts", "attention.ts", "preload.ts", "preview-preload.ts", "preview-pick.ts", "text-modules.d.ts"]
+  "include": ["main.ts", "launch.ts", "shell-env.ts", "updates.ts", "attention.ts", "preload.ts", "preview-preload.ts", "preview-pick.ts", "text-modules.d.ts", "bippy-core.d.ts"]
 }

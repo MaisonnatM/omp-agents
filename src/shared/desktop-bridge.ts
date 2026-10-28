@@ -3,7 +3,7 @@
  * system notifications of the sessions that need you, which the shell's main process (`desktop/attention.ts`) shows,
  * the sign-in of a page that holds no token the server takes, and what the page's Preview and the shell agree on.
  */
-import { fields, type Guard, isString, oneOf, optional } from "../json";
+import { arrayOf, fields, type Guard, isBoolean, isNumber, isString, oneOf, optional } from "../json";
 
 /** The name the bridge takes on `window`; absent in a page no desktop window loaded. */
 export const DESKTOP_BRIDGE = "ompDesktop";
@@ -15,7 +15,7 @@ export const SIGN_IN_CHANNEL = "omp-agents:sign-in";
 /** Asked synchronously by the preload before the page's scripts run: the localStorage entries that sign the page in, or `null`. */
 export const ACCESS_CHANNEL = "omp-agents:access";
 /**
- * Where `desktop/preview-grab.ts` puts its {@link PreviewPicker} in the main world of the Browser's app, which the page
+ * Where `desktop/preview-pick.ts` puts its {@link PreviewPicker} in the main world of the Browser's app, which the page
  * reaches through the webview's `executeJavaScript`.
  */
 export const PREVIEW_PICKER_GLOBAL = "__OMP_PICK__";
@@ -35,6 +35,8 @@ export interface PreviewElement {
 	name: string;
 	snippet: string;
 }
+/** A {@link PreviewElement}, as the page checks what the picker in the app resolves, which any script there can replace. */
+export const isPreviewElement: Guard<PreviewElement> = fields<PreviewElement>({ id: isNumber, name: isString, snippet: isString });
 /** Where a selected element shows in the app, in its CSS pixels from the top left of what the webview shows. */
 export interface PreviewElementBox {
 	id: number;
@@ -50,12 +52,21 @@ export interface PreviewSelection {
 	selecting: boolean;
 	boxes: PreviewElementBox[];
 }
+const isPreviewElementBox: Guard<PreviewElementBox> = fields<PreviewElementBox>({ id: isNumber, x: isNumber, y: isNumber, width: isNumber, height: isNumber });
+/** A {@link PreviewSelection}, as the guest's preload checks what any script in the app can post, and the page what the preload sends. */
+export const isPreviewSelection: Guard<PreviewSelection> = fields<PreviewSelection>({ selecting: isBoolean, boxes: arrayOf(isPreviewElementBox) });
 /** The `ipc-message` channel on which the Browser's webview reports an Escape its app left unhandled. */
 export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
 /** The pick mode keys, V, R, D, and E, pressed in the app while Select is on, which never reach the page otherwise. */
 export const PREVIEW_PICK_KEY_CHANNEL = "omp-agents:preview-pick-key";
-/** The keys the guest hands over on {@link PREVIEW_PICK_KEY_CHANNEL}, the shortcuts of T3 Code's pick modes. */
+/**
+ * The keys the guest hands over on {@link PREVIEW_PICK_KEY_CHANNEL}, the shortcuts of T3 Code's pick modes: the chords
+ * of the `browserPick*` shortcuts in `web/shortcuts.ts`, by which the page finds the mode.
+ */
 export const PICK_MODE_KEYS: readonly string[] = ["v", "r", "d", "e"];
+/** Whether `target` is a text field, where a key types instead of running a shortcut, as the page's shortcuts and the Browser's preload both read it. */
+export const isTypingTarget = (target: EventTarget | null): boolean =>
+	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 /** The Preview webview's session, apart from the dashboard's, and kept across launches, so a sign-in to the app lasts. */
 export const PREVIEW_PARTITION = "persist:omp-preview";
 /** The page's report of a Browser's {@link BrowserPorts}, for the shell's {@link appAddress}. */

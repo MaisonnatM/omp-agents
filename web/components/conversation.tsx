@@ -117,7 +117,7 @@ function LiveConversation({
 	const subject = subjectOf(view, host, lastHost);
 	const { shown, agent, writable, working, requests, shell } = subject;
 	const attachments = usePromptAttachments(subject.images);
-	useComposerFiles(liveDraftKey(view), file => attachments.onFilesChange([...attachments.files, file]));
+	useComposerFiles(writable ? liveDraftKey(view) : null, file => attachments.onFilesChange([...attachments.files, file]));
 
 	const session = subject.kind === "session";
 	const switchable = subject.kind === "session" ? subject.switchable : null;

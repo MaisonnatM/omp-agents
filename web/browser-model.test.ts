@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { LiveSessionProcesses, SessionProcess } from "../src/shared/processes";
-import { annotationText, browserCandidates, cardPlace, dragArea, elementAt, initialAddress, type Mark, markAt, unionArea } from "./browser-model";
+import { annotationText, boundsOf, browserCandidates, cardPlace, dragArea, elementAt, initialAddress, type Mark, markAt, strokeArea, unionArea } from "./browser-model";
 
 const running = (label: string, ports: number[], shared = false): SessionProcess => ({
 	id: label, kind: shared ? "service" : "job", shared, label, memoryBytes: 0, cpuPercent: 0, processCount: 1, ports, startedAt: 0, stopsAt: null,
@@ -31,16 +31,23 @@ test("the Browser opens on the address last loaded, else the first candidate, el
 	expect(initialAddress(null, [])).toBeNull();
 });
 
-test("a drag marks the area it covers inside the page, whichever way it goes, and a click marks none", () => {
+test("a drag marks the area it covers inside the page, whichever way it goes, and a click or a drag off the page marks none", () => {
 	expect(dragArea({ x: 10, y: 10 }, { x: 12, y: 13 }, 800, 600)).toBeNull();
 	expect(dragArea({ x: 300, y: 200 }, { x: 100, y: 50 }, 800, 600)).toEqual({ x: 100, y: 50, width: 200, height: 150 });
 	expect(dragArea({ x: 700, y: 500 }, { x: 900, y: -40 }, 800, 600)).toEqual({ x: 700, y: 0, width: 100, height: 500 });
+	expect(dragArea({ x: -60, y: 100 }, { x: -10, y: 300 }, 800, 600)).toBeNull();
 });
 
 test("the picture covers every mark and element with a margin that stops at the page's edges", () => {
 	const areas = [{ x: 4, y: 100, width: 50, height: 50 }, { x: 300, y: 20, width: 100, height: 570 }];
+	expect(boundsOf(areas)).toEqual({ x: 4, y: 20, width: 396, height: 570 });
 	expect(unionArea(areas, 16, 800, 600)).toEqual({ x: 0, y: 4, width: 416, height: 596 });
 	expect(unionArea([], 16, 800, 600)).toBeNull();
+});
+
+test("a line covers the points it goes through and its width around them", () => {
+	expect(strokeArea([{ x: 10, y: 40 }, { x: 30, y: 20 }])).toEqual({ x: 8, y: 18, width: 24, height: 24 });
+	expect(strokeArea([])).toBeNull();
 });
 
 test("Erase takes the last mark drawn at the point, and the innermost selected element", () => {

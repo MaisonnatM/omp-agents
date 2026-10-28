@@ -20,7 +20,7 @@ It keeps the app's own page untouched and the marks and crop correct at any zoom
 The bridge gains an optional `captureBrowser`, so an app built before it shows no **Screenshot** or **Pick in the app** button.
 The marks live in the page, so the guest's scroll moves under them; they mark the page as it showed when drawn.
 **Select** outlines its elements in the app instead, since only there can it find them (see [Browser's Select runs in the app with react-grab's primitives](2026-10-28-browser-select-runs-in-the-app-with-react-grab-primitives.md)), so the capture shows those outlines and the crop covers them with the marks.
-A picture attaches only to a mounted composer, since attachments live in its state, so the page says to open the conversation when none is mounted.
+A picture attaches only to a mounted composer, since attachments live in its state, so the page says to open the conversation when none is mounted, and **Attach** then appends no chip and keeps picking, as it does when the capture fails.
 
 ## Confirmation
 

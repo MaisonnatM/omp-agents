@@ -39,14 +39,18 @@ export interface Area extends Point {
 /** A drag shorter than this either way is a click, which marks no region. */
 const CLICK_SLOP = 4;
 
-/** The area a drag from `from` to `to` covers on a `width` by `height` page, kept inside it, or `null` for a click. */
+/**
+ * The area a drag from `from` to `to` covers on a `width` by `height` page, kept inside it, or `null` for a click or a
+ * drag that covers less than a pixel of the page either way.
+ */
 export function dragArea(from: Point, to: Point, width: number, height: number): Area | null {
 	if (Math.abs(to.x - from.x) < CLICK_SLOP && Math.abs(to.y - from.y) < CLICK_SLOP) return null;
 	const clampX = (x: number): number => Math.min(Math.max(x, 0), width);
 	const clampY = (y: number): number => Math.min(Math.max(y, 0), height);
 	const left = clampX(Math.min(from.x, to.x));
 	const top = clampY(Math.min(from.y, to.y));
-	return { x: left, y: top, width: clampX(Math.max(from.x, to.x)) - left, height: clampY(Math.max(from.y, to.y)) - top };
+	const area = { x: left, y: top, width: clampX(Math.max(from.x, to.x)) - left, height: clampY(Math.max(from.y, to.y)) - top };
+	return area.width >= 1 && area.height >= 1 ? area : null;
 }
 
 /** What Region and Draw leave on the Browser's page until **Attach**: a box, or a freehand line, with the area it covers. */
@@ -55,25 +59,25 @@ export type Mark = { kind: "region"; id: number; area: Area } | { kind: "stroke"
 /** The width of a Draw line, in the page's CSS pixels. */
 export const STROKE_WIDTH = 4;
 
-/** The smallest area holding every one of `areas`, grown by `margin` and kept inside a `width` by `height` page, or `null` for none. */
-export function unionArea(areas: readonly Area[], margin: number, width: number, height: number): Area | null {
+/** The smallest area holding every one of `areas`, grown by `margin` on each side, or `null` for none. */
+export function boundsOf(areas: readonly Area[], margin = 0): Area | null {
 	if (areas.length === 0) return null;
-	const left = Math.max(0, Math.min(...areas.map(area => area.x)) - margin);
-	const top = Math.max(0, Math.min(...areas.map(area => area.y)) - margin);
-	const right = Math.min(width, Math.max(...areas.map(area => area.x + area.width)) + margin);
-	const bottom = Math.min(height, Math.max(...areas.map(area => area.y + area.height)) + margin);
-	return { x: left, y: top, width: right - left, height: bottom - top };
+	const x = Math.min(...areas.map(area => area.x)) - margin;
+	const y = Math.min(...areas.map(area => area.y)) - margin;
+	return { x, y, width: Math.max(...areas.map(area => area.x + area.width)) + margin - x, height: Math.max(...areas.map(area => area.y + area.height)) + margin - y };
 }
 
-/** The area a line through `points` covers, its width included. */
-export function strokeArea(points: readonly Point[]): Area {
-	const half = STROKE_WIDTH / 2;
-	const xs = points.map(point => point.x);
-	const ys = points.map(point => point.y);
-	const x = Math.min(...xs) - half;
-	const y = Math.min(...ys) - half;
-	return { x, y, width: Math.max(...xs) + half - x, height: Math.max(...ys) + half - y };
+/** {@link boundsOf} `areas`, grown by `margin` and kept inside a `width` by `height` page, or `null` for none. */
+export function unionArea(areas: readonly Area[], margin: number, width: number, height: number): Area | null {
+	const bounds = boundsOf(areas, margin);
+	if (bounds === null) return null;
+	const x = Math.max(0, bounds.x);
+	const y = Math.max(0, bounds.y);
+	return { x, y, width: Math.min(width, bounds.x + bounds.width) - x, height: Math.min(height, bounds.y + bounds.height) - y };
 }
+
+/** The area a line through `points` covers, its width included, or `null` for no points. */
+export const strokeArea = (points: readonly Point[]): Area | null => boundsOf(points.map(point => ({ ...point, width: 0, height: 0 })), STROKE_WIDTH / 2);
 
 /** The mark Erase removes at `point`: the last drawn of those whose area holds it. */
 export const markAt = (marks: readonly Mark[], point: Point): Mark | null =>
@@ -117,15 +121,22 @@ export interface Annotation {
 
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
 
+/** The chip's label of an annotation: its comment on one line, else its first element's name with how many more, else the page's title. */
+function chipLabel({ comment, page, elements }: Annotation): string {
+	const said = comment.replace(/\s+/g, " ").trim();
+	if (said) return said;
+	const [first] = elements;
+	if (first) return elements.length > 1 ? `${first.name} +${elements.length - 1}` : first.name;
+	return page.title.trim() || "Browser annotation";
+}
+
 /**
  * The chip's label and the text the prompt gets of `annotation`. The label is the comment, else the first element's
  * name, else the page's title; the text holds the comment, the page, react-grab's text of each element, and what the
  * attached picture marks.
  */
-export function annotationText({ comment, page, elements, regions, strokes }: Annotation): { label: string; content: string } {
-	const [first] = elements;
-	const label =
-		comment.replace(/\s+/g, " ").trim() || (first ? (elements.length > 1 ? `${first.name} +${elements.length - 1}` : first.name) : page.title.trim() || "Browser annotation");
+export function annotationText(annotation: Annotation): { label: string; content: string } {
+	const { comment, page, elements, regions, strokes } = annotation;
 	const marked = [elements.length > 0 && plural(elements.length, "outlined element", "outlined elements"), regions > 0 && plural(regions, "box", "boxes"), strokes > 0 && plural(strokes, "line", "lines")].filter(Boolean);
 	const lines = [
 		...(comment ? [comment, ""] : []),
@@ -134,5 +145,5 @@ export function annotationText({ comment, page, elements, regions, strokes }: An
 		"",
 		`The attached picture shows ${marked.join(", ")}.`,
 	];
-	return { label, content: lines.join("\n") };
+	return { label: chipLabel(annotation), content: lines.join("\n") };
 }

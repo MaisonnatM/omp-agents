@@ -37,7 +37,10 @@ function composerChannel<T>() {
 			for (const receive of mounted) receive(value);
 			return true;
 		},
-		/** Has the composer of `key` take what is sent to it while mounted; `null` takes nothing. */
+		/**
+		 * Has the composer of `key` take what is sent to it while mounted; `null` takes nothing. A hook kept on the
+		 * channel, which the rules of hooks allow as `channel.useReceiver`.
+		 */
 		useReceiver(key: string | null, receive: (value: T) => void): void {
 			const latest = useRef(receive);
 			latest.current = receive;

@@ -1,4 +1,5 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { isTypingTarget } from "../src/shared/desktop-bridge";
 import { commandKey, record } from "./activity";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the bar draws, whichever it is; one per tab of the larger group. */
@@ -408,9 +409,6 @@ export const shortcutLabels = (id: ShortcutId): readonly string[] => LABELS[id];
 /** Every key that runs `id`, as prose names them: `⌘/ or ?`. */
 export const shortcutKeys = (id: ShortcutId): string => EITHER.format(shortcutLabels(id));
 
-const typing = (target: EventTarget | null): boolean =>
-	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
-
 /**
  * What one shortcut does, given which of its keys was pressed, its place in the shortcut's `keys`. Returning `false`
  * means the action does not apply now, so the key keeps its usual meaning.
@@ -493,7 +491,7 @@ let ranks = 0;
 /** The page's one keydown listener, attached while any component registers shortcuts. */
 function onKeyDown(event: KeyboardEvent): void {
 	if (event.isComposing) return;
-	const outside = !typing(event.target);
+	const outside = !isTypingTarget(event.target);
 	stack.dispatch(event, outside, nextKey(event, outside));
 }
 

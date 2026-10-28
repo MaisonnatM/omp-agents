@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { createShortcutStack, IS_MAC, pairing, SHORTCUT_CATEGORIES, SHORTCUTS, type ShortcutHandlers, shortcutsFor } from "./shortcuts";
+import { PICK_MODE_KEYS } from "../src/shared/desktop-bridge";
+import { createShortcutStack, IS_MAC, pairing, SHORTCUT_CATEGORIES, SHORTCUTS, shortcutBindings, type ShortcutHandlers, shortcutsFor } from "./shortcuts";
 
 type Mods = { ctrl?: boolean; alt?: boolean; meta?: boolean; shift?: boolean };
 const keyEvent = (key: string, code: string, mods: Mods = {}) => ({
@@ -136,6 +137,12 @@ test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+arrows step through sessions,
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual([]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["moveUp"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
+});
+
+test("the Browser's preload hands over exactly the keys of the pick mode shortcuts", () => {
+	const ids = ["browserPickSelect", "browserPickRegion", "browserPickDraw", "browserPickErase"] as const;
+	const keys = ids.flatMap(id => shortcutBindings(id).flatMap(binding => ("chord" in binding ? [binding.chord.key] : [])));
+	expect(keys.toSorted()).toEqual([...PICK_MODE_KEYS].toSorted());
 });
 
 test("G then N, W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {

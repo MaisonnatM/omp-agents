@@ -96,10 +96,10 @@ interface StoredPanel {
 
 /** `side`'s panel as localStorage keeps it. A default is removed rather than stored, so a reset sidebar follows the default if it changes. */
 function useStoredPanel(side: SidebarSide): StoredPanel {
-	const { widthKey, openKey, defaultWidth, maxWidth } = SIDEBARS[side];
+	const { widthKey, openKey, defaultWidth } = SIDEBARS[side];
 	const [width, setWidth] = useStoredState(widthKey, raw => {
 		const stored = Number(raw);
-		return Number.isFinite(stored) && stored > 0 ? clamp(stored, maxWidth) : defaultWidth;
+		return Number.isFinite(stored) && stored > 0 ? stored : defaultWidth;
 	});
 	const [open, setOpen] = useStoredState(openKey, raw => raw !== "false");
 	return { open, width, setWidth, setOpen };
@@ -120,15 +120,13 @@ export interface SidebarPanels {
 export function useSidebarPanels(): SidebarPanels {
 	const sides: Record<SidebarSide, StoredPanel> = { left: useStoredPanel("left"), right: useStoredPanel("right") };
 	const windowWidth = useSyncExternalStore(subscribeResize, () => window.innerWidth);
-	const leftShown = sides.left.open ? sides.left.width : SIDEBARS.left.rail;
-	const max: Record<SidebarSide, number> = {
-		left: SIDEBARS.left.maxWidth,
-		right: Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH)),
-	};
-	const panel = (side: SidebarSide): SidebarPanel => ({ open: sides[side].open, width: clamp(sides[side].width, max[side]), max: max[side] });
+	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: clamp(sides[side].width, max), max });
+	const left = panel("left", SIDEBARS.left.maxWidth);
+	const leftShown = left.open ? left.width : SIDEBARS.left.rail;
+	const panels = { left, right: panel("right", Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH))) };
 	return {
-		panels: { left: panel("left"), right: panel("right") },
-		resize: (side, width) => sides[side].setWidth(clamp(width, max[side])),
+		panels,
+		resize: (side, width) => sides[side].setWidth(clamp(width, panels[side].max)),
 		setOpen: (side, open) => {
 			if (open === sides[side].open) return;
 			const { id } = SIDEBARS[side];
