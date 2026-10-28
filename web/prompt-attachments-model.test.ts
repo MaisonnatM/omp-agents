@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { MAX_PROMPT_FILE_CHARS } from "../src/shared/prompt-files";
-import { type Attachment, type AttachmentRead, preparePrompt } from "./prompt-attachments-model";
+import { type Attachment, type AttachmentRead, LONG_PASTE_CHARS, LONG_PASTE_LINES, pastedTextFile, preparePrompt } from "./prompt-attachments-model";
 
 const textFile = (name: string, text: string): Attachment => ({
 	file: new File([text], name, { type: "text/plain" }),
@@ -40,5 +40,24 @@ describe("preparePrompt", () => {
 		expect(images).toEqual([]);
 		expect(accepted).toEqual([]);
 		expect(refused).toEqual(["A subagent takes text only, so i.png stayed out."]);
+	});
+});
+
+describe("pastedTextFile", () => {
+	test("leaves a paste at both limits inline, and attaches one past either", async () => {
+		expect(pastedTextFile("x".repeat(LONG_PASTE_CHARS), [])).toBeNull();
+		expect(pastedTextFile(Array(LONG_PASTE_LINES).fill("a").join("\n"), [])).toBeNull();
+		const long = pastedTextFile("x".repeat(LONG_PASTE_CHARS + 1), []);
+		expect(long?.name).toBe("Pasted text.txt");
+		expect(long?.type).toStartWith("text/plain");
+		expect(await long?.text()).toBe("x".repeat(LONG_PASTE_CHARS + 1));
+		expect(pastedTextFile(Array(LONG_PASTE_LINES + 1).fill("a").join("\n"), [])?.name).toBe("Pasted text.txt");
+	});
+
+	test("takes the first name no attached file holds", () => {
+		const text = "x".repeat(LONG_PASTE_CHARS + 1);
+		const second = new File([""], "Pasted text 2.txt");
+		expect(pastedTextFile(text, [second])?.name).toBe("Pasted text.txt");
+		expect(pastedTextFile(text, [new File([""], "Pasted text.txt"), second])?.name).toBe("Pasted text 3.txt");
 	});
 });
