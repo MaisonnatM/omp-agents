@@ -187,7 +187,7 @@ export function SessionTodosCard({ items }: { items: readonly Item[] }) {
 			aria-label="Todos"
 			className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-5rem)] w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur"
 		>
-			<CollapsibleTrigger {...activityControl("transcript.todos")} className="relative grid shrink-0 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 pt-2.5 pb-3 text-left outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+			<CollapsibleTrigger {...activityControl("transcript.todos")} className="grid shrink-0 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 pt-2.5 pb-3 text-left outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
 				<ListChecks aria-hidden className="size-4 text-muted-foreground" />
 				<span className="truncate text-sm">
 					<span className="font-medium text-foreground">Todos</span>
@@ -209,12 +209,12 @@ export function SessionTodosCard({ items }: { items: readonly Item[] }) {
 					aria-valuemax={all.length}
 					aria-valuenow={done}
 					aria-valuetext={`${done} of ${all.length} tasks done`}
-					className="absolute inset-x-0 bottom-0 h-0.5 bg-border/70"
+					className="col-start-2 col-end-4 mt-1.5 block h-1.5 overflow-hidden rounded-full bg-muted"
 				>
-					<span className="block h-full rounded-r-full bg-foreground/70 transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${all.length === 0 ? 0 : (done / all.length) * 100}%` }} />
+					<span className="block h-full rounded-full bg-emerald-500 transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${all.length === 0 ? 0 : (done / all.length) * 100}%` }} />
 				</span>
 			</CollapsibleTrigger>
-			<CollapsibleContent className="min-h-0 overflow-y-auto [scrollbar-width:thin]">
+			<CollapsibleContent className="min-h-0 overflow-y-auto border-t border-border [scrollbar-width:thin]">
 				<div className="flex flex-col gap-2 py-1.5">
 					{phases.map((phase, index) => (
 						<Phase key={`${index}:${phase.name}`} phase={phase} label={phase.name || `Phase ${index + 1}`} />
