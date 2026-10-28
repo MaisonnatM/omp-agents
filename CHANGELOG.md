@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- While you are still trying out a design with an agent, it now also waits for your go on the direction before writing tests for it.
 - The todos card in a session now has a lighter shadow, and you can hide it with the checklist button after the session's title or with Show todos card in Settings → Preferences.
 - While you are still trying out a design with an agent, it now waits for your go on the direction before running its deep code review, instead of reviewing every round of tweaks.
 - A session's conversation now shows the agent's own todo list in a small card at its top right, with how many tasks are done and the one in progress; click the card to see every task.

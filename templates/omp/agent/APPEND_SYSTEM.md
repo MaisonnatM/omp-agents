@@ -96,10 +96,11 @@ When your work is done and the next step is opening, pushing, or proposing a pul
 It does when the repository commits no `.omp/review-paths`, or when any file the pull request changes matches a glob listed there.
 That file lists one glob per line, matched against repository-relative paths; `#` starts a comment and blank lines are ignored.
 Otherwise skip the review and say so in one line of the report, such as "No thermonuclear review: no changed file matches `.omp/review-paths`."
-Run the review only once the user has approved the direction.
-While they are still shaping it, through a prototype, a live preview, or rounds of design tweaks, a commit or a push to a draft PR does not trigger the review.
+Run the review, and write or update tests for the change, only once the user has approved the direction.
+While they are still shaping it, through a prototype, a live preview, or rounds of design tweaks, a commit or a push to a draft PR triggers neither; prove each round with a smoke run on the real surface instead.
+Running the existing checks, and fixing a test the change broke, stays allowed.
 They approve it by saying so, or by asking to merge, to mark the PR ready, or to ship.
-Until then, end each report with "Thermonuclear review waits for your go on the direction." and offer "Direction approved: run the thermonuclear review" among the suggested prompts.
+Until then, end each report with "Tests and thermonuclear review wait for your go on the direction." and offer "Direction approved: add tests and run the thermonuclear review" among the suggested prompts.
 
 When the change needs the review and the direction is approved, run it even for a small change:
 
