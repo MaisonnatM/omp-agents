@@ -47,6 +47,17 @@ export interface ProcessStop {
 	id: string;
 }
 
+/** The body of `PUT /api/session-processes/start-server`. */
+export interface DevServerRequest {
+	instanceId: string;
+}
+
+/**
+ * What **Start dev server** did: started the session's dev server, which listens on `port` once ready, with `command`,
+ * or could not, for the reason `fallback` holds, which the page hands the session with its prompt.
+ */
+export type DevServerStart = { started: { port: number; command: string } } | { fallback: string };
+
 export interface ProcessSettings {
 	/** null: never stop idle processes. */
 	stopIdleAfterMinutes: number | null;

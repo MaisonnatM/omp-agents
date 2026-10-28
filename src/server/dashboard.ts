@@ -21,7 +21,7 @@ import { answerDiscussion } from "../omp/discussion";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { findMcpServers } from "../omp/mcp";
-import { ompDaemons } from "../omp/daemons";
+import { ompDaemons, startOwnedService } from "../omp/daemons";
 import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
@@ -69,6 +69,7 @@ import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-loc
 import { PinsFile } from "./pins-file";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
+import { startDevServer } from "./dev-server";
 import { readAppOf, readCwds, readListeningPorts, readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
@@ -614,6 +615,11 @@ export class Dashboard {
 			processes: {
 				list: () => this.#processWatch.list(),
 				stop: ({ instanceId, id }) => this.#processWatch.stop(instanceId, id),
+				startServer: async instanceId => {
+					const session = this.#sessions.get(instanceId);
+					if (!session) throw new Error("That session no longer runs.");
+					return startDevServer(session.sessionId, this.#files.factsOf(session.sessionId).worktree ?? session.cwd, startOwnedService);
+				},
 				settings: () => {
 					this.#processSettings.reload();
 					return this.#processSettings.value;

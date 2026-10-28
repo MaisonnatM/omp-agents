@@ -15,32 +15,35 @@ import { activityControl } from "../activity";
 import { appendToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
 import { initialAddress, browserCandidates } from "../browser-model";
-import { sessionProcessesStore } from "../reads";
+import { sessionProcessesStore, writeStartServer } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
+import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
 
-/** What Start dev server sends the session: a long-lived server it owns, so its port joins the Browser's candidates. */
+/** What Start dev server sends the session when it cannot start the server itself: a long-lived server the session owns, so its port joins the Browser's candidates. */
 const START_SERVER_PROMPT =
-	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Browser can show it. Reply with its address.";
+	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Browser can show it. If it talks to a local server of this project, such as its API, start that one from this worktree as a service too, on its own free port, and point the dev server at it rather than at the default port, which another checkout may serve. Reply with each address.";
 
 /** The window can show a Browser: the desktop app, from the build that added it. */
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
 
 /** A toolbar control of the Browser, named by its tooltip. */
-function ToolbarButton({ label, control, disabled, shortcut, onClick, children }: {
+function ToolbarButton({ label, control, disabled, shortcut, pressed, onClick, children }: {
 	label: string;
 	control: ControlId;
 	disabled: boolean;
 	shortcut?: readonly string[];
+	/** Set for a toggle: whether it is on. */
+	pressed?: boolean;
 	onClick: () => void;
 	children: ReactNode;
 }) {
 	return (
 		<Tooltip content={label} shortcut={shortcut} side="bottom" disabled={disabled}>
-			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} disabled={disabled} onClick={onClick}>
+			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} aria-pressed={pressed} active={pressed} disabled={disabled} onClick={onClick}>
 				{children}
 			</Button>
 		</Tooltip>
@@ -101,10 +104,16 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
-	const startServer = () => {
-		request({ t: "prompt", view, text: START_SERVER_PROMPT, images: [], delivery: "followUp" });
-		toasts.add({ title: "Asked the session to start its dev server" });
-	};
+	const startServer = useAction(async () => {
+		const answer = await writeStartServer(view.instanceId);
+		if ("started" in answer) {
+			webview.load(`http://localhost:${answer.started.port}`);
+			toasts.add({ title: `Started ${answer.started.command}` });
+			return;
+		}
+		request({ t: "prompt", view, text: `${START_SERVER_PROMPT}\n\nStarting it directly failed: ${answer.fallback}`, images: [], delivery: "followUp" });
+		toasts.add({ title: "Asked the session to start its dev server", description: answer.fallback });
+	}, "Cannot start the dev server");
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
@@ -168,13 +177,19 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 							</MenuItem>
 						))}
 						<MenuSeparator />
-						<MenuItem {...activityControl("browser.start-server")} onClick={startServer}>
+						<MenuItem {...activityControl("browser.start-server")} disabled={startServer.pending} onClick={() => startServer.run()}>
 							<Play />
-							Start dev server
+							{startServer.pending ? "Starting dev server…" : "Start dev server"}
 						</MenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<ToolbarButton label="Select element" control="browser.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
+				<ToolbarButton
+					label={webview.picking ? "Stop selecting" : "Select element"}
+					control="browser.select-element"
+					disabled={!webview.ready}
+					pressed={webview.picking}
+					onClick={webview.selectElement}
+				>
 					<MousePointerClick />
 				</ToolbarButton>
 				<ToolbarButton
@@ -208,8 +223,16 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
 					<Server aria-hidden className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
-					<p className="text-xs text-muted-foreground/80">Ask the session to start one, or type its address above.</p>
-					<Button {...activityControl("browser.start-server")} variant="outline" size="sm" leadingIcon={Play} className="mt-1" onClick={startServer}>
+					<p className="text-xs text-muted-foreground/80">Start one, or type its address above.</p>
+					<Button
+						{...activityControl("browser.start-server")}
+						variant="outline"
+						size="sm"
+						leadingIcon={Play}
+						loading={startServer.pending}
+						className="mt-1"
+						onClick={() => startServer.run()}
+					>
 						Start dev server
 					</Button>
 				</div>

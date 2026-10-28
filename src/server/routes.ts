@@ -39,14 +39,14 @@ import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequest, type PullRequestCheckout, type PullRequestRebase, prKey, type RebasedPullRequest, type Repo } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
-import { type LiveSessionProcesses, parseProcessSettings, type ProcessSettings, type ProcessStop } from "../shared/processes";
+import { type DevServerStart, type LiveSessionProcesses, parseProcessSettings, type ProcessSettings, type ProcessStop } from "../shared/processes";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import type { ReplayComparison, ReplayDetail } from "../shared/replay";
 import { MEDIA_FILE_TYPES } from "../shared/transcript";
 import type { View } from "../shared/sessions";
-import { parseProcessStop, parseReviewDraftPost, parseView } from "./wire";
+import { parseDevServerRequest, parseProcessStop, parseReviewDraftPost, parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
 import { findMediaFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
@@ -150,12 +150,14 @@ export interface RouteEnv {
 	processes: ProcessRoutesEnv;
 }
 
-/** What the live sessions run besides omp, and when the idle stop ends it. */
+/** What the live sessions run besides omp, the start of a session's dev server, and when the idle stop ends them. */
 export interface ProcessRoutesEnv {
 	/** Every live session's processes, in roster order. */
 	list(): Promise<LiveSessionProcesses[]>;
 	/** Stops the session's process `id`, unless either no longer runs, and answers what every live session runs after. */
 	stop(stop: ProcessStop): Promise<LiveSessionProcesses[]>;
+	/** Starts live session `instanceId`'s dev server as a service it owns, else answers why it could not; rejects when the session no longer runs. */
+	startServer(instanceId: string): Promise<DevServerStart>;
 	settings(): ProcessSettings;
 	changeSettings(settings: ProcessSettings): ProcessSettings;
 }
@@ -959,12 +961,15 @@ function syncRoutes({ get, write }: RouteKit, env: SyncRoutesEnv): Routes {
 	};
 }
 
-/** The live sessions' processes, the stop of one, and the idle stop's setting. */
+/** The live sessions' processes, the stop of one, the start of a session's dev server, and the idle stop's setting. */
 function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes {
 	return {
 		"/api/session-processes": { GET: get(() => answer(() => env.list())) },
 		"/api/session-processes/stop": {
 			PUT: write(body => checked(parseProcessStop(body), "Expected { instanceId, id } naming a live session and one of its processes"), stop => env.stop(stop)),
+		},
+		"/api/session-processes/start-server": {
+			PUT: write(body => checked(parseDevServerRequest(body), "Expected { instanceId } naming a live session"), ({ instanceId }) => env.startServer(instanceId)),
 		},
 		"/api/process-settings": {
 			GET: get(() => answer(async () => env.settings())),

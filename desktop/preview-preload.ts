@@ -6,15 +6,17 @@
 /// <reference lib="dom" />
 import { ipcRenderer, webFrame } from "electron";
 import { isObject } from "../src/json";
-import { PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL, PREVIEW_PICKING_CHANNEL } from "../src/shared/desktop-bridge";
 import grab from "./dist/preview-grab.txt" with { type: "text" };
 
 // react-grab observes `document.body` as it starts, which the preload runs before the parser made.
 document.addEventListener("DOMContentLoaded", () => void webFrame.executeJavaScript(grab).catch(() => {}), { once: true });
 
 window.addEventListener("message", event => {
-	const content: unknown = event.source === window && isObject(event.data) ? event.data[PREVIEW_GRAB_CHANNEL] : undefined;
+	if (event.source !== window || !isObject(event.data)) return;
+	const { [PREVIEW_GRAB_CHANNEL]: content, [PREVIEW_PICKING_CHANNEL]: picking } = event.data;
 	if (typeof content === "string") ipcRenderer.sendToHost(PREVIEW_GRAB_CHANNEL, content);
+	if (typeof picking === "boolean") ipcRenderer.sendToHost(PREVIEW_PICKING_CHANNEL, picking);
 });
 
 // The guest has the focus while the Browser is maximized, so an Escape the app left alone goes to the page, which restores it.

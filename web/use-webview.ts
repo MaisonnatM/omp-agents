@@ -1,6 +1,6 @@
 /** The Browser's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
 import { useEffect, useRef, useState } from "react";
-import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL, PREVIEW_PICKING_CHANNEL } from "../src/shared/desktop-bridge";
 
 /** What the Browser drives of Electron's `<webview>`, which the page has no types for. */
 export interface WebviewTag extends HTMLWebViewElement {
@@ -51,6 +51,8 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 	const [problem, setProblem] = useState<string | null>(null);
 	const [ready, setReady] = useState(false);
 	const [history, setHistory] = useState({ back: false, forward: false });
+	// Whether react-grab picks in the page, as its preload reports; a new page starts without it.
+	const [picking, setPicking] = useState(false);
 	const latest = useRef({ onPick, onNavigate, onEscape });
 	latest.current = { onPick, onNavigate, onEscape };
 
@@ -71,6 +73,7 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 			if (isMainFrame === false) return;
 			setAddress(url);
 			setProblem(null);
+			setPicking(false);
 			readHistory();
 			if (isLoopbackUrl(url)) latest.current.onNavigate(url);
 		};
@@ -84,6 +87,7 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 			const { channel, args } = event as IpcMessageEvent;
 			const content = args[0];
 			if (channel === PREVIEW_ESCAPE_CHANNEL) latest.current.onEscape();
+			else if (channel === PREVIEW_PICKING_CHANNEL && typeof content === "boolean") setPicking(content);
 			// A sign-in takes the guest to other sites, which must not write into the composer.
 			else if (channel === PREVIEW_GRAB_CHANNEL && typeof content === "string" && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
 		};
@@ -126,10 +130,13 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 		address,
 		setAddress,
 		problem,
+		picking,
 		load,
 		back: () => ref.current?.goBack(),
 		forward: () => ref.current?.goForward(),
 		reload: () => ref.current?.reload(),
-		selectElement: () => void ref.current?.executeJavaScript("window.__REACT_GRAB__?.toggle()", true).catch(() => {}),
+		// Comment mode opens react-grab's prompt on the clicked element, so you type at once; its send copies the element with the text.
+		selectElement: () =>
+			void ref.current?.executeJavaScript("(g => g && (g.isActive() ? g.deactivate() : g.comment()))(window.__REACT_GRAB__)", true).catch(() => {}),
 	};
 }

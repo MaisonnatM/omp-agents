@@ -29,7 +29,7 @@ import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/se
 import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/shared/tickets";
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
-import type { LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
+import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
 import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
@@ -127,6 +127,13 @@ export const sessionProcessesStore = createPolledStore<LiveSessionProcesses[]>({
 export async function writeProcessStop(instanceId: string, id: string): Promise<void> {
 	const answer = await putJson<LiveSessionProcesses[]>("/api/session-processes/stop", { instanceId, id } satisfies ProcessStop);
 	sessionProcessesStore.update(() => answer);
+}
+
+/** Starts live session `instanceId`'s dev server as a service it owns, and reads what every live session runs again once it started. */
+export async function writeStartServer(instanceId: string): Promise<DevServerStart> {
+	const answer = await putJson<DevServerStart>("/api/session-processes/start-server", { instanceId } satisfies DevServerRequest);
+	if ("started" in answer) void sessionProcessesStore.refresh();
+	return answer;
 }
 
 /** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per workspace, so there is one entry. */
