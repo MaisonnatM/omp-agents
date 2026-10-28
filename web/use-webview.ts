@@ -130,6 +130,8 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 		back: () => ref.current?.goBack(),
 		forward: () => ref.current?.goForward(),
 		reload: () => ref.current?.reload(),
-		selectElement: () => void ref.current?.executeJavaScript("window.__REACT_GRAB__?.toggle()", true).catch(() => {}),
+		// Comment mode opens react-grab's prompt on the clicked element, so you type at once; its send copies the element with the text.
+		selectElement: () =>
+			void ref.current?.executeJavaScript("(g => g && (g.isActive() ? g.deactivate() : g.comment()))(window.__REACT_GRAB__)", true).catch(() => {}),
 	};
 }
