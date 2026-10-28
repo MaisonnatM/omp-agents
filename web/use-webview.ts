@@ -11,6 +11,7 @@ export interface WebviewTag extends HTMLWebViewElement {
 	reload(): void;
 	loadURL(url: string): Promise<void>;
 	getURL(): string;
+	getWebContentsId(): number;
 	executeJavaScript(code: string, userGesture?: boolean): Promise<unknown>;
 }
 type IpcMessageEvent = Event & { channel: string; args: unknown[] };
@@ -35,10 +36,12 @@ interface WebviewOptions {
 	onPick: (text: string) => void;
 	/** Takes each address on this computer the page navigates to. */
 	onNavigate: (url: string) => void;
+	/** The ports the session runs servers on, which a sign-in back to the app's usual port is sent to instead. */
+	sessionPorts: readonly number[];
 }
 
 /** The `<webview>` to render with `ref` and `src` once `src` is not `null`, the address field's state, and the toolbar's actions. */
-export function useWebview({ initial, onPick, onNavigate }: WebviewOptions) {
+export function useWebview({ initial, onPick, onNavigate, sessionPorts }: WebviewOptions) {
 	const ref = useRef<WebviewTag>(null);
 	// The webview's first address: later ones go through `loadURL`, since a changed `src` would load each page again.
 	const [src, setSrc] = useState(initial);
@@ -95,6 +98,11 @@ export function useWebview({ initial, onPick, onNavigate }: WebviewOptions) {
 			for (const [name, listener] of listeners) element.removeEventListener(name, listener);
 		};
 	}, [mounted]);
+
+	const portsKey = sessionPorts.join(",");
+	useEffect(() => {
+		if (ready && ref.current) window.ompDesktop?.browserPorts?.(ref.current.getWebContentsId(), portsKey === "" ? [] : portsKey.split(",").map(Number));
+	}, [ready, portsKey]);
 
 	const load = (typed: string): void => {
 		const url = addressOf(typed);

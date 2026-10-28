@@ -14,6 +14,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - The address field loads what you type when you press Enter; `localhost:5173` reads as `http://localhost:5173`.
   The address field loads only addresses on this computer, `localhost`, `127.0.0.1`, and `[::1]`.
   The app itself can go anywhere on the web, so a sign-in that goes through Google or another provider and comes back finishes in the Browser, and a sign-in popup opens as a small window of the app with the same sign-ins.
+  When a sign-in comes back to `localhost` on a port the session runs nothing on, usually the port the app runs on day to day such as `3000`, the Browser loads the same address on the session's server instead, so the sign-in lands in the app you are testing.
   A link that opens a new tab opens in your default browser.
   An address that fails to load says why under the address.
 - Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.

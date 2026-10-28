@@ -18,6 +18,8 @@ export const ACCESS_CHANNEL = "omp-agents:access";
 export const PREVIEW_GRAB_CHANNEL = "omp-agents:preview-grab";
 /** The Preview webview's session, apart from the dashboard's, and kept across launches, so a sign-in to the app lasts. */
 export const PREVIEW_PARTITION = "persist:omp-preview";
+/** The page's report of the ports a Browser's session runs servers on, for the shell's {@link appAddress}. */
+export const BROWSER_PORTS_CHANNEL = "omp-agents:browser-ports";
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -25,6 +27,25 @@ const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "
 export function isLoopbackUrl(url: string): boolean {
 	const parsed = URL.parse(url);
 	return (parsed?.protocol === "http:" || parsed?.protocol === "https:") && LOOPBACK_HOSTS.has(parsed.hostname);
+}
+
+function portOf(url: URL): number {
+	return url.port === "" ? (url.protocol === "https:" ? 443 : 80) : Number(url.port);
+}
+
+/**
+ * Where the Browser goes instead of `target`, leaving `from`: the same address on `home`, the port of the session's
+ * server it last showed, when `target` is on this computer at a port the session runs nothing on, and `from` is a page
+ * off this computer, such as a sign-in provider, or one of the session's servers. An app whose sign-in names the port
+ * it usually runs on, such as `localhost:3000`, so comes back to the session's server. `null` loads `target` as is.
+ */
+export function appAddress(target: string, from: string, home: number | null, sessionPorts: ReadonlySet<number>): string | null {
+	const to = URL.parse(target);
+	if (home === null || to === null || !isLoopbackUrl(target) || sessionPorts.has(portOf(to))) return null;
+	const leaving = URL.parse(from);
+	if (leaving !== null && isLoopbackUrl(from) && !sessionPorts.has(portOf(leaving))) return null;
+	to.port = String(home);
+	return to.href;
 }
 
 /** What a session notification plays: `off` for nothing, `default` for the system's sound, else one of macOS's sounds in `/System/Library/Sounds`. */
@@ -55,6 +76,8 @@ export interface DesktopBridge {
 	onTargetURL?(listener: (url: string) => void): () => void;
 	/** Loads the page again with the current token, keeping its hash, when the token file holds a newer one; absent in an app built before it. */
 	signIn?(): void;
+	/** Tells the shell the ports the session of the Browser's guest `guestId` runs servers on, for {@link appAddress}; absent in an app built before it. */
+	browserPorts?(guestId: number, ports: readonly number[]): void;
 	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
 	titleBar?: boolean;
 	/** The window's page can embed a session's app in a `<webview>` for its Preview; absent in an app built before it. */

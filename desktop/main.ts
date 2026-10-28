@@ -29,7 +29,7 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { ACCESS_CHANNEL, isLoopbackUrl, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, appAddress, BROWSER_PORTS_CHANNEL, isLoopbackUrl, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
@@ -307,7 +307,30 @@ function createWindow(): BrowserWindow {
 		params.partition = PREVIEW_PARTITION;
 		if (!isDashboard(contents.getURL()) || !isLoopbackUrl(params.src ?? "")) event.preventDefault();
 	});
+	interface BrowserApp {
+		guest: WebContents;
+		ports: ReadonlySet<number>;
+		/** The session's port the guest last showed, where a sign-in back to another loopback port goes instead. */
+		home: number | null;
+	}
+	/** Each Browser guest by its `webContents` id, with the ports its session runs servers on, from the page. */
+	const apps = new Map<number, BrowserApp>();
+	const noteHome = (app: BrowserApp): void => {
+		const url = app.guest.getURL();
+		const port = URL.parse(url)?.port;
+		if (isLoopbackUrl(url) && port && app.ports.has(Number(port))) app.home = Number(port);
+	};
+	ipcMain.on(BROWSER_PORTS_CHANNEL, (event, guestId: unknown, ports: unknown) => {
+		const app = typeof guestId === "number" ? apps.get(guestId) : undefined;
+		if (!app || event.sender !== contents || !isDashboard(event.senderFrame?.url ?? "")) return;
+		if (!Array.isArray(ports) || !ports.every(port => Number.isInteger(port))) return;
+		app.ports = new Set(ports);
+		noteHome(app);
+	});
 	contents.on("did-attach-webview", (_event, guest) => {
+		const app: BrowserApp = { guest, ports: new Set(), home: null };
+		apps.set(guest.id, app);
+		guest.once("destroyed", () => apps.delete(guest.id));
 		// A sign-in popup stays in the app, in the Browser's session, so it can hand its result back to its opener; a link opened as a tab goes to the browser.
 		guest.setWindowOpenHandler(({ url, disposition }) => {
 			if (disposition === "new-window" && isWebUrl(url)) {
@@ -316,13 +339,17 @@ function createWindow(): BrowserWindow {
 			openOutside(url);
 			return { action: "deny" };
 		});
-		// A sign-in leaves this computer for its provider and comes back, so the guest follows any web address in place.
-		const keepWeb = (navigation: Electron.Event<{ url: string }>): void => {
-			if (isWebUrl(navigation.url)) return;
+		guest.on("did-navigate", () => noteHome(app));
+		// A sign-in leaves this computer for its provider and comes back, so the guest follows any web address in place,
+		// but one back to the port the app usually runs on goes to the session's server instead.
+		const follow = (navigation: Electron.Event<{ url: string }>): void => {
+			const instead = isWebUrl(navigation.url) ? appAddress(navigation.url, guest.getURL(), app.home, app.ports) : null;
+			if (isWebUrl(navigation.url) && instead === null) return;
 			navigation.preventDefault();
+			if (instead !== null) guest.loadURL(instead).catch(() => {});
 		};
-		guest.on("will-navigate", keepWeb);
-		guest.on("will-redirect", keepWeb);
+		guest.on("will-navigate", follow);
+		guest.on("will-redirect", follow);
 	});
 	/** The token the preload last wrote into the page, so a sign-in reloads the page only for a token it has not tried. */
 	let handedOut: string | null = null;

@@ -64,6 +64,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 			toasts.add({ title: "Added to the composer" });
 		},
 		onNavigate: url => addresses.set(sessionId, url),
+		sessionPorts: candidates.map(candidate => candidate.port),
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
@@ -71,8 +72,8 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		request({ t: "prompt", view, text: START_SERVER_PROMPT, images: [], delivery: "followUp" });
 		toasts.add({ title: "Asked the session to start its dev server" });
 	};
-	// The candidates choose the first address and fill the server menu, so `ps` and `lsof` run only for those.
-	sessionProcessesStore.usePolling(null, webview.src === null || menuOpen);
+	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
+	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
 	const [fullScreen, setFullScreen] = useState(false);
 	useEffect(() => {
