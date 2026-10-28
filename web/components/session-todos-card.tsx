@@ -10,6 +10,7 @@ import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
 import { latestTodos } from "../transcript-view";
 import { type ChangesSession, ChangesSections, useChanges } from "./todos-card-changes";
+import { Stepper } from "./arc/stepper";
 
 /** Whether the card shows the whole todo list, kept for every transcript; it starts folded to its summary. */
 const OPEN_KEY = "omp-agents.todos-card-open";
@@ -274,11 +275,13 @@ function ShipSection({ ship }: { ship: ShipProgress }) {
 				</span>
 			</CollapsibleTrigger>
 			<CollapsibleContent className="border-t border-border">
-				<ol className="flex flex-col py-1.5">
-					{SHIP_STAGES.map((stage, index) => (
-						<TaskRow key={stage} task={{ content: STAGE_LABEL[stage], status: merged || index < at ? "completed" : index === at ? "in_progress" : "pending" }} />
-					))}
-				</ol>
+				<Stepper
+					className="px-3 py-3"
+					label="Ship stages"
+					completeLabel="Merged"
+					current={done}
+					steps={SHIP_STAGES.map(stage => ({ id: stage, label: STAGE_LABEL[stage], ...(stage === ship.stage && ship.work ? { description: WORK_LABEL[ship.work] } : {}) }))}
+				/>
 			</CollapsibleContent>
 		</Collapsible>
 	);
