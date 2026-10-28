@@ -306,7 +306,17 @@ export function App() {
 													hosts={visible.hosts}
 												/>
 											) : (
-												openBot && <BotDetails key={openBot.bot.id} open={openBot} memory={state.botMemories[openBot.bot.id] ?? ""} connected={state.connected} />
+												openBot && (
+													<BotDetails
+														key={openBot.bot.id}
+														open={openBot}
+														session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
+														memory={state.botMemories[openBot.bot.id] ?? ""}
+														connected={state.connected}
+														workspace={workspace}
+														hosts={visible.hosts}
+													/>
+												)
 											)}
 										</DashboardSidebar>
 									)}
