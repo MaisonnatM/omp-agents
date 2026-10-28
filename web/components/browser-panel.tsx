@@ -81,7 +81,10 @@ const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 *
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
 	const { read } = sessionProcessesStore.use();
 	const candidates = useMemo(() => browserCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
-	const sessionPorts = useMemo(() => candidates.map(candidate => candidate.port), [candidates]);
+	const ports = useMemo(
+		() => ({ session: candidates.map(candidate => candidate.port), other: read?.data.find(listed => listed.instanceId === view.instanceId)?.otherPorts ?? [] }),
+		[candidates, read, view.instanceId],
+	);
 	const [saved] = useState(() => addresses.get(sessionId));
 	const draftKey = liveDraftKey(view);
 	const [maximized, setMaximized] = useState(false);
@@ -94,7 +97,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		onNavigate: url => addresses.set(sessionId, url),
 		// The app has the focus while maximized, so its Escape restores too.
 		onEscape: () => setMaximized(false),
-		sessionPorts,
+		ports,
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();

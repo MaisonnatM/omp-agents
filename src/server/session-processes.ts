@@ -6,7 +6,7 @@
  */
 import type { DaemonReport, DaemonScope } from "../omp/modules";
 import { run } from "../proc";
-import { descendants, LISTENERS_ARGV, parseListeners, parsePs, PS_ARGV, PS_ENV, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
+import { cwdsArgv, descendants, LISTENERS_ARGV, parseCwds, parseListeners, parsePs, PS_ARGV, PS_ENV, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";
 import type { LiveSessionProcesses, SessionProcess, SessionProcesses } from "../shared/processes";
 import type { HostStatus } from "../shared/sessions";
@@ -31,6 +31,10 @@ export interface SessionProcessWatchDeps {
 	readTable(): Promise<ProcessTable | null>;
 	/** The TCP ports each process listens on, by pid; `null` when `lsof` failed. */
 	readPorts(): Promise<Map<number, number[]> | null>;
+	/** The working directory of each of `pids` that still runs. */
+	readCwds(pids: readonly number[]): Promise<Map<number, string>>;
+	/** What app `dir` holds, the same for each checkout of it, such as `front/` of one repository; `null` outside git. */
+	appOf(dir: string): Promise<string | null>;
 	/** The daemons every broker scope runs now, without the ones that ended or that no live broker supervises. */
 	readDaemons(): Promise<DaemonReport[]>;
 	/** The project directory a broker scope names for `cwd`. */
@@ -58,6 +62,7 @@ interface Item extends SessionProcess {
 interface Found {
 	omp: SessionProcesses["omp"];
 	items: Item[];
+	otherPorts: number[];
 }
 
 /** What a sample found, by instance id, in roster order. */
@@ -83,6 +88,8 @@ export class SessionProcessWatch {
 	readonly #idleSince = new Map<string, number>();
 	/** Each live session, and each gone one whose omp still ran at the last sample, by instance id. */
 	#seen = new Map<string, Seen>();
+	/** {@link SessionProcessWatchDeps.appOf} by directory, which a running server keeps. */
+	readonly #apps = new Map<string, Promise<string | null>>();
 
 	constructor(deps: SessionProcessWatchDeps) {
 		this.#deps = deps;
@@ -137,7 +144,7 @@ export class SessionProcessWatch {
 				jobs: new Map(jobs.flatMap(job => (job.target.kind === "job" ? [...job.target.members] : []))),
 			});
 			const ompRows = groups?.omp ?? [];
-			found.set(session.instanceId, { omp: { memoryBytes: memoryOf(ompRows), cpuPercent: cpuOf(ompRows), processCount: ompRows.length }, items: jobs });
+			found.set(session.instanceId, { omp: { memoryBytes: memoryOf(ompRows), cpuPercent: cpuOf(ompRows), processCount: ompRows.length }, items: jobs, otherPorts: [] });
 		}
 		const gone = [...previous].filter(([id]) => !live.has(id));
 		const left: Seen[] = [];
@@ -195,7 +202,42 @@ export class SessionProcessWatch {
 			}
 		}
 		for (const each of found.values()) each.items = each.items.filter(item => !due.has(item.id)).sort((a, b) => b.memoryBytes - a.memoryBytes);
+		if (listeners) await this.#fillOtherPorts(found, listeners);
 		return found;
+	}
+
+	/**
+	 * Sets each session's `otherPorts`: every port in `listeners` but its own servers' and those another checkout of the
+	 * same app listens on, such as your own server on the app's usual port, so only those count as the session's app.
+	 */
+	async #fillOtherPorts(found: Sample, listeners: Map<number, number[]>): Promise<void> {
+		const listening = new Map<number, number[]>();
+		for (const [pid, ports] of listeners) for (const port of ports) listening.set(port, [...(listening.get(port) ?? []), pid]);
+		const ownPorts = new Map([...found].map(([id, each]) => [id, new Set(each.items.flatMap(item => (item.shared ? [] : item.ports)))]));
+		const appOfPid = new Map<number, string>();
+		if ([...ownPorts.values()].some(ports => ports.size > 0)) {
+			const cwds = await this.#deps.readCwds([...listeners.keys()]);
+			await Promise.all(
+				[...cwds].map(async ([pid, cwd]) => {
+					const app = await this.#appOf(cwd);
+					if (app !== null) appOfPid.set(pid, app);
+				}),
+			);
+		}
+		for (const [id, each] of found) {
+			const own = ownPorts.get(id)!;
+			const apps = new Set([...own].flatMap(port => (listening.get(port) ?? []).flatMap(pid => appOfPid.get(pid) ?? [])));
+			each.otherPorts = [...listening]
+				.filter(([port, pids]) => !own.has(port) && !pids.some(pid => apps.has(appOfPid.get(pid) ?? "")))
+				.map(([port]) => port)
+				.sort((a, b) => a - b);
+		}
+	}
+
+	#appOf(dir: string): Promise<string | null> {
+		let app = this.#apps.get(dir);
+		if (!app) this.#apps.set(dir, (app = this.#deps.appOf(dir)));
+		return app;
 	}
 
 	/** When the idle stop ends `item`: `timeout` minutes after it started or the last session it serves went idle; `null` while one of them is busy. */
@@ -229,7 +271,12 @@ function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[], port
 }
 
 function answerOf(sample: Sample): LiveSessionProcesses[] {
-	return [...sample].map(([instanceId, found]) => ({ instanceId, omp: found.omp, processes: found.items.map(({ target: _target, serves: _serves, ...shown }) => shown) }));
+	return [...sample].map(([instanceId, found]) => ({
+		instanceId,
+		omp: found.omp,
+		processes: found.items.map(({ target: _target, serves: _serves, ...shown }) => shown),
+		otherPorts: found.otherPorts,
+	}));
 }
 
 /** Every process now, read without blocking the server; `null` when `ps` failed. */
@@ -247,6 +294,24 @@ export async function readListeningPorts(): Promise<Map<number, number[]> | null
 	} catch {
 		return null;
 	}
+}
+
+/** The working directory of each of `pids` that still runs, read without blocking the server; empty when `lsof` failed. */
+export async function readCwds(pids: readonly number[]): Promise<Map<number, string>> {
+	if (pids.length === 0) return new Map();
+	try {
+		const lsof = await run(cwdsArgv(pids), { timeoutMs: 10_000 });
+		// lsof exits 1 when one of the pids has exited since.
+		return lsof.code === 0 || lsof.code === 1 ? parseCwds(lsof.stdout) : new Map();
+	} catch {
+		return new Map();
+	}
+}
+
+/** The repository `dir` is in and where in it, so every checkout of one app answers the same; `null` outside git. */
+export async function readAppOf(dir: string): Promise<string | null> {
+	const git = await run(["git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir", "--show-prefix"], { timeoutMs: 10_000 }).catch(() => null);
+	return git?.code === 0 ? git.stdout.trim() : null;
 }
 
 /** Stops `processes` by {@link terminate}, reading `ps` without blocking the server. */

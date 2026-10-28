@@ -69,7 +69,7 @@ import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-loc
 import { PinsFile } from "./pins-file";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
-import { readListeningPorts, readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
+import { readAppOf, readCwds, readListeningPorts, readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
@@ -353,6 +353,8 @@ export class Dashboard {
 			...ompDaemons(),
 			readTable: readProcessTable,
 			readPorts: readListeningPorts,
+			readCwds,
+			appOf: readAppOf,
 			stopProcesses,
 			sessions: () => sessions.rows(files.factsOf),
 			now: Date.now,

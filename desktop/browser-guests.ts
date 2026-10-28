@@ -1,15 +1,18 @@
 /**
  * The Browser's `<webview>` guests of the dashboard window: what each gets when it attaches, where its navigations and
- * new windows go, and the ports its session runs servers on, which the page reports so a sign-in comes back to them.
+ * new windows go, and the ports its session and other servers listen on, which the page reports so a sign-in comes back
+ * to the session's server.
  */
 import { type BrowserWindow, ipcMain, type WebContents, type WebPreferences } from "electron";
-import { appAddress, BROWSER_PORTS_CHANNEL, isLoopbackUrl, isWebUrl, PREVIEW_PARTITION } from "../src/shared/desktop-bridge";
+import { appAddress, BROWSER_PORTS_CHANNEL, type BrowserPorts, isLoopbackUrl, isWebUrl, PREVIEW_PARTITION } from "../src/shared/desktop-bridge";
 
-/** A guest of the Browser, and the ports its session runs servers on. */
+/** A guest of the Browser, and the ports its session and other servers listen on. */
 interface BrowserApp {
 	guest: WebContents;
-	ports: ReadonlySet<number>;
+	ports: BrowserPorts;
 }
+
+const isPorts = (value: unknown): value is readonly number[] => Array.isArray(value) && value.every(port => Number.isInteger(port));
 
 const GUEST_PREFS = { contextIsolation: true, sandbox: true, nodeIntegration: false, partition: PREVIEW_PARTITION } satisfies WebPreferences;
 
@@ -17,7 +20,7 @@ const GUEST_PREFS = { contextIsolation: true, sandbox: true, nodeIntegration: fa
  * Keeps `contents` within the Browser's rules for `app`: a sign-in popup, a `window.open` with window features, opens
  * as a child of `win` in the Browser's session, keeping its opener, and gets these rules too; any other new window goes
  * to `openOutside`. A navigation follows any web address, so a sign-in through a provider ends here, except one to a
- * loopback port the session runs nothing on, which {@link appAddress} sends to the session's server.
+ * loopback port that {@link appAddress} sends to the session's server.
  */
 function keepInBrowser(contents: WebContents, app: BrowserApp, win: BrowserWindow, openOutside: (url: string) => void): void {
 	contents.setWindowOpenHandler(({ url, disposition }) => {
@@ -54,7 +57,7 @@ export function trackBrowserGuests(win: BrowserWindow, { preload, isDashboard, o
 		if (!isDashboard(contents.getURL()) || !isLoopbackUrl(params.src ?? "")) event.preventDefault();
 	});
 	contents.on("did-attach-webview", (_event, guest) => {
-		const app: BrowserApp = { guest, ports: new Set() };
+		const app: BrowserApp = { guest, ports: { session: [], other: [] } };
 		apps.set(guest.id, app);
 		guest.once("destroyed", () => apps.delete(guest.id));
 		keepInBrowser(guest, app, win, openOutside);
@@ -62,6 +65,8 @@ export function trackBrowserGuests(win: BrowserWindow, { preload, isDashboard, o
 	ipcMain.on(BROWSER_PORTS_CHANNEL, (event, guestId: unknown, ports: unknown) => {
 		const app = typeof guestId === "number" ? apps.get(guestId) : undefined;
 		if (!app || event.sender !== contents || !isDashboard(event.senderFrame?.url ?? "")) return;
-		if (Array.isArray(ports) && ports.every(port => Number.isInteger(port))) app.ports = new Set(ports);
+		if (typeof ports === "object" && ports !== null && "session" in ports && "other" in ports && isPorts(ports.session) && isPorts(ports.other)) {
+			app.ports = { session: ports.session, other: ports.other };
+		}
 	});
 }

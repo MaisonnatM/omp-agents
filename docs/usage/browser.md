@@ -3,7 +3,7 @@
 The **Browser** shows the app a live session runs, its dev server, in the right sidebar beside the conversation, so you can look at a change and point at what to fix next.
 It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser has none.
 
-- The **Browser** tab, next to **PRs** in the [session details sidebar](session-details-sidebar.md), shows it for the live session or subagent the sidebar follows; a past session has none.
+- The **Browser** tab, after **Tickets** in the [session details sidebar](session-details-sidebar.md), shows it for the live session or subagent the sidebar follows; a past session has none.
   The page stays loaded while you switch to another tab and back, and starts again when the sidebar follows another session.
   Drag the sidebar's edge to make the Browser wider or narrower, up to 560 pixels; with two or more panes side by side the sidebar hides, and with it the Browser.
 - The Browser opens on the address you last loaded for that session in the last 30 days, else on the first dev server the session runs.
@@ -14,7 +14,8 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - The address field loads what you type when you press Enter; `localhost:5173` reads as `http://localhost:5173`.
   The address field loads only addresses on this computer, `localhost`, `127.0.0.1`, and `[::1]`.
   The app itself can go anywhere on the web, so a sign-in that goes through Google or another provider and comes back finishes in the Browser, and a sign-in popup opens as a small window of the app with the same sign-ins.
-  When a sign-in comes back to `localhost` on a port the session runs nothing on, usually the port the app runs on day to day such as `3000`, the Browser loads the same address on the session's server instead, so the sign-in lands in the app you are testing.
+  When a sign-in comes back to `localhost` on the port the app runs on day to day, such as `3000`, the Browser loads the same address on the session's server instead, so the sign-in lands in the app you are testing; this happens when nothing listens on that port or another copy of the same app does.
+  A sign-in that comes back to another server of yours, such as the app's API on `8000`, goes there as is.
   A link that opens a new tab opens in your default browser.
   An address that fails to load says why under the address.
 - Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.

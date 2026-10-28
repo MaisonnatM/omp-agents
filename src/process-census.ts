@@ -75,6 +75,20 @@ export function parseListeners(text: string): Map<number, number[]> {
 	return new Map([...ports].map(([each, set]) => [each, [...set].sort((a, b) => a - b)]));
 }
 
+/** `lsof` listing the working directory of each of `pids`, in the fields {@link parseCwds} reads. */
+export const cwdsArgv = (pids: readonly number[]): string[] => ["lsof", "-a", "-d", "cwd", "-Fpn", "-p", pids.join(",")];
+
+/** The working directory of each pid, from {@link cwdsArgv}'s output: a `p<pid>` line, then its `n<path>` line. */
+export function parseCwds(text: string): Map<number, string> {
+	const cwds = new Map<number, string>();
+	let pid: number | null = null;
+	for (const line of text.split("\n")) {
+		if (line.startsWith("p")) pid = Number(line.slice(1));
+		else if (line.startsWith("n") && pid !== null) cwds.set(pid, line.slice(1));
+	}
+	return cwds;
+}
+
 /** Every process now; `null` when `ps` failed. */
 function processTable(): ProcessTable | null {
 	const ps = Bun.spawnSync(PS_ARGV, { env: { ...process.env, ...PS_ENV } });

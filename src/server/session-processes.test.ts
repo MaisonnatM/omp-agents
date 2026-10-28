@@ -34,18 +34,30 @@ function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON
 		sessions: [A, B],
 		owner: true,
 		minutes: 30 as number | null,
-		/** What `lsof` finds listening, by pid; `null` when it fails. */
+		/** What `lsof` finds listening, by pid; `null` when it fails. Pid 400 is your own server of the same app, pid 500 an API in Docker. */
 		listeners: new Map([
 			[111, [5173, 24678]],
 			[110, [5173]],
 			[300, [9222]],
 			[100, [4000]],
+			[400, [3000]],
+			[500, [8000]],
 		]) as Map<number, number[]> | null,
+		cwds: new Map([
+			[100, "/repo"],
+			[110, "/repo/wt/front"],
+			[111, "/repo/wt/front"],
+			[300, "/"],
+			[400, "/repo/front"],
+			[500, "/"],
+		]),
 	};
 	const stopped: string[] = [];
 	const watch = new SessionProcessWatch({
 		readTable: async () => parsePs(state.ps.join("\n")),
 		readPorts: async () => state.listeners,
+		readCwds: async pids => new Map([...state.cwds].filter(([pid]) => pids.includes(pid))),
+		appOf: async dir => (dir === "/repo" ? "/repo/.git\n" : dir.startsWith("/repo/") ? `/repo/.git\n${dir.split("/").at(-1)}/` : null),
 		readDaemons: async () => state.reports,
 		projectDir: async cwd => (cwd.startsWith("/repo") ? "/repo" : cwd),
 		stopService: async (_scope, name, id) => {
@@ -72,7 +84,7 @@ function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON
 }
 
 describe("SessionProcessWatch", () => {
-	test("lists every live session's jobs and services in roster order, biggest memory first, with omp and its MCP servers apart", async () => {
+	test("lists every live session's jobs and services in roster order, biggest memory first, with omp and its MCP servers apart, and the ports other apps listen on", async () => {
 		const { watch } = computer();
 		expect(await watch.list()).toEqual([
 			{
@@ -83,19 +95,22 @@ describe("SessionProcessWatch", () => {
 					{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, ports: [9222], startedAt: T0, stopsAt: null },
 					{ id: API_ID, kind: "service", shared: false, label: "api: bun api.ts", memoryBytes: 0, cpuPercent: 0, processCount: 0, ports: [], startedAt: T0, stopsAt: minutes(30) },
 				],
+				otherPorts: [4000, 8000, 9222],
 			},
 			{
 				instanceId: "b",
 				omp: { memoryBytes: 52_428_800, cpuPercent: 4, processCount: 1 },
 				processes: [{ id: BROWSER_ID, kind: "service", shared: true, label: "browser", memoryBytes: 2_097_152, cpuPercent: 6.5, processCount: 1, ports: [9222], startedAt: T0, stopsAt: null }],
+				otherPorts: [3000, 4000, 5173, 8000, 9222, 24678],
 			},
 		]);
 	});
 
 	test("a failed lsof lists every process with no ports", async () => {
-		const { state, processesOf } = computer();
+		const { state, processesOf, watch } = computer();
 		state.listeners = null;
 		expect((await processesOf("a"))?.map(item => item.ports)).toEqual([[], [], []]);
+		expect((await watch.list()).map(each => each.otherPorts)).toEqual([[], []]);
 	});
 
 	test("a busy session's processes never stop", async () => {

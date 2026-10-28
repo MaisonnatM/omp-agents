@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-10-28-browser-leaves-a-sign-in-on-other-servers
 date: 2026-10-28
 decision-makers: Maxence
 ---

@@ -20,8 +20,15 @@ export const PREVIEW_GRAB_CHANNEL = "omp-agents:preview-grab";
 export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
 /** The Preview webview's session, apart from the dashboard's, and kept across launches, so a sign-in to the app lasts. */
 export const PREVIEW_PARTITION = "persist:omp-preview";
-/** The page's report of the ports a Browser's session runs servers on, for the shell's {@link appAddress}. */
+/** The page's report of a Browser's {@link BrowserPorts}, for the shell's {@link appAddress}. */
 export const BROWSER_PORTS_CHANNEL = "omp-agents:browser-ports";
+
+/** The ports a Browser's session runs servers on, and the ones other servers on this computer listen on. */
+export interface BrowserPorts {
+	session: readonly number[];
+	/** Every listener but the session's and another checkout of its app, such as the app's API, which a redirect stays on. */
+	other: readonly number[];
+}
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -36,27 +43,29 @@ export function isLoopbackUrl(url: string): boolean {
 	return isWebUrl(url) && LOOPBACK_HOSTS.has(URL.parse(url)?.hostname ?? "");
 }
 
-/** The port of `url` when it is on this computer at one of `sessionPorts`, else `null`. */
-function sessionPortOf(url: string, sessionPorts: ReadonlySet<number>): number | null {
+/** The port of `url` when it is on this computer at one of `ports`, else `null`. */
+function portIn(url: string, ports: readonly number[]): number | null {
 	const parsed = URL.parse(url);
 	if (parsed === null || !isLoopbackUrl(url)) return null;
 	const port = parsed.port === "" ? (parsed.protocol === "https:" ? 443 : 80) : Number(parsed.port);
-	return sessionPorts.has(port) ? port : null;
+	return ports.includes(port) ? port : null;
 }
 
 /**
  * Where the Browser goes instead of `target`, leaving `from`, having shown `shown` oldest first: the same address on the
- * session's port it last showed, when `target` is on this computer at a port the session runs nothing on, and `from` is
- * a page off this computer, such as a sign-in provider, or one of the session's servers. An app whose sign-in names the
- * port it usually runs on, such as `localhost:3000`, so comes back to the session's server. `null` loads `target` as is.
+ * session's port it last showed, when `target` is on this computer at a port neither the session nor another server
+ * listens on, or one another checkout of the session's app listens on, and `from` is a page off this computer, such as
+ * a sign-in provider, or one of the session's servers. An app whose sign-in names the port it usually runs on, such as
+ * `localhost:3000`, so comes back to the session's server, while its API's callback, such as on `localhost:8000`, stays
+ * where it is. `null` loads `target` as is.
  */
-export function appAddress(target: string, from: string, shown: readonly string[], sessionPorts: ReadonlySet<number>): string | null {
-	if (!isLoopbackUrl(target) || sessionPortOf(target, sessionPorts) !== null) return null;
-	if (isLoopbackUrl(from) && sessionPortOf(from, sessionPorts) === null) return null;
-	const home = shown.findLast(url => sessionPortOf(url, sessionPorts) !== null);
+export function appAddress(target: string, from: string, shown: readonly string[], ports: BrowserPorts): string | null {
+	if (!isLoopbackUrl(target) || portIn(target, ports.session) !== null || portIn(target, ports.other) !== null) return null;
+	if (isLoopbackUrl(from) && portIn(from, ports.session) === null) return null;
+	const home = shown.findLast(url => portIn(url, ports.session) !== null);
 	if (home === undefined) return null;
 	const to = new URL(target);
-	to.port = String(sessionPortOf(home, sessionPorts));
+	to.port = String(portIn(home, ports.session));
 	return to.href;
 }
 
@@ -88,8 +97,8 @@ export interface DesktopBridge {
 	onTargetURL?(listener: (url: string) => void): () => void;
 	/** Loads the page again with the current token, keeping its hash, when the token file holds a newer one; absent in an app built before it. */
 	signIn?(): void;
-	/** Tells the shell the ports the session of the Browser's guest `guestId` runs servers on, for {@link appAddress}; absent in an app built before it. */
-	browserPorts?(guestId: number, ports: readonly number[]): void;
+	/** Tells the shell the {@link BrowserPorts} of the Browser's guest `guestId`, for {@link appAddress}; absent in an app built before it. */
+	browserPorts?(guestId: number, ports: BrowserPorts): void;
 	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
 	titleBar?: boolean;
 	/** The window's page can embed a session's app in a `<webview>` for its Preview; absent in an app built before it. */

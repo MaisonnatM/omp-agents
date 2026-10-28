@@ -16,7 +16,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The Browser has a Maximize button, which fills the app's window with it, not your whole screen; press it again or Escape, even inside your app, to put it back in the sidebar.
 - The Browser's Open in browser button is now called Open in default browser.
 - Fixed: signing in to your app in the Browser no longer jumps to your default browser; the sign-in finishes in the Browser, and a sign-in popup opens as a small window of the app.
-- Fixed: a sign-in in the Browser that comes back to your app's usual port, such as localhost:3000, now lands on the session's dev server instead.
+- Fixed: a sign-in in the Browser that comes back to your app's usual port, such as localhost:3000, now lands on the session's dev server instead, and one that goes through the app's own API, such as localhost:8000, reaches the API first.
 - Fixed: the Start dev server button in the Browser showed its icon above the label instead of beside it.
 - A running session's name in the sidebar no longer leaves an empty gap where its green dot used to be.
 - Settings → Workflows lists your workflows, the skills tagged as one, with the command that starts each, and lets you read and edit each one in place.

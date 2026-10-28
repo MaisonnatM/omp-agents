@@ -1,6 +1,6 @@
 /** The Browser's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
 import { useEffect, useRef, useState } from "react";
-import { isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
 
 /** What the Browser drives of Electron's `<webview>`, which the page has no types for. */
 export interface WebviewTag extends HTMLWebViewElement {
@@ -38,12 +38,12 @@ interface WebviewOptions {
 	onNavigate: (url: string) => void;
 	/** Takes an Escape the app left unhandled, which never reaches the page while the app has the focus. */
 	onEscape: () => void;
-	/** The ports the session runs servers on, which a sign-in back to the app's usual port is sent to instead. */
-	sessionPorts: readonly number[];
+	/** The ports the session and other servers listen on, which decide where a sign-in back to the app's usual port goes. */
+	ports: BrowserPorts;
 }
 
 /** The `<webview>` to render with `ref` and `src` once `src` is not `null`, the address field's state, and the toolbar's actions. */
-export function useWebview({ initial, onPick, onNavigate, onEscape, sessionPorts }: WebviewOptions) {
+export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: WebviewOptions) {
 	const ref = useRef<WebviewTag>(null);
 	// The webview's first address: later ones go through `loadURL`, since a changed `src` would load each page again.
 	const [src, setSrc] = useState(initial);
@@ -103,8 +103,8 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, sessionPorts
 	}, [mounted]);
 
 	useEffect(() => {
-		if (ready && ref.current) window.ompDesktop?.browserPorts?.(ref.current.getWebContentsId(), sessionPorts);
-	}, [ready, sessionPorts]);
+		if (ready && ref.current) window.ompDesktop?.browserPorts?.(ref.current.getWebContentsId(), ports);
+	}, [ready, ports]);
 
 	const load = (typed: string): void => {
 		const url = addressOf(typed);

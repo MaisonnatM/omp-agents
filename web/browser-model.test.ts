@@ -6,7 +6,7 @@ const running = (label: string, ports: number[], shared = false): SessionProcess
 	id: label, kind: shared ? "service" : "job", shared, label, memoryBytes: 0, cpuPercent: 0, processCount: 1, ports, startedAt: 0, stopsAt: null,
 });
 const session = (instanceId: string, processes: SessionProcess[]): LiveSessionProcesses => ({
-	instanceId, omp: { memoryBytes: 0, cpuPercent: 0, processCount: 1 }, processes,
+	instanceId, omp: { memoryBytes: 0, cpuPercent: 0, processCount: 1 }, processes, otherPorts: [],
 });
 
 test("a session's candidates are its own listening ports, in the CPU card's order, without a shared daemon's", () => {

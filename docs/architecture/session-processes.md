@@ -31,7 +31,8 @@ The same sample runs one `lsof` over every TCP listener of the user's processes 
 
 ## HTTP
 
-`GET /api/session-processes` answers a `LiveSessionProcesses` from `src/shared/processes.ts` for every live session, in roster order: its instance id, omp's own memory, CPU, and process count, and the jobs and services, biggest memory first, each with its id, kind, label, memory, CPU, process count, start, whether it is shared, and its `stopsAt`.
+`GET /api/session-processes` answers a `LiveSessionProcesses` from `src/shared/processes.ts` for every live session, in roster order: its instance id, omp's own memory, CPU, and process count, the jobs and services, biggest memory first, each with its id, kind, label, memory, CPU, process count, start, whether it is shared, and its `stopsAt`, and its `otherPorts`, the ports the Browser leaves a sign-in on.
+`otherPorts` lists every listening port but those of the session's unshared jobs and services and those another checkout of the same app listens on: the same `git` common directory and path in it as one of the session's servers, read from each listener's working directory with `lsof` and kept per directory.
 The memory and CPU of omp, a job, or a service are sums over its processes, and a shared service shows under every session it serves.
 `PUT /api/session-processes/stop` takes `{ instanceId, id }`, checked by `parseProcessStop` in `src/server/wire.ts`, and answers the same list after the stop; a stop for a session that no longer runs stops nothing.
 `GET /api/process-settings` answers the `ProcessSettings`, and `PUT /api/process-settings` takes them, checked by `parseProcessSettings`, and answers them as saved.

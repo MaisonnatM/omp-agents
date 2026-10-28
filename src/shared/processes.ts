@@ -34,6 +34,11 @@ export interface SessionProcesses {
 /** One live session's processes, as `GET /api/session-processes` lists every live session's. */
 export interface LiveSessionProcesses extends SessionProcesses {
 	instanceId: string;
+	/**
+	 * The ports other servers on this computer listen on, sorted: every listener but the session's own and another
+	 * checkout of the same app, such as an API in Docker. The Browser leaves a redirect to one of them where it goes.
+	 */
+	otherPorts: number[];
 }
 
 /** The body of `PUT /api/session-processes/stop`. */
