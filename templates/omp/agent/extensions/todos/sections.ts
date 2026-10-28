@@ -5,20 +5,14 @@ export interface Section {
 	name: string;
 }
 
-/** The section named `name`, matched case-insensitively, or the error naming the ones that exist. */
-export function sectionNamed(sections: Section[] | undefined, name: string): { id: string } | { error: string } {
-	const section = sections?.find(section => section.name.toLowerCase() === name.toLowerCase());
-	if (section) return section;
-	const names = (sections ?? []).map(section => section.name).join(", ") || "none";
-	return { error: `No section named ${JSON.stringify(name)}; the sections are: ${names}.` };
-}
-
 /**
- * Where an add naming section `name` files its todo: that section, else none, with the note that says so.
- * An agent cannot create a section, so refusing the add would only have it retry the same name.
+ * Where a todo filed under section `name` goes: that section, matched case-insensitively, none when `name` is empty,
+ * and none with `missing` naming the sections that exist when the list has no such section.
  */
-export function addSection(sections: Section[] | undefined, name: string | undefined): { categoryId: string | null; note: string } {
-	if (!name) return { categoryId: null, note: "" };
-	const section = sectionNamed(sections, name);
-	return "id" in section ? { categoryId: section.id, note: "" } : { categoryId: null, note: ` It is in no section. ${section.error}` };
+export function sectionFor(sections: Section[] | undefined, name: string | undefined): { categoryId: string | null; missing?: string } {
+	if (!name) return { categoryId: null };
+	const section = sections?.find(section => section.name.toLowerCase() === name.toLowerCase());
+	if (section) return { categoryId: section.id };
+	const names = (sections ?? []).map(section => section.name).join(", ") || "none";
+	return { categoryId: null, missing: `No section named ${JSON.stringify(name)}; the sections are: ${names}.` };
 }

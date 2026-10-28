@@ -9,7 +9,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { addSection, type Section, sectionNamed } from "./todos/sections";
+import { type Section, sectionFor } from "./todos/sections";
 
 const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents");
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
@@ -131,7 +131,7 @@ export default function todos(pi: ExtensionAPI) {
 				case "add": {
 					if (!title) return reply("add needs text.", true);
 					const list = readList();
-					const { categoryId, note } = addSection(list.categories, sectionName);
+					const { categoryId, missing } = sectionFor(list.categories, sectionName);
 					const sessionId = ctx.sessionManager.getSessionId();
 					const same = todosOf(list, sessionId).added.find(todo => todo.text === title);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
@@ -147,7 +147,7 @@ export default function todos(pi: ExtensionAPI) {
 						due: due || null,
 						addedBy: sessionId,
 					});
-					return reply(`Added to the user's todo list (id ${todoId}).${note}`);
+					return reply(`Added to the user's todo list (id ${todoId}).${missing ? ` It is in no section. ${missing}` : ""}`);
 				}
 				case "check": {
 					if (!id) return reply("check needs the todo's id.", true);
@@ -165,9 +165,9 @@ export default function todos(pi: ExtensionAPI) {
 					let categoryId: string | null | undefined;
 					if (section !== undefined) {
 						if (!found.topLevel) return reply("Only a top-level todo has a section.", true);
-						const category = sectionName ? sectionNamed(list.categories, sectionName) : undefined;
-						if (category && "error" in category) return reply(category.error, true);
-						categoryId = category?.id ?? null;
+						const resolved = sectionFor(list.categories, sectionName);
+						if (resolved.missing) return reply(resolved.missing, true);
+						categoryId = resolved.categoryId;
 					}
 					if (title) leave({ op: "edit", id, text: title });
 					if (notes !== undefined) leave({ op: "edit-body", id, body: notes });
