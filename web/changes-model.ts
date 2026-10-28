@@ -1,4 +1,4 @@
-/** The changes explorer's pure layout: the tree, the diff's folds, the file view's gutter marks, and the changes card's paths. */
+/** The changes explorer's pure layout: the tree, the diff's folds, the file view's gutter marks, and the Todos card's file paths. */
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
 import { absoluteFilePath } from "./file-paths";
 
@@ -185,7 +185,7 @@ export function fileLines(rows: readonly DiffRow[]): { lines: FileLine[]; remove
 }
 
 /**
- * The path the session's changes list gives the file that the changes card names `path`, relative to the session's `cwd` or
+ * The path the session's changes list gives the file that the Todos card names `path`, relative to the session's `cwd` or
  * absolute with `~`; `null` when the list holds no such file. A `~` path inside the checkout matches by its tail.
  */
 export function changesPathOf(path: string, cwd: string | null, root: string | null, files: readonly ChangedEntry[]): string | null {

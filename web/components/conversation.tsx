@@ -19,7 +19,6 @@ import type { Dashboard } from "../use-dashboard";
 import type { ScheduleWhen } from "../scheduled-model";
 import { AskAboutSelection } from "./ask-about-selection";
 import { useCompletion } from "./completion-popup";
-import { ChangesCard } from "./changes-card";
 import { blockedShortcut, ComposerEditor, ComposerNote, DirectoryLabel, EmptyConversation } from "./composer";
 import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
@@ -274,6 +273,7 @@ function LiveConversation({
 			) : undefined,
 		[session, writable, cwdDisplay],
 	);
+	const changes = useMemo(() => ({ sessionId, cwd: shown?.cwd ?? null, facts: shown }), [sessionId, shown]);
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
@@ -282,7 +282,7 @@ function LiveConversation({
 				<Trajectory view={view} />
 			) : (
 				<AskAboutSelection origin={{ source: shown ? `session “${hostLabel(shown)}”` : "a session", sendToSession: writable ? sendToSession : null }}>
-					<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
+					<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} changes={changes} />
 				</AskAboutSelection>
 			)}
 			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
@@ -296,13 +296,6 @@ function LiveConversation({
 					/>
 				)}
 				{completion.popup}
-				<ChangesCard
-					view={view}
-					sessionId={sessionId}
-					cwd={shown?.cwd ?? null}
-					working={working}
-					facts={shown}
-				/>
 				<ComposerEditor value={editorRef}>
 					<InputMessage
 						editorRef={editorRef}

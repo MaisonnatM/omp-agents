@@ -118,7 +118,7 @@ describe("fileTree", () => {
 });
 describe("changesPathOf", () => {
 	const files = [entry("web/app.tsx"), entry("~/notes/plan.md"), entry("app.tsx")];
-	test("finds the changes card's path in the changes list, from a subdirectory, outside the checkout, or by its tail under ~", () => {
+	test("finds the Todos card's path in the changes list, from a subdirectory, outside the checkout, or by its tail under ~", () => {
 		expect(changesPathOf("app.tsx", "/repo/web", "/repo", files)).toBe("web/app.tsx");
 		expect(changesPathOf("app.tsx", "/repo", "/repo", files)).toBe("app.tsx");
 		expect(changesPathOf("~/notes/plan.md", "/repo", "/repo", files)).toBe("~/notes/plan.md");

@@ -77,6 +77,7 @@ import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRE
 import { StatusDot, statusLabel } from "./status-dot";
 import { PromptHistory } from "./prompt-history";
 import { SessionTodosCard } from "./session-todos-card";
+import type { ChangesSession } from "./todos-card-changes";
 import { TranscriptMinimap } from "./transcript-minimap";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
@@ -148,7 +149,7 @@ export const ActivityVisibility = createContext<ActivityVisibility>({
 	toggleThinking: () => {},
 });
 
-/** Whether the transcript draws its tool and thinking groups and the changes card; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
+/** Whether the transcript draws its tool and thinking groups and the Todos card's files, images, and sources; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
 export const ActivityShown = createContext(true);
 
 export const HIDE_TOOL_CALLS_KEY = "omp-agents.hide-tool-calls";
@@ -464,6 +465,8 @@ interface TranscriptProps {
 	onEdit?: (entryId: string, text: string) => Promise<void>;
 	/** Shown in place of the transcript, once it loaded, until its first item or turn. */
 	empty?: ReactNode;
+	/** The session whose files, images, and sources the Todos card lists; omitted, the card lists none. */
+	changes?: ChangesSession;
 }
 
 /** A prompt or a reply: the user's and the agent's words. */
@@ -546,7 +549,7 @@ const MessageRow = memo(function MessageRow({
  * It reads the view's items itself, so a streamed token renders it and the outline alone, and of its rows only the
  * ones whose message changed. It renders again for fork state or callbacks, not with the page around it.
  */
-export const Transcript = memo(function Transcript({ view, working, fork, onFork, onEdit, empty }: TranscriptProps) {
+export const Transcript = memo(function Transcript({ view, working, fork, onFork, onEdit, empty, changes }: TranscriptProps) {
 	const items = useTranscript(view);
 	const loaded = usePaneLoaded(view);
 	const last = items.at(-1);
@@ -628,7 +631,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	return (
 		<OpenToolImage.Provider value={openImage}>
 			<div className="@container/transcript relative flex min-h-0 flex-1 flex-col">
-				<SessionTodosCard items={items} />
+				<SessionTodosCard items={items} view={view} working={working} changes={activityShown ? changes : undefined} />
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>
 						<MessageScrollerContent className="mx-auto max-w-conversation gap-3 p-3" aria-relevant="additions text" data-transcript>

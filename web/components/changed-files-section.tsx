@@ -1,4 +1,4 @@
-/** The changes card's Files section: a row per changed file, and the dialog of one file's recorded changes that a subagent's row opens. */
+/** The Todos card's Files section: a row per changed file, and the dialog of one file's recorded changes that a subagent's row opens. */
 import {
 	File as FileIcon,
 	FileCode,
@@ -149,7 +149,7 @@ export function ChangedFileList({ files, onOpen }: { files: ChangedFile[]; onOpe
 								type="button"
 								aria-haspopup="dialog"
 								onClick={() => onOpen(file.path)}
-								className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] outline-none hover:bg-background/70 focus-visible:ring-2 focus-visible:ring-ring"
+								className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 							>
 								<Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 								<span className="min-w-0 truncate">

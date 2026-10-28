@@ -8,7 +8,6 @@ import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { pastLabel, SOURCE_LABELS } from "../labels";
 import { AskAboutSelection } from "./ask-about-selection";
-import { ChangesCard } from "./changes-card";
 import { Header } from "./page-header";
 import { SessionIdCopy, SessionMeta } from "./session-meta";
 import { SessionTitle } from "./session-title";
@@ -35,6 +34,7 @@ interface PastConversationProps {
 
 export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, titleAction, trajectory, header }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
+	const changes = useMemo(() => ({ sessionId, cwd: session?.cwd ?? null, facts: session }), [sessionId, session]);
 	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
 	const failed = resume?.phase === "failed" && resume.op.sessionId === sessionId ? resume.error : null;
@@ -83,12 +83,9 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 					<Trajectory view={view} />
 				) : (
 					<AskAboutSelection origin={{ source: session ? `past session “${title}”` : "a past session", sendToSession: null }}>
-						<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} />
+						<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} changes={changes} />
 					</AskAboutSelection>
 				)}
-				<div className="mx-auto w-full max-w-conversation px-3">
-					<ChangesCard view={view} sessionId={sessionId} cwd={session?.cwd ?? null} working={false} facts={session} className="mb-3 rounded-xl pb-0" />
-				</div>
 			</div>
 		</MessageScrollerProvider>
 	);

@@ -1,4 +1,4 @@
-/** The changes card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
+/** The Todos card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
 import { ChevronDown, GitPullRequest, type LucideIcon, MessageSquare, Paperclip } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
@@ -238,7 +238,7 @@ export function MediaStrip({ media, view, pullRequests, tickets }: MediaStripPro
 									type="button"
 									onClick={() => (picked.length > 0 ? toggle(key) : setShown(key))}
 									aria-pressed={picked.length > 0 ? checked : undefined}
-									className="block rounded-md p-0.5 outline-none hover:bg-background/70 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-background aria-pressed:ring-2 aria-pressed:ring-ring"
+									className="block rounded-md p-0.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-muted aria-pressed:ring-2 aria-pressed:ring-ring"
 								>
 									<img src={mediaSrc(item.src)} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="h-14 w-24 rounded-sm border border-border bg-muted object-cover object-top" />
 								</button>

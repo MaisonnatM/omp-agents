@@ -1,9 +1,12 @@
 # Changed files and images
 
-- A changes card sits directly above each live session's or subagent's composer, and below a past session's transcript.
-  It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items.
+- The **Todos** card at the top right of each live session's, subagent's, or past session's conversation, or above its messages when the conversation is narrow, lists what the agent changed, took, and opened under its todo list.
+  It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items; the card shows once any of them, or the todo list, has something to show.
   Click a section's header to fold or unfold it.
   Each starts open, and the app keeps each choice across sessions and reloads.
+  The card scrolls as a whole when its sections outgrow it.
+  **Show todos card** in Settings › Preferences hides only the todo list; these sections stay.
+  A Bot's page, which reads as a chat, leaves these sections out, and the card hides while the trajectory takes the transcript's place.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows a file-type icon, the file's name, and its lines added and removed, which the header totals.
   When files share a name, muted parent folders distinguish them.
@@ -20,7 +23,7 @@
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-  The file list scrolls within the card, keeping its header and the composer visible.
+  The file list scrolls within the card, keeping its header visible.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Images** shows a horizontal thumbnail strip of the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   It also shows the image files the session wrote that a tool call or its result named, such as the `page.png` a script saved; a named file counts as written when it changed after the session started, so paths in source code and older files stay out.
