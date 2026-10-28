@@ -1,4 +1,4 @@
-// Tracks the /ship workflow (Linear ticket -> draft PR -> thermonuclear -> live for review) per session.
+// Tracks the /ship workflow (Linear ticket -> draft PR -> reviews -> live for review) per session.
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -11,26 +11,51 @@ import { GH, type Gh, ghJson, ghText } from "./github/command";
 
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
-export const CHECKBOX = "- [x] Thermo-nuclear code quality review";
-/** A repository opts out of reviewing every change by committing this file of globs; see `reviewNeeded`. */
-export const REVIEW_PATHS = ".omp/review-paths";
 /** A proof box a repository's PR template declares; the PR goes live only once the author checks it. The gate reads the box, not the proof behind it. */
 export const PROOF_BOX = "- [ ] Browser proof";
 const POLL_MS = 60_000;
 const TURN_REFRESH_MS = 15_000;
 
-export const STAGES = ["ticket", "implement", "draft_pr", "thermonuclear", "ready_gate", "live", "merged"] as const;
+// The interface review comes before the thermonuclear one, so the code-quality review sees the interface fixes.
+export const STAGES = ["ticket", "implement", "draft_pr", "interface_review", "thermonuclear", "ready_gate", "live", "merged"] as const;
 export type Stage = (typeof STAGES)[number];
 export const LIVE_WORK = ["rebase", "fix_comments", "fix_ci"] as const;
 export type LiveWork = (typeof LIVE_WORK)[number];
-/** Stages from the ready gate on, and all live work, decide from GitHub's current PR status, never a stale one. */
-const NEEDS_CURRENT_STATUS: readonly string[] = [...STAGES.slice(STAGES.indexOf("ready_gate")), ...LIVE_WORK];
+
+/** A review a PR's changed files call for, proven by a checked box in the PR body. */
+interface Review {
+	label: string;
+	box: string;
+	/** The repository's file of globs whose changes need the review; see `reviewNeeded`. */
+	paths: string;
+	/** Needed when the repository commits no `paths` file. */
+	withoutPaths: boolean;
+}
+/** Each review by the stage that runs it. */
+export const REVIEWS = {
+	interface_review: { label: "Interface review", box: "- [x] Interface review", paths: ".omp/ui-paths", withoutPaths: false },
+	thermonuclear: { label: "Thermonuclear", box: "- [x] Thermo-nuclear code quality review", paths: ".omp/review-paths", withoutPaths: true },
+} as const satisfies Partial<Record<Stage, Review>>;
+export type ReviewStage = keyof typeof REVIEWS;
+const isReviewStage = (stage: string): stage is ReviewStage => Object.hasOwn(REVIEWS, stage);
+/** The review stages in workflow order. */
+const REVIEW_STAGES = STAGES.filter(isReviewStage);
+/** Each review's state for one PR: whether its changed files call for it, and whether its body has the box. */
+export type Reviews = Record<ReviewStage, { needed: boolean; done: boolean }>;
+
+function byReview<T>(value: (stage: ReviewStage) => T): Record<ReviewStage, T> {
+	return Object.fromEntries(REVIEW_STAGES.map(stage => [stage, value(stage)])) as Record<ReviewStage, T>;
+}
+
+/** Stages after the first review, and all live work, decide from GitHub's current PR status, never a stale one. */
+const NEEDS_CURRENT_STATUS: readonly string[] = [...STAGES.slice(STAGES.indexOf(REVIEW_STAGES[0]) + 1), ...LIVE_WORK];
 
 const LABEL: Record<Stage | LiveWork, string> = {
 	ticket: "Ticket",
 	implement: "Implement",
 	draft_pr: "Draft PR",
-	thermonuclear: "Thermonuclear",
+	interface_review: REVIEWS.interface_review.label,
+	thermonuclear: REVIEWS.thermonuclear.label,
 	ready_gate: "Ready gate",
 	live: "Live for review",
 	merged: "Merged",
@@ -43,7 +68,8 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'implement', issue}).",
 	implement: "Implement and commit on the issue's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
-	thermonuclear: `If the status says no changed file matches \`${REVIEW_PATHS}\`, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	interface_review: `If the status says no changed file matches \`${REVIEWS.interface_review.paths}\`, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
+	thermonuclear: `If the status says no changed file matches \`${REVIEWS.thermonuclear.paths}\`, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, ask the user to approve, then run \`gh pr ready <N>\`.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
@@ -59,9 +85,7 @@ export interface PrStatus {
 	moreThreads: boolean;
 	approved: boolean;
 	checks: "pass" | "fail" | "pending" | "none";
-	reviewed: boolean;
-	/** Whether the PR needs the thermonuclear review; see `reviewNeeded`. */
-	reviewNeeded: boolean;
+	reviews: Reviews;
 }
 
 export interface ShipState {
@@ -99,8 +123,8 @@ interface PrResponse {
 	commits: { nodes: { commit: { statusCheckRollup: { state: string } | null } }[] };
 }
 
-/** The PR's status; `reviewPaths` is the checkout's `.omp/review-paths` text, `undefined` when it has none. */
-export function parsePr(pr: PrResponse, reviewPaths: string | undefined): PrStatus {
+/** The PR's status; `read` returns the text of a paths file in the checkout, `undefined` when it has none. */
+export function parsePr(pr: PrResponse, read: (paths: string) => string | undefined): PrStatus {
 	const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup?.state;
 	const threads = pr.reviewThreads.nodes;
 	return {
@@ -113,8 +137,7 @@ export function parsePr(pr: PrResponse, reviewPaths: string | undefined): PrStat
 		changesRequested: pr.reviewDecision === "CHANGES_REQUESTED",
 		approved: pr.reviewDecision === "APPROVED",
 		checks: !rollup ? "none" : rollup === "SUCCESS" ? "pass" : rollup === "FAILURE" || rollup === "ERROR" ? "fail" : "pending",
-		reviewed: pr.body.includes(CHECKBOX),
-		reviewNeeded: reviewNeeded(reviewPaths, pr.files.nodes.map(file => file.path), pr.changedFiles),
+		reviews: reviewsOf(pr.body, pr.files.nodes.map(file => file.path), pr.changedFiles, read),
 	};
 }
 
@@ -148,8 +171,12 @@ export function renderLines(s: ShipState): string[] {
 	lines.push(STAGES.slice(4).map((stage, i) => `${i + 4 < at || s.stage === "merged" ? "✓" : i + 4 === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
 	if (s.stage === "live" && s.prStatus) lines.push(`Live: ${liveSummary(s.prStatus)}`);
 	if (s.stage === "live" && s.work) lines.push(`Working on: ${LABEL[s.work]}`);
-	if (s.prStatus?.reviewNeeded && !s.prStatus.reviewed && (s.stage === "thermonuclear" || s.stage === "ready_gate")) lines.push("Thermonuclear checkbox missing from the PR body");
-	if (s.prStatus && !s.prStatus.reviewNeeded && s.stage === "thermonuclear") lines.push(`Thermonuclear review not needed: no changed file matches ${REVIEW_PATHS}`);
+	for (const stage of REVIEW_STAGES) {
+		const review = s.prStatus?.reviews[stage];
+		const { label, paths } = REVIEWS[stage];
+		if (review?.needed && !review.done && at >= STAGES.indexOf(stage) && at <= STAGES.indexOf("ready_gate")) lines.push(`${label} checkbox missing from the PR body`);
+		if (review && !review.needed && s.stage === stage) lines.push(`${label} not needed: no changed file matches ${paths}`);
+	}
 	if (s.note) lines.push(`Note: ${s.note}`);
 	return lines;
 }
@@ -215,31 +242,44 @@ export function otherOwner(owner: string | undefined, repo: string | undefined):
 }
 
 /**
- * Whether a PR needs the thermonuclear review: always when the repository commits no `.omp/review-paths` (`reviewPaths` is `undefined`)
- * or GitHub listed fewer `files` than the PR's `changedFiles`, else when a changed repository-relative path matches one of its globs.
+ * Whether a PR needs `review`: when the repository commits no `review.paths` (`paths` is `undefined`), only if the review has `withoutPaths`;
+ * else always when GitHub listed fewer `files` than the PR's `changedFiles`, and otherwise when a changed repository-relative path matches one of its globs.
  * The file lists one glob per line; `#` starts a comment and blank lines are ignored.
  */
-export function reviewNeeded(reviewPaths: string | undefined, files: string[], changedFiles: number): boolean {
-	if (reviewPaths === undefined || files.length < changedFiles) return true;
-	const globs = reviewPaths.split("\n").map(line => line.replace(/#.*/, "").trim()).filter(Boolean).map(glob => new Bun.Glob(glob));
+export function reviewNeeded(review: Review, paths: string | undefined, files: string[], changedFiles: number): boolean {
+	if (paths === undefined) return review.withoutPaths;
+	if (files.length < changedFiles) return true;
+	const globs = paths.split("\n").map(line => line.replace(/#.*/, "").trim()).filter(Boolean).map(glob => new Bun.Glob(glob));
 	return files.some(file => globs.some(glob => glob.match(file)));
 }
 
-/** The text of `.omp/review-paths` at the top of the checkout holding `dir`, or `undefined` when it has none. */
-function readReviewPaths(dir: string): string | undefined {
+/** Each review's state for a PR with this body that changes `files`; `read` returns the text of a paths file in the checkout, `undefined` when it has none. */
+export function reviewsOf(body: string, files: string[], changedFiles: number, read: (paths: string) => string | undefined): Reviews {
+	return byReview(stage => ({ needed: reviewNeeded(REVIEWS[stage], read(REVIEWS[stage].paths), files, changedFiles), done: body.includes(REVIEWS[stage].box) }));
+}
+
+/** The first review, in stage order, that runs before `stage` and that the PR needs without its box. */
+function missingReview(reviews: Reviews, stage: Stage): ReviewStage | undefined {
+	return REVIEW_STAGES.find(review => STAGES.indexOf(review) < STAGES.indexOf(stage) && reviews[review].needed && !reviews[review].done);
+}
+
+/** The text of the file at `paths` from the top of the checkout holding `dir`, or `undefined` when it has none. */
+function readPaths(dir: string, paths: string): string | undefined {
 	for (let at = dir; ; at = dirname(at)) {
 		if (existsSync(join(at, ".git"))) {
-			const file = join(at, REVIEW_PATHS);
+			const file = join(at, paths);
 			return existsSync(file) ? readFileSync(file, "utf8") : undefined;
 		}
 		if (dirname(at) === at) return undefined;
 	}
 }
 
-/** Why a PR with this body may not go live, or `undefined` when it may: it needs the thermonuclear checkbox when `needsReview`, and no unchecked proof box. */
-export function publishBlocker(body: string, needsReview: boolean): string | undefined {
-	if (needsReview && !body.includes(CHECKBOX)) {
-		return `Blocked: the PR is not live until the thermonuclear review is applied and pushed. Run the thermonuclear stage, then add \`${CHECKBOX}\` to the PR body.`;
+/** Why a PR with this body may not go live, or `undefined` when it may: it needs the box of every review `reviews` calls for, and no unchecked proof box. */
+export function publishBlocker(body: string, reviews: Reviews): string | undefined {
+	const missing = missingReview(reviews, "live");
+	if (missing) {
+		const { label, box } = REVIEWS[missing];
+		return `Blocked: the PR is not live until the ${label} stage is done. Run it, apply and push its fixes, then add \`${box}\` to the PR body.`;
 	}
 	if (body.split("\n").some(line => line.trimStart().startsWith(PROOF_BOX))) {
 		return `Blocked: the PR body has an unchecked \`${PROOF_BOX}\` box from the repository's PR template. Do what the box and the repository's instructions ask, then check it; delete the line only when it does not apply to this PR.`;
@@ -309,9 +349,9 @@ export default function ship(pi: ExtensionAPI) {
 	const prStatusSchema = z.object({
 		state: z.enum(["OPEN", "MERGED", "CLOSED"]), draft: z.boolean(), conflicts: z.boolean(), behind: z.boolean(),
 		unresolvedThreads: z.number().int(), moreThreads: z.boolean(), changesRequested: z.boolean(), approved: z.boolean(),
-		checks: z.enum(["pass", "fail", "pending", "none"]), reviewed: z.boolean(),
-		// A status recorded before review paths existed needed the review.
-		reviewNeeded: z.boolean().default(true),
+		checks: z.enum(["pass", "fail", "pending", "none"]),
+		// A status recorded before the reviews were per stage needed the thermonuclear review; the next poll replaces a restored status.
+		reviews: z.object(byReview(() => z.object({ needed: z.boolean(), done: z.boolean() }))).default(() => byReview(stage => ({ needed: stage === "thermonuclear", done: false }))),
 	});
 	const stateSchema = z.object({
 		stage: z.enum(STAGES), work: z.enum(LIVE_WORK).optional(), issue: z.string().optional(),
@@ -421,7 +461,7 @@ export default function ship(pi: ExtensionAPI) {
 			return render(ctx);
 		}
 		refreshFailure = undefined;
-		const prStatus = parsePr(parsed.data, readReviewPaths(ctx.cwd));
+		const prStatus = parsePr(parsed.data, paths => readPaths(ctx.cwd, paths));
 		const merged = prStatus.state === "MERGED";
 		const stage: Stage = merged ? "merged" : state.stage;
 		if (JSON.stringify(prStatus) === JSON.stringify(state.prStatus) && stage === state.stage) return render(ctx);
@@ -438,7 +478,7 @@ export default function ship(pi: ExtensionAPI) {
 		if (r.code !== 0) {
 			const error = r.stderr.trim() || r.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {
-				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage when the change needs it, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
+				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run each review stage the change needs, commit and push its fixes, add its box, and pass the ready gate before publishing.";
 			}
 			const auth = quotaExhausted(error) ? undefined : await authProblem(sessionDir);
 			// gh's hint after its first line, `gh auth login`, cannot replace a token an environment variable holds, and the diagnosis names the fix.
@@ -453,7 +493,7 @@ export default function ship(pi: ExtensionAPI) {
 		const parsed = viewSchema.safeParse(view);
 		if (!parsed.success) return "Could not read the PR body and changed files to check its review and proof boxes: gh returned an unexpected answer.";
 		const { body, files, changedFiles } = parsed.data;
-		return publishBlocker(body, reviewNeeded(readReviewPaths(cwd), files.map(file => file.path), changedFiles));
+		return publishBlocker(body, reviewsOf(body, files.map(file => file.path), changedFiles, paths => readPaths(cwd, paths)));
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -475,7 +515,7 @@ export default function ship(pi: ExtensionAPI) {
 		for (const words of commands(input.command)) {
 			const create = ghPr(words, "create");
 			if (create && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
-				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the ready gate, and after the thermonuclear review when its changes need one." };
+				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the ready gate, and after each review its changed files call for." };
 			}
 			const ready = ghPr(words, "ready");
 			if (ready && !ready.includes("--undo")) {
@@ -506,7 +546,7 @@ export default function ship(pi: ExtensionAPI) {
 		const url = output.match(/https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
 		const ran = commands(command);
 		if (ran.some(words => ghPr(words, "create")) && url && !state.pr) {
-			save(ctx, { ...state, repo: url[1], pr: Number(url[2]), stage: "thermonuclear" });
+			save(ctx, { ...state, repo: url[1], pr: Number(url[2]), stage: REVIEW_STAGES[0] });
 			await refresh(ctx);
 		} else if (state.pr && state.stage !== "live" && ran.some(words => {
 			const ready = ghPr(words, "ready");
@@ -529,7 +569,7 @@ export default function ship(pi: ExtensionAPI) {
 		name: "ship_stage",
 		label: "Ship stage",
 		description: [
-			"Read or record the /ship workflow stage of this session: ticket, implement, draft_pr, thermonuclear, ready_gate, live, merged.",
+			`Read or record the /ship workflow stage of this session: ${STAGES.join(", ")}.`,
 			"While live, record the work you start: rebase, fix_comments, or fix_ci; record `live` again after you push.",
 			"Call with no stage to read the current stage, the PR's live needs from GitHub, and the next action.",
 		].join(" "),
@@ -550,8 +590,16 @@ export default function ship(pi: ExtensionAPI) {
 				return { content: [{ type: "text", text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
 			}
 			if (stage || issue || pr || repo || note !== undefined) {
-				if (stage === "ready_gate" && (!state?.prStatus || (state.prStatus.reviewNeeded && !state.prStatus.reviewed))) {
-					return { content: [{ type: "text", text: `The PR must have the thermonuclear checkbox after the review fixes are pushed, since the repository has no \`${REVIEW_PATHS}\` or a changed file matches it.` }], isError: true };
+				if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
+					const reviews = state?.prStatus?.reviews;
+					if (!reviews && REVIEW_STAGES.some(review => STAGES.indexOf(review) < STAGES.indexOf(stage))) {
+						return { content: [{ type: "text", text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
+					}
+					const missing = reviews && missingReview(reviews, stage);
+					if (missing) {
+						const { label, box, paths, withoutPaths } = REVIEWS[missing];
+						return { content: [{ type: "text", text: `The PR must have \`${box}\` after the ${label} fixes are pushed, since a changed file matches \`${paths}\`${withoutPaths ? ` or the repository has no \`${paths}\`` : ""}.` }], isError: true };
+					}
 				}
 				if ((stage === "live" || stage === "rebase" || stage === "fix_comments" || stage === "fix_ci") && (!state?.prStatus || state.prStatus.draft || state.prStatus.state !== "OPEN")) {
 					return { content: [{ type: "text", text: "The PR must be open and ready for review before recording live work." }], isError: true };

@@ -52,7 +52,7 @@ export interface AgentRow {
 	queue: MessageQueue;
 }
 
-export const SHIP_STAGES = ["ticket", "implement", "draft_pr", "thermonuclear", "ready_gate", "live", "merged"] as const;
+export const SHIP_STAGES = ["ticket", "implement", "draft_pr", "interface_review", "thermonuclear", "ready_gate", "live", "merged"] as const;
 export const SHIP_WORK = ["rebase", "fix_comments", "fix_ci"] as const;
 
 export interface ShipProgress {

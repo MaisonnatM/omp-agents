@@ -118,15 +118,14 @@ function quotaConfig(): Record<string, string> {
 
 const checkouts: string[] = [];
 afterAll(() => { for (const dir of checkouts) rmSync(dir, { recursive: true, force: true }); });
-/** A checkout of the test's own, with `reviewPaths` as its `.omp/review-paths` when given, so this repository's file reaches no test. */
-function checkout(reviewPaths?: string): string {
+/** A checkout of the test's own, with `reviewPaths` as its `.omp/review-paths` and `uiPaths` as its `.omp/ui-paths` when given, so this repository's files reach no test. */
+function checkout(reviewPaths?: string, uiPaths?: string): string {
 	const dir = mkdtempSync(join(tmpdir(), "ship-checkout-"));
 	checkouts.push(dir);
 	mkdirSync(join(dir, ".git"));
-	if (reviewPaths !== undefined) {
-		mkdirSync(join(dir, ".omp"));
-		writeFileSync(join(dir, ".omp/review-paths"), reviewPaths);
-	}
+	mkdirSync(join(dir, ".omp"));
+	if (reviewPaths !== undefined) writeFileSync(join(dir, ".omp/review-paths"), reviewPaths);
+	if (uiPaths !== undefined) writeFileSync(join(dir, ".omp/ui-paths"), uiPaths);
 	return dir;
 }
 
@@ -191,6 +190,16 @@ describe("ship publication gate", () => {
 		expect(result?.block ?? false).toBe(blocked);
 		expect(confirmations).toBe(blocked ? 0 : 1);
 		if (blocked) expect(result?.reason).toContain("- [ ] Browser proof");
+	});
+
+	test.each([[undefined, false], ["web/**/*.tsx\n", true]])("a reviewed PR changing web/app.tsx without the interface box, with ui paths %j, is blocked: %s", (uiPaths, blocked) => {
+		const { result, confirmations } = exercise("ship", {
+			command: "gh pr ready 7", approve: true, cwd: checkout(undefined, uiPaths),
+			responses: { "pr view": prView("- [x] Thermo-nuclear code quality review", ["web/app.tsx"]) },
+		});
+		expect(result?.block ?? false).toBe(blocked);
+		expect(confirmations).toBe(blocked ? 0 : 1);
+		if (blocked) expect(result?.reason).toContain("- [x] Interface review");
 	});
 
 	test.each([["dustinspecker/awesome-eslint", false], ["me/app", true], ["ME/other", true]])("gh pr ready -R %s is gated: %s", (repo, gated) => {
@@ -285,9 +294,9 @@ describe("checked PR description CLI", () => {
 	});
 });
 
-describe("ship_stage ready gate", () => {
-	// A PR with this body changing `file`, checked from a checkout with `reviewPaths`.
-	const readyGate = (body: string, file: string, reviewPaths?: string) => {
+describe("ship_stage review gates", () => {
+	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
+	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) => {
 		const pullRequest = {
 			state: "OPEN", isDraft: true, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
 			changedFiles: 1, files: { nodes: [{ path: file }] },
@@ -295,18 +304,31 @@ describe("ship_stage ready gate", () => {
 			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
 		};
 		return exercise("ship", {
-			run: true, cwd: checkout(reviewPaths),
-			params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			run: true, cwd: checkout(reviewPaths, uiPaths),
+			params: { stage, pr: 7, repo: "owner/name" },
 			response: { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) },
 		}).run;
 	};
 
 	test.each([["- [x] Thermo-nuclear code quality review", false], ["Unreviewed PR", true]])("the first call naming the PR reads its body (%s)", (body, isError) => {
-		expect(readyGate(body, "README.md")).toEqual({ isError, stage: isError ? null : "ready_gate" });
+		expect(record("ready_gate", body, "README.md")).toEqual({ isError, stage: isError ? null : "ready_gate" });
 	});
 
 	test.each([["README.md", false], ["src/shared/protocol.ts", true]])("with review paths, an unreviewed PR changing %s is held: %s", (file, isError) => {
-		expect(readyGate("Unreviewed PR", file, "src/shared/**\n")).toEqual({ isError, stage: isError ? null : "ready_gate" });
+		expect(record("ready_gate", "Unreviewed PR", file, "src/shared/**\n")).toEqual({ isError, stage: isError ? null : "ready_gate" });
+	});
+
+	test.each(["thermonuclear", "ready_gate"])("with ui paths, recording %s without the interface box is refused", stage => {
+		expect(record(stage, "- [x] Thermo-nuclear code quality review", "web/app.tsx", undefined, "web/**/*.tsx\n")).toEqual({ isError: true, stage: null });
+	});
+
+	test.each(["thermonuclear", "ready_gate"])("with ui paths, recording %s with the interface box passes", stage => {
+		const body = "- [x] Interface review\n- [x] Thermo-nuclear code quality review";
+		expect(record(stage, body, "web/app.tsx", undefined, "web/**/*.tsx\n")).toEqual({ isError: false, stage });
+	});
+
+	test("without ui paths, a PR changing web/app.tsx records thermonuclear without the interface box", () => {
+		expect(record("thermonuclear", "Unreviewed PR", "web/app.tsx")).toEqual({ isError: false, stage: "thermonuclear" });
 	});
 
 	test("quota exhaustion exposes stale status and cannot advance the ready gate", () => {
