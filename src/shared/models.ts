@@ -186,12 +186,15 @@ export interface OmpFile {
 	body: { state: "read"; size: number; modifiedAt: number; text: string; hash: string } | { state: "missing" } | { state: "unreadable"; error: string };
 }
 
-/** A skill tagged `workflow` in its frontmatter's `metadata.tags`; `command` is the slash command of the same name that starts it, if any. */
+/**
+ * A skill tagged `workflow` in its frontmatter's `metadata.tags`. `skill` is its file's path among `OmpSettings.files`;
+ * `command` is the path of the slash command of the same name that starts it, if any.
+ */
 export interface Workflow {
 	name: string;
 	description: string;
-	skill: OmpFile;
-	command: OmpFile | null;
+	skill: string;
+	command: string | null;
 }
 
 /** `GET /api/settings`: omp's model routing and files, as a session in `cwd` would load them. */

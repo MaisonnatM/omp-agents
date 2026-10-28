@@ -1,6 +1,6 @@
 /** The Settings Workflows section: the skills tagged `workflow`, each with how to start it, viewed and edited in place (`Workflows`). */
 import { useState } from "react";
-import type { Workflow } from "../../../src/shared/models";
+import type { OmpFile, Workflow } from "../../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Editing } from "./editor";
@@ -11,9 +11,13 @@ const TAG_SNIPPET = "metadata:\n  tags: workflow";
 /** What a session types to start `workflow`: its own command when one exists, else the skill. */
 const invocation = (workflow: Workflow): string => (workflow.command ? `/${workflow.name}` : `/skill:${workflow.name}`);
 
-export function Workflows({ workflows, editing }: { workflows: Workflow[]; editing: Editing }) {
+export function Workflows({ workflows, files, editing }: { workflows: Workflow[]; files: OmpFile[]; editing: Editing }) {
 	const [selected, setSelected] = useState<string | null>(null);
-	const open = workflows.find(workflow => workflow.skill.path === selected) ?? workflows[0];
+	const listed = workflows.flatMap(workflow => {
+		const skill = files.find(file => file.path === workflow.skill);
+		return skill ? [{ workflow, skill }] : [];
+	});
+	const open = listed.find(({ skill }) => skill.path === selected) ?? listed[0];
 	if (!open) {
 		return (
 			<div className="max-w-prose space-y-3 text-sm text-muted-foreground">
@@ -29,21 +33,21 @@ export function Workflows({ workflows, editing }: { workflows: Workflow[]; editi
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
 			<nav aria-label="omp workflows">
 				<ul>
-					{workflows.map(workflow => (
-						<li key={workflow.skill.path}>
-							<Tooltip content={workflow.description || workflow.skill.pathDisplay}>
+					{listed.map(({ workflow, skill }) => (
+						<li key={skill.path}>
+							<Tooltip content={workflow.description || skill.pathDisplay}>
 								<button
 									type="button"
-									aria-current={workflow === open ? "true" : undefined}
-									onClick={() => setSelected(workflow.skill.path)}
+									aria-current={skill === open.skill ? "true" : undefined}
+									onClick={() => setSelected(skill.path)}
 									className={cn(
 										"flex w-full flex-col gap-0.5 rounded-md px-2 py-1 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-										workflow === open && "bg-muted font-medium",
+										skill === open.skill && "bg-muted font-medium",
 									)}
 								>
 									<span className="flex w-full items-baseline gap-2">
 										<span className="truncate">{workflow.name}</span>
-										<span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{workflow.skill.scope}</span>
+										<span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{skill.scope}</span>
 									</span>
 									<span className="truncate font-mono text-xs font-normal text-muted-foreground">{invocation(workflow)}</span>
 								</button>

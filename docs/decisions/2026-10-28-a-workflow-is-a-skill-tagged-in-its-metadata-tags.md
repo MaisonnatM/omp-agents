@@ -30,7 +30,7 @@ A workflow pairs with the command named after it, the project's before the user'
 
 ## Confirmation
 
-`src/omp/workflows.test.ts` checks that a tag in a comma list matches, that a skill without the tag or with a top-level `tags:` key is left out, the command pairing, and that broken YAML is left out.
+`src/omp/workflows.test.ts` checks that a tag in a comma list matches, that a skill without the tag or with a top-level `tags:` key is left out, and that a workflow pairs with the command omp names the same, the project's before the user's.
 
 ## Revisit when
 

@@ -16,7 +16,7 @@
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
 - `src/settings.ts`: builds the settings page's model routing, file list, and workflows, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
-  `src/omp/workflows.ts` (`workflowsOf`) picks the workflows among those files: the skills whose frontmatter's `metadata.tags` names `workflow`, each paired with the command of the same name; `src/omp/workflows.test.ts` tests the tag, the pairing, and the skills it leaves out.
+  `src/omp/workflows.ts` (`workflowsOf`) joins the skills and commands omp discovered: the skills whose frontmatter, as omp parsed it, names `workflow` in `metadata.tags`, each paired with the command omp names the same; `src/omp/workflows.test.ts` tests the tag, the pairing, and the order.
 - `src/decisions.ts`: reads a repository's decision records for Settings › Decisions; `src/decisions.test.ts` tests a record with and without frontmatter, the directory it picks from a nested directory, and a repository with none.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist.
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.

@@ -1,5 +1,5 @@
 ---
-description: Track a Linear ticket from draft PR through interface and thermonuclear reviews to live review and merge-ready
+description: Start the ship workflow for a Linear ticket
 ---
 
 Read `skill://ship` in full and follow it for `$ARGUMENTS`.

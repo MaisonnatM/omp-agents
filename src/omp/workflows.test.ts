@@ -1,47 +1,35 @@
 import { describe, expect, test } from "bun:test";
-import type { OmpFile } from "../shared/models";
+import type { FoundFile } from "./discovery";
 import { workflowsOf } from "./workflows";
 
-const file = (kind: OmpFile["kind"], scope: OmpFile["scope"], path: string, text: string): OmpFile => ({
-	kind,
-	scope,
-	path,
-	pathDisplay: path,
-	body: { state: "read", size: text.length, modifiedAt: 0, text, hash: "" },
-});
+const skill = (name: string, path: string, frontmatter: Record<string, unknown>): FoundFile => ({ kind: "skill", scope: "user", path, name, frontmatter });
+const command = (name: string, scope: FoundFile["scope"], path: string): FoundFile => ({ kind: "command", scope, path, name });
 
 describe("workflowsOf", () => {
-	test("keeps a skill whose metadata.tags lists workflow among other tags, paired with its command, project over user", () => {
-		const skill = file("skill", "user", "/u/skills/ship/SKILL.md", "---\nname: ship\ndescription: Ship a ticket\nmetadata:\n  tags: review, workflow\n---\n\nSteps.\n");
-		const userCommand = file("command", "user", "/u/commands/ship.md", "user");
-		const projectCommand = file("command", "project", "/p/.omp/commands/ship.md", "project");
-		const other = file("command", "project", "/p/.omp/commands/other.md", "other");
-		const workflows = workflowsOf([userCommand, skill, other, projectCommand]);
-		expect(workflows.map(({ name, description, skill, command }) => ({ name, description, skill: skill.path, command: command?.path ?? null }))).toEqual([
-			{ name: "ship", description: "Ship a ticket", skill: "/u/skills/ship/SKILL.md", command: "/p/.omp/commands/ship.md" },
+	test("lists a skill whose metadata.tags names workflow, and leaves out one without it or with a top-level tags key", () => {
+		const workflows = workflowsOf([
+			skill("ship", "/u/skills/ship/SKILL.md", { description: "Ship a ticket", metadata: { tags: "review, workflow" } }),
+			skill("plain", "/u/skills/plain/SKILL.md", { metadata: { tags: "workflows review" } }),
+			skill("top", "/u/skills/top/SKILL.md", { tags: ["workflow"] }),
 		]);
+		expect(workflows).toEqual([{ name: "ship", description: "Ship a ticket", skill: "/u/skills/ship/SKILL.md", command: null }]);
 	});
 
-	test("names a workflow by its directory without a name field, with no command when none matches, sorted by name", () => {
+	test("pairs a workflow with the command omp names like it, the project's over the user's, whatever the file is called", () => {
 		const workflows = workflowsOf([
-			file("skill", "project", "/p/.omp/skills/triage/SKILL.md", "---\ndescription: Triage\nmetadata:\n  tags: workflow\n---\n"),
-			file("skill", "user", "/u/skills/audit/SKILL.md", "---\nname: audit\nmetadata:\n  tags: workflow ops\n---\n"),
+			command("ship", "user", "/u/commands/ship.md"),
+			skill("ship", "/u/skills/deliver/SKILL.md", { metadata: { tags: "workflow" } }),
+			command("other", "project", "/p/.omp/commands/ship.md"),
+			command("ship", "project", "/p/.omp/commands/go/ship.md"),
 		]);
-		expect(workflows.map(({ name, description, command }) => ({ name, description, command }))).toEqual([
-			{ name: "audit", description: "", command: null },
-			{ name: "triage", description: "Triage", command: null },
-		]);
+		expect(workflows).toEqual([{ name: "ship", description: "", skill: "/u/skills/deliver/SKILL.md", command: "/p/.omp/commands/go/ship.md" }]);
 	});
 
-	test("leaves out skills without the tag, with a top-level tags key, with broken YAML, or not read", () => {
+	test("sorts workflows by name", () => {
 		const workflows = workflowsOf([
-			file("skill", "user", "/u/skills/plain/SKILL.md", "---\nname: plain\nmetadata:\n  tags: workflows, review\n---\n"),
-			file("skill", "user", "/u/skills/top/SKILL.md", "---\nname: top\ntags:\n  - workflow\n---\n"),
-			file("skill", "user", "/u/skills/broken/SKILL.md", "---\nname: broken\nmetadata: [workflow\n---\n"),
-			file("skill", "user", "/u/skills/bare/SKILL.md", "metadata:\n  tags: workflow\n"),
-			{ kind: "skill", scope: "user", path: "/u/skills/gone/SKILL.md", pathDisplay: "/u/skills/gone/SKILL.md", body: { state: "missing" } },
-			file("rule", "user", "/u/rules/flow.md", "---\nmetadata:\n  tags: workflow\n---\n"),
+			skill("triage", "/u/skills/triage/SKILL.md", { metadata: { tags: "workflow" } }),
+			skill("audit", "/u/skills/audit/SKILL.md", { metadata: { tags: "ops workflow" } }),
 		]);
-		expect(workflows).toEqual([]);
+		expect(workflows.map(({ name }) => name)).toEqual(["audit", "triage"]);
 	});
 });

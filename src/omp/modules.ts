@@ -369,9 +369,14 @@ export interface CatalogModule {
 	calculateCost(model: CatalogModel, usage: CatalogUsage, timestamp: number): CatalogUsage["cost"];
 }
 
-/** Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. */
+/**
+ * Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. `name` is a skill's or
+ * a slash command's resolved name (src/capability/skill.ts, slash-command.ts); `frontmatter` is a skill's parsed frontmatter.
+ */
 export interface CapabilityItem {
 	_source: { provider: string; path: string; level: "user" | "project" | "native" };
+	name?: string;
+	frontmatter?: Record<string, unknown>;
 }
 export interface DiscoveryModule {
 	loadCapability(id: string, options: { cwd: string; disabledExtensions?: string[] }): Promise<{ items: CapabilityItem[] }>;

@@ -65,9 +65,12 @@ export interface EmailRoute {
 	target: EmailThread | "new" | null;
 }
 
+/** What a workspace section's header says it shows: `workspace` with a workspace picked, `none` with all workspaces. */
+const AS_LOADED = { workspace: "As a session in this workspace loads them", none: "Your user files only, for all workspaces" };
+
 /**
  * The settings page's sections, in the sidebar's order. A `workspace` section shows omp's files and config as a session in
- * the chosen workspace loads them; a `general` section is the same whatever the workspace.
+ * the chosen workspace loads them, and its header says so in `meta`; a `general` section is the same whatever the workspace.
  */
 export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: BarChart3, scope: "general" },
@@ -79,11 +82,11 @@ export const SETTINGS_SECTIONS = [
 	{ value: "source-control", label: "Source control providers", icon: GitMerge, scope: "general" },
 	{ value: "workspaces", label: "Workspaces", icon: Folders, scope: "general" },
 	{ value: "sync", label: "Sync", icon: RefreshCcw, scope: "general" },
-	{ value: "models", label: "Models", icon: RouteIcon, scope: "workspace" },
-	{ value: "files", label: "Files", icon: FileText, scope: "workspace" },
-	{ value: "workflows", label: "Workflows", icon: Workflow, scope: "workspace" },
-	{ value: "decisions", label: "Decisions", icon: Scale, scope: "workspace" },
-	{ value: "worktrees", label: "Worktrees", icon: GitBranch, scope: "workspace" },
+	{ value: "models", label: "Models", icon: RouteIcon, scope: "workspace", meta: AS_LOADED },
+	{ value: "files", label: "Files", icon: FileText, scope: "workspace", meta: AS_LOADED },
+	{ value: "workflows", label: "Workflows", icon: Workflow, scope: "workspace", meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
+	{ value: "decisions", label: "Decisions", icon: Scale, scope: "workspace", meta: { workspace: "The repository's decision records, read-only", none: "Pick a workspace" } },
+	{ value: "worktrees", label: "Worktrees", icon: GitBranch, scope: "workspace", meta: AS_LOADED },
 ] as const;
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
