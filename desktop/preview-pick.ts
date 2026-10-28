@@ -22,13 +22,45 @@ let selecting = false;
 let nextId = 1;
 const selected = new Map<number, { element: Element; outline: HTMLDivElement }>();
 
+/** The height the label above an outline takes, in CSS pixels; an element closer to the top gets it inside instead. */
+const LABEL_HEIGHT = 20;
+
+/** An outline with its label, the name of what it outlines. */
 function outline(): HTMLDivElement {
 	const box = document.createElement("div");
 	box.style.cssText = "position:fixed;box-sizing:border-box;border-radius:2px;display:none";
+	const label = document.createElement("span");
+	label.style.cssText = `position:absolute;left:-2px;height:${LABEL_HEIGHT}px;padding:0 6px;border-radius:4px;color:#fff;font:500 11px/${LABEL_HEIGHT}px system-ui,sans-serif;white-space:nowrap`;
+	box.append(label);
 	root.append(box);
 	return box;
 }
 const hover = outline();
+
+type Fiber = { type: unknown; return: Fiber | null };
+
+/** The name of the React component that renders `element`, read from the fiber React keeps on it, or `null` outside React. */
+function componentName(element: Element): string | null {
+	const key = Object.keys(element).find(name => name.startsWith("__reactFiber$"));
+	let fiber = key ? (element as unknown as Record<string, Fiber>)[key] : null;
+	for (; fiber; fiber = fiber.return) {
+		// A memo or forwardRef component keeps its function under `type` or `render`.
+		const type = fiber.type as { displayName?: string; name?: string; type?: { name?: string }; render?: { name?: string } } | string | null;
+		if (type === null || typeof type === "string" || (typeof type !== "function" && typeof type !== "object")) continue;
+		const name = type.displayName || type.name || type.type?.name || type.render?.name;
+		if (name) return name;
+	}
+	return null;
+}
+
+/** What an outline's label reads: the React component, else the tag with its id and first two classes, as T3 Code labels it. */
+function labelOf(element: Element): string {
+	const name = componentName(element);
+	if (name) return name;
+	const id = element.id ? `#${element.id}` : "";
+	const classes = typeof element.className === "string" ? element.className.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(name => `.${name}`).join("") : "";
+	return `${element.tagName.toLowerCase()}${id}${classes}`;
+}
 
 function place(box: HTMLDivElement, element: Element, fill: number): void {
 	const { left, top, width, height } = element.getBoundingClientRect();
@@ -41,6 +73,10 @@ function place(box: HTMLDivElement, element: Element, fill: number): void {
 		border: `2px solid ${color}`,
 		background: `color-mix(in srgb, ${color} ${fill}%, transparent)`,
 	});
+	const label = box.firstElementChild as HTMLSpanElement;
+	label.textContent = labelOf(element);
+	label.style.background = color;
+	label.style.top = top < LABEL_HEIGHT + 2 ? "0" : `${-LABEL_HEIGHT - 4}px`;
 }
 
 /** Places every outline again and tells the page where the selected elements show. */

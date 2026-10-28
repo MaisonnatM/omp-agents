@@ -79,6 +79,12 @@ export function strokeArea(points: readonly Point[]): Area {
 export const markAt = (marks: readonly Mark[], point: Point): Mark | null =>
 	marks.findLast(({ area }) => point.x >= area.x && point.x <= area.x + area.width && point.y >= area.y && point.y <= area.y + area.height) ?? null;
 
+/** The selected element Erase removes at `point`: the smallest of those that hold it, as the innermost of nested ones is the one meant. */
+export const elementAt = <T extends Area>(elements: readonly T[], point: Point): T | undefined =>
+	elements
+		.filter(box => point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height)
+		.sort((a, b) => a.width * a.height - b.width * b.height)[0];
+
 /**
  * Where the comment card of `size` goes beside the marks covering `bounds` on a `width` by `height` page, as T3 Code
  * places it: right of them, else left, else below, else above, whichever spills least, then kept inside the page.

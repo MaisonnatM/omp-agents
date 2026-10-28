@@ -5,7 +5,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 
 - The **Browser** tab, after **Tickets** in the [session details sidebar](session-details-sidebar.md), shows it for the live session or subagent the sidebar follows; a past session has none.
   The page stays loaded while you switch to another tab and back, and starts again when the sidebar follows another session.
-  Drag the sidebar's edge to make the Browser wider or narrower, up to 560 pixels; with two or more panes side by side the sidebar hides, and with it the Browser.
+  Drag the sidebar's edge to make the Browser wider or narrower, up to 960 pixels; with two or more panes side by side the sidebar hides, and with it the Browser.
 - The Browser opens on the address you last loaded for that session in the last 30 days, else on the first dev server the session runs.
   A dev server is a job or a service of the session, as the status bar's CPU card lists them, that listens on a port; omp's shared browser is never one.
   The server button lists every dev server the session runs, with its port, and picking one loads it.
@@ -22,6 +22,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - **Maximize Browser**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, the same button, or Escape, pressed in the app too, puts it back in the sidebar.
 - **Pick in the app**, the pointer button, starts picking, as in T3 Code: a **Select**, **Region**, **Draw**, and **Erase** switch floats at the top of the app, and the button or Escape stops it.
   **Select**, where picking starts, outlines the element under the pointer, and a click selects it without pressing it in the app; Shift+click adds another, and a click on a selected element drops it.
+  Each outline is labeled with the element's React component, else its tag with its id and first two classes, as in T3 Code.
   **Region** drags a box over part of the app, and **Draw** draws a line on it; selected elements and marks add up across modes, and **Erase** removes the box, line, or selected element you click.
   A card beside them takes a comment; **Attach**, or Enter, stops picking and adds one chip to the session's composer, named after the comment, else the first element's React component or tag, else the page's title, with a picture of the marked part.
   The chip holds the comment, the page's address, and each element's HTML, React component with its file, and selector; hover it to read them.

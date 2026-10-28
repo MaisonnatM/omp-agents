@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ControlId } from "../../src/shared/activity";
 import { activityControl } from "../activity";
-import { type Area, cardPlace, dragArea, type Mark, markAt, type Point, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
+import { type Area, cardPlace, dragArea, elementAt, type Mark, markAt, type Point, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
 import type { PreviewElementBox } from "../../src/shared/desktop-bridge";
 import { type ShortcutId, shortcutKeys } from "../shortcuts";
 
@@ -115,12 +115,6 @@ interface AnnotationLayerProps {
 	/** Takes the marks, the comment typed beside them, the page's CSS width, and the color they were drawn in. */
 	onAttach: (marks: Mark[], comment: string, pageWidth: number, color: string) => void;
 }
-
-/** The smallest selected element under `at`, as the innermost of nested ones is the one meant. */
-const elementAt = (elements: readonly PreviewElementBox[], at: Point): PreviewElementBox | undefined =>
-	elements
-		.filter(box => at.x >= box.x && at.x <= box.x + box.width && at.y >= box.y && at.y <= box.y + box.height)
-		.sort((a, b) => a.width * a.height - b.width * b.height)[0];
 
 /**
  * Covers the page while picking: Region drags a box, Draw a line, and Erase removes the mark or selected element it

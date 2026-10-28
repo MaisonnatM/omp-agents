@@ -1,6 +1,6 @@
 /** `DashboardSidebar`, one of the dashboard's two sidebars, resizable and closeable; `useSidebarPanels` keeps both panels' state and `SidebarToggle` shows or hides one. */
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
@@ -18,7 +18,8 @@ import { Separator, useDragSeparator } from "./drag-separator";
  * double-click to reset.
  */
 const MIN_WIDTH = 240;
-const MAX_WIDTH = 560;
+/** What the session pane keeps between the sidebars, in px, however wide the right one is dragged. */
+const PANE_MIN_WIDTH = 480;
 const STEP = 16;
 /** The show and hide motion: a drawer's curve, fast out of the gate and settling without overshoot. */
 const MOTION_MS = 260;
@@ -29,6 +30,8 @@ interface SidebarSpec {
 	name: string;
 	id: string;
 	defaultWidth: number;
+	/** In px; the right sidebar goes wider, so the Browser can show an app at a laptop's width, as far as the session pane keeps {@link PANE_MIN_WIDTH}. */
+	maxWidth: number;
 	widthKey: string;
 	openKey: string;
 	shortcut: ShortcutId;
@@ -49,6 +52,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		name: "Sessions",
 		id: "sessions-sidebar",
 		defaultWidth: 320,
+		maxWidth: 560,
 		widthKey: "omp-agents.sidebar-width",
 		openKey: "omp-agents.sidebar-open",
 		shortcut: "sessionsSidebar",
@@ -61,6 +65,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		name: "Details",
 		id: "details-sidebar",
 		defaultWidth: 288,
+		maxWidth: 960,
 		widthKey: "omp-agents.plan-width",
 		openKey: "omp-agents.plan-open",
 		shortcut: "detailsSidebar",
@@ -73,28 +78,37 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 
 export interface SidebarPanel {
 	open: boolean;
-	/** In px, within {@link MIN_WIDTH} and {@link MAX_WIDTH}. */
+	/** In px, within {@link MIN_WIDTH} and {@link SidebarPanel.max}. */
 	width: number;
+	/** The widest the sidebar can be in the window now, in px. */
+	max: number;
 }
 
-const clamp = (width: number): number => Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width)));
+const clamp = (width: number, max: number): number => Math.round(Math.min(max, Math.max(MIN_WIDTH, width)));
 
 interface StoredPanel {
-	panel: SidebarPanel;
+	open: boolean;
+	/** As stored, which a narrow window can cut without changing it. */
+	width: number;
 	setWidth: (width: number) => void;
 	setOpen: (open: boolean) => void;
 }
 
 /** `side`'s panel as localStorage keeps it. A default is removed rather than stored, so a reset sidebar follows the default if it changes. */
 function useStoredPanel(side: SidebarSide): StoredPanel {
-	const { widthKey, openKey, defaultWidth } = SIDEBARS[side];
+	const { widthKey, openKey, defaultWidth, maxWidth } = SIDEBARS[side];
 	const [width, setWidth] = useStoredState(widthKey, raw => {
 		const stored = Number(raw);
-		return Number.isFinite(stored) && stored > 0 ? clamp(stored) : defaultWidth;
+		return Number.isFinite(stored) && stored > 0 ? clamp(stored, maxWidth) : defaultWidth;
 	});
 	const [open, setOpen] = useStoredState(openKey, raw => raw !== "false");
-	return { panel: { open, width }, setWidth, setOpen };
+	return { open, width, setWidth, setOpen };
 }
+
+const subscribeResize = (onChange: () => void): (() => void) => {
+	window.addEventListener("resize", onChange);
+	return () => window.removeEventListener("resize", onChange);
+};
 
 export interface SidebarPanels {
 	panels: Record<SidebarSide, SidebarPanel>;
@@ -105,11 +119,18 @@ export interface SidebarPanels {
 
 export function useSidebarPanels(): SidebarPanels {
 	const sides: Record<SidebarSide, StoredPanel> = { left: useStoredPanel("left"), right: useStoredPanel("right") };
+	const windowWidth = useSyncExternalStore(subscribeResize, () => window.innerWidth);
+	const leftShown = sides.left.open ? sides.left.width : SIDEBARS.left.rail;
+	const max: Record<SidebarSide, number> = {
+		left: SIDEBARS.left.maxWidth,
+		right: Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH)),
+	};
+	const panel = (side: SidebarSide): SidebarPanel => ({ open: sides[side].open, width: clamp(sides[side].width, max[side]), max: max[side] });
 	return {
-		panels: { left: sides.left.panel, right: sides.right.panel },
-		resize: (side, width) => sides[side].setWidth(clamp(width)),
+		panels: { left: panel("left"), right: panel("right") },
+		resize: (side, width) => sides[side].setWidth(clamp(width, max[side])),
 		setOpen: (side, open) => {
-			if (open === sides[side].panel.open) return;
+			if (open === sides[side].open) return;
 			const { id } = SIDEBARS[side];
 			const hiding = document.querySelector(open ? `[aria-controls="${id}"][aria-expanded="false"]` : `#${id}`);
 			const refocus = hiding?.contains(document.activeElement) ?? false;
@@ -149,11 +170,12 @@ export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 interface SidebarResizeHandleProps {
 	side: SidebarSide;
 	width: number;
+	max: number;
 	onWidth: (width: number) => void;
 	onDragging: (dragging: boolean) => void;
 }
 
-function SidebarResizeHandle({ side, width, onWidth, onDragging }: SidebarResizeHandleProps) {
+function SidebarResizeHandle({ side, width, max, onWidth, onDragging }: SidebarResizeHandleProps) {
 	const { name, defaultWidth } = SIDEBARS[side];
 	// The handle sits on the sidebar's inner edge: moving it toward the page widens the left sidebar and narrows the right one.
 	const direction = side === "left" ? 1 : -1;
@@ -165,7 +187,7 @@ function SidebarResizeHandle({ side, width, onWidth, onDragging }: SidebarResize
 		keyStep: STEP,
 		shiftSteps: 4,
 		min: MIN_WIDTH,
-		max: MAX_WIDTH,
+		max,
 		reset: defaultWidth,
 		read: (event, start) => start.value + direction * (event.clientX - start.coordinate),
 	});
@@ -188,7 +210,7 @@ function SidebarResizeHandle({ side, width, onWidth, onDragging }: SidebarResize
 			axis="vertical"
 			label={`Resize the ${name.toLowerCase()} sidebar`}
 			min={MIN_WIDTH}
-			max={MAX_WIDTH}
+			max={max}
 			now={width}
 			className={cn("inset-y-0 w-3 cursor-col-resize", side === "left" ? "-right-1.5" : "-left-1.5")}
 		/>
@@ -238,7 +260,7 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, children }: 
 			{/* Closing, it turns inert at once so focus and clicks leave it, and hidden once the width has slid shut. */}
 			<Sidebar id={id} side={side} hidden={!panel.open && !moving} inert={!panel.open} className={cn("relative h-full", dragging && "[&_webview]:pointer-events-none")} style={{ width: panel.width }}>
 				{children}
-				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} onDragging={setDragging} />
+				<SidebarResizeHandle side={side} width={panel.width} max={panel.max} onWidth={onResize} onDragging={setDragging} />
 			</Sidebar>
 			{rail > 0 && (
 				<div className="absolute top-[calc((var(--page-header-height)-1.75rem)/2)] right-[9px] z-10">
