@@ -45,7 +45,7 @@ Files, in `agent/`:
   These references load on demand rather than in every session's context.
 - `APPEND_SYSTEM.md`: short final replies (Résumé, Action, Then) that end on up to three suggested next prompts, questions asked through the ask tool with the recommended option first, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
-- `agents/interface-reviewer.md`: a read-only reviewer that runs your `interface-review` skill in full mode on a PR, on the `plan` role's model, and stops naming the missing skill when `interface-review` or `better-interface` is not installed.
+- `agents/interface-reviewer.md`: a read-only reviewer that runs your `interface-review` skill in full mode on a PR, then checks the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model; it stops naming the missing skill when `interface-review` or `better-interface` is not installed.
 - `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, interface review, thermonuclear review, and live review.
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
   When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.

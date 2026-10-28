@@ -29,6 +29,7 @@ Recording `thermonuclear` or `ready_gate` is refused while a needed interface bo
 With `.omp/ui-paths` committed, a change list GitHub cut short counts as needing the review, as it does for thermonuclear.
 The interface review waits for the user's go on the direction, like thermonuclear, since its findings can redesign the UI.
 The `interface-reviewer` agent reports a missing `interface-review` or `better-interface` skill and stops rather than improvising a review.
+After the skill, the agent checks the change against the app's own design system, read from the repository: shared components reused rather than rebuilt, used as their sibling callers use them, tokens rather than hard-coded values, and sibling screens' patterns; the generic skills judge interface quality, not whether a change matches this app.
 
 ## Confirmation
 
