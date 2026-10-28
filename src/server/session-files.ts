@@ -154,7 +154,7 @@ export class SessionFiles {
 		this.#byId = new Map(files.map(file => [file.id, file]));
 	}
 
-	/** Read the transcripts for what they link to; whether any session's pull requests, Linear issues, or /ship stage changed. The first read covers every transcript. */
+	/** Read the transcripts for what they link to; whether any session's pull requests, Linear issues, /ship stage, or headless mark changed. The first read covers every transcript. */
 	refreshFacts(): Promise<boolean> {
 		return this.facts.refresh(this.#files);
 	}
@@ -166,12 +166,12 @@ export class SessionFiles {
 	}
 
 	/**
-	 * The saved sessions that no live session continues, newest first. `interrupted` names the omp sessions that stopped without End session.
+	 * The saved sessions that no live session continues, newest first, without the `omp -p` runs that other sessions start. `interrupted` names the omp sessions that stopped without End session.
 	 * A row whose file, facts, and interruption did not change since the last call is the same object, so a caller can skip it by identity.
 	 */
 	past(liveSessionIds: ReadonlySet<string>, interrupted: (sessionId: string) => boolean): PastSession[] {
 		return this.#files
-			.filter(session => !session.empty && !liveSessionIds.has(session.id))
+			.filter(session => !session.empty && !liveSessionIds.has(session.id) && !this.facts.headless(session.path))
 			.map(session => {
 				const facts = this.facts.factsOf(session.path);
 				const stopped = session.source === "omp" && interrupted(session.id);

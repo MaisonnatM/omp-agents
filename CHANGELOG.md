@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-10-28
 
 - In the desktop app, the greyed Back and Forward buttons still show their tooltip, and the command menu offers Go back and Go forward, now with arrow icons, only when there is somewhere to go.
+- Past sessions no longer list the quick one-off agent runs that other sessions start in the background, only sessions you had a conversation in.
 - While you are still trying out a design with an agent, it now also waits for your go on the direction before writing tests for it.
 - /ship now runs an interface review before the deep code review when a pull request changes files a project lists as interface files, and holds the pull request back from going live until its fixes are pushed.
 - That interface review also checks that new screens reuse the app's existing components, colors, and sizes, and look like the screens next to them, and tells you when a pull request brings a new way of showing something, such as cards for a list in an app whose lists are all tables.

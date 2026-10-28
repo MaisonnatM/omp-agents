@@ -69,6 +69,7 @@ Every transcript comes from the session files on this machine, not from a networ
 - The server lists the session files through each format's listing at startup and then once a minute, in case a watcher missed a change; omp's is omp's session listing, the code behind omp's session picker.
   Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session.
   The past list skips the empty sessions that omp's picker hides, and a Claude Code or Codex session with no prompt and no reply.
+  It also skips an omp session whose own file's last `omp-agents.headless` entry says `{ headless: true }`; `templates/omp/agent/extensions/headless-mark.ts` writes one at each `session_start` whose mode, `print` or `json` against any other, differs from the last one recorded, and `SessionFactsIndex.headless` reads it in the facts scan, so such a row shows until that scan first reads the file.
   The server looks up files by session id in this listing, so the page never sends a path.
   While no page is connected, it skips building the roster and the past list.
   The past list goes out whole when a page connects; after that the server compares each session with what it last sent and sends only the sessions that changed, joined, or left, so an untouched row keeps its object on the page and skips its render.
