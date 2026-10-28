@@ -1,18 +1,13 @@
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { hashForSettings, SETTINGS_SECTIONS, type SettingsRoute } from "../../routing";
+import { hashForSettings, SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsRoute } from "../../routing";
 
-const GROUPS = [
-	{ scope: "general", label: "General" },
-	{ scope: "workspace", label: "This workspace" },
-] as const;
-
-/** The sidebar while the Settings page is open: the sections that are the same in every workspace, then those the workspace picker changes. */
+/** The sidebar while the Settings page is open: each group's sections under its label, those the workspace picker changes last. */
 export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
-	return GROUPS.map(group => (
-		<SidebarGroup key={group.scope}>
+	return SETTINGS_GROUPS.map(group => (
+		<SidebarGroup key={group.value}>
 			<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
 			<SidebarMenu aria-label={`${group.label} settings`}>
-				{SETTINGS_SECTIONS.filter(({ scope }) => scope === group.scope).map(({ value, label, icon }) => (
+				{SETTINGS_SECTIONS.filter(entry => entry.group === group.value).map(({ value, label, icon }) => (
 					<SidebarMenuItem key={value}>
 						<SidebarMenuButton asChild icon={icon} isActive={section === value}>
 							<a href={hashForSettings(value)} aria-current={section === value ? "page" : undefined}>

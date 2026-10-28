@@ -1,5 +1,5 @@
 /**
- * Settings › Source control providers on the server: whether `gh` and `gt` are signed in, the automatic pulls that
+ * Settings › Source control on the server: whether `gh` and `gt` are signed in, the automatic pulls that
  * keep each workspace repository's default branch current while it has no local changes or commits, and whether a
  * merge cleans up after itself.
  */

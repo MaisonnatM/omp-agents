@@ -155,7 +155,7 @@ export function SettingsPage({
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			{shown.scope === "workspace" ? (
+			{shown.group === "workspace" ? (
 				<Header title={shown.label} meta={cwd === null ? shown.meta.none : shown.meta.workspace}>
 					<WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={onPickWorkspace} />
 				</Header>

@@ -51,12 +51,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "past" | "todos" | "notes" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "createTodo" | "fallback";
+export type HomeSection = "running" | "past" | "todos" | "notes" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "settings" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `todo:<id>`, `note:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`, `fallback:create-note`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `todo:<id>`, `note:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `settings:<section>`, `fallback:create-todo`, `fallback:create-note`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -65,7 +65,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: LucideIcon;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Todo`, `Ticket`, `PR`, `Command`, `Workspace`. */
+	/** The type label at the row's end: `Session`, `Todo`, `Ticket`, `PR`, `Command`, `Workspace`, `Settings`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -245,6 +245,7 @@ const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }
 	conversations: { heading: "In conversations", listing: "found" },
 	commands: { heading: "Commands", listing: "browsed" },
 	workspaces: { heading: "Workspaces", listing: "browsed" },
+	settings: { heading: "Settings", listing: "searched" },
 	createTodo: { heading: null, listing: "typed" },
 	fallback: { heading: null, listing: "typed" },
 };

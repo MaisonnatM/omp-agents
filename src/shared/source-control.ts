@@ -1,4 +1,4 @@
-/** Settings › Source control providers: the CLIs the dashboard reads GitHub and Graphite through, automatic pulls, the cleanup after a merge, and merge methods. */
+/** Settings › Source control: the CLIs the dashboard reads GitHub and Graphite through, automatic pulls, the cleanup after a merge, and merge methods. */
 
 /** GitHub's merge methods, in the order its merge button lists them. */
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;

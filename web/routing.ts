@@ -68,26 +68,37 @@ export interface EmailRoute {
 /** What a workspace section's header says it shows: `workspace` with a workspace picked, `none` with all workspaces. */
 const AS_LOADED = { workspace: "As a session in this workspace loads them", none: "Your user files only, for all workspaces" };
 
+/** The settings sidebar's labelled groups, in its order. */
+export const SETTINGS_GROUPS = [
+	{ value: "usage", label: "Usage" },
+	{ value: "general", label: "General" },
+	{ value: "connections", label: "Connections" },
+	{ value: "workspace", label: "This workspace" },
+] as const;
+
+export type SettingsGroup = (typeof SETTINGS_GROUPS)[number]["value"];
+
 /**
- * The settings page's sections, in the sidebar's order. A `workspace` section shows omp's files and config as a session in
- * the chosen workspace loads them, and its header says so in `meta`; a `general` section is the same whatever the workspace.
+ * The settings page's sections, in the sidebar's order, each in the `group` that lists it, with `keywords` the command
+ * menu also finds it by. A `workspace` section shows omp's files and config as a session in the chosen workspace loads
+ * them, and its header says so in `meta`; a section of any other group is the same whatever the workspace.
  */
 export const SETTINGS_SECTIONS = [
-	{ value: "analytics", label: "Analytics", icon: BarChart3, scope: "general" },
-	{ value: "activity", label: "Activity", icon: MousePointerClick, scope: "general" },
-	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, scope: "general" },
-	{ value: "providers", label: "Providers", icon: KeyRound, scope: "general" },
-	{ value: "integrations", label: "Integrations", icon: Plug, scope: "general" },
-	{ value: "mcp-servers", label: "MCP servers", icon: Blocks, scope: "general" },
-	{ value: "source-control", label: "Source control providers", icon: GitMerge, scope: "general" },
-	{ value: "workspaces", label: "Workspaces", icon: Folders, scope: "general" },
-	{ value: "sync", label: "Sync", icon: RefreshCcw, scope: "general" },
-	{ value: "models", label: "Models", icon: RouteIcon, scope: "workspace", meta: AS_LOADED },
-	{ value: "files", label: "Files", icon: FileText, scope: "workspace", meta: AS_LOADED },
-	{ value: "workflows", label: "Workflows", icon: Workflow, scope: "workspace", meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
-	{ value: "decisions", label: "Decisions", icon: Scale, scope: "workspace", meta: { workspace: "The repository's decision records, read-only", none: "Pick a workspace" } },
-	{ value: "worktrees", label: "Worktrees", icon: GitBranch, scope: "workspace", meta: AS_LOADED },
-] as const;
+	{ value: "analytics", label: "Analytics", icon: BarChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
+	{ value: "activity", label: "Activity", icon: MousePointerClick, group: "usage", keywords: ["features", "used", "time"] },
+	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
+	{ value: "workspaces", label: "Workspaces", icon: Folders, group: "general", keywords: ["directories", "folders", "hide"] },
+	{ value: "sync", label: "Sync", icon: RefreshCcw, group: "general", keywords: ["git", "remote", "machines"] },
+	{ value: "providers", label: "Providers", icon: KeyRound, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
+	{ value: "integrations", label: "Integrations", icon: Plug, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
+	{ value: "mcp-servers", label: "MCP servers", icon: Blocks, group: "connections", keywords: ["mcp", "tools"] },
+	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "graphite", "gh", "gt", "pull", "merge"] },
+	{ value: "models", label: "Models", icon: RouteIcon, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
+	{ value: "files", label: "Files", icon: FileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
+	{ value: "workflows", label: "Workflows", icon: Workflow, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
+	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Pick a workspace" } },
+	{ value: "worktrees", label: "Worktrees", icon: GitBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 

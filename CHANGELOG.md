@@ -5,6 +5,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- The Settings sidebar now sorts its sections into Usage, General, Connections, and This workspace, and Source control providers is now just Source control.
+- The command menu (Cmd+K) now finds Settings sections: type a section's name or what it holds, such as "theme" or "graphite", and press Enter to open it.
+- Providers, Integrations, MCP servers, Workspaces, and Worktrees in Settings no longer repeat their name under the page header.
+- Settings › Sync now counts the files the last sync received and sent instead of listing them all; click a count to see the files.
 - In the Browser, Select element now opens a field on the element you click, so you can type a note at once; sending it adds the note and the element to the composer, and you can go on to the next element.
 - The Browser's Start dev server button now starts your app itself and opens it in the Browser; when it cannot, it asks the session as before.
 - Fixed: plan usage failed because the app started on a Bun older than omp allows. It now starts on Bun 1.4.4.

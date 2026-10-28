@@ -3,9 +3,10 @@
 - The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
   It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
   While Settings is open the sidebar lists its sections instead of a tab's content; select a tab, such as **Sessions**, to leave.
-  The sidebar lists fourteen sections in two groups.
-  **General** holds **Analytics**, **Activity**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, **Workspaces**, and **Sync**, which are the same whatever the workspace.
+  The sidebar lists fourteen sections in four groups.
+  **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, and **Sync**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
+  The command menu finds a section by its name or by what it holds, such as "theme" or "graphite", under **Settings**.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
@@ -121,7 +122,7 @@
 - **Providers** signs omp in to the model providers its sessions call, as `/login` and `omp login` do; see [Providers](providers.md).
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar and Gmail; see [Integrations](integrations.md).
 - **MCP servers** lists every MCP server omp loads and adds more from a catalog or by address; see [MCP servers](mcp-servers.md).
-- **Source control providers** shows whether the `gh` and `gt` command-line tools are installed and signed in; **Check again** reads them again.
+- **Source control** shows whether the `gh` and `gt` command-line tools are installed and signed in, under **Command-line tools**; **Check again** reads them again.
   **Automatically pull** keeps the default branch current when the checkout has no local changes or commits; it is off by default, and the server checks every five minutes and right after a change.
   Each repository your workspaces use lists its last pull and an override, **Default**, **On**, or **Off**; the server keeps both in `source-control.json` beside its access token.
   **After a merge**, on by default and kept in the same file, ends each session the dashboard started that is linked to a pull request that merges, once the session is idle and every pull request it submitted or worked on is merged or closed, whether the merge came from the dashboard or anywhere else.

@@ -85,7 +85,7 @@ Alt is Option on macOS.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
 - Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
-  What you type also searches your todos, closed ones too, the Linear tickets assigned to you once Linear is connected, and the open pull requests of the sidebar's workspace, each under its own heading; each must hold every word typed, in any order.
+  What you type also searches your todos, closed ones too, the Linear tickets assigned to you once Linear is connected, the open pull requests of the sidebar's workspace, and the sections of Settings, each under its own heading; each must hold every word typed, in any order.
   With nothing typed they list only under **Suggestions**, once you use one often enough.
   A todo opens beside its list on the Todo page, a ticket opens its details, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a ticket in Linear and a pull request on GitHub.
   **In conversations**, under those, lists the sessions whose prompts or replies hold every word typed, up to 30, the latest active first, each by the latest such message and how many match; tool output and thinking are not searched.

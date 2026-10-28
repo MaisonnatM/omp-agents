@@ -53,7 +53,7 @@ import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
-import { hashForNotes, type OpenMode, type SidebarTab } from "../../routing";
+import { hashForNotes, hashForSettings, type OpenMode, SETTINGS_GROUPS, SETTINGS_SECTIONS, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { workspaceCwd } from "../../sessions";
@@ -127,13 +127,26 @@ interface CommandPaletteProps {
 
 /**
  * Searches running and past sessions in every workspace, the page's commands, and workspaces, and for a search
- * also the todos, your Linear tickets, and the sidebar workspace's pull requests; Enter runs the highlighted entry's first
+ * also the todos, your Linear tickets, the sidebar workspace's pull requests, and the settings sections; Enter runs the highlighted entry's first
  * action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props hold no closure
  * built per render, so a socket update that touches none of them skips it, and a closed palette renders and reads nothing.
  */
 export const CommandPalette = memo(function CommandPalette({ state, ...props }: CommandPaletteProps) {
 	return state && <OpenCommandPalette state={state} {...props} />;
 });
+
+/** One item per settings section, opening it; the subtitle names the sidebar group that lists it. */
+const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, label, icon, group, keywords }): PaletteItem => ({
+	id: `settings:${value}`,
+	section: "settings",
+	title: label,
+	subtitle: SETTINGS_GROUPS.find(entry => entry.value === group)!.label,
+	keywords: ["settings", ...keywords],
+	icon,
+	accessories: [],
+	kind: "Settings",
+	actions: [[{ id: "open", title: "Open", icon, run: { kind: "link", href: hashForSettings(value) } }]],
+}));
 
 function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
@@ -336,7 +349,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			} } }]],
 		}] : [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...noteItems, ...ticketItem()],
+			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...SETTINGS_ITEMS, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...noteItems, ...ticketItem()],
 			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
