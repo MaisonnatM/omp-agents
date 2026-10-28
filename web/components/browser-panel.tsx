@@ -15,14 +15,15 @@ import { activityControl } from "../activity";
 import { appendToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
 import { initialAddress, browserCandidates } from "../browser-model";
-import { sessionProcessesStore } from "../reads";
+import { sessionProcessesStore, writeStartServer } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
+import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
 
-/** What Start dev server sends the session: a long-lived server it owns, so its port joins the Browser's candidates. */
+/** What Start dev server sends the session when it cannot start the server itself: a long-lived server the session owns, so its port joins the Browser's candidates. */
 const START_SERVER_PROMPT =
 	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Browser can show it. Reply with its address.";
 
@@ -101,10 +102,21 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
-	const startServer = () => {
-		request({ t: "prompt", view, text: START_SERVER_PROMPT, images: [], delivery: "followUp" });
-		toasts.add({ title: "Asked the session to start its dev server" });
-	};
+	const startServer = useAction(async () => {
+		const pending = toasts.add({ title: "Starting the dev server…", timeout: 0 });
+		try {
+			const answer = await writeStartServer(view.instanceId);
+			if ("started" in answer) {
+				webview.load(`http://localhost:${answer.started.port}`);
+				toasts.add({ title: `Started ${answer.started.command}` });
+				return;
+			}
+			request({ t: "prompt", view, text: `${START_SERVER_PROMPT}\n\nStarting it directly failed: ${answer.fallback}`, images: [], delivery: "followUp" });
+			toasts.add({ title: "Asked the session to start its dev server" });
+		} finally {
+			toasts.close(pending);
+		}
+	}, "Cannot start the dev server");
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
@@ -168,7 +180,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 							</MenuItem>
 						))}
 						<MenuSeparator />
-						<MenuItem {...activityControl("browser.start-server")} onClick={startServer}>
+						<MenuItem {...activityControl("browser.start-server")} disabled={startServer.pending} onClick={() => startServer.run()}>
 							<Play />
 							Start dev server
 						</MenuItem>
@@ -208,8 +220,16 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
 					<Server aria-hidden className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
-					<p className="text-xs text-muted-foreground/80">Ask the session to start one, or type its address above.</p>
-					<Button {...activityControl("browser.start-server")} variant="outline" size="sm" leadingIcon={Play} className="mt-1" onClick={startServer}>
+					<p className="text-xs text-muted-foreground/80">Start one, or type its address above.</p>
+					<Button
+						{...activityControl("browser.start-server")}
+						variant="outline"
+						size="sm"
+						leadingIcon={Play}
+						loading={startServer.pending}
+						className="mt-1"
+						onClick={() => startServer.run()}
+					>
 						Start dev server
 					</Button>
 				</div>
