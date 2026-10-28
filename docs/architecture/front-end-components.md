@@ -14,6 +14,7 @@ Fluid's sidebar rail, mobile drawer, cookie, and toggle shortcut are removed fro
 The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.tsx`, which gives each its own width and open state, because Fluid's provider held only one of each.
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
+While a sidebar's width is dragged, `DashboardSidebar` turns off pointer events on any `<webview>` inside it, the Preview's, since a guest page takes the pointer from the handle's capture once the pointer crosses into it.
 
 The pull request detail tabs use `web/components/segmented-tabs.tsx`, a reusable Radix Tabs wrapper with T3's 24px segmented styling.
 Radix owns automatic arrow-key selection, roving focus, and the tab-to-panel ARIA links.

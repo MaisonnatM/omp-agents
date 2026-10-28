@@ -26,6 +26,8 @@ Samples run one at a time.
 A job's id is its process group and its top process's start time, and a service's id is its broker's runtime directory, its name, and its generation, so a stop of an id that no longer runs, or now names another process, stops nothing and answers the current list.
 A job stops through `terminate`: SIGTERM to each member, then SIGKILL after 3 seconds to those still running under the same start time, so a reused pid is never hit.
 A `ps` that fails fails the sample rather than reading as nothing running.
+The same sample runs one `lsof` over every TCP listener of the user's processes (`LISTENERS_ARGV` and `parseListeners` in `src/process-census.ts`), beside `ps`, and each job and service gets the ports its processes listen on, which the [Preview](../usage/preview.md) offers as dev servers.
+`lsof` exits with 1 when none listens, which reads as no ports; an `lsof` that fails or is missing leaves every port list empty and the rest of the sample stands.
 
 ## HTTP
 
