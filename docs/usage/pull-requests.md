@@ -46,7 +46,7 @@
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone, the row only as wide as its tabs; hover an icon for its name.
   The tabs never spill past the sidebar.
   **Pull requests** opens the Pull requests page, a table of your pull requests like Graphite's inbox, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
-  Once you open a pull request or a session from the Pull requests page, the sidebar lists the pull requests instead, beside the details or the session panes.
+  Once you open a session from the Pull requests page, or a pull request's details as a page, the sidebar lists the pull requests instead, beside the details or the session panes.
   In the board view, the sidebar lists the board's columns instead, each with its count; click one to unfold the column and scroll to it, while a pull request's details stay docked beside the board.
   The tab stays on **Pull requests** while you open sessions from it, until you choose **Sessions**.
   The **Your move** count stands out in bold.
@@ -109,9 +109,10 @@
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
-  Click the row to show the pull request's details in the main area; session chips, move badges, the reviewers, and the `⋯` menu keep their own clicks.
+  Click the row to show the pull request's details docked at the right of the table, with the row highlighted; session chips, move badges, the reviewers, and the `⋯` menu keep their own clicks.
   The title remains a link for keyboard and modifier-click navigation.
-  The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
+  **Open as a page** in the docked details shows them on a page of their own, on the tab they showed, and the close button hides them.
+  The app keeps that choice, so the next pull request you open shows as a page too, until the back arrow at the start of the page header, **Back to Pull requests**, brings the list back with the details docked beside it.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
   Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the app keeps the last one of each workspace.
@@ -147,7 +148,7 @@
   A refused drop, Escape, or a release outside the columns springs the card back.
   Space on a focused card's title picks it up, ← and → choose its column, Space or Enter drops it, and Escape or Tab puts it back; a screen reader hears each step.
   Click a card to show the pull request's details docked at the right of the board, with ↓ and ↑ stepping through the cards column by column.
-  **Open as a page** in the docked details switches to the list view with the details on their own page, and the close button hides them.
+  **Open as a page** and the close button work as in the table.
 
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.

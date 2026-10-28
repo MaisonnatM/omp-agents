@@ -1,6 +1,6 @@
 /**
  * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
- * is; or on a board, a column per section, with the details of the pull request it shows docked beside it.
+ * is; or on a board, a column per section. Either docks the details of the pull request it shows beside it.
  */
 import { Maximize2, RefreshCw, X } from "lucide-react";
 import { type PullRequest, prKey, repoKey } from "../../../src/shared/github";
@@ -11,7 +11,7 @@ import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
+import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { useRebasing } from "../../pull-request-rebases";
 import { DROP_LINE } from "../../use-drag-order";
@@ -33,13 +33,14 @@ import {
 	UnmatchedTip,
 	usePullRequests,
 	usePullRequestsBoard,
+	usePullRequestDetailsPlacement,
 	usePullRequestsView,
 	workspacesLabel,
 } from "./pull-requests-board";
 import { PullRequestsKanban } from "./pull-requests-kanban";
 import type { PullRequestDetailTab } from "./pr-details";
 import { SectionCount } from "./pull-requests-nav";
-import { PullRequestDetailPage, PullRequestDetails } from "./pr-page";
+import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts } from "./pr-page";
 import { PullRequestTableRow } from "./pr-row";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
@@ -117,16 +118,22 @@ function RepoTables({ pulls, section }: { pulls: PullRequests; section: SectionT
 	return repos.map(each => <RepoTable key={each.key} view={each} />);
 }
 
-/** The details of the pull request `route` names, docked beside the board, with buttons that show them as a page or close them. */
+/** The details of the pull request `route` names, docked beside the list or the board, with buttons that show them as a page or close them. */
 function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: string | null; hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
 	// The docked details keep their own tab, starting on Code when the route opens a file.
 	const [tab, setTab] = useState<PullRequestDetailTab>(route.files ? "code" : "summary");
+	usePullRequestCopyShortcuts(route.target);
+	const expand = (): void => {
+		// The page takes Code from the route alone, so expanding on Code puts it in the address.
+		if (tab === "code" && !route.files) location.hash = hashForPullRequestFiles(route.target);
+		onExpand();
+	};
 	return (
 		<aside aria-label="Pull request details" className="flex w-[30rem] max-w-[45%] shrink-0 flex-col border-l border-border">
 			<TooltipProvider>
 				<div className="flex h-(--page-header-height) shrink-0 items-center justify-end gap-1 border-b border-border px-3">
 					<Tooltip content="Open as a page" side="bottom">
-						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Open as a page" onClick={onExpand}>
+						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Open as a page" onClick={expand}>
 							<Maximize2 />
 						</Button>
 					</Tooltip>
@@ -171,32 +178,31 @@ interface PullRequestsPageProps {
 	past: PastSession[];
 	/** The section or column a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: SectionTarget | null;
-	/** The pull request whose details the page shows: docked beside the board, or on a page of their own in the list view. */
+	/** The pull request whose details the page shows: docked beside the list or the board, or on a page of their own. */
 	route: PullRequestsRoute;
 }
 
-/**
- * The Pull requests page: in the list view, a pull request's details on a page of their own while `route` names one;
- * else the pull requests as a table or a board.
- */
+/** The Pull requests page: a pull request's details on a page of their own while you chose so and `route` names one; else the pull requests as a table or a board. */
 export function PullRequestsPage(props: PullRequestsPageProps) {
 	const [view, setView] = usePullRequestsView();
+	const [placement, setPlacement] = usePullRequestDetailsPlacement();
 	const { workspace, hosts, route } = props;
 	// Checking the target first narrows the route to one with its files.
-	if (route.target && pullRequestsPageShows(view, route) === "details") return <PullRequestDetailPage key={prKey(route.target)} workspace={workspace} hosts={hosts} target={route.target} files={route.files} />;
-	return <PullRequestsOverview {...props} view={view} onView={setView} />;
+	if (route.target && pullRequestsPageShows(view, placement, route) === "details")
+		return <PullRequestDetailPage key={prKey(route.target)} workspace={workspace} hosts={hosts} target={route.target} files={route.files} onDock={() => setPlacement("beside")} />;
+	return <PullRequestsOverview {...props} view={view} onView={setView} onExpand={() => setPlacement("page")} />;
 }
 
 /**
  * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of every workspace,
  * read from GitHub. It keeps the sidebar list's order, folds, and keys; the browser keeps which view it shows.
  */
-function PullRequestsOverview({ workspace, hosts, past, section, route, view, onView }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void }) {
+function PullRequestsOverview({ workspace, hosts, past, section, route, view, onView, onExpand }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void; onExpand: () => void }) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const pulls = usePullRequests({ workspace, hosts, past, route });
 	const unmatched = pulls.poll.read?.data.unmatched ?? [];
-	const docked = view === "board" && route.target !== null ? route : null;
+	const docked = route.target !== null ? route : null;
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<div className="flex min-w-0 flex-1 flex-col">
@@ -235,7 +241,7 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 					}}
 				</ListPage>
 			</div>
-			{docked && <DockedDetails workspace={workspace} hosts={hosts} route={docked} onExpand={() => onView("list")} />}
+			{docked && <DockedDetails workspace={workspace} hosts={hosts} route={docked} onExpand={onExpand} />}
 		</div>
 	);
 }

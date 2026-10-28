@@ -605,7 +605,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					{...drag.target}
 					data-move={moveId}
 					onClick={event => openFromRow(event, pr)}
-					className={cn("group/row relative cursor-pointer px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+					className={cn("group/row relative cursor-pointer px-3 py-2", targeted ? "bg-muted" : "hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 				/>
 			}
 		>
