@@ -6,7 +6,7 @@
 /// <reference lib="dom" />
 /// <reference types="react-grab" />
 import { init } from "react-grab/core";
-import { PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { PREVIEW_GRAB_CHANNEL, PREVIEW_PICKING_CHANNEL } from "../src/shared/desktop-bridge";
 
 // `react-grab/core` starts nothing on import, unlike `react-grab`; an app that loads its own copy later finds this one
 // on `window.__REACT_GRAB__` and uses it instead of starting a second.
@@ -19,6 +19,9 @@ api.registerPlugin({
 	// and leaves picking on. The dashboard confirms each pick itself, so the Preview goes without these labels.
 	theme: { grabbedBoxes: { enabled: false } },
 	hooks: {
+		// The dashboard shows Select element pressed while picking is on.
+		onActivate: () => window.postMessage({ [PREVIEW_PICKING_CHANNEL]: true }, "*"),
+		onDeactivate: () => window.postMessage({ [PREVIEW_PICKING_CHANNEL]: false }, "*"),
 		// The one hook whose content holds the Comment's text; it fires once the clipboard took the copy. React-grab ends
 		// picking after each send, so it starts again for the next element until Select element or Escape stops it.
 		onCopySuccess: (_elements, content) => {

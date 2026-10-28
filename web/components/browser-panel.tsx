@@ -31,17 +31,19 @@ const START_SERVER_PROMPT =
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
 
 /** A toolbar control of the Browser, named by its tooltip. */
-function ToolbarButton({ label, control, disabled, shortcut, onClick, children }: {
+function ToolbarButton({ label, control, disabled, shortcut, pressed, onClick, children }: {
 	label: string;
 	control: ControlId;
 	disabled: boolean;
 	shortcut?: readonly string[];
+	/** Set for a toggle: whether it is on. */
+	pressed?: boolean;
 	onClick: () => void;
 	children: ReactNode;
 }) {
 	return (
 		<Tooltip content={label} shortcut={shortcut} side="bottom" disabled={disabled}>
-			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} disabled={disabled} onClick={onClick}>
+			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} aria-pressed={pressed} active={pressed} disabled={disabled} onClick={onClick}>
 				{children}
 			</Button>
 		</Tooltip>
@@ -103,19 +105,14 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
 	const startServer = useAction(async () => {
-		const pending = toasts.add({ title: "Starting the dev server…", timeout: 0 });
-		try {
-			const answer = await writeStartServer(view.instanceId);
-			if ("started" in answer) {
-				webview.load(`http://localhost:${answer.started.port}`);
-				toasts.add({ title: `Started ${answer.started.command}` });
-				return;
-			}
-			request({ t: "prompt", view, text: `${START_SERVER_PROMPT}\n\nStarting it directly failed: ${answer.fallback}`, images: [], delivery: "followUp" });
-			toasts.add({ title: "Asked the session to start its dev server" });
-		} finally {
-			toasts.close(pending);
+		const answer = await writeStartServer(view.instanceId);
+		if ("started" in answer) {
+			webview.load(`http://localhost:${answer.started.port}`);
+			toasts.add({ title: `Started ${answer.started.command}` });
+			return;
 		}
+		request({ t: "prompt", view, text: `${START_SERVER_PROMPT}\n\nStarting it directly failed: ${answer.fallback}`, images: [], delivery: "followUp" });
+		toasts.add({ title: "Asked the session to start its dev server", description: answer.fallback });
 	}, "Cannot start the dev server");
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
@@ -182,11 +179,17 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						<MenuSeparator />
 						<MenuItem {...activityControl("browser.start-server")} disabled={startServer.pending} onClick={() => startServer.run()}>
 							<Play />
-							Start dev server
+							{startServer.pending ? "Starting dev server…" : "Start dev server"}
 						</MenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<ToolbarButton label="Select element" control="browser.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
+				<ToolbarButton
+					label={webview.picking ? "Stop selecting" : "Select element"}
+					control="browser.select-element"
+					disabled={!webview.ready}
+					pressed={webview.picking}
+					onClick={webview.selectElement}
+				>
 					<MousePointerClick />
 				</ToolbarButton>
 				<ToolbarButton
