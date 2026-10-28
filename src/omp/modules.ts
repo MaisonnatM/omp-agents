@@ -165,6 +165,8 @@ export interface OmpSettingsInstance {
 	setModelRole(role: string, selector: string | undefined): void;
 	/** Writes staged changes into the re-read global `config.yml` under omp's lock. */
 	flush(): Promise<void>;
+	/** The shell omp's bash tool and services run commands in, from `shellPath` else the user's. */
+	getShellConfig(): { shell: string; args: string[]; env: Record<string, string>; prefix: string | undefined };
 }
 export interface ConfigModule {
 	Settings: {

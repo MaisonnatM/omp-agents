@@ -4,7 +4,7 @@
  */
 import { createServer } from "node:net";
 import { join } from "node:path";
-import type { DaemonSpec } from "../omp/modules";
+import type { startOwnedService } from "../omp/daemons";
 import type { DevServerStart } from "../shared/processes";
 import { errorText, isObject } from "../json";
 
@@ -17,9 +17,6 @@ const LOCKFILES: readonly (readonly [file: string, manager: PackageManager])[] =
 	["pnpm-lock.yaml", "pnpm"],
 	["yarn.lock", "yarn"],
 ];
-
-/** What goes between `<manager> run <script>` and the script's own arguments: npm takes them only after `--`. */
-const ARGS_SEPARATOR: Record<PackageManager, string> = { bun: "", pnpm: "", yarn: "", npm: " --" };
 
 /** The scripts that run a dev server, preferred first. */
 const SCRIPTS = ["dev", "start"] as const;
@@ -41,16 +38,6 @@ const PORT_FLAG_COMMANDS: readonly RegExp[] = [
 /** What leads a command without being it: `cross-env` or `env`, `NAME=value` assignments, and `npx` or `bunx`. */
 const COMMAND_PREFIX = /^(?:(?:cross-env|env)\s+)?(?:[A-Za-z_]\w*=\S*\s+)*(?:(?:npx|bunx)\s+)?/;
 
-export interface DevServerPlan {
-	script: (typeof SCRIPTS)[number];
-	/** What a login shell runs in the project, such as `bun run dev --port 23456`. */
-	command: string;
-	env: { PORT: string };
-	port: number;
-	/** The command passes `--port`, since the script's server takes it; `PORT` is set either way. */
-	portFlag: boolean;
-}
-
 /** The env files a dev server reads in development, whose local addresses name the other servers it talks to. */
 const ENV_FILES = [".env", ".env.local", ".env.development", ".env.development.local"] as const;
 
@@ -63,19 +50,18 @@ const PINNED_PORT = /(?:--port[= ]|(?:^|\s)-p\s+|\bPORT=)(\d+)/;
 /** An env line pointing at a server on this computer, such as `PUBLIC_API_URL=http://localhost:8000`. */
 const LOCAL_SERVER_ENV = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=\s*["']?(https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d+)/m;
 
+/** The files at the project's root that decide its dev server's command. */
+const ROOT_FILES = ["package.json", ...LOCKFILES.map(([file]) => file), ...ENV_FILES];
+
 /**
- * How the project whose `package.json` holds `packageJson`, `null` when it has none, whose directory holds the files
- * `lockfiles`, and whose {@link ENV_FILES} hold `envFiles`, runs its dev server on `port`, else why it cannot be started
- * without the session: no script, a script that runs several servers or pins its port, or an env file that points the
- * app at another local server, such as its API, which this start would not run and which may be another checkout's.
+ * The command, such as `bun run dev --port 23456`, that runs the dev server of the project whose root holds `files`,
+ * by name, on `port`, else why it cannot be started without the session: no script, a script that runs several servers
+ * or pins its port, or an env file that points the app at another local server, such as its API, which this start
+ * would not run and which may be another checkout's. `PORT` is set either way; `--port` only for servers that take it.
  */
-export function planDevServer(
-	packageJson: string | null,
-	lockfiles: readonly string[],
-	envFiles: Readonly<Record<string, string>>,
-	port: number,
-): { ok: DevServerPlan } | { reason: string } {
-	if (packageJson === null) return { reason: "no package.json" };
+export function planDevServer(files: Readonly<Record<string, string>>, port: number): { command: string } | { reason: string } {
+	const packageJson = files["package.json"];
+	if (packageJson === undefined) return { reason: "no package.json" };
 	let manifest: unknown;
 	try {
 		manifest = JSON.parse(packageJson);
@@ -83,76 +69,55 @@ export function planDevServer(
 		return { reason: "package.json is not valid JSON" };
 	}
 	const scripts = isObject(manifest) && isObject(manifest.scripts) ? manifest.scripts : {};
-	const script = SCRIPTS.find(name => typeof scripts[name] === "string");
-	if (script === undefined) return { reason: "no dev or start script in package.json" };
-	const body = scripts[script] as string;
-	if (SEVERAL_SERVERS.test(body)) return { reason: `the ${script} script runs several servers` };
-	const pinned = PINNED_PORT.exec(body)?.[1];
-	if (pinned !== undefined) return { reason: `the ${script} script pins port ${pinned}` };
-	for (const [file, text] of Object.entries(envFiles)) {
-		const local = LOCAL_SERVER_ENV.exec(text);
-		if (local) return { reason: `${file} points ${local[1]} at ${local[2]}, a server this start would not run` };
+	for (const script of SCRIPTS) {
+		const body = scripts[script];
+		if (typeof body !== "string") continue;
+		if (SEVERAL_SERVERS.test(body)) return { reason: `the ${script} script runs several servers` };
+		const pinned = PINNED_PORT.exec(body)?.[1];
+		if (pinned !== undefined) return { reason: `the ${script} script pins port ${pinned}` };
+		for (const file of ENV_FILES) {
+			const local = files[file] === undefined ? null : LOCAL_SERVER_ENV.exec(files[file]);
+			if (local) return { reason: `${file} points ${local[1]} at ${local[2]}, a server this start would not run` };
+		}
+		const manager = LOCKFILES.find(([file]) => file in files)?.[1] ?? "npm";
+		const last = body.split(/&&|;/).at(-1)?.trim().replace(COMMAND_PREFIX, "") ?? "";
+		// npm passes a script arguments only after `--`.
+		const portFlag = PORT_FLAG_COMMANDS.some(pattern => pattern.test(last)) ? `${manager === "npm" ? " --" : ""} --port ${port}` : "";
+		return { command: `${manager} run ${script}${portFlag}` };
 	}
-	const manager = LOCKFILES.find(([file]) => lockfiles.includes(file))?.[1] ?? "npm";
-	const last = body.split(/&&|;/).at(-1)?.trim().replace(COMMAND_PREFIX, "") ?? "";
-	const portFlag = PORT_FLAG_COMMANDS.some(pattern => pattern.test(last));
-	const command = `${manager} run ${script}${portFlag ? `${ARGS_SEPARATOR[manager]} --port ${port}` : ""}`;
-	return { ok: { script, command, env: { PORT: String(port) }, port, portFlag } };
+	return { reason: "no dev or start script in package.json" };
 }
 
 /** The ports a dev server gets, above the ones dev servers default to and below macOS's ephemeral range. */
 const PORTS = { from: 20_000, to: 39_999 };
 
-/** How long a started dev server has to listen on its port; one that runs but does not listen yet still counts as started. */
-const READY_MS = 30_000;
-
-/** Starts `spec` as a service session `owner` owns in `dir`'s project; `startOwnedService` in `src/omp/daemons.ts`. */
-export type StartOwnedService = (dir: string, owner: string, spec: DaemonSpec) => Promise<{ running: true } | { ended: string }>;
-
 /**
  * Starts the dev server of the project in `dir` as a service the omp session `sessionId` owns, through `start`, and
- * answers its port and command, else why it could not, from the plan, the broker, or the output of a server that ended.
+ * answers its port and command, else why it was left to the session: the plan's reason, or the broker's failure or the
+ * output of a server that ended. A failure to read the project or find a port rejects, as the dashboard's own fault.
  */
-export async function startDevServer(sessionId: string, dir: string, start: StartOwnedService): Promise<DevServerStart> {
+export async function startDevServer(sessionId: string, dir: string, start: typeof startOwnedService): Promise<DevServerStart> {
+	const [files, port] = await Promise.all([rootFiles(dir), freePort()]);
+	const planned = planDevServer(files, port);
+	if ("reason" in planned) return { fallback: planned.reason };
+	const { command } = planned;
 	try {
-		const [packageJson, lockfiles, envFiles, port] = await Promise.all([readPackageJson(dir), lockfilesIn(dir), envFilesIn(dir), freePort()]);
-		const planned = planDevServer(packageJson, lockfiles, envFiles, port);
-		if (!("ok" in planned)) return { fallback: planned.reason };
-		const { command, env } = planned.ok;
-		const outcome = await start(dir, sessionId, {
-			name: `dev-${port}`,
-			application: process.env.SHELL ?? "/bin/sh",
-			args: ["-lc", command],
-			env,
-			cwd: dir,
-			pty: true,
-			ready: { port, timeoutMs: READY_MS },
-			restart: "no",
-			persist: false,
-			detached: false,
-		});
+		const outcome = await start(dir, sessionId, { name: `dev-${port}`, command, env: { PORT: String(port) }, readyPort: port });
 		return "ended" in outcome ? { fallback: `${command} exited: ${outcome.ended}` } : { started: { port, command } };
 	} catch (err) {
 		return { fallback: errorText(err) };
 	}
 }
 
-async function envFilesIn(dir: string): Promise<Record<string, string>> {
-	const present = await Promise.all(ENV_FILES.map(async file => {
-		const handle = Bun.file(join(dir, file));
-		return (await handle.exists()) ? [[file, await handle.text()] as const] : [];
-	}));
+/** The {@link ROOT_FILES} in `dir`, by name, with their text. */
+async function rootFiles(dir: string): Promise<Record<string, string>> {
+	const present = await Promise.all(
+		ROOT_FILES.map(async file => {
+			const handle = Bun.file(join(dir, file));
+			return (await handle.exists()) ? [[file, await handle.text()] as const] : [];
+		}),
+	);
 	return Object.fromEntries(present.flat());
-}
-
-async function readPackageJson(dir: string): Promise<string | null> {
-	const file = Bun.file(join(dir, "package.json"));
-	return (await file.exists()) ? file.text() : null;
-}
-
-async function lockfilesIn(dir: string): Promise<string[]> {
-	const present = await Promise.all(LOCKFILES.map(async ([file]) => ((await Bun.file(join(dir, file)).exists()) ? [file] : [])));
-	return present.flat();
 }
 
 /** A random port in {@link PORTS} that nothing listens on now on 127.0.0.1, where the broker checks readiness. */

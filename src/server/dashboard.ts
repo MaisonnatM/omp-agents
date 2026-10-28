@@ -603,9 +603,9 @@ export class Dashboard {
 				list: () => this.#processWatch.list(),
 				stop: ({ instanceId, id }) => this.#processWatch.stop(instanceId, id),
 				startServer: async instanceId => {
-					const host = this.#sessions.rows(this.#files.factsOf).find(row => row.instanceId === instanceId);
-					if (!host) throw new Error("That session no longer runs.");
-					return startDevServer(host.sessionId, host.worktree ?? host.cwd, startOwnedService);
+					const session = this.#sessions.get(instanceId);
+					if (!session) throw new Error("That session no longer runs.");
+					return startDevServer(session.sessionId, this.#files.factsOf(session.sessionId).worktree ?? session.cwd, startOwnedService);
 				},
 				settings: () => {
 					this.#processSettings.reload();

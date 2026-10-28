@@ -23,7 +23,8 @@ api.registerPlugin({
 		onActivate: () => window.postMessage({ [PREVIEW_PICKING_CHANNEL]: true }, "*"),
 		onDeactivate: () => window.postMessage({ [PREVIEW_PICKING_CHANNEL]: false }, "*"),
 		// The one hook whose content holds the Comment's text; it fires once the clipboard took the copy. React-grab ends
-		// picking after each send, so it starts again for the next element until Select element or Escape stops it.
+		// picking after each send and has no option to keep it, so it starts again for the next element until Select
+		// element or Escape stops it; a copy made with react-grab's own hold key re-arms it in comment mode too.
 		onCopySuccess: (_elements, content) => {
 			window.postMessage({ [PREVIEW_GRAB_CHANNEL]: content }, "*");
 			setTimeout(() => api.comment(), 0);

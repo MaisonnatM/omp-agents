@@ -13,9 +13,9 @@ import grab from "./dist/preview-grab.txt" with { type: "text" };
 document.addEventListener("DOMContentLoaded", () => void webFrame.executeJavaScript(grab).catch(() => {}), { once: true });
 
 window.addEventListener("message", event => {
-	const content: unknown = event.source === window && isObject(event.data) ? event.data[PREVIEW_GRAB_CHANNEL] : undefined;
+	if (event.source !== window || !isObject(event.data)) return;
+	const { [PREVIEW_GRAB_CHANNEL]: content, [PREVIEW_PICKING_CHANNEL]: picking } = event.data;
 	if (typeof content === "string") ipcRenderer.sendToHost(PREVIEW_GRAB_CHANNEL, content);
-	const picking: unknown = event.source === window && isObject(event.data) ? event.data[PREVIEW_PICKING_CHANNEL] : undefined;
 	if (typeof picking === "boolean") ipcRenderer.sendToHost(PREVIEW_PICKING_CHANNEL, picking);
 });
 
