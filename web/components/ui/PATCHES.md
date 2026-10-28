@@ -98,3 +98,11 @@ The registry file uses shadcn's `button`, `command`, and `popover`; the dashboar
 - `CalendarBody`, `CalendarHeader`, `CalendarItem`, `Feature`, and `Status` are removed, along with the provider's `startDay` and the `date-fns` import.
   `web/components/calendar/calendar-page.tsx` draws the month from its own entries, so it needs no generic feature list.
 - The month arrows have `aria-label`s, **Previous month** and **Next month**.
+
+## `arc/stepper.tsx`
+
+Arc's Stepper (`https://uiarc.dev/r/stepper.json`), kept to the vertical, read-only form the Todos card's Ship section draws.
+
+- `motion/react` is `framer-motion`, which the dashboard already ships, and Arc's `motionTokens` are inlined as the few constants the file uses.
+- `stepper.module.css` is Tailwind classes on the elements, in the dashboard's tokens: done is `emerald-500`, as the todo glyphs and progress bars are, and the marker is 20px, not 28px, to fit the 20rem card.
+- `orientation`, `onStepSelect` and its keyboard handling, `details`, `compact`, the horizontal caption, and a step's `error` are removed, since nothing uses them; a description shows only on the current step.
