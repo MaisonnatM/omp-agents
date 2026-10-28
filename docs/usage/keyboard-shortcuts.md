@@ -28,6 +28,7 @@ Alt is Option on macOS.
 | Ctrl+\` | Anywhere, the terminal too, on every platform | Show or hide the terminal |
 | Esc | Maximized pane | Restore the split |
 | Esc | Maximized Browser, the app in it too | Put the Browser back in the sidebar |
+| V / R / D / E | Browser while picking, outside text fields, the app in it too | Switch to Select, Region, Draw, or Erase |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
 | Cmd+1 … Cmd+5 | Anywhere | Go to the first … fifth tab the sidebar's bar draws, in the group the header's switch shows |

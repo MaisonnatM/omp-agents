@@ -27,6 +27,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   **Region** drags a box over part of the app, and **Draw** draws a line on it; marks add up across modes, and **Erase** removes the box or line you click.
   A card beside the marks takes a comment; **Attach**, or Enter, attaches a picture of the marked part with the marks drawn on it, adds the comment after it, and stops picking.
   Escape drops the marks.
+  V, R, D, and E switch to **Select**, **Region**, **Draw**, and **Erase** while picking, as in T3 Code, pressed in the app too.
 - **Screenshot**, the camera button, attaches a picture of all the app shows to the composer at once.
   A picture needs the session's conversation open, since attachments live in its composer.
 - The Browser keeps its own cookies and storage across launches, apart from the dashboard's, so an app you signed in to stays signed in.

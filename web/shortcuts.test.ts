@@ -140,8 +140,8 @@ test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+arrows step through sessions,
 
 test("G then N, W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	// R alone replies on an open conversation, and a G before it changes nothing.
-	expect(after("g", "r")).toEqual(["emailReply"]);
+	// R alone switches the Browser's pick mode or replies on an open conversation, and a G before it changes nothing.
+	expect(after("g", "r")).toEqual(["browserPickRegion", "emailReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "m")).toEqual(["email"]);
 	expect(after("g", "i")).toEqual([]);

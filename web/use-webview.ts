@@ -1,6 +1,15 @@
 /** The Browser's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
 import { useEffect, useRef, useState } from "react";
-import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_ACTIVE_CHANNEL, PREVIEW_GRAB_CHANNEL, type PreviewPick } from "../src/shared/desktop-bridge";
+import {
+	type BrowserPorts,
+	isLoopbackUrl,
+	PICK_MODE_KEYS,
+	PREVIEW_ESCAPE_CHANNEL,
+	PREVIEW_GRAB_ACTIVE_CHANNEL,
+	PREVIEW_GRAB_CHANNEL,
+	PREVIEW_PICK_KEY_CHANNEL,
+	type PreviewPick,
+} from "../src/shared/desktop-bridge";
 import { isObject } from "../src/json";
 
 const isPick = (value: unknown): value is PreviewPick => isObject(value) && typeof value.content === "string" && typeof value.label === "string";
@@ -90,6 +99,9 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, onGrabActive
 			const content = args[0];
 			if (channel === PREVIEW_ESCAPE_CHANNEL) latest.current.onEscape();
 			else if (channel === PREVIEW_GRAB_ACTIVE_CHANNEL && typeof content === "boolean") latest.current.onGrabActive(content);
+			// Pressed in the app, the key goes through the page's shortcuts as if pressed in the page.
+			else if (channel === PREVIEW_PICK_KEY_CHANNEL && typeof content === "string" && PICK_MODE_KEYS.includes(content))
+				window.dispatchEvent(new KeyboardEvent("keydown", { key: content, cancelable: true }));
 			// A sign-in takes the guest to other sites, which must not write into the composer.
 			else if (channel === PREVIEW_GRAB_CHANNEL && isPick(content) && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
 		};

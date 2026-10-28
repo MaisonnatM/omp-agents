@@ -8,15 +8,16 @@ import { cn } from "@/lib/utils";
 import type { ControlId } from "../../src/shared/activity";
 import { activityControl } from "../activity";
 import { type Area, cardPlace, dragArea, type Mark, markAt, type Point, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
+import { type ShortcutId, shortcutKeys } from "../shortcuts";
 
 /** Select picks an element with react-grab; Region and Draw mark the page; Erase removes a mark. */
 export type PickMode = "select" | "region" | "draw" | "erase";
 
-const MODES: { mode: PickMode; label: string; hint: string; control: ControlId }[] = [
-	{ mode: "select", label: "Select", hint: "Select an element", control: "browser.pick.select" },
-	{ mode: "region", label: "Region", hint: "Draw a box around an area", control: "browser.pick.region" },
-	{ mode: "draw", label: "Draw", hint: "Draw freehand", control: "browser.pick.draw" },
-	{ mode: "erase", label: "Erase", hint: "Remove a box or a line", control: "browser.pick.erase" },
+const MODES: { mode: PickMode; label: string; hint: string; control: ControlId; shortcut: ShortcutId }[] = [
+	{ mode: "select", label: "Select", hint: "Select an element", control: "browser.pick.select", shortcut: "browserPickSelect" },
+	{ mode: "region", label: "Region", hint: "Draw a box around an area", control: "browser.pick.region", shortcut: "browserPickRegion" },
+	{ mode: "draw", label: "Draw", hint: "Draw freehand", control: "browser.pick.draw", shortcut: "browserPickDraw" },
+	{ mode: "erase", label: "Erase", hint: "Remove a box or a line", control: "browser.pick.erase", shortcut: "browserPickErase" },
 ];
 
 /** The space kept around the marks in the attached image, in the page's CSS pixels. */
@@ -37,7 +38,7 @@ export function PickModes({ mode, onChange }: { mode: PickMode; onChange: (mode:
 					type="button"
 					role="radio"
 					aria-checked={item.mode === mode}
-					title={item.hint}
+					title={`${item.hint} (${shortcutKeys(item.shortcut)})`}
 					className={cn(
 						"h-7 rounded-md px-2.5 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40",
 						item.mode === mode && "bg-primary/10 text-primary hover:bg-primary/10",

@@ -133,7 +133,13 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		setPick(mode);
 		webview.setGrab(mode === "select");
 	};
+	// T3 Code's keys switch the mode while picking; the app hands them over while react-grab has its focus.
+	const pickKey = (mode: PickMode) => () => (pick === null || !CAPTURE_AVAILABLE ? false : choosePick(mode));
 	useShortcuts({
+		browserPickSelect: pickKey("select"),
+		browserPickRegion: pickKey("region"),
+		browserPickDraw: pickKey("draw"),
+		browserPickErase: pickKey("erase"),
 		browserRestore: () => {
 			if (pick) return choosePick(null);
 			if (!maximized) return false;

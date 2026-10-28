@@ -25,6 +25,10 @@ export interface PreviewPick {
 export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
 /** The Preview's react-grab turning its picking on (`true`) or off, which the guest's preload hands to the page. */
 export const PREVIEW_GRAB_ACTIVE_CHANNEL = "omp-agents:preview-grab-active";
+/** The pick mode keys, V, R, D, and E, pressed in the app while react-grab picks, which never reach the page otherwise. */
+export const PREVIEW_PICK_KEY_CHANNEL = "omp-agents:preview-pick-key";
+/** The keys the guest hands over on {@link PREVIEW_PICK_KEY_CHANNEL}, the shortcuts of T3 Code's pick modes. */
+export const PICK_MODE_KEYS: readonly string[] = ["v", "r", "d", "e"];
 /** The Preview webview's session, apart from the dashboard's, and kept across launches, so a sign-in to the app lasts. */
 export const PREVIEW_PARTITION = "persist:omp-preview";
 /** The page's report of a Browser's {@link BrowserPorts}, for the shell's {@link appAddress}. */

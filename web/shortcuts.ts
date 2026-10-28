@@ -34,6 +34,10 @@ export type ShortcutId =
 	| "help"
 	| "restore"
 	| "browserRestore"
+	| "browserPickSelect"
+	| "browserPickRegion"
+	| "browserPickDraw"
+	| "browserPickErase"
 	| "focusComposer"
 	| "pull-requests"
 	| "tickets"
@@ -222,6 +226,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{ id: "browserRestore", category: "sessions", label: "Put a maximized Browser back in the sidebar", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
+	{ id: "browserPickSelect", category: "sessions", label: "Browser, while picking: select an element", keys: [{ chord: { key: "v" }, scope: "outside-fields" }] },
+	{ id: "browserPickRegion", category: "sessions", label: "Browser, while picking: draw a box around an area", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
+	{ id: "browserPickDraw", category: "sessions", label: "Browser, while picking: draw freehand", keys: [{ chord: { key: "d" }, scope: "outside-fields" }] },
+	{ id: "browserPickErase", category: "sessions", label: "Browser, while picking: remove a box or a line", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{
 		id: "focusComposer",
 		category: "sessions",
