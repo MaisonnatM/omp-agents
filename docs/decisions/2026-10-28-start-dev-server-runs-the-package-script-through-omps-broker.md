@@ -24,6 +24,7 @@ Most projects the dashboard runs have a `package.json` whose `dev` script starts
 ## Consequences
 
 - `planDevServer` in `src/server/dev-server.ts` holds the command rules as tables: the lockfiles that name a package manager, and the server commands that take `--port`.
+- A script that pins its port or runs several servers, and an app whose env files point at another local server such as its API, go to the session, whose prompt asks it to start that server from the same worktree on its own port: started alone, the app would talk to whatever serves the default port, possibly another checkout's API.
 - A project those rules miss still gets its server, through the session, with the reason in the prompt.
 - The dashboard's server can now start a project's broker, through omp's `createDaemonBrokerClient`, where before only omp did.
 - A server that runs but never listens on the port it was given counts as started; the Browser then shows a load error until the server menu lists its real port.

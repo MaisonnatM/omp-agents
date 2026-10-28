@@ -25,7 +25,7 @@ import { toasts } from "./toaster";
 
 /** What Start dev server sends the session when it cannot start the server itself: a long-lived server the session owns, so its port joins the Browser's candidates. */
 const START_SERVER_PROMPT =
-	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Browser can show it. Reply with its address.";
+	"Start this project's dev server as a named long-lived service in the worktree you work in, on a free port, so the Browser can show it. If it talks to a local server of this project, such as its API, start that one from this worktree as a service too, on its own free port, and point the dev server at it rather than at the default port, which another checkout may serve. Reply with each address.";
 
 /** The window can show a Browser: the desktop app, from the build that added it. */
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
