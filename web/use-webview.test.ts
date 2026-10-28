@@ -75,6 +75,6 @@ test("the webview opens on the first address found unless the user typed one fir
 			{ src: null, address: "localhost:3000", problem: null },
 			{ src: "http://localhost:3000", address: "http://localhost:3000", problem: null },
 		],
-		"not on this computer": [{ src: null, address: "", problem: "The Preview loads only addresses on this computer, such as http://localhost:5173." }],
+		"not on this computer": [{ src: null, address: "", problem: "The Browser loads only addresses on this computer, such as http://localhost:5173." }],
 	});
 });
