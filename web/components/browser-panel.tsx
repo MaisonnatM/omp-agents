@@ -3,19 +3,21 @@
  * tab, where an element picked with react-grab lands in the session's composer.
  */
 import { ArrowLeft, ArrowRight, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
 import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { appendToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
 import { initialAddress, browserCandidates } from "../browser-model";
 import { sessionProcessesStore } from "../reads";
 import { useWebview } from "../use-webview";
+import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
 
@@ -72,20 +74,22 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	// The candidates choose the first address and fill the server menu, so `ps` and `lsof` run only for those.
 	sessionProcessesStore.usePolling(null, webview.src === null || menuOpen);
 	const mounted = webview.src !== null;
-	const sectionRef = useRef<HTMLElement>(null);
 	const [fullScreen, setFullScreen] = useState(false);
 	useEffect(() => {
-		const sync = () => setFullScreen(document.fullscreenElement !== null && document.fullscreenElement === sectionRef.current);
-		document.addEventListener("fullscreenchange", sync);
-		return () => document.removeEventListener("fullscreenchange", sync);
-	}, []);
-	const toggleFullScreen = () => {
-		const done = fullScreen ? document.exitFullscreen() : sectionRef.current?.requestFullscreen();
-		done?.catch(() => toasts.add({ title: "Could not change full screen" }));
-	};
+		if (!fullScreen) return;
+		const exitOnEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setFullScreen(false);
+		};
+		document.addEventListener("keydown", exitOnEscape);
+		return () => document.removeEventListener("keydown", exitOnEscape);
+	}, [fullScreen]);
 
 	return (
-		<section ref={sectionRef} aria-label="Browser" className="flex min-h-0 flex-1 flex-col bg-background">
+		<section
+			aria-label="Browser"
+			// Full screen covers the window below its title bar, whose window buttons and drag strip stay usable.
+			className={cn("flex min-h-0 flex-col bg-background", fullScreen ? cn("fixed inset-x-0 bottom-0 z-30", DESKTOP_TITLE_BAR ? "top-9" : "top-0") : "flex-1")}
+		>
 			<div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border px-1.5">
 				<ToolbarButton label="Back" control="browser.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
 					<ArrowLeft />
@@ -138,7 +142,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<ToolbarButton label="Select element" control="browser.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
 					<MousePointerClick />
 				</ToolbarButton>
-				<ToolbarButton label={fullScreen ? "Exit full screen" : "Full screen"} control="browser.full-screen" disabled={false} onClick={toggleFullScreen}>
+				<ToolbarButton label={fullScreen ? "Exit full screen" : "Full screen"} control="browser.full-screen" disabled={false} onClick={() => setFullScreen(!fullScreen)}>
 					{fullScreen ? <Minimize2 /> : <Maximize2 />}
 				</ToolbarButton>
 				<Tooltip content="Open in default browser" side="bottom" disabled={!mounted}>
@@ -164,8 +168,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 					<Server aria-hidden className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
 					<p className="text-xs text-muted-foreground/80">Ask the session to start one, or type its address above.</p>
-					<Button {...activityControl("browser.start-server")} variant="outline" size="sm" className="mt-1" onClick={startServer}>
-						<Play />
+					<Button {...activityControl("browser.start-server")} variant="outline" size="sm" leadingIcon={Play} className="mt-1" onClick={startServer}>
 						Start dev server
 					</Button>
 				</div>
