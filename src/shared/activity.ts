@@ -127,6 +127,7 @@ export const CONTROLS = [
 	{ id: "preview.server", label: "Preview dev server menu", area: "Preview" },
 	{ id: "preview.start-server", label: "Preview Start dev server", area: "Preview" },
 	{ id: "preview.select-element", label: "Preview Select element", area: "Preview" },
+	{ id: "preview.full-screen", label: "Preview Full screen", area: "Preview" },
 	{ id: "preview.open-in-browser", label: "Preview Open in browser", area: "Preview" },
 	{ id: "pull-requests.view.list", label: "Pull requests list view", area: "Pull requests" },
 	{ id: "pull-requests.view.board", label: "Pull requests board view", area: "Pull requests" },

@@ -16,6 +16,7 @@ It is in the [desktop app](desktop-app.md) only; a browser tab has no Preview.
   A link in the app to any other address, and any link that opens a new window, opens in your default browser.
   An address that fails to load says why under the address.
 - Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.
+- **Full screen**, the expand button, fills the screen with the Preview, toolbar included; the same button or Escape brings it back to the sidebar.
 - **Select element**, the pointer button, turns on react-grab's picking in the app, and a click on an element adds it to the session's composer: its HTML, the React component around it with its file, and a selector.
   React-grab's **Comment** adds the element with a note you type first; the composer gets the note and then the element.
   Each pick goes after what the composer already holds, and a message confirms it; nothing is sent until you send it.

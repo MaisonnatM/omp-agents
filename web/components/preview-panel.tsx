@@ -2,8 +2,8 @@
  * `PreviewPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Preview
  * tab, where an element picked with react-grab lands in the session's composer.
  */
-import { ArrowLeft, ArrowRight, ExternalLink, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
 import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
@@ -72,9 +72,20 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	// The candidates choose the first address and fill the server menu, so `ps` and `lsof` run only for those.
 	sessionProcessesStore.usePolling(null, webview.src === null || menuOpen);
 	const mounted = webview.src !== null;
+	const sectionRef = useRef<HTMLElement>(null);
+	const [fullScreen, setFullScreen] = useState(false);
+	useEffect(() => {
+		const sync = () => setFullScreen(document.fullscreenElement !== null && document.fullscreenElement === sectionRef.current);
+		document.addEventListener("fullscreenchange", sync);
+		return () => document.removeEventListener("fullscreenchange", sync);
+	}, []);
+	const toggleFullScreen = () => {
+		const done = fullScreen ? document.exitFullscreen() : sectionRef.current?.requestFullscreen();
+		done?.catch(() => toasts.add({ title: "Could not change full screen" }));
+	};
 
 	return (
-		<section aria-label="Preview" className="flex min-h-0 flex-1 flex-col">
+		<section ref={sectionRef} aria-label="Preview" className="flex min-h-0 flex-1 flex-col bg-background">
 			<div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border px-1.5">
 				<ToolbarButton label="Back" control="preview.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
 					<ArrowLeft />
@@ -126,6 +137,9 @@ export function PreviewPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				</DropdownMenu>
 				<ToolbarButton label="Select element" control="preview.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
 					<MousePointerClick />
+				</ToolbarButton>
+				<ToolbarButton label={fullScreen ? "Exit full screen" : "Full screen"} control="preview.full-screen" disabled={false} onClick={toggleFullScreen}>
+					{fullScreen ? <Minimize2 /> : <Maximize2 />}
 				</ToolbarButton>
 				<Tooltip content="Open in browser" side="bottom" disabled={!mounted}>
 					<Button
