@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
-- The Browser tab now picks as T3 Code does: the pointer button floats a Select and Region switch over your app, and Region drags over an area like a macOS screenshot to attach its picture to the session's message. The new camera button attaches a picture of the whole app.
+- The Browser tab now picks as T3 Code does: the pointer button floats a Select, Region, Draw, and Erase switch over your app. A picked element shows as a chip in the message box. Boxes and lines you draw on the app attach as one picture, with the comment you type beside them. The new camera button attaches a picture of the whole app.
 - Fixed: plan usage failed because the app started on a Bun older than omp allows. It now starts on Bun 1.4.4.
 - The workspace picker now lists each repository once, with sessions in its worktrees, such as a review's, under it instead of one workspace each.
 - Sessions started in a Mac temporary folder, such as one `mktemp -d` made, are now hidden from the sidebar like those in `/tmp`.

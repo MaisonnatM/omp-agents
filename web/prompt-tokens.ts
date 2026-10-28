@@ -4,7 +4,7 @@
  */
 import { skillLabel } from "./labels";
 
-export type ChipKind = "skill" | "command" | "file" | "directory" | "ticket" | "pull-request" | "person" | "todo" | "session";
+export type ChipKind = "skill" | "command" | "file" | "directory" | "ticket" | "pull-request" | "person" | "todo" | "session" | "element";
 
 export interface PromptToken {
 	kind: ChipKind;
@@ -28,6 +28,16 @@ const quoted = (json: string): string => {
 const unescapeLink = (text: string): string => text.replace(/\\([[\]])/g, "$1");
 
 const STRING = String.raw`"(?:[^"\\\n]|\\.)*"`;
+
+/**
+ * An element picked in the Browser as one line of the prompt: its label and react-grab's text as JSON strings, in a
+ * code span, so markdown keeps the HTML and escapes in it as written. The span's backticks outnumber any run inside.
+ */
+export function elementReference(label: string, content: string): string {
+	const inner = `browser element ${JSON.stringify(label)} ${JSON.stringify(content)}`;
+	const fence = "`".repeat(Math.max(0, ...(inner.match(/`+/g) ?? []).map(run => run.length)) + 1);
+	return `${fence}${inner}${fence}`;
+}
 
 interface Pattern {
 	re: RegExp;
@@ -54,6 +64,10 @@ const PATTERNS: readonly Pattern[] = [
 	{ re: new RegExp(String.raw`(?<![\w-])todo (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "todo", label: quoted(m[1]), target: m[2] }) },
 	{ re: new RegExp(String.raw`(?<![\w-])omp session (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "session", label: quoted(m[1]), target: m[2] }) },
 	{ re: new RegExp(String.raw`(?<![\w-])Linear user (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "person", label: quoted(m[1]), target: m[2] }) },
+	{
+		re: new RegExp(String.raw`(?<![\w\x60])(\x60+)browser element (${STRING}) (${STRING})\1(?!\x60)`, "g"),
+		token: m => ({ kind: "element", label: quoted(m[2]), target: quoted(m[3]) }),
+	},
 	{
 		// The `@` menu's category prefixes are a query still being typed, not a path.
 		re: /(?<=^|\s)@(?!(?:file|todo|ticket|pr|person|mail|event|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
@@ -118,8 +132,8 @@ function chipTree(parent: MdNode, source: string): void {
 	if (!parent.children) return;
 	parent.children = parent.children.flatMap(node => {
 		if (node.type === "text") return chipText(node);
-		if (node.type === "link") {
-			// A ticket or pull request is a markdown link, which the parser has already taken apart: match its source.
+		if (node.type === "link" || node.type === "inlineCode") {
+			// A ticket or pull request is a markdown link, and a Browser element a code span, which the parser has already taken apart: match its source.
 			const written = source.slice(node.position?.start.offset, node.position?.end.offset);
 			const [token] = promptTokens(written, { leading: false });
 			return token && token.start === 0 && token.end === written.length ? [chipNode(token)] : [node];

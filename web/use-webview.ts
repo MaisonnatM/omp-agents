@@ -1,6 +1,9 @@
 /** The Browser's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
 import { useEffect, useRef, useState } from "react";
-import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_ACTIVE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { type BrowserPorts, isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_ACTIVE_CHANNEL, PREVIEW_GRAB_CHANNEL, type PreviewPick } from "../src/shared/desktop-bridge";
+import { isObject } from "../src/json";
+
+const isPick = (value: unknown): value is PreviewPick => isObject(value) && typeof value.content === "string" && typeof value.label === "string";
 
 /** What the Browser drives of Electron's `<webview>`, which the page has no types for. */
 export interface WebviewTag extends HTMLWebViewElement {
@@ -33,7 +36,7 @@ interface WebviewOptions {
 	/** The address to open on, once there is one, unless the address field holds text the user typed first. */
 	initial: string | null;
 	/** Takes each element react-grab copies in the page, with any comment typed on it. */
-	onPick: (text: string) => void;
+	onPick: (pick: PreviewPick) => void;
 	/** Takes each address on this computer the page navigates to. */
 	onNavigate: (url: string) => void;
 	/** Takes an Escape the app left unhandled, which never reaches the page while the app has the focus. */
@@ -88,7 +91,7 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, onGrabActive
 			if (channel === PREVIEW_ESCAPE_CHANNEL) latest.current.onEscape();
 			else if (channel === PREVIEW_GRAB_ACTIVE_CHANNEL && typeof content === "boolean") latest.current.onGrabActive(content);
 			// A sign-in takes the guest to other sites, which must not write into the composer.
-			else if (channel === PREVIEW_GRAB_CHANNEL && typeof content === "string" && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
+			else if (channel === PREVIEW_GRAB_CHANNEL && isPick(content) && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
 		};
 		const listeners: [string, (event: Event) => void][] = [
 			["dom-ready", onReady],

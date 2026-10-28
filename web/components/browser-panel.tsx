@@ -1,6 +1,6 @@
 /**
  * `BrowserPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Browser
- * tab, where an element picked with react-grab, or an area captured as an image, lands in the session's composer.
+ * tab, where an element picked with react-grab lands in the session's composer as a chip, and a marked or whole page as an image.
  */
 import { ArrowLeft, ArrowRight, Camera, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -14,11 +14,12 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { appendToComposer, attachToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { type Area, browserCandidates, initialAddress } from "../browser-model";
+import { browserCandidates, initialAddress, type Mark } from "../browser-model";
+import { elementReference } from "../prompt-tokens";
 import { sessionProcessesStore } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useWebview } from "../use-webview";
-import { CaptureLayer, captureFile, type PickMode, PickModes } from "./browser-capture";
+import { AnnotationLayer, annotationFile, type PickMode, PickModes, screenshotFile } from "./browser-capture";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
@@ -102,12 +103,12 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const [saved] = useState(() => addresses.get(sessionId));
 	const draftKey = liveDraftKey(view);
 	const [maximized, setMaximized] = useState(false);
-	// Picking, as T3 Code's: Select picks an element with react-grab, Region drags over an area to attach its picture.
+	// Picking, as T3 Code's: Select picks an element with react-grab; Region, Draw, and Erase mark the page to attach its picture.
 	const [pick, setPick] = useState<PickMode | null>(null);
 	const webview = useWebview({
 		initial: initialAddress(saved, candidates),
-		onPick: text => {
-			appendToComposer(draftKey, text);
+		onPick: ({ label, content }) => {
+			appendToComposer(draftKey, elementReference(label, content));
 			toasts.add({ title: "Added to the composer" });
 		},
 		onNavigate: url => addresses.set(sessionId, url),
@@ -139,14 +140,21 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 			setMaximized(false);
 		},
 	});
-	const attachCapture = async (area: Area | null, pageWidth: number): Promise<void> => {
-		// A drag along an edge, outside the page, covers nothing.
-		if (area !== null && (area.width < 1 || area.height < 1)) return;
-		const png = await webview.capture();
-		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-		const file = await captureFile(png, area, pageWidth);
+	const attachImage = (file: File): void => {
 		if (attachToComposer(draftKey, file)) toasts.add({ title: "Added to the composer" });
 		else toasts.add({ title: "Open the session's conversation to attach the capture" });
+	};
+	const screenshot = async (): Promise<void> => {
+		const png = await webview.capture();
+		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
+		attachImage(screenshotFile(png));
+	};
+	const attachMarks = async (marks: Mark[], comment: string, pageWidth: number, color: string): Promise<void> => {
+		choosePick(null);
+		const png = await webview.capture();
+		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
+		attachImage(await annotationFile(png, marks, pageWidth, color));
+		if (comment) appendToComposer(draftKey, comment);
 	};
 	const sectionRef = useRef<HTMLElement>(null);
 	// What the maximized Browser covers leaves the tab order and the accessibility tree.
@@ -212,7 +220,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 					<MousePointerClick />
 				</ToolbarButton>
 				{CAPTURE_AVAILABLE && (
-					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void attachCapture(null, 0)}>
+					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void screenshot()}>
 						<Camera />
 					</ToolbarButton>
 				)}
@@ -263,14 +271,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						allowpopups={"" as unknown as boolean}
 						className="flex min-h-0 w-full flex-1"
 					/>
-					{pick === "region" && (
-						<CaptureLayer
-							onArea={(area, pageWidth) => {
-								choosePick(null);
-								void attachCapture(area, pageWidth);
-							}}
-						/>
-					)}
+					{pick !== null && CAPTURE_AVAILABLE && <AnnotationLayer mode={pick} onAttach={(...args) => void attachMarks(...args)} />}
 					{pick !== null && CAPTURE_AVAILABLE && <PickModes mode={pick} onChange={choosePick} />}
 				</div>
 			)}

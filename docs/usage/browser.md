@@ -20,11 +20,13 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   An address that fails to load says why under the address.
 - Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.
 - **Maximize Browser**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, the same button, or Escape, pressed in the app too, puts it back in the sidebar.
-- **Pick in the app**, the pointer button, starts picking, as in T3 Code: a **Select** and **Region** switch floats at the top of the app, and the button, Escape, or a finished pick stops it.
-  **Select**, where picking starts, turns on react-grab, and a click on an element adds it to the session's composer: its HTML, the React component around it with its file, and a selector.
-  React-grab's **Comment** adds the element with a note you type first; the composer gets the note and then the element.
+- **Pick in the app**, the pointer button, starts picking, as in T3 Code: a **Select**, **Region**, **Draw**, and **Erase** switch floats at the top of the app, and the button or Escape stops it.
+  **Select**, where picking starts, turns on react-grab, and a click on an element adds it to the session's composer as a chip named after its React component, or its tag, with the element's HTML, the React component around it with its file, and a selector inside; hover the chip to read them.
+  React-grab's **Comment** names the chip after the note you type first, and the note goes in with the element.
   Each pick goes after what the composer already holds, and a message confirms it; nothing is sent until you send it.
-  **Region** works like a macOS screenshot: drag over part of the app, or click once for all of it, and the picture is attached to the session's composer as an image.
+  **Region** drags a box over part of the app, and **Draw** draws a line on it; marks add up across modes, and **Erase** removes the box or line you click.
+  A card beside the marks takes a comment; **Attach**, or Enter, attaches a picture of the marked part with the marks drawn on it, adds the comment after it, and stops picking.
+  Escape drops the marks.
 - **Screenshot**, the camera button, attaches a picture of all the app shows to the composer at once.
   A picture needs the session's conversation open, since attachments live in its composer.
 - The Browser keeps its own cookies and storage across launches, apart from the dashboard's, so an app you signed in to stays signed in.

@@ -14,8 +14,8 @@ document.addEventListener("DOMContentLoaded", () => void webFrame.executeJavaScr
 
 window.addEventListener("message", event => {
 	if (event.source !== window || !isObject(event.data)) return;
-	const content: unknown = event.data[PREVIEW_GRAB_CHANNEL];
-	if (typeof content === "string") ipcRenderer.sendToHost(PREVIEW_GRAB_CHANNEL, content);
+	const pick: unknown = event.data[PREVIEW_GRAB_CHANNEL];
+	if (isObject(pick) && typeof pick.content === "string" && typeof pick.label === "string") ipcRenderer.sendToHost(PREVIEW_GRAB_CHANNEL, { content: pick.content, label: pick.label });
 	const active: unknown = event.data[PREVIEW_GRAB_ACTIVE_CHANNEL];
 	if (typeof active === "boolean") ipcRenderer.sendToHost(PREVIEW_GRAB_ACTIVE_CHANNEL, active);
 });

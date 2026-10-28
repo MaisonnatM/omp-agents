@@ -81,7 +81,7 @@
   Done todos and the session you are typing in stay out of the list.
   Use arrow keys, Tab or Enter to insert a suggestion, and Esc to close the list.
   File suggestions follow Git ignore rules in Git repositories.
-- In the composer, a skill or command at the start of the prompt, an `@` file or folder, and an inserted todo, ticket, pull request, person, or session show as a chip, a single unit with an icon and a short name, such as the file's name or the ticket's ID and title.
+- In the composer, a skill or command at the start of the prompt, an `@` file or folder, an inserted todo, ticket, pull request, person, or session, and an element picked in the [Browser](browser.md) show as a chip, a single unit with an icon and a short name, such as the file's name or the ticket's ID and title.
   A picked suggestion is a chip at once; a reference you type becomes one once you type past it or move the caret away, so `/mo` stays text while you type `/move`.
   Typing right against a chip turns it back into text, so `/move` followed by `X` reads `/moveX`.
   The arrow keys step over a chip as over one character, Backspace removes a chip whole, undo brings it back, and the prompt you send is still the text behind each chip.

@@ -14,8 +14,13 @@ export const SOUND_CHANNEL = "omp-agents:sound";
 export const SIGN_IN_CHANNEL = "omp-agents:sign-in";
 /** Asked synchronously by the preload before the page's scripts run: the localStorage entries that sign the page in, or `null`. */
 export const ACCESS_CHANNEL = "omp-agents:access";
-/** The `ipc-message` channel of the Preview's webview, which carries each element react-grab copied in it, and the key of the page's message to its preload. */
+/** The `ipc-message` channel of the Preview's webview, which carries each element react-grab copied in it as a {@link PreviewPick}, and the key of the page's message to its preload. */
 export const PREVIEW_GRAB_CHANNEL = "omp-agents:preview-grab";
+/** An element react-grab copied: what it copied, a typed comment included, and the label its composer chip reads. */
+export interface PreviewPick {
+	content: string;
+	label: string;
+}
 /** The `ipc-message` channel on which the Browser's webview reports an Escape its app left unhandled. */
 export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
 /** The Preview's react-grab turning its picking on (`true`) or off, which the guest's preload hands to the page. */
