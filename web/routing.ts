@@ -8,7 +8,7 @@ import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
 
-/** Where a tab's trigger sits: `bar` is the sidebar's tab bar, `header` the buttons before the command menu button. */
+/** Where a tab's trigger sits: `bar` is the sidebar's tab bar, `header` the buttons after the command menu button. */
 export type TabPlace = "bar" | "header";
 
 /**

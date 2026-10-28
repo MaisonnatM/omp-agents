@@ -24,7 +24,7 @@ export const useHeaderControls = (): ReactNode => useContext(HeaderControlsConte
 interface HeaderControlsProps {
 	notices: Notice[];
 	onShowSearch: () => void;
-	/** The shown tabs whose triggers sit here, before the command menu button, in order. */
+	/** The shown tabs whose triggers sit here, after the command menu button between two dividers, in order. */
 	tabs: readonly SidebarTab[];
 	/** The panel the sidebar shows, whose button is pressed. */
 	tab: SidebarPanel;
@@ -38,29 +38,35 @@ const SettingsIcon = PAGE_ICON.settings;
 export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, tab, onTab, settingsOpen, onToggleSettings }: HeaderControlsProps) {
 	return (
 		<div className="flex shrink-0 items-center gap-1">
-			{tabs.map(value => {
-				const { label, icon: Icon } = TAB_ROWS[value];
-				return (
-					<Tooltip key={value} content={label} shortcut={shortcutLabels(value)} side="bottom">
-						<Button
-							{...activityControl("header.tab")}
-							variant="ghost"
-							size="icon-compact"
-							className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
-							aria-label={label}
-							aria-pressed={tab === value}
-							onClick={() => onTab(value)}
-						>
-							<Icon />
-						</Button>
-					</Tooltip>
-				);
-			})}
 			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
 				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
 					<Search />
 				</Button>
 			</Tooltip>
+			{tabs.length > 0 && (
+				<>
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+					{tabs.map(value => {
+						const { label, icon: Icon } = TAB_ROWS[value];
+						return (
+							<Tooltip key={value} content={label} shortcut={shortcutLabels(value)} side="bottom">
+								<Button
+									{...activityControl("header.tab")}
+									variant="ghost"
+									size="icon-compact"
+									className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
+									aria-label={label}
+									aria-pressed={tab === value}
+									onClick={() => onTab(value)}
+								>
+									<Icon />
+								</Button>
+							</Tooltip>
+						);
+					})}
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+				</>
+			)}
 			<WhatsNew />
 			<NoticesBell notices={notices} />
 			<Tooltip content={settingsOpen ? "Close settings" : "Settings"} shortcut={shortcutLabels("settings")} side="bottom">
