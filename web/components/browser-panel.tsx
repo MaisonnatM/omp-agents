@@ -1,8 +1,8 @@
 /**
  * `BrowserPanel`: a live session's running app in the desktop app's `<webview>`, shown in the right sidebar's Browser
- * tab, where an element picked with react-grab lands in the session's composer.
+ * tab, where an element picked with react-grab, or an area captured as an image, lands in the session's composer.
  */
-import { ArrowLeft, ArrowRight, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Scan, Server } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
@@ -12,12 +12,13 @@ import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, 
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { appendToComposer, liveDraftKey } from "../composer-drafts";
+import { appendToComposer, attachToComposer, liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { initialAddress, browserCandidates } from "../browser-model";
+import { type Area, browserCandidates, initialAddress } from "../browser-model";
 import { sessionProcessesStore } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useWebview } from "../use-webview";
+import { CaptureLayer, captureFile } from "./browser-capture";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
@@ -29,18 +30,31 @@ const START_SERVER_PROMPT =
 /** The window can show a Browser: the desktop app, from the build that added it. */
 export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesktop?.preview === true;
 
+/** The window's shell takes capture requests: the desktop app, from the build that added **Capture area**. */
+const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.captureBrowser === "function";
+
 /** A toolbar control of the Browser, named by its tooltip. */
-function ToolbarButton({ label, control, disabled, shortcut, onClick, children }: {
+function ToolbarButton({ label, control, disabled, pressed, shortcut, onClick, children }: {
 	label: string;
 	control: ControlId;
 	disabled: boolean;
+	pressed?: boolean;
 	shortcut?: readonly string[];
 	onClick: () => void;
 	children: ReactNode;
 }) {
 	return (
 		<Tooltip content={label} shortcut={shortcut} side="bottom" disabled={disabled}>
-			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} disabled={disabled} onClick={onClick}>
+			<Button
+				{...activityControl(control)}
+				variant="ghost"
+				size="icon-compact"
+				aria-label={label}
+				aria-pressed={pressed}
+				disabled={disabled}
+				className={cn(pressed && "bg-accent text-accent-foreground")}
+				onClick={onClick}
+			>
 				{children}
 			</Button>
 		</Tooltip>
@@ -88,6 +102,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const [saved] = useState(() => addresses.get(sessionId));
 	const draftKey = liveDraftKey(view);
 	const [maximized, setMaximized] = useState(false);
+	const [capturing, setCapturing] = useState(false);
 	const webview = useWebview({
 		initial: initialAddress(saved, candidates),
 		onPick: text => {
@@ -95,8 +110,8 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 			toasts.add({ title: "Added to the composer" });
 		},
 		onNavigate: url => addresses.set(sessionId, url),
-		// The app has the focus while maximized, so its Escape restores too.
-		onEscape: () => setMaximized(false),
+		// The app has the focus while maximized, so its Escape cancels a capture or restores too.
+		onEscape: () => (capturing ? setCapturing(false) : setMaximized(false)),
 		ports,
 	});
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -110,10 +125,21 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const mounted = webview.src !== null;
 	useShortcuts({
 		browserRestore: () => {
+			if (capturing) return setCapturing(false);
 			if (!maximized) return false;
 			setMaximized(false);
 		},
 	});
+	const captureArea = async (area: Area | null, pageWidth: number): Promise<void> => {
+		setCapturing(false);
+		// A drag along an edge, outside the page, covers nothing.
+		if (area !== null && (area.width < 1 || area.height < 1)) return;
+		const png = await webview.capture();
+		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
+		const file = await captureFile(png, area, pageWidth);
+		if (attachToComposer(draftKey, file)) toasts.add({ title: "Added to the composer" });
+		else toasts.add({ title: "Open the session's conversation to attach the capture" });
+	};
 	const sectionRef = useRef<HTMLElement>(null);
 	// What the maximized Browser covers leaves the tab order and the accessibility tree.
 	useEffect(() => (maximized && sectionRef.current ? inertAround(sectionRef.current) : undefined), [maximized]);
@@ -177,6 +203,11 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<ToolbarButton label="Select element" control="browser.select-element" disabled={!webview.ready} onClick={webview.selectElement}>
 					<MousePointerClick />
 				</ToolbarButton>
+				{CAPTURE_AVAILABLE && (
+					<ToolbarButton label="Capture area" control="browser.capture-area" disabled={!webview.ready} pressed={capturing} onClick={() => setCapturing(!capturing)}>
+						<Scan />
+					</ToolbarButton>
+				)}
 				<ToolbarButton
 					label={maximized ? "Restore Browser" : "Maximize Browser"}
 					control="browser.maximize"
@@ -214,15 +245,18 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 					</Button>
 				</div>
 			) : (
-				<webview
-					ref={webview.ref}
-					src={webview.src}
-					partition={PREVIEW_PARTITION}
-					// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
-					// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
-					allowpopups={"" as unknown as boolean}
-					className="flex min-h-0 w-full flex-1"
-				/>
+				<div className="relative flex min-h-0 flex-1">
+					<webview
+						ref={webview.ref}
+						src={webview.src}
+						partition={PREVIEW_PARTITION}
+						// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
+						// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
+						allowpopups={"" as unknown as boolean}
+						className="flex min-h-0 w-full flex-1"
+					/>
+					{capturing && <CaptureLayer onArea={(area, pageWidth) => void captureArea(area, pageWidth)} />}
+				</div>
 			)}
 		</section>
 	);

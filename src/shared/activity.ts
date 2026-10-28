@@ -127,6 +127,7 @@ export const CONTROLS = [
 	{ id: "browser.server", label: "Browser dev server menu", area: "Browser" },
 	{ id: "browser.start-server", label: "Browser Start dev server", area: "Browser" },
 	{ id: "browser.select-element", label: "Browser Select element", area: "Browser" },
+	{ id: "browser.capture-area", label: "Browser Capture area", area: "Browser" },
 	{ id: "browser.maximize", label: "Browser Maximize", area: "Browser" },
 	{ id: "browser.open-in-browser", label: "Browser Open in default browser", area: "Browser" },
 	{ id: "pull-requests.view.list", label: "Pull requests list view", area: "Pull requests" },

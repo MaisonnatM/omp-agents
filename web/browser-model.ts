@@ -24,3 +24,27 @@ export function browserCandidates(sessions: readonly LiveSessionProcesses[] | nu
 /** The address the Browser opens on: the one last loaded for the session, else the first candidate, else none. */
 export const initialAddress = (saved: string | null, candidates: readonly BrowserCandidate[]): string | null =>
 	saved !== null && isLoopbackUrl(saved) ? saved : (candidates[0]?.url ?? null);
+
+export interface Point {
+	x: number;
+	y: number;
+}
+
+/** An area of the Browser's page, in its CSS pixels from the top left. */
+export interface Area extends Point {
+	width: number;
+	height: number;
+}
+
+/** A drag shorter than this either way is a click, which captures the whole page, as a click on a window does in macOS's screenshot. */
+const CLICK_SLOP = 4;
+
+/** The area a drag from `from` to `to` covers on a `width` by `height` page, kept inside it, or `null` for a click. */
+export function dragArea(from: Point, to: Point, width: number, height: number): Area | null {
+	if (Math.abs(to.x - from.x) < CLICK_SLOP && Math.abs(to.y - from.y) < CLICK_SLOP) return null;
+	const clampX = (x: number): number => Math.min(Math.max(x, 0), width);
+	const clampY = (y: number): number => Math.min(Math.max(y, 0), height);
+	const left = clampX(Math.min(from.x, to.x));
+	const top = clampY(Math.min(from.y, to.y));
+	return { x: left, y: top, width: clampX(Math.max(from.x, to.x)) - left, height: clampY(Math.max(from.y, to.y)) - top };
+}

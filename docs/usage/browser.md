@@ -23,4 +23,6 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - **Select element**, the pointer button, turns on react-grab's picking in the app, and a click on an element adds it to the session's composer: its HTML, the React component around it with its file, and a selector.
   React-grab's **Comment** adds the element with a note you type first; the composer gets the note and then the element.
   Each pick goes after what the composer already holds, and a message confirms it; nothing is sent until you send it.
+- **Capture area**, the frame button beside it, works like a macOS screenshot: drag over part of the app, or click once for all of what it shows, and the picture is attached to the session's composer as an image.
+  Escape cancels, and the capture needs the session's conversation open, since attachments live in its composer.
 - The Browser keeps its own cookies and storage across launches, apart from the dashboard's, so an app you signed in to stays signed in.

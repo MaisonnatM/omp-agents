@@ -22,6 +22,8 @@ export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
 export const PREVIEW_PARTITION = "persist:omp-preview";
 /** The page's report of a Browser's {@link BrowserPorts}, for the shell's {@link appAddress}. */
 export const BROWSER_PORTS_CHANNEL = "omp-agents:browser-ports";
+/** The page's request for a PNG of what a Browser's guest shows, answered by the shell. */
+export const BROWSER_CAPTURE_CHANNEL = "omp-agents:browser-capture";
 
 /** The ports a Browser's session runs servers on, and the ones other servers on this computer listen on. */
 export interface BrowserPorts {
@@ -99,6 +101,8 @@ export interface DesktopBridge {
 	signIn?(): void;
 	/** Tells the shell the {@link BrowserPorts} of the Browser's guest `guestId`, for {@link appAddress}; absent in an app built before it. */
 	browserPorts?(guestId: number, ports: BrowserPorts): void;
+	/** A PNG of what the Browser's guest `guestId` shows, at the screen's pixel density, or `null` when it shows nothing; absent in an app built before it. */
+	captureBrowser?(guestId: number): Promise<Uint8Array | null>;
 	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
 	titleBar?: boolean;
 	/** The window's page can embed a session's app in a `<webview>` for its Preview; absent in an app built before it. */

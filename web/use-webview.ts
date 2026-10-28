@@ -131,5 +131,7 @@ export function useWebview({ initial, onPick, onNavigate, onEscape, ports }: Web
 		forward: () => ref.current?.goForward(),
 		reload: () => ref.current?.reload(),
 		selectElement: () => void ref.current?.executeJavaScript("window.__REACT_GRAB__?.toggle()", true).catch(() => {}),
+		/** A PNG of what the page shows, or `null` before it loaded or in an app whose shell takes no capture request. */
+		capture: async (): Promise<Uint8Array | null> => (ready && ref.current ? ((await window.ompDesktop?.captureBrowser?.(ref.current.getWebContentsId())) ?? null) : null),
 	};
 }
