@@ -174,8 +174,9 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 }
 
 /**
- * The agent's own todo list, as its latest `todo` call left it, floating at the top right of its transcript once it
- * made one: a summary of progress and the task in progress, which unfolds into every phase, open tasks first.
+ * The agent's own todo list, as its latest `todo` call left it, once it made one: a summary of progress and the task in
+ * progress, which unfolds into every phase, open tasks first. It floats at the top right of its transcript when the
+ * transcript is wide enough to keep it beside the messages, and otherwise sits above them.
  */
 export function SessionTodosCard({ items }: { items: readonly Item[] }) {
 	const phases = useMemo(() => latestTodos(items), [items]);
@@ -190,7 +191,7 @@ export function SessionTodosCard({ items }: { items: readonly Item[] }) {
 			open={open}
 			onOpenChange={setOpen}
 			aria-label="Todos"
-			className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-5rem)] w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-sm backdrop-blur"
+			className="mx-auto mt-3 flex max-h-[45%] w-[calc(100%-1.5rem)] max-w-[calc(var(--container-conversation)-1.5rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-sm backdrop-blur @min-[83rem]/transcript:absolute @min-[83rem]/transcript:top-3 @min-[83rem]/transcript:right-3 @min-[83rem]/transcript:z-10 @min-[83rem]/transcript:m-0 @min-[83rem]/transcript:max-h-[calc(100%-5rem)] @min-[83rem]/transcript:w-[min(20rem,calc((100cqw-var(--container-conversation))/2-1.5rem))] @min-[83rem]/transcript:max-w-none"
 		>
 			<CollapsibleTrigger {...activityControl("transcript.todos")} className="grid shrink-0 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 pt-2.5 pb-3 text-left outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
 				<ListChecks aria-hidden className="size-4 text-muted-foreground" />

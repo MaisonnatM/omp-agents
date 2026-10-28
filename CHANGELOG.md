@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
-- The todos card in a session now has a lighter shadow, and you can hide it with the checklist button after the session's title or with Show todos card in Settings → Preferences.
+- The todos card in a session now has a lighter shadow, never covers the conversation, sitting above it when the pane is too narrow to keep it at the side, and you can hide it with Show todos card in Settings → Preferences.
 - While you are still trying out a design with an agent, it now waits for your go on the direction before running its deep code review, instead of reviewing every round of tweaks.
 - A session's conversation now shows the agent's own todo list in a small card at its top right, with how many tasks are done and the one in progress; click the card to see every task.
 - A Bot can now create, change, pause, and delete its own routines when you ask it in its conversation, and it can't touch another Bot's routines.
