@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- On a wide pane, the todos card now floats at the top right sooner, and the conversation moves left to make room for it.
 - Behind the scenes: agents test the desktop app in a hidden window, so their checks no longer open windows on your screen.
 - Fixed: a running session's name in the sidebar still sat a little to the right of the others; it now lines up.
 - The Preview tab in the desktop app is now called Browser.
