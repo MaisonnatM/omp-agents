@@ -22,7 +22,7 @@
   Its optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it, and the name while the name is empty.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
   **Create** saves it and opens its page, `#bots/<id>`.
-  A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it remembers that.
+  A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
   The conversation reads as a chat: it shows your messages and the Bot's replies, never its tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
   The Bot's conversation is not listed in the **Sessions** tab, the command palette, or the workspace list; only its Bot's page shows it.
@@ -40,6 +40,7 @@
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
   Below come its **Job**, its **Memory**, its **Routines**, **End session** while its session runs, and **Delete**.
   Editing the job shows **Save job** and **Revert**; every turn's system prompt carries the saved job.
+  You can also tell the Bot in its conversation to change its job, and it saves the new one to its **Job** field once the dashboard applies it.
   **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date; for a long memory it lists the newest 16 KB, the part the Bot reads.
   Only the Bot writes it, with its `remember` tool, when you tell it something worth keeping.
   **Routines** lists the Bot's routines, each with its last run's dot, its schedules and triggers, and when it last ran and what that run did, or **Not run yet**; **New routine** opens the editor of a new one, `#bots/<id>/routines/new`.

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Schedule } from "../routines";
-import { MAX_FACT_LENGTH } from "../shared/bots";
+import { MAX_FACT_LENGTH, MAX_JOB_LENGTH } from "../shared/bots";
 import botExtension, { BOT_FLAGS, type BotExtensionApi, type BotTool, type SaveRoutineParams } from "./bot-extension";
 
 const dirs: string[] = [];
@@ -32,20 +32,22 @@ const nightly = {
 
 /**
  * The extension loaded as omp loads it for Bot `scout`, whose memory file does not exist yet, beside Bot `relay`'s routine and, unless `routines` is
- * false, its own; `unset` names flags the dashboard leaves out.
+ * false, its own; `job` is Scout's job in `bots.json`, and `unset` names flags the dashboard leaves out.
  */
-function loadedBot({ routines = true, unset = [] as string[] } = {}) {
+function loadedBot({ routines = true, job = "Watch the build.\nAsk before merging.", unset = [] as string[] } = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-bot-extension-"));
 	dirs.push(dir);
 	const bots = join(dir, "bots.json");
 	const memory = join(dir, "bots", "scout", "memory.md");
 	const routinesFile = join(dir, "routines.json");
 	const inbox = join(dir, "routine-inbox");
-	writeFileSync(bots, JSON.stringify({ bots: [{ id: "scout", name: "Scout", job: "Watch the build.\nAsk before merging.", cwd: "/tmp", model: null, skill: null, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z" }] }));
+	const botInbox = join(dir, "bot-inbox");
+	writeFileSync(bots, JSON.stringify({ bots: [{ id: "scout", name: "Scout", job, cwd: "/tmp", model: null, skill: null, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z" }] }));
 	if (routines) writeFileSync(routinesFile, JSON.stringify({ routines: [relayMail, standup, nightly] }));
 	const flags = new Map<string, string>([
 		[BOT_FLAGS.bot, "scout"],
 		[BOT_FLAGS.bots, bots],
+		[BOT_FLAGS.botInbox, botInbox],
 		[BOT_FLAGS.memory, memory],
 		[BOT_FLAGS.routines, routinesFile],
 		[BOT_FLAGS.routineInbox, inbox],
@@ -73,13 +75,15 @@ function loadedBot({ routines = true, unset = [] as string[] } = {}) {
 	});
 	const prompt = (kind: "main" | "sub" = "main") => handler!({ systemPrompt: ["base"] }, { agent: { kind } })?.systemPrompt;
 	const call = <Params>(name: string, params: Params) => tools.get(name)!.execute("call-1", params);
-	/** The requests the routine tools left for the dashboard, oldest first. */
-	const requests = () => (existsSync(inbox) ? readdirSync(inbox).sort().map(name => (name.endsWith(".json") ? JSON.parse(readFileSync(join(inbox, name), "utf8")) : name)) : []);
+	/** The requests the tools left in `inboxDir` for the dashboard, oldest first. */
+	const left = (inboxDir: string) => (existsSync(inboxDir) ? readdirSync(inboxDir).sort().map(name => (name.endsWith(".json") ? JSON.parse(readFileSync(join(inboxDir, name), "utf8")) : name)) : []);
 	return {
 		memory,
 		prompt,
-		requests,
+		requests: () => left(inbox),
+		jobRequests: () => left(botInbox),
 		remember: (fact: string) => call("remember", { fact }),
+		setJob: (job: string) => call("set_job", { job }),
 		saveRoutine: (params: SaveRoutineParams) => call("save_routine", params),
 		deleteRoutine: (id: string) => call("delete_routine", { id }),
 	};
@@ -196,4 +200,21 @@ test("the routine tools refuse another Bot's routine, an id no routine has, a ne
 	await expect(bot.saveRoutine({ name: "Never", schedules: [], triggers: [], task: { kind: "prompt", prompt: "Hello." } })).rejects.toThrow("The routine is not valid");
 	await expect(bot.saveRoutine({ id: "r3", triggers: [] })).rejects.toThrow("The routine is not valid");
 	expect(bot.requests()).toEqual([]);
+});
+
+test("set_job leaves the dashboard one request with this Bot's new job, and the next prompt still reads the job from bots.json, which only the dashboard saves", async () => {
+	const bot = loadedBot({ job: "" });
+	expect(bot.prompt()?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.\n");
+	expect((await bot.setJob("  Triage the inbox.\nAsk before replying.\n")).content[0]?.text).toBe("Saved your job. The dashboard applies it, and while the dashboard is stopped the change waits for it.");
+	expect(bot.jobRequests()).toEqual([{ botId: "scout", job: "Triage the inbox.\nAsk before replying." }]);
+	expect(bot.prompt()?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet.");
+});
+
+test("set_job with an empty job asks to clear it, and refuses a job past the page's limit or a session with no bot inbox, leaving nothing", async () => {
+	const bot = loadedBot();
+	await expect(bot.setJob("x".repeat(MAX_JOB_LENGTH + 1))).rejects.toThrow(`job is ${MAX_JOB_LENGTH + 1} characters; keep it to at most ${MAX_JOB_LENGTH}.`);
+	expect(bot.jobRequests()).toEqual([]);
+	expect((await bot.setJob(" ")).content[0]?.text).toBe("Cleared your job. The dashboard applies it, and while the dashboard is stopped the change waits for it.");
+	expect(bot.jobRequests()).toEqual([{ botId: "scout", job: "" }]);
+	await expect(loadedBot({ unset: [BOT_FLAGS.botInbox] }).setJob("Watch the build.")).rejects.toThrow("This session is not an omp-agents Bot, so it has no job.");
 });

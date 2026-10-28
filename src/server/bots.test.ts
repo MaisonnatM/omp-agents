@@ -56,7 +56,7 @@ function harness() {
 		live: sessionId => live(sessions.find(session => session.sessionId === sessionId && !session.ended)),
 		session: instanceId => live(sessions.find(session => session.instanceId === instanceId)),
 		savedFile: sessionId => (saved.has(sessionId) ? join(dir, `${sessionId}.jsonl`) : null),
-		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botsDir: join(dir, "bots"), routinesFile: join(dir, "routines.json"), routineInboxDir: join(dir, "routine-inbox") },
+		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botInboxDir: join(dir, "bot-inbox"), botsDir: join(dir, "bots"), routinesFile: join(dir, "routines.json"), routineInboxDir: join(dir, "routine-inbox") },
 		now: () => "2026-05-02T09:00:00.000Z",
 		onChange: () => {},
 	});
@@ -79,6 +79,8 @@ describe("Bots", () => {
 			"scout",
 			"--omp-agents-bots",
 			join(dir, "bots.json"),
+			"--omp-agents-bot-inbox",
+			join(dir, "bot-inbox"),
 			"--omp-agents-bot-memory",
 			join(dir, "bots", "scout", "memory.md"),
 			"--omp-agents-routines",

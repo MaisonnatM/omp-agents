@@ -1,22 +1,24 @@
 // omp-agents Bots: gives a Bot's session its name, job, memory, and routines on every turn, the `remember` tool, the one
-// writer of that memory, and the `save_routine` and `delete_routine` tools, which ask the dashboard to change the Bot's
-// own routines. The dashboard loads it with `omp -e` and the flags in `BOT_FLAGS` for a Bot's session only
-// (`Bots.join` in src/server/bots.ts), so no other session reads it.
+// writer of that memory, the `set_job` tool, which asks the dashboard to change the Bot's job, and the `save_routine` and
+// `delete_routine` tools, which ask it to change the Bot's own routines. The dashboard loads it with `omp -e` and the
+// flags in `BOT_FLAGS` for a Bot's session only (`Bots.join` in src/server/bots.ts), so no other session reads it.
 import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { errorText, isObject, parseJson } from "../json";
 import { readTail } from "../read-tail";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
-import { type BotId, MAX_FACT_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
+import { type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
 
 /**
- * The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, its `memory.md`, the
- * `routines.json` it reads its routines from, and the directory its routine tools leave their requests in.
+ * The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, the directory its
+ * `set_job` tool leaves its job in, its `memory.md`, the `routines.json` it reads its routines from, and the directory its
+ * routine tools leave their requests in.
  */
 export const BOT_FLAGS = {
 	bot: "omp-agents-bot",
 	bots: "omp-agents-bots",
+	botInbox: "omp-agents-bot-inbox",
 	memory: "omp-agents-bot-memory",
 	routines: "omp-agents-routines",
 	routineInbox: "omp-agents-routine-inbox",
@@ -84,7 +86,7 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 }
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-function leave(dir: string, request: BotRoutineRequest): void {
+function leave(dir: string, request: BotRoutineRequest | BotJobRequest): void {
 	try {
 		mkdirSync(dir, { recursive: true });
 		const name = `${Date.now()}-${randomUUID()}`;
@@ -101,11 +103,12 @@ const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }]
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
 const NO_ROUTINES = "This session is not an omp-agents Bot, so it has no routines.";
 
-/** A Bot's session as its flags name it: the Bot, its `bots.json` and `memory.md`, and its routine files, `null` when the dashboard passed none. */
+/** A Bot's session as its flags name it: the Bot, its `bots.json` and `memory.md`, and its inboxes and `routines.json`, `null` when the dashboard passed none. */
 interface ThisBot {
 	botId: BotId;
 	botsPath: string;
 	memoryPath: string;
+	botInbox: string | null;
 	routinesPath: string | null;
 	routineInbox: string | null;
 }
@@ -113,6 +116,7 @@ interface ThisBot {
 export default function botExtension(pi: BotExtensionApi): void {
 	pi.registerFlag(BOT_FLAGS.bot, { type: "string", description: "The omp-agents Bot this session is." });
 	pi.registerFlag(BOT_FLAGS.bots, { type: "string", description: "The omp-agents bots.json that holds its name and job." });
+	pi.registerFlag(BOT_FLAGS.botInbox, { type: "string", description: "The directory its set_job tool leaves its job in." });
 	pi.registerFlag(BOT_FLAGS.memory, { type: "string", description: "The memory.md the Bot remembers in." });
 	pi.registerFlag(BOT_FLAGS.routines, { type: "string", description: "The omp-agents routines.json that holds its routines." });
 	pi.registerFlag(BOT_FLAGS.routineInbox, { type: "string", description: "The directory its routine tools leave their changes in." });
@@ -128,7 +132,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 		const botsPath = flag(BOT_FLAGS.bots);
 		const memoryPath = flag(BOT_FLAGS.memory);
 		if (!botId || !botsPath || !memoryPath) return null;
-		return { botId, botsPath, memoryPath, routinesPath: flag(BOT_FLAGS.routines), routineInbox: flag(BOT_FLAGS.routineInbox) };
+		return { botId, botsPath, memoryPath, botInbox: flag(BOT_FLAGS.botInbox), routinesPath: flag(BOT_FLAGS.routines), routineInbox: flag(BOT_FLAGS.routineInbox) };
 	};
 
 	/** The Bot's routines as `routines.json` holds them now; none when the file is missing or unreadable, or the dashboard named none. */
@@ -153,7 +157,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 		const prompt = [
 			`You are ${bot.name}, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.`,
 			"Your job, and what you ask before doing:",
-			bot.job.trim() || "No job yet. Ask the user what it is, and what you should ask before doing, then `remember` what they say.",
+			bot.job.trim() || "No job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.",
 			"What you remember from earlier turns:",
 			...(memory?.cut ? ["(Older memory was cut to keep this prompt short; only the newest facts follow.)"] : []),
 			memory?.text.trim() || "Nothing yet.",
@@ -185,6 +189,23 @@ export default function botExtension(pi: BotExtensionApi): void {
 				throw new Error(`Cannot write the memory: ${errorText(error)}`);
 			}
 			return reply(`Remembered: ${line}`);
+		},
+	});
+
+	pi.registerTool<{ job: string }>({
+		name: "set_job",
+		label: "Set job",
+		description: `Replaces this Bot's job, which every later turn's system prompt carries and the user sees in the Bot's Job field: Markdown on what the Bot does and what it asks before doing, at most ${MAX_JOB_LENGTH} characters. An empty job clears it.`,
+		parameters: pi.typebox.Type.Object({ job: pi.typebox.Type.String({ description: "The whole job, as Markdown; empty to clear it.", maxLength: MAX_JOB_LENGTH }) }),
+		loadMode: "essential",
+		approval: "write",
+		async execute(_toolCallId, { job }) {
+			const bot = thisBot();
+			if (!bot?.botInbox) throw new Error("This session is not an omp-agents Bot, so it has no job.");
+			const text = job.trim();
+			if (text.length > MAX_JOB_LENGTH) throw new Error(`job is ${text.length} characters; keep it to at most ${MAX_JOB_LENGTH}.`);
+			leave(bot.botInbox, { botId: bot.botId, job: text });
+			return reply(`${text ? "Saved your job" : "Cleared your job"}. ${APPLIES}`);
 		},
 	});
 

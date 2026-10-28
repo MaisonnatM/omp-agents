@@ -42,6 +42,8 @@ export const routinesFile = join(configDir, "routines.json");
 export const routineInboxDir = join(configDir, "routine-inbox");
 /** The Bots: each one's name, job, workspace, and conversation, beside {@link tokenFile}. */
 export const botsFile = join(configDir, "bots.json");
+/** Where a Bot's `set_job` tool leaves the job it gives itself, one JSON file each, so the server stays the only writer of {@link botsFile}. */
+export const botInboxDir = join(configDir, "bot-inbox");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */

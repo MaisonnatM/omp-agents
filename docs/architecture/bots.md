@@ -5,10 +5,10 @@ A Bot is a named, long-lived teammate: one conversation, a job, and a memory.
 `src/server/bots-file.ts` keeps the list in `bots.json` beside the access token.
 A save keeps the Bot's `sessionId`, and a remove forgets the Bot but leaves its session file and its memory directory; the `Dashboard` removes the Bot's routines first.
 A Bot's `shape` and `hue`, one of `BOT_SHAPES` and `BOT_HUES`, are its avatar's look; `parseBotSpec` gives an entry saved before them the look `defaultLook` hashes from its id, so an old Bot keeps its face.
-A new Bot's `job` is empty until its first conversation gives it one: the extension then tells the Bot to ask for it and `remember` the answer.
+A new Bot's `job` is empty until its first conversation gives it one: the extension then tells the Bot to ask for it and call `set_job` with the answer.
 
 `Bots` in `src/server/bots.ts` binds each Bot to the session its conversation runs in.
-A new session whose `StartRequest` names a `bot`, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, its `memory.md` path, the `routines.json` path, and the `routine-inbox/` directory beside it.
+A new session whose `StartRequest` names a `bot`, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, the `bot-inbox/` directory beside it, its `memory.md` path, the `routines.json` path, and the `routine-inbox/` directory beside it.
 Only `Bots` sets `bot`, since `parseNewSessionRequest` never reads one, so a page cannot start a Bot's session.
 Any other start launches plain, so no other session loads the extension.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
@@ -21,6 +21,13 @@ The name, job, and memory need only the Bot's id, `bots.json`, and `memory.md` f
 Its `remember` tool appends `- YYYY-MM-DD fact` to `$XDG_DATA_HOME/omp-agents/bots/<id>/memory.md`, and nothing else writes that file.
 It refuses a fact longer than `MAX_FACT_LENGTH`, 500 characters, so each fact stays one short sentence.
 `readTail` in `src/read-tail.ts` reads only the file's newest whole lines within `MAX_MEMORY_BYTES`, 16 KB, of its end, so a memory that grows for months costs each turn the same; when it left older lines out, the prompt says so before the memory.
+
+The extension's `set_job` tool replaces the Bot's own job, and never writes `bots.json`.
+It takes one `job`, the whole job as Markdown, trims it, refuses one longer than `MAX_JOB_LENGTH`, 20,000 characters, the limit `parseBotSpec` holds a job the page saves to, and an empty one clears the job.
+It writes one `BotJobRequest` (`src/shared/bots.ts`), the Bot's id and its job, into `bot-inbox/` the way the routine tools write theirs, and loads as `essential` and asks approval as a write.
+The server's `BotInbox` in `src/server/bot-inbox.ts` reads each file with `parseBotJobRequest` and saves the Bot with only its `job` changed through the list registry's `bots` save, as the page's **Save job** does, so every page hears it and the next turn's prompt reads it from `bots.json`.
+It moves aside as `<name>.invalid`, with a logged reason, a file that is no request, a job for a Bot that is gone, and a save the Bots refuse; a job the Bot already holds is done and deleted.
+Only the server that owns the lock drains it, so a job waits there while the dashboard is stopped.
 
 The extension's `save_routine` and `delete_routine` tools change only the Bot's own routines, and never write `routines.json`.
 `save_routine` takes an optional `id`, `name`, `schedules` (each `every` some `minutes`, or `weekly` on `days` at a `time`), `triggers` (each `{ kind }`, one of `TRIGGER_KINDS`), `task` (a `prompt` or a `command`), and `enabled`, the fields of a `RoutineSpec` but its `botId`.
