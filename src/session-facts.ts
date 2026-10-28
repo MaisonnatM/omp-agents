@@ -67,7 +67,7 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "mcp__linear_", '"cwd"'];
+const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"'];
 /** A Linear MCP tool called directly (`mcp__linear_get_issue`, or `xd_mcp__linear_get_issue`), or written to as an omp device. */
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
@@ -225,6 +225,8 @@ export class SessionFactsScan {
 	/** How many `gt submit` calls finished: a quiet one prints no PR, yet its branch may head a new one. */
 	submitsFinished = 0;
 	ship: ShipProgress | null = null;
+	/** omp ran the session as `omp -p` or `--mode json`, as the `headless-mark` extension records. */
+	headless = false;
 	/** The `cwd` arguments of bash calls as written, each once, the most recently used last. */
 	readonly workDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
@@ -250,6 +252,10 @@ export class SessionFactsScan {
 		}
 		if (!isObject(entry)) return;
 		this.replay.applyEntry(entry);
+		if (entry.type === "custom" && entry.customType === "omp-agents.headless") {
+			this.headless = true;
+			return;
+		}
 		if (entry.type === "custom" && entry.customType === "omp-ship.state") {
 			const ship = parseShipProgress(entry.data);
 			if (ship) {
@@ -624,6 +630,11 @@ export class SessionFactsIndex {
 		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree, branch: session.branch, ...(replay ? { replay } : {}) };
 	}
 
+	/** Whether omp ran session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
+	headless(sessionPath: string): boolean {
+		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.fold.scan.headless ?? false;
+	}
+
 	/** Resolves once the refreshes asked for so far are done. */
 	settled(): Promise<void> {
 		return this.#chain.then(() => {});
@@ -836,6 +847,7 @@ export class SessionFactsIndex {
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; submitted: boolean; moved: boolean; writtenAt: number }> {
 		let session = this.#sessions.get(path);
 		const previousShip = session?.transcripts.get(path)?.fold.scan.ship;
+		const wasHeadless = session?.transcripts.get(path)?.fold.scan.headless ?? false;
 		session ??= {
 			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new FoldedFile(path, () => new TranscriptFold(true, this.#ownFileFolds.map(folds => folds.start(path))))]]),
 			refs: [], submitted: new Map(), repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], submitsFinished: 0, workDirs: [], worktree: null, branch: null,
@@ -853,6 +865,6 @@ export class SessionFactsIndex {
 		const same = workDirs.length === before.length && workDirs.every((dir, i) => dir === before[i]);
 		const moved = !same || (session.worktree !== null && !(await exists(session.worktree)));
 		session.workDirs = workDirs;
-		return { session, changed: shipChanged, submitted: this.#gather(session, own), moved, writtenAt: modifiedAt };
+		return { session, changed: shipChanged || own.headless !== wasHeadless, submitted: this.#gather(session, own), moved, writtenAt: modifiedAt };
 	}
 }

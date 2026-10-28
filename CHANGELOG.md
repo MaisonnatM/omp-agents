@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- Past sessions no longer list the quick one-off agent runs that other sessions start in the background, only sessions you had a conversation in.
 - While you are still trying out a design with an agent, it now also waits for your go on the direction before writing tests for it.
 - The todos card in a session now has a lighter shadow, and you can hide it with the checklist button after the session's title or with Show todos card in Settings → Preferences.
 - The todos card in a session now has a lighter shadow, never covers the conversation, sitting above it when the pane is too narrow to keep it at the side, and you can hide it with Show todos card in Settings → Preferences.
