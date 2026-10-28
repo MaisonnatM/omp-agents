@@ -1,5 +1,6 @@
 /** The Settings Workflows section: the skills tagged `workflow`, each with how to start it, viewed and edited in place (`Workflows`). */
 import { useState } from "react";
+import { SessionVisual } from "../session-visual";
 import type { OmpFile, Workflow } from "../../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,18 @@ const TAG_SNIPPET = "metadata:\n  tags: workflow";
 
 /** What a session types to start `workflow`: its own command when one exists, else the skill. */
 const invocation = (workflow: Workflow): string => (workflow.command ? `/${workflow.name}` : `/skill:${workflow.name}`);
+
+/** The skill's steps, its top-level `1. **Title.**` items, in order. */
+export function workflowSteps(text: string): string[] {
+	return [...text.matchAll(/^\d+\. \*\*(.+?)\.?\*\*/gm)].map(match => match[1]!.trim());
+}
+
+/** The steps as a left-to-right mermaid flowchart; `null` under two steps. */
+export function stepsFlowchart(steps: string[]): string | null {
+	if (steps.length < 2) return null;
+	const nodes = steps.map((step, i) => `  s${i}["${i + 1}. ${step.replaceAll('"', "'")}"]`);
+	return ["flowchart LR", ...nodes, `  ${steps.map((_, i) => `s${i}`).join(" --> ")}`].join("\n");
+}
 
 export function Workflows({ workflows, files, editing }: { workflows: Workflow[]; files: OmpFile[]; editing: Editing }) {
 	const [selected, setSelected] = useState<string | null>(null);
@@ -56,7 +69,15 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 					))}
 				</ul>
 			</nav>
-			<FileView key={open.skill.path} file={open.skill} editing={editing} />
+			<div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+				<StepsChart key={open.skill.path} file={open.skill} />
+				<FileView key={open.skill.path} file={open.skill} editing={editing} />
+			</div>
 		</div>
 	);
+}
+
+function StepsChart({ file }: { file: OmpFile }) {
+	const source = file.body.state === "read" ? stepsFlowchart(workflowSteps(file.body.text)) : null;
+	return source ? <SessionVisual language="mermaid" source={source} code={source} /> : null;
 }
