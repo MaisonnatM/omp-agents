@@ -1,4 +1,7 @@
-/** Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across reloads. */
+/**
+ * Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across
+ * reloads, and the channel that appends text to it from elsewhere on the page, such as the session's Preview.
+ */
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { fields, isNumber, isObject, isString } from "../src/json";
 import type { BotId } from "../src/shared/bots";
@@ -56,6 +59,19 @@ export const putDraft = (key: string, text: string): void => writeDraft(key, tex
 
 export const clearDraft = (key: string): void => writeDraft(key, null);
 
+/** `text` added to `draft`, a blank line after what was typed; the mounted composer and the kept draft must append alike. */
+const withAppended = (draft: string, text: string): string => (draft.trim() ? `${draft}\n\n${text}` : text);
+
+/** The mounted composers by draft key, each taking appended text. */
+const appenders = new Map<string, Set<(text: string) => void>>();
+
+/** Appends `text` to the composer of `key`: in place when it is mounted, without taking focus, else to its kept draft. */
+export function appendToComposer(key: string, text: string): void {
+	const mounted = appenders.get(key);
+	if (mounted?.size) for (const append of mounted) append(text);
+	else putDraft(key, withAppended(storedDrafts()[key]?.text ?? "", text));
+}
+
 /**
  * A composer's text, starting from the draft kept under `key`, else from `seed`, and kept there as it changes. Empty
  * text, or text equal to `seed`, keeps nothing, so a sent, scheduled, or emptied message forgets the draft. `null` keeps
@@ -69,5 +85,15 @@ export function useComposerDraft(key: string | null, seed: string): [string, Dis
 	useEffect(() => {
 		if (slot !== null) writeDraft(slot, text === "" || text === start ? null : text);
 	}, [slot, start, text]);
+	useEffect(() => {
+		if (slot === null) return;
+		const append = (added: string): void => setText(current => withAppended(current, added));
+		const mounted = appenders.get(slot) ?? new Set();
+		appenders.set(slot, mounted.add(append));
+		return () => {
+			mounted.delete(append);
+			if (mounted.size === 0) appenders.delete(slot);
+		};
+	}, [slot]);
 	return [text, setText];
 }

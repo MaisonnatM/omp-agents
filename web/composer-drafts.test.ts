@@ -15,7 +15,7 @@ let now = 0;
 Date.now = () => now;
 // React DOM reads these globals as it loads, so it is imported after they are set.
 const { createRoot } = await import("react-dom/client");
-const { clearDraft, liveDraftKey, newDraftKey, putDraft, useComposerDraft } = await import("./composer-drafts.ts");
+const { appendToComposer, clearDraft, liveDraftKey, newDraftKey, putDraft, useComposerDraft } = await import("./composer-drafts.ts");
 
 const DAY = 24 * 60 * 60 * 1000;
 const STORAGE_KEY = "omp-agents.composer-drafts";
@@ -60,6 +60,18 @@ clearDraft(live("fork"));
 results.cleared = await open(live("fork"));
 
 memory.clear();
+const append = (draftKey, text) => act(async () => appendToComposer(draftKey, text));
+await open(live("grab"));
+await append(live("grab"), "[<h1>Get started</h1> in App]");
+await type(composer[0] + "\nmake this bigger");
+await append(live("grab"), "[<button>Count</button> in App]");
+await append(live("other"), "[<p>Edit</p> in App]");
+results.appended = { mounted: composer[0], other: stored()["live/other"].text };
+await open(live("other"));
+await append(live("grab"), "[<a>Docs</a> in App]");
+results.appended.unmounted = stored()["live/grab"].text;
+
+memory.clear();
 putDraft(live("old"), "old");
 now = 2 * DAY;
 putDraft(live("recent"), "recent");
@@ -75,7 +87,7 @@ await act(async () => root.unmount());
 console.log(JSON.stringify(results));
 `;
 
-test("each composer keeps its own draft, forgets one equal to its seed or empty, and drops drafts untouched for 30 days or unreadable", async () => {
+test("each composer keeps its own draft, forgets one equal to its seed or empty, drops drafts untouched for 30 days or unreadable, and takes appended text in place or in its draft", async () => {
 	const child = Bun.spawn([process.execPath, "--eval", scenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
 	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
@@ -90,6 +102,11 @@ test("each composer keeps its own draft, forgets one equal to its seed or empty,
 		seeded: ["Fix the build", { "new/todo/t1": { text: "Fix the build first", at: 0 } }, {}, {}, "Fix the build"],
 		put: "the prompt it branched at",
 		cleared: "",
+		appended: {
+			mounted: "[<h1>Get started</h1> in App]\nmake this bigger\n\n[<button>Count</button> in App]",
+			other: "[<p>Edit</p> in App]",
+			unmounted: "[<h1>Get started</h1> in App]\nmake this bigger\n\n[<button>Count</button> in App]\n\n[<a>Docs</a> in App]",
+		},
 		expiry: { "live/recent": { text: "recent", at: 2 * day }, new: { text: "new", at: 31 * day } },
 		corrupt: "",
 		mistyped: ["", "", "kept"],
