@@ -33,12 +33,16 @@ Then hold each added or changed line against them:
 - **Usage.** A shared component used against its siblings' pattern: a different variant or size for the same role, its styles overridden with classes instead of a variant, or props its other callers never need.
 - **Tokens.** Hard-coded colors, font sizes, spacing, radii, shadows, or z-indices where a token or scale step exists, and arbitrary Tailwind values such as `text-[13px]` or `bg-[#111]`.
 - **Patterns.** Layout, density, icon set and size, empty, loading and error states, and copy tone that differ from sibling screens doing the same job.
+- **New patterns.** For each kind of UI the change adds, such as a list of records, a form, a detail view, navigation between views, a filter, a confirmation, or a status display, search the app for how it already presents that kind and count the places.
+  When the app has one established way and the change brings another, report it: for example, every list in the app is a table and the PR shows its list as cards, or every confirmation is a dialog and the PR confirms inline.
+  Name the new pattern, the established one, how many places use it, and two of their paths.
+  A new pattern is reported even when it looks good, since a second way of doing the same thing is what the review exists to catch.
 
 Report a deviation only when you can cite the existing component, token, or sibling it should match, with its path.
-A deviation the PR description or a decision record justifies is not a finding.
+A deviation the PR description or a decision record justifies is not a finding, except a new pattern, which still goes under **New patterns** as a notice naming that justification.
 Give these findings the same statuses and severity scale as step 1.
 
 ## Report
 
 Give each finding its status: Introduced, Regression, or Pre-existing.
-Return the review in the skill's own output format, with the step 2 findings under their own heading and the design system you found listed above them, ending with the skill's verdict, which step 2's findings count toward.
+Return the review in the skill's own output format, with the design system you found, then the step 2 findings, then a **New patterns** section listing every new pattern or "None", each under its own heading, ending with the skill's verdict, which step 2's findings count toward.
