@@ -6,7 +6,7 @@ omp's sessions run on that same Bun, through `process.execPath`.
 It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, and `src/shared/desktop-bridge.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`, and `desktop/preload.ts` into `desktop/dist/preload.cjs`.
 Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the command palette on its **Create todo** view.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
-`OMP_AGENTS_HEADLESS=1` keeps the window hidden and the app out of the Dock, and a Dock click, a second launch, a notification, or the quick-capture shortcut does not show it; agents' smoke checks drive it over CDP ([Agent smoke checks](../agent-smoke.md#desktop-smoke)).
+`OMP_AGENTS_HEADLESS=1` keeps the window hidden and the app out of the Dock, shows no notification, badge, or sound, and a Dock click, a second launch, or the quick-capture shortcut does not show the window; agents' smoke checks drive it over CDP ([Agent smoke checks](../agent-smoke.md#desktop-smoke)).
 
 - At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /api/hello?nonce=<nonce>` on the port with a fresh random nonce.
   Only an omp-agents server that holds this token can answer with `helloProof`, the HMAC of the token, the port, and the nonce, so the shell sends the token nowhere else.

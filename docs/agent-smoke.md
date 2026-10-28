@@ -157,7 +157,8 @@ Chromium is the `playwright-core` build that `~/Library/Caches/ms-playwright` ho
 
 ## Desktop smoke
 
-The desktop shell opens a real window on the user's screen unless `OMP_AGENTS_HEADLESS=1` keeps it hidden and out of the Dock, so every desktop smoke sets it.
+The desktop shell opens a real window on the user's screen unless `OMP_AGENTS_HEADLESS=1` keeps it hidden, out of the Dock, and without notifications or sounds, so every desktop smoke sets it.
+A check of notifications, the Dock badge, or sounds runs without it, and only once the user agrees to a window opening.
 After `bun run build` in `desktop/`, start a named service on your smoke port with `OMP_AGENTS_HEADLESS=1 PORT=<port> bun launch.ts --remote-debugging-port=<page port> --inspect=<main port>`.
 The hidden window still renders, and `Page.captureScreenshot` captures it.
 Only a check of what the window shows on screen, such as its position or full screen, runs without `OMP_AGENTS_HEADLESS`, and only once the user agrees to a window opening.

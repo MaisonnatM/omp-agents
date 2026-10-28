@@ -75,7 +75,7 @@ const PREVIEW_PRELOAD = join(app.getAppPath(), "dist", "preview-preload.cjs");
 const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
 /** Brings the window up with the command palette open on Create todo, from any app. */
 const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
-/** `OMP_AGENTS_HEADLESS=1` keeps the window hidden and the app out of the Dock, for agents' smoke checks, which drive it over CDP. */
+/** `OMP_AGENTS_HEADLESS=1` keeps the window hidden, the app out of the Dock, and its notifications and sounds silent, for agents' smoke checks, which drive it over CDP. */
 const HEADLESS = process.env.OMP_AGENTS_HEADLESS === "1";
 
 // Each port is its own server, so each gets its own localStorage, window bounds, and single-instance lock.
@@ -464,7 +464,7 @@ if (!app.requestSingleInstanceLock()) {
 		else app.dock?.setIcon(ICON);
 		win = createWindow();
 		void connect(win);
-		showAttention(win, isDashboard, reveal);
+		if (!HEADLESS) showAttention(win, isDashboard, reveal);
 		const quickTodo = (): void => {
 			reveal();
 			void win?.webContents.executeJavaScript(`window.dispatchEvent(new Event(${JSON.stringify(QUICK_TODO_EVENT)}))`).catch(() => {});
