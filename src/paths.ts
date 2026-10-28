@@ -38,6 +38,8 @@ export const userNoteInboxDir = join(configDir, "note-inbox");
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
+/** Where a Bot's `save_routine` and `delete_routine` tools leave their changes to its routines, one JSON file each, so the server stays the only writer of {@link routinesFile}. */
+export const routineInboxDir = join(configDir, "routine-inbox");
 /** The Bots: each one's name, job, workspace, and conversation, beside {@link tokenFile}. */
 export const botsFile = join(configDir, "bots.json");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */

@@ -56,7 +56,7 @@ function harness() {
 		live: sessionId => live(sessions.find(session => session.sessionId === sessionId && !session.ended)),
 		session: instanceId => live(sessions.find(session => session.instanceId === instanceId)),
 		savedFile: sessionId => (saved.has(sessionId) ? join(dir, `${sessionId}.jsonl`) : null),
-		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botsDir: join(dir, "bots") },
+		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botsDir: join(dir, "bots"), routinesFile: join(dir, "routines.json"), routineInboxDir: join(dir, "routine-inbox") },
 		now: () => "2026-05-02T09:00:00.000Z",
 		onChange: () => {},
 	});
@@ -72,7 +72,20 @@ describe("Bots", () => {
 		const { bots, file, sessions, requests, dir } = harness();
 		expect(await bots.message(scout.id, "Remember that I prefer short answers.")).toBe("s1");
 		expect(requests[0]).toMatchObject({ kind: "new", cwd: "/work/webapp", prompt: "Remember that I prefer short answers.", bot: scout.id });
-		expect(sessions[0]?.args).toEqual(["-e", "/ext/bot.ts", "--omp-agents-bot", "scout", "--omp-agents-bots", join(dir, "bots.json"), "--omp-agents-bot-memory", join(dir, "bots", "scout", "memory.md")]);
+		expect(sessions[0]?.args).toEqual([
+			"-e",
+			"/ext/bot.ts",
+			"--omp-agents-bot",
+			"scout",
+			"--omp-agents-bots",
+			join(dir, "bots.json"),
+			"--omp-agents-bot-memory",
+			join(dir, "bots", "scout", "memory.md"),
+			"--omp-agents-routines",
+			join(dir, "routines.json"),
+			"--omp-agents-routine-inbox",
+			join(dir, "routine-inbox"),
+		]);
 		expect(file.value[0]?.sessionId).toBe("s1");
 
 		expect(await bots.message(scout.id, "And now?")).toBe("s1");
