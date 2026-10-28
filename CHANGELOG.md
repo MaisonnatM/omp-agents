@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-28
 
+- Fixed: a todo an agent files under a category you don't have now lands in your list with no category instead of failing.
 - A session running /ship now shows a Ship section in its todos card, with the current stage and a progress bar; unfold it to see every stage as a step.
 - In the Browser, Select element now opens a field on the element you click, so you can type a note at once; sending it adds the note and the element to the composer, and you can go on to the next element.
 - The Browser's Start dev server button now starts your app itself and opens it in the Browser; when it cannot, it asks the session as before.
