@@ -72,10 +72,11 @@ describe("discoverableSessions", () => {
 	});
 
 	test("a temp cwd is not a workspace switch", () => {
-		for (const cwd of ["/tmp", "/tmp/", "/tmp/job", "/private/tmp", "/private/tmp/", "/private/tmp/job"]) {
+		for (const cwd of ["/tmp", "/tmp/", "/tmp/job", "/private/tmp", "/private/tmp/", "/private/tmp/job", "/var/folders/wj/x/T/tmp.a", "/private/var/folders/wj/x/T/tmp.a"]) {
 			expect(workspaceSwitch("~/app", cwd, none)).toBeNull();
 		}
 		expect(workspaceSwitch("~/app", "/tmp-workspace", none)).toBe("/tmp-workspace");
+		expect(workspaceSwitch("~/app", "/var/foldersx", none)).toBe("/var/foldersx");
 		expect(workspaceSwitch("~/app", "~/other", none)).toBe("~/other");
 		expect(workspaceSwitch(null, "~/other", none)).toBeNull();
 		expect(workspaceSwitch("~/app", "~/app", none)).toBeNull();

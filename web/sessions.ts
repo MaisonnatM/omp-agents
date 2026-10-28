@@ -3,9 +3,10 @@ import { newestPastFirst, type PastSession, type RosterHost, type View, type Wor
 import type { Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 
-const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
+// `/var/folders` holds macOS's per-user `$TMPDIR`, where `mktemp -d` puts its directories.
+const HIDDEN_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"];
 
-/** A working directory outside `/tmp` and `/private/tmp`, including their descendants, and not one Settings → Workspaces hid. */
+/** A working directory outside the temp roots in `HIDDEN_ROOTS`, including their descendants, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
 	return !hidden.has(cwd) && !HIDDEN_ROOTS.some(root => cwd === root || cwd.startsWith(`${root}/`));
 }

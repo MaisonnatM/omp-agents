@@ -25,7 +25,7 @@
   While empty, it shows its key, Cmd+F, on its right.
   Cmd+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, Cmd+F does nothing.
   Cmd+K opens the command menu, which searches every workspace instead.
-- Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
+- Sessions in `/tmp`, `/private/tmp`, or macOS's temp folders under `/var/folders` (where `mktemp -d` puts its directories), including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.
   Their saved transcripts remain available through a direct session link.
 - A workspace hidden in **Settings › Workspaces** is left out the same way, but only its own directory: sessions in a directory inside it stay listed.
