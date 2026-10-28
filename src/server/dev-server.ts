@@ -1,13 +1,17 @@
 /**
- * **Start dev server**: the command a project's `package.json` runs its dev server with, on a port picked here.
- * `docs/architecture/session-processes.md` says how the Browser starts it.
+ * **Start dev server**: the command a project's `package.json` runs its dev server with, on a port picked here, and its
+ * start as a service of omp's project broker that the session owns. `docs/architecture/session-processes.md` says how.
  */
-import { isObject } from "../json";
+import { createServer } from "node:net";
+import { join } from "node:path";
+import type { DaemonSpec } from "../omp/modules";
+import type { DevServerStart } from "../shared/processes";
+import { errorText, isObject } from "../json";
 
 type PackageManager = "bun" | "pnpm" | "yarn" | "npm";
 
 /** The lockfile that names each package manager, checked in order; a project with none runs npm. */
-export const LOCKFILES: readonly (readonly [file: string, manager: PackageManager])[] = [
+const LOCKFILES: readonly (readonly [file: string, manager: PackageManager])[] = [
 	["bun.lock", "bun"],
 	["bun.lockb", "bun"],
 	["pnpm-lock.yaml", "pnpm"],
@@ -67,4 +71,68 @@ export function planDevServer(packageJson: string | null, lockfiles: readonly st
 	const portFlag = PORT_FLAG_COMMANDS.some(pattern => pattern.test(last));
 	const command = `${manager} run ${script}${portFlag ? `${ARGS_SEPARATOR[manager]} --port ${port}` : ""}`;
 	return { ok: { script, command, env: { PORT: String(port) }, port, portFlag } };
+}
+
+/** The ports a dev server gets, above the ones dev servers default to and below macOS's ephemeral range. */
+const PORTS = { from: 20_000, to: 39_999 };
+
+/** How long a started dev server has to listen on its port; one that runs but does not listen yet still counts as started. */
+const READY_MS = 30_000;
+
+/** Starts `spec` as a service session `owner` owns in `dir`'s project; `startOwnedService` in `src/omp/daemons.ts`. */
+export type StartOwnedService = (dir: string, owner: string, spec: DaemonSpec) => Promise<{ running: true } | { ended: string }>;
+
+/**
+ * Starts the dev server of the project in `dir` as a service the omp session `sessionId` owns, through `start`, and
+ * answers its port and command, else why it could not, from the plan, the broker, or the output of a server that ended.
+ */
+export async function startDevServer(sessionId: string, dir: string, start: StartOwnedService): Promise<DevServerStart> {
+	try {
+		const [packageJson, lockfiles, port] = await Promise.all([readPackageJson(dir), lockfilesIn(dir), freePort()]);
+		const planned = planDevServer(packageJson, lockfiles, port);
+		if (!("ok" in planned)) return { fallback: planned.reason };
+		const { command, env } = planned.ok;
+		const outcome = await start(dir, sessionId, {
+			name: `dev-${port}`,
+			application: process.env.SHELL ?? "/bin/sh",
+			args: ["-lc", command],
+			env,
+			cwd: dir,
+			pty: true,
+			ready: { port, timeoutMs: READY_MS },
+			restart: "no",
+			persist: false,
+			detached: false,
+		});
+		return "ended" in outcome ? { fallback: `${command} exited: ${outcome.ended}` } : { started: { port, command } };
+	} catch (err) {
+		return { fallback: errorText(err) };
+	}
+}
+
+async function readPackageJson(dir: string): Promise<string | null> {
+	const file = Bun.file(join(dir, "package.json"));
+	return (await file.exists()) ? file.text() : null;
+}
+
+async function lockfilesIn(dir: string): Promise<string[]> {
+	const present = await Promise.all(LOCKFILES.map(async ([file]) => ((await Bun.file(join(dir, file)).exists()) ? [file] : [])));
+	return present.flat();
+}
+
+/** A random port in {@link PORTS} that nothing listens on now on 127.0.0.1, where the broker checks readiness. */
+async function freePort(): Promise<number> {
+	for (let tries = 0; tries < 20; tries++) {
+		const port = PORTS.from + Math.floor(Math.random() * (PORTS.to - PORTS.from + 1));
+		if (await bindable(port)) return port;
+	}
+	throw new Error(`no free port from ${PORTS.from} to ${PORTS.to}`);
+}
+
+function bindable(port: number): Promise<boolean> {
+	const { promise, resolve } = Promise.withResolvers<boolean>();
+	const server = createServer();
+	server.once("error", () => resolve(false));
+	server.listen(port, "127.0.0.1", () => server.close(() => resolve(true)));
+	return promise;
 }

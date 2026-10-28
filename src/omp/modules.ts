@@ -662,6 +662,40 @@ export interface PsTableModule {
 export interface LaunchPathsModule {
 	canonicalProjectDir(dir: string): Promise<string>;
 }
+/**
+ * A daemon to start (pi-tui src/tools/daemon.ts `DaemonSpec`), never restarted, kept, or detached. It is ready once
+ * `ready.port` accepts a connection on 127.0.0.1.
+ */
+export interface DaemonSpec {
+	name: string;
+	application: string;
+	args: string[];
+	env: Record<string, string>;
+	cwd: string;
+	pty: boolean;
+	ready: { port: number; timeoutMs: number };
+	restart: "no";
+	persist: false;
+	detached: false;
+}
+/** A connection to one project's daemon broker (src/launch/client.ts `DaemonBrokerClient`), with the operations the dashboard sends. */
+export interface DaemonBrokerClient {
+	request(operation: { op: "start"; spec: DaemonSpec; owner: string; replace: true; awaitReady: true }): Promise<{ op: "start"; daemon: DaemonSnapshot; readyTimedOut: boolean }>;
+	request(operation: {
+		op: "logs";
+		name: string;
+		lines: number;
+		head: false;
+		follow: false;
+		renderTerminalRows: true;
+		timeoutMs: number;
+	}): Promise<{ op: "logs"; text: string; terminalRows?: string[] }>;
+	close(): void;
+}
+/** The daemon broker's client (src/launch/client.ts): a connection to the broker of the project `projectDir` is in, which it starts when none runs. */
+export interface LaunchClientModule {
+	createDaemonBrokerClient(projectDir: string): Promise<DaemonBrokerClient>;
+}
 
 type Kind = "function" | "number" | "object" | "string";
 
@@ -906,3 +940,4 @@ export const worktreeCli = await load<WorktreeCliModule>(join(srcDir, "cli", "wo
 export const psData = await load<PsDataModule>(join(srcDir, "cli", "ps-data.ts"), { collectReports: "function", scopeClient: "function" });
 export const psTable = await load<PsTableModule>(join(dirname(packageDir), "pi-tui", "src", "apps", "ps-data.ts"), { TERMINAL_STATES: "object" });
 export const launchPaths = await load<LaunchPathsModule>(join(srcDir, "launch", "paths.ts"), { canonicalProjectDir: "function" });
+export const launchClient = await load<LaunchClientModule>(join(srcDir, "launch", "client.ts"), { createDaemonBrokerClient: "function" });
