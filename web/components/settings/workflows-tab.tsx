@@ -27,7 +27,7 @@ export function Workflows({ workflows, editing }: { workflows: Workflow[]; editi
 	}
 	return (
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
-			<nav aria-label="Workflows">
+			<nav aria-label="omp workflows">
 				<ul>
 					{workflows.map(workflow => (
 						<li key={workflow.skill.path}>
