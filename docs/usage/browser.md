@@ -29,7 +29,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - **Maximize Browser**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, the same button, or Escape, pressed in the app too, puts it back in the sidebar.
 - **Select element**, the pointer button, turns on react-grab's picking in the app, and a click on an element opens a field on it with the cursor in it, so you type what to change right away.
   Its send arrow, or Enter, adds what you typed and the element to the session's composer: its HTML, the React component around it with its file, and a selector.
-  Each press picks one element; press it again to stop picking.
+  Picking stays on after each send, so you can comment on one element after another; press **Select element** again, or Escape, to stop.
   React-grab's **Comment** adds the element with a note you type first; the composer gets the note and then the element.
   Each pick goes after what the composer already holds, and a message confirms it; nothing is sent until you send it.
 - The Browser keeps its own cookies and storage across launches, apart from the dashboard's, so an app you signed in to stays signed in.

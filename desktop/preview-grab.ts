@@ -19,7 +19,11 @@ api.registerPlugin({
 	// and leaves picking on. The dashboard confirms each pick itself, so the Preview goes without these labels.
 	theme: { grabbedBoxes: { enabled: false } },
 	hooks: {
-		// The one hook whose content holds the Comment's text; it fires once the clipboard took the copy.
-		onCopySuccess: (_elements, content) => window.postMessage({ [PREVIEW_GRAB_CHANNEL]: content }, "*"),
+		// The one hook whose content holds the Comment's text; it fires once the clipboard took the copy. React-grab ends
+		// picking after each send, so it starts again for the next element until Select element or Escape stops it.
+		onCopySuccess: (_elements, content) => {
+			window.postMessage({ [PREVIEW_GRAB_CHANNEL]: content }, "*");
+			setTimeout(() => api.comment(), 0);
+		},
 	},
 });
