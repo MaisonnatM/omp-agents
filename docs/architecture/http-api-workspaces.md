@@ -1,7 +1,9 @@
 # HTTP API: source control, sync, worktrees, and workspaces
 
-`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
+`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout with `pathDisplay` naming it with `~`, with its own choice and its last pull since the server started.
+A repository whose main checkout is in a temp directory, as `inTempDir` in `src/shared/workspaces.ts` reads it, is left out of the answer and of the pulls.
 `gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.
+`PUT /api/source-control/graphite-sign-in` takes `{ token }`, checked by `parseGraphiteToken`, runs `gt auth --no-interactive --token` with it as an argument, never through a shell, and answers the same as the `GET`; an error it answers has the token replaced, and activity records the path alone.
 `PUT /api/source-control` takes a `SourceControlChange`, `{ op: "default", on }`, `{ op: "repo", repo, on }` with `on: null` dropping a repository's own choice, or `{ op: "clean-up", on }`, checked by `parseSourceControlChange` in `src/server/wire.ts`, and answers the same as the `GET`.
 A change that changes the settings saves `source-control.json` beside the access token and, for a change of the pulls on the server that holds the owner lock, pulls at once; a file from before `cleanUp` reads with it on.
 A pull, from that change or from the pull loop every five minutes, waits for the one under way, then runs `pullDefaultBranch` on each repository whose pulls are on.
@@ -10,6 +12,10 @@ It reads the default branch from `origin/HEAD`, fetches it, and moves the local 
 `GET /api/sync` answers a `SyncAnswer` from `src/shared/settings-sync.ts`: the `SyncSettings`, `{ remote, branch, excluded }`, and the last `SyncOutcome` or `null`.
 `PUT /api/sync` takes `SyncSettings`, checked by `parseSyncSettings`, which refuses an address that starts with `-`, holds whitespace, or carries a password, a branch name Git would refuse, and an unknown item, and answers the same as the `GET`.
 `PUT /api/sync/run` takes `{ choices }`, each conflicting path mapped to `local` or `remote`, checked by `parseSyncRun` in `src/server/wire.ts`, runs one sync, and answers the same as the `GET`, with a conflict or a failure as the last outcome rather than an error status.
+A failure keeps Git's `Repository not found` or `does not appear to be a git repository` line over the advice after it, so the Sync tab can offer to create a missing GitHub repository.
+`PUT /api/sync/create-repo` takes `{ name }`, a GitHub repository name or `owner/name`, checked by `parseSyncRepoName`.
+It refuses when `gh` is missing or signed out, takes the repository when it exists, belongs to the signed-in account, and is private, refuses one that is public or another account's, and otherwise runs `gh repo create --private`.
+It saves the repository's clone URL as the remote, SSH when `gh config get git_protocol` says `ssh` and HTTPS otherwise, drops the last outcome, and answers the same as the `GET`.
 
 `GET /api/worktrees` lists the worktrees of every repository a session ran in, or of `?cwd=` when that directory is in a repository.
 Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, why removal is refused, and `merged`: `{ by: "pull-request", number }`, `{ by: "default-branch", branch }`, or `null`.

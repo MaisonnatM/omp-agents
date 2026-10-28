@@ -57,8 +57,8 @@ import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
-	MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
-	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
+	MAX_QUEUED_STACK, parseBranchRelease, parseCalendarShown, parseEventRef, parseGoogleClient, parseGoogleLinks, parseGraphiteToken, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
+	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRepoName, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
 } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
@@ -70,6 +70,7 @@ import type { ServedBuild } from "../served-build";
 import { UpdateRefused } from "./self-update";
 import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } from "../shared/settings-sync";
 import { DAY_MS } from "../shared/days";
+import { signInGraphite } from "../source-control";
 import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -130,6 +131,8 @@ export interface SyncRoutesEnv {
 	answer(): SyncAnswer;
 	configure(settings: SyncSettings): SyncAnswer;
 	sync(choices: Record<string, SyncSide>): Promise<SyncAnswer>;
+	/** Points sync at a private GitHub repository, `name` or `owner/name`, created through `gh` when it does not exist. */
+	createRemote(name: string): Promise<SyncAnswer>;
 }
 
 /** Everything the HTTP API reads, by concern. */
@@ -354,6 +357,15 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		},
 	);
 
+	/** `PUT /api/source-control/graphite-sign-in` `{ token }`: signs `gt` in with the token, then answers the same as the `GET`. */
+	const graphiteSignIn = write(
+		body => checked(parseGraphiteToken(body), "Expected { token } holding a Graphite token"),
+		async token => {
+			await signInGraphite(token);
+			return env.sourceControl();
+		},
+	);
+
 	/** The place of the session `?session=` names, or the response refusing it. */
 	function sessionPlace(params: URLSearchParams): SessionPlace | Response {
 		const sessionId = params.get("session") ?? "";
@@ -398,6 +410,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/pull-requests": { GET: pullRequests },
 		"/api/workspaces": { PUT: workspaceChange },
 		"/api/source-control": { GET: sourceControl, PUT: sourceControlChange },
+		"/api/source-control/graphite-sign-in": { PUT: graphiteSignIn },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
 		"/api/conversations": { GET: conversations },
@@ -958,6 +971,8 @@ function syncRoutes({ get, write }: RouteKit, env: SyncRoutesEnv): Routes {
 			PUT: write(body => checked(parseSyncSettings(body)), async settings => env.configure(settings)),
 		},
 		"/api/sync/run": { PUT: write(body => checked(parseSyncRun(body), "Expected { choices }"), choices => env.sync(choices)) },
+		/** `{ name }`: creates the private GitHub repository, or takes the signed-in account's own, and saves it as the remote. */
+		"/api/sync/create-repo": { PUT: write(body => checked(parseSyncRepoName(body), "Expected { name } naming a GitHub repository as name or owner/name"), name => env.createRemote(name)) },
 	};
 }
 

@@ -9,6 +9,12 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The command menu (Cmd+K) now finds Settings sections: type a section's name or what it holds, such as "theme" or "graphite", and press Enter to open it.
 - Providers, Integrations, MCP servers, Workspaces, and Worktrees in Settings no longer repeat their name under the page header.
 - Settings › Sync now counts the files the last sync received and sent instead of listing them all; click a count to see the files.
+- Settings › Sync can now create a private GitHub repository for you and use it as the remote, also right after a sync fails because the remote does not exist.
+- Settings › Source control can now sign Graphite in with a token pasted in the page, shows repository paths from your home folder, and no longer lists repositories in temporary folders.
+- In the desktop app, Settings › Workspaces has Choose folder…, which opens the system's folder picker and adds the folder you pick.
+- Settings › Files has a field above the list that narrows it to the files whose name you type.
+- Settings › MCP servers no longer repeats Linear, Slack, Gmail, and Google Calendar as rows; one line names them and links to Integrations.
+- The gear button and G then , now reopen the Settings section you last had open.
 - In the Browser, Select element now opens a field on the element you click, so you can type a note at once; sending it adds the note and the element to the composer, and you can go on to the next element.
 - The Browser's Start dev server button now starts your app itself and opens it in the Browser; when it cannot, it asks the session as before.
 - Fixed: plan usage failed because the app started on a Bun older than omp allows. It now starts on Bun 1.4.4.

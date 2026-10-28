@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { McpServerRow } from "../../../src/shared/mcp-servers";
 import type { SignInControls } from "../../use-sign-in";
 import { ConnectionCallout, type ConnectionCalloutProps } from "./mcp-connection-controls";
-import { McpServerItem } from "./mcp-server-row";
+import { McpServerItem, type OwnServer, ownServers } from "./mcp-server-row";
 
 const idle: SignInControls = { starting: false, waitingUrl: null, failure: null, connect: async () => {} };
 const failing = { message: "Server unreachable", checking: false, check: () => {} };
@@ -47,7 +47,7 @@ describe("ConnectionCallout", () => {
 	});
 });
 
-const notion = (status: McpServerRow["status"], signedIn: boolean): McpServerRow => ({
+const notion = (status: OwnServer["status"], signedIn: boolean): OwnServer => ({
 	name: "notion",
 	transport: "http",
 	url: "https://mcp.notion.com/mcp",
@@ -78,5 +78,15 @@ describe("McpServerItem", () => {
 		const html = renderToStaticMarkup(<McpServerItem server={notion({ kind: "ready", tools: [{ name: "search", description: null }] }, true)} />);
 		expect(html).toContain("Connected");
 		expect(html).toMatch(/>1<\/span> tools/);
+	});
+});
+
+describe("ownServers", () => {
+	test("keeps the servers that are not integrations and names each integration once, in Settings › Integrations' order", () => {
+		const local = notion({ kind: "local" }, false);
+		const integration = (name: string, id: "gmail" | "linear" | "slack"): McpServerRow => ({ ...local, name, status: { kind: "integration", id } });
+		const { own, integrations } = ownServers([integration("gmail-work", "gmail"), local, integration("slack", "slack"), integration("gmail-home", "gmail"), integration("linear", "linear")]);
+		expect(own.map(server => server.name)).toEqual(["notion"]);
+		expect(integrations).toEqual(["linear", "slack", "gmail"]);
 	});
 });

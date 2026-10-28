@@ -8,9 +8,10 @@ import { join } from "node:path";
 import { canonical, git, worktreesOf } from "./git";
 import { JsonFile } from "./fs";
 import { errorText, isObject } from "./json";
-import { HOME } from "./paths";
+import { displayPath, HOME } from "./paths";
 import { run, runChecked } from "./proc";
 import { applySourceControl, DEFAULT_SOURCE_CONTROL, type ProviderStatus, type PullOutcome, type PullRepo, type SourceControlAnswer, type SourceControlChange, type SourceControlSettings } from "./shared/source-control";
+import { inTempDir } from "./shared/workspaces";
 import { SerialLane } from "./serial-lane";
 
 const FETCH_TIMEOUT_MS = 60_000;
@@ -53,13 +54,13 @@ export async function pullDefaultBranch(dir: string): Promise<PullOutcome> {
 	return { kind: "pulled", commits: Number((await git(dir, "rev-list", "--count", `${local}..${remote}`)).trim()) };
 }
 
-/** The main checkout of each repository among `cwds`, each once, in the order its first workspace comes. */
+/** The main checkout of each repository among `cwds`, each once, in the order its first workspace comes; none in a temp directory. */
 export async function repositoriesOf(cwds: readonly string[]): Promise<string[]> {
 	const mains = await Promise.all(cwds.map(cwd => worktreesOf(cwd).then(rows => (rows[0] && !rows[0].bare ? canonical(rows[0].path) : null), () => null)));
-	return [...new Set(mains.filter(main => main !== null))];
+	return [...new Set(mains.filter(main => main !== null).filter(main => !inTempDir(main)))];
 }
 
-async function githubStatus(): Promise<ProviderStatus> {
+export async function githubStatus(): Promise<ProviderStatus> {
 	if (!Bun.which("gh")) return { provider: "github", state: "missing", account: null };
 	const { stdout, code } = await run(["gh", "api", "user", "--jq", ".login"]);
 	return code === 0 && stdout.trim() ? { provider: "github", state: "signed-in", account: stdout.trim() } : { provider: "github", state: "signed-out", account: null };
@@ -74,6 +75,14 @@ async function graphiteStatus(): Promise<ProviderStatus> {
 	);
 	const signedIn = isObject(config) && typeof config.authToken === "string" && config.authToken !== "";
 	return { provider: "graphite", state: signedIn ? "signed-in" : "signed-out", account: null };
+}
+
+/** Signs `gt` in with `token`, as `gt auth --token` does; an error never holds the token. */
+export async function signInGraphite(token: string): Promise<void> {
+	if (!Bun.which("gt")) throw new Error("gt is not installed");
+	await runChecked(["gt", "auth", "--no-interactive", "--token", token], { timeoutMs: FETCH_TIMEOUT_MS }).catch((err: unknown) => {
+		throw new Error(errorText(err).replaceAll(token, "<token>"));
+	});
 }
 
 /** A file from before the cleanup setting reads with it on. */
@@ -138,7 +147,7 @@ export class SourceControl {
 			providers,
 			autoPull: { on: this.#settings.on, repos: this.#settings.repos },
 			cleanUp: this.#settings.cleanUp,
-			repos: repos.map(path => ({ path, on: this.#settings.repos[path] ?? null, last: this.#last.get(path) ?? null })),
+			repos: repos.map(path => ({ path, pathDisplay: displayPath(path), on: this.#settings.repos[path] ?? null, last: this.#last.get(path) ?? null })),
 		};
 	}
 }

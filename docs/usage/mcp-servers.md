@@ -7,7 +7,7 @@
   A remote server shows whether omp can use it, by listing its tools with omp's sign-in: **Connected** with the number of tools, which unfolds to their names, each with its description on hover, **Signed out** with **Connect** when it asks for a sign-in omp lacks, **Needs reconnecting** when it refuses omp's sign-in, or **Unreachable** with its error and **Check again**.
   A local server, which runs a command, says **Not checked**, as only an omp session starts it.
   A server whose config lives in another tool's file says **From** that tool, and the section does not change it.
-  Linear, Slack, Google Calendar, and Gmail show the status that [Integrations](integrations.md) reads, and **Open** goes there to sign in or out.
+  Linear, Slack, Google Calendar, and Gmail are not listed as rows: one line under the list names the ones omp loads, and **Open Integrations** goes to [Integrations](integrations.md) to sign in or out.
 - **Connect** and **Reconnect** sign in the way omp's `/mcp reauth` does, in your default browser, and the row waits for you there as an integration's does.
   The **⋯** menu holds **Reconnect** and **Sign out** for a server omp holds a sign-in for, and **Disable** and **Remove** for a server in omp's own file.
   **Disable** keeps the server in `mcp.json` but stops new omp sessions loading it, as `/mcp disable` does, and **Enable** turns it back on.

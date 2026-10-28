@@ -29,6 +29,7 @@ import {
 	type Page,
 	type Route,
 	routeFromHash,
+	settingsSection,
 	swapView,
 	viewForSession,
 } from "./routing";
@@ -99,6 +100,10 @@ describe("layout hash", () => {
 		expect(routeFromHash("#settings")).toEqual({ kind: "page", page: { kind: "settings", section: "analytics" } });
 		expect(routeFromHash("#settings/%2Fw")).toEqual({ kind: "page", page: { kind: "settings", section: "analytics" } });
 		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
+	});
+
+	test("a remembered settings section reopens while it still names one, else Analytics", () => {
+		expect([settingsSection("files"), settingsSection(null), settingsSection("gone")]).toEqual(["files", "analytics", "analytics"]);
 	});
 
 	test("the new-session draft is not read as a layout, and its directory keeps its slashes and tilde", () => {

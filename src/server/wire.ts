@@ -576,6 +576,20 @@ export function parseSyncRun(body: unknown): Parsed<Record<string, SyncSide>> {
 	return choices.length <= 10_000 && choices.every(([, side]) => isSyncSide(side)) ? { ok: Object.fromEntries(choices) as Record<string, SyncSide> } : null;
 }
 
+/** The body of `PUT /api/sync/create-repo`: `{ name }`, a GitHub repository's `name` or `owner/name`. */
+export function parseSyncRepoName(body: unknown): Parsed<string> {
+	if (!isObject(body) || typeof body.name !== "string") return null;
+	const parts = body.name.trim().split("/");
+	return parts.length <= 2 && parts.every(part => GITHUB_NAME.test(part)) ? { ok: parts.join("/") } : null;
+}
+
+/** The body of `PUT /api/source-control/graphite-sign-in`: `{ token }`, one word that cannot read as an option. */
+export function parseGraphiteToken(body: unknown): Parsed<string> {
+	if (!isObject(body) || typeof body.token !== "string") return null;
+	const token = body.token.trim();
+	return /^[^\s-]\S{0,1023}$/.test(token) ? { ok: token } : null;
+}
+
 /** The body of `PUT /api/session-processes/stop`: a live session's instance id and the id of one of its processes. */
 export function parseProcessStop(body: unknown): Parsed<ProcessStop> {
 	return isObject(body) && isNonEmpty(body.instanceId) && isNonEmpty(body.id) ? { ok: { instanceId: body.instanceId, id: body.id } } : null;

@@ -24,6 +24,8 @@ export const PREVIEW_PICKING_CHANNEL = "omp-agents:preview-picking";
 export const PREVIEW_PARTITION = "persist:omp-preview";
 /** The page's report of a Browser's {@link BrowserPorts}, for the shell's {@link appAddress}. */
 export const BROWSER_PORTS_CHANNEL = "omp-agents:browser-ports";
+/** The page's `invoke` that opens the system's folder dialog over the window, answered with the folder picked or `null`. */
+export const PICK_DIRECTORY_CHANNEL = "omp-agents:pick-directory";
 
 /** The ports a Browser's session runs servers on, and the ones other servers on this computer listen on. */
 export interface BrowserPorts {
@@ -101,6 +103,8 @@ export interface DesktopBridge {
 	signIn?(): void;
 	/** Tells the shell the {@link BrowserPorts} of the Browser's guest `guestId`, for {@link appAddress}; absent in an app built before it. */
 	browserPorts?(guestId: number, ports: BrowserPorts): void;
+	/** Opens the system's folder dialog over the window, and answers the folder picked, or `null` when it was cancelled; absent in an app built before it. */
+	pickDirectory?(): Promise<string | null>;
 	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
 	titleBar?: boolean;
 	/** The window's page can embed a session's app in a `<webview>` for its Preview; absent in an app built before it. */

@@ -1,14 +1,11 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
 import { newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
-import type { Workspace } from "../src/shared/workspaces";
+import { inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 
-// `/var/folders` holds macOS's per-user `$TMPDIR`, where `mktemp -d` puts its directories.
-const HIDDEN_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"];
-
-/** A working directory outside the temp roots in `HIDDEN_ROOTS`, including their descendants, and not one Settings → Workspaces hid. */
+/** A working directory outside the temp directories, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
-	return !hidden.has(cwd) && !HIDDEN_ROOTS.some(root => cwd === root || cwd.startsWith(`${root}/`));
+	return !hidden.has(cwd) && !inTempDir(cwd);
 }
 
 /** The running sessions that work on `item`: their tool calls named it, or a quick action on it started them. */

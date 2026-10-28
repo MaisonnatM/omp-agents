@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { run, runChecked, type RunOptions } from "./proc";
+import { MISSING_REPOSITORY } from "./shared/settings-sync";
 
 /** A text file as the repository holds it. */
 export interface RepoFile {
@@ -23,7 +24,11 @@ const quiet = (): Record<string, string> => ({
 	...(process.env.GIT_SSH_COMMAND || process.env.GIT_SSH ? {} : { GIT_SSH_COMMAND: "ssh -o BatchMode=yes" }),
 });
 
-const failure = (stderr: string, what: string): Error => new Error(stderr.split("\n").findLast(line => line.trim())?.trim() || `${what} failed`);
+/** Git's line saying the remote repository is missing, which comes before its advice, else its last line. */
+function failure(stderr: string, what: string): Error {
+	const lines = stderr.split("\n").map(line => line.trim()).filter(Boolean);
+	return new Error(lines.find(line => MISSING_REPOSITORY.test(line)) ?? lines.at(-1) ?? `${what} failed`);
+}
 
 /**
  * Paths sync carries: none that git's fast-import would need quoted, and none with an empty, `.`, or `..` segment,

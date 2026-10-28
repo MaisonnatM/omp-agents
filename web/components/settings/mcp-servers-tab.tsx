@@ -1,27 +1,32 @@
 import { Plus, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
-import type { McpServerRow, McpServersAnswer } from "../../../src/shared/mcp-servers";
+import { useState } from "react";
+import { MCP_SERVICES } from "../../../src/shared/accounts";
+import type { McpServersAnswer } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
 import { readTime } from "../../labels";
-import { integrationsStore, mcpServersStore } from "../../reads";
+import { mcpServersStore } from "../../reads";
+import { hashForSettings } from "../../routing";
 import { IntegrationList } from "../integrations/integration-row";
 import { McpCatalog } from "../integrations/mcp-catalog";
 import { McpServerForm } from "../integrations/mcp-server-form";
-import { McpServerItem } from "../integrations/mcp-server-row";
+import { McpServerItem, type OwnServer, ownServers } from "../integrations/mcp-server-row";
 import { LoadNote } from "../sheet-details";
 import { Section } from "./editor";
 
-/** Servers you can change first, then the integrations, then the rest, each by name. */
-const RANK: Record<McpServerRow["status"]["kind"], number> = { ready: 0, refused: 0, failing: 0, "signed-out": 0, local: 1, integration: 2, disabled: 3 };
+/** Servers you can change first, then the rest, each by name. */
+const RANK: Record<OwnServer["status"]["kind"], number> = { ready: 0, refused: 0, failing: 0, "signed-out": 0, local: 1, disabled: 2 };
+
+const AND = new Intl.ListFormat("en", { type: "conjunction" });
 
 function Servers({ answer: { servers, configPath } }: { answer: McpServersAnswer }) {
-	const sorted = servers.toSorted((a, b) => RANK[a.status.kind] - RANK[b.status.kind] || a.name.localeCompare(b.name));
+	const { own, integrations } = ownServers(servers);
+	const sorted = own.toSorted((a, b) => RANK[a.status.kind] - RANK[b.status.kind] || a.name.localeCompare(b.name));
 	return (
 		<div className="space-y-8">
 			<section className="space-y-2.5">
 				<h4 className="flex items-baseline gap-2 px-1 text-[13px] font-medium">
 					Installed
-					<span className="text-muted-foreground tabular-nums">{servers.length}</span>
+					<span className="text-muted-foreground tabular-nums">{sorted.length}</span>
 				</h4>
 				{sorted.length > 0 ? (
 					<IntegrationList label="Installed">
@@ -30,7 +35,15 @@ function Servers({ answer: { servers, configPath } }: { answer: McpServersAnswer
 						))}
 					</IntegrationList>
 				) : (
-					<p className="px-1 text-xs text-muted-foreground">omp loads no MCP server yet. Add one below.</p>
+					<p className="px-1 text-xs text-muted-foreground">{integrations.length > 0 ? "omp loads no other MCP server yet. Add one below." : "omp loads no MCP server yet. Add one below."}</p>
+				)}
+				{integrations.length > 0 && (
+					<p className="px-1 text-xs text-muted-foreground">
+						{AND.format(integrations.map(id => MCP_SERVICES[id].label))} {integrations.length === 1 ? "comes" : "come"} from Integrations.{" "}
+						<a href={hashForSettings("integrations")} className="text-foreground underline-offset-2 hover:underline">
+							Open Integrations
+						</a>
+					</p>
 				)}
 			</section>
 			<McpCatalog servers={servers} />
@@ -47,9 +60,6 @@ export function McpServersTab({ active }: { active: boolean }) {
 	const { read, error, refreshing } = mcpServersStore.usePolling(null, active);
 	const [adding, setAdding] = useState(false);
 	const meta = "The MCP servers omp loads in every session";
-	useEffect(() => {
-		if (active) integrationsStore.ensure();
-	}, [active]);
 	return (
 		<Section
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}

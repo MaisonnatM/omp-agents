@@ -48,7 +48,7 @@ import { useFocusedSession } from "./use-focused-session";
 import { useOverlays } from "./use-overlays";
 import { usePageShortcuts } from "./use-page-shortcuts";
 import { useSessionLists } from "./use-session-lists";
-import { settingsRoute, useSidebarTab } from "./use-sidebar-tab";
+import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
@@ -79,7 +79,7 @@ export function App() {
 	const { signedOut: signedOutTabs, shown: tabs } = useSidebarTabs();
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
-	const settings = useMemo(() => settingsRoute(page), [page]);
+	const settings = useSettingsRoute(page);
 	const latestBot = useMemo(() => (state.bots === null ? null : (botRows(state.bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [state.bots, state.hosts, state.botLasts]);
 	const { tab, showTab, group, showGroup } = useSidebarTab({ page, signedOutTabs, shown: tabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	const emptyGroups = useMemo((): ReadonlySet<TabGroup> => new Set(TAB_GROUPS.flatMap(({ value }) => (groupTabs(tabs, value).length === 0 ? [value] : []))), [tabs]);

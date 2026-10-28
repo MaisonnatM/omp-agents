@@ -1,4 +1,4 @@
-import { Eye, EyeOff, FolderPlus } from "lucide-react";
+import { Eye, EyeOff, FolderOpen, FolderPlus } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Workspace, WorkspaceChange, WorkspaceList } from "../../../src/shared/workspaces";
@@ -7,6 +7,9 @@ import { putJson } from "../../api";
 import { folderName } from "../../labels";
 import { IntegrationList } from "../integrations/integration-row";
 import { Section } from "./editor";
+
+/** The desktop app's bridge, whose folder dialog picks a workspace; absent in a browser, which keeps the typed path alone. */
+const desktop = typeof window === "undefined" ? undefined : window.ompDesktop;
 
 function WorkspaceRow({ workspace, note, action }: { workspace: Workspace; note: string | null; action: ReactNode }) {
 	return (
@@ -29,7 +32,7 @@ interface WorkspacesTabProps {
 	list: WorkspaceList<Workspace>;
 }
 
-/** The directories the pickers and the sidebar offer, a field to add one by path, and the hidden ones, each a click from coming back. */
+/** The directories the pickers and the sidebar offer, a field to add one by path or, in the desktop app, from the folder dialog, and the hidden ones, each a click from coming back. */
 export function WorkspacesTab({ workspaces, list: { added, hidden } }: WorkspacesTabProps) {
 	const addedCwds = new Set(added.map(entry => entry.cwd));
 	const [path, setPath] = useState("");
@@ -53,6 +56,10 @@ export function WorkspacesTab({ workspaces, list: { added, hidden } }: Workspace
 		event.preventDefault();
 		if (await change({ op: "add", cwd: path })) setPath("");
 	};
+	const choose = async (): Promise<void> => {
+		const cwd = await desktop?.pickDirectory?.();
+		if (cwd) await change({ op: "add", cwd });
+	};
 	return (
 		<>
 			<Section meta="The directories the directory pickers and the sidebar's workspace picker offer. Hiding one also hides its sessions from the sidebar and search; a link to one still opens it.">
@@ -69,6 +76,11 @@ export function WorkspacesTab({ workspaces, list: { added, hidden } }: Workspace
 					<Button type="submit" variant="secondary" size="compact" leadingIcon={FolderPlus} loading={pending?.op === "add"} disabled={pending !== null || path.trim() === ""}>
 						Add workspace
 					</Button>
+					{desktop?.pickDirectory && (
+						<Button type="button" variant="ghost" size="compact" leadingIcon={FolderOpen} disabled={pending !== null} onClick={() => void choose()}>
+							Choose folder…
+						</Button>
+					)}
 				</form>
 				{error && (
 					<p role="alert" className="text-xs text-red-600 dark:text-red-400">

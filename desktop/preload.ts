@@ -1,10 +1,10 @@
 /**
  * The window's preload: signs the dashboard's page in before its scripts run, then hands it `window.ompDesktop`, which
- * reports the sessions that need you to `attention.ts` and asks for a sign-in.
+ * reports the sessions that need you to `attention.ts`, asks for a sign-in, and opens the system's folder dialog.
  */
 import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
 import { isString, recordOf } from "../src/json";
-import { ACCESS_CHANNEL, ALERT_CHANNEL, BADGE_CHANNEL, BROWSER_PORTS_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, SIGN_IN_CHANNEL, SOUND_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, ALERT_CHANNEL, BADGE_CHANNEL, BROWSER_PORTS_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, PICK_DIRECTORY_CHANNEL, SIGN_IN_CHANNEL, SOUND_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 
 // Main answers only the dashboard's own page, so any other page, such as the shell's own notice, gets nothing.
 const access: unknown = ipcRenderer.sendSync(ACCESS_CHANNEL);
@@ -23,6 +23,10 @@ const bridge: DesktopBridge = {
 	},
 	signIn: () => ipcRenderer.send(SIGN_IN_CHANNEL),
 	browserPorts: (guestId, ports) => ipcRenderer.send(BROWSER_PORTS_CHANNEL, guestId, ports),
+	pickDirectory: async () => {
+		const picked: unknown = await ipcRenderer.invoke(PICK_DIRECTORY_CHANNEL);
+		return typeof picked === "string" ? picked : null;
+	},
 	titleBar: process.platform === "darwin",
 	preview: true,
 };

@@ -62,6 +62,8 @@ export type PullOutcome =
 export interface PullRepo {
 	/** Its main checkout. */
 	path: string;
+	/** {@link path} with the home directory as `~`. */
+	pathDisplay: string;
 	/** `null` when it follows the default. */
 	on: boolean | null;
 	last: { at: number; outcome: PullOutcome } | null;

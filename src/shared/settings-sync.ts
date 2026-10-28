@@ -130,6 +130,17 @@ export function parseSyncSettings(value: unknown): Parsed<SyncSettings, { error:
 	return { ok: { remote, branch, excluded: SYNC_ITEM_IDS.filter(id => (value.excluded as unknown[]).includes(id)) } };
 }
 
+/** The repository **Create private repository on GitHub** offers, under the signed-in account. */
+export const DEFAULT_SYNC_REPO = "omp-settings";
+
+/** Git's words for a remote repository that does not exist, or that this machine may not see. */
+export const MISSING_REPOSITORY = /Repository not found|does not appear to be a git repository/i;
+
+const GITHUB_REMOTE = /^(?:git@github\.com:|ssh:\/\/git@github\.com\/|https:\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/;
+
+/** The `owner/name` of the GitHub repository `remote` names, when `error`, a failed sync's, says it does not exist; `null` otherwise. */
+export const missingGithubRepo = (remote: string, error: string): string | null => (MISSING_REPOSITORY.test(error) ? (GITHUB_REMOTE.exec(remote)?.[1] ?? null) : null);
+
 const isSkip: Guard<SyncSkip> = fields<SyncSkip>({ path: isString, reason: oneOf(["link", "binary", "large", "credential"] as const) });
 const isConflict: Guard<SyncConflict> = fields<SyncConflict>({ path: isString, item: isSyncItemId, local: nullable(isString), remote: nullable(isString) });
 

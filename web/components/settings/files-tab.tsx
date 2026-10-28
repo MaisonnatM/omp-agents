@@ -1,11 +1,12 @@
 /** The Settings Files section: omp's config files by group, each viewed and edited in place (`Files`). */
+import { Search } from "lucide-react";
 import { useState } from "react";
 import type { FileEdit, OmpFile, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
-import { FILE_KIND_LABELS, fileGroups, formatBytes } from "../../labels";
+import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../labels";
 import { EditBar, type Editing, SaveError, useEditor } from "./editor";
 
 /** One omp file, viewed or edited in place; also the right pane of Settings › Workflows. */
@@ -87,22 +88,39 @@ export function FileView({ file, editing }: { file: OmpFile; editing: Editing })
 	);
 }
 
+/** omp's files by group, a filter that narrows them by name, and the one picked, the first by default, viewed in place. */
 export function Files({ files, editing }: { files: OmpFile[]; editing: Editing }) {
-	const groups = fileGroups(files);
+	const [query, setQuery] = useState("");
 	const [selected, setSelected] = useState<string | null>(null);
-	const open = files.find(file => file.path === selected) ?? groups[0]?.[1][0];
+	const open = files.find(file => file.path === selected) ?? fileGroups(files, "")[0]?.[1][0];
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
+	const groups = fileGroups(files, query);
 	return (
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
 			<nav aria-label="omp files" className="space-y-4">
+				<label className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-muted-foreground focus-within:ring-2 focus-within:ring-ring [&>svg]:size-3.5">
+					<Search aria-hidden />
+					<input
+						type="search"
+						aria-label="Filter omp files"
+						placeholder="Filter"
+						value={query}
+						onChange={event => setQuery(event.target.value)}
+						onKeyDown={event => {
+							if (event.key !== "Escape") return;
+							setQuery("");
+							event.currentTarget.blur();
+						}}
+						className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+					/>
+				</label>
+				{groups.length === 0 && <p className="px-2 text-sm text-muted-foreground">No file matches.</p>}
 				{groups.map(([kind, group]) => (
 					<div key={kind} className="space-y-1">
 						<h4 className="px-2 text-xs font-medium text-muted-foreground">{FILE_KIND_LABELS[kind]}</h4>
 						<ul>
 							{group.map(file => {
-								const parts = file.path.split("/");
-								// A skill's file is always SKILL.md; its directory names it.
-								const name = parts.at(-1) === "SKILL.md" ? parts.at(-2) : parts.at(-1);
+								const name = fileName(file);
 								return (
 									<li key={file.path}>
 										<Tooltip content={file.pathDisplay}>

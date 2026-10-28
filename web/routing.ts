@@ -102,7 +102,8 @@ export const SETTINGS_SECTIONS = [
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 
-const isSettingsSection = (segment: string): segment is SettingsSection => SETTINGS_SECTIONS.some(({ value }) => value === segment);
+/** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open. */
+export const settingsSection = (segment: string | null): SettingsSection => SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics";
 
 /** The open section of the settings page; its workspace sections read the sidebar's workspace. */
 export interface SettingsRoute {
@@ -233,10 +234,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
-	settings: rest => {
-		const [section = ""] = (rest ?? "").split("/");
-		return { kind: "settings", section: isSettingsSection(section) ? section : "analytics" };
-	},
+	settings: rest => ({ kind: "settings", section: settingsSection(rest?.split("/")[0] ?? null) }),
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
 	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
 	"pull-requests": rest => {

@@ -29,7 +29,7 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { ACCESS_CHANNEL, isWebUrl, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, isWebUrl, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
@@ -314,6 +314,11 @@ function createWindow(): BrowserWindow {
 		const url = event.senderFrame?.url ?? "";
 		if (event.sender !== contents || !isDashboard(url) || loadToken(tokenFile) === handedOut) return;
 		win.loadURL(`${ORIGIN}/${URL.parse(url)?.hash ?? ""}`).catch(() => {});
+	});
+	ipcMain.handle(PICK_DIRECTORY_CHANNEL, async event => {
+		if (event.sender !== contents || !isDashboard(event.senderFrame?.url ?? "")) return null;
+		const { canceled, filePaths } = await dialog.showOpenDialog(win, { properties: ["openDirectory", "createDirectory"] });
+		return canceled ? null : (filePaths[0] ?? null);
 	});
 
 	win.on("close", event => {

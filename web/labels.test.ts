@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { age, commandLabel, dayLabel, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import type { OmpFile } from "../src/shared/models";
+import { age, commandLabel, dayLabel, fileGroups, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -82,5 +83,34 @@ describe("command labels", () => {
 		expect(commandLabel("/opt/homebrew/bin/node /Users/me/app/node_modules/.bin/tsc --noEmit -w")).toBe("node tsc --noEmit -w");
 		expect(commandLabel("smoke-hold: /bin/zsh -l -c bun -e 'x/y'")).toBe("smoke-hold: zsh -l -c bun -e 'x/y'");
 		expect(commandLabel("vite --port 5173")).toBe("vite --port 5173");
+	});
+});
+
+describe("file groups", () => {
+	const file = (kind: OmpFile["kind"], path: string, scope: OmpFile["scope"] = "user"): OmpFile => ({ kind, scope, path, pathDisplay: path, body: { state: "missing" } });
+	const files = [
+		file("skill", "/u/.omp/agent/skills/poteto-mode/SKILL.md"),
+		file("context", "/repo/AGENTS.md", "project"),
+		file("context", "/u/.omp/agent/AGENTS.md"),
+		file("agent", "/u/.omp/agent/agents/poteto-agent.md"),
+		file("skill", "/u/.omp/agent/skills/better-ui/SKILL.md"),
+	];
+	const paths = (query: string) => fileGroups(files, query).map(([kind, group]) => [kind, group.map(entry => entry.path)]);
+
+	test("a blank filter lists every file by kind in the page's order, user files before project files", () => {
+		expect(paths("")).toEqual([
+			["context", ["/u/.omp/agent/AGENTS.md", "/repo/AGENTS.md"]],
+			["agent", ["/u/.omp/agent/agents/poteto-agent.md"]],
+			["skill", ["/u/.omp/agent/skills/poteto-mode/SKILL.md", "/u/.omp/agent/skills/better-ui/SKILL.md"]],
+		]);
+	});
+
+	test("a filter keeps the files whose listed name holds every word in any case, a skill named by its directory, and drops the kinds left empty", () => {
+		expect(paths("POTETO")).toEqual([
+			["agent", ["/u/.omp/agent/agents/poteto-agent.md"]],
+			["skill", ["/u/.omp/agent/skills/poteto-mode/SKILL.md"]],
+		]);
+		expect(paths("mode poteto")).toEqual([["skill", ["/u/.omp/agent/skills/poteto-mode/SKILL.md"]]]);
+		expect(paths("skill")).toEqual([]);
 	});
 });

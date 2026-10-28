@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "./git";
 import { applySourceControl, DEFAULT_SOURCE_CONTROL, startingMethod } from "./shared/source-control";
-import { pullDefaultBranch } from "./source-control";
+import { pullDefaultBranch, repositoriesOf } from "./source-control";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -60,6 +60,15 @@ describe("pullDefaultBranch", () => {
 		writeFileSync(join(clone, "a"), "edited");
 		expect(await pullDefaultBranch(clone)).toEqual({ kind: "pulled", commits: 1 });
 		expect(await head(clone, "refs/heads/main")).toBe(await head(origin));
+	});
+});
+
+describe("repositoriesOf", () => {
+	test("leaves out a repository in a temp directory", async () => {
+		const { clone } = await cloneBehind();
+		const here = await repositoriesOf([import.meta.dir]);
+		expect(here).toHaveLength(1);
+		expect(await repositoriesOf([clone, import.meta.dir])).toEqual(here);
 	});
 });
 

@@ -21,6 +21,12 @@ export interface Workspace {
 
 export const NO_WORKSPACES: WorkspaceList = { added: [], hidden: [] };
 
+// `/var/folders` holds macOS's per-user `$TMPDIR`, where `mktemp -d` puts its directories.
+const TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"];
+
+/** Whether `dir` is a temp root or under one: no picker, list, or project list offers it. */
+export const inTempDir = (dir: string): boolean => TEMP_ROOTS.some(root => dir === root || dir.startsWith(`${root}/`));
+
 /** `list` after `change`, or `list` itself when it changes nothing. Adding also shows a hidden directory. */
 export function applyWorkspace(list: WorkspaceList, { op, cwd }: WorkspaceChange): WorkspaceList {
 	const added = op === "add" && !list.added.includes(cwd) ? [...list.added, cwd] : list.added;

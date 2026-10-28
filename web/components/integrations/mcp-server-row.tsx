@@ -1,14 +1,13 @@
 import { Power, PowerOff, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { hasAccounts, MCP_SERVICES, type McpIntegrationId, type SignInState } from "../../../src/shared/accounts";
+import { MCP_INTEGRATIONS, type McpIntegrationId, type SignInState } from "../../../src/shared/accounts";
 import { catalogEntry } from "../../../src/shared/mcp-catalog";
 import type { McpServerRow, McpServerStatus, McpTransport } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
-import { integrationsStore, mcpServersStore } from "../../reads";
-import { hashForSettings } from "../../routing";
+import { mcpServersStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
@@ -26,17 +25,28 @@ import {
 	useToolList,
 	WAITING_STATUS,
 } from "./mcp-connection-controls";
-import { SERVICES, STATUS as INTEGRATION_STATUS } from "./services";
 import { MCP_LOGOS } from "./mcp-logos";
 
 const refresh = (): Promise<void> => mcpServersStore.refresh();
 
 const TRANSPORT: Record<McpTransport, string> = { http: "HTTP", sse: "SSE", stdio: "Local command" };
 
-/** A server's status, once a row that is one of the integrations went to {@link IntegrationServerRow}. */
-type ServerStatus = Exclude<McpServerStatus, { kind: "integration" }>;
+/** A server omp loads that is not one of Settings › Integrations' services, which that section lists instead. */
+export type OwnServer = McpServerRow & { status: Exclude<McpServerStatus, { kind: "integration" }> };
 
-const STATUS: Record<ServerStatus["kind"], StatusLabel> = {
+/** `servers` split into the ones this list shows and the Settings › Integrations services the others belong to, in that section's order. */
+export function ownServers(servers: readonly McpServerRow[]): { own: OwnServer[]; integrations: McpIntegrationId[] } {
+	const own: OwnServer[] = [];
+	const integrations = new Set<McpIntegrationId>();
+	for (const server of servers) {
+		const { status } = server;
+		if (status.kind === "integration") integrations.add(status.id);
+		else own.push({ ...server, status });
+	}
+	return { own, integrations: MCP_INTEGRATIONS.filter(id => integrations.has(id)) };
+}
+
+const STATUS: Record<OwnServer["status"]["kind"], StatusLabel> = {
 	disabled: { label: "Disabled", color: "gray" },
 	local: { label: "Not checked", color: "gray" },
 	...REMOTE_STATUS,
@@ -51,41 +61,9 @@ const SourceMeta = ({ server }: { server: McpServerRow }) =>
 		</>
 	);
 
-/** A server that is one of Settings › Integrations' services, or one account of it, which that section checks and signs in to. */
-function IntegrationServerRow({ server, id }: { server: McpServerRow; id: McpIntegrationId }) {
-	const { label } = MCP_SERVICES[id];
-	const integration = integrationsStore.use().read?.data.integrations[id];
-	const connection = integration && (hasAccounts(integration) ? integration.accounts.find(account => account.name === server.name)?.connection : integration.connection);
-	return (
-		<IntegrationRow
-			name={server.name}
-			mark={<MarkTile logo={SERVICES[id].logo} name={label} />}
-			status={<StatusBadge {...(connection ? INTEGRATION_STATUS[connection.kind] : { label: "Integration", color: "gray" })} />}
-			summary={`${label}, which Settings › Integrations signs in to and checks.`}
-			meta={
-				<>
-					<span>{TRANSPORT[server.transport]}</span>
-					{server.host && (
-						<>
-							<MetaDot />
-							<span className="font-mono">{server.host}</span>
-						</>
-					)}
-					<SourceMeta server={server} />
-				</>
-			}
-			actions={
-				<Button variant="ghost" size="compact" render={<a href={hashForSettings("integrations")} />}>
-					Open
-				</Button>
-			}
-		/>
-	);
-}
-
-/** A server omp loads that is not one of the integrations: where omp stands with it, its sign-in, and the changes its config allows. */
-function ServerRow({ server, status }: { server: McpServerRow; status: ServerStatus }) {
-	const { name, source } = server;
+/** One MCP server omp loads that is not one of the integrations: where omp stands with it, its sign-in, and the changes its config allows. */
+export function McpServerItem({ server }: { server: OwnServer }) {
+	const { name, source, status } = server;
 	const entry = server.catalogId === null ? undefined : catalogEntry(server.catalogId);
 	const remote = server.transport !== "stdio" && status.kind !== "disabled";
 	const start = async (): Promise<SignInState> => (await putJson<McpServerRow>("/api/mcp-servers/sign-in", { name })).signIn;
@@ -230,9 +208,4 @@ function ServerRow({ server, status }: { server: McpServerRow; status: ServerSta
 			{tools.list}
 		</IntegrationRow>
 	);
-}
-
-/** One MCP server omp loads: an integration's points to its section; any other shows its status, sign-in, and config changes. */
-export function McpServerItem({ server }: { server: McpServerRow }) {
-	return server.status.kind === "integration" ? <IntegrationServerRow server={server} id={server.status.id} /> : <ServerRow server={server} status={server.status} />;
 }

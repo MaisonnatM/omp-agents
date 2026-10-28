@@ -1,12 +1,14 @@
 /**
  * Settings › Sync on the server: reads the portable files of {@link SYNC_ITEMS} on this machine, merges them three ways
- * with the remote's against the last commit this machine applied, pushes the result, and writes what changed here.
+ * with the remote's against the last commit this machine applied, pushes the result, and writes what changed here. It
+ * can also create the remote as a private GitHub repository through `gh`.
  */
 import { mkdir, readdir, readFile, realpath, rm, rmdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteText, JsonFile, type ReducerFile } from "./fs";
 import { errorText, isObject, type Parsed, parseJson } from "./json";
+import { run, runChecked, runJson } from "./proc";
 import { SerialLane } from "./serial-lane";
 import type { HiddenCalendars } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
@@ -15,7 +17,7 @@ import type { ProcessSettings } from "./shared/processes";
 import { DEFAULT_SYNC_SETTINGS, isSyncOutcome, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncItem, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip, type SyncStoreId } from "./shared/settings-sync";
 import type { SourceControlSettings } from "./shared/source-control";
 import type { WorkspaceList } from "./shared/workspaces";
-import { parseSourceControlSettings, type SourceControl } from "./source-control";
+import { githubStatus, parseSourceControlSettings, type SourceControl } from "./source-control";
 import { plainPath, type RepoFile, SyncRepo } from "./sync-repo";
 import type { UserNoteList } from "./user-notes-shared";
 import type { UserTodoList } from "./user-todos-shared";
@@ -439,6 +441,52 @@ export async function applyLocal(items: readonly SyncItem[], changes: ReadonlyMa
 	}
 }
 
+/** A GitHub repository as `gh repo view` names it. */
+interface GithubRepo {
+	nameWithOwner: string;
+	owner: string;
+	isPrivate: boolean;
+	url: string;
+	sshUrl: string;
+}
+
+const GH_TIMEOUT_MS = 60_000;
+
+/** `repo`'s clone URL in the protocol gh's `git_protocol` names: SSH for `ssh`, else HTTPS, gh's default. */
+export const cloneUrl = (repo: Pick<GithubRepo, "url" | "sshUrl">, protocol: string): string => (protocol.trim() === "ssh" ? repo.sshUrl : `${repo.url}.git`);
+
+/** GitHub's repository `fullName`, or `null` when there is none by that name. */
+async function viewGithubRepo(fullName: string): Promise<GithubRepo | null> {
+	const value = await runJson(["gh", "repo", "view", fullName, "--json", "nameWithOwner,owner,isPrivate,url,sshUrl"], { timeoutMs: GH_TIMEOUT_MS }).catch((err: unknown) => {
+		if (err instanceof Error && err.message.includes("Could not resolve to a Repository")) return null;
+		throw err;
+	});
+	if (value === null) return null;
+	if (!isObject(value) || typeof value.nameWithOwner !== "string" || !isObject(value.owner) || typeof value.owner.login !== "string" || typeof value.isPrivate !== "boolean" || typeof value.url !== "string" || typeof value.sshUrl !== "string") {
+		throw new Error(`gh did not describe ${fullName}`);
+	}
+	return { nameWithOwner: value.nameWithOwner, owner: value.owner.login, isPrivate: value.isPrivate, url: value.url, sshUrl: value.sshUrl };
+}
+
+/**
+ * The clone URL of the private GitHub repository `name` names, `owner/name` or a name under the signed-in account,
+ * created when it does not exist; one that exists must be the account's own, and private.
+ */
+async function privateGithubRepo(name: string): Promise<string> {
+	const github = await githubStatus();
+	if (github.state === "missing") throw new Error("gh is not installed: install the GitHub CLI to create a repository");
+	if (!github.account) throw new Error("gh is signed out: run gh auth login in a terminal, then try again");
+	const fullName = name.includes("/") ? name : `${github.account}/${name}`;
+	const existing = await viewGithubRepo(fullName);
+	if (existing && existing.owner !== github.account) throw new Error(`${existing.nameWithOwner} already exists and belongs to ${existing.owner}`);
+	if (existing && !existing.isPrivate) throw new Error(`${existing.nameWithOwner} already exists and is public; make it private on GitHub or choose another name`);
+	if (!existing) await runChecked(["gh", "repo", "create", fullName, "--private"], { timeoutMs: GH_TIMEOUT_MS });
+	const repo = existing ?? (await viewGithubRepo(fullName));
+	if (!repo) throw new Error(`GitHub does not show ${fullName} yet; try again`);
+	const protocol = await run(["gh", "config", "get", "git_protocol"]);
+	return cloneUrl(repo, protocol.code === 0 ? protocol.stdout : "");
+}
+
 interface SyncState {
 	settings: SyncSettings;
 	last: SyncOutcome | null;
@@ -475,6 +523,13 @@ export class SettingsSync {
 		const { remote, branch } = this.#state.settings;
 		const moved = settings.remote !== remote || settings.branch !== branch;
 		this.#save({ settings, last: moved ? null : this.#state.last });
+		return this.answer();
+	}
+
+	/** Points sync at the private GitHub repository `name` names, created when it does not exist, and saves; the last outcome was about another remote, or this one before it existed. */
+	async createRemote(name: string): Promise<SyncAnswer> {
+		const remote = await privateGithubRepo(name);
+		this.#save({ settings: { ...this.#state.settings, remote }, last: null });
 		return this.answer();
 	}
 

@@ -1,5 +1,5 @@
-import { RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { ExternalLink, RefreshCw } from "lucide-react";
+import { type FormEvent, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +21,7 @@ import { age, folderName } from "../../labels";
 import { useMergeMethodChoice } from "../../merge-method";
 import { IntegrationList } from "../integrations/integration-row";
 import { OrgIcon } from "../org-icon";
-import { Section } from "./editor";
+import { FIELD, Section } from "./editor";
 import { ToggleSwitch } from "../toggle-switch";
 
 const PROVIDERS: Record<SourceControlProvider, { name: string; summary: string; signIn: string }> = {
@@ -29,10 +29,67 @@ const PROVIDERS: Record<SourceControlProvider, { name: string; summary: string; 
 	graphite: { name: "Graphite", summary: "Opens your pull requests on Graphite, and lets sessions submit stacks with the gt CLI.", signIn: "gt auth --token <token>" },
 };
 
-function ProviderRow({ status }: { status: ProviderStatus }) {
+/** Where Graphite hands out the token `gt auth` takes. */
+const GRAPHITE_TOKEN_PAGE = "https://app.graphite.com/activate";
+
+/** A Graphite token field that signs `gt` in on the server. */
+function GraphiteSignIn({ signIn }: { signIn: (token: string) => Promise<void> }) {
+	const [token, setToken] = useState("");
+	const [pending, setPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const submit = async (event: FormEvent): Promise<void> => {
+		event.preventDefault();
+		setPending(true);
+		setError(null);
+		try {
+			await signIn(token.trim());
+		} catch (err) {
+			setError(errorText(err));
+		} finally {
+			setPending(false);
+		}
+	};
+	return (
+		<form className="mt-2 space-y-2" onSubmit={submit}>
+			<div className="flex flex-wrap items-end gap-2">
+				<label className="space-y-1 text-xs text-muted-foreground">
+					Graphite token
+					<input
+						name="graphite-token"
+						type="password"
+						autoComplete="off"
+						autoCapitalize="none"
+						spellCheck={false}
+						value={token}
+						onChange={event => setToken(event.target.value)}
+						className={`${FIELD} block w-72 max-w-full text-foreground`}
+					/>
+				</label>
+				<Button type="submit" variant="secondary" size="compact" loading={pending} disabled={pending || token.trim() === ""}>
+					Sign in
+				</Button>
+				<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={GRAPHITE_TOKEN_PAGE} target="_blank" rel="noreferrer" />}>
+					Get a token
+				</Button>
+			</div>
+			{error && (
+				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+					{error}
+				</p>
+			)}
+		</form>
+	);
+}
+
+function ProviderRow({ status, signInGraphite }: { status: ProviderStatus; signInGraphite: (token: string) => Promise<void> }) {
 	const { name, summary, signIn } = PROVIDERS[status.provider];
 	const cli = status.provider === "github" ? "gh" : "gt";
-	const fact = { missing: `${cli} is not installed`, "signed-out": `Run ${signIn} in a terminal to sign in`, "signed-in": status.account ? `Signed in as ${status.account}` : `${cli} is signed in` }[status.state];
+	const inline = status.provider === "graphite" && status.state === "signed-out";
+	const fact = {
+		missing: status.provider === "graphite" ? `gt is not installed. Once it is, run ${signIn} in a terminal to sign in` : `${cli} is not installed`,
+		"signed-out": inline ? `Paste a token from Graphite to sign ${cli} in` : `Run ${signIn} in a terminal to sign in`,
+		"signed-in": status.account ? `Signed in as ${status.account}` : `${cli} is signed in`,
+	}[status.state];
 	return (
 		<li className="flex items-start gap-3.5 p-4">
 			<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 shadow-surface-2">
@@ -49,6 +106,7 @@ function ProviderRow({ status }: { status: ProviderStatus }) {
 				</div>
 				<p className="mt-0.5 text-[13px] text-pretty text-muted-foreground">{summary}</p>
 				<p className="mt-1.5 text-xs text-muted-foreground">{fact}</p>
+				{inline && <GraphiteSignIn signIn={signInGraphite} />}
 			</div>
 		</li>
 	);
@@ -87,6 +145,9 @@ export function SourceControlTab({ active }: { active: boolean }) {
 			setPending(false);
 		}
 	};
+	const signInGraphite = async (token: string): Promise<void> => {
+		await read.write(() => putJson<SourceControlAnswer>("/api/source-control/graphite-sign-in", { token }));
+	};
 	const answer = read.data;
 	const on = answer?.autoPull.on ?? false;
 	return (
@@ -104,7 +165,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 				{answer && (
 					<IntegrationList label="Command-line tools">
 						{answer.providers.map(status => (
-							<ProviderRow key={status.provider} status={status} />
+							<ProviderRow key={status.provider} status={status} signInGraphite={signInGraphite} />
 						))}
 					</IntegrationList>
 				)}
@@ -127,7 +188,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 								<div className="min-w-0 flex-1">
 									<p className="truncate text-[13px] font-medium">{folderName(repo.path) ?? repo.path}</p>
 									<p className="truncate text-xs text-muted-foreground">
-										{repo.path} · {lastPull(repo)}
+										{repo.pathDisplay} · {lastPull(repo)}
 									</p>
 								</div>
 								<Select<RepoPull>

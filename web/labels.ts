@@ -1,5 +1,6 @@
 /** Names the page gives things: sessions, models, providers, file kinds, and the click gestures that open rows. */
 import type { MouseEvent } from "react";
+import { everyWord } from "../src/shared/every-word";
 import type { PullRequestLink } from "../src/shared/github";
 import type { OmpFile, OmpFileKind } from "../src/shared/models";
 import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
@@ -19,10 +20,17 @@ export const FILE_KIND_LABELS: Record<OmpFileKind, string> = {
 	hook: "Hooks",
 };
 
-/** Files by kind in {@link FILE_KIND_LABELS} order, user files before project files; kinds without files left out. */
-export function fileGroups(files: OmpFile[]): [OmpFileKind, OmpFile[]][] {
+/** The name Settings › Files lists `file` by: a skill's file is always SKILL.md, so its directory names it. */
+export function fileName(file: OmpFile): string {
+	const parts = file.path.split("/");
+	return (parts.at(-1) === "SKILL.md" ? parts.at(-2) : parts.at(-1)) ?? file.path;
+}
+
+/** The files whose {@link fileName} holds every word of `query`, by kind in {@link FILE_KIND_LABELS} order, user files before project files; kinds without such files left out. */
+export function fileGroups(files: OmpFile[], query: string): [OmpFileKind, OmpFile[]][] {
+	const matches = everyWord(query);
 	return (Object.keys(FILE_KIND_LABELS) as OmpFileKind[]).flatMap((kind): [OmpFileKind, OmpFile[]][] => {
-		const group = files.filter(file => file.kind === kind).toSorted((a, b) => (a.scope === b.scope ? 0 : a.scope === "user" ? -1 : 1));
+		const group = files.filter(file => file.kind === kind && matches(fileName(file))).toSorted((a, b) => (a.scope === b.scope ? 0 : a.scope === "user" ? -1 : 1));
 		return group.length ? [[kind, group]] : [];
 	});
 }

@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../src/shared/sessions";
-import { type Layout, openView, type Page, type SettingsRoute, type TabGroup, type SidebarPanel, type SidebarTab } from "./routing";
+import { type Layout, openView, type Page, type SettingsRoute, settingsSection, type TabGroup, type SidebarPanel, type SidebarTab } from "./routing";
 import { groupEntry, TAB_ROWS } from "./sidebar-tabs";
+import { useStoredState } from "./stored-state";
 
 /** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
 const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", settings: "settings" };
@@ -17,9 +18,15 @@ const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
 	email: { kind: "email", target: null },
 };
 
-/** The settings section the header's Settings button keeps: the open page's, else Analytics. */
-export function settingsRoute(page: Page | null): SettingsRoute {
-	return { section: page?.kind === "settings" ? page.section : "analytics" };
+/** The settings section the header's Settings button, `G ,`, and the sidebar keep: the open page's, else the last one open, which this browser remembers, else Analytics. */
+export function useSettingsRoute(page: Page | null): SettingsRoute {
+	const [last, setLast] = useStoredState("omp-agents.settings-section", settingsSection);
+	const open = page?.kind === "settings" ? page.section : null;
+	useEffect(() => {
+		if (open) setLast(open);
+	}, [open, setLast]);
+	const section = open ?? last;
+	return useMemo(() => ({ section }), [section]);
 }
 
 interface SidebarTabInput {

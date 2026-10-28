@@ -5,6 +5,8 @@
 - **Remote** takes the remote's address and a branch, `main` by default; **Save** keeps both in `settings-sync.json` beside the access token.
   Sync uses this machine's git credentials, its SSH keys or credential helper, and never asks for a password, so a remote that needs one fails with git's message.
   An address with a password in it is refused.
+  With no remote saved and `gh` signed in, **Create private repository on GitHub** creates a private repository named in the field beside it, `omp-settings` by default, and saves its address as the remote; a private repository of yours with that name is reused, and a public one or another account's is refused.
+  When a sync fails because the saved GitHub remote does not exist, **Create <owner>/<name> on GitHub** under the failure creates it the same way.
 - **Sync** fetches the branch, compares each file with the last version this machine synced, and then sends what changed here and writes what changed on the remote.
   A file that changed on one side only takes that side's version, and a file both sides changed the same way stays as it is.
   For the source control settings, changes to different repositories, or to different settings, merge.

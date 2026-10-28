@@ -1,7 +1,19 @@
 import { RefreshCcw } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DEFAULT_SYNC_SETTINGS, NEVER_SYNCED, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip } from "../../../src/shared/settings-sync";
+import {
+	DEFAULT_SYNC_REPO,
+	DEFAULT_SYNC_SETTINGS,
+	missingGithubRepo,
+	NEVER_SYNCED,
+	SYNC_ITEMS,
+	type SyncAnswer,
+	type SyncConflict,
+	type SyncOutcome,
+	type SyncSettings,
+	type SyncSide,
+	type SyncSkip,
+} from "../../../src/shared/settings-sync";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
@@ -14,6 +26,16 @@ const SKIP_REASON: Record<SyncSkip["reason"], string> = { link: "a link", binary
 const SIDE_LABEL: Record<SyncSide, string> = { local: "This machine", remote: "Remote" };
 const ITEM_LABEL = Object.fromEntries(SYNC_ITEMS.map(item => [item.id, item.label]));
 const ago = (at: number): string => (Date.now() - at < 60_000 ? "just now" : `${age(at)} ago`);
+
+type Pending = "save" | "sync" | "create";
+
+function ErrorText({ children }: { children: ReactNode }) {
+	return (
+		<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+			{children}
+		</p>
+	);
+}
 
 function Paths({ verb, paths }: { verb: string; paths: string[] }) {
 	if (paths.length === 0) return null;
@@ -85,9 +107,9 @@ function LastSync({ last }: { last: SyncOutcome | null }) {
 	switch (last.kind) {
 		case "failed":
 			return (
-				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+				<ErrorText>
 					Sync failed {ago(last.at)}: {last.error}
-				</p>
+				</ErrorText>
 			);
 		case "conflict":
 			return null;
@@ -113,23 +135,25 @@ function LastSync({ last }: { last: SyncOutcome | null }) {
 export function SyncTab({ active }: { active: boolean }) {
 	const read = useEditableRead<SyncAnswer>(active ? "/api/sync" : null);
 	const [draft, setDraft] = useState<Pick<SyncSettings, "remote" | "branch"> | null>(null);
-	const [pending, setPending] = useState<"save" | "sync" | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const [repoName, setRepoName] = useState(DEFAULT_SYNC_REPO);
+	const [pending, setPending] = useState<Pending | null>(null);
+	const [error, setError] = useState<{ of: Pending; text: string } | null>(null);
 	const [choices, setChoices] = useState<Record<string, SyncSide>>({});
 	const answer = read.data;
 	const settings = answer?.settings ?? DEFAULT_SYNC_SETTINGS;
 	const shown = draft ?? settings;
 	const last = answer?.last ?? null;
 	const conflicted = last?.kind === "conflict" ? last : null;
+	const missing = last?.kind === "failed" ? missingGithubRepo(settings.remote, last.error) : null;
 
-	const send = async (kind: "save" | "sync", request: () => Promise<SyncAnswer>): Promise<boolean> => {
+	const send = async (kind: Pending, request: () => Promise<SyncAnswer>): Promise<boolean> => {
 		setPending(kind);
 		setError(null);
 		try {
 			await read.write(request);
 			return true;
 		} catch (err) {
-			setError(errorText(err));
+			setError({ of: kind, text: errorText(err) });
 			return false;
 		} finally {
 			setPending(null);
@@ -139,13 +163,20 @@ export function SyncTab({ active }: { active: boolean }) {
 	const sync = async (chosen: Record<string, SyncSide>): Promise<void> => {
 		if (await send("sync", () => putJson("/api/sync/run", { choices: chosen }))) setChoices({});
 	};
+	const create = async (name: string): Promise<void> => {
+		if (await send("create", () => putJson("/api/sync/create-repo", { name }))) setDraft(null);
+	};
 	const submit = async (event: FormEvent): Promise<void> => {
 		event.preventDefault();
 		if (await save({ ...settings, ...shown })) setDraft(null);
 	};
+	const submitCreate = (event: FormEvent): void => {
+		event.preventDefault();
+		void create(repoName.trim());
+	};
 	const changed = draft !== null && (draft.remote.trim() !== settings.remote || draft.branch.trim() !== settings.branch);
 	const decided = conflicted?.conflicts.every(conflict => choices[conflict.path]) ?? false;
-
+	const createError = error?.of === "create" && <ErrorText>{error.text}</ErrorText>;
 	return (
 		<>
 			<Section title="Remote" meta="A Git repository only you can read, such as a private GitHub repository. Sync uses this machine's git credentials and never asks for a password.">
@@ -162,6 +193,19 @@ export function SyncTab({ active }: { active: boolean }) {
 						Save
 					</Button>
 				</form>
+				{answer && settings.remote === "" && (
+					<form className="flex flex-wrap items-end gap-2" onSubmit={submitCreate}>
+						<label className="space-y-1 text-sm">
+							New repository
+							<input value={repoName} onChange={event => setRepoName(event.target.value)} autoCapitalize="none" spellCheck={false} className={`${FIELD} block w-56`} />
+						</label>
+						<Button type="submit" variant="secondary" size="compact" loading={pending === "create"} disabled={pending !== null || repoName.trim() === ""}>
+							Create private repository on GitHub
+						</Button>
+						<p className="basis-full text-xs text-muted-foreground">No repository yet? gh creates a private one under your GitHub account, or under an organization you name as owner/name.</p>
+					</form>
+				)}
+				{settings.remote === "" && createError}
 			</Section>
 			<Section
 				title="Last sync"
@@ -173,13 +217,17 @@ export function SyncTab({ active }: { active: boolean }) {
 				}
 			>
 				{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
-				{error && (
-					<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-						{error}
-					</p>
-				)}
-				{answer && settings.remote === "" && <p className="text-xs text-muted-foreground">Name a remote above to sync.</p>}
+				{error && error.of !== "create" && <ErrorText>{error.text}</ErrorText>}
+				{answer && settings.remote === "" && <p className="text-xs text-muted-foreground">Name or create a remote above to sync.</p>}
 				{answer && <LastSync last={last} />}
+				{missing && (
+					<div className="space-y-2">
+						<Button variant="secondary" size="compact" loading={pending === "create"} disabled={pending !== null} onClick={() => void create(missing)}>
+							Create {missing} on GitHub
+						</Button>
+						{createError}
+					</div>
+				)}
 				{conflicted && (
 					<div className="space-y-3">
 						<p role="alert" className="text-xs">

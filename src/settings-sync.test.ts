@@ -10,8 +10,8 @@ import { ProcessSettingsFile } from "./server/process-settings-file";
 import { UserNotesFile } from "./server/user-notes-file";
 import { UserTodosFile } from "./server/user-todos-file";
 import { WorkspacesFile } from "./server/workspaces-file";
-import { applyLocal, canonicalJson, localPath, mergeFile, mergeJson, planSync, portablePath, portableText, readLocal, SettingsSync, type SyncStore, sourceControlStore, syncStores } from "./settings-sync";
-import { neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncStoreId } from "./shared/settings-sync";
+import { applyLocal, canonicalJson, cloneUrl, localPath, mergeFile, mergeJson, planSync, portablePath, portableText, readLocal, SettingsSync, type SyncStore, sourceControlStore, syncStores } from "./settings-sync";
+import { missingGithubRepo, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncStoreId } from "./shared/settings-sync";
 import { SourceControl } from "./source-control";
 import type { UserNoteChange } from "./user-notes-shared";
 import { addTodo } from "./user-todos";
@@ -234,6 +234,24 @@ async function pair() {
 
 const addNote = (id: string): UserNoteChange => ({ op: "add", note: { id, title: id, body: "", todoId: null, addedBy: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" } });
 
+describe("a GitHub remote", () => {
+	const repo = { url: "https://github.com/ann/omp-settings", sshUrl: "git@github.com:ann/omp-settings.git" };
+
+	test("clones over SSH when gh's git_protocol says ssh, and over HTTPS otherwise, gh's default", () => {
+		expect(cloneUrl(repo, "ssh\n")).toBe("git@github.com:ann/omp-settings.git");
+		expect(cloneUrl(repo, "https\n")).toBe("https://github.com/ann/omp-settings.git");
+		expect(cloneUrl(repo, "")).toBe("https://github.com/ann/omp-settings.git");
+	});
+
+	test("names the GitHub repository a failed sync could not find, and nothing for another failure or host", () => {
+		expect(missingGithubRepo("git@github.com:ann/omp-settings.git", "ERROR: Repository not found.")).toBe("ann/omp-settings");
+		expect(missingGithubRepo("https://github.com/ann/omp-settings", "remote: Repository not found.")).toBe("ann/omp-settings");
+		expect(missingGithubRepo("ssh://git@github.com/ann/omp.settings.git/", "ERROR: Repository not found.")).toBe("ann/omp.settings");
+		expect(missingGithubRepo("git@gitlab.com:ann/omp-settings.git", "ERROR: Repository not found.")).toBeNull();
+		expect(missingGithubRepo("git@github.com:ann/omp-settings.git", "git@github.com: Permission denied (publickey).")).toBeNull();
+	});
+});
+
 describe("SettingsSync", () => {
 	test("carries a change from one machine to another, changes nothing on a second sync, and stops on a conflict until a side is chosen", async () => {
 		const root = scratch();
@@ -348,6 +366,6 @@ describe("SettingsSync", () => {
 		const root = scratch();
 		const a = machine(join(root, "a"), join(root, "missing.git"));
 		const last = (await a.sync.sync()).last;
-		expect(last?.kind).toBe("failed");
+		expect(last).toMatchObject({ kind: "failed", error: expect.stringContaining("does not appear to be a git repository") });
 	});
 });

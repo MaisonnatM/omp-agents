@@ -30,6 +30,7 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
   Its `onTargetURL`, absent in an app built before it, receives the address of the link under the pointer or keyboard focus from the window's `update-target-url` event, and an empty string when the window blurs or navigates.
   Its `signIn`, which the page calls when it holds no token, asks the shell to load the dashboard again with the page's hash, so the preload writes the current token.
   The main process reloads only when the token file now holds a token other than the one it last handed out, as after a rotation; otherwise a reload would loop, and the page stays on its notice that the server holds another token.
+  Its `pickDirectory`, absent in an app built before it, which **Settings › Workspaces** calls for **Choose folder…**, invokes `PICK_DIRECTORY_CHANNEL`, and the main process answers with the folder picked in `dialog.showOpenDialog` over the window, or `null` when it was cancelled.
   The main process takes each one only from the window's own dashboard frame.
 - The session's permission handlers grant only clipboard writes and full screen, and only to the dashboard's own page; every other request is refused.
   Session notifications come from the main process, so the page needs no notification permission.
