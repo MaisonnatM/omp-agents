@@ -631,7 +631,13 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	return (
 		<OpenToolImage.Provider value={openImage}>
 			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
-				<SessionTodosCard items={items} view={view} working={working} changes={activityShown ? changes : undefined} />
+				<SessionTodosCard
+					items={items}
+					view={view}
+					working={working}
+					changes={activityShown ? changes : undefined}
+					ship={changes?.sessionId ? (changes.facts?.ship ?? null) : null}
+				/>
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>
 						<MessageScrollerContent className="conversation-lane gap-3 p-3" aria-relevant="additions text" data-transcript>

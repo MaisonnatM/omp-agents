@@ -60,6 +60,7 @@ export const CONTROLS = [
 	{ id: "transcript.activity-group", label: "Tool calls group, folded or unfolded", area: "Transcript" },
 	{ id: "transcript.scroll-to-bottom", label: "Scroll-to-bottom arrow", area: "Transcript" },
 	{ id: "transcript.todos", label: "Todos card, folded or unfolded", area: "Transcript" },
+	{ id: "transcript.ship", label: "Todos card's Ship section, folded or unfolded", area: "Transcript" },
 	{ id: "media-viewer.open", label: "Image opened large", area: "Transcript" },
 	{ id: "media-viewer.step", label: "Image viewer previous or next", area: "Transcript" },
 	{ id: "media-viewer.new-tab", label: "Image viewer, open in a new tab", area: "Transcript" },
