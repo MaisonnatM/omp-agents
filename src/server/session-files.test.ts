@@ -62,13 +62,21 @@ describe("SessionFiles", () => {
 
 	test("the past list leaves out a session marked as an `omp -p` run once its facts are read", async () => {
 		const { project, files } = setup();
-		const headless = join(project, "headless.jsonl");
+		const headlessPath = join(project, "headless.jsonl");
 		writeSession(join(project, "kept.jsonl"), "kept", "kept", 1_000_000);
-		writeSession(headless, "headless", "one-shot", 2_000_000);
-		writeFileSync(headless, `${JSON.stringify({ type: "custom", customType: "omp-agents.headless", id: "h1", parentId: "a1", timestamp: at })}\n`, { flag: "a" });
+		writeSession(headlessPath, "headless", "one-shot", 2_000_000);
+		const mark = (headless: boolean, id: string) => writeFileSync(headlessPath, `${JSON.stringify({ type: "custom", customType: "omp-agents.headless", data: { headless }, id, parentId: "a1", timestamp: at })}\n`, { flag: "a" });
+		mark(true, "h1");
 		await files.scan();
 		expect(await files.refreshFacts()).toBe(true);
 		expect(titles(files)).toEqual(["kept"]);
+
+		// Resumed in a terminal, it lists again.
+		mark(false, "h2");
+		files.touch(headlessPath);
+		await files.refresh();
+		expect(await files.refreshFacts()).toBe(true);
+		expect(titles(files)).toEqual(["one-shot", "kept"]);
 	});
 
 	test("a refresh adds a file that appeared and drops one that is gone", async () => {

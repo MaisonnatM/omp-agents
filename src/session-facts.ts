@@ -252,15 +252,14 @@ export class SessionFactsScan {
 		}
 		if (!isObject(entry)) return;
 		this.replay.applyEntry(entry);
-		if (entry.type === "custom" && entry.customType === "omp-agents.headless") {
-			this.headless = true;
-			return;
-		}
-		if (entry.type === "custom" && entry.customType === "omp-ship.state") {
-			const ship = parseShipProgress(entry.data);
-			if (ship) {
-				this.ship = ship;
-				if (ship.issue) this.#ticket(ship.issue, "worked");
+		if (entry.type === "custom") {
+			if (entry.customType === "omp-agents.headless") this.headless = isObject(entry.data) && entry.data.headless === true;
+			else if (entry.customType === "omp-ship.state") {
+				const ship = parseShipProgress(entry.data);
+				if (ship) {
+					this.ship = ship;
+					if (ship.issue) this.#ticket(ship.issue, "worked");
+				}
 			}
 			return;
 		}
@@ -626,13 +625,19 @@ export class SessionFactsIndex {
 	factsOf(sessionPath: string): SessionFacts {
 		const session = this.#sessions.get(sessionPath);
 		if (!session) return NO_FACTS;
-		const replay = session.transcripts.get(sessionPath)?.fold.scan.replay.facts();
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree, branch: session.branch, ...(replay ? { replay } : {}) };
+		const own = this.#own(sessionPath);
+		const replay = own?.replay.facts();
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.ship ?? null, worktree: session.worktree, branch: session.branch, ...(replay ? { replay } : {}) };
 	}
 
-	/** Whether omp ran session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
+	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
 	headless(sessionPath: string): boolean {
-		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.fold.scan.headless ?? false;
+		return this.#own(sessionPath)?.headless ?? false;
+	}
+
+	/** The scan of session `path`'s own file, not its subagents'; `undefined` before its first scan. */
+	#own(path: string): SessionFactsScan | undefined {
+		return this.#sessions.get(path)?.transcripts.get(path)?.fold.scan;
 	}
 
 	/** Resolves once the refreshes asked for so far are done. */
@@ -642,7 +647,7 @@ export class SessionFactsIndex {
 
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
-	 * Resolves whether any session's pull requests, Linear issues, /ship stage, worktree, or branch changed.
+	 * Resolves whether any session's pull requests, Linear issues, /ship stage, headless mark, worktree, or branch changed.
 	 * Refreshes run one at a time, and the calls made while one runs share a single next refresh of the newest list.
 	 */
 	refresh(sessions: readonly ListedSession[]): Promise<boolean> {
@@ -846,8 +851,9 @@ export class SessionFactsIndex {
 	 */
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; submitted: boolean; moved: boolean; writtenAt: number }> {
 		let session = this.#sessions.get(path);
-		const previousShip = session?.transcripts.get(path)?.fold.scan.ship;
-		const wasHeadless = session?.transcripts.get(path)?.fold.scan.headless ?? false;
+		const before = this.#own(path);
+		const previousShip = before?.ship ?? null;
+		const wasHeadless = before?.headless ?? false;
 		session ??= {
 			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new FoldedFile(path, () => new TranscriptFold(true, this.#ownFileFolds.map(folds => folds.start(path))))]]),
 			refs: [], submitted: new Map(), repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], submitsFinished: 0, workDirs: [], worktree: null, branch: null,
@@ -859,10 +865,10 @@ export class SessionFactsIndex {
 		const reads = await Promise.all([...session.transcripts.values()].map(transcript => transcript.read()));
 		if (reads.every(read => read.readable)) session.modifiedAt = modifiedAt;
 		const own = session.transcripts.get(path)!.fold.scan;
-		const shipChanged = JSON.stringify(previousShip ?? null) !== JSON.stringify(own.ship ?? null);
+		const shipChanged = JSON.stringify(previousShip) !== JSON.stringify(own.ship ?? null);
 		const workDirs = [...own.workDirs].reverse().map(dir => absolute(cwd, dir));
-		const before = session.workDirs;
-		const same = workDirs.length === before.length && workDirs.every((dir, i) => dir === before[i]);
+		const dirsBefore = session.workDirs;
+		const same = workDirs.length === dirsBefore.length && workDirs.every((dir, i) => dir === dirsBefore[i]);
 		const moved = !same || (session.worktree !== null && !(await exists(session.worktree)));
 		session.workDirs = workDirs;
 		return { session, changed: shipChanged || own.headless !== wasHeadless, submitted: this.#gather(session, own), moved, writtenAt: modifiedAt };

@@ -17,6 +17,7 @@ const pi = input.omp ? await import(process.argv[2]) : undefined;
 let tool;
 let confirmations = 0;
 const executed = [];
+const entries = [];
 const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
 // Loads an extension as one omp session does and returns its handlers by event name.
 function load(extension) {
@@ -26,7 +27,7 @@ function load(extension) {
 		zod: z,
 		on(name, handler) { hooks[name] = handler; },
 		registerTool(registered) { tool = registered; },
-		appendEntry() {},
+		appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
 		// input.responses answers by subcommand, such as "pr view" or "repo view"; input.response answers the rest.
 		async exec(_command, args) {
 			executed.push(args);
@@ -77,6 +78,10 @@ if (input.command) {
 		results.push(reason);
 	}
 	console.log(JSON.stringify({ results }));
+} else if (input.starts) {
+	// Each mode starts the same session file again, as a resume does; the entries are what the file gained.
+	for (const mode of input.starts) await hooks.session_start({ type: "session_start" }, { mode, sessionManager: { getBranch: () => entries } });
+	console.log(JSON.stringify({ entries }));
 } else if (input.agentStart) {
 	const result = await hooks.before_agent_start({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
@@ -89,7 +94,7 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-accounts" | "pr-description", input: object, env: Record<string, string> = {}): {
+function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
@@ -98,6 +103,7 @@ function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-
 	prompt: string[] | null;
 	results: (string | null)[];
 	executed: string[][];
+	entries: { customType: string; data: unknown }[];
 } {
 	const child = Bun.spawnSync([
 		process.execPath, "run", "-", packageDir,
@@ -655,5 +661,19 @@ describe("google accounts", () => {
 		]);
 		servers(["gmail"]);
 		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(work, "app") }, env).prompt).toBeNull();
+	});
+});
+
+describe("headless-mark", () => {
+	const starts = (...modes: string[]) => exercise("headless-mark", { starts: modes }).entries.map(entry => entry.data);
+
+	test("marks a print or json run headless once, and an interactive or dashboard session not at all", () => {
+		expect(starts("print", "print")).toEqual([{ headless: true }]);
+		expect(starts("json")).toEqual([{ headless: true }]);
+		expect(starts("tui", "rpc")).toEqual([]);
+	});
+
+	test("records the change when a session resumes in the other mode", () => {
+		expect(starts("print", "tui", "print")).toEqual([{ headless: true }, { headless: false }, { headless: true }]);
 	});
 });
