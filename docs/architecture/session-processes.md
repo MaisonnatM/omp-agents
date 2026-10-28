@@ -10,7 +10,7 @@ Each such group is a job, listed by its top process, the group's leader, and sto
 omp's stdio MCP servers are children of omp in omp's own process group: they are omp's helpers, not something the session started, so the card only shows their memory and CPU with omp's, and they end with the session.
 omp starts its shared workers, whose commands begin with `__omp_worker_`, such as a project's daemon broker, the blob broker, or the LSP multiplexer, as children of whichever omp first needs them, and they serve every omp of the project or the machine.
 `descendants` in `src/process-census.ts` skips them and everything under them, for the card, the keeper's census, and `stopTree` alike; `OMP_WORKER_PREFIX` names the prefix omp's `cli/worker-selectors.ts` gives every worker.
-A service is a daemon the project's broker runs: a dev server the bash tool started with a `name`, or omp's shared headless browser.
+A service is a daemon the project's broker runs: a dev server the bash tool or the Browser's **Start dev server** started with a `name`, or omp's shared headless browser.
 It runs under the broker, not under omp, and outlives the session that started it while any omp stays in the project, which with sessions the dashboard keeps running is forever.
 `ompDaemons` in `src/omp/daemons.ts` lists them with omp's own `collectReports` from `cli/ps-data.ts`, which never starts a broker, keeps the ones a live broker supervises that have not ended, and stops one generation through the broker's `stop` with its id and a 3-second timeout.
 A service whose snapshot names an owner belongs to the session with that omp session id, and to the live session that took the id over with `/new`.
@@ -35,7 +35,21 @@ The same sample runs one `lsof` over every TCP listener of the user's processes 
 `otherPorts` lists every listening port but those of the session's unshared jobs and services and those another checkout of the same app listens on: the same `git` common directory and path in it as one of the session's servers, read from each listener's working directory with `lsof` and kept per directory.
 The memory and CPU of omp, a job, or a service are sums over its processes, and a shared service shows under every session it serves.
 `PUT /api/session-processes/stop` takes `{ instanceId, id }`, checked by `parseProcessStop` in `src/server/wire.ts`, and answers the same list after the stop; a stop for a session that no longer runs stops nothing.
+`PUT /api/session-processes/start-server` takes `{ instanceId }`, checked by `parseDevServerRequest`, starts that live session's dev server as [Start dev server](#start-dev-server) says, and answers a `DevServerStart`: `{ started: { port, command } }`, or `{ fallback }` with why it could not; a session that no longer runs answers an error.
 `GET /api/process-settings` answers the `ProcessSettings`, and `PUT /api/process-settings` takes them, checked by `parseProcessSettings`, and answers them as saved.
+
+## Start dev server
+
+The Browser's **Start dev server** starts a session's dev server without a model turn, as a service the session owns, so it lists, stops, and idles out as a service the session's bash tool started does.
+`startDevServer` in `src/server/dev-server.ts` works in the session's `worktree`, else its `cwd`, and reads the files of `ROOT_FILES` there: `package.json`, the lockfiles of `LOCKFILES`, and the env files of `ENV_FILES`.
+`planDevServer` answers a reason instead of a command when the script runs several servers (`SEVERAL_SERVERS`), sets its own port (`PINNED_PORT`), or an env file points a variable at a server on this computer (`LOCAL_SERVER_ENV`), such as an API, which the start would not run and which may be another checkout's.
+Otherwise it turns them and a port into the command: the `dev` script, else `start`, run by the package manager the first lockfile of `LOCKFILES` names, else npm, with `PORT` set and, when the script's last command is a server in `PORT_FLAG_COMMANDS`, `--port`, after `--` for npm.
+The port is a random one from 20000 to 39999 that binds on 127.0.0.1 a moment before.
+`startOwnedService` in `src/omp/daemons.ts` then sends the project's broker, through omp's `createDaemonBrokerClient`, which starts a broker when none runs, a `start` of `dev-<port>`: the command in the shell omp's settings for the directory give its bash tool, from `getShellConfig`, as omp's `startService` builds it, with `PORT` in its environment, in a pseudo-terminal, owned by the session's omp session id, replacing one of the same name, and ready once the port accepts a connection on 127.0.0.1, within 30 seconds.
+The broker answers once the service is ready, its readiness timed out, or it ended; one that ended answers with its last 40 lines of output from a `logs` request, and the client closes either way.
+A broker that fails answers its error as the reason, as a server that ended does; a failure to read the project or find a free port is the dashboard's own, and shows as an error instead of going to the session.
+A service that runs counts as started, ready or not, and the page loads `http://localhost:<port>`.
+No `package.json`, no script, a service that ended, and an error from the broker answer `fallback`, and the page then sends the session its old prompt with that reason appended, so the model starts the server instead.
 
 ## The idle stop
 

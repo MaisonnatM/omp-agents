@@ -8,31 +8,26 @@ import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
 
-/** The header's switch between the sidebar's two sets of tabs: Dev for code work, Ops for the day around it. */
-export const TAB_GROUPS = [
-	{ value: "dev", label: "Dev" },
-	{ value: "ops", label: "Ops" },
-] as const;
-
-export type TabGroup = (typeof TAB_GROUPS)[number]["value"];
+/** Where a tab's trigger sits: `bar` is the sidebar's tab bar, `header` the buttons after the command menu button. */
+export type TabPlace = "bar" | "header";
 
 /**
- * The sidebar's tabs, in order, each in the `group` whose bar shows it. A tab with an `integration` shows, and its
+ * The sidebar's tabs, in order, each at the `place` that draws its trigger. A tab with an `integration` shows, and its
  * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
  * offers to reconnect. Settings is no tab: the header's button opens it.
  */
 export const SIDEBAR_TABS = [
-	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], group: "dev" },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, group: "dev", integration: "linear" },
-	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, group: "dev" },
-	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, group: "dev" },
-	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, group: "dev" },
-	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, group: "ops" },
-	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, group: "ops" },
-	{ value: "email", label: "Email", icon: PAGE_ICON.email, group: "ops", integration: "gmail" },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: TabGroup; integration?: McpIntegrationId }[];
+	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: "bar" },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: "bar", integration: "linear" },
+	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: "bar" },
+	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, place: "bar" },
+	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: "bar" },
+	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, place: "header" },
+	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, place: "header" },
+	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: "header", integration: "gmail" },
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; place: TabPlace; integration?: McpIntegrationId }[];
 
-/** A tab of the sidebar's bar; the tickets, Bots, todo, notes, calendar, and email tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A sidebar tab, whose trigger sits in the bar or the header; the tickets, Bots, todo, notes, calendar, and email tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** What the sidebar shows: a tab's panel, or the settings sections while the Settings page is open. */

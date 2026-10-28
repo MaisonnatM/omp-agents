@@ -102,7 +102,7 @@
   It comes from `~/.omp/agent/extensions/todos.ts`, which `bun run omp-template` installs.
 - An agent adds a todo when it stops on a step outside the session that only you can take, such as setting up an account or a credential, running something on your machine, or reviewing a pull request.
   It asks for an approval or an answer in its reply, not in a todo.
-  The todo lands last, as **Todo** with no priority, in no category unless the agent names one, which must already exist; its chip names the session that added it and opens it.
+  The todo lands last, as **Todo** with no priority, in no category unless the agent names one that exists; when the category it names does not exist, the todo lands in none and the agent is told which categories do, and its chip names the session that added it and opens it.
 - An agent edits or deletes a todo when you ask it to, or to fix or drop one its session added.
   `edit` changes only the fields it names: its notes replace the todo's, an empty `due` clears the due day, and an empty `section` takes a top-level todo out of its category; a todo under another has no category.
   `edit` and `delete` refuse an id the list lacks, and a deleted todo leaves the list and the archive with no undo.

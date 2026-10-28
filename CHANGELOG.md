@@ -7,6 +7,12 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - The Browser tab now picks as T3 Code does: the pointer button floats a Select, Region, Draw, and Erase switch over your app. Elements you select and boxes and lines you draw go in together with the comment you type beside them: one chip in the message box and one picture. The new camera button attaches a picture of the whole app.
 - The session details sidebar, and the Browser in it, now widens to 960 pixels, as far as the conversation keeps 480.
+- Behind the scenes: merging a branch into main without a line here now stops at the merge, and a fast-forward without one warns, so the line goes on the branch instead of a fix-up after it.
+- Fixed: a todo an agent files under a category you don't have now lands in your list with no category instead of failing.
+- A session running /ship now shows a Ship section in its todos card, with the current stage and a progress bar; unfold it to see every stage as a step.
+- Notes, Calendar, and Email moved to buttons in the header beside the command menu, replacing the Dev and Ops switch.
+- Cmd+1 through Cmd+5 now count the tabs of the sidebar's bar: Pull requests, Tickets, Bots, Sessions, and Todo.
+- The Browser's Start dev server button now starts your app itself and opens it in the Browser; when it cannot, it asks the session as before.
 - Fixed: plan usage failed because the app started on a Bun older than omp allows. It now starts on Bun 1.4.4.
 - The workspace picker now lists each repository once, with sessions in its worktrees, such as a review's, under it instead of one workspace each.
 - Sessions started in a Mac temporary folder, such as one `mktemp -d` made, are now hidden from the sidebar like those in `/tmp`.

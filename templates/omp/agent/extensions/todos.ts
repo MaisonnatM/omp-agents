@@ -9,6 +9,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { type Section, sectionFor } from "./todos/sections";
 
 const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents");
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
@@ -27,7 +28,7 @@ interface Todo extends Leaf {
 	addedBy?: string | null;
 }
 interface List {
-	categories?: { id: string; name: string }[];
+	categories?: Section[];
 	todos?: Todo[];
 }
 
@@ -86,14 +87,6 @@ function findTodo(list: List, id: string): { todo: Leaf; topLevel: boolean } | u
 	return undefined;
 }
 
-/** The section named `name`, matched case-insensitively, or the error naming the ones that exist. */
-function sectionNamed(list: List, name: string): { id: string } | { error: string } {
-	const category = list.categories?.find(category => category.name.toLowerCase() === name.toLowerCase());
-	if (category) return category;
-	const names = (list.categories ?? []).map(category => category.name).join(", ") || "none";
-	return { error: `No section named ${JSON.stringify(name)}; the sections are: ${names}.` };
-}
-
 const reply = (text: string, isError = false) => ({ content: [{ type: "text" as const, text }], isError });
 
 export default function todos(pi: ExtensionAPI) {
@@ -109,7 +102,7 @@ export default function todos(pi: ExtensionAPI) {
 			.string()
 			.max(200)
 			.optional()
-			.describe("add, edit: the name of an existing Todo page section to file it in; omit for none; edit: empty moves it out of its section"),
+			.describe("add, edit: the name of an existing Todo page section to file it in; omit for none; add: an unknown one files it in none; edit: empty moves it out of its section"),
 		id: z.string().max(64).optional().describe("check, edit, delete: the todo's id, from list"),
 	});
 	pi.registerTool({
@@ -123,7 +116,7 @@ export default function todos(pi: ExtensionAPI) {
 			"Never add your own work items; use your todo tool for those.",
 			"When you finish the work a todo asks for, or the user has done the step it names, check it off.",
 			"Edit or delete a todo only when the user asks, or to fix or drop one this session added; prefer check over delete for a step that was done.",
-			"Sections must already exist; you cannot create, rename, or remove one.",
+			"Sections must already exist; you cannot create, rename, or remove one. An add naming a section that does not exist files the todo in no section.",
 		].join(" "),
 		parameters: params,
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
@@ -138,8 +131,7 @@ export default function todos(pi: ExtensionAPI) {
 				case "add": {
 					if (!title) return reply("add needs text.", true);
 					const list = readList();
-					const category = sectionName ? sectionNamed(list, sectionName) : undefined;
-					if (category && "error" in category) return reply(category.error, true);
+					const { categoryId, missing } = sectionFor(list.categories, sectionName);
 					const sessionId = ctx.sessionManager.getSessionId();
 					const same = todosOf(list, sessionId).added.find(todo => todo.text === title);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
@@ -149,13 +141,13 @@ export default function todos(pi: ExtensionAPI) {
 						id: todoId,
 						parentId: null,
 						afterId: null,
-						categoryId: category?.id ?? null,
+						categoryId,
 						text: title,
 						body: notes ?? "",
 						due: due || null,
 						addedBy: sessionId,
 					});
-					return reply(`Added to the user's todo list (id ${todoId}).`);
+					return reply(`Added to the user's todo list (id ${todoId}).${missing ? ` It is in no section. ${missing}` : ""}`);
 				}
 				case "check": {
 					if (!id) return reply("check needs the todo's id.", true);
@@ -173,9 +165,9 @@ export default function todos(pi: ExtensionAPI) {
 					let categoryId: string | null | undefined;
 					if (section !== undefined) {
 						if (!found.topLevel) return reply("Only a top-level todo has a section.", true);
-						const category = sectionName ? sectionNamed(list, sectionName) : undefined;
-						if (category && "error" in category) return reply(category.error, true);
-						categoryId = category?.id ?? null;
+						const resolved = sectionFor(list.categories, sectionName);
+						if (resolved.missing) return reply(resolved.missing, true);
+						categoryId = resolved.categoryId;
 					}
 					if (title) leave({ op: "edit", id, text: title });
 					if (notes !== undefined) leave({ op: "edit-body", id, body: notes });

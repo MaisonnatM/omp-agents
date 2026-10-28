@@ -1,4 +1,4 @@
-/** The Dev and Ops switch, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
+/** The Notes, Calendar, and Email buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { PAGE_ICON } from "../page-icons";
-import { TAB_GROUPS, type TabGroup } from "../routing";
+import type { SidebarPanel, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
+import { TAB_ROWS } from "../sidebar-tabs";
 import { useHistoryPosition } from "../use-history-position";
 import { NoticesBell } from "./notices";
-import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "./segmented-tabs";
 import { WhatsNew } from "./whats-new";
 
 /** The desktop app on macOS hides the system's title bar, so the page draws it, `DesktopTitleBar`, with these controls. */
@@ -24,34 +24,49 @@ export const useHeaderControls = (): ReactNode => useContext(HeaderControlsConte
 interface HeaderControlsProps {
 	notices: Notice[];
 	onShowSearch: () => void;
-	/** The group whose tabs the sidebar's bar shows. */
-	group: TabGroup;
-	/** The groups with no tab shown, whose switch is disabled. */
-	emptyGroups: ReadonlySet<TabGroup>;
-	onGroup: (group: TabGroup) => void;
+	/** The shown tabs whose triggers sit here, after the command menu button between two dividers, in order. */
+	tabs: readonly SidebarTab[];
+	/** The panel the sidebar shows, whose button is pressed. */
+	tab: SidebarPanel;
+	onTab: (tab: SidebarTab) => void;
 	settingsOpen: boolean;
 	onToggleSettings: () => void;
 }
 
 const SettingsIcon = PAGE_ICON.settings;
 
-export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, group, emptyGroups, onGroup, settingsOpen, onToggleSettings }: HeaderControlsProps) {
+export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, tab, onTab, settingsOpen, onToggleSettings }: HeaderControlsProps) {
 	return (
 		<div className="flex shrink-0 items-center gap-1">
-			<SegmentedTabs value={group} onValueChange={value => onGroup(value as TabGroup)}>
-				<SegmentedTabsList {...activityControl("header.group")} aria-label="Sidebar tabs" className="rounded-md">
-					{TAB_GROUPS.map(({ value, label }) => (
-						<SegmentedTab key={value} value={value} disabled={emptyGroups.has(value)} className="h-5 rounded-sm px-2 text-2xs">
-							{label}
-						</SegmentedTab>
-					))}
-				</SegmentedTabsList>
-			</SegmentedTabs>
 			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
 				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
 					<Search />
 				</Button>
 			</Tooltip>
+			{tabs.length > 0 && (
+				<>
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+					{tabs.map(value => {
+						const { label, icon: Icon } = TAB_ROWS[value];
+						return (
+							<Tooltip key={value} content={label} shortcut={shortcutLabels(value)} side="bottom">
+								<Button
+									{...activityControl("header.tab")}
+									variant="ghost"
+									size="icon-compact"
+									className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
+									aria-label={label}
+									aria-pressed={tab === value}
+									onClick={() => onTab(value)}
+								>
+									<Icon />
+								</Button>
+							</Tooltip>
+						);
+					})}
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+				</>
+			)}
 			<WhatsNew />
 			<NoticesBell notices={notices} />
 			<Tooltip content={settingsOpen ? "Close settings" : "Settings"} shortcut={shortcutLabels("settings")} side="bottom">

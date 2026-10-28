@@ -1,11 +1,9 @@
 # Sessions sidebar
 
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
-- The **Dev** and **Ops** switch at the right end of the header picks which tabs the sidebar's tab bar shows.
-  **Dev** shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**; **Ops** shows **Notes**, **Calendar**, and **Email**.
+- The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**.
+  **Notes**, **Calendar**, and **Email** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar, and the open one's button stays pressed.
   The **Bots** tab lists your Bots, which the **Sessions** tab does not; see [Bots](bots.md).
-  Switching opens the tab you last left in that group, else its first tab, and the switch follows any page you open, so G then N or a link to a note turns it to **Ops**.
-  A side whose tabs are all hidden or signed out is disabled.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
