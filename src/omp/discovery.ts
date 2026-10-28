@@ -22,10 +22,13 @@ const PACKAGED_PROVIDERS: Record<string, true> = {
 	"omp-plugins": true,
 };
 
+/** `name` is the name omp resolved for a skill or slash command; `frontmatter` is a skill's, as omp parsed it. */
 export interface FoundFile {
 	kind: OmpFileKind;
 	scope: "user" | "project";
 	path: string;
+	name?: string;
+	frontmatter?: Record<string, unknown>;
 }
 
 /** The user-written files a session in `cwd` loads, through omp's own discovery. */
@@ -34,10 +37,10 @@ export async function discoverOmpFiles(cwd: string, disabledExtensions: string[]
 		Promise.all(
 			FILE_CAPABILITIES.map(async ([id, kind]) => {
 				const { items } = await discovery.loadCapability(id, { cwd, disabledExtensions });
-				return items.flatMap(({ _source: source }): FoundFile[] =>
+				return items.flatMap(({ _source: source, name, frontmatter }): FoundFile[] =>
 					source.level === "native" || PACKAGED_PROVIDERS[source.provider]
 						? []
-						: [{ kind, scope: source.level, path: source.path }],
+						: [{ kind, scope: source.level, path: source.path, name, frontmatter }],
 				);
 			}),
 		),

@@ -11,6 +11,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The Browser has a Full screen button; press it again or Escape to put it back in the sidebar.
 - The Browser's Open in browser button is now called Open in default browser.
 - A running session's name in the sidebar no longer leaves an empty gap where its green dot used to be.
+- Settings → Workflows lists your workflows, the skills tagged as one, with the command that starts each, and lets you read and edit each one in place.
+  A flowchart above each workflow draws its numbered steps in order.
+- The steps /ship follows now live in a ship skill, so you can change them from Settings → Workflows; /ship works as before.
 - In the desktop app, the greyed Back and Forward buttons still show their tooltip, and the command menu offers Go back and Go forward, now with arrow icons, only when there is somewhere to go.
 - Past sessions no longer list the quick one-off agent runs that other sessions start in the background, only sessions you had a conversation in.
 - The Files, Images, and Sources sections moved from above the message box into the Todos card, at the top right of the conversation or above its messages when the window is narrow.

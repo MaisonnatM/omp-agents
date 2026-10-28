@@ -53,6 +53,8 @@ The main ones:
   Extensions: `omp -e <file>` (`pi-coding-agent/src/main.ts`, `additionalExtensionPaths`) loads in `rpc-ui` mode too; `pi-coding-agent/src/discovery/omp-extension-roots.ts` dedupes by path only, so the same extension at two paths loads twice.
 - Service tiers: `serviceTierFamily` and `shouldSendServiceTier` in `pi-ai/src/types.ts`, which `fastAvailable` in `src/omp/models.ts` calls to decide, as `setFastMode` in `pi-coding-agent/src/session/model-controls.ts` does, whether `/fast` can turn on for the live model.
 - Settings and discovery: `pi-coding-agent/src/config/settings.ts`, `pi-coding-agent/src/discovery/index.ts`, and `pi-coding-agent/src/task/discovery.ts`.
+  Skill frontmatter: `SkillFrontmatter` in `pi-coding-agent/src/capability/skill.ts` keeps any key of a user's skill, but `validateAgentSkillFrontmatter` in `pi-coding-agent/src/discovery/agent-plugin-format.ts` refuses a plugin's or a skillshare pack's skill with a top-level key outside its list or a non-string `metadata` value, so `src/omp/workflows.ts` reads the `workflow` tag from `metadata.tags`.
+  `src/omp/discovery.ts` keeps a `Skill`'s `name` and `frontmatter` and a `SlashCommand`'s `name` (`pi-coding-agent/src/capability/slash-command.ts`) from the capability items, so the workflows read neither file themselves.
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
   `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`.
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.

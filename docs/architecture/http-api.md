@@ -6,6 +6,10 @@ This file holds the settings, analytics, and activity endpoints and the rules ev
 The server loads omp's settings with omp's own read-only loader (`Settings.loadReadOnly` in `pi-coding-agent/src/config/settings.ts`), the same way a session that starts in that directory would, and applies omp's rule for which roles use the `default` chain (`expandDefaultRetryFallbackChains`).
 It finds the files through omp's capability discovery (`pi-coding-agent/src/discovery`), agent discovery (`pi-coding-agent/src/task/discovery.ts`), and `findConfigFile` for `APPEND_SYSTEM.md`, and then reads each file from disk.
 Each file carries the SHA-256 of its text.
+`workflows` lists, by name, the skills among those files whose frontmatter, as omp's discovery parsed it, names `workflow` in `metadata.tags`, a comma- or space-separated string (`workflowsOf` in `src/omp/workflows.ts`).
+The tag sits under `metadata` because omp's plugin loader (`validateAgentSkillFrontmatter` in `pi-coding-agent/src/discovery/agent-plugin-format.ts`) refuses a top-level key other than `name`, `description`, `license`, `allowed-tools`, `metadata`, and `compatibility`, and a `metadata` value that is not a string.
+Each workflow carries the skill's name as omp resolves it, its `name` field else its directory, and two paths into `files`: `skill`, and `command`, the slash command omp names the same, the project's before the user's, or `null`.
+A workflow's skill is one of `files`, so `PUT /api/settings/file` edits it.
 `GET /api/models` runs `omp models --json` for the pickers.
 
 `GET /api/analytics?range=<range>` answers `Analytics` from omp-stats and Claude Code's and Codex's recorded requests, defaulting to `24h`.

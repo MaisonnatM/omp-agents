@@ -20,6 +20,7 @@ import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
 import { SourceControlTab } from "./source-control-tab";
 import { SyncTab } from "./sync-tab";
+import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 
@@ -62,7 +63,7 @@ function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; work
 const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
 
 /** The omp sections' content once settings are read, else why they are empty. */
-function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing): Record<"models" | "files", ReactNode> {
+function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing): Record<"models" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
 		const note =
 			read.error === null ? (
@@ -72,29 +73,26 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 					Cannot read omp's settings: {read.error}
 				</p>
 			);
-		return { models: note, files: note };
+		return { models: note, files: note, workflows: note };
 	}
-	const { routing, files } = read.data;
-	const filesPanel = <Files key={cwd ?? ""} files={files} editing={editing} />;
+	const { routing, files, workflows } = read.data;
+	const key = cwd ?? "";
+	const filesPanel = <Files key={key} files={files} editing={editing} />;
+	const workflowsPanel = <Workflows key={key} workflows={workflows} files={files} editing={editing} />;
 	if ("error" in routing) {
 		const alert = (
 			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
 				omp cannot load its settings: {routing.error}
 			</p>
 		);
-		return { models: alert, files: filesPanel };
+		return { models: alert, files: filesPanel, workflows: workflowsPanel };
 	}
 	const configPath = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"))?.pathDisplay;
 	return {
 		models: <ModelsTab routing={routing} configPath={configPath} editing={editing} />,
 		files: filesPanel,
+		workflows: workflowsPanel,
 	};
-}
-
-/** What a workspace section's header says it shows for `cwd`. */
-function workspaceMeta(section: SettingsSection, cwd: string | null): string {
-	if (section === "decisions") return cwd === null ? "Pick a workspace" : "The repository's decision records, read-only";
-	return cwd === null ? "Your user files only, for all workspaces" : "As a session in this workspace loads them";
 }
 
 /** One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place. */
@@ -153,16 +151,16 @@ export function SettingsPage({
 			{panels[value]}
 		</section>
 	));
-	const { label, scope } = SETTINGS_SECTIONS.find(({ value }) => value === section)!;
+	const shown = SETTINGS_SECTIONS.find(({ value }) => value === section)!;
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			{scope === "workspace" ? (
-				<Header title={label} meta={workspaceMeta(section, cwd)}>
+			{shown.scope === "workspace" ? (
+				<Header title={shown.label} meta={cwd === null ? shown.meta.none : shown.meta.workspace}>
 					<WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={onPickWorkspace} />
 				</Header>
 			) : (
-				<Header title={label} />
+				<Header title={shown.label} />
 			)}
 			{/* Relative, so an absolute child such as a table's `sr-only` caption stays in this scroll and never makes the document scroll. */}
 			<div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto">
