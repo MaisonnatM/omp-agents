@@ -186,6 +186,14 @@ export interface OmpFile {
 	body: { state: "read"; size: number; modifiedAt: number; text: string; hash: string } | { state: "missing" } | { state: "unreadable"; error: string };
 }
 
+/** A skill tagged `workflow` in its frontmatter's `metadata.tags`; `command` is the slash command of the same name that starts it, if any. */
+export interface Workflow {
+	name: string;
+	description: string;
+	skill: OmpFile;
+	command: OmpFile | null;
+}
+
 /** `GET /api/settings`: omp's model routing and files, as a session in `cwd` would load them. */
 export interface OmpSettings {
 	/** The workspace whose project files and settings are included; `null` for user-level only. */
@@ -193,6 +201,8 @@ export interface OmpSettings {
 	/** `error` is omp's reason when it cannot load the settings, for example a malformed `config.yml`. */
 	routing: ModelRouting | { error: string };
 	files: OmpFile[];
+	/** The workflow skills among `files`, by name. */
+	workflows: Workflow[];
 }
 
 /** One decision record, a Markdown file in a repository's records directory, as the `decision-records` skill writes them. */

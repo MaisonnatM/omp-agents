@@ -66,7 +66,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Notes.**
   Markdown notes with search, optional todo links, and Undo, shared with agent sessions through the starter kit's `user_note` tool.
 - **Settings editor.**
-  Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, and pin a skill that every new session starts through.
+  Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, edit your workflows, the skills tagged `workflow` such as `/ship`'s, and pin a skill that every new session starts through.
 - **Plan quota.**
   Remaining quota per provider plan, from `omp usage`.
 - **Keyboard-first.**
@@ -156,7 +156,7 @@ PORT=5000 bun run desktop
 
 ### omp starter kit
 
-[`templates/omp`](templates/omp) holds the omp setup this project is built with: model roles and fallback chains across Anthropic, OpenAI Codex, Cursor, and OpenRouter, an `AGENTS.md`, a review agent, a `/ship` command, and skills.
+[`templates/omp`](templates/omp) holds the omp setup this project is built with: model roles and fallback chains across Anthropic, OpenAI Codex, Cursor, and OpenRouter, an `AGENTS.md`, a review agent, a `/ship` workflow skill and its command, and skills.
 It also turns on `collab.autoStart`.
 It is opinionated: it expects accounts on those four providers, installs the third-party `pstack` plugin from the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace, and sets a reply format for every session in `APPEND_SYSTEM.md`.
 Run it with `--dry-run` first to see each change.

@@ -20,6 +20,7 @@ import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
 import { SourceControlTab } from "./source-control-tab";
 import { SyncTab } from "./sync-tab";
+import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 
@@ -62,7 +63,7 @@ function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; work
 const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
 
 /** The omp sections' content once settings are read, else why they are empty. */
-function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing): Record<"models" | "files", ReactNode> {
+function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing): Record<"models" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
 		const note =
 			read.error === null ? (
@@ -72,28 +73,31 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 					Cannot read omp's settings: {read.error}
 				</p>
 			);
-		return { models: note, files: note };
+		return { models: note, files: note, workflows: note };
 	}
-	const { routing, files } = read.data;
+	const { routing, files, workflows } = read.data;
 	const filesPanel = <Files key={cwd ?? ""} files={files} editing={editing} />;
+	const workflowsPanel = <Workflows key={cwd ?? ""} workflows={workflows} editing={editing} />;
 	if ("error" in routing) {
 		const alert = (
 			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
 				omp cannot load its settings: {routing.error}
 			</p>
 		);
-		return { models: alert, files: filesPanel };
+		return { models: alert, files: filesPanel, workflows: workflowsPanel };
 	}
 	const configPath = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"))?.pathDisplay;
 	return {
 		models: <ModelsTab routing={routing} configPath={configPath} editing={editing} />,
 		files: filesPanel,
+		workflows: workflowsPanel,
 	};
 }
 
 /** What a workspace section's header says it shows for `cwd`. */
 function workspaceMeta(section: SettingsSection, cwd: string | null): string {
 	if (section === "decisions") return cwd === null ? "Pick a workspace" : "The repository's decision records, read-only";
+	if (section === "workflows" && cwd === null) return "Your user skills only, for all workspaces";
 	return cwd === null ? "Your user files only, for all workspaces" : "As a session in this workspace loads them";
 }
 

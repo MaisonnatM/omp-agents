@@ -108,3 +108,8 @@ _Avoid_: Leader, primary
 **Starter kit**:
 The optional omp setup in `templates/omp/` that one command installs into omp's agent directory.
 _Avoid_: Template, preset, config pack
+
+**Workflow**:
+An omp skill whose `SKILL.md` frontmatter names `workflow` in `metadata.tags`, such as the starter kit's `ship`, which Settings › Workflows lists and edits; a command of the same name starts it.
+It is not a GitHub Actions workflow under `.github/workflows/`.
+_Avoid_: Playbook, procedure, pipeline

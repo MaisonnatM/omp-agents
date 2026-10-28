@@ -8,7 +8,8 @@ import { putJson, settingsUrl } from "../../api";
 import { FILE_KIND_LABELS, fileGroups, formatBytes } from "../../labels";
 import { EditBar, type Editing, SaveError, useEditor } from "./editor";
 
-function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
+/** One omp file, viewed or edited in place; also the right pane of Settings › Workflows. */
+export function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 	const { body } = file;
 	const editor = useEditor(
 		body.state === "read" ? body.text : "",

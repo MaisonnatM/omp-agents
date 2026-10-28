@@ -14,8 +14,9 @@
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows, and names a provider as the page shows it (`providerName`).
   `src/server/usage-poll.ts` (`UsagePoll`) runs it for the dashboard: on the usage tick and a page's open, each followed by the plan notice check, and fresh for a continue, which skips that check.
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
-- `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
+- `src/settings.ts`: builds the settings page's model routing, file list, and workflows, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
+  `src/omp/workflows.ts` (`workflowsOf`) picks the workflows among those files: the skills whose frontmatter's `metadata.tags` names `workflow`, each paired with the command of the same name; `src/omp/workflows.test.ts` tests the tag, the pairing, and the skills it leaves out.
 - `src/decisions.ts`: reads a repository's decision records for Settings › Decisions; `src/decisions.test.ts` tests a record with and without frontmatter, the directory it picks from a nested directory, and a repository with none.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist.
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.

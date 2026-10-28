@@ -7,6 +7,7 @@ import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpCo
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
 import { connectedProviders, listModels } from "./omp/models";
+import { workflowsOf } from "./omp/workflows";
 import { displayPath, HOME } from "./paths";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
 import type { ModelUpdate } from "./shared/notices";
@@ -100,7 +101,8 @@ async function loadSession(cwd: string | null): Promise<{ routing: OmpSettings["
 
 export async function loadOmpSettings(cwd: string | null): Promise<OmpSettings> {
 	const { routing, found } = await loadSession(cwd);
-	return { cwd, routing, files: await Promise.all(found.map(readFile)) };
+	const files = await Promise.all(found.map(readFile));
+	return { cwd, routing, files, workflows: workflowsOf(files) };
 }
 
 /** What a routing edit is checked against: the models omp lists, and what the config names today. */
