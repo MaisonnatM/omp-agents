@@ -16,6 +16,8 @@ export const SIGN_IN_CHANNEL = "omp-agents:sign-in";
 export const ACCESS_CHANNEL = "omp-agents:access";
 /** The `ipc-message` channel of the Preview's webview, which carries each element react-grab copied in it, and the key of the page's message to its preload. */
 export const PREVIEW_GRAB_CHANNEL = "omp-agents:preview-grab";
+/** The `ipc-message` channel on which the Browser's webview reports an Escape its app left unhandled. */
+export const PREVIEW_ESCAPE_CHANNEL = "omp-agents:preview-escape";
 /** The Preview webview's session, apart from the dashboard's, and kept across launches, so a sign-in to the app lasts. */
 export const PREVIEW_PARTITION = "persist:omp-preview";
 /** The page's report of the ports a Browser's session runs servers on, for the shell's {@link appAddress}. */
@@ -23,28 +25,38 @@ export const BROWSER_PORTS_CHANNEL = "omp-agents:browser-ports";
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-/** Whether `url` is an http or https address on this computer, the only kind the Preview loads. */
-export function isLoopbackUrl(url: string): boolean {
-	const parsed = URL.parse(url);
-	return (parsed?.protocol === "http:" || parsed?.protocol === "https:") && LOOPBACK_HOSTS.has(parsed.hostname);
+/** Whether `url` is an http or https address. */
+export function isWebUrl(url: string): boolean {
+	const protocol = URL.parse(url)?.protocol;
+	return protocol === "http:" || protocol === "https:";
 }
 
-function portOf(url: URL): number {
-	return url.port === "" ? (url.protocol === "https:" ? 443 : 80) : Number(url.port);
+/** Whether `url` is an http or https address on this computer, the only kind the Preview loads. */
+export function isLoopbackUrl(url: string): boolean {
+	return isWebUrl(url) && LOOPBACK_HOSTS.has(URL.parse(url)?.hostname ?? "");
+}
+
+/** The port of `url` when it is on this computer at one of `sessionPorts`, else `null`. */
+function sessionPortOf(url: string, sessionPorts: ReadonlySet<number>): number | null {
+	const parsed = URL.parse(url);
+	if (parsed === null || !isLoopbackUrl(url)) return null;
+	const port = parsed.port === "" ? (parsed.protocol === "https:" ? 443 : 80) : Number(parsed.port);
+	return sessionPorts.has(port) ? port : null;
 }
 
 /**
- * Where the Browser goes instead of `target`, leaving `from`: the same address on `home`, the port of the session's
- * server it last showed, when `target` is on this computer at a port the session runs nothing on, and `from` is a page
- * off this computer, such as a sign-in provider, or one of the session's servers. An app whose sign-in names the port
- * it usually runs on, such as `localhost:3000`, so comes back to the session's server. `null` loads `target` as is.
+ * Where the Browser goes instead of `target`, leaving `from`, having shown `shown` oldest first: the same address on the
+ * session's port it last showed, when `target` is on this computer at a port the session runs nothing on, and `from` is
+ * a page off this computer, such as a sign-in provider, or one of the session's servers. An app whose sign-in names the
+ * port it usually runs on, such as `localhost:3000`, so comes back to the session's server. `null` loads `target` as is.
  */
-export function appAddress(target: string, from: string, home: number | null, sessionPorts: ReadonlySet<number>): string | null {
-	const to = URL.parse(target);
-	if (home === null || to === null || !isLoopbackUrl(target) || sessionPorts.has(portOf(to))) return null;
-	const leaving = URL.parse(from);
-	if (leaving !== null && isLoopbackUrl(from) && !sessionPorts.has(portOf(leaving))) return null;
-	to.port = String(home);
+export function appAddress(target: string, from: string, shown: readonly string[], sessionPorts: ReadonlySet<number>): string | null {
+	if (!isLoopbackUrl(target) || sessionPortOf(target, sessionPorts) !== null) return null;
+	if (isLoopbackUrl(from) && sessionPortOf(from, sessionPorts) === null) return null;
+	const home = shown.findLast(url => sessionPortOf(url, sessionPorts) !== null);
+	if (home === undefined) return null;
+	const to = new URL(target);
+	to.port = String(sessionPortOf(home, sessionPorts));
 	return to.href;
 }
 

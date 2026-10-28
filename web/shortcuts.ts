@@ -33,6 +33,7 @@ export type ShortcutId =
 	| "forward"
 	| "help"
 	| "restore"
+	| "browserRestore"
 	| "focusComposer"
 	| "pull-requests"
 	| "tickets"
@@ -220,6 +221,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "forward", category: "general", label: "Go forward", command: "Go forward", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
+	{ id: "browserRestore", category: "sessions", label: "Put a maximized Browser back in the sidebar", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{
 		id: "focusComposer",
 		category: "sessions",

@@ -18,7 +18,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   A link that opens a new tab opens in your default browser.
   An address that fails to load says why under the address.
 - Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.
-- **Full screen**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, without entering macOS full screen; the same button or Escape brings it back to the sidebar.
+- **Maximize Browser**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, the same button, or Escape, pressed in the app too, puts it back in the sidebar.
 - **Select element**, the pointer button, turns on react-grab's picking in the app, and a click on an element adds it to the session's composer: its HTML, the React component around it with its file, and a selector.
   React-grab's **Comment** adds the element with a note you type first; the composer gets the note and then the element.
   Each pick goes after what the composer already holds, and a message confirms it; nothing is sent until you send it.

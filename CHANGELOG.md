@@ -7,7 +7,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - The Preview tab in the desktop app is now called Browser.
 - The Browser has a Start dev server button, which asks the session to start its app so the Browser can show it.
-- The Browser has a Full screen button, which fills the app's window, not your whole screen; press it again or Escape to put it back in the sidebar.
+- The Browser has a Maximize button, which fills the app's window with it, not your whole screen; press it again or Escape, even inside your app, to put it back in the sidebar.
 - The Browser's Open in browser button is now called Open in default browser.
 - Fixed: signing in to your app in the Browser no longer jumps to your default browser; the sign-in finishes in the Browser, and a sign-in popup opens as a small window of the app.
 - Fixed: a sign-in in the Browser that comes back to your app's usual port, such as localhost:3000, now lands on the session's dev server instead.

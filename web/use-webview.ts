@@ -1,6 +1,6 @@
 /** The Browser's Electron `<webview>`: what it loads, its address field, its history, and the elements react-grab copies in it. */
 import { useEffect, useRef, useState } from "react";
-import { isLoopbackUrl, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
+import { isLoopbackUrl, PREVIEW_ESCAPE_CHANNEL, PREVIEW_GRAB_CHANNEL } from "../src/shared/desktop-bridge";
 
 /** What the Browser drives of Electron's `<webview>`, which the page has no types for. */
 export interface WebviewTag extends HTMLWebViewElement {
@@ -36,12 +36,14 @@ interface WebviewOptions {
 	onPick: (text: string) => void;
 	/** Takes each address on this computer the page navigates to. */
 	onNavigate: (url: string) => void;
+	/** Takes an Escape the app left unhandled, which never reaches the page while the app has the focus. */
+	onEscape: () => void;
 	/** The ports the session runs servers on, which a sign-in back to the app's usual port is sent to instead. */
 	sessionPorts: readonly number[];
 }
 
 /** The `<webview>` to render with `ref` and `src` once `src` is not `null`, the address field's state, and the toolbar's actions. */
-export function useWebview({ initial, onPick, onNavigate, sessionPorts }: WebviewOptions) {
+export function useWebview({ initial, onPick, onNavigate, onEscape, sessionPorts }: WebviewOptions) {
 	const ref = useRef<WebviewTag>(null);
 	// The webview's first address: later ones go through `loadURL`, since a changed `src` would load each page again.
 	const [src, setSrc] = useState(initial);
@@ -49,8 +51,8 @@ export function useWebview({ initial, onPick, onNavigate, sessionPorts }: Webvie
 	const [problem, setProblem] = useState<string | null>(null);
 	const [ready, setReady] = useState(false);
 	const [history, setHistory] = useState({ back: false, forward: false });
-	const latest = useRef({ onPick, onNavigate });
-	latest.current = { onPick, onNavigate };
+	const latest = useRef({ onPick, onNavigate, onEscape });
+	latest.current = { onPick, onNavigate, onEscape };
 
 	useEffect(() => {
 		if (src !== null || initial === null || address !== "") return;
@@ -81,8 +83,9 @@ export function useWebview({ initial, onPick, onNavigate, sessionPorts }: Webvie
 		const onMessage = (event: Event): void => {
 			const { channel, args } = event as IpcMessageEvent;
 			const content = args[0];
+			if (channel === PREVIEW_ESCAPE_CHANNEL) latest.current.onEscape();
 			// A sign-in takes the guest to other sites, which must not write into the composer.
-			if (channel === PREVIEW_GRAB_CHANNEL && typeof content === "string" && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
+			else if (channel === PREVIEW_GRAB_CHANNEL && typeof content === "string" && isLoopbackUrl(element.getURL())) latest.current.onPick(content);
 		};
 		const listeners: [string, (event: Event) => void][] = [
 			["dom-ready", onReady],
@@ -99,10 +102,9 @@ export function useWebview({ initial, onPick, onNavigate, sessionPorts }: Webvie
 		};
 	}, [mounted]);
 
-	const portsKey = sessionPorts.join(",");
 	useEffect(() => {
-		if (ready && ref.current) window.ompDesktop?.browserPorts?.(ref.current.getWebContentsId(), portsKey === "" ? [] : portsKey.split(",").map(Number));
-	}, [ready, portsKey]);
+		if (ready && ref.current) window.ompDesktop?.browserPorts?.(ref.current.getWebContentsId(), sessionPorts);
+	}, [ready, sessionPorts]);
 
 	const load = (typed: string): void => {
 		const url = addressOf(typed);

@@ -25,16 +25,17 @@ test("the Preview loads only http and https addresses on this computer, on any p
 describe("appAddress", () => {
 	const session = new Set([24817, 24818]);
 	const callback = "http://localhost:3000/v1/auth/callback?code=c&state=s";
+	const shown = ["http://localhost:24818/", "http://localhost:24817/login", "https://auth.workos.com/sso"];
 
-	test("a sign-in that comes back to the app's usual port lands on the session's server, query kept", () => {
-		expect(appAddress(callback, "https://auth.workos.com/sso", 24817, session)).toBe("http://localhost:24817/v1/auth/callback?code=c&state=s");
-		expect(appAddress("http://localhost:3000/orgs", "http://localhost:24817/login", 24817, session)).toBe("http://localhost:24817/orgs");
+	test("a sign-in that comes back to the app's usual port lands on the session's server it last showed, query kept", () => {
+		expect(appAddress(callback, "https://auth.workos.com/sso", shown, session)).toBe("http://localhost:24817/v1/auth/callback?code=c&state=s");
+		expect(appAddress("http://localhost:3000/orgs", "http://localhost:24818/login", shown, session)).toBe("http://localhost:24817/orgs");
 	});
 
-	test("leaves addresses the session serves, pages off this computer, and pages it does not serve", () => {
-		expect(appAddress("http://localhost:24818/api", "http://localhost:24817/", 24817, session)).toBeNull();
-		expect(appAddress("https://accounts.google.com/", "http://localhost:24817/", 24817, session)).toBeNull();
-		expect(appAddress("http://localhost:3000/next", "http://localhost:8000/docs", 24817, session)).toBeNull();
-		expect(appAddress(callback, "https://auth.workos.com/sso", null, session)).toBeNull();
+	test("leaves addresses the session serves, pages off this computer, pages it does not serve, and a guest that showed none of its servers", () => {
+		expect(appAddress("http://localhost:24818/api", "http://localhost:24817/", shown, session)).toBeNull();
+		expect(appAddress("https://accounts.google.com/", "http://localhost:24817/", shown, session)).toBeNull();
+		expect(appAddress("http://localhost:3000/next", "http://localhost:8000/docs", shown, session)).toBeNull();
+		expect(appAddress(callback, "https://auth.workos.com/sso", ["https://auth.workos.com/sso"], session)).toBeNull();
 	});
 });
