@@ -38,10 +38,10 @@
 - `web/components/routines/routines-card.tsx`: `RoutinesCard`, a Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header with **New routine**, then a row per routine, one open at a time, the arrow keys moving between their names.
   `web/components/routines/routine-row.tsx` draws a row: its name, **Run now**, and the switch that pauses it; its schedules and its next run's countdown; its trigger logos, its task, and its last 10 runs as a strip of ticks, each with a tooltip, that opens the row on that run.
   `web/components/routines/routine-open.tsx` draws an open row: the picked run, with what triggered it, its command's output, and its errors; the task whole; the schedule as a cadence, a time, and a day that save as they change; and **Edit** and **Delete**.
-  Its `CommandOutput` and `TriggeredBy` also render output and triggering events inside conversation cards.
+  Its `CommandOutput`, `TriggeredBy`, and section `HEADING` also render output, triggering events, and headings inside conversation cards.
   `web/components/routines/routine-run-card.tsx` holds `RoutineRunCard`, a folded conversation card built from a `routine` item's saved message, with its name, task icon, trigger logos, time, status, and command duration.
   Opening it shows the prompt or command, output, triggering events, **Open routine**, and the copy action that `web/components/transcript.tsx` supplies.
-  `web/components/routines/routine-marks.tsx` holds `TaskIcon`, `RunDot`, `HealthIcon`, `RunIcon`, `HEALTH_TICK`, and `TRIGGER_MARKS`, shared by routine rows, conversation cards, and the Bot's routine list.
+  `web/components/routines/routine-marks.tsx` holds `TaskIcon`, `RunDot`, `HealthIcon`, `RunIcon`, `HEALTH_TICK`, and `TRIGGER_MARKS`, shared by routine rows, conversation cards, and the Bot's routine list, and `OPEN_SPRING` and `INSTANT`, how an open row or card unfolds.
   `HealthIcon` draws a labeled status shape and color from `RunHealth`, while `RunIcon` derives those from a saved run through `runHealth` and `runWords` in `web/routines-model.ts`.
   `messageStatus` in that model derives a conversation card's status from its pending send, completed command, or `!` prompt's shell result.
   `web/components/toggle-switch.tsx` holds `ToggleSwitch`, the switch the card's rows and the Settings tabs share.

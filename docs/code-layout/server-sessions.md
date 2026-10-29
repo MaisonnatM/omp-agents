@@ -34,6 +34,7 @@
   Its `promptItem` folds stamped routine messages into `routine` items with their saved message and restores a skill invocation on the saved prompt.
   The fold also retains a `!` prompt's `bashExecution` output and result as `shell` on its routine item.
   Starting prompts use the same classification, so a routine shows its pending card until the recorded message replaces it.
+  Its `skillArgs` reads what the user typed after a `/skill:` prompt's token, for the fold, the Bots sidebar's preview in `src/server/bots.ts`, and the live title's check in `src/dashboard-session.ts`.
 - `src/conversation-search.ts`: the conversation search behind `GET /api/conversations`.
   `Conversations` keeps a fold of each session's own file, not its subagents', with the user's prompts' and the agent's replies' item ids and text.
   `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, decoded by the file's format, and the search leaves out routine items.

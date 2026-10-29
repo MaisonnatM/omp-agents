@@ -13,11 +13,9 @@ import { activityControl } from "../../activity";
 import { hashForBotRoutine } from "../../routing";
 import { durationWords, messageStatus, pastRunWords } from "../../routines-model";
 import { useMinute } from "../../use-minute";
-import { HealthIcon, TaskIcon, TRIGGER_MARKS } from "./routine-marks";
-import { CommandOutput, TriggeredBy } from "./routine-open";
-import { INSTANT, OPEN_SPRING } from "./routine-row";
+import { HealthIcon, INSTANT, OPEN_SPRING, TaskIcon, TRIGGER_MARKS } from "./routine-marks";
+import { CommandOutput, HEADING, TriggeredBy } from "./routine-open";
 
-const HEADING = "text-xs font-medium text-muted-foreground";
 const CODE = "block rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words";
 
 /** `copy` is the fold's copy button for what the routine sent. */

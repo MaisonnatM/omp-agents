@@ -3,7 +3,7 @@
  * to as that session lives, and a message to a Bot, which reaches its live session or resumes it.
  */
 import { join } from "node:path";
-import { isObject, parseJson } from "../json";
+import { isObject, parseJson, str } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
@@ -11,9 +11,11 @@ import { type Bot, type BotEdit, type BotId, type BotLast, MAX_MEMORY_BYTES } fr
 import type { ServerMsg } from "../shared/protocol";
 import { modelOfSelector } from "../shared/models";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
-import { entryTime, oneLine } from "../session-entries";
+import { type RoutineMessage, taskText } from "../shared/routine-message";
+import { promptAuthor, skillInvocation } from "../shared/transcript";
+import { entryTime, oneLine, textOf } from "../session-entries";
 import { readTail } from "../read-tail";
-import { messageItemsOf } from "../transcript";
+import { isUserPrompt, skillArgs, splitSuggestions } from "../transcript";
 import type { BotsFile } from "./bots-file";
 import type { SessionJoin } from "./start";
 
@@ -36,25 +38,59 @@ export function lastMessage(path: string): BotLast | null {
 	return null;
 }
 
-/** What session-file line `line` previews, as the transcript shows it: a collaborator's prompt, a `!` command's record, and a dashboard prompt preview nothing. */
+/**
+ * What session-file line `line` previews: the user's prompt or a `/skill:` prompt as typed, a routine's message, or the
+ * agent's reply. A prompt the dashboard sent, a collaborator's, and a `!` command the user ran preview nothing.
+ */
 function messageOf(line: string): BotLast | null {
 	const entry = parseJson(line);
 	if (!isObject(entry)) return null;
 	const at = entryTime(entry) ?? 0;
-	const items = messageItemsOf(entry);
-	const prompt = items.find(item => item.kind !== "assistant");
-	if (prompt?.kind === "routine") {
-		const { routine, sent } = prompt.message;
-		return { at, from: "routine", name: routine.name, text: oneLine(sent.kind === "prompt" ? sent.prompt : `$ ${sent.command}`) };
+	if (entry.type === "custom_message" && isUserPrompt(entry)) {
+		const skill = isObject(entry.details) ? str(entry.details.name) : undefined;
+		return skill ? promptLast(at, skillInvocation(skill, skillArgs(entry))) : null;
 	}
-	if (prompt?.kind === "user") {
-		const shell = isObject(entry.message) && entry.message.role === "bashExecution";
-		const body = prompt.text || (prompt.files ?? []).join(", ");
-		const text = oneLine(prompt.skill ? `/skill:${prompt.skill}${body ? ` ${body}` : ""}` : body);
-		return prompt.from === null && !shell && text ? { at, from: "user", text } : null;
+	if (entry.type !== "message" || !isObject(entry.message)) return null;
+	const { role, content, command } = entry.message;
+	switch (role) {
+		case "user":
+			return promptLast(at, textOf(content).trim());
+		case "assistant": {
+			const text = oneLine(splitSuggestions(textOf(content).trim()).body);
+			return text ? { at, from: "bot", text } : null;
+		}
+		case "bashExecution": {
+			// omp runs a `!` prompt without its `!`; with it back, a routine's run reads as the text the routine sent.
+			const author = promptAuthor(`!${str(command) ?? ""}`);
+			return author.kind === "routine" ? routineLast(at, author.message) : null;
+		}
+		default:
+			return null;
 	}
-	const reply = oneLine(items.flatMap(item => (item.kind === "assistant" ? [item.text] : [])).join("\n"));
-	return reply ? { at, from: "bot", text: reply } : null;
+}
+
+/** What prompt `text` previews: the user's as one line, a routine's under its name, none for the dashboard's. */
+function promptLast(at: number, text: string): BotLast | null {
+	if (!text) return null;
+	const author = promptAuthor(text);
+	switch (author.kind) {
+		case "user":
+			return { at, from: "user", text: oneLine(text) };
+		case "routine":
+			return routineLast(at, author.message);
+		case "dashboard":
+			return null;
+		default: {
+			const unhandled: never = author;
+			return unhandled;
+		}
+	}
+}
+
+/** A routine's message as a preview: its prompt, or `$ ` and its command. */
+function routineLast(at: number, message: RoutineMessage): BotLast {
+	const task = taskText(message);
+	return { at, from: "routine", name: message.routine.name, text: oneLine(message.sent.kind === "command" ? `$ ${task}` : task) };
 }
 
 export interface BotsDeps {

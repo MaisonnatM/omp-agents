@@ -1,6 +1,6 @@
 /** Pure transforms from the server's `items` messages to the blocks a transcript renders. */
 import type { RoutineTask } from "../src/routines";
-import { taskOf } from "../src/shared/routine-message";
+import { taskOf, taskText } from "../src/shared/routine-message";
 import type { Item, TodoPhase } from "../src/shared/transcript";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -112,9 +112,8 @@ export function outline(items: Item[], working: boolean): OutlineTurn[] {
 	const turns: OutlineTurn[] = [];
 	for (const item of items) {
 		if (item.kind === "routine") {
-			const task = taskOf(item.message);
-			const prompt = task.kind === "prompt" ? task.prompt : task.command;
-			turns.push({ id: item.id, prompt, skill: null, routine: { name: item.message.routine.name, task }, nudge: null, reply: null, tools: 0, failed: 0, running: false });
+			const { message } = item;
+			turns.push({ id: item.id, prompt: taskText(message), skill: null, routine: { name: message.routine.name, task: taskOf(message) }, nudge: null, reply: null, tools: 0, failed: 0, running: false });
 			continue;
 		}
 		if (item.kind === "user") {

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { CachedCheckouts, type CheckoutReads } from "./git";
 import { runChecked } from "./proc";
 import { parseShipProgress, type PullRequestRef, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
+import type { BotId } from "./shared/bots";
+import { type RoutineMessage, routineMessageText } from "./shared/routine-message";
 
 /** No checkout anywhere, for tests that need no git. */
 const NO_GIT: CheckoutReads = { worktreeAt: async () => null, headHistory: async () => null, defaultBranchOf: async () => null };
@@ -125,6 +127,18 @@ describe("SessionFactsScan", () => {
 		expect([[...own.found.values()], [...own.named]]).toEqual([[{ ...worked("acme", "api", 5), named: true }], [12, 13, 14, 17]]);
 		const subagent = scanOf(lines, false);
 		expect([[...subagent.found.values()], [...subagent.named]]).toEqual([[], []]);
+	});
+
+	test("a routine's message links the PRs its trigger events and its command's output name, and names the numbers they write", () => {
+		const message: RoutineMessage = {
+			botId: "scout" as BotId,
+			routine: { id: "r1", name: "Review" },
+			at: 50,
+			triggeredBy: [{ kind: "pull-request", title: "Fix the build (#8)", detail: "Ready for review", url: "https://github.com/acme/webapp/pull/8" }],
+			sent: { kind: "command", command: "gh pr checks 3", run: { phase: "exited", code: 0, output: "https://github.com/acme/api/pull/9", startedAt: 1, endedAt: 2 } },
+		};
+		const scan = scanOf([prompt(routineMessageText(message))]);
+		expect([[...scan.found.values()], [...scan.named]]).toEqual([[{ ...worked("acme", "webapp", 8), named: true }, { ...worked("acme", "api", 9), named: true }], [8]]);
 	});
 
 	test("the branches a git push updated, but not a rejected push or push output another command prints", () => {

@@ -30,8 +30,9 @@ export function routineMessageText(message: RoutineMessage): string {
 
 /**
  * The message stamped `text` carries, or `null` for any text the format did not write. The stamp is the last one at
- * the start of a line or after whitespace whose JSON runs to the end; omp trims a `/skill:` prompt's arguments, so the
- * blank line before it may be gone. Every field is checked, and a command's report must be the one its stamp writes.
+ * the start of a line or after whitespace whose JSON runs to the end: omp re-joins a bare `/skill:x` with its trimmed
+ * arguments as `/skill:x # omp-agents routine run…`, so the stamp can follow a space mid-line, with no blank line
+ * before it. Every field is checked, and a command's report must be the one its stamp writes.
  */
 export function readRoutineMessage(text: string): RoutineMessage | null {
 	const trimmed = text.trimEnd();
@@ -48,6 +49,9 @@ export function readRoutineMessage(text: string): RoutineMessage | null {
 export function taskOf({ sent }: RoutineMessage): RoutineTask {
 	return sent.kind === "prompt" ? { kind: "prompt", prompt: sent.prompt } : { kind: "command", command: sent.command };
 }
+
+/** What the routine sent: its prompt, or its command. */
+export const taskText = ({ sent }: RoutineMessage): string => (sent.kind === "command" ? sent.command : sent.prompt);
 
 /** The stamp: the run without the prompt or the output, which the body holds once. */
 function stampOf({ botId, routine, at, triggeredBy, sent }: RoutineMessage): Record<string, unknown> {

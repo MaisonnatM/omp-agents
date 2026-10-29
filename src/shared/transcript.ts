@@ -54,6 +54,9 @@ export function promptAuthor(text: string): PromptAuthor {
 	return message ? { kind: "routine", message } : { kind: "user" };
 }
 
+/** A `/skill:` prompt as typed: the skill's token, then `text` after a space when there is any. */
+export const skillInvocation = (skill: string, text: string): string => (text ? `/skill:${skill} ${text}` : `/skill:${skill}`);
+
 export type Item =
 	/**
 	 * `skill`: the skill a `/skill:<name>` prompt invoked, with `text` holding only what the user typed after it; `null` for

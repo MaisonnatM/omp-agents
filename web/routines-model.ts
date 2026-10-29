@@ -149,13 +149,18 @@ export function nextRunWords(routine: Routine, now: number): string {
 /** A row's schedules in the order they were saved, `On a trigger` when it has none. */
 export const schedulesWords = ({ schedules }: Pick<Routine, "schedules">): string => schedules.map(scheduleWords).join(", ") || "On a trigger";
 
+/** How a command or a `!` prompt's shell that exited with `code` stands. */
+function exitStatus(code: number): { health: RunHealth; words: string } {
+	return code === 0 ? { health: "ok", words: "Succeeded" } : { health: "failed", words: `Failed (exit ${code})` };
+}
+
 /** How a command stands. */
 function commandWords(command: CommandRun): string {
 	switch (command.phase) {
 		case "running":
 			return "Running…";
 		case "exited":
-			return command.code === 0 ? "Succeeded" : `Failed (exit ${command.code})`;
+			return exitStatus(command.code).words;
 		case "stopped":
 			return command.reason === "time-limit" ? "Stopped at the time limit" : "Stopped with the dashboard";
 		case "failed":
@@ -192,7 +197,7 @@ export function runHealth({ outcome, errors }: RoutineRun): RunHealth {
 
 function commandHealth(command: CommandRun): RunHealth {
 	if (command.phase === "running") return "running";
-	return command.phase === "exited" && command.code === 0 ? "ok" : "failed";
+	return command.phase === "exited" ? exitStatus(command.code).health : "failed";
 }
 
 /**
@@ -203,8 +208,7 @@ export function messageStatus({ message, pending, shell }: Extract<Item, { kind:
 	if (pending) return { health: "waiting", words: "Sending…" };
 	if (message.sent.kind === "command") return { health: commandHealth(message.sent.run), words: commandWords(message.sent.run) };
 	if (shell?.cancelled) return { health: "failed", words: "Cancelled" };
-	if (shell && shell.code !== null && shell.code !== 0) return { health: "failed", words: `Failed (exit ${shell.code})` };
-	if (shell?.code === 0) return { health: "ok", words: "Succeeded" };
+	if (shell && shell.code !== null) return exitStatus(shell.code);
 	return { health: "ok", words: "Sent" };
 }
 

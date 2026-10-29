@@ -44,7 +44,8 @@ import {
 } from "lucide-react";
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentRow, LiveView, View } from "../../src/shared/sessions";
-import type { Item } from "../../src/shared/transcript";
+import { taskText } from "../../src/shared/routine-message";
+import { type Item, skillInvocation } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import {
@@ -475,20 +476,14 @@ type MessageItem = Extract<Item, { kind: "user" | "assistant" }>;
 
 type RoutineItem = Extract<Item, { kind: "routine" }>;
 
-/**
- * What a message's copy button copies: a skill prompt as the user typed it, not the skill's text; a routine's prompt or command as it sent it.
- * `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform.
- */
-function copyText(item: MessageItem | RoutineItem): string {
-	if (item.kind === "routine") return item.message.sent.kind === "command" ? item.message.sent.command : item.message.sent.prompt;
-	return item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
-}
+/** What a message's copy button copies: a skill prompt as the user typed it, not the skill's text. `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform. */
+const copyText = (item: MessageItem): string => (item.kind === "user" && item.skill ? skillInvocation(item.skill, item.text) : item.text);
 
 /** A routine's message, as its card. Memoized on the item, so a streamed token leaves it as it is. */
 const RoutineRow = memo(function RoutineRow({ item }: { item: RoutineItem }) {
 	return (
 		<MessageScrollerItem messageId={item.id} className="flex flex-col">
-			<RoutineRunCard item={item} copy={<CopyButton text={copyText(item)} label={item.message.sent.kind === "command" ? "Copy command" : "Copy prompt"} />} />
+			<RoutineRunCard item={item} copy={<CopyButton text={taskText(item.message)} label={item.message.sent.kind === "command" ? "Copy command" : "Copy prompt"} />} />
 		</MessageScrollerItem>
 	);
 });

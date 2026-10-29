@@ -22,6 +22,7 @@ import {
 	type TriggerEvent,
 } from "../routines";
 import { type BotId, type BotSpec, defaultLook } from "../shared/bots";
+import { skillInvocation } from "../shared/transcript";
 
 /** The Bot the routines from before Bots move to; page Bots have random UUIDs, so none takes this id. */
 export const ROUTINES_BOT_ID = "routines" as BotId;
@@ -97,7 +98,7 @@ function adoptLegacy(value: Record<string, unknown>, workspace: string): { field
 		}
 		case "prompt": {
 			const text = elsewhere !== null && typeof task.prompt === "string" ? `Work in ${elsewhere}.\n\n${task.prompt}` : task.prompt;
-			const prompt = isNonEmpty(skill) && typeof text === "string" ? `/skill:${skill} ${text}` : text;
+			const prompt = isNonEmpty(skill) && typeof text === "string" ? skillInvocation(skill, text) : text;
 			return { fields: { ...value, botId: ROUTINES_BOT_ID, task: { kind: "prompt", prompt } }, toRoutinesBot: true };
 		}
 		default:

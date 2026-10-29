@@ -12,7 +12,7 @@ import { imagesOf, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
 import { splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import type { RoutineMessage } from "./shared/routine-message";
-import { type Item, promptAuthor, type TodoPhase, type TodoTask } from "./shared/transcript";
+import { type Item, promptAuthor, skillInvocation, type TodoPhase, type TodoTask } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -47,6 +47,9 @@ const messageKey = (message: Json): string | undefined =>
 export const isUserPrompt = (value: Json): boolean =>
 	value.role === "user" || (value.customType === SKILL_PROMPT && value.attribution === "user");
 
+/** What the user typed after the `/skill:` token of {@link SKILL_PROMPT} message `message`, which omp trims. */
+export const skillArgs = (message: Json): string => (isObject(message.details) && str(message.details.args)) || "";
+
 /** A prompt with an expanded skill as the skill's name and what the user typed after the `/skill:` token. */
 function unwrapSkill(prompt: string): { text: string; skill: string | null } {
 	const match = SKILL_INVOCATION.exec(prompt);
@@ -76,8 +79,7 @@ function promptItem(id: string, { text, skill }: { text: string; skill: string |
 /** A routine's message with the skill omp invoked for it, which its prompt names as it was sent. */
 function withSkill(message: RoutineMessage, skill: string | null): RoutineMessage {
 	if (skill === null || message.sent.kind !== "prompt") return message;
-	const { prompt } = message.sent;
-	return { ...message, sent: { kind: "prompt", prompt: prompt ? `/skill:${skill} ${prompt}` : `/skill:${skill}` } };
+	return { ...message, sent: { kind: "prompt", prompt: skillInvocation(skill, message.sent.prompt) } };
 }
 
 /** `prompt` without the files the composer attached after it, which `files` names when there are any. */
@@ -183,7 +185,8 @@ export type MessageItem = Extract<Item, { kind: "user" | "routine" | "assistant"
 
 /**
  * The prompts, routine messages and replies one session-file entry holds, as a fold of the whole file shows them,
- * without a prompt the dashboard sent in the user's place. Their ids and text
+ * without a prompt the dashboard sent in the user's place; a reader that wants only the user's words, as the
+ * conversation search does, leaves the routine messages out. Their ids and text
  * come from the entry alone (its message's timestamp, else its own id), so one entry folded by itself names them the
  * same, without the thinking, tool calls, and order a whole fold keeps.
  */
@@ -352,7 +355,7 @@ export class Transcript {
 					const skill = str(details.name);
 					// Subagents get skills as hidden context the user never typed.
 					if (message.attribution !== "user" || !skill) return [];
-					return this.#upsert(promptItem(key, { text: str(details.args) ?? "", skill }, { from: null, entryId: null }));
+					return this.#upsert(promptItem(key, { text: skillArgs(message), skill }, { from: null, entryId: null }));
 				}
 				if (message.customType !== COLLAB_PROMPT) return [];
 				return this.#upsert(promptItem(key, unwrapSkill(textOf(message.content)), { from: str(details.from) ?? null, entryId: null, ...imagesOf(message.content) }));
@@ -365,6 +368,8 @@ export class Transcript {
 				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), { ...imagesOf(message.content), ...todoList(message.toolName, message) });
 			}
 			case "bashExecution": {
+				// omp runs a `!` prompt's text without its `!`, so putting it back makes the text the one the routine sent:
+				// a stamped run then reads as that routine's message, whose prompt is `!ls` as the routine holds it.
 				const author = promptAuthor(`!${str(message.command) ?? ""}`);
 				if (author.kind !== "routine") return this.#upsert({ id: key, kind: "user", text: shellRun(message), skill: null, from: null, entryId: null });
 				const shell = { output: str(message.output) ?? "", code: typeof message.exitCode === "number" ? message.exitCode : null, cancelled: message.cancelled === true };
