@@ -2,7 +2,7 @@
 
 - The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
   It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
-  While Settings is open the sidebar lists its sections instead of a tab's content; select a tab, such as **Sessions**, to leave.
+  While Settings is open the sidebar lists its sections in place of the tab bar and a tab's content.
   The sidebar lists fourteen sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, and **Sync**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.

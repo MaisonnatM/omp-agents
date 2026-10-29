@@ -45,8 +45,8 @@ interface SidebarTabInput {
  * The panel the sidebar shows, and the way to show another tab: a page selects its tab, and `#pull-requests` picks the
  * Pull requests tab, which stays while you work in the panes until you choose Sessions. Sessions keeps the panes, or
  * opens the latest session when no pane shows one; Bots opens the latest Bot's page. `showTab` keeps its identity across renders.
- * A page whose tab the user hid in Preferences, or whose trigger sits in the header, still selects that tab, so its panel,
- * such as the Notes nav, shows with no tab of the bar selected; a page whose service is signed out keeps the tab the panes had.
+ * A page whose tab the user hid in Preferences still selects that tab, so its panel shows with no tab of the bar selected,
+ * and a page whose trigger sits in the header shows its panel, such as the Notes nav, with no bar; a page whose service is signed out keeps the tab the panes had.
  */
 export function useSidebarTab({ page, signedOutTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
 	tab: SidebarPanel;

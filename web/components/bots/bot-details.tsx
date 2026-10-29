@@ -1,4 +1,4 @@
-/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and routines, then Delete; and its conversation's PRs and Tickets tabs. */
+/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and routines, then Delete; and its conversation's Tickets tab once it worked on any. */
 import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
@@ -15,7 +15,7 @@ import { age } from "../../labels";
 import { runWords, startsWords } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
 import { DetailsSidebarFrame } from "../details-sidebar-frame";
-import { sessionWorkTabs } from "../session-details";
+import { ticketsTabs } from "../session-details";
 import { TEXT_AREA } from "../form-field";
 import { RunDot } from "../routines/routine-marks";
 import { BotAvatar } from "./bot-avatar";
@@ -248,12 +248,9 @@ interface BotDetailsProps {
 	/** Its `memory.md`, empty while it remembers nothing. */
 	memory: string;
 	connected: boolean;
-	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
-	workspace: string | null;
-	hosts: RosterHost[];
 }
 
-export function BotDetails({ open: { bot, host, routines, routine, status }, session, memory, connected, workspace, hosts }: BotDetailsProps) {
+export function BotDetails({ open: { bot, host, routines, routine, status }, session, memory, connected }: BotDetailsProps) {
 	return (
 		<DetailsSidebarFrame
 			label="Bot details"
@@ -288,15 +285,7 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 						</div>
 					),
 				},
-				...sessionWorkTabs({
-					scope: bot.sessionId ?? bot.id,
-					working: host?.status === "working",
-					pullRequests: session?.pullRequests ?? [],
-					tickets: session?.tickets ?? [],
-					workspace,
-					hosts,
-					live: host ? { kind: "live", instanceId: host.instanceId, agentId: null } : null,
-				}),
+				...ticketsTabs(session?.tickets ?? [], host?.status === "working"),
 			]}
 		/>
 	);

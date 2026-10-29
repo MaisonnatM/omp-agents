@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-10-29
+
+- A Bot's right sidebar now shows only Details, and Tickets once its conversation worked on a Linear issue; the PRs and Browser tabs are gone there.
+- Settings, Notes, Calendar, and Email now show their list in the left sidebar without the tab bar above it.
+
 ## 2026-10-28
 
 - The Settings sidebar now sorts its sections into Usage, General, Connections, and This workspace, and Source control providers is now just Source control.
