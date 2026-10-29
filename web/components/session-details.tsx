@@ -1,4 +1,4 @@
-/** The right sidebar for a session: its pull requests, its running app in the desktop app, and once it has any, its Linear issues; a Bot's details share them. */
+/** The right sidebar for a session: its pull requests, its running app in the desktop app, and once it has any, its Linear issues; a Bot's details share its Tickets tab. */
 import { AppWindow, GitPullRequest } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
@@ -28,6 +28,12 @@ export interface SessionWork {
 	live: LiveView | null;
 }
 
+/** The **Tickets** tab once the session worked on any Linear issue; none before. */
+export const ticketsTabs = (tickets: string[], working: boolean): DetailsTab<"tickets">[] =>
+	tickets.length > 0
+		? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, scrollsItself: true, content: <SessionTicketsTab tickets={tickets} version={working} /> }]
+		: [];
+
 /** The **PRs** tab, the **Tickets** tab once the session worked on any, and the **Browser** tab for a live session in the desktop app. */
 export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets">[] {
 	return [
@@ -40,9 +46,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspa
 			scrollsItself: true,
 			content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={live?.instanceId ?? null} />,
 		},
-		...(tickets.length > 0
-			? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, scrollsItself: true, content: <SessionTicketsTab tickets={tickets} version={working} /> } as const]
-			: []),
+		...ticketsTabs(tickets, working),
 		...(BROWSER_AVAILABLE && live !== null
 			? [
 					{

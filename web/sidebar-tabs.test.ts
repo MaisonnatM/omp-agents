@@ -1,11 +1,13 @@
 import { expect, test } from "bun:test";
 import { bindingLabel, IS_MAC } from "./shortcuts";
+import type { SidebarPanel } from "./routing";
 import {
 	DEFAULT_TAB_LAYOUT,
 	decodeTabLayout,
 	encodeTabLayout,
 	hideTab,
 	moveTab,
+	panelOnBar,
 	placedTabs,
 	positionKey,
 	shortcutRows,
@@ -113,6 +115,11 @@ test("placedTabs keeps the shown tabs at one place, in their order: Notes, Calen
 	expect(placedTabs(shown, "bar")).toEqual(["pull-requests", "tickets", "bots", "sessions", "todo"]);
 	expect(placedTabs(shown, "header")).toEqual(["notes", "email", "calendar"]);
 	expect(placedTabs(["sessions", "todo"], "header")).toEqual([]);
+});
+
+test("panelOnBar holds for the bar's tabs and not for Settings or the header's tabs", () => {
+	const panels: SidebarPanel[] = ["pull-requests", "tickets", "bots", "sessions", "todo", "notes", "calendar", "email", "settings"];
+	expect(panels.filter(panelOnBar)).toEqual(["pull-requests", "tickets", "bots", "sessions", "todo"]);
 });
 
 test("until the integrations answer, the tabs that wait on one are signed out", () => {

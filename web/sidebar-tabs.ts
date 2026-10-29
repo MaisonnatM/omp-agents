@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import { integrationsStore } from "./reads";
-import { SIDEBAR_TABS, type SidebarTab, type TabPlace } from "./routing";
+import { SIDEBAR_TABS, type SidebarPanel, type SidebarTab, type TabPlace } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
@@ -71,6 +71,9 @@ export const shownTabs = (layout: TabLayout, signedOut: ReadonlySet<SidebarTab>)
 
 /** The tabs of `shown` whose triggers sit at `place`, in their order. */
 export const placedTabs = (shown: readonly SidebarTab[], place: TabPlace): SidebarTab[] => shown.filter(tab => TAB_ROWS[tab].place === place);
+
+/** Whether `panel` belongs to the tab bar, which the sidebar draws above it; Settings and the header's tabs show their panel alone. */
+export const panelOnBar = (panel: SidebarPanel): boolean => panel !== "settings" && TAB_ROWS[panel].place === "bar";
 
 /** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>

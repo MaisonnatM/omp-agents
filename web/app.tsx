@@ -313,8 +313,6 @@ export function App() {
 														session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
 														memory={state.botMemories[openBot.bot.id] ?? ""}
 														connected={state.connected}
-														workspace={workspace}
-														hosts={visible.hosts}
 													/>
 												)
 											)}
