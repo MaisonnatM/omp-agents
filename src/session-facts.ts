@@ -15,14 +15,14 @@
  * `list_comments`), its identifier in the session's own prompt, and the session's branch (`eng-123-fix`, `me/eng-123`).
  * An issue a search only listed is not linked. A subagent's prompt is its assignment, so it names nothing.
  *
- * The session's own bash calls tell which linked worktree it works in: a session started in a repository's main
- * checkout often adds a worktree and runs its commands there with bash's `cwd`.
+ * The session's own bash calls and file changes tell which linked worktree it works in: a session started in a
+ * repository's main checkout often adds a worktree, then edits its files and runs its commands there with bash's `cwd`.
  *
  * The read of a session's own file also feeds the `OwnFileFolds` the index is given, so another feature that folds
  * session files does not read them a second time.
  */
 import { access } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
 import { isObject, oneOf } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
@@ -37,6 +37,7 @@ import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type Shi
 import { TICKET_ID } from "./shared/tickets";
 import { messageItemsOf } from "./transcript";
 import { WorkspacePlacement } from "./workspace-placement";
+import { changedPaths } from "./work";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)`: the branch, then its PR. */
 const GT_SUBMITTED = /^(\S+): https:\/\/app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+)\/(\d+)\S* \((?:created|updated)\)[ \t\r]*$/gm;
@@ -68,7 +69,7 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"'];
+const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"'];
 /** A Linear MCP tool called directly (`mcp__linear_get_issue`, or `xd_mcp__linear_get_issue`), or written to as an omp device. */
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
@@ -228,7 +229,7 @@ export class SessionFactsScan {
 	ship: ShipProgress | null = null;
 	/** omp ran the session as `omp -p` or `--mode json`, as the `headless-mark` extension records. */
 	headless = false;
-	/** The `cwd` arguments of bash calls as written, each once, the most recently used last. */
+	/** The `cwd` arguments of bash calls as written, and the directories of the files `edit` and `write` changed, each once, the most recently used last. */
 	readonly workDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
 	unreadableLines = false;
@@ -288,10 +289,7 @@ export class SessionFactsScan {
 		for (const call of toolCallsOf(entry.message)) {
 			const cwd = call.name === "bash" && typeof call.args.cwd === "string" && call.args.cwd ? call.args.cwd : null;
 			if (call.name === "bash" && typeof call.args.command === "string") this.#command(call.id, call.args.command, cwd, Date.parse(String(entry.timestamp)));
-			if (cwd) {
-				this.workDirs.delete(cwd);
-				this.workDirs.add(cwd);
-			}
+			if (cwd) this.#workedIn(cwd);
 			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);
 			const linear = linearCall(call.name, call.args);
 			if (linear) this.#linear(call.id, linear.tool, linear.args);
@@ -305,6 +303,7 @@ export class SessionFactsScan {
 		if (!result) return;
 		const { callId, details } = result;
 		if (callId !== undefined && this.#opening.delete(callId) && !result.isError) this.#opened(textOf(result.content));
+		if (!result.isError) for (const path of changedPaths(result.toolName, details)) this.#workedIn(dirname(path));
 		if (result.toolName === "bash") {
 			const expected = callId === undefined ? undefined : this.#take(callId);
 			const job = isObject(details.async) ? details.async.jobId : undefined;
@@ -319,6 +318,11 @@ export class SessionFactsScan {
 				this.#finished(job.resultText, this.#take(String(job.id)));
 			}
 		}
+	}
+
+	#workedIn(dir: string): void {
+		this.workDirs.delete(dir);
+		this.workDirs.add(dir);
 	}
 
 	#take(id: string): Expected | undefined {
@@ -480,7 +484,7 @@ interface SessionScan {
 	tickets: string[];
 	/** How many `gt submit` calls its transcripts finished. */
 	submitsFinished: number;
-	/** The `cwd` arguments of the session's own bash calls, absolute, the most recently used first. */
+	/** The `cwd` arguments of the session's own bash calls and the directories of the files its `edit` and `write` calls changed, absolute, the most recently used first. */
 	workDirs: string[];
 	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
 	worktree: string | null;

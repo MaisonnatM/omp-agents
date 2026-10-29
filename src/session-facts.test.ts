@@ -448,6 +448,26 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).worktree).toBeNull();
 	});
 
+	test("names the linked worktree the session's own edit and write calls last changed a file in, before any bash call runs there", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		mkdirSync(join(parent, "app-done", "docs"));
+		const changed = (id: string, toolName: string, details: object, isError = false) =>
+			JSON.stringify({ type: "message", message: { role: "toolResult", toolCallId: id, toolName, isError, content: [{ type: "text", text: "ok" }], details } });
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(session, `${changed("w1", "write", { resolvedPath: join(parent, "app-wip", "notes.md") })}\n`);
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
+		const listed = (modifiedAt: number) => [{ path: session, cwd: main, modifiedAt }];
+
+		expect(await index.refresh(listed(1))).toBe(true);
+		expect(index.factsOf(session).worktree).toBe(join(parent, "app-wip"));
+		appendFileSync(session, `${changed("e1", "edit", { path: join(parent, "app-done", "docs", "a.md") }, true)}\n`);
+		expect(await index.refresh(listed(2))).toBe(false);
+		appendFileSync(session, `${changed("e2", "edit", { perFileResults: [{ path: join(parent, "app-done", "docs", "a.md"), op: "update" }] })}\n`);
+		expect(await index.refresh(listed(3))).toBe(true);
+		expect(index.factsOf(session).worktree).toBe(join(parent, "app-done"));
+	});
+
 	test("names the branch of the linked worktree a session works in, follows a branch switch, and links the PR that heads it, not the main checkout's", async () => {
 		const parent = realpathSync(sessionDir());
 		const main = await repoWithWorktrees(parent);

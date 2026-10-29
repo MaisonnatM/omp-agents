@@ -26,18 +26,30 @@ function diffCounts(diff: string): { added: number; removed: number } {
 	return { added, removed };
 }
 
-/** The files one `edit` result changed: each of `perFileResults` that succeeded for a multi-file edit, else the result itself. */
-function editedFiles(details: Record<string, unknown>, at: number | null): [string, FileChange][] {
+/** Each file one `edit` result changed, with its result: each of `perFileResults` that succeeded for a multi-file edit, else the result itself. */
+function editResults(details: Record<string, unknown>): [string, Record<string, unknown>][] {
 	const results = Array.isArray(details.perFileResults) ? details.perFileResults : [details];
-	return results.flatMap((result): [string, FileChange][] => {
+	return results.flatMap((result): [string, Record<string, unknown>][] => {
 		if (!isObject(result) || result.isError === true) return [];
 		const path = str(result.path);
-		if (!path) return [];
+		return path ? [[path, result]] : [];
+	});
+}
+
+function editedFiles(details: Record<string, unknown>, at: number | null): [string, FileChange][] {
+	return editResults(details).map(([path, result]) => {
 		const op = str(result.op);
 		const diff = str(result.diff) || null;
 		const kind = op && Object.hasOwn(EDIT_KINDS, op) ? EDIT_KINDS[op] : "edited";
-		return [[path, { tool: "edit", kind, at, ...diffCounts(diff ?? ""), diff }]];
+		return [path, { tool: "edit", kind, at, ...diffCounts(diff ?? ""), diff }];
 	});
+}
+
+/** The paths a successful `edit` or `write` result changed, as omp reported them; none for another tool or a write to a device. */
+export function changedPaths(toolName: string, details: Record<string, unknown>): string[] {
+	if (toolName === "edit") return editResults(details).map(([path]) => path);
+	const path = toolName === "write" ? str(details.resolvedPath) : undefined;
+	return path ? [path] : [];
 }
 
 export class Work {
