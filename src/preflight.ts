@@ -3,12 +3,13 @@
  * `src/server.ts` imports it first, so a missing requirement prints one line saying how to fix it instead of a stack trace.
  */
 import { errorText } from "./json";
+import { OMP_MISSING_EXIT, OmpMissing } from "./shared/startup";
 
 const MIN_BUN = "1.4.4";
 
-function fail(message: string): never {
+function fail(message: string, code = 1): never {
 	console.error(`omp-agents: ${message}`);
-	process.exit(1);
+	process.exit(code);
 }
 
 if (!Bun.semver.satisfies(Bun.version, `>=${MIN_BUN}`)) fail(`Bun ${MIN_BUN} or later is required, and this is Bun ${Bun.version}; run \`bun upgrade\`.`);
@@ -17,5 +18,5 @@ try {
 	// Dynamic, because a static import's throw cannot be caught: this module resolves omp as it loads.
 	await import("./omp/install");
 } catch (err) {
-	fail(errorText(err));
+	fail(errorText(err), err instanceof OmpMissing ? OMP_MISSING_EXIT : 1);
 }

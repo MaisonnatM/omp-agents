@@ -1,54 +1,8 @@
-/** Where the installed omp package is, how to run its CLI, and how to read its `package.json`. */
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { errorText, isObject } from "../json";
+/** The one omp installation this process uses for modules and CLI commands. */
+import { resolveOmp } from "./resolve";
 
-const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
-
-/**
- * The JSON object in the `package.json` at `path`, read fresh from disk: `omp update` rewrites it while this server runs.
- * @throws Error naming `path` when the file cannot be read or holds no JSON object.
- */
-export function readManifest(path: string): Record<string, unknown> {
-	let manifest: unknown;
-	try {
-		manifest = JSON.parse(readFileSync(path, "utf8"));
-	} catch (err) {
-		throw new Error(`could not read the package manifest ${path}: ${errorText(err)}`);
-	}
-	if (!isObject(manifest)) throw new Error(`${path} is not a package manifest`);
-	return manifest;
-}
-
-function findPackageDir(): string {
-	const override = process.env.OMP_PACKAGE_DIR;
-	if (override) return override;
-	const bin = Bun.which("omp");
-	if (!bin) throw new Error(`\`omp\` is not on PATH; install it with \`bun install -g ${PACKAGE_NAME}\`, or set OMP_PACKAGE_DIR to its installed directory`);
-	let dir = dirname(realpathSync(bin));
-	while (dir !== dirname(dir)) {
-		const manifest = join(dir, "package.json");
-		if (existsSync(manifest) && readManifest(manifest).name === PACKAGE_NAME) return dir;
-		dir = dirname(dir);
-	}
-	// `omp update` can replace Bun's link with a compiled binary in `$BUN_INSTALL/bin`, beside Bun's global packages.
-	const global = join(dirname(dirname(bin)), "install/global/node_modules", PACKAGE_NAME);
-	if (existsSync(join(global, "package.json"))) return global;
-	throw new Error(`could not find ${PACKAGE_NAME} above ${bin}; set OMP_PACKAGE_DIR`);
-}
-
-export const packageDir = findPackageDir();
-
-/** The installed package's version and the path of its `omp` script, from its manifest. */
-function readPackage(): { version: string; script: string } {
-	const path = join(packageDir, "package.json");
-	const manifest = readManifest(path);
-	const script = isObject(manifest.bin) ? manifest.bin.omp : undefined;
-	if (typeof manifest.version !== "string" || typeof script !== "string") throw new Error(`${path} names no version or no \`omp\` bin; set OMP_PACKAGE_DIR to the installed ${PACKAGE_NAME} directory`);
-	return { version: manifest.version, script };
-}
-
-const installed = readPackage();
+const installed = resolveOmp();
+export const packageDir: string = installed.packageDir;
 export const ompVersion: string = installed.version;
-/** Runs this same package's CLI, so new sessions match the modules loaded here. */
-export const ompCommand: string[] = [process.execPath, join(packageDir, installed.script)];
+/** Runs this same package's CLI, including when OMP_PACKAGE_DIR overrides PATH. */
+export const ompCommand: string[] = installed.command;
