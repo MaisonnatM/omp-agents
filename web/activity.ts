@@ -175,6 +175,7 @@ export function listenForControls(doc: Pick<Document, "addEventListener" | "remo
  */
 export const VIEWS = [
 	{ key: "home", label: "Home" },
+	{ key: "get-started", label: "Get started" },
 	{ key: "session", label: "A session" },
 	{ key: "past", label: "A past session" },
 	{ key: "split", label: "Split panes" },
@@ -225,6 +226,7 @@ function pageView(page: Page): ViewKey {
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
 		case "calendar":
+		case "get-started":
 		case "new":
 			return page.kind;
 	}

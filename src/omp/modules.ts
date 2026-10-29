@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { Database } from "bun:sqlite";
 import type { RetrySettings } from "../shared/models";
+import type { CollabAutoStart } from "../shared/readiness";
 import type { Access, CollabSocket, HostSnapshot, LinkErrorCode } from "./collab";
 import { ompVersion, packageDir } from "./install";
 import type { AutocompleteProvider, FileSlashCommand, Skill } from "./prompts";
@@ -57,6 +58,7 @@ export interface StorageModule {
 export interface DirsModule {
 	getSessionsDir(): string;
 	getAgentDir(): string;
+	getProjectDir(): string;
 	/** omp's user-level MCP config, `mcp.json` in the agent directory. */
 	getMCPConfigPath(scope: "user"): string;
 	getBlobsDir(): string;
@@ -161,6 +163,8 @@ export interface SettingsReader<T> {
 export interface OmpSettingsInstance {
 	/** `modelRoles` as configured, in config order. */
 	getModelRoles(): Record<string, string>;
+	/** The native global layer, without project/runtime overlays. */
+	getGlobalSettings(): Record<string, unknown>;
 	/** Stages one role in the global `config.yml`; `flush` writes it, leaving every other role as it is on disk. */
 	setModelRole(role: string, selector: string | undefined): void;
 	/** Writes staged changes into the re-read global `config.yml` under omp's lock. */
@@ -177,6 +181,7 @@ export interface ConfigModule {
 }
 /** Subset of omp's `Setting` handle (src/config/registry.ts). `set`/`setEntry` stage a global write; `undefined` removes. */
 export interface SettingHandle {
+	readonly id: string;
 	readonly definition: { protocolDefault?: readonly string[] };
 	pinDefault(settings: OmpSettingsInstance): void;
 	readonly enumValues: readonly string[] | undefined;
@@ -725,6 +730,28 @@ async function load<T>(file: string, expected: Record<string, Kind>): Promise<T>
 const srcDir = join(packageDir, "src");
 const utilsSrc = join(dirname(packageDir), "pi-utils", "src");
 
+export const collabSettings = await load<{ cfgCollabAutoStart: { readonly default: CollabAutoStart } }>(join(srcDir, "collab", "settings.ts"), {
+	"cfgCollabAutoStart.default": "string",
+});
+
+/** Read-only plugin registries; no CLI config initialization or project discovery writes. */
+export const marketplaceRegistry = await load<{
+	getMarketplacesRegistryPath(): string;
+	getInstalledPluginsRegistryPath(): string;
+	readMarketplacesRegistry(path: string): Promise<{ marketplaces: { name: string }[] }>;
+	readInstalledPluginsRegistry(path: string): Promise<{ plugins: Record<string, unknown> }>;
+}>(join(srcDir, "extensibility", "plugins", "marketplace", "registry.ts"), {
+	getMarketplacesRegistryPath: "function",
+	getInstalledPluginsRegistryPath: "function",
+	readMarketplacesRegistry: "function",
+	readInstalledPluginsRegistry: "function",
+});
+export const pluginRegistryDiscovery = await load<{
+	resolveOrDefaultProjectRegistryPath(cwd: string): Promise<string | undefined>;
+}>(join(srcDir, "discovery", "helpers.ts"), {
+	resolveOrDefaultProjectRegistryPath: "function",
+});
+
 export const registry = await load<RegistryModule>(join(srcDir, "collab", "registry.ts"), {
 	listCollabHosts: "function",
 	resolveCollabHostLink: "function",
@@ -791,6 +818,7 @@ export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "s
 export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getSessionsDir: "function",
 	getAgentDir: "function",
+	getProjectDir: "function",
 	getMCPConfigPath: "function",
 	getBlobsDir: "function",
 	getStatsDbPath: "function",
@@ -828,6 +856,7 @@ export const slashCommands = await load<SlashCommandsModule>(join(srcDir, "exten
 export const config = await load<ConfigModule>(join(srcDir, "config", "settings.ts"), {
 	"Settings.loadReadOnly": "function",
 	"Settings.loadIsolated": "function",
+	"Settings.prototype.getGlobalSettings": "function",
 });
 export const extensionSettings = await load<ExtensionSettingsModule>(join(srcDir, "extensibility", "settings.ts"), {
 	"cfgSkills.get": "function",

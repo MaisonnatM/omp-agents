@@ -30,6 +30,8 @@ import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/sha
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
+import type { Readiness, StarterKitStatus } from "../src/shared/readiness";
+import type { ProviderStatus } from "../src/shared/source-control";
 import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
@@ -73,6 +75,16 @@ export function useRead<T>(url: string | null, version?: unknown): Refreshable<T
 	const current = read?.url === url ? read : null;
 	const refreshing = current !== null && !Object.is(current.version, version);
 	return useMemo(() => (current ? { data: current.data, error: current.error, refreshing } : UNREAD_IDLE), [current, refreshing]);
+}
+
+/** Setup checks stay in memory and poll only while Get started is visible. Optional processes never delay local facts. */
+export const readinessStore = createPolledStore<Readiness>({ url: () => "/api/readiness", pollMs: 5_000 });
+export const readinessGithubStore = createPolledStore<ProviderStatus>({ url: () => "/api/readiness/github" });
+export const starterKitStore = createPolledStore<StarterKitStatus>({ url: () => "/api/readiness/starter-kit" });
+
+export async function showTerminalSessions(): Promise<void> {
+	const answer = await putJson<Readiness>("/api/readiness/terminal-sessions", {});
+	readinessStore.update(() => answer);
 }
 
 /** The open pull requests by workspace `cwd`, which the sidebar and the Pull requests page share; `null` reads every workspace. */

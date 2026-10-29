@@ -75,6 +75,13 @@ export const BROWSER_PORTS_CHANNEL = "omp-agents:browser-ports";
 export const BROWSER_CAPTURE_CHANNEL = "omp-agents:browser-capture";
 /** The page's `invoke` that opens the system's folder dialog over the window, answered with the folder picked or `null`. */
 export const PICK_DIRECTORY_CHANNEL = "omp-agents:pick-directory";
+/** The only installer operation the page may request. No path, flags, or command arguments cross the bridge. */
+export const INSTALL_STARTER_KIT_CHANNEL = "omp-agents:install-starter-kit";
+
+export interface StarterKitInstallResult {
+	ok: boolean;
+	message: string;
+}
 
 /** The ports a Browser's session runs servers on, and the ones other servers on this computer listen on. */
 export interface BrowserPorts {
@@ -156,6 +163,8 @@ export interface DesktopBridge {
 	captureBrowser?(guestId: number): Promise<Uint8Array | null>;
 	/** Opens the system's folder dialog over the window, and answers the folder picked, or `null` when it was cancelled; absent in an app built before it. */
 	pickDirectory?(): Promise<string | null>;
+	/** Runs the desktop's non-forced starter kit installer and returns its output without native dialogs. */
+	installStarterKit?(): Promise<StarterKitInstallResult>;
 	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
 	titleBar?: boolean;
 	/** The window's page can embed a session's app in a `<webview>` for its Preview; absent in an app built before it. */

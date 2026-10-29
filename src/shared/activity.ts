@@ -48,6 +48,11 @@ export const featureId = (kind: ActivityKind, key: string): string => `${kind}:$
  * A component tags each with `activityControl(id)` from `web/activity.ts`; `area` groups them in Settings › Activity.
  */
 export const CONTROLS = [
+	{ id: "get-started.dismiss", label: "Get started dismissed on this computer", area: "Get started" },
+	{ id: "get-started.refresh", label: "Get started checked again", area: "Get started" },
+	{ id: "get-started.install-kit", label: "Get started starter kit installation", area: "Get started" },
+	{ id: "get-started.copy-command", label: "Get started command copied", area: "Get started" },
+	{ id: "get-started.install-gh", label: "Get started GitHub CLI installation link", area: "Get started" },
 	{ id: "trajectory.toggle", label: "Trajectory toggle", area: "Panes" },
 	{ id: "trajectory.turn", label: "Trajectory turn, folded or unfolded", area: "Panes" },
 	{ id: "trajectory.step", label: "Trajectory step, folded or unfolded", area: "Panes" },

@@ -11,6 +11,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { deepEquals, Glob } from "bun";
 import { errorText, isObject } from "../../src/json";
+import { resolveOmp } from "../../src/omp/resolve";
 
 type Json = Record<string, unknown>;
 
@@ -76,18 +77,21 @@ function readYamlMapping(path: string): Json {
 
 /** The ids of installed marketplace plugins, from `omp plugin list --json`. */
 function pluginIds(listing: unknown): Set<string> {
-	const plugins = isObject(listing) && Array.isArray(listing.marketplace) ? listing.marketplace : [];
-	return new Set(plugins.flatMap(plugin => (isObject(plugin) && typeof plugin.id === "string" ? [plugin.id] : [])));
+	if (!isObject(listing) || !Array.isArray(listing.marketplace)) throw new Error("omp plugin list returned no marketplace plugins");
+	return new Set(listing.marketplace.map(plugin => {
+		if (!isObject(plugin) || typeof plugin.id !== "string") throw new Error("omp plugin list returned a plugin without an id");
+		return plugin.id;
+	}));
 }
 
-const MARKETPLACE = { name: "cursor-plugins", source: "cursor/plugins" };
+export const STARTER_KIT_MARKETPLACE = { name: "cursor-plugins", source: "cursor/plugins" };
 /** pstack provides the `Poteto Mode` skill that `poteto-mode` points at, and the `poteto-agent` that `/ship` delegates to. */
 const PLUGINS = ["pstack@cursor-plugins"];
 
 const LABEL: Record<Action, string> = { create: "add", update: "overwrite", keep: "keep yours", same: "unchanged" };
 
-async function omp(args: string[]): Promise<string> {
-	const proc = Bun.spawn(["omp", ...args], { stdout: "pipe", stderr: "pipe" });
+async function omp(command: readonly string[], args: string[]): Promise<string> {
+	const proc = Bun.spawn([...command, ...args], { stdout: "pipe", stderr: "pipe" });
 	const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
 	if (code !== 0) throw new Error(`omp ${args.join(" ")} failed: ${(err || out).trim()}`);
 	return out;
@@ -102,6 +106,34 @@ function layerFiles(root: string): KitFile[] {
 	return [...new Glob("**/*").scanSync({ cwd: root, dot: true })].sort().map(rel => ({ rel, text: readFileSync(join(root, rel), "utf8") }));
 }
 
+export interface StarterKitPlan {
+	files: (KitFile & { dest: string; action: Action })[];
+	settings: SettingStep[];
+	hasMarketplace: boolean;
+	plugins: { id: string; action: Action }[];
+}
+
+export interface StarterKitSnapshot {
+	knownSettings: ReadonlySet<string>;
+	hasMarketplace: boolean;
+	plugins: ReadonlySet<string>;
+}
+
+/** Read-only, including settings and plugins. Callers supply native or CLI reads, never config initialization here. */
+export function planStarterKit(kit: string, agentDir: string, snapshot: StarterKitSnapshot, { force = false, maintainer = false } = {}): StarterKitPlan {
+	if (!existsSync(join(kit, "agent"))) throw new Error(`Starter kit files are missing from ${kit}`);
+	const layers = [layerFiles(join(kit, "agent"))];
+	if (maintainer) layers.push(layerFiles(join(kit, "maintainer")));
+	const files = overlayFiles(layers).map(file => {
+		const dest = join(agentDir, file.rel);
+		return { ...file, dest, action: planValue(existsSync(dest) ? readFileSync(dest, "utf8") : undefined, file.text, force) };
+	});
+	const userConfigPath = join(agentDir, "config.yml");
+	const user = existsSync(userConfigPath) ? readYamlMapping(userConfigPath) : {};
+	const settings = planSettings(settingsOf(readYamlMapping(join(kit, "config.yml")), snapshot.knownSettings), user, force);
+	return { files, settings, hasMarketplace: snapshot.hasMarketplace, plugins: PLUGINS.map(id => ({ id, action: snapshot.plugins.has(id) ? "same" : "create" })) };
+}
+
 async function main(argv: string[]): Promise<void> {
 	const knownFlags = ["--dry-run", "--force", "--maintainer"];
 	const unknown = argv.find(arg => !knownFlags.includes(arg));
@@ -109,32 +141,25 @@ async function main(argv: string[]): Promise<void> {
 	const dryRun = argv.includes("--dry-run");
 	const force = argv.includes("--force");
 	const maintainer = argv.includes("--maintainer");
-	if (!Bun.which("omp")) throw new Error("`omp` is not on PATH; install it with `bun install -g @oh-my-pi/pi-coding-agent`");
+	const { command: ompCommand } = resolveOmp();
 
 	const kit = import.meta.dir;
 	const agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".omp", "agent");
 	const profile = maintainer ? " and the maintainer git profile" : "";
 	console.log(`${dryRun ? "Would install" : "Installing"} the omp starter kit${profile} into ${agentDir}${force ? ", overwriting your versions" : ""}`);
 
-	const layers = [layerFiles(join(kit, "agent"))];
-	if (maintainer) layers.push(layerFiles(join(kit, "maintainer")));
-	const files = overlayFiles(layers).map(file => {
-		const dest = join(agentDir, file.rel);
-		return { ...file, dest, action: planValue(existsSync(dest) ? readFileSync(dest, "utf8") : undefined, file.text, force) };
-	});
+	const listed: unknown = JSON.parse(await omp(ompCommand, ["config", "list", "--json"]));
+	if (!isObject(listed) || Array.isArray(listed)) throw new Error("omp config list returned no settings");
+	const snapshot: StarterKitSnapshot = {
+		knownSettings: new Set(Object.keys(listed)),
+		hasMarketplace: new RegExp(`^\\s*${STARTER_KIT_MARKETPLACE.name}\\s`, "m").test(await omp(ompCommand, ["plugin", "marketplace", "list"])),
+		plugins: pluginIds(JSON.parse(await omp(ompCommand, ["plugin", "list", "--json"]))),
+	};
+	const { files, settings, hasMarketplace, plugins } = planStarterKit(kit, agentDir, snapshot, { force, maintainer });
 	for (const file of files) print(file.action, `file ${file.rel}`);
-
-	const listed: unknown = JSON.parse(await omp(["config", "list", "--json"]));
-	const known = new Set(isObject(listed) ? Object.keys(listed) : []);
-	const userConfigPath = join(agentDir, "config.yml");
-	const user = existsSync(userConfigPath) ? readYamlMapping(userConfigPath) : {};
-	const settings = planSettings(settingsOf(readYamlMapping(join(kit, "config.yml")), known), user, force);
 	for (const setting of settings) print(setting.action, `setting ${setting.target}`);
-
-	const hasMarketplace = new RegExp(`^\\s*${MARKETPLACE.name}\\s`, "m").test(await omp(["plugin", "marketplace", "list"]));
-	const installed = pluginIds(JSON.parse(await omp(["plugin", "list", "--json"])));
-	print(hasMarketplace ? "same" : "create", `marketplace ${MARKETPLACE.source}`);
-	for (const id of PLUGINS) print(installed.has(id) ? "same" : "create", `plugin ${id}`);
+	print(hasMarketplace ? "same" : "create", `marketplace ${STARTER_KIT_MARKETPLACE.source}`);
+	for (const plugin of plugins) print(plugin.action, `plugin ${plugin.id}`);
 
 	const kept = [...files, ...settings].filter(step => step.action === "keep").length;
 	const keptNote = kept > 0 ? ` ${kept} of yours ${dryRun ? "would stay" : "stayed"}; pass --force to overwrite them.` : "";
@@ -149,10 +174,10 @@ async function main(argv: string[]): Promise<void> {
 		writeFileSync(file.dest, file.text);
 	}
 	for (const { target, value } of settings.filter(s => writes(s.action))) {
-		await omp(["config", "set", target, typeof value === "object" ? JSON.stringify(value) : String(value)]);
+		await omp(ompCommand, ["config", "set", target, typeof value === "object" ? JSON.stringify(value) : String(value)]);
 	}
-	if (!hasMarketplace) await omp(["plugin", "marketplace", "add", MARKETPLACE.source]);
-	for (const id of PLUGINS.filter(id => !installed.has(id))) await omp(["plugin", "install", id]);
+	if (!hasMarketplace) await omp(ompCommand, ["plugin", "marketplace", "add", STARTER_KIT_MARKETPLACE.source]);
+	for (const { id, action } of plugins) if (writes(action)) await omp(ompCommand, ["plugin", "install", id]);
 	console.log(`Done.${keptNote}`);
 }
 

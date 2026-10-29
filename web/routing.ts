@@ -169,6 +169,7 @@ export interface ScheduledRoute {
 
 /** A page that covers the panes. */
 export type Page =
+	| { kind: "get-started" }
 	| ({ kind: "settings" } & SettingsRoute)
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
@@ -232,6 +233,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
+	"get-started": () => ({ kind: "get-started" }),
 	settings: rest => ({ kind: "settings", section: settingsSection(rest?.split("/")[0] ?? null) }),
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
 	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
@@ -293,6 +295,7 @@ function restOfPage(page: Page): string | null {
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
 		case "calendar":
+		case "get-started":
 			return null;
 		default: {
 			const never: never = page;
@@ -314,6 +317,7 @@ function queryOfPage(page: Page): string | null {
 		case "tickets":
 		case "bots":
 		case "calendar":
+		case "get-started":
 		case "email":
 		case "scheduled":
 			return null;

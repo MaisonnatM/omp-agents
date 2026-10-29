@@ -13,12 +13,13 @@ const SHELL_LOCAL: Record<string, true> = { PWD: true, OLDPWD: true, SHLVL: true
 const TIMEOUT_MS = 10_000;
 
 /** The login shell's variables, read through `env -0` between two markers that set them apart from what its rc files print. */
-function loginShellEnv(): Record<string, string> {
+function loginShellEnv(base: NodeJS.ProcessEnv = process.env): Record<string, string> {
 	const shell = process.env.SHELL || "/bin/zsh";
 	const mark = `omp-agents-env-${randomUUID()}`;
 	// `-i` too: Bun's installer adds `~/.bun/bin` to the PATH in `.zshrc`, which a login shell alone does not read.
 	const out = execFileSync(shell, ["-ilc", `printf '%s' '${mark}'; command env -0; printf '%s' '${mark}'`], {
 		encoding: "utf8",
+		env: base,
 		timeout: TIMEOUT_MS,
 		stdio: ["ignore", "pipe", "ignore"],
 	});
@@ -30,6 +31,26 @@ function loginShellEnv(): Record<string, string> {
 		if (eq > 0 && !SHELL_LOCAL[entry.slice(0, eq)]) env[entry.slice(0, eq)] = entry.slice(eq + 1);
 	}
 	return env;
+}
+
+/** What launchd hands an app, so a refreshed shell rebuilds PATH and the omp variables from its rc files instead of echoing this process's. */
+const launchdEnv = (): NodeJS.ProcessEnv => {
+	const { HOME, USER, LOGNAME, SHELL, TMPDIR, LANG } = process.env;
+	return { HOME, USER, LOGNAME, SHELL, TMPDIR, LANG, PATH: "/usr/bin:/bin:/usr/sbin:/sbin" };
+};
+
+/** Retry rediscovers executables without moving paths the app already initialized. */
+export function refreshExecutableEnv(): void {
+	try {
+		const env = loginShellEnv(launchdEnv());
+		for (const key of ["PATH", "BUN_INSTALL", "OMP_PACKAGE_DIR"]) {
+			const value = env[key];
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	} catch (err) {
+		console.error(`omp-agents: cannot refresh executable discovery: ${errorText(err)}`);
+	}
 }
 
 if (app.isPackaged) {

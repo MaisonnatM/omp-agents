@@ -1,7 +1,10 @@
 /** omp's config: the settings a session loads, and writing the model routing back through omp's own path. */
+import { homedir } from "node:os";
+import { isObject } from "../json";
+import type { CollabAutoStart } from "../shared/readiness";
 import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
-import { config, dirs, extensionSettings, fallbackChains, modelSettings, type SettingHandle, sessionSettings, settingsRegistry } from "./modules";
+import { collabSettings, config, dirs, extensionSettings, fallbackChains, modelSettings, type OmpSettingsInstance, type SettingHandle, sessionSettings, settingsRegistry } from "./modules";
 
 /** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
 export const agentDir: string = dirs.getAgentDir();
@@ -104,5 +107,28 @@ export async function writeRouting(cwd: string, edit: RoutingEdit): Promise<void
 			setting("modelProviderOrder").set(settings, edit.providers.length > 0 ? edit.providers : undefined);
 			break;
 	}
+	await settings.flush();
+}
+
+function globalCollabAutoStart(settings: OmpSettingsInstance): CollabAutoStart {
+	const global = settings.getGlobalSettings();
+	const value = (isObject(global.collab) ? global.collab.autoStart : undefined) ?? collabSettings.cfgCollabAutoStart.default;
+	if (value === "off" || value === "view" || value === "control") return value;
+	throw new Error("omp's global collab.autoStart is not off, view, or control");
+}
+
+/** Global terminal publishing, without any workspace's overrides or writes. */
+export async function readCollabAutoStart(): Promise<CollabAutoStart> {
+	return globalCollabAutoStart(await config.Settings.loadReadOnly({ cwd: homedir() }));
+}
+
+/** Stages only this setting and flushes through omp's locked global config writer. */
+export async function showTerminalSessions(): Promise<void> {
+	const cwd = homedir();
+	const current = globalCollabAutoStart(await config.Settings.loadReadOnly({ cwd }));
+	if (current === "view" || current === "control") return;
+	const settings = await config.Settings.loadIsolated({ cwd });
+	if (globalCollabAutoStart(settings) !== "off") return;
+	setting("collab.autoStart").set(settings, "control");
 	await settings.flush();
 }

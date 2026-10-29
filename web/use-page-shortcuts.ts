@@ -88,6 +88,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			help: () => latest.current.setShortcutsOpen(open => !open),
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
 			newSession: () => latest.current.openNewSession(),
+			getStarted: () => latest.current.navigate({ kind: "get-started" }),
 			previousSession: () => step(-1),
 			nextSession: () => step(1),
 			// ↑ and ↓ step only while the panes show: a page's list, or its native scrolling, keeps them.

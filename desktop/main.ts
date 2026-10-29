@@ -4,8 +4,8 @@
  * address in the default browser.
  */
 // First: a packaged app takes the login shell's environment before `src/paths.ts` reads it.
-import "./shell-env";
-import { type ChildProcess, execFile, spawn } from "node:child_process";
+import { refreshExecutableEnv } from "./shell-env";
+import { type ChildProcess, execFile, spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -16,6 +16,7 @@ import {
 	app,
 	BrowserWindow,
 	type ContextMenuParams,
+	clipboard,
 	dialog,
 	globalShortcut,
 	ipcMain,
@@ -29,13 +30,14 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { ACCESS_CHANNEL, isWebUrl, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, INSTALL_STARTER_KIT_CHANNEL, isWebUrl, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, type StarterKitInstallResult, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
 import { showAttention } from "./attention";
 import { trackBrowserGuests } from "./browser-guests";
 import { startUpdates, type Updates } from "./updates";
+import { OMP_INSTALL_COMMAND, OMP_MISSING_EXIT } from "../src/shared/startup";
 
 const PORT = portFromEnv();
 const ORIGIN = originOf(PORT);
@@ -64,6 +66,8 @@ const STOP_TIMEOUT_MS = 10_000;
 const LOG_LINES = 40;
 /** The error page's Retry link, which never loads: `will-navigate` catches it. */
 const RETRY_URL = "omp-agents:retry";
+const COPY_OMP_URL = "omp-agents:copy-omp-install";
+const missingOmpNotices = new WeakMap<WebContents, string>();
 /** A navigation that another one replaced, which is no failure. */
 const ERR_ABORTED = -3;
 const IS_MAC = process.platform === "darwin";
@@ -132,6 +136,12 @@ function tail(stream: Readable, out: NodeJS.WriteStream): Interface {
 	return lines;
 }
 
+class ServerExit extends Error {
+	constructor(readonly code: number | null, signal: NodeJS.Signals | null) {
+		super(`The server exited with ${signal ?? `code ${code}`}.`);
+	}
+}
+
 /**
  * Starts the server and resolves once it listens, or rejects with why it did not. It listens when it prints
  * {@link isListeningLine}: an answer on the port alone could come from another server that took the port first.
@@ -155,7 +165,7 @@ function launch(): Promise<ChildProcess> {
 	});
 	tail(child.stderr, process.stderr);
 	child.once("error", (err: NodeJS.ErrnoException) => reject(new Error(err.code === "ENOENT" ? `\`${SERVER.bun}\` is not found.` : err.message)));
-	child.once("exit", (code, signal) => reject(new Error(`The server exited with ${signal ?? `code ${code}`}.`)));
+	child.once("exit", (code, signal) => reject(new ServerExit(code, signal)));
 	return promise;
 }
 
@@ -172,6 +182,18 @@ pre{font-size:12px;white-space:pre-wrap;padding:.75rem;border-radius:6px;backgro
 function showError(win: BrowserWindow, title: string, detail: string): void {
 	const log = serverLog.length ? `<pre>${escapeHtml(serverLog.join("\n"))}</pre>` : "";
 	void win.loadURL(notice(title, `<p>${escapeHtml(detail)}</p>${log}<p><a href="${RETRY_URL}">Retry</a></p>`));
+}
+
+/** This page needs no server, token, or renderer privileges. Its two actions carry no user input. */
+function showOmpMissing(win: BrowserWindow): void {
+	const bun = spawnSync("bun", ["--version"], { stdio: "ignore", timeout: 2_000 });
+	const prerequisite = bun.error
+		? '<p>Install <a href="https://bun.sh">Bun</a> first, then run this command in your terminal.</p>'
+		: "<p>Run this command in your terminal. It needs Bun.</p>";
+	const detail = serverLog.length ? `<details><summary>Technical details</summary><pre>${escapeHtml(serverLog.join("\n"))}</pre></details>` : "";
+	const url = notice("Install omp to get started", `<p>omp agents uses omp to run your sessions.</p>${prerequisite}<pre>${escapeHtml(OMP_INSTALL_COMMAND)}</pre><p><a href="${COPY_OMP_URL}">Copy command</a> · <a href="${RETRY_URL}">Retry</a></p><p>Once installation finishes, Retry looks for omp again. Nothing is installed automatically.</p>${detail}`);
+	missingOmpNotices.set(win.webContents, url);
+	void win.loadURL(url);
 }
 
 /** Uses the server on the port, or starts one, then loads the dashboard, which the preload signs in with the token. */
@@ -197,7 +219,8 @@ async function connect(win: BrowserWindow): Promise<void> {
 			});
 		}
 	} catch (err) {
-		showError(win, "The server did not start", errorText(err));
+		if (err instanceof ServerExit && err.code === OMP_MISSING_EXIT) showOmpMissing(win);
+		else showError(win, "The server did not start", errorText(err));
 		return;
 	}
 	// A failed load reaches `did-fail-load`, which shows it.
@@ -280,8 +303,15 @@ function createWindow(): BrowserWindow {
 		return { action: "deny" };
 	});
 	contents.on("will-navigate", event => {
-		if (event.url === RETRY_URL) {
+		if (event.url === COPY_OMP_URL && contents.getURL() === missingOmpNotices.get(contents)) {
 			event.preventDefault();
+			clipboard.writeText(OMP_INSTALL_COMMAND);
+			void contents.executeJavaScript("document.querySelector('a[href=\"omp-agents:copy-omp-install\"]').textContent = 'Copied'");
+			return;
+		}
+		if (event.url === RETRY_URL && contents.getURL().startsWith("data:text/html")) {
+			event.preventDefault();
+			refreshExecutableEnv();
 			void connect(win);
 			return;
 		}
@@ -320,6 +350,10 @@ function createWindow(): BrowserWindow {
 		const { canceled, filePaths } = await dialog.showOpenDialog(win, { properties: ["openDirectory", "createDirectory"] });
 		return canceled ? null : (filePaths[0] ?? null);
 	});
+	ipcMain.handle(INSTALL_STARTER_KIT_CHANNEL, (event, ...args: unknown[]) => {
+		if (event.sender !== contents || event.senderFrame !== contents.mainFrame || !isDashboard(event.senderFrame?.url) || args.length !== 0) throw new Error("Starter kit installation is available only in the dashboard");
+		return installStarterKit();
+	});
 
 	win.on("close", event => {
 		writeFileSync(BOUNDS_FILE, JSON.stringify(win.getNormalBounds()));
@@ -334,12 +368,23 @@ function toggleOpenAtLogin(item: MenuItem): void {
 	item.checked = app.getLoginItemSettings().openAtLogin;
 }
 
-/** Runs the starter kit's installer, which writes into omp's agent directory, and shows what it printed. */
-function installStarterKit(): void {
-	execFile(SERVER.bun, [KIT_INSTALLER], { env: process.env, timeout: 120_000 }, (err, stdout, stderr) => {
-		if (err) dialog.showErrorBox("Starter kit install failed", `${stderr || errorText(err)}`.trim());
-		else void dialog.showMessageBox({ message: "omp starter kit installed", detail: `${stdout.trim()}\n\nNew omp sessions load it.` });
+let installingStarterKit: Promise<StarterKitInstallResult> | null = null;
+
+/** One fixed installer, shared by the menu and page. User customizations are never forced. */
+function installStarterKit(): Promise<StarterKitInstallResult> {
+	if (installingStarterKit) return installingStarterKit;
+	const { promise, resolve } = Promise.withResolvers<StarterKitInstallResult>();
+	installingStarterKit = promise.finally(() => { installingStarterKit = null; });
+	execFile(SERVER.bun, [KIT_INSTALLER], { cwd: SERVER.cwd, env: process.env, timeout: 120_000 }, (err, stdout, stderr) => {
+		resolve({ ok: !err, message: (err ? stderr || stdout || errorText(err) : stdout).trim().slice(-16_000) });
 	});
+	return installingStarterKit;
+}
+
+async function installStarterKitFromMenu(): Promise<void> {
+	const result = await installStarterKit();
+	if (!result.ok) dialog.showErrorBox("Starter kit install failed", result.message);
+	else void dialog.showMessageBox({ message: "omp starter kit installed", detail: `${result.message}\n\nNew omp sessions load it.` });
 }
 
 /** The update check, in a packaged app alone: a checkout updates through the dashboard's **Update dashboard**, which pulls it and restarts the server. */
@@ -383,7 +428,7 @@ function applicationMenu(): Menu {
 						...updateItem(),
 						SEPARATOR,
 						...openAtLogin,
-						{ label: "Install omp Starter Kit…", click: installStarterKit },
+						{ label: "Install omp Starter Kit…", click: () => void installStarterKitFromMenu() },
 						SEPARATOR,
 						{ role: "hide" },
 						{ role: "hideOthers" },
