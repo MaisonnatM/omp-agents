@@ -28,7 +28,8 @@ class ConversationFold implements LineFold {
 	applyLine(line: string): void {
 		if (!this.#format.messageLine.test(line)) return;
 		for (const entry of this.#format.decode(line)) {
-			for (const item of messageItemsOf(entry)) this.messages.set(item.id, { id: item.id, role: item.kind, text: item.text });
+			// A routine's message is not the user's words, as a dashboard prompt is not.
+			for (const item of messageItemsOf(entry)) if (item.kind !== "routine") this.messages.set(item.id, { id: item.id, role: item.kind, text: item.text });
 		}
 	}
 }

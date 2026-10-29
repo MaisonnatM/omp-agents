@@ -7,7 +7,7 @@
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
 - **New routine**, under **Routines** in the Bot's details or at the top of its routines card, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
-  The task is **Send a message**, a message that goes into the Bot's conversation each run, as if you wrote it there, or **Run a command**, a shell command.
+  The task is **Send a message**, a message that goes into the Bot's conversation as a routine run card, or **Run a command**, a shell command.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run a schedule or **Run now** started, or runs at a time of day on the days you pick.
   **Weekdays** and **Every day** pick those days at once.
   **Add schedule** adds another.
@@ -27,6 +27,14 @@
   A triggered run leaves the schedules alone: an hourly routine still runs on the hour.
 - A message reaches the Bot the way your own does: it follows the Bot's running session, resumes its saved one, or starts its first.
   A routine starts no session of its own, so the Bot keeps one conversation, and its answers show there.
+- In the conversation, each routine message has a folded card with the routine's name, a message or command icon, the logos of what triggered it, its time, and a status icon and label.
+  A message reads **Sending…** until recorded, then **Sent**; a command report shows how the command ended and how long it took.
+  Click the card to show its **Prompt** or **Command**, any output, and **Started by** with links to the events when available.
+  A prompt that starts with `!` shows its shell output and result in the same card.
+  Output longer than 20 lines folds behind **Show output**.
+  **Open routine** opens the routine's row, and the copy button copies only its prompt or command.
+  The card keeps the name and instructions sent with that run, even after you edit the routine.
+  On a narrow conversation, the time and status label hide, but the status icon stays.
 - A command runs with `sh` in the Bot's workspace, without an omp session.
   The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
   It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.

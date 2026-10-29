@@ -68,8 +68,11 @@ export type OpenPullRequest = { kind: "none" } | { kind: "ready"; prompt: string
 const NONE: OpenPullRequest = { kind: "none" };
 const OPENING: OpenPullRequest = { kind: "opening" };
 
-/** The text of the prompt that opened a pane's last turn, the user's or the dashboard's. */
-const lastPrompt = ({ items }: PaneData): string | null => items.findLast(opensTurn)?.text ?? null;
+/** The text of the prompt that opened a pane's last turn, the user's or the dashboard's; none when a routine sent it, as no press does. */
+const lastPrompt = ({ items }: PaneData): string | null => {
+	const opener = items.findLast(opensTurn);
+	return opener && opener.kind !== "routine" ? opener.text : null;
+};
 
 /** The press under way per session id. */
 const presses = keyedStore<Press | null>(null);

@@ -58,6 +58,7 @@ export const CONTROLS = [
 	{ id: "prompt-history.toggle", label: "Chat history button", area: "Transcript" },
 	{ id: "prompt-history.jump", label: "Chat history prompt", area: "Transcript" },
 	{ id: "transcript.activity-group", label: "Tool calls group, folded or unfolded", area: "Transcript" },
+	{ id: "transcript.routine-card", label: "Routine run card, folded or unfolded", area: "Transcript" },
 	{ id: "transcript.scroll-to-bottom", label: "Scroll-to-bottom arrow", area: "Transcript" },
 	{ id: "transcript.todos", label: "Todos card, folded or unfolded", area: "Transcript" },
 	{ id: "transcript.ship", label: "Todos card's Ship section, folded or unfolded", area: "Transcript" },

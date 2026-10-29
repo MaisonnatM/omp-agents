@@ -40,10 +40,15 @@ const HEALTH_ICON: Record<RunHealth, { icon: LucideIcon; tone: string }> = {
 	waiting: { icon: CircleDashed, tone: "text-amber-600 dark:text-amber-400" },
 };
 
+/** A result as its health's icon, labelled with its words. */
+export function HealthIcon({ health, label, className }: { health: RunHealth; label: string; className?: string }) {
+	const { icon: Icon, tone } = HEALTH_ICON[health];
+	return <Icon role="img" aria-label={label} className={cn("size-3.5 shrink-0", tone, className)} />;
+}
+
 /** A run's result as an icon, labelled with the run's words. */
 export function RunIcon({ run, className }: { run: RoutineRun; className?: string }) {
-	const { icon: Icon, tone } = HEALTH_ICON[runHealth(run)];
-	return <Icon role="img" aria-label={runWords(run)} className={cn("size-3.5 shrink-0", tone, className)} />;
+	return <HealthIcon health={runHealth(run)} label={runWords(run)} className={className} />;
 }
 
 /** Each health's tick on a routine's run strip. */

@@ -1,5 +1,5 @@
 /** The rules of routines: when one is due, how a change edits the list, and which routine the page and `routines.json` may hold. */
-import { isNonEmpty, isObject, isSafeInteger, oneOf, type Parsed } from "./json";
+import { fields, isNonEmpty, isObject, isSafeInteger, isString, nullable, oneOf, type Parsed } from "./json";
 import { type BotId, parseBotId } from "./shared/bots";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -214,6 +214,31 @@ function parseSchedules(value: unknown): Parsed<Schedule[]> {
 }
 
 export const isTriggerKind = oneOf(TRIGGER_KINDS);
+
+const isTriggerEvent = fields<TriggerEvent>({ kind: isTriggerKind, title: isString, detail: isString, url: nullable(isString) });
+
+/** A trigger event as `routines.json` and a routine's message keep it, without other fields, or `null`. */
+export function parseTriggerEvent(value: unknown): TriggerEvent | null {
+	return isTriggerEvent(value) ? { kind: value.kind, title: value.title, detail: value.detail, url: value.url } : null;
+}
+
+/** A run's command as `routines.json` keeps it, or `null`. */
+export function parseCommandRun(value: unknown): CommandRun | null {
+	if (!isObject(value) || !isSafeInteger(value.startedAt)) return null;
+	const { phase, startedAt, endedAt, output } = value;
+	if (phase === "running") return { phase, startedAt };
+	if (!isSafeInteger(endedAt)) return null;
+	switch (phase) {
+		case "exited":
+			return typeof value.code === "number" && Number.isSafeInteger(value.code) && typeof output === "string" ? { phase, code: value.code, output, startedAt, endedAt } : null;
+		case "stopped":
+			return (value.reason === "time-limit" || value.reason === "dashboard") && typeof output === "string" ? { phase, reason: value.reason, output, startedAt, endedAt } : null;
+		case "failed":
+			return typeof value.error === "string" ? { phase, error: value.error, startedAt, endedAt } : null;
+		default:
+			return null;
+	}
+}
 
 /** Each kind at most once. */
 function parseTriggers(value: unknown): Parsed<Trigger[]> {

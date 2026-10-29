@@ -31,8 +31,13 @@
   `src/omp/stats.ts` provides its `listPrice` callback through the bundled `pi-catalog` exports loaded in `src/omp/modules.ts`.
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, `imagesOf`, and `UNREAD_LINE` with `unreadLine`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
 - `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last; an unread line shows as a warning notice with the line's start, and a prompt the dashboard sent in the user's place as a `dashboard` item the page hides.
+  Its `promptItem` folds stamped routine messages into `routine` items with their saved message and restores a skill invocation on the saved prompt.
+  The fold also retains a `!` prompt's `bashExecution` output and result as `shell` on its routine item.
+  Starting prompts use the same classification, so a routine shows its pending card until the recorded message replaces it.
 - `src/conversation-search.ts`: the conversation search behind `GET /api/conversations`.
-  `Conversations` keeps a fold of each session's own file, not its subagents', with the prompts' and replies' item ids and text: `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, decoded by the file's format, and lines that fail the format's `messageLine` go unparsed.
+  `Conversations` keeps a fold of each session's own file, not its subagents', with the user's prompts' and the agent's replies' item ids and text.
+  `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, decoded by the file's format, and the search leaves out routine items.
+  Lines that fail the format's `messageLine` go unparsed.
   `SessionFiles` hands it to `SessionFactsIndex` as one of its `OwnFileFolds`, so the index's read of each session file feeds both folds and no file is read twice; the index starts a fresh conversation when the file shrinks and forgets it once the session leaves the list.
   `Conversations.search` then matches those with `everyWord` and reads no file.
 - `src/work.ts`: folds session-file lines into the files changed.

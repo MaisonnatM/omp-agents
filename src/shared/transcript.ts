@@ -1,6 +1,7 @@
 /** What a transcript shows: its items, the files its agent changed, its images, and the files it opens. */
 
 import type { DiffRow } from "./changes";
+import { readRoutineMessage, type RoutineMessage } from "./routine-message";
 
 /** The extensions of the files that agent text may open in the page's file dialog, `GET /api/file`. */
 export const TEXT_FILE_EXTENSIONS: readonly string[] = ["md", "markdown", "txt", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "xml", "diff", "patch"];
@@ -44,8 +45,14 @@ export const mediaUrl = (path: string): string => `/api/media?${new URLSearchPar
 /** How a prompt the dashboard sent in the user's place starts, as an older version's project updates did; the agent read it, the user never sees it as theirs. */
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
 
-/** Whether prompt `text` is one the dashboard sent in the user's place. */
-export const isDashboardPrompt = (text: string): boolean => text.startsWith(DASHBOARD_PROMPT_PREFIX);
+/** Who sent a prompt: the user, the dashboard in the user's place, or a routine, whose message a stamp tells. */
+export type PromptAuthor = { kind: "user" } | { kind: "dashboard" } | { kind: "routine"; message: RoutineMessage };
+
+export function promptAuthor(text: string): PromptAuthor {
+	if (text.startsWith(DASHBOARD_PROMPT_PREFIX)) return { kind: "dashboard" };
+	const message = readRoutineMessage(text);
+	return message ? { kind: "routine", message } : { kind: "user" };
+}
 
 export type Item =
 	/**
@@ -57,10 +64,15 @@ export type Item =
 	 */
 	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[]; files?: string[]; pending?: true }
 	/**
-	 * A prompt the dashboard sent in the user's place, which {@link isDashboardPrompt} tells.
+	 * A prompt the dashboard sent in the user's place, which {@link promptAuthor} tells.
 	 * The page shows nothing for it, but it opens a turn as a prompt does. `entryId` as a prompt's.
 	 */
 	| { id: string; kind: "dashboard"; text: string; entryId: string | null }
+	/**
+	 * A message a routine run sent, which {@link promptAuthor} tells; it opens a turn as a prompt does. `entryId` and
+	 * `pending` as a prompt's. `shell`: what omp's run of a `!` prompt printed and how it ended; absent for any other.
+	 */
+	| { id: string; kind: "routine"; message: RoutineMessage; entryId: string | null; pending?: true; shell?: { output: string; code: number | null; cancelled: boolean } }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }

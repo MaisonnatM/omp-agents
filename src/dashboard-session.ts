@@ -5,7 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { stat } from "node:fs/promises";
-import { errorText, isObject, isTexts } from "./json";
+import { errorText, isObject, isTexts, str } from "./json";
 import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused, turnUpdate } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
@@ -15,11 +15,11 @@ import type { PreparedReplay } from "./replay";
 import { launchForReplayResume, readReplayMarker, replayLaunch, requireReplayReady } from "./omp/replay-launch";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
-import { isDashboardPrompt } from "./shared/transcript";
+import { promptAuthor } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";
 import { textOf } from "./session-entries";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
-import { isUserPrompt, type StartingPrompt } from "./transcript";
+import { isUserPrompt, SKILL_PROMPT, type StartingPrompt } from "./transcript";
 import { SerialLane } from "./serial-lane";
 import { ASK_DIALOG_OPT_IN, PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 import { sessionVisualsExtension } from "./server/resources";
@@ -85,6 +85,12 @@ const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_chang
 /** A message taken back from omp's queue, holding only the image fields the composer restores. */
 function withdrawn({ text, images = [] }: { text: string; images?: readonly PromptImage[] }): WithdrawnMessage {
 	return { text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) };
+}
+
+/** What the user typed for prompt `message`: a `/skill:` prompt's text is the skill's, its arguments what they typed. */
+function typedText(message: Record<string, unknown>): string {
+	if (message.customType !== SKILL_PROMPT) return textOf(message.content);
+	return (isObject(message.details) && str(message.details.args)) || "";
 }
 
 /** How a session reaches its omp, which decides what a failed opening does to it. */
@@ -525,7 +531,8 @@ export class DashboardSession implements LiveSession {
 				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
 				this.#change(() => this.#prompt.release());
 				// omp's restore leaves out a prompt it admitted but never ran, so the composer gets it back from here.
-				return [...mark.unsent(), ...steering, ...followUp].map(withdrawn);
+				// Only the user's own: a message the dashboard or a routine sent is not theirs to edit.
+				return [...mark.unsent(), ...steering, ...followUp].filter(({ text }) => promptAuthor(text).kind === "user").map(withdrawn);
 			}),
 		);
 	}
@@ -667,10 +674,10 @@ export class DashboardSession implements LiveSession {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
 		} else if (
-			event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && !isDashboardPrompt(textOf(event.message.content)) && this.sessionName === null && !this.#titled
+			event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && promptAuthor(typedText(event.message)).kind === "user" && this.sessionName === null && !this.#titled
 		) {
 			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
-			// A prompt the dashboard sent waits for the user's own, which the title should name.
+			// A prompt the dashboard or a routine sent waits for the user's own, which the title should name.
 			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt.
 			// Through the turn gate, `/rename` can land after the turn's last state event, so read the title it made here.
 			this.#titled = true;

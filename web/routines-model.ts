@@ -15,6 +15,7 @@ import {
 } from "../src/routines";
 import type { BotId } from "../src/shared/bots";
 import { minutesOfTimeInput, timeInputValue } from "../src/shared/days";
+import type { Item } from "../src/shared/transcript";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
@@ -184,12 +185,27 @@ export function runHealth({ outcome, errors }: RoutineRun): RunHealth {
 			return "waiting";
 		case "sent":
 			return "ok";
-		case "command": {
-			const { run } = outcome;
-			if (run.phase === "running") return "running";
-			return run.phase === "exited" && run.code === 0 ? "ok" : "failed";
-		}
+		case "command":
+			return commandHealth(outcome.run);
 	}
+}
+
+function commandHealth(command: CommandRun): RunHealth {
+	if (command.phase === "running") return "running";
+	return command.phase === "exited" && command.code === 0 ? "ok" : "failed";
+}
+
+/**
+ * How a routine's message in its Bot's conversation stands, for its card: `Sending…` until omp records it, how its
+ * command ended, how the shell ran a `!` prompt, else `Sent`.
+ */
+export function messageStatus({ message, pending, shell }: Extract<Item, { kind: "routine" }>): { health: RunHealth; words: string } {
+	if (pending) return { health: "waiting", words: "Sending…" };
+	if (message.sent.kind === "command") return { health: commandHealth(message.sent.run), words: commandWords(message.sent.run) };
+	if (shell?.cancelled) return { health: "failed", words: "Cancelled" };
+	if (shell && shell.code !== null && shell.code !== 0) return { health: "failed", words: `Failed (exit ${shell.code})` };
+	if (shell?.code === 0) return { health: "ok", words: "Succeeded" };
+	return { health: "ok", words: "Sent" };
 }
 
 /** Each health as the count of a routine's runs says it. */

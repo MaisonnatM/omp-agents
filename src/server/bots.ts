@@ -3,7 +3,7 @@
  * to as that session lives, and a message to a Bot, which reaches its live session or resumes it.
  */
 import { join } from "node:path";
-import { isObject } from "../json";
+import { isObject, parseJson } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
@@ -11,10 +11,9 @@ import { type Bot, type BotEdit, type BotId, type BotLast, MAX_MEMORY_BYTES } fr
 import type { ServerMsg } from "../shared/protocol";
 import { modelOfSelector } from "../shared/models";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
-import { isDashboardPrompt } from "../shared/transcript";
-import { entryTime, oneLine, textOf } from "../session-entries";
+import { entryTime, oneLine } from "../session-entries";
 import { readTail } from "../read-tail";
-import { splitSuggestions } from "../transcript";
+import { messageItemsOf } from "../transcript";
 import type { BotsFile } from "./bots-file";
 import type { SessionJoin } from "./start";
 
@@ -27,7 +26,7 @@ type BotFiles = { sessionId: string | null; memory: string; last: BotLast | null
 /** How much of a session file's end {@link lastMessage} reads; a conversation whose last words sit further back previews none. */
 const LAST_TAIL = 256 * 1024;
 
-/** The last prompt or reply with text in session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
+/** The last prompt, routine message or reply with text in session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
 export function lastMessage(path: string): BotLast | null {
 	const lines = readTail(path, LAST_TAIL)?.text.split("\n") ?? [];
 	for (let i = lines.length - 1; i >= 0; i--) {
@@ -37,20 +36,25 @@ export function lastMessage(path: string): BotLast | null {
 	return null;
 }
 
+/** What session-file line `line` previews, as the transcript shows it: a collaborator's prompt, a `!` command's record, and a dashboard prompt preview nothing. */
 function messageOf(line: string): BotLast | null {
-	let entry: unknown;
-	try {
-		entry = JSON.parse(line);
-	} catch {
-		return null;
+	const entry = parseJson(line);
+	if (!isObject(entry)) return null;
+	const at = entryTime(entry) ?? 0;
+	const items = messageItemsOf(entry);
+	const prompt = items.find(item => item.kind !== "assistant");
+	if (prompt?.kind === "routine") {
+		const { routine, sent } = prompt.message;
+		return { at, from: "routine", name: routine.name, text: oneLine(sent.kind === "prompt" ? sent.prompt : `$ ${sent.command}`) };
 	}
-	if (!isObject(entry) || entry.type !== "message" || !isObject(entry.message)) return null;
-	const { role, content } = entry.message;
-	const text = textOf(content).trim();
-	if (!text) return null;
-	if (role === "user" && !isDashboardPrompt(text)) return { at: entryTime(entry) ?? 0, from: "user", text: oneLine(text) };
-	if (role === "assistant") return { at: entryTime(entry) ?? 0, from: "bot", text: oneLine(splitSuggestions(text).body) };
-	return null;
+	if (prompt?.kind === "user") {
+		const shell = isObject(entry.message) && entry.message.role === "bashExecution";
+		const body = prompt.text || (prompt.files ?? []).join(", ");
+		const text = oneLine(prompt.skill ? `/skill:${prompt.skill}${body ? ` ${body}` : ""}` : body);
+		return prompt.from === null && !shell && text ? { at, from: "user", text } : null;
+	}
+	const reply = oneLine(items.flatMap(item => (item.kind === "assistant" ? [item.text] : [])).join("\n"));
+	return reply ? { at, from: "bot", text: reply } : null;
 }
 
 export interface BotsDeps {

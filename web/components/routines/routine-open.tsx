@@ -37,7 +37,7 @@ const HEADING = "text-xs font-medium text-muted-foreground";
 const FOLDED_OUTPUT_LINES = 20;
 
 /** What a command printed, scrolling past a few lines, and folded when it is long. */
-function CommandOutput({ output }: { output: string }) {
+export function CommandOutput({ output }: { output: string }) {
 	const pre = (
 		<pre
 			aria-label="Output"

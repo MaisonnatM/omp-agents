@@ -104,7 +104,7 @@ export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], last
 			const unread = host?.unread ?? null;
 			const asking = botAsking(host);
 			const fresher = unread?.reply && (!last || unread.at >= last.at) ? unread.reply : null;
-			const said = fresher ?? (last ? (last.from === "user" ? `You: ${last.text}` : last.text) : null);
+			const said = fresher ?? (!last ? null : last.from === "user" ? `You: ${last.text}` : last.from === "routine" ? `${last.name}: ${last.text}` : last.text);
 			const preview = asking ?? (host?.status === "working" ? "Working…" : said ? plainMarkdown(said) : "No messages yet");
 			return {
 				bot,

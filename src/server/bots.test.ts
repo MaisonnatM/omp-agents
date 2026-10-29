@@ -152,7 +152,8 @@ describe("Bots", () => {
 	test("the message reads a Bot's files again only once its session changed, and forgets a removed Bot", async () => {
 		const { bots, file, dir } = harness();
 		await bots.message(scout.id, "Hello.");
-		const said = (text: string) => writeFileSync(join(dir, "s1.jsonl"), `${JSON.stringify({ type: "message", timestamp: "2026-05-02T09:30:00.000Z", message: { role: "assistant", content: text } })}\n`);
+		const said = (text: string) =>
+			writeFileSync(join(dir, "s1.jsonl"), `${JSON.stringify({ type: "message", timestamp: "2026-05-02T09:30:00.000Z", message: { role: "assistant", content: [{ type: "text", text }] } })}\n`);
 		said("Hi.");
 		expect(bots.msg().lasts[scout.id]?.text).toBe("Hi.");
 		said("Still here.");

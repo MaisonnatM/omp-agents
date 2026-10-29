@@ -2,7 +2,7 @@
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { oneLine } from "../session-entries";
 import type { SessionSource } from "../shared/sessions";
-import { isDashboardPrompt } from "../shared/transcript";
+import { promptAuthor } from "../shared/transcript";
 import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, sessionEntries, sessionManager, storage } from "./modules";
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
@@ -21,16 +21,32 @@ export interface SavedSession {
 	empty: boolean;
 }
 
+/** The title a session's first prompt gives it: the user's as one line, a routine's name, none for the dashboard's. */
+function firstTitle(firstMessage: string): string | null {
+	// omp writes this placeholder when the prefix it scans holds no user text.
+	if (!firstMessage || firstMessage === "(no messages)") return null;
+	const author = promptAuthor(firstMessage);
+	switch (author.kind) {
+		case "user":
+			return oneLine(firstMessage);
+		case "routine":
+			return author.message.routine.name;
+		case "dashboard":
+			return null;
+		default: {
+			const unhandled: never = author;
+			return unhandled;
+		}
+	}
+}
+
 function saved(session: SessionInfo): SavedSession {
 	return {
 		id: session.id,
 		path: session.path,
 		source: "omp",
 		cwd: session.cwd,
-		// omp writes this placeholder when the prefix it scans holds no user text.
-		title:
-			session.title ||
-			(session.firstMessage && session.firstMessage !== "(no messages)" && !isDashboardPrompt(session.firstMessage) ? oneLine(session.firstMessage) : null),
+		title: session.title || firstTitle(session.firstMessage),
 		modifiedAt: session.modified.getTime(),
 		empty: listing.isEmptySession(session),
 	};

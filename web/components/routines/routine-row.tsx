@@ -28,8 +28,9 @@ import { ToggleSwitch } from "../toggle-switch";
 import { HEALTH_TICK, RunIcon, TaskIcon, TRIGGER_MARKS } from "./routine-marks";
 import { RoutineOpen } from "./routine-open";
 
-const OPEN_SPRING = { type: "spring", duration: 0.34, bounce: 0 } as const;
-const INSTANT = { duration: 0 } as const;
+/** How an open row's details unfold, and how they do under reduced motion. */
+export const OPEN_SPRING = { type: "spring", duration: 0.34, bounce: 0 } as const;
+export const INSTANT = { duration: 0 } as const;
 
 /** A click on one of these inside a row works the control, and leaves the row as it is. */
 const ROW_CONTROLS = "button, a, input, [role='switch'], [role='group']";
