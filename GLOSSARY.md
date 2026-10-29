@@ -51,6 +51,11 @@ The Collab channel through which a host shares one session with its guests.
 
 ## Interface
 
+**Get started**:
+The six-step checklist for a model-provider sign-in and a first session, followed by optional setup, available as a page and automatically on a vacant first-run home.
+Its checkmarks reflect real setup; only its dismissal stays on this computer.
+_Avoid_: Setup wizard, tour, onboarding modal
+
 **Roster**:
 The list of running, interrupted, pinned, and past sessions in the sidebar.
 _Avoid_: Session list, inbox

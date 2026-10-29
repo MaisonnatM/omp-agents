@@ -35,6 +35,20 @@ Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`.
 The omp sessions it starts still use the user's omp directory, so they still run with the user's models and sign-ins.
 Each session's socket lives under `$XDG_CONFIG_HOME/omp-agents/sessions/<port>/`, and the server refuses a socket path past 103 bytes (`MAX_SOCKET_PATH_BYTES` in `src/keeper-link.ts`), so a smoke that starts sessions needs a short `XDG_CONFIG_HOME` such as `mktemp -d /tmp/oa-c.XXXX`; under macOS's default `$TMPDIR`, starting a session fails with "The session socket path is too long".
 
+For first-launch Get started, isolate `HOME` as well as omp itself with a fresh `PI_CODING_AGENT_DIR`, and use the fresh desktop port's origin/storage.
+Keep the config path short, for example `/tmp/oa-c.<suffix>`, and the home, data, and agent paths separate, such as `/tmp/oa-h.<suffix>`, `/tmp/oa-d.<suffix>`, and `/tmp/oa-a.<suffix>`.
+Set `OMP_PACKAGE_DIR` to the absolute installed omp package before changing HOME, and omit inherited auth-broker, provider credential, and `PI_CONFIG_FILES` overrides so the smoke does not borrow a real sign-in.
+Launch the target checkout through `desktop/launch.ts` (`bun run desktop` from its root), with `OMP_AGENTS_HEADLESS=1`.
+The page's only onboarding key is `omp-agents.get-started-dismissed`; remove that key on the smoke origin to exercise automatic entry again, without clearing the token.
+Use `#get-started` to inspect all six rows on an existing setup without changing its dismissal.
+
+To exercise the pre-server missing-omp page, start a separate hidden desktop on a free port with `OMP_PACKAGE_DIR` set to a nonexistent package directory, for example `/tmp/oa-no-omp/package`.
+Do not point it at a malformed manifest, which intentionally remains an ordinary startup error.
+Wait for the data-page heading instead of a server listening line.
+The page is owned by `desktop/main.ts`, needs no token, and offers Copy, Retry, and Technical details.
+For Retry, let the login shell resolve the newly installed package or update only its discovery variables; HOME, XDG paths, and PORT must stay at their launch values.
+These are real installation/configuration paths: never run the kit installer or terminal-publishing mutation on the user's agent directory for a visual-only check.
+
 The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shells, and commands it starts (`childEnv` in `src/proc.ts`), so a smoke server an agent starts takes the port it is given and does not exit when its stdin ends.
 
 ## Browser smoke
@@ -75,6 +89,7 @@ Besides a live session's own hash, the routes are:
 - `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
 - `#calendar`, `#bots`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
+- `#get-started`, which always opens the six-step checklist even after local dismissal;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `files`, `workflows`, `decisions`, or `worktrees`.
 
 ## Activity reconcile

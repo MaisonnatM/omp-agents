@@ -10,6 +10,9 @@
   `web/use-history-position.ts` follows whether history can go back and forward, which the title bar's Back and Forward buttons and the palette's Go back and Go forward read.
   `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.
   `#pull-requests` alone shows the Pull requests page, and the sidebar's Pull requests tab then lists its sections.
+- `web/components/get-started.tsx`: the fixed six-step checklist, the vacant-home eligibility check, and the neutral home with New session / Get started.
+  It derives completion from readiness reads and the existing global session/integration stores; only dismissal is stored locally, never portable completion ticks.
+  `#get-started` and the command menu always open it without redirecting another page or draft.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request, a Linear issue, or a todo, which runs in the background.

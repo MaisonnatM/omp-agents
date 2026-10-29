@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-29
 
+- New: a Get started checklist greets you on first launch: sign in to a model provider, then start your first session. Optional steps show terminal sessions, connect GitHub, install the starter kit, and connect integrations. Steps tick themselves; reopen it any time from Cmd+K.
+- When omp is not installed, the desktop app now shows the command to install it, with Copy and Retry, instead of a startup error.
+- Fixed: the desktop app's starter kit now includes its model settings.
 - A Bot's right sidebar now shows only Details, and Tickets once its conversation worked on a Linear issue; the PRs and Browser tabs are gone there.
 - Settings, Notes, Calendar, and Email now show their list in the left sidebar without the tab bar above it.
 

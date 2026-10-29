@@ -23,6 +23,10 @@ A file or a setting that you already have keeps your version, and the installer 
 Pass `--force` to overwrite those with the kit's version.
 Running the installer again changes nothing that already matches.
 
+The desktop app's **Get started** checklist and **Install omp Starter Kit…** menu run this same non-forced installer.
+The checklist's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it.
+CLI calls use the resolved omp package, including `OMP_PACKAGE_DIR` when set.
+
 Restart running omp sessions to pick up the new files and settings.
 
 ## What's inside
@@ -99,7 +103,7 @@ Files, in `agent/`:
 
 ## Requirements
 
-- omp, on your `PATH`.
+- omp, on your `PATH` or named by `OMP_PACKAGE_DIR`.
 - Accounts for the providers you want to use: Anthropic, OpenAI Codex, Cursor, and OpenRouter.
   omp skips a provider that it cannot reach and uses the next one in the chain.
   Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.

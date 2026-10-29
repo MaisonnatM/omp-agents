@@ -2,6 +2,9 @@
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are the default kit.
+The installer's `planStarterKit` reads the same file, setting, marketplace, and plugin requirements for installation and Get started; customized `keep` entries count as present.
+The dashboard supplies read-only native snapshots instead of running CLI config initialization, and installation uses the exact resolved omp command, including `OMP_PACKAGE_DIR`.
+Packaged resources include `agent/`, `config.yml`, and `install.js`.
 `templates/omp/README.md` lists what each of its extensions does.
 `agent/extensions/google-accounts.ts` tells a session which Google account each Gmail and Google Calendar MCP server signs in as, and which addresses its workspace links; `templates/omp/google-accounts.test.ts` tests its workspace lookup against a real repository and a linked worktree outside it, and its prompt text, and `templates/omp/extensions.test.ts` runs its hook on scratch files.
 `agent/extensions/headless-mark.ts` records in an `omp-agents.headless` entry whether `omp -p` or `--mode json` started the session, at each start that changes it, which `src/session-facts.ts` folds and `SessionFiles.past` drops; `templates/omp/extensions.test.ts` runs its hook through starts in each mode.
