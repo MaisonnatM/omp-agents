@@ -13,7 +13,7 @@ A workflow's skill is one of `files`, so `PUT /api/settings/file` edits it.
 `GET /api/models` runs `omp models --json` for the pickers.
 
 **Get started** reads `GET /api/readiness` (independent provider/config facts), `GET /api/readiness/github` (GitHub only), and `GET /api/readiness/starter-kit` (a genuinely read-only installer plan).
-`PUT /api/readiness/terminal-sessions` takes only `{}`, keeps existing `view`/`control`, otherwise stages `collab.autoStart=control` through omp's isolated locked writer, and returns fresh local facts.
+`PUT /api/readiness/terminal-sessions` takes `{ access }` of `view` or `control`, stages only `collab.autoStart` through omp's isolated locked writer unless it already holds that value, and returns fresh local facts.
 Sessions and integrations reuse their existing socket/store reads; see [Get started](get-started.md).
 
 `GET /api/analytics?range=<range>` answers `Analytics` from omp-stats and Claude Code's and Codex's recorded requests, defaulting to `24h`.

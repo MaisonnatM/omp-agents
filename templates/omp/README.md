@@ -23,8 +23,8 @@ A file or a setting that you already have keeps your version, and the installer 
 Pass `--force` to overwrite those with the kit's version.
 Running the installer again changes nothing that already matches.
 
-The desktop app's **Get started** checklist and **Install omp Starter Kit…** menu run this same non-forced installer.
-The checklist's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it.
+The desktop app's **Get started** starter kit step and **Install omp Starter Kit…** menu run this same non-forced installer.
+That step's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it.
 CLI calls use the resolved omp package, including `OMP_PACKAGE_DIR` when set.
 
 Restart running omp sessions to pick up the new files and settings.

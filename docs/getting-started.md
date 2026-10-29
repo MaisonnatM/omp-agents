@@ -7,9 +7,9 @@ Your first session, then the integrations that each need a sign-in.
 
 - Open the app from the README's [Quick start](../README.md#quick-start), or run `bun run desktop` from a clone.
   If omp is missing, the app shows the install command and **Retry**; install [Bun](https://bun.sh) first when needed.
-- **Get started** connects a model provider through the existing **Settings › Providers** sign-in and opens your first session.
+- **Get started** walks you through setup one step per screen: it signs you in to a model provider right there, then opens your first session.
   An existing `/login` sign-in in omp's terminal counts too; you do not need to sign in twice.
-  The [checklist reference](usage/get-started.md) describes all six steps, automatic checks, and local dismissal.
+  The [Get started reference](usage/get-started.md) describes all five steps, automatic checks, and local dismissal.
 
 ## Your first session
 
@@ -33,7 +33,7 @@ omp config set collab.autoStart control
 ```
 
 Then restart those sessions, or run `/new` or `/collab` in each.
-You can also use **Turn on** on the Get started checklist; it keeps an existing read-only `view` choice and changes no other setting.
+You can also pick **Control** or **Read-only** on Get started's terminal sessions step; it changes no other setting.
 The [starter kit](../templates/omp/README.md) sets this for you.
 
 ## Pull requests

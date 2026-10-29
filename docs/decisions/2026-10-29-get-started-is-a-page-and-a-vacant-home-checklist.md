@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-29
 decision-makers: Maxence Maisonnat
+superseded-by: 2026-10-29-get-started-is-a-step-by-step-wizard
 ---
 
 # Get started is a page and a vacant-home checklist

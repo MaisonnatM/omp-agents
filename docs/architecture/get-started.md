@@ -1,18 +1,21 @@
 # Get started
 
-`web/components/get-started.tsx` owns the fixed six-step checklist and its local pending/result state.
+`web/components/get-started.tsx` owns the wizard: its welcome screen, the fixed five-step table, the step rail, and Back, Next, and Skip.
+`web/components/get-started-steps.tsx` draws each step's body with its local pending and result state.
 `PageSwitch` mounts it only for `#get-started` or a vacant home; it never redirects the hash or covers a selected page, draft, or pane.
 The provider count and any global live or past session suppress automatic onboarding for an existing setup.
 While those initial facts are unknown, home stays neutral rather than flashing an onboarding page at a returning user.
-Only `omp-agents.get-started-dismissed` is stored, through `useStoredState`; it is deliberately absent from `PORTABLE_PREFERENCES`.
-There are no persisted completion flags.
+Two keys are stored through `useStoredState`, deliberately absent from `PORTABLE_PREFERENCES`: `omp-agents.get-started-dismissed` and `omp-agents.get-started-step`, the step on screen.
+There are no persisted completion flags; the rail's checks and each step's Next come from the live facts.
 
 ## Facts, not a controller
 
 `src/shared/readiness.ts` holds `ReadinessFact<T>` (`known` or `unavailable`), `Readiness`'s local provider/config facts, and the installer's aggregate `StarterKitStatus`.
 The component adds `checking` before a source answers.
 A source's error takes precedence over its stale answer, so an unavailable check never appears done.
-The component's ordinary functions build two groups from its fixed step table, reusing `IntegrationList`, `IntegrationRow`, `Button`, `Badge`, `Callout`, `CopyableCode`, and `useAction`.
+The wizard derives each step's done state from those facts, reusing `IntegrationList`, `IntegrationRow`, `Button`, `Badge`, `Callout`, `CopyableCode`, and `useAction`.
+The provider step mounts `ProviderGroups` and `useProviders` from `web/components/settings/providers-tab.tsx`, the same list and sign-in polling as Settings, and refreshes `readinessStore` when its connected count changes.
+The first-session step appends a suggested prompt to the new-session draft with `appendToComposer`, then opens it.
 
 - `GET /api/readiness` runs `connectedProviders` and the native collab setting read independently, each retaining its own failure.
   It waits for neither GitHub nor kit status.
@@ -21,9 +24,9 @@ The component's ordinary functions build two groups from its fixed step table, r
   It reads native marketplace and user/project plugin registries through `src/omp/modules.ts`, takes known setting IDs from the loaded setting registry, and passes that snapshot to the installer's read-only `planStarterKit`.
   It never runs `omp config list`, whose `Settings.init` can migrate or write, nor a plugin command or installation.
   `keep` and `same` count as complete; every pending `create` or `update`, including settings, marketplace, and plugins, prevents completion.
-- `PUT /api/readiness/terminal-sessions` accepts only `{}` and runs `showTerminalSessions` in `src/omp/config.ts`.
-  A read-only load refuses malformed config before an isolated native writer stages only `collab.autoStart=control` and flushes under omp's lock.
-  The native global layer and descriptor default determine readiness, not a workspace or runtime override; an existing `view` or `control` is left alone.
+- `PUT /api/readiness/terminal-sessions` takes `{ access }` of `view` or `control` and runs `shareTerminalSessions` in `src/omp/config.ts`.
+  A read-only load refuses malformed config before an isolated native writer stages only `collab.autoStart` and flushes under omp's lock; a matching value writes nothing.
+  The native global layer and descriptor default determine readiness, not a workspace or runtime override.
   Unrelated keys survive.
 
 The page reuses the global socket `hosts`/`past` arrays: any row is positive evidence even before `listed`.

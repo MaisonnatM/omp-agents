@@ -23,7 +23,7 @@ omp-agents runs as a desktop app: the packaged app, or `bun run desktop` from a 
   **Retry** also rediscovers `PATH`, `BUN_INSTALL`, and `OMP_PACKAGE_DIR` after installation, without replacing the app's home, XDG paths, or port.
 - In the packaged app, **omp agents › Check for Updates…** checks GitHub Releases now; the app also checks on its own, downloads an update in the background, and shows **Restart to Install** once it is ready.
   **Install omp Starter Kit…** installs the starter kit from `templates/omp/` into omp's agent directory.
-  The **Get started** checklist runs that same non-forced installer, preserving your files and settings, and shows its result in the page instead of a system dialog.
+  Get started's starter kit step runs that same non-forced installer, preserving your files and settings, and shows its result in the page instead of a system dialog.
 - Every link to another site opens in the default browser, and so does an integration's sign-in page.
   The window never leaves the dashboard.
 - Cmd+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.
