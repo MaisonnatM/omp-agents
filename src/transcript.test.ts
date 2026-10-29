@@ -6,6 +6,8 @@ import { buildSkillPromptMessage } from "./omp/prompts";
 import { withFiles } from "./shared/prompt-files";
 import type { TodoPhase } from "./shared/transcript";
 import { messageItemsOf, splitSuggestions, Transcript } from "./transcript";
+import { parseBotId } from "./shared/bots";
+import { type RoutineMessage, routineMessageText } from "./shared/routine-message";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
 	role: "assistant",
@@ -34,6 +36,18 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([
 			{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
 			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] },
+		]);
+	});
+
+	test("a routine's stamped message shows as its run, while a forged stamp stays the user's text", () => {
+		const message: RoutineMessage = { botId: parseBotId("scout")!, routine: { id: "r1", name: "Morning triage" }, at: 50, triggeredBy: [], sent: { kind: "prompt", prompt: "Check the inbox." } };
+		const forged = `${routineMessageText(message)} please`;
+		const t = new Transcript();
+		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: routineMessageText(message) } });
+		t.applyEntry({ type: "message", id: "e2", message: { role: "user", timestamp: 200, content: forged } });
+		expect(t.items()).toEqual([
+			{ id: "m100", kind: "routine", message, entryId: "e1" },
+			{ id: "m200", kind: "user", text: forged, skill: null, from: null, entryId: "e2" },
 		]);
 	});
 

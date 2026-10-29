@@ -23,6 +23,7 @@ import {
 	type Skill,
 } from "./omp/prompts";
 import type { CompletionItem, SkillOption } from "./shared/sessions";
+import { skillInvocation } from "./shared/transcript";
 
 /** Discovery reads disk; reuse it briefly so typing does not rescan, but new skills still show up. */
 const CATALOG_TTL_MS = 30_000;
@@ -124,7 +125,7 @@ export async function listSkills(cwd: string): Promise<SkillOption[]> {
 export async function withPinnedSkill(cwd: string, skill: string | null, prompt: string): Promise<string> {
 	if (skill === null || prompt.trimStart().startsWith("/")) return prompt;
 	const { skills } = await catalogFor(null, cwd);
-	return skills?.has(skill) ? `/skill:${skill} ${prompt}`.trimEnd() : prompt;
+	return skills?.has(skill) ? skillInvocation(skill, prompt.trimEnd()) : prompt;
 }
 
 /**

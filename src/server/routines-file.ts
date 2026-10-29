@@ -6,13 +6,14 @@
  */
 import { resolve } from "node:path";
 import { ReducerFile } from "../fs";
-import { fields, isNonEmpty, isObject, isSafeInteger, isString, isTexts, nullable, parseAll } from "../json";
+import { isNonEmpty, isObject, isSafeInteger, isTexts, parseAll } from "../json";
 import { expandHome, HOME } from "../paths";
 import {
 	applyRoutine,
-	isTriggerKind,
 	MAX_ROUTINE_RUNS,
+	parseCommandRun,
 	parseRoutineSpec,
+	parseTriggerEvent,
 	type CommandRun,
 	type Routine,
 	type RoutineChange,
@@ -21,6 +22,7 @@ import {
 	type TriggerEvent,
 } from "../routines";
 import { type BotId, type BotSpec, defaultLook } from "../shared/bots";
+import { skillInvocation } from "../shared/transcript";
 
 /** The Bot the routines from before Bots move to; page Bots have random UUIDs, so none takes this id. */
 export const ROUTINES_BOT_ID = "routines" as BotId;
@@ -41,29 +43,6 @@ function parseStarted(value: unknown): { instanceId: string; sessionId: string }
 	if (!isObject(value)) return null;
 	const { instanceId, sessionId } = value;
 	return typeof instanceId === "string" && typeof sessionId === "string" ? { instanceId, sessionId } : null;
-}
-
-function parseCommandRun(value: unknown): CommandRun | null {
-	if (!isObject(value) || !isSafeInteger(value.startedAt)) return null;
-	const { phase, startedAt, endedAt, output } = value;
-	if (phase === "running") return { phase, startedAt };
-	if (!isSafeInteger(endedAt)) return null;
-	switch (phase) {
-		case "exited":
-			return typeof value.code === "number" && Number.isSafeInteger(value.code) && typeof output === "string" ? { phase, code: value.code, output, startedAt, endedAt } : null;
-		case "stopped":
-			return (value.reason === "time-limit" || value.reason === "dashboard") && typeof output === "string" ? { phase, reason: value.reason, output, startedAt, endedAt } : null;
-		case "failed":
-			return typeof value.error === "string" ? { phase, error: value.error, startedAt, endedAt } : null;
-		default:
-			return null;
-	}
-}
-
-const isTriggerEvent = fields<TriggerEvent>({ kind: isTriggerKind, title: isString, detail: isString, url: nullable(isString) });
-
-function parseTriggerEvent(value: unknown): TriggerEvent | null {
-	return isTriggerEvent(value) ? { kind: value.kind, title: value.title, detail: value.detail, url: value.url } : null;
 }
 
 /**
@@ -119,7 +98,7 @@ function adoptLegacy(value: Record<string, unknown>, workspace: string): { field
 		}
 		case "prompt": {
 			const text = elsewhere !== null && typeof task.prompt === "string" ? `Work in ${elsewhere}.\n\n${task.prompt}` : task.prompt;
-			const prompt = isNonEmpty(skill) && typeof text === "string" ? `/skill:${skill} ${text}` : text;
+			const prompt = isNonEmpty(skill) && typeof text === "string" ? skillInvocation(skill, text) : text;
 			return { fields: { ...value, botId: ROUTINES_BOT_ID, task: { kind: "prompt", prompt } }, toRoutinesBot: true };
 		}
 		default:

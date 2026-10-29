@@ -44,7 +44,8 @@ import {
 } from "lucide-react";
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentRow, LiveView, View } from "../../src/shared/sessions";
-import type { Item } from "../../src/shared/transcript";
+import { taskText } from "../../src/shared/routine-message";
+import { type Item, skillInvocation } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import {
@@ -75,6 +76,7 @@ import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
 import { ImageViewer } from "./media-viewer";
 import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
+import { RoutineRunCard } from "./routines/routine-run-card";
 import { PromptHistory } from "./prompt-history";
 import { SessionTodosCard } from "./session-todos-card";
 import type { ChangesSession } from "./todos-card-changes";
@@ -341,17 +343,17 @@ function ToolChips({ names, chips }: { names: string[]; chips: ToolChipLabels })
 	});
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, label = "Copy message" }: { text: string; label?: string }) {
 	const { copied, copy } = useCopy();
 	const CopyIcon = useIcon("copy");
 	const CheckIcon = useIcon("check");
 	const Icon = copied ? CheckIcon : CopyIcon;
 	return (
-		<Tooltip content={copied ? "Copied" : "Copy message"}>
+		<Tooltip content={copied ? "Copied" : label}>
 			<Button
 				variant="ghost"
 				size="icon-compact"
-				aria-label={copied ? "Copied" : "Copy message"}
+				aria-label={copied ? "Copied" : label}
 				data-copied={copied || undefined}
 				onClick={() => copy(text)}
 			>
@@ -472,9 +474,19 @@ interface TranscriptProps {
 /** A prompt or a reply: the user's and the agent's words. */
 type MessageItem = Extract<Item, { kind: "user" | "assistant" }>;
 
+type RoutineItem = Extract<Item, { kind: "routine" }>;
+
 /** What a message's copy button copies: a skill prompt as the user typed it, not the skill's text. `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform. */
-const copyText = (item: MessageItem): string =>
-	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
+const copyText = (item: MessageItem): string => (item.kind === "user" && item.skill ? skillInvocation(item.skill, item.text) : item.text);
+
+/** A routine's message, as its card. Memoized on the item, so a streamed token leaves it as it is. */
+const RoutineRow = memo(function RoutineRow({ item }: { item: RoutineItem }) {
+	return (
+		<MessageScrollerItem messageId={item.id} className="flex flex-col">
+			<RoutineRunCard item={item} copy={<CopyButton text={taskText(item.message)} label={item.message.sent.kind === "command" ? "Copy command" : "Copy prompt"} />} />
+		</MessageScrollerItem>
+	);
+});
 
 interface MessageRowProps {
 	item: MessageItem;
@@ -662,6 +674,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 										</MessageScrollerItem>
 									);
 								}
+								if (item.kind === "routine") return <RoutineRow key={item.id} item={item} />;
 								const point = forks.get(item.id);
 								const edit = editing?.item.id === item.id ? editing : null;
 								return (

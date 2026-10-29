@@ -95,6 +95,22 @@ export interface BotRow {
 	at: number;
 }
 
+/** The conversation's last words as a row says them: yours after `You:`, a routine's after its name, the Bot's as they are. */
+function saidLine(last: BotLast): string {
+	switch (last.from) {
+		case "user":
+			return `You: ${last.text}`;
+		case "routine":
+			return `${last.name}: ${last.text}`;
+		case "bot":
+			return last.text;
+		default: {
+			const unhandled: never = last;
+			return unhandled;
+		}
+	}
+}
+
 /** Each Bot's row, the most recent conversation first, then by name. */
 export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], lasts: Readonly<Record<BotId, BotLast | null>>): BotRow[] {
 	return bots
@@ -104,7 +120,7 @@ export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], last
 			const unread = host?.unread ?? null;
 			const asking = botAsking(host);
 			const fresher = unread?.reply && (!last || unread.at >= last.at) ? unread.reply : null;
-			const said = fresher ?? (last ? (last.from === "user" ? `You: ${last.text}` : last.text) : null);
+			const said = fresher ?? (last && saidLine(last));
 			const preview = asking ?? (host?.status === "working" ? "Working…" : said ? plainMarkdown(said) : "No messages yet");
 			return {
 				bot,

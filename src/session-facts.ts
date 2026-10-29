@@ -32,6 +32,7 @@ import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
 import { ReplayFold } from "./replay";
+import { taskText } from "./shared/routine-message";
 import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
 import { TICKET_ID } from "./shared/tickets";
 import { messageItemsOf } from "./transcript";
@@ -272,8 +273,15 @@ export class SessionFactsScan {
 			return;
 		}
 		if (this.#prompts && (entry.type === "message" ? isObject(entry.message) && entry.message.role === "user" : entry.type === "custom_message" && entry.customType === "skill-prompt")) {
-			// The user's own words: a skill's expanded instructions, a dashboard prompt, and a collaborator's are left out.
-			for (const item of messageItemsOf(entry)) if (item.kind === "user" && item.from === null) this.#prompt(item.text);
+			// The user's own words, and what a routine sent with the events that started it, whose links name the work: a skill's expanded instructions, a dashboard prompt, and a collaborator's are left out.
+			for (const item of messageItemsOf(entry)) {
+				if (item.kind === "user" && item.from === null) this.#prompt(item.text);
+				else if (item.kind === "routine") {
+					const { triggeredBy, sent } = item.message;
+					const output = sent.kind === "command" && "output" in sent.run ? sent.run.output : "";
+					this.#prompt([taskText(item.message), ...triggeredBy.flatMap(({ title, detail, url }) => [title, detail, url ?? ""]), output].join("\n"));
+				}
+			}
 			return;
 		}
 		if (entry.type !== "message" || !isObject(entry.message)) return;

@@ -76,12 +76,11 @@ export const MAX_FACT_LENGTH = 500;
  */
 export const MAX_MEMORY_BYTES = 16 * 1024;
 
-/** The last words of a Bot's conversation, which its sidebar row previews: when, in ms since the epoch, who said them, and the text as one line. */
-export interface BotLast {
-	at: number;
-	from: "user" | "bot";
-	text: string;
-}
+/**
+ * The last words of a Bot's conversation, which its sidebar row previews: when, in ms since the epoch, who said them,
+ * and the text as one line; a routine's message names the routine as of the send.
+ */
+export type BotLast = { at: number; from: "user" | "bot"; text: string } | { at: number; from: "routine"; name: string; text: string };
 
 /** The tool a Bot's session writes its memory with; the page marks each finished call in the conversation. */
 export const REMEMBER_TOOL = "remember";

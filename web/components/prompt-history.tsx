@@ -93,7 +93,7 @@ export const PromptHistory = memo(function PromptHistory({ view, items, working 
 });
 
 function Panel({ view, items, working }: { view: View; items: Item[]; working: boolean }) {
-	const turns = useMemo(() => outline(items, working), [items, working]);
+	const turns = useMemo(() => outline(items, working).filter(turn => !turn.routine), [items, working]);
 	const reduceMotion = useReducedMotion() ?? false;
 	const shape = useShape();
 	const column = useRef<HTMLOListElement>(null);

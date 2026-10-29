@@ -1,4 +1,6 @@
 /** Pure transforms from the server's `items` messages to the blocks a transcript renders. */
+import type { RoutineTask } from "../src/routines";
+import { taskOf, taskText } from "../src/shared/routine-message";
 import type { Item, TodoPhase } from "../src/shared/transcript";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -10,8 +12,9 @@ type DashboardItem = Extract<Item, { kind: "dashboard" }>;
 
 export type Block = { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
 
-/** Whether `item` opens a turn: a prompt, the user's or one the dashboard sent in their place, which shows nothing. */
-export const opensTurn = (item: Item): item is Extract<Item, { kind: "user" | "dashboard" }> => item.kind === "user" || item.kind === "dashboard";
+/** Whether `item` opens a turn: a prompt, the user's, one a routine sent, or one the dashboard sent in their place, which shows nothing. */
+export const opensTurn = (item: Item): item is Extract<Item, { kind: "user" | "routine" | "dashboard" }> =>
+	item.kind === "user" || item.kind === "routine" || item.kind === "dashboard";
 
 const blockKey = (block: Block): string => (block.kind === "item" ? block.item.id : block.id);
 
@@ -78,10 +81,12 @@ export function turnReplies(items: Item[], working: boolean): Set<string> {
 export interface OutlineTurn {
 	/** The prompt's item id. */
 	id: string;
-	/** The prompt's text, or for a prompt that carried only images, how many it carried: `2 images`. */
+	/** The prompt's text, or for a prompt that carried only images, how many it carried: `2 images`; a routine's prompt or command. */
 	prompt: string;
 	/** The skill the prompt invoked; `null` for any other prompt. */
 	skill: string | null;
+	/** The routine that sent the prompt, as of the send; `null` for the user's. */
+	routine: { name: string; task: RoutineTask } | null;
 	/**
 	 * A prompt of a few words that only lets the agent carry on: `approve`, such as `go`, accepts the reply before it as a
 	 * plan; `resume`, such as `continue`, picks up work the turn before stopped. `null` for any other prompt.
@@ -106,6 +111,11 @@ export function outline(items: Item[], working: boolean): OutlineTurn[] {
 	const replies = turnReplies(items, working);
 	const turns: OutlineTurn[] = [];
 	for (const item of items) {
+		if (item.kind === "routine") {
+			const { message } = item;
+			turns.push({ id: item.id, prompt: taskText(message), skill: null, routine: { name: message.routine.name, task: taskOf(message) }, nudge: null, reply: null, tools: 0, failed: 0, running: false });
+			continue;
+		}
 		if (item.kind === "user") {
 			const text = item.text.trim();
 			const images = item.images?.length ?? 0;
@@ -113,7 +123,7 @@ export function outline(items: Item[], working: boolean): OutlineTurn[] {
 			const prompt = text || files.join(", ") || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
 			const match = turns.length > 0 && !item.skill && images === 0 && files.length === 0 ? NUDGE.exec(text) : null;
 			const nudge = match ? (match[1] ? "resume" : "approve") : null;
-			turns.push({ id: item.id, prompt, skill: item.skill, nudge, reply: null, tools: 0, failed: 0, running: false });
+			turns.push({ id: item.id, prompt, skill: item.skill, routine: null, nudge, reply: null, tools: 0, failed: 0, running: false });
 			continue;
 		}
 		const turn = turns.at(-1);
@@ -146,8 +156,8 @@ export interface ForkPoint {
 /**
  * Fork points by item id. A prompt forks at itself. A turn's last reply forks at the next prompt,
  * keeping the whole turn; earlier replies in the turn, a reply still streaming, and a reply no
- * forkable prompt follows have none. A prompt the dashboard sent shows nothing to fork from, but a
- * reply before it forks there.
+ * forkable prompt follows have none. A prompt a routine or the dashboard sent has no fork point of
+ * its own, but a reply before it forks there.
  */
 export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 	const points = new Map<string, ForkPoint>();
@@ -155,7 +165,7 @@ export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 	let replyFound = false;
 	for (let i = items.length - 1; i >= 0; i--) {
 		const item = items[i];
-		if (item.kind === "dashboard") {
+		if (item.kind === "dashboard" || item.kind === "routine") {
 			nextPrompt = item.entryId;
 			replyFound = false;
 		} else if (item.kind === "user") {
@@ -172,8 +182,8 @@ export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 
 /**
  * The prompt a double-click edits: the last one, once omp has saved it. omp resends an edit as text alone, so a skill
- * prompt or one that carried images or files is not editable. None after a prompt the dashboard sent, which an edit of
- * the user's prompt before it would drop.
+ * prompt or one that carried images or files is not editable. None after a prompt a routine or the dashboard sent,
+ * which an edit of the user's prompt before it would drop.
  */
 export function editablePrompt(items: Item[]): { itemId: string; entryId: string } | null {
 	const last = items.findLast(opensTurn);

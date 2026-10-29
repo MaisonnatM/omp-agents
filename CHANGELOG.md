@@ -17,6 +17,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The gear button and G then , now reopen the Settings section you last had open.
 - In the Browser, Select element now opens a field on the element you click, so you can type a note at once; sending it adds the note and the element to the composer, and you can go on to the next element.
 - Pasting a long text into the message box now attaches it as a file, Pasted text.txt, as ChatGPT and Claude do, so what you type stays readable. Its tile shows the first lines.
+- A routine's message in its Bot's conversation now shows as a run card instead of a message from you: the routine's name, what triggered it, whether it was sent or how its command ended, and its output a click away, with a link to the routine. The Bots sidebar shows the routine's name in place of "You:".
 - The Browser tab now picks as T3 Code does: the pointer button floats a Select, Region, Draw, and Erase switch over your app. Elements you select and boxes and lines you draw go in together with the comment you type beside them: one chip in the message box and one picture. The new camera button attaches a picture of the whole app.
 - The session details sidebar, and the Browser in it, now widens to 960 pixels, as far as the conversation keeps 480.
 - Behind the scenes: agents checking the desktop app now see a script's error instead of a confusing crash later, so they fix the right problem.

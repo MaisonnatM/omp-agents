@@ -52,7 +52,7 @@ describe("Bots", () => {
 
 	test("a row previews the question first, then Working…, then the freshest words as plain text, else no messages", () => {
 		const named = (id: string, name: string, sessionId: string | null): Bot => ({ ...bot(sessionId), id: id as BotId, name });
-		const bots = [named("asker", "Asker", "s1"), named("worker", "Worker", "s2"), named("replied", "Replied", "s3"), named("talked", "Talked", "s4"), named("fresh", "Fresh", null)];
+		const bots = [named("asker", "Asker", "s1"), named("worker", "Worker", "s2"), named("replied", "Replied", "s3"), named("talked", "Talked", "s4"), named("scheduled", "Scheduled", "s5"), named("fresh", "Fresh", null)];
 		const hosts = [
 			{ sessionId: "s1", status: "needs-input", requests: [{ title: "Push to main?" }], unread: null },
 			{ sessionId: "s2", status: "working", requests: [], unread: null },
@@ -63,6 +63,7 @@ describe("Bots", () => {
 			["worker" as BotId]: { at: 3_000, from: "user", text: "Check the deploy." },
 			["replied" as BotId]: { at: 2_000, from: "user", text: "How is the build?" },
 			["talked" as BotId]: { at: 1_000, from: "user", text: "Thanks." },
+			["scheduled" as BotId]: { at: 500, from: "routine", name: "Nightly build", text: "Check the **inbox**." },
 		};
 		expect(botRows(bots, hosts, lasts).map(({ bot, host, unread, preview, at }) => [bot.name, host?.sessionId ?? null, unread, preview, at])).toEqual([
 			["Fresh", null, false, "No messages yet", Date.parse("2026-10-05T09:00:00.000Z")],
@@ -70,6 +71,7 @@ describe("Bots", () => {
 			["Asker", "s1", false, "Push to main?", 4_000],
 			["Worker", "s2", false, "Working…", 3_000],
 			["Talked", null, false, "You: Thanks.", 1_000],
+			["Scheduled", null, false, "Nightly build: Check the inbox.", 500],
 		]);
 	});
 

@@ -15,11 +15,11 @@ import type { PreparedReplay } from "./replay";
 import { launchForReplayResume, readReplayMarker, replayLaunch, requireReplayReady } from "./omp/replay-launch";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
-import { isDashboardPrompt } from "./shared/transcript";
+import { promptAuthor } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";
 import { textOf } from "./session-entries";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
-import { isUserPrompt, type StartingPrompt } from "./transcript";
+import { isUserPrompt, SKILL_PROMPT, skillArgs, type StartingPrompt } from "./transcript";
 import { SerialLane } from "./serial-lane";
 import { ASK_DIALOG_OPT_IN, PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 import { sessionVisualsExtension } from "./server/resources";
@@ -525,7 +525,8 @@ export class DashboardSession implements LiveSession {
 				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
 				this.#change(() => this.#prompt.release());
 				// omp's restore leaves out a prompt it admitted but never ran, so the composer gets it back from here.
-				return [...mark.unsent(), ...steering, ...followUp].map(withdrawn);
+				// Only the user's own: a message the dashboard or a routine sent is not theirs to edit.
+				return [...mark.unsent(), ...steering, ...followUp].filter(({ text }) => promptAuthor(text).kind === "user").map(withdrawn);
 			}),
 		);
 	}
@@ -667,11 +668,11 @@ export class DashboardSession implements LiveSession {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
 		} else if (
-			event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && !isDashboardPrompt(textOf(event.message.content)) && this.sessionName === null && !this.#titled
+			event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && promptAuthor(event.message.customType === SKILL_PROMPT ? skillArgs(event.message) : textOf(event.message.content)).kind === "user" && this.sessionName === null && !this.#titled
 		) {
 			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
-			// A prompt the dashboard sent waits for the user's own, which the title should name.
-			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt.
+			// A prompt the dashboard or a routine sent waits for the user's own, which the title should name.
+			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt; its text is the skill's, its arguments what the user typed.
 			// Through the turn gate, `/rename` can land after the turn's last state event, so read the title it made here.
 			this.#titled = true;
 			void this.#turn

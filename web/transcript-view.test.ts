@@ -151,8 +151,8 @@ describe("outline", () => {
 
 	test("groups each prompt with its turn's final reply and counts the turn's tools and failures", () => {
 		expect(outline(items, false)).toEqual([
-			{ id: "p1", prompt: "Fix it", skill: null, nudge: null, reply: { id: "r1b", text: "Fixed." }, tools: 2, failed: 1, running: false },
-			{ id: "p2", prompt: "Ship it", skill: null, nudge: null, reply: { id: "r2", text: "Shipping" }, tools: 0, failed: 0, running: false },
+			{ id: "p1", prompt: "Fix it", skill: null, routine: null, nudge: null, reply: { id: "r1b", text: "Fixed." }, tools: 2, failed: 1, running: false },
+			{ id: "p2", prompt: "Ship it", skill: null, routine: null, nudge: null, reply: { id: "r2", text: "Shipping" }, tools: 0, failed: 0, running: false },
 		]);
 	});
 

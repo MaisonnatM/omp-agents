@@ -68,6 +68,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `replay-compare.open`; dragging the divider is not observed |
 | Desktop link address | not observed | display only |
 | Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `transcript.todos`, `transcript.ship`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`; the viewer's arrow keys record nothing; code block copy and session visuals are not observed |
+| Routine run card in a conversation | control, view | `transcript.routine-card` folds or unfolds the card; **Open routine** records the `bots/routine` view; copy and the output disclosure are not observed |
 | Trajectory | control | `trajectory.toggle`, `trajectory.turn`, `trajectory.step` |
 | Replay from here | control, action | `replay.open`; starting the replay is the dialog's request |
 | Replay comparison | control | `replay-compare.open` |

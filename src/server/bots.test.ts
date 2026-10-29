@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { BotId, BotSpec } from "../shared/bots";
+import type { BotId, BotLast, BotSpec } from "../shared/bots";
+import { type RoutineMessage, routineMessageText } from "../shared/routine-message";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { Bots, lastMessage } from "./bots";
 import { BotsFile } from "./bots-file";
@@ -191,6 +192,21 @@ describe("lastMessage", () => {
 	test("the user's own prompt counts, as one line; a prompt the dashboard sent does not", () => {
 		const path = write([line("user", "Keep an eye on\nthe deploy."), line("user", "[omp-agents] Continue.")]);
 		expect(lastMessage(path)).toEqual({ at: Date.parse("2026-05-02T09:30:00.000Z"), from: "user", text: "Keep an eye on the deploy." });
+	});
+
+	test("a routine's message previews under its name as the prompt, `/skill:` prompt, `!` prompt or command it sent; the user's own `!` command does not", () => {
+		const at = Date.parse("2026-05-02T09:30:00.000Z");
+		const sent = (prompt: string): RoutineMessage => ({ botId: scout.id, routine: { id: "r1", name: "Morning triage" }, at: 50, triggeredBy: [], sent: { kind: "prompt", prompt } });
+		const routine = (text: string): BotLast => ({ at, from: "routine", name: "Morning triage", text });
+		const bash = (command: string) => JSON.stringify({ type: "message", timestamp: "2026-05-02T09:30:00.000Z", message: { role: "bashExecution", command, output: "a.txt", exitCode: 0 } });
+		const skill = routineMessageText(sent("/skill:triage Check the\ninbox."));
+		const skillPrompt = { type: "custom_message", customType: "skill-prompt", attribution: "user", timestamp: "2026-05-02T09:30:00.000Z", details: { name: "triage", args: skill.slice("/skill:triage".length).trim() }, content: "The skill." };
+		const command: RoutineMessage = { ...sent(""), sent: { kind: "command", command: "make test", run: { phase: "exited", code: 0, output: "ok", startedAt: 1, endedAt: 2 } } };
+		expect(lastMessage(write([line("user", routineMessageText(sent("Check the inbox.")))]))).toEqual(routine("Check the inbox."));
+		expect(lastMessage(write([JSON.stringify(skillPrompt)]))).toEqual(routine("/skill:triage Check the inbox."));
+		expect(lastMessage(write([bash(routineMessageText(sent("!ls")).slice(1))]))).toEqual(routine("!ls"));
+		expect(lastMessage(write([line("user", routineMessageText(command))]))).toEqual(routine("$ make test"));
+		expect(lastMessage(write([line("user", "Hello."), bash("ls")]))).toEqual({ at, from: "user", text: "Hello." });
 	});
 
 	test("a file whose end is all tool output, or no file at all, has no last words", () => {

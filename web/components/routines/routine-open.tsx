@@ -31,13 +31,14 @@ import { useDashboardActions } from "../dashboard-context";
 import { FIELD } from "../form-field";
 import { RunIcon } from "./routine-marks";
 
-const HEADING = "text-xs font-medium text-muted-foreground";
+/** A section's heading inside an opened routine or run card. */
+export const HEADING = "text-xs font-medium text-muted-foreground";
 
 /** Output longer than this many lines folds behind a disclosure. */
 const FOLDED_OUTPUT_LINES = 20;
 
 /** What a command printed, scrolling past a few lines, and folded when it is long. */
-function CommandOutput({ output }: { output: string }) {
+export function CommandOutput({ output }: { output: string }) {
 	const pre = (
 		<pre
 			aria-label="Output"

@@ -4,6 +4,7 @@
 - The sidebar's **Bots** tab, just before **Sessions**, lists every Bot like a messaging app, whatever workspace the sidebar shows.
   Each row shows the Bot's avatar, its name, the time of its last message, and that message on one muted line.
   The line reads **You:** before your own words, **Working…** while the Bot works, or the question it waits on you for, in amber.
+  When a routine sent the last message, the line starts with that routine's name instead of **You:**, followed by its prompt or command.
   A blue dot marks a reply you have not read, and the most recent conversation comes first.
   The tab counts the Bots that wait on you: those asking you something, and those with a reply you have not read.
 - Each Bot's avatar is a colored shape with two eyes, which you pick when you make it and can change later, so a rename keeps its face.
@@ -24,7 +25,8 @@
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
-  The conversation reads as a chat: it shows your messages and the Bot's replies, never its tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
+  The conversation reads as a chat with your messages, the Bot's replies, and folded [routine run cards](routines.md).
+  It never shows the Bot's tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
   The Bot's conversation is not listed in the **Sessions** tab, the command palette, or the workspace list; only its Bot's page shows it.
   A new Bot greets you and offers three starters, built from its job, or asking what its job should be while it has none, which the composer lists under its action bar as it lists suggested prompts.
   The composer reads **Message** and the Bot's name.
@@ -33,6 +35,8 @@
   What you type there stays when you leave the page, one draft per Bot, until you send it.
   Its `/` and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, ticket, pull request, person, email, event, or session.
   Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name.
+  A routine run card shows the routine's name, task icon, trigger logos, time, and status, with a command's duration when available.
+  Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
   Its tabs are **Details**, **PRs**, **Browser**, and **Tickets**, and it remembers the one you last picked, apart from a session's.

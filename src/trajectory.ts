@@ -7,7 +7,8 @@ import { FoldedFile, ReadQueue } from "./line-reader";
 import { entryTime, textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { addUsage, type Clipped, NO_USAGE, type TokenUsage, type Turn, type TurnStep } from "./shared/trajectory";
 import { REPLAY_BLOCK } from "./shared/replay";
-import { isDashboardPrompt } from "./shared/transcript";
+import { routineMessageText } from "./shared/routine-message";
+import { promptAuthor } from "./shared/transcript";
 import { messageItemsOf } from "./transcript";
 
 const TEXT_MAX = 16_000;
@@ -107,7 +108,7 @@ export class Trajectory {
 			case "bashExecution":
 				if (!this.#opens(entry)) {
 					const text = textOf(message.content);
-					const source = message.synthetic === true ? "synthetic" : message.role === "user" && isDashboardPrompt(text) ? "omp-agents" : String(message.role);
+					const source = message.synthetic === true ? "synthetic" : message.role === "user" && promptAuthor(text).kind === "dashboard" ? "omp-agents" : String(message.role);
 					this.#waiting.push({ kind: "injection", source, attribution: attributionOf(message.attribution), body: clip(text) });
 				}
 				return;
@@ -132,7 +133,7 @@ export class Trajectory {
 
 	/** Opens a turn when the transcript shows `entry` as a prompt, and returns it. */
 	#opens(entry: Record<string, unknown>): Turn | null {
-		const prompt = messageItemsOf(entry).find(item => item.kind === "user");
+		const prompt = messageItemsOf(entry).find(item => item.kind === "user" || item.kind === "routine");
 		if (!prompt) return null;
 		const turn: Turn = {
 			id: str(entry.id) ?? `turn-${this.#turns.length + 1}`,
@@ -145,7 +146,8 @@ export class Trajectory {
 		};
 		this.#turns.push(turn);
 		this.#flush(turn);
-		this.#push(turn, { kind: "prompt", body: clip(prompt.text, this.detail ? Infinity : TEXT_MAX), skill: prompt.skill });
+		const { body, skill } = prompt.kind === "routine" ? { body: routineMessageText(prompt.message), skill: null } : { body: prompt.text, skill: prompt.skill };
+		this.#push(turn, { kind: "prompt", body: clip(body, this.detail ? Infinity : TEXT_MAX), skill });
 		return turn;
 	}
 
