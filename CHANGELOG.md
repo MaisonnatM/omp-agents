@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-29
 
+- Fixed: a session's Changes dialog now shows line counts for files it edits in another checkout of the project from its first edit, rather than marking them S until it runs a command there.
 - A Bot's right sidebar now shows only Details, and Tickets once its conversation worked on a Linear issue; the PRs and Browser tabs are gone there.
 - Settings, Notes, Calendar, and Email now show their list in the left sidebar without the tab bar above it.
 
