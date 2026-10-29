@@ -11,6 +11,7 @@ import { activityControl } from "../activity";
 import { SPLIT_CLICK } from "../labels";
 import type { PolledEntry } from "../polled-store";
 import { integrationsStore, readinessGithubStore, readinessStore, starterKitStore } from "../reads";
+import { getStartedSurface } from "../get-started-model";
 import { useStoredState } from "../stored-state";
 import { useAction } from "../use-action";
 import { useDashboardActions } from "./dashboard-context";
@@ -223,8 +224,8 @@ export function GetStarted({ route, vacantHome, sessions, rosterError, sessionEr
 	const firstSession: Observation<boolean> = sessions === true ? { kind: "known", value: true } : sessionError ? { kind: "unavailable", message: sessionError } : sessions === null ? CHECKING : { kind: "known", value: false };
 	const requiredDone = known(providers, count => count > 0) && sessions === true;
 	const pending = !dismissed && !requiredDone;
-	const settled = providers.kind !== "checking" && firstSession.kind !== "checking";
-	const open = route || (pending && settled && vacantHome && !minimized);
+	const surface = getStartedSurface({ route, vacantHome, dismissed, minimized, requiredDone, settled: providers.kind !== "checking" && firstSession.kind !== "checking" });
+	const open = surface === "dialog";
 	useEffect(() => (open || pending ? readinessStore.poll() : undefined), [open, pending]);
 	const github = observation(readinessGithubStore.usePolling(null, open));
 	const kit = observation(starterKitStore.usePolling(null, open));
@@ -300,7 +301,7 @@ export function GetStarted({ route, vacantHome, sessions, rosterError, sessionEr
 					</DialogPrimitive.Content>
 				</DialogPrimitive.Portal>
 			</DialogPrimitive.Root>
-			{pending && settled && !open && <Bubble finished={requiredFinished} onDismiss={dismiss} />}
+			{surface === "bubble" && <Bubble finished={requiredFinished} onDismiss={dismiss} />}
 		</>
 	);
 }
