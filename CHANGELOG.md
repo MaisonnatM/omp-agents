@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-29
 
-- New: Get started walks you through setup on first launch, one step per screen. Sign in to a model provider right there, choose how terminal sessions show, install the starter kit, connect GitHub and your tools, then start your first session from a suggested task. Skip any step, and reopen it any time from Cmd+K.
+- New: Get started walks you through setup on first launch, one step per screen in a dialog. Sign in to a model provider right there, choose how terminal sessions show, install the starter kit, connect GitHub and your tools, then start your first session from a suggested task. Close it and it waits in a bubble at the bottom right until setup is done; reopen it any time from the bubble or Cmd+K.
 - When omp is not installed, the desktop app now shows the command to install it, with Copy and Retry, instead of a startup error.
 - Fixed: the desktop app's starter kit now includes its model settings.
 - A Bot's right sidebar now shows only Details, and Tickets once its conversation worked on a Linear issue; the PRs and Browser tabs are gone there.

@@ -1,11 +1,12 @@
 # Get started
 
-`web/components/get-started.tsx` owns the wizard: its welcome screen, the fixed five-step table, the step rail, and Back, Next, and Skip.
+`web/components/get-started.tsx` owns the setup dialog: its welcome screen, the fixed five-step table, the step rail, Back, Next, and Skip, and the bottom-right bubble it closes into.
 `web/components/get-started-steps.tsx` draws each step's body with its local pending and result state.
-`PageSwitch` mounts it only for `#get-started` or a vacant home; it never redirects the hash or covers a selected page, draft, or pane.
-The provider count and any global live or past session suppress automatic onboarding for an existing setup.
-While those initial facts are unknown, home stays neutral rather than flashing an onboarding page at a returning user.
-Two keys are stored through `useStoredState`, deliberately absent from `PORTABLE_PREFERENCES`: `omp-agents.get-started-dismissed` and `omp-agents.get-started-step`, the step on screen.
+`web/app.tsx` mounts `GetStarted` once; the dialog is open at `#get-started`, under which `PageSwitch` draws the home or panes, and on its own over a vacant home until it is first closed.
+Closing at `#get-started` returns to the panes; the dialog never opens on its own over a selected page, draft, or pane.
+The provider count and any global live or past session suppress automatic onboarding and the bubble for an existing setup.
+While those initial facts are unknown, neither the dialog nor the bubble appears, so a returning user sees no flash of onboarding.
+Three keys are stored through `useStoredState`, deliberately absent from `PORTABLE_PREFERENCES`: `omp-agents.get-started-dismissed`, `omp-agents.get-started-minimized`, set when the dialog closes so a vacant home shows the bubble instead, and `omp-agents.get-started-step`, the step on screen.
 There are no persisted completion flags; the rail's checks and each step's Next come from the live facts.
 
 ## Facts, not a controller

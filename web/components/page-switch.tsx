@@ -14,7 +14,7 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
 import { EmailPage } from "./email/email-page";
-import { GetStarted } from "./get-started";
+import { EmptyHome } from "./get-started";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
@@ -108,16 +108,7 @@ export const PageSwitch = memo(function PageSwitch({
 	const { send, start, dismissStart, changeTodo, changeNote } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
-	const setup = {
-		sessions: hosts.length > 0 || past.length > 0 ? true : listed && connected && !rosterError ? false : null,
-		live: hosts.length > 0,
-		rosterError,
-		sessionError: rosterError ?? (!connected ? "Waiting for the dashboard to reconnect before checking sessions." : null),
-		onClose: () => show(layout),
-	};
 	switch (page?.kind) {
-		case "get-started":
-			return <GetStarted mode="page" {...setup} />;
 		case "new": {
 			const cwd = page.cwd ?? defaultWorkspace;
 			const seed = todoSeed(userTodos, page.todoId);
@@ -209,6 +200,8 @@ export const PageSwitch = memo(function PageSwitch({
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
 		case "email":
 			return <EmailPage target={page.target} workspace={workspace} />;
+		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
+		case "get-started":
 		case undefined:
 			if (layout.panes.length > 0) {
 				return (
@@ -230,7 +223,7 @@ export const PageSwitch = memo(function PageSwitch({
 					/>
 				);
 			}
-			return <GetStarted mode="home" {...setup} />;
+			return <EmptyHome live={hosts.length > 0} rosterError={rosterError} />;
 		default: {
 			const never: never = page;
 			return never;

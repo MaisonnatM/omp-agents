@@ -52,8 +52,8 @@ The Collab channel through which a host shares one session with its guests.
 ## Interface
 
 **Get started**:
-The step-by-step setup for a model-provider sign-in and a first session, with optional steps between them, available as a page and automatically on a vacant first-run home.
-Its checks reflect real setup; only its dismissal and the step on screen stay on this computer.
+The step-by-step setup for a model-provider sign-in and a first session, with optional steps between them, in a dialog that opens at `#get-started` and automatically on a vacant first-run home, and that closes into a bottom-right bubble until setup is done or skipped.
+Its checks reflect real setup; only its dismissal, its closed state, and the step on screen stay on this computer.
 _Avoid_: Onboarding, tour, checklist
 
 **Roster**:

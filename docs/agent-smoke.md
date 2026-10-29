@@ -39,8 +39,8 @@ For first-launch Get started, isolate `HOME` as well as omp itself with a fresh 
 Keep the config path short, for example `/tmp/oa-c.<suffix>`, and the home, data, and agent paths separate, such as `/tmp/oa-h.<suffix>`, `/tmp/oa-d.<suffix>`, and `/tmp/oa-a.<suffix>`.
 Set `OMP_PACKAGE_DIR` to the absolute installed omp package before changing HOME, and omit inherited auth-broker, provider credential, and `PI_CONFIG_FILES` overrides so the smoke does not borrow a real sign-in.
 Launch the target checkout through `desktop/launch.ts` (`bun run desktop` from its root), with `OMP_AGENTS_HEADLESS=1`.
-The page's onboarding keys are `omp-agents.get-started-dismissed` and `omp-agents.get-started-step`; remove both on the smoke origin to exercise automatic entry from the welcome screen again, without clearing the token.
-Use `#get-started` to walk all five steps on an existing setup without changing its dismissal.
+The page's onboarding keys are `omp-agents.get-started-dismissed`, `omp-agents.get-started-minimized`, and `omp-agents.get-started-step`; remove all three on the smoke origin to exercise the automatic dialog from the welcome screen again, without clearing the token.
+Use `#get-started` to open the dialog and walk all five steps on an existing setup without changing its dismissal.
 
 To exercise the pre-server missing-omp page, start a separate hidden desktop on a free port with `OMP_PACKAGE_DIR` set to a nonexistent package directory, for example `/tmp/oa-no-omp/package`.
 Do not point it at a malformed manifest, which intentionally remains an ordinary startup error.
@@ -89,7 +89,7 @@ Besides a live session's own hash, the routes are:
 - `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
 - `#calendar`, `#bots`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
-- `#get-started`, which always opens Get started's step-by-step setup even after local dismissal;
+- `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `files`, `workflows`, `decisions`, or `worktrees`.
 
 ## Activity reconcile

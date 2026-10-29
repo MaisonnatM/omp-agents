@@ -58,6 +58,8 @@ export const CONTROLS = [
 	{ id: "get-started.skip", label: "Get started step skipped", area: "Get started" },
 	{ id: "get-started.step", label: "Get started step picked from its list", area: "Get started" },
 	{ id: "get-started.suggestion", label: "Get started first-session suggestion", area: "Get started" },
+	{ id: "get-started.close", label: "Get started closed into its bubble", area: "Get started" },
+	{ id: "get-started.bubble", label: "Get started reopened from its bubble", area: "Get started" },
 	{ id: "trajectory.toggle", label: "Trajectory toggle", area: "Panes" },
 	{ id: "trajectory.turn", label: "Trajectory turn, folded or unfolded", area: "Panes" },
 	{ id: "trajectory.step", label: "Trajectory step, folded or unfolded", area: "Panes" },

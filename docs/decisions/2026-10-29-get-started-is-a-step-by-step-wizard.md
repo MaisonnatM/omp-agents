@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-10-29-get-started-opens-in-a-dialog-and-a-bubble
 date: 2026-10-29
 decision-makers: Maxence Maisonnat
 supersedes: 2026-10-29-get-started-is-a-page-and-a-vacant-home-checklist

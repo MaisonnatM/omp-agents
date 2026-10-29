@@ -1,10 +1,14 @@
 # Get started
 
-**Get started** walks you through setup one step per screen.
-It opens on an empty home when you have not connected a model provider and started a session yet.
-It never replaces an open conversation, a new-session draft, or a page you chose.
+**Get started** walks you through setup one step per screen, in a dialog over the dashboard.
+It opens by itself on an empty home when you have not connected a model provider and started a session yet.
+It never opens by itself over an open conversation, a new-session draft, or a page you chose.
 A computer with a connected provider and any live or past session goes straight to the ordinary home.
 Open it any time with Cmd+K (Ctrl+K), **Get started**, or the `#get-started` link.
+
+Close the dialog with its X or Esc and it shrinks into a bubble at the bottom right, showing how many of the two required steps are done.
+Click the bubble to reopen the dialog on the same step.
+The bubble stays on every page until both required steps are done or you skip setup; its X skips setup.
 
 ## Moving through it
 
@@ -41,7 +45,7 @@ Checks come from the actual setup, never from a saved tick or a click.
 A failed check says why on its step without hiding the others or marking it done.
 Checks update while setup is visible and when you return to the window; **Check again** on the tools step reads them immediately.
 
-**Skip setup** hides automatic setup on this origin/computer, not on your other computers or through Settings sync.
+**Skip setup** hides the bubble and automatic setup on this origin/computer, not on your other computers or through Settings sync.
 **Finish setup** on the last step does the same once you have a session.
 The ordinary empty home offers **New session** and **Get started**, and still shows registry errors.
 Explicitly opening **Get started** works even after dismissal or after both required steps are done.
