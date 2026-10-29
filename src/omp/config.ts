@@ -1,7 +1,7 @@
 /** omp's config: the settings a session loads, and writing the model routing back through omp's own path. */
 import { homedir } from "node:os";
 import { isObject } from "../json";
-import type { CollabAutoStart } from "../shared/readiness";
+import type { CollabAutoStart, TerminalAccess } from "../shared/readiness";
 import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
 import { collabSettings, config, dirs, extensionSettings, fallbackChains, modelSettings, type OmpSettingsInstance, type SettingHandle, sessionSettings, settingsRegistry } from "./modules";
@@ -122,13 +122,12 @@ export async function readCollabAutoStart(): Promise<CollabAutoStart> {
 	return globalCollabAutoStart(await config.Settings.loadReadOnly({ cwd: homedir() }));
 }
 
-/** Stages only this setting and flushes through omp's locked global config writer. */
-export async function showTerminalSessions(): Promise<void> {
+/** Stages only `collab.autoStart` as `access` and flushes through omp's locked global config writer; a matching value writes nothing. */
+export async function shareTerminalSessions(access: TerminalAccess): Promise<void> {
 	const cwd = homedir();
-	const current = globalCollabAutoStart(await config.Settings.loadReadOnly({ cwd }));
-	if (current === "view" || current === "control") return;
+	if (globalCollabAutoStart(await config.Settings.loadReadOnly({ cwd })) === access) return;
 	const settings = await config.Settings.loadIsolated({ cwd });
-	if (globalCollabAutoStart(settings) !== "off") return;
-	setting("collab.autoStart").set(settings, "control");
+	if (globalCollabAutoStart(settings) === access) return;
+	setting("collab.autoStart").set(settings, access);
 	await settings.flush();
 }

@@ -30,7 +30,7 @@ import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/sha
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
-import type { Readiness, StarterKitStatus } from "../src/shared/readiness";
+import type { Readiness, StarterKitStatus, TerminalAccess } from "../src/shared/readiness";
 import type { ProviderStatus } from "../src/shared/source-control";
 import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
@@ -82,8 +82,8 @@ export const readinessStore = createPolledStore<Readiness>({ url: () => "/api/re
 export const readinessGithubStore = createPolledStore<ProviderStatus>({ url: () => "/api/readiness/github" });
 export const starterKitStore = createPolledStore<StarterKitStatus>({ url: () => "/api/readiness/starter-kit" });
 
-export async function showTerminalSessions(): Promise<void> {
-	const answer = await putJson<Readiness>("/api/readiness/terminal-sessions", {});
+export async function shareTerminalSessions(access: TerminalAccess): Promise<void> {
+	const answer = await putJson<Readiness>("/api/readiness/terminal-sessions", { access });
 	readinessStore.update(() => answer);
 }
 

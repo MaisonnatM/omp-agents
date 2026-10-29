@@ -20,7 +20,8 @@ import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from ".
 import type { Integrations } from "../integrations";
 import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
-import { blobsDir, showTerminalSessions } from "../omp/config";
+import { blobsDir, shareTerminalSessions } from "../omp/config";
+import { isTerminalAccess } from "../shared/readiness";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
@@ -906,8 +907,8 @@ export function createRoutes(env: RouteEnv): Routes {
 		"/api/readiness/github": { GET: kit.get(() => answer(githubStatus)) },
 		"/api/readiness/starter-kit": { GET: kit.get(() => answer(readStarterKitStatus)) },
 		"/api/readiness/terminal-sessions": {
-			PUT: kit.write(body => isObject(body) && !Array.isArray(body) && Object.keys(body).length === 0 ? true : fail(400, "Expected an empty object"), async () => {
-				await showTerminalSessions();
+			PUT: kit.write(body => isObject(body) && isTerminalAccess(body.access) ? body.access : fail(400, "Expected { access } of view or control"), async access => {
+				await shareTerminalSessions(access);
 				return readReadiness();
 			}),
 		},
