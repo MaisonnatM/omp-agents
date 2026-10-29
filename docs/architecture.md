@@ -5,6 +5,7 @@ Read this list, then only the file for the subsystem you need.
 For installation, see the [README](../README.md); for the interface, see [Using omp-agents](usage.md); for where each file lives and what it does, see [Code layout](code-layout.md).
 
 - [omp modules](architecture/omp-modules.md)
+- [Get started](architecture/get-started.md)
 - [Transcripts](architecture/transcripts.md)
 - [Terminal sessions](architecture/terminal-sessions.md)
   - [Why the server joins every terminal session](architecture/terminal-sessions.md#why-the-server-joins-every-terminal-session)

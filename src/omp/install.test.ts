@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readManifest } from "./install";
+import { readManifest } from "./resolve";
 
 const dir = mkdtempSync(join(tmpdir(), "omp-agents-manifest-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

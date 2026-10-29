@@ -318,7 +318,8 @@ const matches = (provider: ModelProvider, query: string): boolean => {
 	return needle === "" || provider.name.toLowerCase().includes(needle) || provider.methods.some(({ id }) => id.includes(needle));
 };
 
-function Groups({ answer: { providers, login } }: { answer: ProvidersAnswer }) {
+/** Connected providers, then a searchable list of the rest, each with its sign-in. */
+export function ProviderGroups({ answer: { providers, login } }: { answer: ProvidersAnswer }) {
 	const [query, setQuery] = useState("");
 	const connected = providers.filter(providerConnected);
 	const available = providers.filter(provider => !providerConnected(provider));
@@ -345,16 +346,21 @@ function Groups({ answer: { providers, login } }: { answer: ProvidersAnswer }) {
 	);
 }
 
-/** The model providers omp signs in to, as `/login` and `omp login` do, with the accounts it holds for each. */
-export function ProvidersTab({ active }: { active: boolean }) {
-	const { read, error, refreshing } = providersStore.usePolling(null, active);
-	const running = active && read?.data.login?.phase === "running";
-
+/** omp's providers, read while `active`, and read every second while a sign-in runs, which `running` says. */
+export function useProviders(active: boolean) {
+	const entry = providersStore.usePolling(null, active);
+	const running = active && entry.read?.data.login?.phase === "running";
 	useEffect(() => {
 		if (!running) return;
 		const timer = setInterval(() => void refresh(), LOGIN_POLL_MS);
 		return () => clearInterval(timer);
 	}, [running]);
+	return { ...entry, running };
+}
+
+/** The model providers omp signs in to, as `/login` and `omp login` do, with the accounts it holds for each. */
+export function ProvidersTab({ active }: { active: boolean }) {
+	const { read, error, refreshing, running } = useProviders(active);
 
 	const meta = "The model providers omp signs in to";
 	return (
@@ -369,7 +375,7 @@ export function ProvidersTab({ active }: { active: boolean }) {
 			{read ? (
 				<>
 					{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the providers: {error}</p>}
-					<Groups answer={read.data} />
+					<ProviderGroups answer={read.data} />
 				</>
 			) : (
 				<LoadNote loading="Reading omp's providers…" error={error && `Cannot load the providers: ${error}`} />

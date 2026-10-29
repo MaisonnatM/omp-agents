@@ -23,6 +23,7 @@ They are not in this repository.
 The main ones:
 
 - Collab: `pi-coding-agent/src/collab/registry.ts`, `protocol.ts`, `crypto.ts`, and `relay-client.ts`.
+  `collab/settings.ts` exports `cfgCollabAutoStart`, whose native default complements `Settings.getGlobalSettings` when Get started reads `off`/`view`/`control` without a workspace's overrides.
 - Session files: `pi-coding-agent/src/session/session-listing.ts` and `session-loader.ts`.
   `appendCustomMessageEntry` in `pi-coding-agent/src/session/session-manager.ts` gives a `custom_message` entry the timestamp of the message it records, which `#persistMessageEnd` in `agent-session.ts` passes.
   `setSessionName(title, "user")` there is how `renameSessionFile` in `src/omp/sessions.ts` retitles a saved session, opened with `SessionManager.open`: it writes the header's title slot in place and appends a `title_change` entry, and a `"user"` title outranks every later `"auto"` one.
@@ -55,6 +56,10 @@ The main ones:
 - Settings and discovery: `pi-coding-agent/src/config/settings.ts`, `pi-coding-agent/src/discovery/index.ts`, and `pi-coding-agent/src/task/discovery.ts`.
   Skill frontmatter: `SkillFrontmatter` in `pi-coding-agent/src/capability/skill.ts` keeps any key of a user's skill, but `validateAgentSkillFrontmatter` in `pi-coding-agent/src/discovery/agent-plugin-format.ts` refuses a plugin's or a skillshare pack's skill with a top-level key outside its list or a non-string `metadata` value, so `src/omp/workflows.ts` reads the `workflow` tag from `metadata.tags`.
   `src/omp/discovery.ts` keeps a `Skill`'s `name` and `frontmatter` and a `SlashCommand`'s `name` (`pi-coding-agent/src/capability/slash-command.ts`) from the capability items, so the workflows read neither file themselves.
+  `config/registry.ts`'s `all` supplies known setting IDs for the installer-owned readiness plan.
+- Starter-kit plugins: `pi-coding-agent/src/extensibility/plugins/marketplace/registry.ts` exports `getMarketplacesRegistryPath`, `getInstalledPluginsRegistryPath`, `readMarketplacesRegistry`, and `readInstalledPluginsRegistry`.
+  Get started reads these registries and the current project's registry, located by the read-only `resolveOrDefaultProjectRegistryPath` in `discovery/helpers.ts` with native `getProjectDir`.
+  It never initializes CLI config, migrates plugin data, or installs anything while checking readiness.
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
   `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`.
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.

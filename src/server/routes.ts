@@ -10,7 +10,7 @@ import { buildContextReport } from "../context-sources";
 import { readDecisions } from "../decisions";
 import { readFavicon } from "../favicon";
 import { readGithubMedia } from "../github-media";
-import { errorText } from "../json";
+import { errorText, isObject } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import type { FileUsage } from "../foreign/usage";
@@ -20,7 +20,8 @@ import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from ".
 import type { Integrations } from "../integrations";
 import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
-import { blobsDir } from "../omp/config";
+import { blobsDir, readCollabAutoStart, shareTerminalSessions } from "../omp/config";
+import { isTerminalAccess } from "../shared/readiness";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
@@ -69,6 +70,7 @@ import { parseSyncSettings, type SyncAnswer, type SyncSettings, type SyncSide } 
 import { signInGraphite } from "../source-control";
 import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
 import { calendarRoutes, type CalendarRoutesEnv } from "./calendar-routes";
+import { readStarterKitStatus } from "../readiness";
 
 /** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
@@ -901,6 +903,14 @@ export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
 	const routes: Routes = {
 		...sessionRoutes(kit, env.sessions),
+		"/api/readiness/starter-kit": { GET: kit.get(() => answer(readStarterKitStatus)) },
+		"/api/readiness/terminal-sessions": {
+			GET: kit.get(() => answer(readCollabAutoStart)),
+			PUT: kit.write(body => isObject(body) && isTerminalAccess(body.access) ? body.access : fail(400, "Expected { access } of view or control"), async access => {
+				await shareTerminalSessions(access);
+				return readCollabAutoStart();
+			}),
+		},
 		...integrationRoutes(kit, env.integrations),
 		...providerRoutes(kit),
 		...calendarRoutes(kit, env.calendar),

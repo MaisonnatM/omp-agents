@@ -4,12 +4,14 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { type BrandLogo, BrandMark } from "./brand-logos";
 
-/** A row's mark on its tile: a brand's mark in its colors, else `name`'s first letter. */
-export function MarkTile({ logo, name }: { logo: BrandLogo | null; name: string }) {
+/** A row's mark on its tile: a brand's mark in its colors, else `icon`, else `name`'s first letter. */
+export function MarkTile({ logo = null, icon: Icon, name }: { logo?: BrandLogo | null; icon?: LucideIcon; name: string }) {
 	return (
 		<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 text-foreground shadow-surface-2">
 			{logo ? (
 				<BrandMark logo={logo} className="size-5" />
+			) : Icon ? (
+				<Icon className="size-4 text-muted-foreground" />
 			) : (
 				<span className="text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</span>
 			)}
@@ -17,10 +19,13 @@ export function MarkTile({ logo, name }: { logo: BrandLogo | null; name: string 
 	);
 }
 
+/** The raised surface of a list of rows, a hairline between rows, for a list that is not of {@link IntegrationRow}s. */
+export const LIST_SURFACE = "divide-y divide-border overflow-hidden rounded-xl bg-surface-3 shadow-surface-2";
+
 /** Integration rows on one raised surface, a hairline between rows. */
 export function IntegrationList({ label, children }: { label: string; children: ReactNode }) {
 	return (
-		<ul aria-label={label} className="divide-y divide-border overflow-hidden rounded-xl bg-surface-3 shadow-surface-2">
+		<ul aria-label={label} className={LIST_SURFACE}>
 			{children}
 		</ul>
 	);

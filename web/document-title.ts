@@ -7,6 +7,8 @@ export const APP_NAME = "omp agents";
 /** What the page or conversation in front is called, or `null` when nothing is open. */
 function contextOf(page: Page | null, view: View | null, host: RosterHost | null, past: PastSession | null): string | null {
 	switch (page?.kind) {
+		case "get-started":
+			return "Get started";
 		case "new":
 			return "New session";
 		case "scheduled":

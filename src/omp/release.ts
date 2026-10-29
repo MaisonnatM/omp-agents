@@ -2,7 +2,8 @@
 import { join } from "node:path";
 import { HOME } from "../paths";
 import { run } from "../proc";
-import { ompCommand, packageDir, readManifest } from "./install";
+import { ompCommand, packageDir } from "./install";
+import { readManifest } from "./resolve";
 import { config, updateCli, updateSettings } from "./modules";
 
 const RELEASE_TIMEOUT_MS = 10_000;

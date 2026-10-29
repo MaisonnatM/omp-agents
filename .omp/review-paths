@@ -5,6 +5,9 @@
 # Shared contracts between the server, the page, and transports.
 src/shared/protocol.ts
 src/shared/sessions.ts
+src/shared/readiness.ts
+src/shared/startup.ts
+src/shared/desktop-bridge.ts
 src/live-session.ts
 src/omp/modules.ts
 

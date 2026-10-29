@@ -30,6 +30,7 @@ export type ShortcutId =
 	| "sessionsSidebar"
 	| "detailsSidebar"
 	| "settings"
+	| "getStarted"
 	| "back"
 	| "forward"
 	| "help"
@@ -160,6 +161,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "dequeue", category: "sessions", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
 	{ id: "switcher", category: "general", label: "Open the command menu", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
+	{ id: "getStarted", category: "general", label: "Open Get started, the step-by-step setup", command: "Get started", keys: [] },
 	{
 		id: "newSession",
 		category: "sessions",

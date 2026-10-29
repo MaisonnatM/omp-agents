@@ -48,6 +48,18 @@ export const featureId = (kind: ActivityKind, key: string): string => `${kind}:$
  * A component tags each with `activityControl(id)` from `web/activity.ts`; `area` groups them in Settings › Activity.
  */
 export const CONTROLS = [
+	{ id: "get-started.dismiss", label: "Get started dismissed on this computer", area: "Get started" },
+	{ id: "get-started.refresh", label: "Get started checked again", area: "Get started" },
+	{ id: "get-started.install-kit", label: "Get started starter kit installation", area: "Get started" },
+	{ id: "get-started.copy-command", label: "Get started command copied", area: "Get started" },
+	{ id: "get-started.install-gh", label: "Get started GitHub CLI installation link", area: "Get started" },
+	{ id: "get-started.next", label: "Get started step continued", area: "Get started" },
+	{ id: "get-started.back", label: "Get started step back", area: "Get started" },
+	{ id: "get-started.skip", label: "Get started step skipped", area: "Get started" },
+	{ id: "get-started.step", label: "Get started step picked from its list", area: "Get started" },
+	{ id: "get-started.suggestion", label: "Get started first-session suggestion", area: "Get started" },
+	{ id: "get-started.close", label: "Get started closed into its bubble", area: "Get started" },
+	{ id: "get-started.bubble", label: "Get started reopened from its bubble", area: "Get started" },
 	{ id: "trajectory.toggle", label: "Trajectory toggle", area: "Panes" },
 	{ id: "trajectory.turn", label: "Trajectory turn, folded or unfolded", area: "Panes" },
 	{ id: "trajectory.step", label: "Trajectory step, folded or unfolded", area: "Panes" },

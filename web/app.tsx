@@ -26,6 +26,8 @@ import { RenderBoundary } from "./components/render-boundary";
 import { ScheduledSends } from "./components/scheduled";
 import { SessionDetails } from "./components/session-details";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
+import { GetStarted } from "./components/get-started";
+import { firstSessionFact } from "./get-started-model";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
 import { StatusBar } from "./components/status-bar";
 import { subjectOf } from "./components/subject";
@@ -319,6 +321,13 @@ export function App() {
 										</DashboardSidebar>
 									)}
 									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />
+									<GetStarted
+										route={page?.kind === "get-started"}
+										vacantHome={!page && layout.panes.length === 0}
+										firstSession={firstSessionFact({ hosts: state.hosts.length, past: state.past.length, listed: state.listed, connected: state.connected, rosterError: state.rosterError })}
+										rosterError={state.rosterError}
+										onClose={() => show(layout)}
+									/>
 									{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
 									{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
 									<DiscussionPanel />

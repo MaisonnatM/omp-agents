@@ -5,6 +5,7 @@ Read this list, then only the file for the feature you need.
 For installation, see the [README](../README.md); for a first session and each integration's setup, see [Getting started](getting-started.md).
 For which file draws each part of the screen, see the [Interface map](code-layout.md#interface-map).
 
+- [Get started](usage/get-started.md)
 - [Sessions sidebar](usage/sessions-sidebar.md)
 - [Terminal](usage/terminal.md)
 - [Session details sidebar](usage/session-details-sidebar.md)

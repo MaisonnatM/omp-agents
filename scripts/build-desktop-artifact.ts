@@ -48,6 +48,7 @@ async function buildResources(): Promise<void> {
 	// The installer reads its layers beside itself, as `templates/omp/install.ts` does in a checkout.
 	const kitOut = join(RESOURCES, "templates", "omp");
 	cpSync(join(KIT, "agent"), join(kitOut, "agent"), { recursive: true });
+	cpSync(join(KIT, "config.yml"), join(kitOut, "config.yml"));
 	await bundle(join(KIT, "install.ts"), kitOut, "install.js", { target: "bun" });
 }
 

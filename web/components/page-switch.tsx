@@ -5,7 +5,6 @@ import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows, type OpenBot } from "../bots-model";
 import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
-import { SPLIT_CLICK } from "../labels";
 import type { SplitAxis } from "../pane-navigation";
 import type { Layout, Page, TodoListView } from "../routing";
 import { hashForNewSession } from "../routing";
@@ -15,6 +14,7 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
 import { EmailPage } from "./email/email-page";
+import { EmptyHome } from "./empty-home";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
@@ -28,27 +28,6 @@ import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
-
-function EmptyState({ rosterError }: { rosterError: string | null }) {
-	return (
-		<section className="m-auto w-full min-w-0 max-w-lg space-y-3 p-8 text-sm">
-			<h2 className="text-base font-semibold">No omp sessions are published</h2>
-			<p>
-				Sessions publish themselves to the local Collab registry when <code>collab.autoStart</code> is <code>control</code>{" "}
-				(or <code>view</code> for read-only):
-			</p>
-			<pre className="overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs">
-				omp config set collab.autoStart control
-			</pre>
-			<p>
-				Only sessions started after that setting changed appear here. Restart sessions that were already running, or
-				run <code>/new</code> or <code>/collab</code> inside them. Or start one here with the <strong>+</strong> next to
-				the session list.
-			</p>
-			{rosterError && <p className="text-red-600 dark:text-red-400">Registry error: {rosterError}</p>}
-		</section>
-	);
-}
 
 /** What a new session for top-level todo `todoId` starts with: its title, then its notes. `null` while the list names no such todo. */
 function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string } | null {
@@ -221,6 +200,8 @@ export const PageSwitch = memo(function PageSwitch({
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
 		case "email":
 			return <EmailPage target={page.target} workspace={workspace} />;
+		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
+		case "get-started":
 		case undefined:
 			if (layout.panes.length > 0) {
 				return (
@@ -242,12 +223,7 @@ export const PageSwitch = memo(function PageSwitch({
 					/>
 				);
 			}
-			if (hosts.length === 0) return <EmptyState rosterError={rosterError} />;
-			return (
-				<p className="m-auto max-w-sm text-center text-sm text-muted-foreground">
-					Select a session to see its conversation. {SPLIT_CLICK} more to see up to four side by side.
-				</p>
-			);
+			return <EmptyHome live={hosts.length > 0} rosterError={rosterError} />;
 		default: {
 			const never: never = page;
 			return never;
