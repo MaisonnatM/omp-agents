@@ -36,6 +36,7 @@ function editResults(details: Record<string, unknown>): [string, Record<string, 
 	});
 }
 
+/** Each file one `edit` result changed, as a `FileChange` at `at`. */
 function editedFiles(details: Record<string, unknown>, at: number | null): [string, FileChange][] {
 	return editResults(details).map(([path, result]) => {
 		const op = str(result.op);
