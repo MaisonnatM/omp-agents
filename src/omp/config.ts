@@ -81,15 +81,19 @@ export const retryChoices = (key: keyof RetrySettings): readonly string[] | unde
 /** @throws Error, with omp's message, when omp would not write `value` to `retry.<key>`. */
 export const assertRetryValue = (key: keyof RetrySettings, value: unknown): void => setting(`retry.${key}`).assertWritable(value);
 
+/** Loads the global config for a write; refuses while omp cannot parse it, since loading one to write moves it aside. */
+async function loadGlobalForWrite(cwd: string): Promise<OmpSettingsInstance> {
+	await config.Settings.loadReadOnly({ cwd });
+	return config.Settings.loadIsolated({ cwd });
+}
+
 /**
  * Writes `edit` to the global `config.yml` through omp's own write path, as `omp config set` does: omp re-reads
  * the file under its lock and writes back only the paths the edit set, so every other key survives.
  * The caller has validated `edit`.
  */
 export async function writeRouting(cwd: string, edit: RoutingEdit): Promise<void> {
-	// Loading a config to write moves one omp cannot parse aside; refuse while it is broken instead.
-	await config.Settings.loadReadOnly({ cwd });
-	const settings = await config.Settings.loadIsolated({ cwd });
+	const settings = await loadGlobalForWrite(cwd);
 	const setChain = (key: string, fallbacks: string[]): void =>
 		setting("retry.fallbackChains").setEntry(settings, key, fallbacks.length > 0 ? fallbacks : undefined);
 	switch (edit.kind) {
@@ -124,9 +128,7 @@ export async function readCollabAutoStart(): Promise<CollabAutoStart> {
 
 /** Stages only `collab.autoStart` as `access` and flushes through omp's locked global config writer; a matching value writes nothing. */
 export async function shareTerminalSessions(access: TerminalAccess): Promise<void> {
-	const cwd = homedir();
-	if (globalCollabAutoStart(await config.Settings.loadReadOnly({ cwd })) === access) return;
-	const settings = await config.Settings.loadIsolated({ cwd });
+	const settings = await loadGlobalForWrite(homedir());
 	if (globalCollabAutoStart(settings) === access) return;
 	setting("collab.autoStart").set(settings, access);
 	await settings.flush();

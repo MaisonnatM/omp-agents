@@ -1,27 +1,9 @@
-/** The local setup facts the Get started page cannot obtain from its existing session and integration stores. */
+/** The starter kit's state, which Get started cannot obtain from its existing stores. */
 import { planStarterKit, STARTER_KIT_MARKETPLACE } from "../templates/omp/install";
-import { errorText } from "./json";
-import { agentDir, readCollabAutoStart } from "./omp/config";
+import { agentDir } from "./omp/config";
 import { dirs, marketplaceRegistry, pluginRegistryDiscovery, settingsRegistry } from "./omp/modules";
-import { connectedProviders } from "./omp/models";
 import { ompTemplateDir } from "./server/resources";
-import type { Readiness, ReadinessFact, StarterKitStatus } from "./shared/readiness";
-
-async function observed<T>(read: () => Promise<T>): Promise<ReadinessFact<T>> {
-	try {
-		return { kind: "known", value: await read() };
-	} catch (err) {
-		return { kind: "unavailable", message: errorText(err) };
-	}
-}
-
-export async function readReadiness(): Promise<Readiness> {
-	const [providers, collabAutoStart] = await Promise.all([
-		observed(async () => (await connectedProviders()).size),
-		observed(readCollabAutoStart),
-	]);
-	return { providers, collabAutoStart };
-}
+import type { StarterKitStatus } from "./shared/readiness";
 
 export async function readStarterKitStatus(): Promise<StarterKitStatus> {
 	const [marketplaces, userPlugins, projectPlugins] = await Promise.all([
@@ -36,8 +18,7 @@ export async function readStarterKitStatus(): Promise<StarterKitStatus> {
 		hasMarketplace: marketplaces.marketplaces.some(marketplace => marketplace.name === STARTER_KIT_MARKETPLACE.name),
 		plugins,
 	});
-	const actions = [...plan.files, ...plan.settings, ...plan.plugins].map(step => step.action);
-	actions.push(plan.hasMarketplace ? "same" : "create");
+	const actions = [...plan.files, ...plan.settings, plan.marketplace, ...plan.plugins].map(step => step.action);
 	return {
 		pending: actions.filter(action => action === "create" || action === "update").length,
 		kept: actions.filter(action => action === "keep").length,

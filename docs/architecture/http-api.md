@@ -12,9 +12,9 @@ Each workflow carries the skill's name as omp resolves it, its `name` field else
 A workflow's skill is one of `files`, so `PUT /api/settings/file` edits it.
 `GET /api/models` runs `omp models --json` for the pickers.
 
-**Get started** reads `GET /api/readiness` (independent provider/config facts), `GET /api/readiness/github` (GitHub only), and `GET /api/readiness/starter-kit` (a genuinely read-only installer plan).
-`PUT /api/readiness/terminal-sessions` takes `{ access }` of `view` or `control`, stages only `collab.autoStart` through omp's isolated locked writer unless it already holds that value, and returns fresh local facts.
-Sessions and integrations reuse their existing socket/store reads; see [Get started](get-started.md).
+**Get started** reads `GET /api/readiness/terminal-sessions` (omp's global `collab.autoStart`) and `GET /api/readiness/starter-kit` (a genuinely read-only installer plan).
+`PUT /api/readiness/terminal-sessions` takes `{ access }` of `view` or `control`, stages only `collab.autoStart` through omp's isolated locked writer unless it already holds that value, and returns the value it reads back; another body is a 400.
+Providers, GitHub, sessions, and integrations reuse `GET /api/providers`, `GET /api/source-control`, and their existing socket/store reads; see [Get started](get-started.md).
 
 `GET /api/analytics?range=<range>` answers `Analytics` from omp-stats and Claude Code's and Codex's recorded requests, defaulting to `24h`.
 The accepted ranges are `today`, `24h`, `7d`, `30d`, `90d`, and `all`; an unknown range returns 400.

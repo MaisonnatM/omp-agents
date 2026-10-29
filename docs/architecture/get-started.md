@@ -11,30 +11,31 @@ There are no persisted completion flags; the rail's checks and each step's Next 
 
 ## Facts, not a controller
 
-`src/shared/readiness.ts` holds `ReadinessFact<T>` (`known` or `unavailable`), `Readiness`'s local provider/config facts, and the installer's aggregate `StarterKitStatus`.
-The component adds `checking` before a source answers.
-A source's error takes precedence over its stale answer, so an unavailable check never appears done.
-The wizard derives each step's done state from those facts, reusing `IntegrationList`, `IntegrationRow`, `Button`, `Badge`, `Callout`, `CopyableCode`, and `useAction`.
-The provider step mounts `ProviderGroups` and `useProviders` from `web/components/settings/providers-tab.tsx`, the same list and sign-in polling as Settings, and refreshes `readinessStore` when its connected count changes.
+Every fact is an `Observation<T>` from `web/get-started-model.ts`: `known`, `unavailable` with why, or `checking` before its source answers.
+Each polled store's entry becomes one through `observation()`, where a source's error takes precedence over its stale answer, so an unavailable check never appears done.
+The wizard derives each step's done state from those facts, reusing `IntegrationList`, `IntegrationRow`, `MarkTile`, `Button`, `Badge`, `Callout`, `CopyableCode`, and `useAction`.
+The provider step draws `ProviderGroups` from `web/components/settings/providers-tab.tsx`, the same list and sign-in as Settings.
+Its connected count and the step's Done come from the same `providersStore` read and `providerConnected`, which `GetStarted` polls through `useProviders` while the dialog or bubble is due.
 The first-session step appends a suggested prompt to the new-session draft with `appendToComposer`, then opens it.
 
-- `GET /api/readiness` runs `connectedProviders` and the native collab setting read independently, each retaining its own failure.
-  It waits for neither GitHub nor kit status.
-- `GET /api/readiness/github` reuses `githubStatus`, without consulting Graphite.
+- `GET /api/readiness/terminal-sessions` answers omp's global `collab.autoStart`, `off`, `view`, or `control`, through `readCollabAutoStart` in `src/omp/config.ts`.
+- `PUT /api/readiness/terminal-sessions` takes `{ access }` of `view` or `control`, runs `shareTerminalSessions` in `src/omp/config.ts`, and answers the value it reads back.
+  A read-only load refuses malformed config before an isolated native writer stages only `collab.autoStart` and flushes under omp's lock; a matching value writes nothing.
+  The native global layer and descriptor default determine the answer, not a workspace or runtime override.
+  Unrelated keys survive.
 - `GET /api/readiness/starter-kit` calls `readStarterKitStatus` in `src/readiness.ts`.
   It reads native marketplace and user/project plugin registries through `src/omp/modules.ts`, takes known setting IDs from the loaded setting registry, and passes that snapshot to the installer's read-only `planStarterKit`.
   It never runs `omp config list`, whose `Settings.init` can migrate or write, nor a plugin command or installation.
   `keep` and `same` count as complete; every pending `create` or `update`, including settings, marketplace, and plugins, prevents completion.
-- `PUT /api/readiness/terminal-sessions` takes `{ access }` of `view` or `control` and runs `shareTerminalSessions` in `src/omp/config.ts`.
-  A read-only load refuses malformed config before an isolated native writer stages only `collab.autoStart` and flushes under omp's lock; a matching value writes nothing.
-  The native global layer and descriptor default determine readiness, not a workspace or runtime override.
-  Unrelated keys survive.
+- GitHub comes from `GET /api/source-control`, the answer Settings' Source control tab reads, through `sourceControlStore`; Graphite's status in it is ignored.
 
-The page reuses the global socket `hosts`/`past` arrays: any row is positive evidence even before `listed`.
+`firstSessionFact` in `web/get-started-model.ts` reads the global socket `hosts`/`past` arrays: any row is positive evidence even before `listed`.
 An empty array is negative only after listing, with a connected socket and no roster error; otherwise it is checking or unavailable.
 Integrations reuse `integrationsStore` and `connectionsOf(...).some(signedIn)`, counting services rather than accounts.
-The three onboarding HTTP stores stay in memory; local facts poll every five seconds and the optional facts every minute only while needed/visible.
+The onboarding stores stay in memory: the providers poll every minute while the dialog or bubble is due, the terminal setting every five seconds while the dialog is open, and the starter kit, source control, and integrations every minute while it is open.
 The component refreshes on focus and on **Check again**; optional probes never gate the required rows.
+
+Closed, the dialog's bubble draws through `UnderToasts` from `web/components/toaster.tsx` into the toast column's corner, below the toasts and outside their live region, so a toast stacks above it rather than covering it.
 
 ## Desktop installation
 
@@ -57,6 +58,6 @@ The desktop shell imports only the Node-safe startup contract, never the server 
 A child exiting with 79 shows a shell-owned data page with `bun install -g @oh-my-pi/pi-coding-agent`, a fixed Copy action, Retry, and technical output in a disclosure.
 It mentions Bun and links to bun.sh when Bun is absent from the shell's PATH.
 No dashboard server, token, generic shell execution, or automatic installation is needed.
-Retry reruns login-shell discovery but copies only `PATH`, `BUN_INSTALL`, and `OMP_PACKAGE_DIR` into the environment.
+In the packaged app, Retry reruns login-shell discovery but copies only `PATH`, `BUN_INSTALL`, and `OMP_PACKAGE_DIR` into the environment; a checkout keeps the environment it was launched with.
 It never replaces initialized `HOME`, XDG paths, `PORT`, or the desktop's data locations.
 Other startup failures keep the ordinary error notice.

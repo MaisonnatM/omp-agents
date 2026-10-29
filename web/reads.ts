@@ -30,8 +30,8 @@ import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/sha
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
-import type { Readiness, StarterKitStatus, TerminalAccess } from "../src/shared/readiness";
-import type { ProviderStatus } from "../src/shared/source-control";
+import type { CollabAutoStart, StarterKitStatus, TerminalAccess } from "../src/shared/readiness";
+import type { SourceControlAnswer } from "../src/shared/source-control";
 import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
@@ -78,13 +78,14 @@ export function useRead<T>(url: string | null, version?: unknown): Refreshable<T
 }
 
 /** Setup checks stay in memory and poll only while Get started is visible. Optional processes never delay local facts. */
-export const readinessStore = createPolledStore<Readiness>({ url: () => "/api/readiness", pollMs: 5_000 });
-export const readinessGithubStore = createPolledStore<ProviderStatus>({ url: () => "/api/readiness/github" });
+export const terminalSessionsStore = createPolledStore<CollabAutoStart>({ url: () => "/api/readiness/terminal-sessions", pollMs: 5_000 });
 export const starterKitStore = createPolledStore<StarterKitStatus>({ url: () => "/api/readiness/starter-kit" });
+/** GitHub's and Graphite's CLIs, the pull settings, and the workspaces' repositories, as Settings' Source control tab shows them. */
+export const sourceControlStore = createPolledStore<SourceControlAnswer>({ url: () => "/api/source-control" });
 
-export async function shareTerminalSessions(access: TerminalAccess): Promise<void> {
-	const answer = await putJson<Readiness>("/api/readiness/terminal-sessions", { access });
-	readinessStore.update(() => answer);
+export async function setTerminalAccess(access: TerminalAccess): Promise<void> {
+	const answer = await putJson<CollabAutoStart>("/api/readiness/terminal-sessions", { access });
+	terminalSessionsStore.update(() => answer);
 }
 
 /** The open pull requests by workspace `cwd`, which the sidebar and the Pull requests page share; `null` reads every workspace. */

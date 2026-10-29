@@ -5,7 +5,7 @@
  */
 // First: a packaged app takes the login shell's environment before `src/paths.ts` reads it.
 import { refreshExecutableEnv } from "./shell-env";
-import { type ChildProcess, execFile, spawn, spawnSync } from "node:child_process";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -67,7 +67,6 @@ const LOG_LINES = 40;
 /** The error page's Retry link, which never loads: `will-navigate` catches it. */
 const RETRY_URL = "omp-agents:retry";
 const COPY_OMP_URL = "omp-agents:copy-omp-install";
-const missingOmpNotices = new WeakMap<WebContents, string>();
 /** A navigation that another one replaced, which is no failure. */
 const ERR_ABORTED = -3;
 const IS_MAC = process.platform === "darwin";
@@ -179,21 +178,24 @@ const notice = (title: string, body = ""): string =>
 pre{font-size:12px;white-space:pre-wrap;padding:.75rem;border-radius:6px;background:color-mix(in srgb,currentColor 8%,transparent)}</style>
 <h1 style="font-size:20px">${escapeHtml(title)}</h1>${body}`)}`;
 
+/** Whether `url` is one of {@link notice}'s pages, the only pages whose links the shell acts on. */
+const isNotice = (url: string): boolean => url.startsWith("data:text/html");
+
 function showError(win: BrowserWindow, title: string, detail: string): void {
 	const log = serverLog.length ? `<pre>${escapeHtml(serverLog.join("\n"))}</pre>` : "";
 	void win.loadURL(notice(title, `<p>${escapeHtml(detail)}</p>${log}<p><a href="${RETRY_URL}">Retry</a></p>`));
 }
 
 /** This page needs no server, token, or renderer privileges. Its two actions carry no user input. */
-function showOmpMissing(win: BrowserWindow): void {
-	const bun = spawnSync("bun", ["--version"], { stdio: "ignore", timeout: 2_000 });
-	const prerequisite = bun.error
-		? '<p>Install <a href="https://bun.sh">Bun</a> first, then run this command in your terminal.</p>'
-		: "<p>Run this command in your terminal. It needs Bun.</p>";
+async function showOmpMissing(win: BrowserWindow): Promise<void> {
+	// Checked off the main thread, which `spawnSync` would block for up to 2 s.
+	const { promise: bun, resolve: ran } = Promise.withResolvers<boolean>();
+	execFile("bun", ["--version"], { timeout: 2_000 }, err => ran(!err));
+	const prerequisite = await bun
+		? "<p>Run this command in your terminal. It needs Bun.</p>"
+		: '<p>Install <a href="https://bun.sh">Bun</a> first, then run this command in your terminal.</p>';
 	const detail = serverLog.length ? `<details><summary>Technical details</summary><pre>${escapeHtml(serverLog.join("\n"))}</pre></details>` : "";
-	const url = notice("Install omp to get started", `<p>omp agents uses omp to run your sessions.</p>${prerequisite}<pre>${escapeHtml(OMP_INSTALL_COMMAND)}</pre><p><a href="${COPY_OMP_URL}">Copy command</a> · <a href="${RETRY_URL}">Retry</a></p><p>Once installation finishes, Retry looks for omp again. Nothing is installed automatically.</p>${detail}`);
-	missingOmpNotices.set(win.webContents, url);
-	void win.loadURL(url);
+	void win.loadURL(notice("Install omp to get started", `<p>omp agents uses omp to run your sessions.</p>${prerequisite}<pre>${escapeHtml(OMP_INSTALL_COMMAND)}</pre><p><a href="${COPY_OMP_URL}" aria-live="polite">Copy command</a> · <a href="${RETRY_URL}">Retry</a></p><p>Once installation finishes, Retry looks for omp again. Nothing is installed automatically.</p>${detail}`));
 }
 
 /** Uses the server on the port, or starts one, then loads the dashboard, which the preload signs in with the token. */
@@ -219,7 +221,7 @@ async function connect(win: BrowserWindow): Promise<void> {
 			});
 		}
 	} catch (err) {
-		if (err instanceof ServerExit && err.code === OMP_MISSING_EXIT) showOmpMissing(win);
+		if (err instanceof ServerExit && err.code === OMP_MISSING_EXIT) await showOmpMissing(win);
 		else showError(win, "The server did not start", errorText(err));
 		return;
 	}
@@ -303,13 +305,14 @@ function createWindow(): BrowserWindow {
 		return { action: "deny" };
 	});
 	contents.on("will-navigate", event => {
-		if (event.url === COPY_OMP_URL && contents.getURL() === missingOmpNotices.get(contents)) {
+		if (event.url === COPY_OMP_URL && isNotice(contents.getURL())) {
 			event.preventDefault();
 			clipboard.writeText(OMP_INSTALL_COMMAND);
-			void contents.executeJavaScript("document.querySelector('a[href=\"omp-agents:copy-omp-install\"]').textContent = 'Copied'");
+			const link = `document.querySelector('a[href="${COPY_OMP_URL}"]')`;
+			void contents.executeJavaScript(`{ const a = ${link}; a.textContent = 'Copied'; setTimeout(() => { a.textContent = 'Copy command'; }, 2000); }`);
 			return;
 		}
-		if (event.url === RETRY_URL && contents.getURL().startsWith("data:text/html")) {
+		if (event.url === RETRY_URL && isNotice(contents.getURL())) {
 			event.preventDefault();
 			refreshExecutableEnv();
 			void connect(win);

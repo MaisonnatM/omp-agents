@@ -39,8 +39,9 @@ const launchdEnv = (): NodeJS.ProcessEnv => {
 	return { HOME, USER, LOGNAME, SHELL, TMPDIR, LANG, PATH: "/usr/bin:/bin:/usr/sbin:/sbin" };
 };
 
-/** Retry rediscovers executables without moving paths the app already initialized. */
+/** Retry rediscovers executables without moving paths the app already initialized. A checkout keeps the environment it was launched with. */
 export function refreshExecutableEnv(): void {
+	if (!app.isPackaged) return;
 	try {
 		const env = loginShellEnv(launchdEnv());
 		for (const key of ["PATH", "BUN_INSTALL", "OMP_PACKAGE_DIR"]) {

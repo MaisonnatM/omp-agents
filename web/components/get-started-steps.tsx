@@ -1,25 +1,25 @@
 /** The body of each Get started step: what it sets up, its live state, and the controls that set it up here. */
 import { ArrowRight, Check, CircleAlert, Eye, GitPullRequest, type LucideIcon, Package, Plug, RefreshCw, SquareTerminal } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { providerConnected } from "../../src/shared/providers";
+import { providerConnected, type ProvidersAnswer } from "../../src/shared/providers";
 import type { ProviderStatus } from "../../src/shared/source-control";
 import type { StarterKitInstallResult } from "../../src/shared/desktop-bridge";
-import type { CollabAutoStart, ReadinessFact, StarterKitStatus, TerminalAccess } from "../../src/shared/readiness";
-import { errorText } from "../../src/json";
+import type { CollabAutoStart, StarterKitStatus, TerminalAccess } from "../../src/shared/readiness";
 import { activityControl, record } from "../activity";
 import { appendToComposer, newDraftKey } from "../composer-drafts";
-import { readinessStore, shareTerminalSessions, starterKitStore } from "../reads";
+import type { Observation } from "../get-started-model";
+import type { PolledEntry } from "../polled-store";
+import { setTerminalAccess, starterKitStore } from "../reads";
 import { useAction } from "../use-action";
 import { CopyableCode } from "./copyable-code";
 import { useDashboardActions } from "./dashboard-context";
-import { Callout, IntegrationList, IntegrationRow } from "./integrations/integration-row";
+import { Callout, IntegrationList, IntegrationRow, LIST_SURFACE, MarkTile } from "./integrations/integration-row";
 import { LoadNote } from "./sheet-details";
-import { ProviderGroups, useProviders } from "./settings/providers-tab";
+import { ProviderGroups } from "./settings/providers-tab";
 
-export type Observation<T> = ReadinessFact<T> | { kind: "checking" };
 export type Need = "required" | "recommended" | "optional";
 
 export const NEED_LABEL: Record<Need, string> = { required: "Required", recommended: "Recommended", optional: "Optional" };
@@ -37,17 +37,9 @@ function Unavailable({ fact }: { fact: Observation<unknown> }) {
 	);
 }
 
-function IconTile({ icon: Icon }: { icon: LucideIcon }) {
-	return (
-		<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 text-muted-foreground shadow-surface-2">
-			<Icon className="size-4" />
-		</span>
-	);
-}
-
 function DoneBadge({ done, need }: { done: boolean; need: Need }) {
 	return (
-		<Badge size="compact" color={done ? "green" : "gray"}>
+		<Badge variant="dot" size="compact" color={done ? "green" : "gray"}>
 			{done ? "Done" : NEED_LABEL[need]}
 		</Badge>
 	);
@@ -65,17 +57,13 @@ export function StepHeader({ id, title, children }: { id: string; title: string;
 	);
 }
 
-/** Every provider omp can sign in to, signed in here; a change refreshes the readiness the rest of setup reads. */
-export function ProviderStep() {
-	const { read, error } = useProviders(true);
+/** Every provider omp can sign in to, signed in here, from the read Get started counts its connected providers in. */
+export function ProviderStep({ providers: { read, error } }: { providers: PolledEntry<ProvidersAnswer> }) {
 	const connected = read ? read.data.providers.filter(providerConnected).length : null;
-	useEffect(() => {
-		if (connected !== null) void readinessStore.refresh();
-	}, [connected]);
 	return (
 		<div className="space-y-5">
 			{connected !== null && connected > 0 && (
-				<Callout tone="info" icon={Check} role="status">
+				<Callout tone="info" icon={Check}>
 					{connected === 1 ? "One provider is connected. Its models are ready for your first session." : `${connected} providers are connected. Their models are ready for your first session.`}
 				</Callout>
 			)}
@@ -93,29 +81,51 @@ const ACCESS: readonly { value: TerminalAccess; title: string; summary: string; 
 	{ value: "view", title: "Read-only", summary: "Watch terminal sessions here without sending them anything.", icon: Eye },
 ];
 
-/** Two cards that choose how sessions started in a terminal show here; off stays a choice of omp's own settings. */
+/**
+ * Two cards that choose how sessions started in a terminal show here; off stays a choice of omp's own settings. Like
+ * `QuestionOptions`, Tab enters the group at its checked card, else its first, arrows and Home and End move between
+ * the cards, and Enter or Space picks one.
+ */
 export function TerminalStep({ terminal }: { terminal: Observation<CollabAutoStart> }) {
 	const [choosing, setChoosing] = useState<TerminalAccess | null>(null);
+	const cards = useRef<(HTMLButtonElement | null)[]>([]);
 	const choose = useAction(async (access: TerminalAccess) => {
 		setChoosing(access);
 		try {
-			await shareTerminalSessions(access);
+			await setTerminalAccess(access);
 		} finally {
 			setChoosing(null);
 		}
 	}, "Could not save how terminal sessions show");
-	const current = terminal.kind === "known" ? terminal.value : null;
+	const shown = choosing ?? (terminal.kind === "known" ? terminal.value : null);
+	const tabStop = Math.max(0, ACCESS.findIndex(({ value }) => value === shown));
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+		const from = cards.current.findIndex(card => card === document.activeElement);
+		if (from === -1) return;
+		let to: number;
+		if (event.key === "Home") to = 0;
+		else if (event.key === "End") to = ACCESS.length - 1;
+		else if (event.key === "ArrowDown" || event.key === "ArrowRight") to = (from + 1) % ACCESS.length;
+		else if (event.key === "ArrowUp" || event.key === "ArrowLeft") to = (from - 1 + ACCESS.length) % ACCESS.length;
+		else return;
+		event.preventDefault();
+		cards.current[to]?.focus();
+	};
 	return (
 		<div className="@container space-y-5">
-			<div role="radiogroup" aria-label="Terminal session access" className="grid gap-3 @md:grid-cols-2">
-				{ACCESS.map(({ value, title, summary, icon: Icon }) => {
-					const selected = (choosing ?? current) === value;
+			<div role="radiogroup" aria-label="Terminal session access" onKeyDown={onKeyDown} className="grid gap-3 @md:grid-cols-2">
+				{ACCESS.map(({ value, title, summary, icon }, index) => {
+					const selected = shown === value;
 					return (
 						<button
 							key={value}
+							ref={card => {
+								cards.current[index] = card;
+							}}
 							type="button"
 							role="radio"
 							aria-checked={selected}
+							tabIndex={index === tabStop ? 0 : -1}
 							disabled={terminal.kind !== "known" || choose.pending}
 							onClick={() => choose.run(value)}
 							className={cn(
@@ -124,7 +134,7 @@ export function TerminalStep({ terminal }: { terminal: Observation<CollabAutoSta
 							)}
 						>
 							<span className="flex w-full items-center justify-between">
-								<IconTile icon={Icon} />
+								<MarkTile icon={icon} name={title} />
 								<span aria-hidden className={cn("flex size-4 items-center justify-center rounded-full ring-1 ring-border", selected && "bg-foreground ring-foreground")}>
 									{selected && <span className="size-1.5 rounded-full bg-background" />}
 								</span>
@@ -145,45 +155,49 @@ export function TerminalStep({ terminal }: { terminal: Observation<CollabAutoSta
 	);
 }
 
+function kitMeta(kit: Observation<StarterKitStatus>): string | null {
+	if (kit.kind === "checking") return "Checking this computer…";
+	if (kit.kind === "unavailable") return null;
+	const { pending, kept, total } = kit.value;
+	if (pending > 0) return `${pending} of ${total} ${total === 1 ? "addition" : "additions"} still needed.`;
+	return kept ? `Installed, with ${kept} of your customizations kept. New sessions load it.` : "Installed. New sessions load it.";
+}
+
 /** The starter kit's plan and its installer, which runs only through the desktop app. */
 export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 	const [result, setResult] = useState<StarterKitInstallResult | null>(null);
-	const canInstall = Boolean(window.ompDesktop?.installStarterKit);
+	const run = window.ompDesktop?.installStarterKit;
 	const install = useAction(async () => {
+		if (!run) return;
 		setResult(null);
 		try {
-			const run = window.ompDesktop?.installStarterKit;
-			if (!run) throw new Error("Reopen this page in the current desktop app to install the starter kit.");
 			setResult(await run());
-		} catch (err) {
-			setResult({ ok: false, message: errorText(err) });
 		} finally {
 			await starterKitStore.refresh();
 		}
 	}, "Could not install the starter kit");
 	const done = kit.kind === "known" && kit.value.pending === 0;
-	const meta = kit.kind === "known" ? (done ? `Installed${kit.value.kept ? `, with ${kit.value.kept} of your customizations kept` : ""}. New sessions load it.` : `${kit.value.pending} of ${kit.value.total} ${kit.value.total === 1 ? "addition" : "additions"} still needed.`) : kit.kind === "checking" ? "Checking this computer…" : null;
 	return (
 		<div className="space-y-5">
 			<IntegrationList label="Starter kit">
 				<IntegrationRow
 					name="omp starter kit"
-					mark={<IconTile icon={Package} />}
+					mark={<MarkTile icon={Package} name="omp starter kit" />}
 					status={<DoneBadge done={done} need="optional" />}
 					summary="Workflows, extensions, model settings, and plugins. Files you changed stay as they are."
-					meta={meta}
+					meta={kitMeta(kit)}
 					actions={
 						!done && (
-							<Button size="compact" loading={install.pending} disabled={install.pending || !canInstall || kit.kind !== "known"} onClick={() => install.run()} {...activityControl("get-started.install-kit")}>
+							<Button size="compact" loading={install.pending} disabled={install.pending || !run || kit.kind !== "known"} onClick={() => install.run()} {...activityControl("get-started.install-kit")}>
 								Install
 							</Button>
 						)
 					}
 				>
-					{!canInstall && !done && <p className="text-xs text-muted-foreground">Open omp agents in the desktop app to install it.</p>}
+					{!run && !done && <p className="text-xs text-muted-foreground">Open omp agents in the desktop app to install it.</p>}
 					<Unavailable fact={kit} />
 					{result && (
-						<Callout tone={result.ok ? "info" : "danger"} icon={result.ok ? Check : CircleAlert} role="status">
+						<Callout tone={result.ok ? "info" : "danger"} icon={result.ok ? Check : CircleAlert} role="alert">
 							<p>{result.ok ? "Installed. New sessions load its files and settings." : "Installation failed. You can try again."}</p>
 							<details className="mt-1">
 								<summary className="cursor-pointer">Installer output</summary>
@@ -197,25 +211,33 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 	);
 }
 
+function githubMeta(github: Observation<ProviderStatus>): string | null {
+	if (github.kind === "checking") return "Checking this computer…";
+	if (github.kind === "unavailable") return null;
+	const { state, account } = github.value;
+	if (state === "missing") return "The GitHub CLI is not installed.";
+	if (state === "signed-out") return "The GitHub CLI is installed and signed out.";
+	return account ? `Signed in as ${account}` : "Signed in";
+}
+
 /** GitHub through its CLI, and the services in Integrations, each checked again when the window regains focus. */
 export function ToolsStep({ github, integrations, onRefresh, refreshing }: { github: Observation<ProviderStatus>; integrations: Observation<number>; onRefresh: () => void; refreshing: boolean }) {
 	const signedIn = github.kind === "known" && github.value.state === "signed-in";
 	const connected = integrations.kind === "known" ? integrations.value : 0;
-	const githubMeta = github.kind === "known" ? (signedIn ? `Signed in${github.value.account ? ` as ${github.value.account}` : ""}` : github.value.state === "missing" ? "The GitHub CLI is not installed." : "The GitHub CLI is installed and signed out.") : github.kind === "checking" ? "Checking this computer…" : null;
 	return (
 		<div className="space-y-5">
 			<IntegrationList label="Your tools">
 				<IntegrationRow
 					name="GitHub"
-					mark={<IconTile icon={GitPullRequest} />}
+					mark={<MarkTile icon={GitPullRequest} name="GitHub" />}
 					status={<DoneBadge done={signedIn} need="optional" />}
 					summary="Pull requests in the dashboard, and omp working on them."
-					meta={githubMeta}
+					meta={githubMeta(github)}
 					actions={
 						github.kind === "known" &&
 						github.value.state === "missing" && (
 							<Button variant="secondary" size="compact" render={<a href="https://cli.github.com" target="_blank" rel="noreferrer" />} {...activityControl("get-started.install-gh")}>
-								Install gh
+								Install GitHub CLI
 							</Button>
 						)
 					}
@@ -230,7 +252,7 @@ export function ToolsStep({ github, integrations, onRefresh, refreshing }: { git
 				</IntegrationRow>
 				<IntegrationRow
 					name="Integrations"
-					mark={<IconTile icon={Plug} />}
+					mark={<MarkTile icon={Plug} name="Integrations" />}
 					status={<DoneBadge done={connected > 0} need="optional" />}
 					summary="Linear, Slack, Gmail, and the other services omp can work in."
 					meta={integrations.kind === "known" ? `${connected} ${connected === 1 ? "service" : "services"} connected` : integrations.kind === "checking" ? "Checking…" : null}
@@ -268,11 +290,11 @@ export function SessionStep({ sessions }: { sessions: Observation<boolean> }) {
 	return (
 		<div className="space-y-5">
 			{sessions.kind === "known" && sessions.value && (
-				<Callout tone="info" icon={Check} role="status">
+				<Callout tone="info" icon={Check}>
 					A session is already here. Start another whenever you like.
 				</Callout>
 			)}
-			<ul aria-label="Suggested first tasks" className="divide-y divide-border overflow-hidden rounded-xl bg-surface-3 shadow-surface-2">
+			<ul aria-label="Suggested first tasks" className={LIST_SURFACE}>
 				{SUGGESTIONS.map(({ title, prompt }) => (
 					<li key={title}>
 						<button

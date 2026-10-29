@@ -109,7 +109,7 @@ function layerFiles(root: string): KitFile[] {
 export interface StarterKitPlan {
 	files: (KitFile & { dest: string; action: Action })[];
 	settings: SettingStep[];
-	hasMarketplace: boolean;
+	marketplace: { source: string; action: Action };
 	plugins: { id: string; action: Action }[];
 }
 
@@ -131,7 +131,12 @@ export function planStarterKit(kit: string, agentDir: string, snapshot: StarterK
 	const userConfigPath = join(agentDir, "config.yml");
 	const user = existsSync(userConfigPath) ? readYamlMapping(userConfigPath) : {};
 	const settings = planSettings(settingsOf(readYamlMapping(join(kit, "config.yml")), snapshot.knownSettings), user, force);
-	return { files, settings, hasMarketplace: snapshot.hasMarketplace, plugins: PLUGINS.map(id => ({ id, action: snapshot.plugins.has(id) ? "same" : "create" })) };
+	return {
+		files,
+		settings,
+		marketplace: { source: STARTER_KIT_MARKETPLACE.source, action: snapshot.hasMarketplace ? "same" : "create" },
+		plugins: PLUGINS.map(id => ({ id, action: snapshot.plugins.has(id) ? "same" : "create" })),
+	};
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -155,10 +160,10 @@ async function main(argv: string[]): Promise<void> {
 		hasMarketplace: new RegExp(`^\\s*${STARTER_KIT_MARKETPLACE.name}\\s`, "m").test(await omp(ompCommand, ["plugin", "marketplace", "list"])),
 		plugins: pluginIds(JSON.parse(await omp(ompCommand, ["plugin", "list", "--json"]))),
 	};
-	const { files, settings, hasMarketplace, plugins } = planStarterKit(kit, agentDir, snapshot, { force, maintainer });
+	const { files, settings, marketplace, plugins } = planStarterKit(kit, agentDir, snapshot, { force, maintainer });
 	for (const file of files) print(file.action, `file ${file.rel}`);
 	for (const setting of settings) print(setting.action, `setting ${setting.target}`);
-	print(hasMarketplace ? "same" : "create", `marketplace ${STARTER_KIT_MARKETPLACE.source}`);
+	print(marketplace.action, `marketplace ${marketplace.source}`);
 	for (const plugin of plugins) print(plugin.action, `plugin ${plugin.id}`);
 
 	const kept = [...files, ...settings].filter(step => step.action === "keep").length;
@@ -176,7 +181,7 @@ async function main(argv: string[]): Promise<void> {
 	for (const { target, value } of settings.filter(s => writes(s.action))) {
 		await omp(ompCommand, ["config", "set", target, typeof value === "object" ? JSON.stringify(value) : String(value)]);
 	}
-	if (!hasMarketplace) await omp(ompCommand, ["plugin", "marketplace", "add", STARTER_KIT_MARKETPLACE.source]);
+	if (writes(marketplace.action)) await omp(ompCommand, ["plugin", "marketplace", "add", marketplace.source]);
 	for (const { id, action } of plugins) if (writes(action)) await omp(ompCommand, ["plugin", "install", id]);
 	console.log(`Done.${keptNote}`);
 }

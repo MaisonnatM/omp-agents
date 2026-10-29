@@ -346,7 +346,7 @@ export function ProviderGroups({ answer: { providers, login } }: { answer: Provi
 	);
 }
 
-/** omp's providers, read while `active`, and read every second while a sign-in runs. */
+/** omp's providers, read while `active`, and read every second while a sign-in runs, which `running` says. */
 export function useProviders(active: boolean) {
 	const entry = providersStore.usePolling(null, active);
 	const running = active && entry.read?.data.login?.phase === "running";
@@ -355,13 +355,12 @@ export function useProviders(active: boolean) {
 		const timer = setInterval(() => void refresh(), LOGIN_POLL_MS);
 		return () => clearInterval(timer);
 	}, [running]);
-	return entry;
+	return { ...entry, running };
 }
 
 /** The model providers omp signs in to, as `/login` and `omp login` do, with the accounts it holds for each. */
 export function ProvidersTab({ active }: { active: boolean }) {
-	const { read, error, refreshing } = useProviders(active);
-	const running = active && read?.data.login?.phase === "running";
+	const { read, error, refreshing, running } = useProviders(active);
 
 	const meta = "The model providers omp signs in to";
 	return (

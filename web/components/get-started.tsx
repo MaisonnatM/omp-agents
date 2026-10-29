@@ -1,22 +1,22 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Plus, X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useId } from "react";
+import { useCallback, useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { connectionsOf, signedIn } from "../../src/shared/accounts";
-import type { CollabAutoStart } from "../../src/shared/readiness";
+import { providerConnected } from "../../src/shared/providers";
+import type { ProviderStatus, SourceControlAnswer } from "../../src/shared/source-control";
 import { activityControl } from "../activity";
-import { SPLIT_CLICK } from "../labels";
-import type { PolledEntry } from "../polled-store";
-import { integrationsStore, readinessGithubStore, readinessStore, starterKitStore } from "../reads";
-import { getStartedSurface } from "../get-started-model";
+import { getStartedSurface, known, mapKnown, type Observation, observation } from "../get-started-model";
+import { integrationsStore, providersStore, sourceControlStore, starterKitStore, terminalSessionsStore } from "../reads";
 import { useStoredState } from "../stored-state";
 import { useAction } from "../use-action";
 import { useDashboardActions } from "./dashboard-context";
-import { KitStep, NEED_LABEL, type Need, type Observation, ProviderStep, SessionStep, StepHeader, TerminalStep, ToolsStep } from "./get-started-steps";
-import { Callout } from "./integrations/integration-row";
+import { KitStep, NEED_LABEL, type Need, ProviderStep, SessionStep, StepHeader, TerminalStep, ToolsStep } from "./get-started-steps";
+import { Callout, LIST_SURFACE } from "./integrations/integration-row";
+import { useProviders } from "./settings/providers-tab";
+import { UnderToasts } from "./toaster";
 
 const GET_STARTED_DISMISSED = "omp-agents.get-started-dismissed";
 /** Set once the dialog is closed, so a vacant home shows the bubble instead of opening the dialog again. */
@@ -36,40 +36,11 @@ type StepId = (typeof STEPS)[number]["id"];
 type Place = "welcome" | StepId;
 
 const isPlace = (raw: string | null): raw is Place => raw === "welcome" || STEPS.some(step => step.id === raw);
-const CHECKING = { kind: "checking" } as const;
 const REQUIRED_COUNT = STEPS.filter(item => item.need === "required").length;
 
-function observation<T>(entry: PolledEntry<T>): Observation<T> {
-	if (entry.error) return { kind: "unavailable", message: entry.error };
-	return entry.read ? { kind: "known", value: entry.read.data } : CHECKING;
-}
-
-const known = <T,>(fact: Observation<T>, done: (value: T) => boolean): boolean => fact.kind === "known" && done(fact.value);
-
-/** The main area when no session or page shows. */
-export function EmptyHome({ live, rosterError }: { live: boolean; rosterError: string | null }) {
-	const { openNewSession } = useDashboardActions();
-	return (
-		<Empty className="m-auto max-w-lg flex-none">
-			<EmptyHeader>
-				<EmptyTitle>{live ? "Select a session" : "No sessions are running"}</EmptyTitle>
-				<EmptyDescription>{live ? `Choose a session to see its conversation. ${SPLIT_CLICK} more to see up to four side by side.` : "Start a session here, or return to setup whenever you need it."}</EmptyDescription>
-			</EmptyHeader>
-			<div className="flex flex-wrap justify-center gap-2">
-				<Button size="compact" leadingIcon={Plus} onClick={() => openNewSession()}>
-					New session
-				</Button>
-				<Button variant="secondary" size="compact" render={<a href="#get-started" />}>
-					Get started
-				</Button>
-			</div>
-			{rosterError && (
-				<Callout tone="warning" icon={CircleAlert}>
-					Registry error: {rosterError}
-				</Callout>
-			)}
-		</Empty>
-	);
+function githubOf({ providers }: SourceControlAnswer): Observation<ProviderStatus> {
+	const github = providers.find(({ provider }) => provider === "github");
+	return github ? { kind: "known", value: github } : { kind: "unavailable", message: "Source control does not report the GitHub CLI." };
 }
 
 /** The app's mark, as `web/favicon.svg` draws it. */
@@ -96,7 +67,7 @@ function Marker({ index, done, current }: { index: number; done: boolean; curren
 			aria-hidden
 			className={cn(
 				"flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium tabular-nums ring-1 transition-colors duration-200 ease-out ring-inset",
-				done ? "bg-green-500/15 text-green-700 ring-green-500/30 dark:text-green-400" : current ? "bg-foreground text-background ring-foreground" : "text-muted-foreground ring-border",
+				done ? "bg-emerald-500/15 text-emerald-700 ring-emerald-500/30 dark:text-emerald-400" : current ? "bg-foreground text-background ring-foreground" : "text-muted-foreground ring-border",
 			)}
 		>
 			{done ? <Check className="size-3.5" /> : index + 1}
@@ -119,7 +90,7 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
 				strokeLinecap="round"
 				strokeDasharray={circumference}
 				strokeDashoffset={circumference * (1 - done / total)}
-				className="stroke-primary transition-[stroke-dashoffset] duration-500 ease-out"
+				className="stroke-emerald-500 transition-[stroke-dashoffset] duration-500 ease-out motion-reduce:transition-none"
 			/>
 		</svg>
 	);
@@ -151,7 +122,7 @@ function Welcome({ titleId, done, onStart, onDismiss }: { titleId: string; done:
 					</h2>
 					<p className="text-sm text-pretty text-muted-foreground">One place to start omp coding sessions, follow the ones in your terminals, and review what they did. Two steps are required; the rest can wait.</p>
 				</div>
-				<ol aria-label="Setup steps" className="w-full divide-y divide-border overflow-hidden rounded-xl bg-surface-3 text-start shadow-surface-2">
+				<ol aria-label="Setup steps" className={cn(LIST_SURFACE, "w-full text-start")}>
 					{STEPS.map((step, index) => (
 						<li key={step.id} className="flex items-center gap-3 px-4 py-2.5">
 							<Marker index={index} done={done[step.id]} current={false} />
@@ -173,10 +144,10 @@ function Welcome({ titleId, done, onStart, onDismiss }: { titleId: string; done:
 	);
 }
 
-/** The closed dialog, at the bottom right of the window until setup is done or skipped. */
+/** The closed dialog, at the bottom right of the window under the toasts, until setup is done or skipped. */
 function Bubble({ finished, onDismiss }: { finished: number; onDismiss: () => void }) {
 	return (
-		<div className="fixed end-4 bottom-10 z-30 flex items-center gap-0.5 rounded-full bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-border motion-safe:animate-in motion-safe:duration-300 motion-safe:ease-out motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:slide-in-from-bottom-2">
+		<div className="flex items-center gap-0.5 rounded-full bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-border motion-safe:animate-in motion-safe:duration-300 motion-safe:ease-out motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:slide-in-from-bottom-2">
 			<a
 				href="#get-started"
 				{...activityControl("get-started.bubble")}
@@ -202,14 +173,14 @@ function Bubble({ finished, onDismiss }: { finished: number; onDismiss: () => vo
  * bottom right until the required steps are done or setup is skipped. Dismissal, the closed dialog, and the step on
  * screen are stored on this origin alone; completion is read live.
  */
-export function GetStarted({ route, vacantHome, sessions, rosterError, sessionError, onClose }: {
+export function GetStarted({ route, vacantHome, firstSession, rosterError, onClose }: {
 	/** The URL names `#get-started`. */
 	route: boolean;
 	/** No page or pane shows, so the dialog may open on its own. */
 	vacantHome: boolean;
-	sessions: boolean | null;
+	/** Whether a session has run here, as `firstSessionFact` reads it from the roster. */
+	firstSession: Observation<boolean>;
 	rosterError: string | null;
-	sessionError: string | null;
 	/** Leaves `#get-started`. */
 	onClose: () => void;
 }) {
@@ -218,22 +189,22 @@ export function GetStarted({ route, vacantHome, sessions, rosterError, sessionEr
 	const [dismissed, setDismissed] = useStoredState(GET_STARTED_DISMISSED, value => value === "true");
 	const [minimized, setMinimized] = useStoredState(GET_STARTED_MINIMIZED, value => value === "true");
 	const [place, setPlace] = useStoredState<Place>(GET_STARTED_STEP, raw => (isPlace(raw) ? raw : "welcome"));
-	const core = readinessStore.use();
-	const providers: Observation<number> = core.error ? { kind: "unavailable", message: core.error } : (core.read?.data.providers ?? CHECKING);
-	const terminal: Observation<CollabAutoStart> = core.error ? { kind: "unavailable", message: core.error } : (core.read?.data.collabAutoStart ?? CHECKING);
-	const firstSession: Observation<boolean> = sessions === true ? { kind: "known", value: true } : sessionError ? { kind: "unavailable", message: sessionError } : sessions === null ? CHECKING : { kind: "known", value: false };
-	const requiredDone = known(providers, count => count > 0) && sessions === true;
+	const providerEntry = providersStore.use();
+	const providers = mapKnown(observation(providerEntry), answer => answer.providers.filter(providerConnected).length);
+	const requiredDone = known(providers, count => count > 0) && known(firstSession, Boolean);
 	const pending = !dismissed && !requiredDone;
 	const surface = getStartedSurface({ route, vacantHome, dismissed, minimized, requiredDone, settled: providers.kind !== "checking" && firstSession.kind !== "checking" });
 	const open = surface === "dialog";
-	useEffect(() => (open || pending ? readinessStore.poll() : undefined), [open, pending]);
-	const github = observation(readinessGithubStore.usePolling(null, open));
+	// Reads the providers above while setup shows or waits, and every second while a sign-in runs.
+	useProviders(open || pending);
+	const terminal = observation(terminalSessionsStore.usePolling(null, open));
+	const sourceControl = observation(sourceControlStore.usePolling(null, open));
+	const github = sourceControl.kind === "known" ? githubOf(sourceControl.value) : sourceControl;
 	const kit = observation(starterKitStore.usePolling(null, open));
-	const integrations = observation(integrationsStore.usePolling(null, open));
-	const integrationCount: Observation<number> = integrations.kind === "known" ? { kind: "known", value: Object.values(integrations.value.integrations).filter(item => connectionsOf(item).some(signedIn)).length } : integrations;
+	const integrations = mapKnown(observation(integrationsStore.usePolling(null, open)), answer => Object.values(answer.integrations).filter(item => connectionsOf(item).some(signedIn)).length);
 
 	const refresh = useCallback(async (): Promise<void> => {
-		await Promise.all([readinessStore.refresh(), ...(open ? [readinessGithubStore.refresh(), starterKitStore.refresh(), integrationsStore.refresh(null, { fresh: true })] : [])]);
+		await Promise.all([providersStore.refresh(), ...(open ? [terminalSessionsStore.refresh(), sourceControlStore.refresh(), starterKitStore.refresh(), integrationsStore.refresh(null, { fresh: true })] : [])]);
 	}, [open]);
 	useEffect(() => {
 		if (!open && !pending) return;
@@ -253,8 +224,8 @@ export function GetStarted({ route, vacantHome, sessions, rosterError, sessionEr
 		provider: known(providers, count => count > 0),
 		terminal: known(terminal, value => value !== "off"),
 		kit: known(kit, value => value.pending === 0),
-		tools: known(github, value => value.state === "signed-in") || known(integrationCount, count => count > 0),
-		session: sessions === true,
+		tools: known(github, value => value.state === "signed-in") || known(integrations, count => count > 0),
+		session: known(firstSession, Boolean),
 	};
 	const requiredFinished = STEPS.filter(item => item.need === "required" && done[item.id]).length;
 	const close = (): void => {
@@ -290,10 +261,10 @@ export function GetStarted({ route, vacantHome, sessions, rosterError, sessionEr
 								onDismiss={dismiss}
 								onNewSession={() => openNewSession()}
 								body={{
-									provider: <ProviderStep />,
+									provider: <ProviderStep providers={providerEntry} />,
 									terminal: <TerminalStep terminal={terminal} />,
 									kit: <KitStep kit={kit} />,
-									tools: <ToolsStep github={github} integrations={integrationCount} onRefresh={() => check.run()} refreshing={check.pending} />,
+									tools: <ToolsStep github={github} integrations={integrations} onRefresh={() => check.run()} refreshing={check.pending} />,
 									session: <SessionStep sessions={firstSession} />,
 								}}
 							/>
@@ -301,7 +272,11 @@ export function GetStarted({ route, vacantHome, sessions, rosterError, sessionEr
 					</DialogPrimitive.Content>
 				</DialogPrimitive.Portal>
 			</DialogPrimitive.Root>
-			{surface === "bubble" && <Bubble finished={requiredFinished} onDismiss={dismiss} />}
+			{surface === "bubble" && (
+				<UnderToasts>
+					<Bubble finished={requiredFinished} onDismiss={dismiss} />
+				</UnderToasts>
+			)}
 		</>
 	);
 }
@@ -398,11 +373,11 @@ function Wizard({ place, titleId, done, requiredFinished, rosterError, body, onP
 					)}
 					{body[step.id]}
 				</div>
-				<footer className="flex items-center gap-2 border-t border-border px-8 py-4">
+				<footer className="flex flex-wrap items-center gap-2 border-t border-border px-8 py-4">
 					<Button variant="ghost" leadingIcon={ArrowLeft} onClick={() => onPlace(index === 0 ? "welcome" : STEPS[index - 1]!.id)} {...activityControl("get-started.back")}>
 						Back
 					</Button>
-					<div className="ms-auto flex items-center gap-2">{forward}</div>
+					<div className="ms-auto flex flex-wrap items-center justify-end gap-2">{forward}</div>
 				</footer>
 			</div>
 		</div>

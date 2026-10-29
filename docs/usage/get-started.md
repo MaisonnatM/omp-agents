@@ -32,7 +32,7 @@ Leaving for Settings or a session and coming back returns to the same step on th
    Completion includes files, settings, the marketplace, and plugins, not merely the presence of one extension.
    The step shows installation progress and output; new sessions load what was installed.
 4. **GitHub and tools** is optional and done once either GitHub or an integration is connected.
-   GitHub is checked independently of Graphite: install [gh](https://cli.github.com) if needed, then copy `gh auth login` and run it in a terminal.
+   GitHub is checked independently of Graphite: **Install GitHub CLI** opens [its download page](https://cli.github.com) if `gh` is missing, then copy `gh auth login` and run it in a terminal.
    **Open Integrations** goes to **Settings › Integrations**, which counts connected services, not accounts: two Gmail accounts count as one service.
 5. **First session** is required.
    Each suggested task opens the new-session draft with its prompt; **New session** opens a blank one.

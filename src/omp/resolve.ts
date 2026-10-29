@@ -2,7 +2,7 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { errorText, isObject } from "../json";
-import { OmpMissing } from "../shared/startup";
+import { OMP_INSTALL_COMMAND, OmpMissing } from "../shared/startup";
 
 const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
 
@@ -35,7 +35,7 @@ function findPackageDir(): string {
 		return override;
 	}
 	const bin = Bun.which("omp");
-	if (!bin) throw new OmpMissing(`\`omp\` is not on PATH; install it with \`bun install -g ${PACKAGE_NAME}\`, or set OMP_PACKAGE_DIR to its installed directory`);
+	if (!bin) throw new OmpMissing(`\`omp\` is not on PATH; install it with \`${OMP_INSTALL_COMMAND}\`, or set OMP_PACKAGE_DIR to its installed directory`);
 	let resolved: string;
 	try {
 		resolved = realpathSync(bin);

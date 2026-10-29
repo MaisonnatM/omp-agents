@@ -4,13 +4,6 @@ export type CollabAutoStart = "off" | "view" | "control";
 export type TerminalAccess = Exclude<CollabAutoStart, "off">;
 export const isTerminalAccess = (value: unknown): value is TerminalAccess => value === "view" || value === "control";
 
-export type ReadinessFact<T> = { kind: "known"; value: T } | { kind: "unavailable"; message: string };
-
-export interface Readiness {
-	providers: ReadinessFact<number>;
-	collabAutoStart: ReadinessFact<CollabAutoStart>;
-}
-
 /** A non-forced installer plan. Customized files and settings count as present. */
 export interface StarterKitStatus {
 	pending: number;

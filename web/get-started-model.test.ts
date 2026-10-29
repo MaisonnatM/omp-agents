@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type GetStartedFacts, getStartedSurface } from "./get-started-model";
+import { firstSessionFact, type GetStartedFacts, getStartedSurface, type SessionFacts } from "./get-started-model";
 
 const fresh: GetStartedFacts = { route: false, vacantHome: true, dismissed: false, minimized: false, requiredDone: false, settled: true };
 
@@ -27,5 +27,27 @@ describe("getStartedSurface", () => {
 
 	test("#get-started opens the dialog even after dismissal or completion", () => {
 		expect(getStartedSurface({ ...fresh, route: true, dismissed: true, requiredDone: true, vacantHome: false })).toBe("dialog");
+	});
+});
+
+describe("firstSessionFact", () => {
+	const empty: SessionFacts = { hosts: 0, past: 0, listed: true, connected: true, rosterError: null };
+
+	test("any live or past session settles it, even while the roster fails or the connection is down", () => {
+		expect(firstSessionFact({ ...empty, hosts: 1, rosterError: "boom", connected: false })).toEqual({ kind: "known", value: true });
+		expect(firstSessionFact({ ...empty, past: 2, listed: false })).toEqual({ kind: "known", value: true });
+	});
+
+	test("an empty roster that answered over a live connection means no session yet", () => {
+		expect(firstSessionFact(empty)).toEqual({ kind: "known", value: false });
+	});
+
+	test("an empty roster is still checking until it answers", () => {
+		expect(firstSessionFact({ ...empty, listed: false })).toEqual({ kind: "checking" });
+	});
+
+	test("a roster error or a lost connection makes it unavailable, the roster error first", () => {
+		expect(firstSessionFact({ ...empty, rosterError: "registry unreadable", connected: false })).toEqual({ kind: "unavailable", message: "registry unreadable" });
+		expect(firstSessionFact({ ...empty, connected: false })).toEqual({ kind: "unavailable", message: "Waiting for the dashboard to reconnect before checking sessions." });
 	});
 });
