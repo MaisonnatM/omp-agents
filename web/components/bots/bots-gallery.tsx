@@ -1,22 +1,33 @@
-/** `BotsGallery`, the `#bots` page: each Bot as a card with its face, name, job's first sentence, and how it stands, then a card that makes a new one. */
+/** `BotsGallery`, the `#bots` page: each Bot as a card with its face, name, job's first sentence, and how it stands, under Pinned, its section, or Other Bots once any Bot is pinned or in one, then a card that makes a new one. */
 import { Plus } from "lucide-react";
+import { useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { botAsking, botRoutines, botStatus, type BotRow, jobLine } from "../../bots-model";
+import { botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, botRoutines, botSections, botsGrouped, botStatus, type BotRow, jobLine } from "../../bots-model";
 import { mailTime } from "../../labels";
 import { hashForBots, hashForNewBot } from "../../routing";
 import { PageFrame } from "../list-page";
 import { BotAvatar } from "./bot-avatar";
+import { BotMenu, type SectionNaming, SectionNameDialog } from "./bot-menu";
 
 const CARD = "flex min-h-52 flex-col items-center gap-2 rounded-xl border border-border p-5 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-function BotCard({ row: { bot, host, unread, at }, routineCount }: { row: BotRow; routineCount: number }) {
+const GRID = "grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4";
+
+interface BotCardProps {
+	row: BotRow;
+	routineCount: number;
+	sections: readonly string[];
+	onName: (naming: SectionNaming) => void;
+}
+
+function BotCard({ row: { bot, host, unread, at }, routineCount, sections, onName }: BotCardProps) {
 	const asking = botAsking(host);
 	const tagline = jobLine(bot.job);
 	const routinesWords = routineCount === 0 ? null : routineCount === 1 ? "1 routine" : `${routineCount} routines`;
 	return (
-		<li>
+		<BotMenu bot={bot} sections={sections} onName={onName} render={<li />}>
 			<a href={hashForBots(bot.id)} className={cn(CARD, "h-full bg-card hover:bg-accent/50")}>
 				<span className="relative">
 					<BotAvatar look={bot} size="hero" working={host?.status === "working"} asking={asking !== null} />
@@ -38,6 +49,20 @@ function BotCard({ row: { bot, host, unread, at }, routineCount }: { row: BotRow
 					</time>
 				</span>
 			</a>
+		</BotMenu>
+	);
+}
+
+function NewBotCard() {
+	return (
+		<li>
+			<a href={hashForNewBot()} className={cn(CARD, "h-full justify-center border-dashed text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
+				<span className="flex size-16 items-center justify-center rounded-full border border-dashed border-current">
+					<Plus aria-hidden className="size-6" />
+				</span>
+				<span className="font-medium">New Bot</span>
+				<span className="text-sm text-pretty">Start from a job, or write your own.</span>
+			</a>
 		</li>
 	);
 }
@@ -49,6 +74,12 @@ interface BotsGalleryProps {
 }
 
 export function BotsGallery({ rows, routines }: BotsGalleryProps) {
+	const [naming, setNaming] = useState<SectionNaming | null>(null);
+	const bots = rows?.map(({ bot }) => bot) ?? [];
+	const sections = botSections(bots);
+	const cards = (list: readonly BotRow[]) =>
+		list.map(row => <BotCard key={row.bot.id} row={row} routineCount={botRoutines(routines, row.bot.id).length} sections={sections} onName={setNaming} />);
+	const groups = rows !== null && botsGrouped(bots) ? botGroups(rows) : null;
 	return (
 		<PageFrame
 			title="Bots"
@@ -61,22 +92,25 @@ export function BotsGallery({ rows, routines }: BotsGalleryProps) {
 		>
 			{rows === null ? (
 				<p className="px-6 py-6 text-sm text-muted-foreground">Loading your Bots…</p>
-			) : (
-				<ul aria-label="Bots" className="mx-auto grid w-full max-w-5xl grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4 px-6 py-6">
-					{rows.map(row => (
-						<BotCard key={row.bot.id} row={row} routineCount={botRoutines(routines, row.bot.id).length} />
-					))}
-					<li>
-						<a href={hashForNewBot()} className={cn(CARD, "h-full justify-center border-dashed text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
-							<span className="flex size-16 items-center justify-center rounded-full border border-dashed border-current">
-								<Plus aria-hidden className="size-6" />
-							</span>
-							<span className="font-medium">New Bot</span>
-							<span className="text-sm text-pretty">Start from a job, or write your own.</span>
-						</a>
-					</li>
+			) : groups === null ? (
+				<ul aria-label="Bots" className={cn(GRID, "mx-auto w-full max-w-5xl px-6 py-6")}>
+					{cards(rows)}
+					<NewBotCard />
 				</ul>
+			) : (
+				<div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-6">
+					{groups.map((group, index) => (
+						<section key={botGroupKey(group)} className="flex flex-col gap-3">
+							<h2 className="text-sm font-semibold text-muted-foreground">{botGroupLabel(group)}</h2>
+							<ul aria-label={botGroupListName(group)} className={GRID}>
+								{cards(group.rows)}
+								{index === groups.length - 1 && <NewBotCard />}
+							</ul>
+						</section>
+					))}
+				</div>
 			)}
+			{naming && <SectionNameDialog naming={naming} onClose={() => setNaming(null)} />}
 		</PageFrame>
 	);
 }

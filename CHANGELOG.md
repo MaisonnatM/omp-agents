@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-30
 
+- You can pin a Bot to keep it at the top of the Bots tab and the gallery: right-click it and choose Pin.
+- You can group your Bots into sections: right-click a Bot, choose Move to section, then New section.
+- A section's menu in the Bots tab renames it or removes it, and you can fold any group of Bots.
 - Behind the scenes: the starter kit's guide now names a reply's three parts the way the agent writes them, so it no longer confuses new readers.
 - Fixed: a session on a Cursor model asks you its questions with the question form instead of in plain text, because the starter kit now points it to omp's question tool.
 - Cmd+W now ends the focused session, in place of Cmd+Shift+X.

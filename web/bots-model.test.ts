@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Routine } from "../src/routines";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import type { RosterHost } from "../src/shared/sessions";
-import { botHost, botRows, botsNeedingYou, botStatus, botView, jobLine, memoryEntries, openBot, starterPrompts } from "./bots-model";
+import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, jobLine, memoryEntries, openBot, starterPrompts } from "./bots-model";
 import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
@@ -115,5 +115,26 @@ describe("Bots", () => {
 			{ date: null, fact: "plain line" },
 		]);
 		expect(memoryEntries("")).toEqual([]);
+	});
+
+	test("the Bots list as Pinned, then each section by name, then Other Bots, each most recent first, and as one list until any is pinned or in a section", () => {
+		const placed = (id: string, at: number, pinned: boolean, section: string | null): BotRow => ({
+			bot: { ...bot(null), id: id as BotId, name: id, pinned, section },
+			host: null,
+			unread: false,
+			preview: "",
+			at,
+		});
+		const rows = [placed("ana", 9, false, "Work"), placed("bo", 8, true, "Work"), placed("cy", 7, false, null), placed("di", 6, false, "Chores"), placed("ed", 5, false, "Work"), placed("fay", 4, true, null)];
+		expect(botGroups(rows).map(group => [botGroupKey(group), botGroupLabel(group), botGroupListName(group), group.rows.map(({ bot }) => bot.name)])).toEqual([
+			["pinned", "Pinned", "Pinned Bots", ["bo", "fay"]],
+			["section:Chores", "Chores", "Chores Bots", ["di"]],
+			["section:Work", "Work", "Work Bots", ["ana", "ed"]],
+			["rest", "Other Bots", "Other Bots", ["cy"]],
+		]);
+		expect(botSections(rows.map(({ bot }) => bot))).toEqual(["Chores", "Work"]);
+		expect(botsGrouped(rows.map(({ bot }) => bot))).toBe(true);
+		expect(botsGrouped([placed("cy", 7, false, null).bot])).toBe(false);
+		expect(botGroups([placed("cy", 7, false, null)]).map(botGroupKey)).toEqual(["rest"]);
 	});
 });

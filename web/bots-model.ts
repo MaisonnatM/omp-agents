@@ -133,6 +133,48 @@ export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], last
 		.sort((a, b) => b.at - a.at || a.bot.name.localeCompare(b.bot.name));
 }
 
+/** A group the Bots tab and the gallery list: the pinned Bots, one section's, or the Bots in neither. */
+export type BotGroup = { kind: "pinned"; rows: BotRow[] } | { kind: "section"; name: string; rows: BotRow[] } | { kind: "rest"; rows: BotRow[] };
+
+/** `rows` grouped: Pinned, then each section by name, then the rest, each in `rows`' order; a group with no row drops. */
+export function botGroups(rows: readonly BotRow[]): BotGroup[] {
+	const pinned: BotRow[] = [];
+	const sections = new Map<string, BotRow[]>();
+	const rest: BotRow[] = [];
+	for (const row of rows) {
+		const { section } = row.bot;
+		if (row.bot.pinned) pinned.push(row);
+		else if (section === null) rest.push(row);
+		else sections.set(section, [...(sections.get(section) ?? []), row]);
+	}
+	const named = [...sections].sort(([a], [b]) => a.localeCompare(b)).map(([name, rows]): BotGroup => ({ kind: "section", name, rows }));
+	return [...(pinned.length > 0 ? [{ kind: "pinned", rows: pinned } as const] : []), ...named, ...(rest.length > 0 ? [{ kind: "rest", rows: rest } as const] : [])];
+}
+
+/** The Bots list in groups once any of them is pinned or in a section; until then, as one list. */
+export const botsGrouped = (bots: readonly Bot[]): boolean => bots.some(bot => bot.pinned || bot.section !== null);
+
+/** Every section a Bot names, a pinned one's too, sorted by name. */
+export const botSections = (bots: readonly Bot[]): string[] => [...new Set(bots.flatMap(bot => bot.section ?? []))].sort((a, b) => a.localeCompare(b));
+
+/** What a group's header reads. */
+export function botGroupLabel(group: BotGroup): string {
+	switch (group.kind) {
+		case "pinned":
+			return "Pinned";
+		case "section":
+			return group.name;
+		case "rest":
+			return "Other Bots";
+	}
+}
+
+/** What a group's list is called for a screen reader. */
+export const botGroupListName = (group: BotGroup): string => (group.kind === "rest" ? botGroupLabel(group) : `${botGroupLabel(group)} Bots`);
+
+/** A group's key, for React and for the collapsed groups the Bots tab stores. */
+export const botGroupKey = (group: BotGroup): string => (group.kind === "section" ? `section:${group.name}` : group.kind);
+
 /** How many of `rows` need you: their running session asks you something, or ended a turn you have not read. */
 export const botsNeedingYou = (rows: readonly BotRow[]): number => rows.filter(({ host }) => host !== null && needsYou(host)).length;
 
