@@ -4,7 +4,7 @@ import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboar
 import { checkoutDir, worktreeAt } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
-import { keptSessions, PLAIN_LAUNCH, type RpcLaunch } from "../omp/rpc";
+import { keptSessions, type RpcLaunch } from "../omp/rpc";
 import { prepareReplay } from "../replay";
 import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
@@ -137,7 +137,7 @@ export function createStarter(env: StartEnv): Starter {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
-				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, PLAIN_LAUNCH, emit));
+				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, rpcLaunch, emit));
 			}
 			case "replay": {
 				const source = env.pathFor(request.view);

@@ -165,13 +165,19 @@ export class Bots {
 		return join(this.#deps.paths.botsDir, id, "memory.md");
 	}
 
+	/** The Bot whose conversation `request` starts or resumes, `null` for none: a new session that names a Bot, or the resume of a Bot's conversation. */
+	botOf(request: StartRequest): BotId | null {
+		if (request.kind === "new") return request.bot;
+		return request.kind === "resume" ? (this.list.find(bot => bot.sessionId === request.sessionId)?.id ?? null) : null;
+	}
+
 	/**
-	 * How `request` joins the server: a new session that names a Bot, or the resume of a Bot's conversation, launches with
-	 * the Bot extension, and a PR shepherd's with the shepherd extension too, and binds the Bot to the session once it is
-	 * live. Any other start launches plain.
+	 * How `request` joins the server: a Bot's conversation ({@link botOf}) launches with the Bot extension, and a PR
+	 * shepherd's with the shepherd extension too, and binds the Bot to the session once it is live. Any other start
+	 * launches plain.
 	 */
 	join(request: StartRequest): SessionJoin {
-		const id = request.kind === "new" ? request.bot : request.kind === "resume" ? this.list.find(bot => bot.sessionId === request.sessionId)?.id : undefined;
+		const id = this.botOf(request);
 		if (!id) return { rpc: PLAIN_LAUNCH, attach() {} };
 		const { extension, botsFile, botInboxDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir } = this.#deps.paths;
 		const shepherd = this.list.find(bot => bot.id === id)?.kind === "pr-shepherd";

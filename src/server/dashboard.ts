@@ -86,6 +86,7 @@ import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
 import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
+import { SessionMoves } from "./session-moves";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
@@ -132,6 +133,11 @@ export class Dashboard {
 	});
 	readonly #botsFile = new BotsFile(botsFile);
 	readonly #bots: Bots;
+	readonly #moves = new SessionMoves({
+		session: instanceId => this.#sessions.started(instanceId),
+		isBot: request => this.#bots.botOf(request) !== null,
+		note: (instanceId, text) => this.#views.note(instanceId, null, "error", text),
+	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
 	readonly #calendars = new CalendarsFile(calendarsFile);
@@ -771,6 +777,7 @@ export class Dashboard {
 				return;
 			case "event":
 				this.#views.applyEvent(instanceId, update.event);
+				this.#moves.heard(instanceId, update.event);
 				return;
 			case "starting":
 				this.#views.starting(instanceId);
@@ -783,6 +790,7 @@ export class Dashboard {
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#reviewDrafts.exited(instanceId);
+				this.#moves.exited(instanceId);
 				// Its last turn may have remembered something.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
@@ -821,6 +829,7 @@ export class Dashboard {
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
+				this.#moves.turnEnded(instanceId);
 				return;
 			}
 			default: {
@@ -840,9 +849,9 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain. */
+	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's can move itself. */
 	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request)];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
