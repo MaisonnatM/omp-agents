@@ -2,7 +2,6 @@
 import { Plus, Repeat, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
-import type { AnalyticsSession } from "../../../src/shared/analytics";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -13,15 +12,15 @@ import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../
 import { PAGE_ICON } from "../../page-icons";
 import { hashForBotRoutine, hashForBots } from "../../routing";
 import { age } from "../../labels";
-import { useRead } from "../../reads";
+import { sessionUsageStore } from "../../reads";
 import { runWords, startsWords } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
-import { DetailsSidebarFrame } from "../details-sidebar-frame";
+import { DetailsEmpty, DetailsSidebarFrame } from "../details-sidebar-frame";
+import { LoadNote } from "../sheet-details";
 import { ticketsTabs } from "../session-details";
 import { TEXT_AREA } from "../form-field";
 import { RunDot } from "../routines/routine-marks";
-import { compact, dollars, full } from "../settings/analytics-format";
-import { percent } from "../settings/table";
+import { compact, dollars, full, percent } from "../settings/analytics-format";
 import { BotAvatar } from "./bot-avatar";
 import { BotLookPicker } from "./bot-look-picker";
 
@@ -193,7 +192,7 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 				<a
 					href={hashForBotRoutine(bot.id, { kind: "list" })}
 					aria-current={open.kind === "list" ? "page" : undefined}
-					className="rounded-sm text-xs font-medium text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:text-foreground"
+					className="rounded-sm text-xs font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:text-muted-foreground"
 				>
 					All routines
 				</a>
@@ -210,7 +209,7 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 				)}
 			</div>
 			{routines.length === 0 ? (
-				<p className="text-xs text-muted-foreground">No routine yet. A routine messages {bot.name} or runs a command in its workspace on its schedules, its triggers, or both.</p>
+				<DetailsEmpty icon={Repeat} title="No routine yet" description={`A routine messages ${bot.name} or runs a command in its workspace on its schedules, its triggers, or both.`} />
 			) : (
 				<ul className="space-y-1.5">
 					{routines.map(routine => {
@@ -241,48 +240,45 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 	);
 }
 
-/** How often the usage is read again while the Bot works, so a running turn's requests show as they land. */
-const LIVE_USAGE_MS = 5_000;
+function Muted({ children }: { children: ReactNode }) {
+	return <p className="text-xs text-muted-foreground">{children}</p>;
+}
 
-/** What the Bot's conversation used over all time, its subagents folded in, read again every few seconds while it works and when a turn ends. */
+/** What the Bot's conversation used over all time, its subagents folded in. */
 function BotUsage({ bot, host }: { bot: Bot; host: RosterHost | null }) {
 	const id = useId();
-	const working = host?.status === "working";
-	const [tick, setTick] = useState(0);
-	useEffect(() => {
-		if (!working) return;
-		const timer = setInterval(() => setTick(n => n + 1), LIVE_USAGE_MS);
-		return () => clearInterval(timer);
-	}, [working]);
-	const { data: session, error, settled } = useRead<AnalyticsSession | null>(bot.sessionId === null ? null : `/api/analytics/session?${new URLSearchParams({ session: bot.sessionId })}`, `${host?.status}:${tick}`);
-	const muted = (text: string) => <p className="text-xs text-muted-foreground">{text}</p>;
-	let body: ReactNode;
-	if (session) {
-		const { usage, subagentTokens } = session;
-		const { tokens } = usage;
-		body = (
-			<div className="space-y-0.5 tabular-nums">
-				<p className="text-lg font-semibold">
-					<span title={`${full.format(tokens.total)} tokens`}>{compact.format(tokens.total)} tokens</span>
-					<span className="text-muted-foreground"> · </span>
-					<span title="API list price, not your subscription bill">{dollars(usage.cost)}</span>
-				</p>
-				{muted(`${compact.format(tokens.input)} input · ${compact.format(tokens.output)} output · ${compact.format(tokens.cacheRead)} cache read · ${compact.format(tokens.cacheWrite)} cache write`)}
-				{muted(`${full.format(usage.requests)} ${usage.requests === 1 ? "request" : "requests"}${usage.failed > 0 ? `, ${full.format(usage.failed)} failed` : ""} · ${percent.format(usage.cacheRate)} cache hit rate`)}
-				{subagentTokens > 0 && muted(`${compact.format(subagentTokens)} tokens from subagents`)}
-			</div>
-		);
-	} else if (error) body = muted(`Cannot read usage: ${error}`);
-	else if (bot.sessionId === null || settled) body = muted("No requests yet.");
-	// Holds the numbers' height while they load, so Delete below does not jump.
-	else body = <div aria-hidden="true" className="h-16" />;
 	return (
-		<section aria-labelledby={id} className="space-y-2">
+		<section aria-labelledby={id} className="min-h-16 space-y-2">
 			<h3 id={id} className="text-xs font-medium text-muted-foreground">
 				Usage
 			</h3>
-			{body}
+			{bot.sessionId === null ? <Muted>No requests yet. Usage shows what {bot.name}'s conversation used once it replies.</Muted> : <SessionUsage bot={bot} sessionId={bot.sessionId} working={host?.status === "working"} />}
 		</section>
+	);
+}
+
+/** Read every few seconds while the Bot works, and once more when a turn ends so its last requests land. */
+function SessionUsage({ bot, sessionId, working }: { bot: Bot; sessionId: string; working: boolean }) {
+	const { read, error } = sessionUsageStore.usePolling(sessionId, working);
+	useEffect(() => {
+		if (!working) void sessionUsageStore.refresh(sessionId);
+	}, [sessionId, working]);
+	if (!read) return <LoadNote loading="Reading usage…" error={error && `Cannot read usage: ${error}`} />;
+	if (!read.data) return <Muted>No requests yet. Usage shows what {bot.name}'s conversation used once it replies.</Muted>;
+	const { usage, subagentTokens } = read.data;
+	const { tokens } = usage;
+	return (
+		<div className="space-y-0.5 tabular-nums">
+			<p className="text-base font-semibold">
+				<span title={`${full.format(tokens.total)} tokens`}>{compact.format(tokens.total)} tokens</span>
+				<span className="text-muted-foreground"> · </span>
+				{dollars(usage.cost)}
+			</p>
+			<Muted>{`${compact.format(tokens.input)} input · ${compact.format(tokens.output)} output · ${compact.format(tokens.cacheRead)} cache read · ${compact.format(tokens.cacheWrite)} cache write`}</Muted>
+			<Muted>{`${full.format(usage.requests)} ${usage.requests === 1 ? "request" : "requests"}${usage.failed > 0 ? `, ${full.format(usage.failed)} failed` : ""} · ${percent.format(usage.cacheRate)} cache hit rate`}</Muted>
+			{subagentTokens > 0 && <Muted>{`${compact.format(subagentTokens)} tokens from subagents`}</Muted>}
+			<Muted>Cost at API list price, not your subscription bill.</Muted>
+		</div>
 	);
 }
 

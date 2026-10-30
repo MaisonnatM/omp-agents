@@ -2,8 +2,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
-
 /** `wide` keeps a many-column table legible by scrolling it sideways on narrow screens; the first `textColumns` align to the start. */
 export function Table({ label, columns, textColumns = 1, wide = false, children }: { label: string; columns: string[]; textColumns?: number; wide?: boolean; children: ReactNode }) {
 	return (

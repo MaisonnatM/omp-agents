@@ -6,6 +6,7 @@ import type { Database } from "bun:sqlite";
 import type { Pricer } from "../foreign/usage";
 import type { AnalyticsRange } from "../shared/analytics";
 import type { CreditsSubject } from "../shared/notices";
+import { artifactsDir } from "../subagents";
 import type { StatsDashboard, StatsProviderPoint, StatsSync, StatsToolDashboard } from "./modules";
 import { catalog, rateLimit, statsAggregator, statsDb, statsLive, statsRollup } from "./modules";
 
@@ -116,7 +117,7 @@ export async function readStats(range: AnalyticsRange): Promise<StatsRead> {
 
 /** What one session file and its subagents' files used by model in `db`, over all time. */
 export function sessionRows(db: Database, file: string): SessionModelRow[] {
-	const subagents = file.endsWith(".jsonl") ? file.slice(0, -".jsonl".length) : file;
+	const subagents = artifactsDir(file);
 	return db.query<SessionModelRow, [string, string, string]>(ONE_SESSION_MODEL_ROWS).all(file, `${subagents}/`, `${subagents}0`);
 }
 
