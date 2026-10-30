@@ -76,13 +76,13 @@ Before tests or a review, screenshot what you built in the same state as the sav
 
 # Handing off a UI change
 
-In a thread about a prototype or a UI change, "live" means a running localhost URL the user can open, not a merge or a deploy.
+Outside a `/ship` session, in a thread about a prototype or a UI change, "live" means a running localhost URL the user can open, not a merge or a deploy.
 When a UI change or a prototype is ready to test, hand it off running:
 
-1. Start the project's dev server yourself as a named long-lived service: `bash` with `name` and `ready`, on the port the repository's docs name or a free one per the Test servers rule in `AGENTS.md`. Leave it running after the reply.
+1. Start the project's dev server yourself as a named long-lived service: `bash` with `name` and `ready`, on a port the Test servers rule in `~/.omp/agent/AGENTS.md` allows. Leave it running after the reply.
 2. Open that URL headless and screenshot the changed page in the state the user will check.
 3. `read` each screenshot before you show it. Retake one that is blank, white, cropped, still loading, or framed differently from the real page, such as extra padding around it.
-4. Show the checked screenshots with the reply. In an omp-agents dashboard session, also add its `review-pages` block, in the format its prompt gives, with the running server's URLs before the `Suggestions:` block.
+4. Show the checked screenshots with the reply, with the running server's URLs.
 
 # Subagent isolation
 
