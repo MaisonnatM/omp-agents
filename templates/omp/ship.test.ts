@@ -34,6 +34,8 @@ describe("ship command parsing", () => {
 		["gh pr ready 23 >/dev/null", [["23"]]],
 		["gh pr ready 314 2>&1", [["314"]]],
 		["gh pr ready 5 -R a/b", [["5", "--repo", "a/b"]]],
+		["gh pr -R a/b ready 5", [["5", "--repo", "a/b"]]],
+		["gh pr --repo=a/b ready 5 -R c/d", [["5", "--repo", "c/d"]]],
 		['rg "gh pr ready" f', []],
 		["cd x && gh pr ready 4", [["4"]]],
 		["gh pr ready 6 > out.txt 2> err.txt", [["6"]]],

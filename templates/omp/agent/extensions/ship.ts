@@ -2,10 +2,10 @@
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { commands } from "./shell/commands";
+import { commands, located, within } from "./shell/commands";
 import { quotaExhausted } from "./github/access";
 import { type GhCredential, GhRunner, rejectedCredential, TOKEN_VARIABLE } from "./github/runner";
 
@@ -199,9 +199,23 @@ function report(s: ShipState | undefined): string {
 	return lines.join("\n");
 }
 
-/** The arguments after `gh pr <sub>` when the command's words run it, else `undefined`. */
+/** The arguments of `gh pr <sub>` when the command's words run it, including any `-R` given before `<sub>`, else `undefined`. */
 export function ghPr(words: string[], sub: "create" | "ready"): string[] | undefined {
-	return words[0] === "gh" && words[1] === "pr" && words[2] === sub ? words.slice(3) : undefined;
+	if (words[0] !== "gh" || words[1] !== "pr") return undefined;
+	let i = 2;
+	while (/^(?:-R|--repo(?:=|$))/.test(words[i] ?? "")) i += words[i] === "-R" || words[i] === "--repo" ? 2 : 1;
+	return words[i] === sub ? [...words.slice(2, i), ...words.slice(i + 1)] : undefined;
+}
+
+/** The PR a `gt submit --publish` (or `gt ss -p`) puts live, the branch's, with an empty selector, and the directory it runs in from `dir` after gt's own flags such as `--cwd`; `undefined` when the words publish nothing. */
+function gtPublish(words: string[], dir: string | null): { selector: string[]; dir: string | null } | undefined {
+	if (words[0] !== "gt") return undefined;
+	let i = 1;
+	for (; words[i]?.startsWith("-"); i++) {
+		if (words[i] === "--cwd") dir = within(dir, words[++i]);
+		else if (words[i].startsWith("--cwd=")) dir = within(dir, words[i].slice(6));
+	}
+	return (words[i] === "submit" || words[i] === "ss") && words.slice(i + 1).some(a => a === "--publish" || a === "-p") ? { selector: [], dir } : undefined;
 }
 
 /** The `gh pr view` selector for `gh pr ready <args>`: its first positional (number, URL, or branch) and `--repo`; redirections and other flags drop. */
@@ -356,7 +370,7 @@ export default function ship(pi: ExtensionAPI) {
 		// A status recorded before the reviews were per stage is dropped; the next poll refetches it.
 		prStatus: prStatusSchema.optional().catch(undefined), updatedAt: z.string(),
 	});
-	const viewSchema = z.object({ body: z.string(), changedFiles: z.number().int(), files: z.array(z.object({ path: z.string() })) });
+	const viewSchema = z.object({ body: z.string(), changedFiles: z.number().int(), files: z.array(z.object({ path: z.string() })), url: z.string() });
 	let state: ShipState | undefined;
 	let lastRefresh = 0;
 	let lastSummary = "";
@@ -452,17 +466,21 @@ export default function ship(pi: ExtensionAPI) {
 		lastSummary = summary;
 	}
 
-	async function publishCheck(selector: string[], cwd: string, sessionDir: string): Promise<string | undefined> {
-		const r = await gh(["pr", "view", ...selector, "--json", "body,changedFiles,files"], cwd);
+	/** What the publish gate does with a PR: `theirs` is a PR of a repository the user cannot push to, such as an awesome list, which follows that project's process, not /ship. */
+	type Verdict = { kind: "block"; reason: string } | { kind: "theirs" } | { kind: "ask" };
+
+	/** The verdict on `command` putting live the PR `selector` names, read from `dir`, where it runs, whose checkout holds the review paths it is checked against. */
+	async function publishCheck(selector: string[], dir: string, command: string, sessionDir: string): Promise<Verdict> {
+		const r = await gh(["pr", "view", ...selector, "--json", "body,changedFiles,files,url"], dir);
 		if (r.code !== 0) {
 			const error = r.stderr.trim() || r.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {
-				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run each review stage the change needs, commit and push its fixes, add its box, and pass the ready gate before publishing.";
+				return { kind: "block", reason: "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run each review stage the change needs, commit and push its fixes, add its box, and pass the ready gate before publishing." };
 			}
 			const held = quotaExhausted(error) ? undefined : await runner.credentials(sessionDir);
 			const auth = held && authDiagnosis(held, dotenvFiles(sessionDir));
 			// gh's hint after its first line, `gh auth login`, cannot replace a token an environment variable holds, and the diagnosis names the fix.
-			return `Could not read the PR body to check its review and proof boxes: ${auth ? `${error.split("\n")[0]}. ${auth}` : error}`;
+			return { kind: "block", reason: `Could not read the PR body to check its review and proof boxes: ${auth ? `${error.split("\n")[0]}. ${auth}` : error}` };
 		}
 		let view: unknown;
 		try {
@@ -471,9 +489,20 @@ export default function ship(pi: ExtensionAPI) {
 			view = undefined;
 		}
 		const parsed = viewSchema.safeParse(view);
-		if (!parsed.success) return "Could not read the PR body and changed files to check its review and proof boxes: gh returned an unexpected answer.";
+		const pr = parsed.success ? parsed.data.url.match(/^https?:\/\/(([^/]+)\/([^/]+\/[^/]+))\/pull\/(\d+)/) : null;
+		if (!parsed.success || !pr) return { kind: "block", reason: "Could not read the PR body and changed files to check its review and proof boxes: gh returned an unexpected answer." };
+		const [, repository, host, name, number] = pr;
+		if ((await gh(["api", `repos/${name}`, "--hostname", host, "--jq", ".permissions.push"], dir)).stdout.trim() === "false") return { kind: "theirs" };
+		const local = (await gh(["repo", "view", "--json", "url", "-q", ".url"], dir)).stdout.trim().replace(/^https?:\/\//, "");
+		if (local.toLowerCase() !== repository.toLowerCase()) {
+			return {
+				kind: "block",
+				reason: `Blocked: ${repository}#${number} is checked against the review paths in a checkout of ${repository}, but ${command} runs in ${dir}, ${local ? `a checkout of ${local}` : "which gh resolves to no repository"}. Run it from a checkout of ${repository}: set the bash call's cwd to one, or cd there in the same command.`,
+			};
+		}
 		const { body, files, changedFiles } = parsed.data;
-		return publishBlocker(body, reviewsOf(body, files.map(file => file.path), changedFiles, checkoutReader(cwd)));
+		const reason = publishBlocker(body, reviewsOf(body, files.map(file => file.path), changedFiles, checkoutReader(dir)));
+		return reason ? { kind: "block", reason } : { kind: "ask" };
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -491,30 +520,26 @@ export default function ship(pi: ExtensionAPI) {
 		if (event.toolName !== "bash") return;
 		const input = event.input;
 		if (typeof input.command !== "string") return;
-		const cwd = typeof input.cwd === "string" ? input.cwd : ctx.cwd;
-		for (const words of commands(input.command)) {
+		for (const { words, dir } of located(input.command, typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd)) {
 			const create = ghPr(words, "create");
 			if (create && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
 				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the ready gate, and after each review its changed files call for." };
 			}
 			const ready = ghPr(words, "ready");
-			if (ready && !ready.includes("--undo")) {
-				const selector = prSelector(ready);
-				// A PR to someone else's repository, such as an awesome list, follows that project's process, not /ship.
-				const owner = selectorOwner(selector);
-				if (owner && otherOwner(owner, await resolveRepo(cwd))) continue;
-				const reason = await publishCheck(selector, cwd, ctx.cwd);
-				if (reason) return { block: true, reason };
-				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The PR passed the ship gate. Mark this draft ready for human review?"))) {
-					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
-				}
+			const live = ready && !ready.includes("--undo") ? { selector: prSelector(ready), dir } : gtPublish(words, dir);
+			if (!live) continue;
+			const command = `\`${words.join(" ")}\``;
+			if (/\bGH_(?:REPO|HOST)=/.test(input.command)) {
+				return { block: true, reason: `Blocked: this command sets GH_REPO or GH_HOST, which this gate cannot apply to its own read of the PR ${command} puts live. Name the repository with \`-R owner/name\` or a PR URL instead, then retry.` };
 			}
-			if (words[0] === "gt" && (words[1] === "submit" || words[1] === "ss") && words.some(a => a === "--publish" || a === "-p")) {
-				const reason = await publishCheck([], cwd, ctx.cwd);
-				if (reason) return { block: true, reason };
-				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The PR passed the ship gate. Publish it for human review?"))) {
-					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
-				}
+			if (live.dir === null) {
+				return { block: true, reason: `Blocked: ${command} puts a PR live from a directory this gate cannot locate, because a variable, a command substitution, or \`cd -\` names it. Write the directory out, as in \`cd /absolute/path && ...\`, or set the bash call's cwd, then retry.` };
+			}
+			const verdict = await publishCheck(live.selector, live.dir, command, ctx.cwd);
+			if (verdict.kind === "theirs") continue;
+			if (verdict.kind === "block") return { block: true, reason: verdict.reason };
+			if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", `The PR passed the ship gate. ${ready ? "Mark this draft ready" : "Publish it"} for human review?`))) {
+				return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
 			}
 		}
 	});
