@@ -60,15 +60,18 @@ export async function repositoriesOf(cwds: readonly string[]): Promise<string[]>
 	return [...new Set(mains.filter(main => main !== null).filter(main => !inTempDir(main)))];
 }
 
+/** Whether `bin` is on the current `PATH`; `Bun.which` alone searches the one this process started with. */
+const installed = (bin: string): boolean => Bun.which(bin, { PATH: process.env.PATH }) !== null;
+
 export async function githubStatus(): Promise<ProviderStatus> {
-	if (!Bun.which("gh")) return { provider: "github", state: "missing", account: null };
+	if (!installed("gh")) return { provider: "github", state: "missing", account: null };
 	const { stdout, code } = await run(["gh", "api", "user", "--jq", ".login"]);
 	return code === 0 && stdout.trim() ? { provider: "github", state: "signed-in", account: stdout.trim() } : { provider: "github", state: "signed-out", account: null };
 }
 
 /** `gt auth --token` saves the token in Graphite's user config. */
 async function graphiteStatus(): Promise<ProviderStatus> {
-	if (!Bun.which("gt")) return { provider: "graphite", state: "missing", account: null };
+	if (!installed("gt")) return { provider: "graphite", state: "missing", account: null };
 	const config = await readFile(join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "graphite", "user_config"), "utf8").then(
 		text => JSON.parse(text) as unknown,
 		() => null,
@@ -79,7 +82,7 @@ async function graphiteStatus(): Promise<ProviderStatus> {
 
 /** Signs `gt` in with `token`, as `gt auth --token` does; an error never holds the token. */
 export async function signInGraphite(token: string): Promise<void> {
-	if (!Bun.which("gt")) throw new Error("gt is not installed");
+	if (!installed("gt")) throw new Error("gt is not installed");
 	await runChecked(["gt", "auth", "--no-interactive", "--token", token], { timeoutMs: FETCH_TIMEOUT_MS }).catch((err: unknown) => {
 		throw new Error(errorText(err).replaceAll(token, "<token>"));
 	});
