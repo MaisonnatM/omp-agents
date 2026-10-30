@@ -31,7 +31,7 @@ const RULES = [
 	`\`${FIX_TOOL}\` starts one session on a pull request's branch that repairs it: ${SHEPHERD_FIXES.join(", ")}. Each session is its own conversation, so you do not do the fix yourself.`,
 	`\`${MERGE_TOOL}\` hands a pull request to the dashboard's merge queue, which merges it once its checks pass.`,
 	`The dashboard refuses a pull request the user did not write, one that is not approved, or one a session already works on; it starts each fix at most ${MAX_FIXES_PER_PULL_REQUEST} times per pull request, and queues a merge only when the head has the same diff as a commit a reviewer approved.`,
-	"Both tools only leave a request; when the dashboard refuses one, it tells you why in this conversation.",
+	"Both tools only leave a request; when the dashboard refuses one, it tells you why in this conversation. Then tell the user, and do not ask again for that pull request until a routine run names it again.",
 ].join("\n");
 
 export default function shepherdExtension(pi: BotExtensionApi): void {

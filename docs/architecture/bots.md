@@ -66,7 +66,7 @@ The shepherd extension adds its rules to the main agent's system prompt and regi
 `queue_merge` takes `owner`, `repo`, `number`, and an optional `method`, `squash` when left out.
 Each checks the pull request's name with `parsePullRequest` and writes one `ShepherdRequest` into `shepherd-inbox/` as the routine tools write theirs.
 
-`ShepherdInbox` in `src/server/shepherd-inbox.ts` drains it on the server that owns the lock.
+`ShepherdInbox` in `src/server/shepherd-inbox.ts` drains it on the server that owns the lock, one request at a time through a `SerialLane`, so a second ask for the same fix sees the session the first one started.
 It sets aside a file that is no request, or one from a Bot that is gone or is not a shepherd.
 It reads the pull requests fresh with `loadPullRequests` over the known workspaces, finds the one the request names, and asks `shepherdRefusal`, which refuses a pull request you did not write, a draft or a merged one, one that is not approved, and one a running session works on (`agentOn`).
 A fix is refused too when its action no longer applies (`pullRequestActions`), or once it started `MAX_FIXES_PER_PULL_REQUEST`, 2, times on that pull request since the server started; otherwise the inbox starts `newSessionRequest` in the repository's first workspace with the action's prompt, its branch as a `work` branch, and the pull request as its subject, as the page's quick action does.

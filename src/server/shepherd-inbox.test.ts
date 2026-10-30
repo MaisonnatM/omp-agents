@@ -53,15 +53,17 @@ function inbox({ listed = pr(), working = false, unapproved = null as string | n
 	dirs.push(dir);
 	const inboxDir = join(dir, "shepherd-inbox");
 	mkdirSync(inboxDir);
-	const state = { listed };
+	const state = { listed, busy: false };
 	const started: StartRequest[] = [];
 	const queued: MergeQueueChange[] = [];
 	const told: string[] = [];
 	const box = new ShepherdInbox(inboxDir, {
 		bots: () => [shepherd, helper],
 		pullRequests: async () => ({ repos: [{ owner: "acme", repo: "webapp", cwds: ["/code/webapp"], pullRequests: [state.listed] }], unmatched: [] }),
-		agent: () => () => (working ? "working" : null),
+		agent: () => () => (working || state.busy ? "working" : null),
 		start: async request => {
+			await Promise.resolve();
+			state.busy = true;
 			started.push(request);
 			return { ok: true, instanceId: `i${started.length}`, workspace: "/code/webapp", prompt: null };
 		},
@@ -75,13 +77,15 @@ function inbox({ listed = pr(), working = false, unapproved = null as string | n
 		await box.drain();
 	};
 	const left = () => readdirSync(inboxDir);
-	return { send, started, queued, told, left, state, inboxDir };
+	return { send, started, queued, told, left, state, inboxDir, drainAll: () => box.drain(), finish: () => void (state.busy = false) };
 }
 
 test("a fix starts its quick action's session on the pull request's branch, linked to it, and a third start of the same fix is refused", async () => {
-	const { send, started, told, left } = inbox();
+	const { send, started, told, left, finish } = inbox();
 	await send(fixCi);
+	finish();
 	await send(fixCi);
+	finish();
 	await send(fixCi);
 	expect(started).toHaveLength(2);
 	expect(started[0]).toMatchObject({
@@ -94,6 +98,15 @@ test("a fix starts its quick action's session on the pull request's branch, link
 	});
 	expect(told).toEqual(["The dashboard did not start fix-ci on acme/webapp#7: fix-ci already ran 2 times on it."]);
 	expect(left()).toEqual([]);
+});
+
+test("two requests for the same fix dropped at once start one session, since the second sees the first one working", async () => {
+	const { started, told, inboxDir, drainAll } = inbox();
+	writeFileSync(join(inboxDir, "1-a.json"), JSON.stringify(fixCi));
+	writeFileSync(join(inboxDir, "1-b.json"), JSON.stringify(fixCi));
+	await drainAll();
+	expect(started).toHaveLength(1);
+	expect(told).toEqual(["The dashboard did not start fix-ci on acme/webapp#7: a session already works on it."]);
 });
 
 test("a fix is refused, and the Bot told why, for a pull request that is not approved, not yours, worked on, or without that problem", async () => {
