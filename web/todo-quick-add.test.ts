@@ -40,11 +40,12 @@ describe("parseQuickTodo", () => {
 
 describe("quickAddTodo", () => {
 	test("a parsed day and category override the place's, and the rest of the place stays", () => {
-		expect(quickAddTodo("Pay rent fri #work", categories, day, { afterId: "x", categoryId: "h", due: day })).toMatchObject({
+		expect(quickAddTodo("Pay rent fri #work", categories, day, { afterId: "x", categoryId: "h", workspace: "/code/app", due: day })).toMatchObject({
 			op: "add",
 			text: "Pay rent",
 			afterId: "x",
 			categoryId: "w",
+			workspace: "/code/app",
 			due: "2026-10-09",
 		});
 		expect(quickAddTodo("Pay rent", categories, day, { categoryId: "h", due: day })).toMatchObject({ categoryId: "h", due: day });

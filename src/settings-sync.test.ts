@@ -295,12 +295,12 @@ describe("SettingsSync", () => {
 		expect(await runChecked(["git", "--git-dir", remote, "show", "main:omp/AGENTS.md"])).toBe("From A.\n");
 	});
 
-	test("keeps the todos and notes two machines each added, carries the preferences and workspaces, and settles both on one list", async () => {
+	test("keeps the todos and notes two machines each added, carries the preferences, workspaces, and each todo's Workspace, and settles both on one list", async () => {
 		const { remote, a, b } = await pair();
 		const [notes, preferences, todos, workspaces] = ["notes", "preferences", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		await a.sync.sync();
 		await b.sync.sync();
-		a.todos.apply(addTodo({ id: "from-a", text: "From A" }));
+		a.todos.apply(addTodo({ id: "from-a", text: "From A", workspace: join(a.home, "code", "app") }));
 		a.notes.apply(addNote("note-a"));
 		a.preferences.apply({ op: "set", key: "omp-agents.theme", value: "dark" });
 		a.workspaces.apply({ op: "add", cwd: join(a.home, "code", "app") });
@@ -308,7 +308,7 @@ describe("SettingsSync", () => {
 		b.notes.apply(addNote("note-b"));
 
 		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [notes, preferences, todos, workspaces] });
-		expect(await runChecked(["git", "--git-dir", remote, "show", `main:${workspaces}`])).toContain('"~/code/app"');
+		for (const synced of [workspaces, todos]) expect(await runChecked(["git", "--git-dir", remote, "show", `main:${synced}`])).toContain('"~/code/app"');
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [notes, preferences, todos, workspaces], sent: [notes, todos] });
 		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [notes, todos], sent: [] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [] });
@@ -319,6 +319,7 @@ describe("SettingsSync", () => {
 		}
 		expect(b.preferences.value).toEqual({ "omp-agents.theme": "dark" });
 		expect(b.workspaces.value.added).toEqual([join(b.home, "code", "app")]);
+		expect(b.todos.value.todos.map(todo => todo.workspace)).toEqual([join(b.home, "code", "app"), null]);
 		expect([...b.changed].sort()).toEqual(["preferences", "user-notes", "user-todos", "workspaces"]);
 		expect([...a.changed].sort()).toEqual(["user-notes", "user-todos"]);
 	});

@@ -735,6 +735,59 @@ describe("user_todo optional due date", () => {
 	});
 });
 
+describe("user_todo Workspace", () => {
+	const root = mkdtempSync(join(tmpdir(), "todos-extension-"));
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+	const env = { XDG_CONFIG_HOME: join(root, "config"), HOME: root };
+	const config = join(root, "config", "omp-agents");
+	const inbox = join(config, "todo-inbox");
+	const app = join(root, "code", "app");
+	mkdirSync(app, { recursive: true });
+	mkdirSync(config, { recursive: true });
+	writeFileSync(
+		join(config, "todos.json"),
+		JSON.stringify({ todos: [{ id: "t1", text: "Ship the release", workspace: app, children: [{ id: "c1", text: "Tag it" }] }] }),
+	);
+	const call = (params: object) => exercise("todos", { run: true, params, cwd: root }, env);
+	const left = () => (existsSync(inbox) ? readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8"))) : []);
+	const clear = () => rmSync(inbox, { recursive: true, force: true });
+
+	test("add files a todo in the session's directory unless it names another, ~ allowed, or none", () => {
+		clear();
+		call({ action: "add", text: "Here" });
+		call({ action: "add", text: "There", workspace: "~/code/app" });
+		call({ action: "add", text: "Nowhere", workspace: "" });
+		expect(left().map(change => [change.text, change.workspace])).toEqual([
+			["Here", root],
+			["There", app],
+			["Nowhere", null],
+		]);
+	});
+
+	test("a Workspace that is no directory is refused and nothing is written", () => {
+		clear();
+		const added = call({ action: "add", text: "Lost", workspace: join(root, "gone") });
+		const edited = call({ action: "edit", id: "t1", text: "Renamed", workspace: join(root, "gone") });
+		expect([added.run.isError, added.text, edited.run.isError]).toEqual([true, `Not a directory: ${join(root, "gone")}`, true]);
+		expect(left()).toEqual([]);
+	});
+
+	test("edit sets or clears a top-level todo's Workspace and refuses one under another", () => {
+		clear();
+		call({ action: "edit", id: "t1", workspace: "code" });
+		call({ action: "edit", id: "t1", workspace: "" });
+		expect(call({ action: "edit", id: "c1", workspace: app }).run.isError).toBe(true);
+		expect(left()).toEqual([
+			{ op: "set-workspace", id: "t1", workspace: join(root, "code") },
+			{ op: "set-workspace", id: "t1", workspace: null },
+		]);
+	});
+
+	test("list names each todo's Workspace by its folder", () => {
+		expect(call({ action: "list" }).text?.split("\n").slice(0, 2)).toEqual(["- Ship the release (id t1, Workspace app)", "  - Tag it (id c1)"]);
+	});
+});
+
 describe("user_note", () => {
 	const root = mkdtempSync(join(tmpdir(), "notes-extension-"));
 	afterAll(() => rmSync(root, { recursive: true, force: true }));

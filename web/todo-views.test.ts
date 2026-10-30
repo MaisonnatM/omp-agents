@@ -13,6 +13,7 @@ const todo = (id: string, status: TodoStatus): UserTodo => ({
 	due: null,
 	createdAt: null,
 	categoryId: null,
+	workspace: null,
 	children: [],
 	links: [],
 	addedBy: null,

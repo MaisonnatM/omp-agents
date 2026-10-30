@@ -71,6 +71,7 @@ const todo = (fields: Partial<UserTodo>): UserTodo => ({
 	due: null,
 	createdAt: null,
 	categoryId: null,
+	workspace: null,
 	children: [],
 	links: [],
 	addedBy: null,
@@ -100,6 +101,11 @@ describe("todoStart", () => {
 		const prompt = message.t === "start" && message.kind === "new" ? message.prompt : "";
 		expect(prompt).toContain('Todo "Speed up the sidebar"');
 		expect(prompt).toContain("It lags when 200 sessions are listed.");
+	});
+
+	test("starts in the todo's Workspace when it has one, else in the directory it is given", () => {
+		expect(todoStart(todo({ workspace: "/code/app" }), "plan", "/tmp", null).cwd).toBe("/code/app");
+		expect(todoStart(todo({ workspace: null }), "plan", "/tmp", null).cwd).toBe("/tmp");
 	});
 });
 

@@ -22,6 +22,7 @@ const leaf = (id: string, text: string, doneAt: string | null = null): UserTodoL
 const todo = (id: string, text: string, fields: Partial<UserTodo> = {}): UserTodo => ({
 	...leaf(id, text),
 	categoryId: null,
+	workspace: null,
 	children: [],
 	links: [],
 	addedBy: null,

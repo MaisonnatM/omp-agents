@@ -82,6 +82,9 @@ export function earliestDue(todo: UserTodo): string | null {
 	return days.length === 0 ? null : days.reduce((a, b) => (a < b ? a : b));
 }
 
+/** Where a session for top-level `todo` starts: its Workspace, else `fallback`, the directory a new session would start in anyway. */
+export const todoCwd = (todo: Pick<UserTodo, "workspace">, fallback: string): string => todo.workspace ?? fallback;
+
 /**
  * The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first.
  * The lists that span categories leave out the todos of the categories in `hidden`; a category's own list shows them.

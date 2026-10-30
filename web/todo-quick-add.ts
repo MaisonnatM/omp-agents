@@ -43,13 +43,13 @@ export function parseQuickTodo(input: string, categories: readonly UserTodoCateg
 
 /**
  * The `add` of the todo typed as `text`, or `null` for no title. A recognized day or `#category` sets `due` or `categoryId`
- * over `place`'s own; a todo under another `parentId` joins its parent's category, so it takes no `#category`.
+ * over `place`'s own; a todo under another `parentId` joins its parent's category and Workspace, so it takes no `#category`.
  */
 export function quickAddTodo(
 	text: string,
 	categories: readonly UserTodoCategory[],
 	day: string,
-	place: { parentId?: string | null; afterId?: string | null; categoryId?: string | null; due?: string | null; status?: TodoStatus } = {},
+	place: { parentId?: string | null; afterId?: string | null; categoryId?: string | null; workspace?: string | null; due?: string | null; status?: TodoStatus } = {},
 ): Extract<UserTodoChange, { op: "add" }> | null {
 	const parsed = parseQuickTodo(text, place.parentId ? [] : categories, day);
 	if (!parsed) return null;

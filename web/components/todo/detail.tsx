@@ -1,21 +1,22 @@
-import { ChevronRight, Play, Plus, Ticket } from "lucide-react";
+import { ChevronRight, Folder, Play, Plus, Ticket } from "lucide-react";
 import { useContext, useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { TicketChoice, TodoTicketAnswer, TodoTicketRequest } from "../../../src/shared/tickets";
 import { addTodo } from "../../../src/user-todos";
 import { addNote } from "../../../src/user-notes";
+import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
-import { dayLabel } from "../../labels";
+import { dayLabel, folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type QuickItem, quickOn, todoActions, todoStart, type WorkActionId } from "../../quick-actions";
 import { hashForNewSession, hashForNotes } from "../../routing";
-import { categoryColor, TODO_STATUS, type TodoEntry } from "../../todo-views";
+import { categoryColor, TODO_STATUS, type TodoEntry, todoCwd } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoField } from "../../use-todo-keys";
 import { UserNotesContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -144,13 +145,49 @@ interface TodoDetailProps {
 	onPrevious?: () => void;
 	onNext?: () => void;
 	sessions: KnownSessions;
-	/** Where **Start session** opens the new-session draft. */
+	/** Where **Start session** opens the new-session draft of a todo with no Workspace. */
 	newSessionCwd: string;
+	/** The Workspaces the Workspace picker offers. */
+	workspaces: Workspace[];
 	linearConnected: boolean;
 }
 
+/** A property picker's button in the open todo's property row. */
+const PROPERTY_BUTTON = "h-7 shrink-0 justify-start border border-border px-2 text-[13px] font-normal text-foreground";
+
 function CategoryDot({ categoryId }: { categoryId: string | null }) {
 	return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(categoryId)] }} />;
+}
+
+/** A top-level todo's Workspace, where its sessions start: none, or a Workspace the sidebar lists. One it no longer lists stays a choice, as its path. */
+function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { todo: UserTodo; workspaces: Workspace[]; disabled: boolean; onChange: (change: UserTodoChange) => void }) {
+	const { workspace } = todo;
+	const offered = workspace === null || workspaces.some(({ cwd }) => cwd === workspace) ? workspaces : [...workspaces, { cwd: workspace, cwdDisplay: workspace }];
+	const current = workspace === null ? "No workspace" : (folderName(workspace) ?? workspace);
+	const choices: Choice[] = [
+		{ value: "", label: "No workspace" },
+		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <Folder aria-hidden className="size-3.5 text-muted-foreground" /> })),
+	];
+	return (
+		<FieldPicker
+			field="Workspace"
+			current={current}
+			trigger={
+				<>
+					<Folder aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+					<span className="truncate">{current}</span>
+				</>
+			}
+			className={PROPERTY_BUTTON}
+			choices={choices}
+			selected={[workspace ?? ""]}
+			disabled={disabled}
+			onPick={value => {
+				const next = value || null;
+				if (next !== workspace) onChange({ op: "set-workspace", id: todo.id, workspace: next });
+			}}
+		/>
+	);
 }
 
 /** A top-level todo's sub-todos: how many are done, a row per sub-todo with its own status and its priority when set, and a way to add one. */
@@ -259,7 +296,7 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 				))}
 				<Tooltip content="Open a new-session draft from this todo, to edit its prompt or pick its directory">
 					<Button variant={main === "draft" ? "primary" : actions.length > 0 ? "ghost" : "secondary"} size="compact" leadingIcon={Play} asChild>
-						<a href={hashForNewSession(newSessionCwd, todo.id)}>{sessionId === null ? "Start session" : "Start another session"}</a>
+						<a href={hashForNewSession(todoCwd(todo, newSessionCwd), todo.id)}>{sessionId === null ? "Start session" : "Start another session"}</a>
 					</Button>
 				</Tooltip>
 			</div>
@@ -311,7 +348,7 @@ function LinkedNotes({ todo }: { todo: UserTodo }) {
  * The open todo: a bar with where it sits and the way to its neighbours, then its title, its properties as pickers, its
  * notes, and for a top-level todo its sub-todos, agent, links, and when it was added.
  */
-export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChange, onOpen, onClose, onPrevious, onNext, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
+export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChange, onOpen, onClose, onPrevious, onNext, sessions, newSessionCwd, workspaces, linearConnected }: TodoDetailProps) {
 	const { todo } = open;
 	const top = open.parent === null ? open.todo : null;
 	const categoryId = (open.parent ?? open.todo).categoryId;
@@ -379,7 +416,7 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 									<span className="truncate">{category}</span>
 								</>
 							}
-							className="h-7 shrink-0 justify-start border border-border px-2 text-[13px] font-normal text-foreground"
+							className={PROPERTY_BUTTON}
 							choices={categoryChoices}
 							selected={[top.categoryId ?? ""]}
 							disabled={readOnly}
@@ -389,6 +426,7 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 							}}
 						/>
 					)}
+					{top && <TodoWorkspacePicker todo={top} workspaces={workspaces} disabled={readOnly} onChange={onChange} />}
 					<TodoDuePicker todo={todo} look="property" day={day} disabled={readOnly} {...pickerOf("due")} onChange={onChange} />
 				</div>
 				<NotesEditor key={todo.id} value={todo.body} label={`Notes of ${todo.text}`} readOnly={readOnly} onSave={body => onChange({ op: "edit-body", id: todo.id, body })} />

@@ -7,11 +7,16 @@ const CREATED = "2026-10-01T08:00:00.000Z";
 
 const leaf = (id: string): UserTodoLeaf => ({ id, text: id, body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: CREATED });
 
-const todo = (id: string, children: string[] = [], { done = false, categoryId = null }: { done?: boolean; categoryId?: string | null } = {}): UserTodo => ({
+const todo = (
+	id: string,
+	children: string[] = [],
+	{ done = false, categoryId = null, workspace = null }: { done?: boolean; categoryId?: string | null; workspace?: string | null } = {},
+): UserTodo => ({
 	...leaf(id),
 	status: done ? "done" : "todo",
 	doneAt: done ? AT : null,
 	categoryId,
+	workspace,
 	children: children.map(leaf),
 	links: [],
 	addedBy: null,
@@ -108,7 +113,31 @@ describe("applyUserTodo", () => {
 		);
 		const moved = { ...leaf("b"), text: "Bee", body: "# Notes\n\n- one", due: "2026-10-09", assignee: "agent" as const };
 		expect(edited.todos[0]!.children).toEqual([moved]);
-		expect(after(edited, { op: "outdent", id: "b" }).todos[1]).toEqual({ ...moved, categoryId: null, children: [], links: [], addedBy: null });
+		expect(after(edited, { op: "outdent", id: "b" }).todos[1]).toEqual({ ...moved, categoryId: null, workspace: null, children: [], links: [], addedBy: null });
+	});
+
+	test("a new top-level todo keeps the Workspace it is given, and one under another takes none of its own", () => {
+		const list = after(listOf([], todo("a", [], { workspace: "/code/app" })), addTodo({ id: "n", workspace: "/code/site", text: "n", createdAt: CREATED }));
+		expect(list.todos.map(todo => todo.workspace)).toEqual(["/code/app", "/code/site"]);
+		expect(after(list, addTodo({ id: "c", parentId: "a", workspace: "/code/site", text: "c", createdAt: CREATED })).todos[0]!.children).toEqual([leaf("c")]);
+	});
+
+	test("set-workspace sets and clears a top-level todo's Workspace, and leaves a todo under another to its parent's", () => {
+		const list = listOf([], todo("a", ["a1"]));
+		const set = after(list, { op: "set-workspace", id: "a", workspace: "/code/app" });
+		expect(set.todos[0]!.workspace).toBe("/code/app");
+		expect(after(set, { op: "set-workspace", id: "a", workspace: null }).todos[0]!.workspace).toBeNull();
+		expect(after(set, { op: "set-workspace", id: "a1", workspace: "/code/site" })).toBe(set);
+		expect(after(set, { op: "set-workspace", id: "a", workspace: "/code/app" })).toBe(set);
+	});
+
+	test("a todo under another shares its Workspace: outdent and clear-done give it the parent's, and indent drops its own for the new parent's", () => {
+		const list = listOf([], todo("a", ["a1", "a2"], { workspace: "/code/app" }), todo("b", [], { workspace: "/code/site" }));
+		expect(after(list, { op: "outdent", id: "a1" }).todos[1]).toMatchObject({ id: "a1", workspace: "/code/app" });
+		expect(after(list, check("a2"), { op: "clear-done", categoryId: null }).archive[0]).toMatchObject({ id: "a2", workspace: "/code/app" });
+		const indented = after(list, { op: "indent", id: "b" });
+		expect(shape(indented)).toBe("a(a1 a2 b)");
+		expect(after(indented, { op: "outdent", id: "b" }).todos[1]).toMatchObject({ id: "b", workspace: "/code/app" });
 	});
 
 	test("closing a top-level todo closes its open todos with the same status and time, keeps an earlier close, and reopening it leaves them", () => {
@@ -288,6 +317,8 @@ describe("applyUserTodo", () => {
 			{ op: "outdent", id: "a" },
 			{ op: "clear-done", categoryId: null },
 			{ op: "categorize", id: "a", categoryId: "work" },
+			{ op: "set-workspace", id: "a", workspace: null },
+			{ op: "set-workspace", id: "gone", workspace: "/code/app" },
 			{ op: "move", id: "a", afterId: null, categoryId: "work" },
 			{ op: "move", id: "b", afterId: "a", categoryId: "work" },
 			{ op: "move", id: "a", afterId: "gone", categoryId: "work" },

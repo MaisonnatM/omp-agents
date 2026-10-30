@@ -162,7 +162,7 @@ test("a file link whose escapes do not decode drops its address instead of throw
 });
 
 test("a sent prompt draws its references as chips that open here, and code stays code", () => {
-	const todo: UserTodo = { id: "t1", text: "Tidy", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: "work", children: [], links: [], addedBy: null };
+	const todo: UserTodo = { id: "t1", text: "Tidy", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: "work", workspace: null, children: [], links: [], addedBy: null };
 	const prompt = (todos: UserTodoList | null) =>
 		renderToStaticMarkup(
 			<UserTodosContext.Provider value={todos}>

@@ -334,7 +334,12 @@ export class Dashboard {
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
-		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), { active: () => ownerLock.held });
+		/** The workspace directory `cwd` counts in, asking git when it was not asked about yet. */
+		const workspaceOf = async (cwd: string): Promise<string> => {
+			await placement.place([cwd], worktreeAt);
+			return placement.cwdOf(cwd);
+		};
+		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		this.#noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
 		this.#routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		this.#botInbox = new BotInbox(botInboxDir, () => this.#botsFile.value, change => lists.apply("bots", change), { active: () => ownerLock.held });
@@ -350,10 +355,7 @@ export class Dashboard {
 				return plan.blockers.length ? plan.blockers.map(blocker => blocker.message).join(" ") : plan.kind === "unreadable" ? "The checkout could not be inspected." : null;
 			},
 			onStarted: () => broadcasts.syncRoster(),
-			workspaceOf: async cwd => {
-				await placement.place([cwd], worktreeAt);
-				return placement.cwdOf(cwd);
-			},
+			workspaceOf,
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},

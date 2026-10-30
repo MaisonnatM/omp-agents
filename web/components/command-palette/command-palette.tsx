@@ -305,7 +305,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 
 	const items = useMemo((): PaletteItem[] => {
 		const createTodo = (): void => {
-			const change = todoCategories && quickAddTodo(search, todoCategories, localDay());
+			const change = todoCategories && quickAddTodo(search, todoCategories, localDay(), { workspace });
 			if (change) changeTodo(change);
 		};
 		const todoItem = (id: string, section: "fallback" | "createTodo", title: string, subtitle?: string): PaletteItem[] =>
@@ -354,7 +354,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, changeTodo, connected, notes, changeNote, linearConnected, onCreateTicket]);
+	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, workspace, changeTodo, connected, notes, changeNote, linearConnected, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;

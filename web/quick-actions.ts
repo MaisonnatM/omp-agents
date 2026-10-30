@@ -9,6 +9,7 @@ import type { NewSessionRequest, WorkItem } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { QuickOp, StartOf } from "./starts";
+import { todoCwd } from "./todo-views";
 
 /** The actions that tickets and todos share: work on it, or plan it first. */
 export type WorkActionId = "work" | "plan";
@@ -156,10 +157,10 @@ export const ticketStart = (ticket: Ticket, action: WorkActionId, cwd: string, s
 	skill,
 });
 
-/** The start of `action` on `todo`, in `cwd`, through the pinned `skill` when one is pinned. */
+/** The start of `action` on `todo`, in its Workspace or else `cwd`, through the pinned `skill` when one is pinned. */
 export const todoStart = (todo: UserTodo, action: WorkActionId, cwd: string, skill: string | null): QuickOp => ({
 	kind: "quick",
-	cwd,
+	cwd: todoCwd(todo, cwd),
 	branch: null,
 	prompt: TODO_RULES[action].prompt(todo),
 	subject: { kind: "todo", id: todo.id, text: todo.text, action },

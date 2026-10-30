@@ -18,7 +18,7 @@ const leaf = (id: string, text: string, status: TodoStatus): UserTodoLeaf => ({
 	due: null,
 	createdAt: null,
 });
-const todo = (fields: Partial<UserTodo>): UserTodo => ({ ...leaf("t1", "Fix login", "todo"), categoryId: null, children: [], links: [], addedBy: null, ...fields });
+const todo = (fields: Partial<UserTodo>): UserTodo => ({ ...leaf("t1", "Fix login", "todo"), categoryId: null, workspace: null, children: [], links: [], addedBy: null, ...fields });
 const ticket: Ticket = {
 	id: "ENG-7",
 	title: "Login page",

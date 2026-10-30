@@ -283,23 +283,31 @@ const NOTES_BY_ID: Carriage = {
 };
 
 /** Each todo once, where the list first holds it: a todo two machines moved to two places arrives in both. */
-const TODOS_ONCE: Carriage = {
-	portable: json => json,
-	local: json => {
+function todosOnce(json: unknown): unknown {
+	if (!isPlainObject(json)) return json;
+	const seen = new Set<unknown>();
+	const once = (todos: unknown): unknown =>
+		Array.isArray(todos)
+			? todos.flatMap(todo => {
+					if (!isPlainObject(todo)) return [todo];
+					if (seen.has(todo.id)) return [];
+					seen.add(todo.id);
+					return [Array.isArray(todo.children) ? { ...todo, children: once(todo.children) } : todo];
+				})
+			: todos;
+	return { ...json, todos: once(json.todos), archive: once(json.archive) };
+}
+
+/** Each top-level todo's Workspace, of the list and of the archive, named from `home`, and each todo once on the way back. */
+function todoCarriage(home: string): Carriage {
+	const workspaces = (json: unknown, path: (path: string, home: string) => string): unknown => {
 		if (!isPlainObject(json)) return json;
-		const seen = new Set<unknown>();
-		const once = (todos: unknown): unknown =>
-			Array.isArray(todos)
-				? todos.flatMap(todo => {
-						if (!isPlainObject(todo)) return [todo];
-						if (seen.has(todo.id)) return [];
-						seen.add(todo.id);
-						return [Array.isArray(todo.children) ? { ...todo, children: once(todo.children) } : todo];
-					})
-				: todos;
-		return { ...json, todos: once(json.todos), archive: once(json.archive) };
-	},
-};
+		const each = (todos: unknown): unknown =>
+			Array.isArray(todos) ? todos.map(todo => (isPlainObject(todo) && typeof todo.workspace === "string" ? { ...todo, workspace: path(todo.workspace, home) } : todo)) : todos;
+		return { ...json, todos: each(json.todos), archive: each(json.archive) };
+	};
+	return { portable: json => workspaces(json, portablePath), local: json => todosOnce(workspaces(json, localPath)) };
+}
 
 /** The page's preferences, `{}` while no page has handed the server any. */
 const PAGE_VALUES: Carriage = {
@@ -330,7 +338,7 @@ export function syncStores(files: SyncedFiles, home: string, changed: (list: Lis
 	return {
 		"source-control": sourceControlStore(files.sourceControl, home),
 		notes: fileStore(files.notes, () => changed("user-notes"), NOTES_BY_ID),
-		todos: fileStore(files.todos, () => changed("user-todos"), TODOS_ONCE),
+		todos: fileStore(files.todos, () => changed("user-todos"), todoCarriage(home)),
 		preferences: partsStore({ page: fileStore(files.preferences, () => changed("preferences"), PAGE_VALUES), processes: fileStore(files.processes) }),
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
 		// The Calendar page asks for its calendars again, and the server reads which are hidden as it answers.

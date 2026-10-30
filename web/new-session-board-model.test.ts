@@ -32,7 +32,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 
 const list = (pullRequests: PullRequestSummary[]): PullRequestList => ({ repos: [{ owner: "acme", repo: "webapp", cwds: ["/code/webapp"], pullRequests }], unmatched: [] });
 
-const todo = (id: string, status: UserTodo["status"]): UserTodo => ({ id, text: id, body: "", status, priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, children: [], links: [], addedBy: null });
+const todo = (id: string, status: UserTodo["status"]): UserTodo => ({ id, text: id, body: "", status, priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, workspace: null, children: [], links: [], addedBy: null });
 
 const past = (sessionId: string, fields: Partial<PastSession> = {}): PastSession => ({ sessionId, title: sessionId, cwd: "/code/webapp", cwdDisplay: "~/code/webapp", source: "omp", modifiedAt: 0, interrupted: false, ...fields }) as PastSession;
 

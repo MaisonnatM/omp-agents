@@ -20,10 +20,11 @@ import {
 	type UserTodoList,
 } from "./user-todos-shared";
 
-/** The longest todo title, category name, and id the server takes in a change, and the longest todo body. */
+/** The longest todo title, category name, and id the server takes in a change, the longest todo body, and the longest Workspace path. */
 export const MAX_TODO_TEXT = 2000;
 export const MAX_TODO_ID = 64;
 export const MAX_TODO_BODY = 100_000;
+export const MAX_TODO_WORKSPACE = 4096;
 
 const isTime = (value: unknown): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value));
 const isStatus = (value: unknown): value is TodoStatus => TODO_STATUSES.includes(value as TodoStatus);
@@ -39,19 +40,25 @@ interface Fields {
 	id: (value: unknown) => value is string;
 	text: (value: unknown) => value is string;
 	body: (value: unknown) => value is string;
+	workspace: (value: unknown) => value is string;
 }
 
 const isString = (value: unknown): value is string => typeof value === "string";
 
-const STORED: Fields = { id: isString, text: isString, body: isString };
+const STORED: Fields = { id: isString, text: isString, body: isString, workspace: isString };
 
 /** A todo or category id a change names: not blank, within `MAX_TODO_ID`. */
 export const isTodoId = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_TODO_ID;
+
+/** A Workspace a change names: an absolute path within `MAX_TODO_WORKSPACE`. Whether it exists is not checked here. */
+const isWorkspace = (value: unknown): value is string =>
+	typeof value === "string" && value.startsWith("/") && value.length <= MAX_TODO_WORKSPACE && !value.includes("\0");
 
 const SENT: Fields = {
 	id: isTodoId,
 	text: (value): value is string => typeof value === "string" && value.length <= MAX_TODO_TEXT,
 	body: (value): value is string => typeof value === "string" && value.length <= MAX_TODO_BODY,
+	workspace: isWorkspace,
 };
 
 export function parseTodoLink(value: unknown): UserTodoLink | null {
@@ -99,15 +106,15 @@ function parseLeaf(value: unknown, fields: Fields): UserTodoLeaf | null {
 	return { id, text, body, status: open && isClosed(status) ? "todo" : status, priority, assignee, doneAt: open ? null : doneAt, due, createdAt };
 }
 
-/** A top-level todo; one from before categories, links, or agents has none of them. */
+/** A top-level todo; one from before categories, links, agents, or Workspaces has none of them. */
 function parseTodo(raw: unknown, fields: Fields): UserTodo | null {
 	const todo = parseLeaf(raw, fields);
 	if (!todo || !isObject(raw)) return null;
 	const children = parseAll(raw.children, child => parseLeaf(child, fields));
 	const links = parseAll(raw.links ?? [], parseTodoLink);
-	const { categoryId = null, addedBy = null } = raw;
-	if (!children || !links || !isOptional(categoryId, fields.id) || !isOptional(addedBy, fields.id)) return null;
-	return { ...todo, categoryId, children, links, addedBy };
+	const { categoryId = null, workspace = null, addedBy = null } = raw;
+	if (!children || !links || !isOptional(categoryId, fields.id) || !isOptional(workspace, fields.workspace) || !isOptional(addedBy, fields.id)) return null;
+	return { ...todo, categoryId, workspace, children, links, addedBy };
 }
 
 function parseCategory(value: unknown): UserTodoCategory | null {
@@ -153,12 +160,12 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 	if (!isId(id)) return null;
 	switch (op) {
 		case "add": {
-			const { parentId, body = "", due = null, links = [], addedBy = null, status = "todo", priority = 0, assignee = null, createdAt = null } = value;
+			const { parentId, workspace = null, body = "", due = null, links = [], addedBy = null, status = "todo", priority = 0, assignee = null, createdAt = null } = value;
 			const parsed = parseAll(links, parseTodoLink);
-			if (!SENT.text(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId) || !SENT.body(body)) return null;
+			if (!SENT.text(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId) || !isOptional(workspace, isWorkspace) || !SENT.body(body)) return null;
 			if (!isOptional(due, isDay) || !isOptionalId(addedBy) || !parsed || !isStatus(status) || !isPriority(priority) || !isOptional(assignee, isAssignee)) return null;
 			if (!isOptional(createdAt, isTime)) return null;
-			return { op, id, parentId, afterId, categoryId, text, body, due, links: parsed, addedBy, status, priority, assignee, createdAt };
+			return { op, id, parentId, afterId, categoryId, workspace, text, body, due, links: parsed, addedBy, status, priority, assignee, createdAt };
 		}
 		case "edit":
 			return SENT.text(text) ? { op, id, text } : null;
@@ -181,6 +188,8 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 		}
 		case "categorize":
 			return isOptionalId(categoryId) ? { op, id, categoryId } : null;
+		case "set-workspace":
+			return isOptional(value.workspace, isWorkspace) ? { op, id, workspace: value.workspace } : null;
 		case "add-category":
 		case "rename-category":
 			return isNonEmpty(name) && SENT.text(name) ? { op, id, name } : null;

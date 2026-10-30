@@ -4,7 +4,7 @@ import { applyUserTodo } from "../../../src/user-todos";
 import type { TodoStatus, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
 import { hashForNewSession } from "../../routing";
 import { quickAddTodo } from "../../todo-quick-add";
-import { type ListKind, lastOf, restoreOf, type Section } from "../../todo-views";
+import { type ListKind, lastOf, restoreOf, type Section, todoCwd } from "../../todo-views";
 import { toasts } from "../toaster";
 import type { TodoKey } from "./input";
 
@@ -59,8 +59,10 @@ interface TodoEditingOptions {
 	onChange: (change: UserTodoChange) => void;
 	/** Todo `id` was deleted. */
 	onRemoved: (id: string) => void;
-	/** Where **Start session** opens the new-session draft. */
+	/** Where **Start session** opens the new-session draft of a todo with no Workspace. */
 	newSessionCwd: string;
+	/** The sidebar's Workspace, which a todo added here starts its sessions in; `null` under All workspaces. */
+	workspace: string | null;
 }
 
 /** Where a todo added right below `todo` goes, and its status: after it, in its status, as Linear adds one within a group. */
@@ -87,7 +89,7 @@ export interface TodoEditing {
 }
 
 /** The page's typing: which title or new todo has the input, what its keys do, and deleting with **Undo**. */
-export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, newSessionCwd }: TodoEditingOptions): TodoEditing {
+export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, newSessionCwd, workspace }: TodoEditingOptions): TodoEditing {
 	const [editing, setEditing] = useState<Editing>(NOT_EDITING);
 
 	/** Deletes todo `id` with the todos under it, and offers **Undo**, which puts it back where it was. */
@@ -107,14 +109,14 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 	 * Adds `text` as a todo; a trailing due day or `#category` sets that field instead of staying in the title. Returns
 	 * where the next draft goes: after the new todo, or in its place when the parsed fields move the todo out of this list.
 	 */
-	const add = (draft: Draft, text: string): { id: string; afterId: string | null } | null => {
+	const add = (draft: Draft, text: string): { id: string; afterId: string | null; workspace: string | null } | null => {
 		const { parentId, afterId, categoryId, status } = draft;
 		const dueToday = parentId === null && kind.add?.dueToday === true;
-		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId, status, due: dueToday ? day : null });
+		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId, workspace, status, due: dueToday ? day : null });
 		if (!change) return null;
 		onChange(change);
 		const leaves = change.categoryId !== categoryId || (dueToday && change.due !== null && change.due > day);
-		return { id: change.id, afterId: leaves ? afterId : change.id };
+		return { id: change.id, afterId: leaves ? afterId : change.id, workspace: change.workspace };
 	};
 
 	return {
@@ -138,11 +140,13 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 					commit(todo, text);
 					setEditing(text.trim() && kind.add ? { kind: "draft", parentId, ...below(todo), categoryId, text: "" } : NOT_EDITING);
 					return true;
-				case "start":
-					if (parentId !== null || !text.trim()) return false;
+				case "start": {
+					const top = parentId === null ? list.todos.find(({ id }) => id === todo.id) : undefined;
+					if (!top || !text.trim()) return false;
 					commit(todo, text);
-					location.hash = hashForNewSession(newSessionCwd, todo.id);
+					location.hash = hashForNewSession(todoCwd(top, newSessionCwd), todo.id);
 					return true;
+				}
 				case "escape":
 					setEditing(NOT_EDITING);
 					return true;
@@ -173,7 +177,7 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 					const added = add(draft, text);
 					if (!added) return false;
 					setEditing(NOT_EDITING);
-					location.hash = hashForNewSession(newSessionCwd, added.id);
+					location.hash = hashForNewSession(todoCwd(added, newSessionCwd), added.id);
 					return true;
 				}
 				case "escape":

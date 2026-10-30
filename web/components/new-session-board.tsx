@@ -12,7 +12,7 @@ import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { pullRequestsStore } from "../reads";
 import { hashForNewSession, hashForPullRequests, hashForTodo } from "../routing";
-import { TODO_STATUS } from "../todo-views";
+import { TODO_STATUS, todoCwd } from "../todo-views";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus, UserTodosContext } from "./dashboard-context";
 import { STATE_ICON } from "./pull-requests/avatars";
@@ -20,8 +20,8 @@ import { MoveBadge } from "./pull-requests/pr-row";
 import { DueText, StatusIcon } from "./todo/fields";
 
 interface Props {
-	/** The composer's directory, which a todo's session starts in. */
-	cwd: string | null;
+	/** The composer's directory, which a todo with no Workspace starts its session in. */
+	cwd: string;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** The sidebar's workspace, `null` for all, which scopes the sessions. */
@@ -51,7 +51,7 @@ export function NewSessionBoard({ cwd, hosts, past, workspace, note }: Props) {
 				<section aria-label="Pick up work" className="mx-auto grid w-full max-w-[1040px] grid-cols-1 rounded-[18px] bg-card/80 shadow-surface-3 backdrop-blur md:grid-cols-3 [&>*+*]:border-t [&>*+*]:border-border md:[&>*+*]:border-t-0 md:[&>*+*]:border-s">
 					<Column icon={CircleDashed} title="Todos for agents" count={todos.length} all={hashForTodo({ kind: "all" })} empty="No open todos.">
 						{todos.slice(0, BOARD_ROWS).map(todo => (
-							<Row key={todo.id} title={todo.text} action="Start" onPick={() => (location.hash = hashForNewSession(cwd, todo.id))} icon={<StatusIcon status={todo.status} className="size-3.5" />}>
+							<Row key={todo.id} title={todo.text} action="Start" onPick={() => (location.hash = hashForNewSession(todoCwd(todo, cwd), todo.id))} icon={<StatusIcon status={todo.status} className="size-3.5" />}>
 								{todo.due ? <DueText due={todo.due} day={day} /> : TODO_STATUS[todo.status].label}
 							</Row>
 						))}

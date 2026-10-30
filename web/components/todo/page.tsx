@@ -1,6 +1,7 @@
 import { ListTodo, ListX, Plus, Trash2 } from "lucide-react";
 import { Fragment, type ReactNode, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
+import type { Workspace } from "../../../src/shared/workspaces";
 import { isClosed, type TodoStatus, type UserTodo, type UserTodoChange, type UserTodoLeaf, type UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -34,8 +35,12 @@ interface TodoPageProps {
 	onChange: (change: UserTodoChange) => void;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** Where **Start session** opens the new-session draft. */
+	/** Where **Start session** opens the new-session draft of a todo with no Workspace. */
 	newSessionCwd: string;
+	/** The sidebar's Workspace, which a todo added here starts its sessions in; `null` under All workspaces. */
+	workspace: string | null;
+	/** The Workspaces a todo's Workspace picker offers. */
+	workspaces: Workspace[];
 	linearConnected: boolean;
 }
 
@@ -55,7 +60,7 @@ export function TodoPage({ list, ...props }: TodoPageProps) {
 	return <LoadedTodoPage list={list} {...props} />;
 }
 
-function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, linearConnected }: TodoPageProps & { list: UserTodoList }) {
+function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, workspace, workspaces, linearConnected }: TodoPageProps & { list: UserTodoList }) {
 	const openTodo = (id: string | null): void => {
 		location.hash = hashForTodo(view, id);
 	};
@@ -72,7 +77,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
 	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
 	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
-	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd });
+	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
 	const drag = useTodoDrag(kind.canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
@@ -261,6 +266,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 							onNext={at >= 0 && at < order.length - 1 ? () => openStep(1) : undefined}
 							sessions={sessions}
 							newSessionCwd={newSessionCwd}
+							workspaces={workspaces}
 							linearConnected={linearConnected}
 						/>
 					)

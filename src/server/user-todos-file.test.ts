@@ -28,7 +28,7 @@ describe("UserTodosFile", () => {
 		const path = todosPath();
 		const first = new UserTodosFile(path);
 		expect(first.apply({ op: "add-category", id: "w", name: "Work" })).toBe(true);
-		expect(first.apply(addTodo({ id: "a", categoryId: "w", text: "Ship it", createdAt: CREATED }))).toBe(true);
+		expect(first.apply(addTodo({ id: "a", categoryId: "w", workspace: "/code/app", text: "Ship it", createdAt: CREATED }))).toBe(true);
 		expect(first.apply(addTodo({ id: "b", parentId: "a", text: "Write the docs", priority: 3, createdAt: CREATED }))).toBe(true);
 		expect(first.apply({ op: "edit-body", id: "a", body: "**Friday**" })).toBe(true);
 		expect(first.apply({ op: "indent", id: "a" })).toBe(false);
@@ -46,6 +46,7 @@ describe("UserTodosFile", () => {
 					due: null,
 					createdAt: CREATED,
 					categoryId: "w",
+					workspace: "/code/app",
 					children: [{ id: "b", text: "Write the docs", body: "", status: "todo", priority: 3, assignee: null, doneAt: null, due: null, createdAt: CREATED }],
 					links: [],
 					addedBy: null,
@@ -55,7 +56,7 @@ describe("UserTodosFile", () => {
 		});
 	});
 
-	test("a list saved before bodies, categories, dates, links, statuses, priorities, assignees, and the archive reads with none, a checked todo as Done", () => {
+	test("a list saved before bodies, categories, Workspaces, dates, links, statuses, priorities, assignees, and the archive reads with none, a checked todo as Done", () => {
 		const path = todosPath();
 		writeTodos(
 			path,
@@ -72,11 +73,12 @@ describe("UserTodosFile", () => {
 					status: "todo",
 					doneAt: null,
 					categoryId: null,
+					workspace: null,
 					children: [{ id: "a1", text: "Older", ...old, status: "done", doneAt: "2026-10-05T09:00:00.000Z" }],
 					links: [],
 					addedBy: null,
 				},
-				{ id: "b", text: "Lost", ...old, status: "todo", doneAt: null, categoryId: null, children: [], links: [], addedBy: null },
+				{ id: "b", text: "Lost", ...old, status: "todo", doneAt: null, categoryId: null, workspace: null, children: [], links: [], addedBy: null },
 			],
 			archive: [],
 		});

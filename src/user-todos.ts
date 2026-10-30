@@ -13,6 +13,7 @@ export function addTodo(fields: Pick<AddChange, "text"> & Partial<Omit<AddChange
 		parentId = null,
 		afterId = null,
 		categoryId = null,
+		workspace = null,
 		text,
 		body = "",
 		due = null,
@@ -23,7 +24,7 @@ export function addTodo(fields: Pick<AddChange, "text"> & Partial<Omit<AddChange
 		assignee = null,
 		createdAt = new Date().toISOString(),
 	} = fields;
-	return { op: "add", id, parentId, afterId, categoryId, text, body, due, links, addedBy, status, priority, assignee, createdAt };
+	return { op: "add", id, parentId, afterId, categoryId, workspace, text, body, due, links, addedBy, status, priority, assignee, createdAt };
 }
 
 /**
@@ -72,7 +73,15 @@ function updateAt(todos: UserTodo[], { top, child }: Place, next: (todo: UserTod
 
 const leafOf = ({ id, text, body, status, priority, assignee, doneAt, due, createdAt }: UserTodoLeaf): UserTodoLeaf => ({ id, text, body, status, priority, assignee, doneAt, due, createdAt });
 
-const topOf = (leaf: UserTodoLeaf, categoryId: string | null): UserTodo => ({ ...leafOf(leaf), categoryId, children: [], links: [], addedBy: null });
+/** `leaf` as a top-level todo in its former parent's category and Workspace. */
+const topOf = (leaf: UserTodoLeaf, { categoryId, workspace }: Pick<UserTodo, "categoryId" | "workspace">): UserTodo => ({
+	...leafOf(leaf),
+	categoryId,
+	workspace,
+	children: [],
+	links: [],
+	addedBy: null,
+});
 
 const validCategory = (categoryId: string | null, isCategory: (id: string) => boolean): string | null =>
 	categoryId !== null && isCategory(categoryId) ? categoryId : null;
@@ -188,7 +197,7 @@ function applyToTodos(todos: UserTodo[], change: TodoChange, isCategory: (id: st
 		}
 		case "outdent": {
 			if (place.child === null) return todos;
-			const moved: UserTodo = { ...topOf(target, parent.categoryId), children: parent.children.slice(place.child + 1) };
+			const moved: UserTodo = { ...topOf(target, parent), children: parent.children.slice(place.child + 1) };
 			return todos.toSpliced(place.top, 1, { ...parent, children: parent.children.slice(0, place.child) }, moved);
 		}
 		case "categorize": {
@@ -197,6 +206,9 @@ function applyToTodos(todos: UserTodo[], change: TodoChange, isCategory: (id: st
 			// Last, so it ends the category it joins.
 			return [...todos.toSpliced(place.top, 1), { ...parent, categoryId }];
 		}
+		case "set-workspace":
+			if (place.child !== null || parent.workspace === change.workspace) return todos;
+			return todos.with(place.top, { ...parent, workspace: change.workspace });
 		default: {
 			const never: never = change;
 			return never;
@@ -223,7 +235,7 @@ function clearDone(list: UserTodoList, categoryId: string | null, before: string
 		}
 		const done = todo.children.filter(cleared);
 		if (done.length === 0) return [todo];
-		archived.push(...done.map(child => topOf(child, todo.categoryId)));
+		archived.push(...done.map(child => topOf(child, todo)));
 		return [{ ...todo, children: todo.children.filter(child => !cleared(child)) }];
 	});
 	return archived.length === 0 ? list : { ...list, todos, archive: [...archived.reverse(), ...list.archive] };
@@ -259,6 +271,7 @@ function applyChange(list: UserTodoList, change: UserTodoChange): UserTodoList {
 				due: change.due,
 				createdAt: change.createdAt,
 				categoryId: change.categoryId,
+				workspace: change.workspace,
 				children: [],
 				links: uniqueLinks(change.links),
 				addedBy: change.addedBy,

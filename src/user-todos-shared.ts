@@ -44,9 +44,14 @@ export interface UserTodoLeaf {
 	createdAt: string | null;
 }
 
-/** A top-level todo of the Todo page, in category `categoryId` (`null` for none), with its own todos in order, which share its category. */
+/**
+ * A top-level todo of the Todo page, in category `categoryId` (`null` for none), with its own todos in order, which
+ * share its category and its Workspace.
+ */
 export interface UserTodo extends UserTodoLeaf {
 	categoryId: string | null;
+	/** The `cwd` of the Workspace its sessions start in, a main checkout or a plain directory; `null` for none. */
+	workspace: string | null;
 	children: UserTodoLeaf[];
 	/** What it points to, each once, in the order they were linked. */
 	links: UserTodoLink[];
@@ -74,8 +79,9 @@ export interface UserTodoList {
 export type UserTodoChange =
 	/**
 	 * After todo `afterId` among `parentId`'s todos (the top level for `null`), or last for `null`. A top-level todo goes
-	 * in category `categoryId`, or in none when that category is gone; one under another goes in its parent's. A top-level
-	 * todo takes `links` and `addedBy`; any todo takes `body`, `due`, `status`, `priority`, and `assignee`. A closed `status` closes it at `createdAt`.
+	 * in category `categoryId`, or in none when that category is gone, and in Workspace `workspace`; one under another goes
+	 * in its parent's category and Workspace. A top-level todo takes `links` and `addedBy`; any todo takes `body`, `due`,
+	 * `status`, `priority`, and `assignee`. A closed `status` closes it at `createdAt`.
 	 */
 	| {
 			op: "add";
@@ -83,6 +89,7 @@ export type UserTodoChange =
 			parentId: string | null;
 			afterId: string | null;
 			categoryId: string | null;
+			workspace: string | null;
 			text: string;
 			body: string;
 			due: string | null;
@@ -122,6 +129,8 @@ export type UserTodoChange =
 	| { op: "outdent"; id: string }
 	/** A top-level todo, with its todos, moves to category `categoryId`, or to none for `null`. */
 	| { op: "categorize"; id: string; categoryId: string | null }
+	/** A top-level todo, with its todos, starts its sessions in Workspace `workspace`, or in none for `null`. */
+	| { op: "set-workspace"; id: string; workspace: string | null }
 	/**
 	 * Moves every closed todo (Done or Canceled) of category `categoryId`, or of the whole list for `null`, to the archive.
 	 * A closed todo under an open one goes there as a top-level todo of its parent's category. With `before`, an ISO 8601

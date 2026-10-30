@@ -34,7 +34,7 @@ import {
 	viewForSession,
 } from "./routing";
 
-const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, children: [], links: [], addedBy: null, ...fields });
+const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, workspace: null, children: [], links: [], addedBy: null, ...fields });
 
 test("notes routes address each list and encode the open note", () => {
 	expect(hashForNotes({ kind: "all" }, "note / one")).toBe("#notes?open=note%20%2F%20one");

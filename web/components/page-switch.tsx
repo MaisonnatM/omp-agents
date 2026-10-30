@@ -10,6 +10,7 @@ import type { Layout, Page, TodoListView } from "../routing";
 import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
+import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
@@ -29,12 +30,12 @@ import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
 
-/** What a new session for top-level todo `todoId` starts with: its title, then its notes. `null` while the list names no such todo. */
-function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string } | null {
+/** What a new session for top-level todo `todoId` starts with: its title, then its notes, and its Workspace. `null` while the list names no such todo. */
+function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string; workspace: string | null } | null {
 	const todo = todoId === null ? undefined : list?.todos.find(({ id }) => id === todoId);
 	if (!todo) return null;
 	const body = todo.body.trim();
-	return { text: todo.text, prompt: body ? `${todo.text}\n\n${body}` : todo.text };
+	return { text: todo.text, prompt: body ? `${todo.text}\n\n${body}` : todo.text, workspace: todo.workspace };
 }
 
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
@@ -110,8 +111,9 @@ export const PageSwitch = memo(function PageSwitch({
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
 		case "new": {
-			const cwd = page.cwd ?? defaultWorkspace;
 			const seed = todoSeed(userTodos, page.todoId);
+			// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
+			const cwd = page.cwd ?? (seed ? todoCwd(seed, defaultWorkspace) : defaultWorkspace);
 			// Until the todo list arrives, a todo's draft is neither the plain draft nor kept, so it cannot overwrite either.
 			const pending = page.todoId !== null && userTodos === null;
 			return (
@@ -169,6 +171,8 @@ export const PageSwitch = memo(function PageSwitch({
 					disabled={!connected}
 					onChange={changeTodo}
 					newSessionCwd={defaultWorkspace}
+					workspace={workspace}
+					workspaces={workspaces}
 					linearConnected={linearCallable}
 				/>
 			);
