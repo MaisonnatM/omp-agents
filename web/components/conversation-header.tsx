@@ -95,9 +95,8 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 					side="bottom"
 				>
 					<Button
-						variant="ghost"
+						variant="primary"
 						size="icon-compact"
-						className="hover:text-destructive-foreground"
 						loading={ending}
 						aria-label={ending ? "Ending…" : "End session"}
 						onClick={() => onEnd(view.instanceId)}
