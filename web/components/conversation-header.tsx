@@ -98,11 +98,12 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 						variant="ghost"
 						size="icon-compact"
 						className="hover:text-destructive-foreground"
-						leadingIcon={CircleStop}
 						loading={ending}
 						aria-label={ending ? "Ending…" : "End session"}
 						onClick={() => onEnd(view.instanceId)}
-					/>
+					>
+						<CircleStop />
+					</Button>
 				</Tooltip>
 			)}
 			{actions}
