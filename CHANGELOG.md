@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-10-30
+
+- Fixed: Settings, Notes, Calendar, and Email show the sidebar's tab bar again, so a tab such as Sessions takes you back.
+- Fixed: on macOS, the title bar's Back and Forward buttons now line up with the window's close, minimize, and zoom buttons, with a gap after them.
+
 ## 2026-10-29
 
 - Fixed: a session's Changes dialog now shows line counts for files it edits in another checkout of the project from its first edit, rather than marking them S until it runs a command there.

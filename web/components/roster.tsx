@@ -20,7 +20,7 @@ import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPan
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
-import { panelOnBar, TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
+import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
@@ -236,7 +236,7 @@ export function Roster({
 				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
 				<span aria-hidden className="size-7 shrink-0" />
 			</SidebarHeader>
-			{tabs.length > 0 && panelOnBar(tab) && (
+			{tabs.length > 0 && (
 				<SizeProvider size="compact">
 					<TabsList aria-label="Sidebar" className="mx-2 mt-2 max-w-[calc(100%-1rem)] self-start">
 						{tabs.map(value => {
