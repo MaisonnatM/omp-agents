@@ -50,14 +50,18 @@ function terminal(cwd: string, agents: AgentRow[] = [agent("Child")], overrides:
 	};
 }
 
-function bash(cwd: string, id = "call"): object {
+function call(name: string, args: object, id: string): object {
 	return {
 		type: "message", id, parentId: "prompt", timestamp: at,
 		message: {
 			role: "assistant", api: "anthropic-messages", provider: "anthropic", model: "claude", timestamp: 2, stopReason: "toolUse",
-			content: [{ type: "toolCall", id: `${id}-tool`, name: "bash", arguments: { command: "pwd", cwd } }],
+			content: [{ type: "toolCall", id: `${id}-tool`, name, arguments: args }],
 		},
 	};
+}
+
+function bash(cwd: string, id = "call"): object {
+	return call("bash", { command: "pwd", cwd }, id);
 }
 
 function native(path: string, cwd: string, workDirs: string[] = []): string {
@@ -97,6 +101,22 @@ describe("resident checkout protection", () => {
 		const plan = await worktrees(occupants).preview(foreign);
 		expect(plan.blockers[0]?.message).toContain("parent");
 		expect(plan.blockers[0]?.message).toContain("Child");
+	});
+
+	test("protects every checkout a live session's own tool calls name, in any repository", async () => {
+		const { root, main } = await repository([]);
+		const { targets: [ranIn, changedInto, read, edited, unused] } = await repository(["ran-in", "changed-into", "read", "edited", "unused"]);
+		if (!ranIn || !changedInto || !read || !edited || !unused) throw new Error("Missing fixture worktree");
+		const own = native(join(root, "own.jsonl"), main, [ranIn.path]);
+		appendFileSync(own, [
+			call("bash", { command: `cd ${changedInto.path} && git status` }, "cd"),
+			call("read", { path: `${join(read.path, "README.md")}:1-20` }, "read"),
+			call("edit", { input: `[${join(edited.path, "src", "a.ts")}#1A2B]\nPUT 1.=1:\n+x\n` }, "edit"),
+		].map(entry => `${JSON.stringify(entry)}\n`).join(""));
+		const occupants = await new WorktreeOccupants().snapshot([terminal(main, [])], (_host, id) => (id ? null : own));
+		for (const target of [ranIn, changedInto, read, edited]) expect(await codes(occupants, target)).toEqual(["occupied"]);
+		expect(await codes(occupants, unused)).toEqual([]);
+		expect((await worktrees(occupants).preview(changedInto)).blockers[0]?.message).toContain("Checkout session");
 	});
 
 	test("keeps the parent scope for a missing transcript and releases it when a native child file appears", async () => {
