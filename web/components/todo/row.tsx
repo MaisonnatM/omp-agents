@@ -22,6 +22,8 @@ interface TodoRowProps {
 	siblings: readonly UserTodoLeaf[];
 	/** The category a top-level todo shows as a badge, in a list that mixes categories. */
 	category?: UserTodoCategory;
+	/** The Workspace a top-level todo shows as a chip, in a list that mixes workspaces. */
+	workspace?: string;
 	day: string;
 	sessions: KnownSessions;
 	/** Changes would not reach the server. */
@@ -37,7 +39,7 @@ interface TodoRowProps {
 }
 
 /** A todo's row: its priority when set, status, and assignee, title, what it carries, when it was added, and the buttons that add under it and delete it. */
-export function TodoRow({ section, entry, siblings, category, day, sessions, disabled, open, picker, onPicker, drag, editing, onOpen, onChange }: TodoRowProps) {
+export function TodoRow({ section, entry, siblings, category, workspace, day, sessions, disabled, open, picker, onPicker, drag, editing, onOpen, onChange }: TodoRowProps) {
 	const { todo } = entry;
 	const top = entry.parent === null ? entry.todo : null;
 	const children = top?.children ?? [];
@@ -105,11 +107,11 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 						{category.name}
 					</Badge>
 				)}
-				{top?.workspace && (
-					<Tooltip content={`Starts its sessions in ${top.workspace}`}>
+				{workspace && (
+					<Tooltip content={`Starts its sessions in ${workspace}`}>
 						<span className="inline-flex max-w-28 shrink-0 items-center gap-1 rounded-md px-1 text-xs text-muted-foreground [&>svg]:size-3 [&>svg]:shrink-0">
 							<Folder aria-hidden />
-							<span className="truncate">{folderName(top.workspace) ?? top.workspace}</span>
+							<span className="truncate">{folderName(workspace) ?? workspace}</span>
 						</span>
 					</Tooltip>
 				)}

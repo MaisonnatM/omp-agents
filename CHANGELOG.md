@@ -15,6 +15,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A todo can name the workspace it is about, such as yampa or omp-agents: pick it from the open todo's Workspace button, and its row shows the workspace's name.
 - Work on it, Plan it, Start session, and the new-session board start a todo's session in its workspace instead of the sidebar's.
 - A todo an agent adds belongs to the workspace that session runs in, unless the agent names another.
+- With a workspace picked at the top of the sidebar, the Todo lists and their counts show only that workspace's todos; All workspaces shows every todo.
 - When a session finds its work belongs in another project, it now moves itself there once its turn ends, and the sidebar follows; before, it asked you to type /move.
 - The End session button in a session's header is now a filled button, so it stands out.
 - The End session button in a session's header shows its stop icon again; it was an empty, invisible button.

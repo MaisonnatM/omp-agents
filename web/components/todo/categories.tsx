@@ -63,6 +63,8 @@ interface TodoCategoriesProps {
 	sessions: KnownSessions;
 	/** The list the Todo page shows. */
 	view: TodoListView;
+	/** The sidebar's Workspace, which narrows every count; `null` for all workspaces. */
+	workspace: string | null;
 	/** Changes would not reach the server. */
 	disabled: boolean;
 	onChange: (change: UserTodoChange) => void;
@@ -114,13 +116,13 @@ function ShownCheckbox({ id, name, shown, onToggle }: { id: string; name: string
 	);
 }
 
-export function TodoCategories({ list, view, disabled, onChange, sessions }: TodoCategoriesProps) {
+export function TodoCategories({ list, view, workspace, disabled, onChange, sessions }: TodoCategoriesProps) {
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	const [hidden, toggleHidden] = useHiddenTodoCategories();
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = localDay();
 	const link = (target: TodoListView, name: string, icon: ReactNode) => {
-		const count = leftIn(list, target, day, sessions, hidden);
+		const count = leftIn(list, target, day, sessions, { hidden, workspace });
 		const active = sameTodoView(view, target);
 		return (
 			<>

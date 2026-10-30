@@ -85,17 +85,27 @@ export function earliestDue(todo: UserTodo): string | null {
 /** Where a session for top-level `todo` starts: its Workspace, else `fallback`, the directory a new session would start in anyway. */
 export const todoCwd = (todo: Pick<UserTodo, "workspace">, fallback: string): string => todo.workspace ?? fallback;
 
+/** What narrows every list: the categories hidden from the lists that span them, and the sidebar's Workspace, `null` for all workspaces. */
+export interface TodoScope {
+	hidden: ReadonlySet<string>;
+	workspace: string | null;
+}
+
 /**
  * The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first.
- * The lists that span categories leave out the todos of the categories in `hidden`; a category's own list shows them.
+ * Under a selected Workspace every list, the archive too, holds only the todos that name it.
+ * The lists that span categories leave out the todos of the categories in `scope.hidden`; a category's own list shows them.
  */
-export function todosOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>): UserTodo[] {
-	const shown = hidden.size === 0 ? list.todos : list.todos.filter(todo => todo.categoryId === null || !hidden.has(todo.categoryId));
+export function todosOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, scope: TodoScope): UserTodo[] {
+	const { hidden, workspace } = scope;
+	const inWorkspace = (todos: UserTodo[]): UserTodo[] => (workspace === null ? todos : todos.filter(todo => todo.workspace === workspace));
+	const todos = inWorkspace(list.todos);
+	const shown = hidden.size === 0 ? todos : todos.filter(todo => todo.categoryId === null || !hidden.has(todo.categoryId));
 	switch (view.kind) {
 		case "all":
 			return shown;
 		case "category":
-			return list.todos.filter(todo => todo.categoryId === view.id);
+			return todos.filter(todo => todo.categoryId === view.id);
 		case "today":
 			return shown
 				.filter(todo => isDueBy(todo, day))
@@ -105,7 +115,7 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 		case "agents":
 			return shown.filter(todo => todo.addedBy !== null);
 		case "archive":
-			return list.archive;
+			return inWorkspace(list.archive);
 		default: {
 			const never: never = view;
 			return never;
@@ -114,8 +124,8 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 }
 
 /** How many top-level todos `view` lists still open; for Archive, how many it holds. */
-export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>): number {
-	const todos = todosOf(list, view, day, sessions, hidden);
+export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, scope: TodoScope): number {
+	const todos = todosOf(list, view, day, sessions, scope);
 	return view.kind === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
 }
 

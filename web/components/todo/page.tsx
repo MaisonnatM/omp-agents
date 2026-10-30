@@ -73,7 +73,8 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
 	const [hidden] = useHiddenTodoCategories();
-	const listed = todosOf(list, view, day, sessions, hidden);
+	const scope = { hidden, workspace };
+	const listed = todosOf(list, view, day, sessions, scope);
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
 	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
 	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
@@ -82,7 +83,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
 	const title = titleOf(list, view);
-	const left = leftIn(list, view, day, sessions, hidden);
+	const left = leftIn(list, view, day, sessions, scope);
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const empty = section.todos.length === 0 ? (query ? `No todo matches “${query}”.` : kind.empty) : null;
 	const groups = (kind.readOnly ? [] : byStatus(section.todos))
@@ -124,6 +125,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 			entry={entry}
 			siblings={siblings}
 			category={entry.parent === null && view.kind !== "category" ? list.categories.find(({ id }) => id === entry.todo.categoryId) : undefined}
+			workspace={entry.parent === null && workspace === null ? (entry.todo.workspace ?? undefined) : undefined}
 			day={day}
 			sessions={sessions}
 			disabled={disabled}

@@ -293,7 +293,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
-					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
+					<TodoCategories list={userTodos} view={todoView} workspace={workspace} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="notes" asChild>

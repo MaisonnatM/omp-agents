@@ -1,7 +1,8 @@
 # Todo list
 
-- The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session, in place of the panes; a top-level todo can name the workspace it is about, and every list still shows todos of every workspace.
+- The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session, in place of the panes; a top-level todo can name the workspace it is about.
   The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Archive**, then your categories, each with how many top-level todos are open in it.
+  With a workspace picked at the top of the sidebar, every list, the archive too, and every count holds only the todos that name that workspace; **All workspaces** shows every todo, those that name none included.
   Each category has a color checkbox, and its todos carry a badge of that color.
   Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, and `#todo/<category id>` address them.
   Uncheck a category to keep its todos out of **All**, **Today**, **Needs you**, and **From agents**, and out of their counts; its own list still shows them, and the app keeps the choice, on every machine through Settings › Sync.
@@ -65,7 +66,7 @@
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
   Under it, buttons show its status, its priority, its assignee, its category and its **Workspace** for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
   The **Workspace** menu lists **No workspace** and the workspaces the sidebar lists, each by folder name and path.
-  A top-level todo with a workspace shows a folder chip with its name in the list, whose tooltip gives the path its sessions start in.
+  Under **All workspaces**, a top-level todo with a workspace shows a folder chip with its name in the list, whose tooltip gives the path its sessions start in.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
   Its notes follow, always formatted.
   Click into them and type: markdown at the start of a line formats it as you type, `# ` a heading, `- ` a bullet, `1. ` a numbered list, `[ ] ` or `[x] ` a check item, `> ` a quote, and ```` ``` ```` a code block.
