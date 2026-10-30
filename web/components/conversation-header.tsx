@@ -4,6 +4,7 @@ import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { hostLabel } from "../labels";
 import { OpenPullRequestButton } from "../open-pull-request";
 import { openReview, reviewPagesStore } from "../review-pages";
@@ -45,7 +46,7 @@ function ReviewVisualsButton({ instanceId }: { instanceId: string }) {
 	if (pages.length === 0) return null;
 	return (
 		<Tooltip content={pages.map(page => page.label).join(" · ")} side="bottom">
-			<Button variant="outline" size="compact" leadingIcon={Eye} onClick={() => openReview(instanceId)}>
+			<Button {...activityControl("conversation.review-visuals")} variant="outline" size="compact" leadingIcon={Eye} onClick={() => openReview(instanceId)}>
 				Review visuals · {pages.length}
 			</Button>
 		</Tooltip>

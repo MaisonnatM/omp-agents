@@ -40,3 +40,13 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   A picture needs the session's conversation open, since attachments live in its composer.
   When the picture cannot be taken or the conversation is closed, **Attach** adds nothing and keeps picking, with the selection and the marks, so you can try again.
 - The Browser keeps its own cookies and storage across launches, apart from the dashboard's, so an app you signed in to stays signed in.
+
+## Review visuals
+
+- A session the dashboard started ends a reply with a list of pages to review after it changes something you should look at; the reply shows the list as a card, with each page's name and how to reach it.
+- **Review visuals · N**, in the conversation's header once a reply lists pages, opens the right sidebar on the **Browser** with one tab per page, up to 8, after the session's own **App** tab, and shows the first; its tooltip names the pages.
+- Each tab keeps its page loaded while another shows, and a page's note, such as "Open the Sync tab", shows above it.
+- Picking and **Screenshot** work on the tab shown, as on the **App** tab.
+- A review tab does not change the address the **App** tab opens on next time.
+- Clicking **Review visuals** again opens the session's latest list in place of the review tabs open.
+- Only pages on this computer open; a listed address elsewhere is left out.

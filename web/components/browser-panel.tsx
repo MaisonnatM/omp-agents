@@ -114,6 +114,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 				<div role="tablist" aria-label="Browser tabs" className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-border px-1.5 py-1 [scrollbar-width:none]">
 					{tabs.map(tab => (
 						<button
+							{...activityControl("browser.tab")}
 							key={tab.id}
 							type="button"
 							role="tab"

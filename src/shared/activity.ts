@@ -149,6 +149,8 @@ export const CONTROLS = [
 	{ id: "browser.annotation.attach", label: "Browser annotation Attach", area: "Browser" },
 	{ id: "browser.maximize", label: "Browser Maximize", area: "Browser" },
 	{ id: "browser.open-in-browser", label: "Browser Open in default browser", area: "Browser" },
+	{ id: "browser.tab", label: "Browser tab", area: "Browser" },
+	{ id: "conversation.review-visuals", label: "Review visuals button", area: "Panes" },
 	{ id: "pull-requests.view.list", label: "Pull requests list view", area: "Pull requests" },
 	{ id: "pull-requests.view.board", label: "Pull requests board view", area: "Pull requests" },
 	{ id: "pr-details.tab.summary", label: "Pull request Summary tab", area: "Pull requests" },

@@ -11,7 +11,10 @@ export interface ReviewPage {
 	note: string | null;
 }
 
-const FENCE = /```review-pages\s*\n([\s\S]*?)```/g;
+/** The most tabs one review opens, each a page kept loaded in memory. */
+export const MAX_REVIEW_PAGES = 8;
+
+const FENCE = /```review-pages[^\S\n]*\n([\s\S]*?)```/g;
 
 function pageOf(raw: unknown): ReviewPage | null {
 	if (typeof raw !== "object" || raw === null) return null;
@@ -20,16 +23,30 @@ function pageOf(raw: unknown): ReviewPage | null {
 	return { label: typeof label === "string" && label.trim() ? label.trim() : url, url, note: typeof note === "string" && note.trim() ? note.trim() : null };
 }
 
-/** The pages of the last parseable `review-pages` fence the agent wrote, keeping only addresses on this computer; empty before one. */
+/**
+ * The pages a `review-pages` fence's `source` lists: a JSON array of `{label, url, note?}`, keeping only addresses on
+ * this computer, each once, up to {@link MAX_REVIEW_PAGES}; `null` when it is not a JSON array.
+ */
+export function parseReviewPages(source: string): ReviewPage[] | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(source);
+	} catch {
+		return null;
+	}
+	if (!Array.isArray(parsed)) return null;
+	const pages = parsed.flatMap(raw => pageOf(raw) ?? []);
+	return pages.filter((page, at) => pages.findIndex(other => other.url === page.url) === at).slice(0, MAX_REVIEW_PAGES);
+}
+
+/** The pages of the last valid `review-pages` fence in a settled agent reply; empty before one. */
 export function latestReviewPages(items: readonly Item[]): ReviewPage[] {
 	for (let at = items.length - 1; at >= 0; at--) {
 		const item = items[at]!;
 		if (item.kind !== "assistant" || item.streaming) continue;
 		for (const match of [...item.text.matchAll(FENCE)].reverse()) {
-			try {
-				const parsed: unknown = JSON.parse(match[1]!);
-				if (Array.isArray(parsed)) return parsed.flatMap(raw => pageOf(raw) ?? []);
-			} catch {}
+			const pages = parseReviewPages(match[1]!);
+			if (pages !== null) return pages;
 		}
 	}
 	return [];
