@@ -1,10 +1,13 @@
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { afterAll, afterEach, beforeAll, describe, expect, mock, setDefaultTimeout, spyOn, test } from "bun:test";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as github from "./github";
 import * as proc from "./proc";
 import { rebasePullRequest } from "./pull-request-rebase";
+
+// A git call here took 300 to 450 ms under full-suite load on a busy machine, and the longest test makes about 28 of them.
+setDefaultTimeout(30_000);
 
 const realRunChecked = proc.runChecked;
 const realRun = proc.run;
@@ -16,27 +19,28 @@ afterEach(() => {
 
 const git = async (cwd: string, ...args: string[]): Promise<string> => (await realRunChecked(["git", ...args], { cwd })).trim();
 
+const commit = async (dir: string, file: string, text: string, subject: string) => {
+	writeFileSync(join(dir, file), text);
+	await git(dir, "add", file);
+	await git(dir, "commit", "-q", "-m", subject);
+};
+
 /**
  * `acme/app` checked out in `app` on `main`, its `origin` a bare repository beside it. Pull request 7 merges `feature`,
  * one commit on `one` that adds `feature.txt`, into `main`, which has `two` since; `app` has `feature` as `origin` does,
- * checked out nowhere. Pushes run the hooks in `hooks`, which holds none.
+ * checked out nowhere. Pushes run the hooks in `hooks`, which holds none. Built once here, then copied for each test.
  */
-async function setup() {
-	const parent = realpathSync(mkdtempSync(join(tmpdir(), "omp-agents-pr-rebase-")));
-	dirs.push(parent);
-	const origin = join(parent, "origin.git");
-	const main = join(parent, "app");
-	const hooks = join(parent, "hooks");
+let template: { dir: string; before: string };
+beforeAll(async () => {
+	const dir = realpathSync(mkdtempSync(join(tmpdir(), "omp-agents-pr-rebase-template-")));
+	const origin = join(dir, "origin.git");
+	const main = join(dir, "app");
+	const hooks = join(dir, "hooks");
 	mkdirSync(main);
 	mkdirSync(hooks);
-	await git(parent, "init", "-q", "--bare", "-b", "main", origin);
+	await git(dir, "init", "-q", "--bare", "-b", "main", origin);
 	await git(main, "init", "-q", "-b", "main");
 	for (const [key, value] of [["user.name", "t"], ["user.email", "t@t"], ["commit.gpgSign", "false"], ["core.hooksPath", hooks]]) await git(main, "config", key!, value!);
-	const commit = async (dir: string, file: string, text: string, subject: string) => {
-		writeFileSync(join(dir, file), text);
-		await git(dir, "add", file);
-		await git(dir, "commit", "-q", "-m", subject);
-	};
 	await commit(main, "README.md", "app\n", "one");
 	await git(main, "remote", "add", "origin", origin);
 	await git(main, "switch", "-q", "-c", "feature");
@@ -45,7 +49,20 @@ async function setup() {
 	await git(main, "switch", "-q", "main");
 	await commit(main, "main.txt", "main\n", "two");
 	await git(main, "push", "-q", "origin", "main");
-	const before = await git(main, "rev-parse", "feature");
+	template = { dir, before: await git(main, "rev-parse", "feature") };
+});
+afterAll(() => rmSync(template.dir, { recursive: true, force: true }));
+
+/** A copy of the template repositories, with pull request lookups answered from `prs`. */
+function setup() {
+	const parent = realpathSync(mkdtempSync(join(tmpdir(), "omp-agents-pr-rebase-")));
+	dirs.push(parent);
+	cpSync(template.dir, parent, { recursive: true });
+	const config = join(parent, "app", ".git", "config");
+	writeFileSync(config, readFileSync(config, "utf8").replaceAll(template.dir, parent));
+	const origin = join(parent, "origin.git");
+	const main = join(parent, "app");
+	const hooks = join(parent, "hooks");
 
 	/** Each pull request's head and base branch, by number. */
 	const prs = new Map<number, [head: string, base: string]>([[7, ["feature", "main"]]]);
@@ -62,11 +79,11 @@ async function setup() {
 		await git(main, "worktree", "add", "-q", path, "feature");
 		return path;
 	};
-	return { parent, origin, main, hooks, before, prs, rebase, commit, subjects, review };
+	return { parent, origin, main, hooks, before: template.before, prs, rebase, subjects, review };
 }
 
 test("answers current when the branch already has its base, and pushes nothing", async () => {
-	const { origin, main, rebase } = await setup();
+	const { origin, main, rebase } = setup();
 	await git(main, "switch", "-q", "feature");
 	await git(main, "merge", "-q", "--no-edit", "main");
 	await git(main, "push", "-q", "origin", "feature");
@@ -77,7 +94,7 @@ test("answers current when the branch already has its base, and pushes nothing",
 
 describe("a branch behind its base", () => {
 	test("rebases it onto origin's base, pushes it, and moves the local branch, without leaving a worktree", async () => {
-		const { origin, main, before, rebase, subjects } = await setup();
+		const { origin, main, before, rebase, subjects } = setup();
 		expect(await rebase()).toEqual({ kind: "rebased", branch: "feature", onto: "main" });
 		expect(await subjects(origin, "feature")).toBe("the change\ntwo\none");
 		const pushed = await git(origin, "rev-parse", "feature");
@@ -87,7 +104,7 @@ describe("a branch behind its base", () => {
 	});
 
 	test("fast-forwards and rebases the worktree that has the branch checked out", async () => {
-		const { origin, rebase, subjects, review } = await setup();
+		const { origin, rebase, subjects, review } = setup();
 		const path = await review();
 		await git(path, "reset", "-q", "--hard", "HEAD~1");
 		expect(await rebase()).toEqual({ kind: "rebased", branch: "feature", onto: "main" });
@@ -97,7 +114,7 @@ describe("a branch behind its base", () => {
 	});
 
 	test("answers the conflicted files, leaving origin, the branch, and its worktree as they were", async () => {
-		const { origin, main, before, rebase, commit, review } = await setup();
+		const { origin, main, before, rebase, review } = setup();
 		await commit(main, "feature.txt", "theirs\n", "three");
 		await git(main, "push", "-q", "origin", "main");
 		const path = await review();
@@ -109,7 +126,7 @@ describe("a branch behind its base", () => {
 	});
 
 	test("answers a conflict in a worktree of its own, which it removes, leaving the local branch where it was", async () => {
-		const { origin, main, before, rebase, commit } = await setup();
+		const { origin, main, before, rebase } = setup();
 		await commit(main, "feature.txt", "theirs\n", "three");
 		await git(main, "push", "-q", "origin", "main");
 		expect(await rebase()).toEqual({ kind: "conflict", files: ["feature.txt"], branch: "feature", onto: "main" });
@@ -121,7 +138,7 @@ describe("a branch behind its base", () => {
 
 describe("refusals", () => {
 	test("refuses a worktree with uncommitted changes on the branch", async () => {
-		const { origin, before, rebase, review } = await setup();
+		const { origin, before, rebase, review } = setup();
 		const path = await review();
 		writeFileSync(join(path, "README.md"), "edited\n");
 		await expect(rebase()).rejects.toThrow(`${path} has uncommitted changes on \`feature\`. Commit or stash them before rebasing pull request #7.`);
@@ -130,7 +147,7 @@ describe("refusals", () => {
 	});
 
 	test("refuses a worktree in the middle of a merge, and leaves the merge as it was", async () => {
-		const { origin, main, before, rebase, review } = await setup();
+		const { origin, main, before, rebase, review } = setup();
 		const path = await review();
 		const empty = await git(main, "commit-tree", "feature^{tree}", "-p", "feature", "-m", "side");
 		await git(path, "merge", "-q", "--no-ff", "--no-commit", empty);
@@ -140,7 +157,7 @@ describe("refusals", () => {
 	});
 
 	test("refuses a local branch with commits the pull request lacks, and moves nothing", async () => {
-		const { origin, main, before, rebase } = await setup();
+		const { origin, main, before, rebase } = setup();
 		await git(main, "switch", "-q", "feature");
 		await git(main, "commit", "-q", "--allow-empty", "-m", "mine");
 		const mine = await git(main, "rev-parse", "HEAD");
@@ -151,7 +168,7 @@ describe("refusals", () => {
 	});
 
 	test("refuses a pull request whose branch is in a fork", async () => {
-		const { rebase } = await setup();
+		const { rebase } = setup();
 		spyOn(proc, "runJson").mockResolvedValue({ title: "Add the change", head: { ref: "feature", sha: "unused", repo: { full_name: "someone/app" } }, base: { ref: "main", repo: { full_name: "acme/app" } } });
 		await expect(rebase()).rejects.toThrow("Pull request #7's branch is in a fork, which this dashboard does not push to.");
 	});
@@ -159,7 +176,7 @@ describe("refusals", () => {
 
 describe("a refused push", () => {
 	test("throws the pre-push hook's output and puts the worktree back where it was", async () => {
-		const { origin, hooks, before, rebase, review } = await setup();
+		const { origin, hooks, before, rebase, review } = setup();
 		writeFileSync(join(hooks, "pre-push"), '#!/bin/sh\necho "2 tests failed" >&2\nexit 1\n', { mode: 0o755 });
 		const path = await review();
 		await git(path, "reset", "-q", "--hard", "HEAD~1");
@@ -171,7 +188,7 @@ describe("a refused push", () => {
 	});
 
 	test("runs the pre-push hook without the server's own PORT", async () => {
-		const { hooks, rebase } = await setup();
+		const { hooks, rebase } = setup();
 		writeFileSync(join(hooks, "pre-push"), '#!/bin/sh\necho "PORT=${PORT-unset}" >&2\nexit 1\n', { mode: 0o755 });
 		const port = process.env.PORT;
 		process.env.PORT = "4317";
@@ -184,7 +201,7 @@ describe("a refused push", () => {
 	});
 
 	test("refuses a push once origin's branch moved after the fetch, and moves nothing", async () => {
-		const { origin, main, before, rebase } = await setup();
+		const { origin, main, before, rebase } = setup();
 		spyOn(proc, "run").mockImplementation(async (argv, opts) => {
 			if (argv.some(arg => arg.startsWith("--force-with-lease"))) await git(main, "push", "-q", "-f", "origin", "main:feature");
 			return realRun(argv, opts);
@@ -196,7 +213,7 @@ describe("a refused push", () => {
 });
 
 test("replays only a stacked branch's own commits onto a parent rewritten since it branched", async () => {
-	const { origin, main, prs, rebase, commit, subjects } = await setup();
+	const { origin, main, prs, rebase, subjects } = setup();
 	await git(main, "switch", "-q", "-c", "parent", "main~1");
 	await commit(main, "parent.txt", "p1\n", "p1");
 	await git(main, "switch", "-q", "-c", "child");
