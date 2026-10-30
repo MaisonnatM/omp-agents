@@ -78,6 +78,8 @@ if (input.command) {
 		// external is another process changing the checkout outside omp.
 		if (call.external) spawnSync("bash", ["-c", call.external], { cwd, stdio: "ignore" });
 		else if (call.shutdown) await session.session_shutdown({ type: "session_shutdown" }, ctx);
+		// apply is an isolated subagent's changes about to land in that checkout.
+		else if (call.apply) reason = (await session.before_subagent_apply({ type: "before_subagent_apply", agent: "task", agentId: "Child", invocationKind: "task", checkout: call.apply, merge: "patch" }, ctx))?.reason ?? null;
 		else {
 			const event = { toolCallId: String(results.length), ...(call.write ? { toolName: "write", input: { path: call.write } } : { toolName: "bash", input: { command: call.bash } }) };
 			reason = (await session.tool_call(event, ctx))?.reason ?? null;
@@ -532,7 +534,7 @@ describe("checkout ownership", () => {
 		git(dir, "switch", "-q", "-c", "feat");
 		return dir;
 	};
-	// Each list runs in one new omp process; a call is a write, a bash command, another process's command, or a shutdown.
+	// Each list runs in one new omp process; a call is a write, a bash command, an isolated subagent's apply, another process's command, or a shutdown.
 	const calls = (list: object[]) => exercise("worktree-guard", { calls: list }, env).results;
 	const claimFile = (dir: string) => join(git(dir, "rev-parse", "--path-format=absolute", "--git-dir"), "omp-checkout-owner.json");
 	// The test process is alive for as long as the omp processes it starts, so its claim reads as another live session's.
@@ -699,6 +701,25 @@ describe("checkout ownership", () => {
 		const results = calls(commands.map(bash => ({ bash, cwd: root, dry: true })));
 		const outcome = (reason: string | null) => (reason === null ? null : reason.includes("cannot locate") ? "unlocated" : held(reason, dir) === true ? "held" : reason);
 		expect(Object.fromEntries(commands.map((command, i) => [command, outcome(results[i])]))).toEqual(expected);
+	});
+
+	test("an isolated subagent's changes apply to the linked worktree its spawn names, never to the main checkout on its default branch", () => {
+		const dir = repo();
+		git(dir, "switch", "-q", "main");
+		const worktree = `${dir}-wt`;
+		git(dir, "worktree", "add", "-q", "-b", "work", worktree);
+		const [onMain, inWorktree] = calls([{ apply: dir }, { apply: worktree }]);
+		expect(onMain).toContain("main checkout, on its default branch `main`");
+		expect(onMain).toContain("spawn each later isolated subagent with `checkout` set to that checkout's path");
+		expect(inWorktree).toBeNull();
+	});
+
+	test("an isolated subagent's changes do not apply to a checkout where another live session has uncommitted changes", () => {
+		const dir = repo();
+		writeFileSync(join(dir, "file.txt"), "theirs\n");
+		claimByAnother(dir);
+		const [reason] = calls([{ apply: dir }]);
+		expect(held(reason, dir)).toBe(true);
 	});
 });
 

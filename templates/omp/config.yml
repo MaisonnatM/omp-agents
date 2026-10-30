@@ -58,7 +58,7 @@ modelProviderOrder:
   - cursor
   - openrouter
 
-# `isolated: true` subagents work in their own clone; successful changes apply back as a patch.
+# `isolated: true` subagents work in their own clone of the checkout their `checkout` option names; successful changes apply back there as a patch.
 task:
   isolation:
     enabled: true

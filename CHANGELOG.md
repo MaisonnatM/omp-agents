@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-10-30
 
 - Behind the scenes: the pull request rebase tests build their repositories once and copy them for each test, and wait up to 30 seconds, so they pass when the machine is busy.
+- Fixed: a helper agent that works on its own copy of a repository now puts its changes back only where its agent says, and the starter kit refuses to put them in your main copy while it is on main, keeping them aside for you instead.
 - When an agent shows you design options, it names each one, such as Mode chip, and uses that same name in previews, Slack posts, tickets, pull requests, and suggested prompts, so a number never points at the wrong design.
 - A Bot's details now have their own Routines tab, which lists its routines and counts them on the tab.
 - A Bot's Details tab now shows its Usage: the tokens its conversation used and what they would cost at list price, with its requests and cache hit rate.
