@@ -9,6 +9,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: a session on a Cursor model asks you its questions with the question form instead of in plain text, because the starter kit now points it to omp's question tool.
 - Cmd+W now ends the focused session, in place of Cmd+Shift+X.
 - Cmd+Shift+W now closes the window, since Cmd+W ends a session.
+- End session in a session's header is now a stop icon; hover it to see its name and shortcut.
 - You can click Review visuals, the eye in the Browser's toolbar, to open every page the agent asks you to look at, each in its own Browser tab.
 - An agent's list of pages to review now shows as a small card in its reply.
 - The Browser's tabs look like a web browser's, with the App tab pinned first and a close button on each review tab.
