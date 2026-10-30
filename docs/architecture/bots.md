@@ -4,6 +4,8 @@ A Bot is a named, long-lived teammate: one conversation, a job, and a memory.
 `src/shared/bots.ts` holds the model, `Bot` and `BotChange`, and `applyBot`, the reducer that the page and the server share.
 `src/server/bots-file.ts` keeps the list in `bots.json` beside the access token.
 A save keeps the Bot's `sessionId`, and a remove forgets the Bot but leaves its session file and its memory directory; the `Dashboard` removes the Bot's routines first.
+Each Bot also keeps where it lists, `pinned` and `section`, which a save keeps and only `pin`, `move`, and `rename-section` change; a Bot saved before them reads as neither pinned nor in a section.
+A section is only the name its Bots share, so `rename-section` renames it for every Bot in it, or with `to: null` moves them all out, and the section goes with its last Bot.
 A Bot's `shape` and `hue`, one of `BOT_SHAPES` and `BOT_HUES`, are its avatar's look; `parseBotSpec` gives an entry saved before them the look `defaultLook` hashes from its id, so an old Bot keeps its face.
 A new Bot's `job` is empty until its first conversation gives it one: the extension then tells the Bot to ask for it and call `set_job` with the answer.
 
@@ -40,7 +42,7 @@ The server's `RoutineInbox` applies it, and checks ownership again; see [Routine
 Both tools load as `essential` and ask approval as writes, as `remember` does.
 
 A `bot` socket message carries one `BotChange`.
-`save` and `remove` go through the list registry, so every socket hears the new list as a `bots` message, with as much of each Bot's memory as the prompt carries, so the message stays as small as the prompt's.
+`save`, `remove`, `pin`, `move`, and `rename-section` go through the list registry, so every socket hears the new list as a `bots` message, with as much of each Bot's memory as the prompt carries, so the message stays as small as the prompt's.
 The same message carries each Bot's last words, which `lastMessage` reads from the end of its session file, and the server sends it again as each turn of a Bot's conversation starts and ends, so the sidebar's previews and times follow the conversation.
 `Bots.msg` keeps each Bot's memory and last words as it read them, and reads one Bot's files again only when its conversation moved to another session or its session started or ended a turn or exited (`changed`), so a push reads one Bot's files, not every Bot's.
 `message` calls `Bots.message`, which answers once omp took the text: a follow-up in the live session, else a resume of the Bot's session followed by the text, else a new session in the Bot's workspace that starts with it.

@@ -7,7 +7,7 @@ import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
 
-const bot = (sessionId: string | null): Bot => ({ id: scout, name: "Scout", job: "", cwd: "~/code/webapp", model: null, skill: null, shape: "clover", hue: 320, sessionId, createdAt: "2026-10-05T09:00:00.000Z" });
+const bot = (sessionId: string | null): Bot => ({ id: scout, name: "Scout", job: "", cwd: "~/code/webapp", model: null, skill: null, shape: "clover", hue: 320, sessionId, createdAt: "2026-10-05T09:00:00.000Z", pinned: false, section: null });
 
 describe("Bots", () => {
 	test("the Bot's running session is the host of its session id, and none without one", () => {

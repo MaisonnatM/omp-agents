@@ -44,18 +44,31 @@ export interface Bot extends BotLook {
 	/** Its one conversation; `null` until its first message starts it. */
 	sessionId: string | null;
 	createdAt: string;
+	/** Listed under Pinned, above every section, whatever its section. */
+	pinned: boolean;
+	/** The name of the section it lists under while it is not pinned, `null` for none; a section exists while a Bot names it. */
+	section: string | null;
 }
 
-/** What the page edits of a Bot: all but its conversation and its creation time, which the server keeps. */
-export type BotSpec = Omit<Bot, "sessionId" | "createdAt">;
+/** What the page edits of a Bot: all but its conversation, its creation time, and where it lists, which a save keeps. */
+export type BotSpec = Omit<Bot, "sessionId" | "createdAt" | "pinned" | "section">;
 
-/** One edit the page sends; `message` is the user's text for the Bot's conversation, which edits no Bot. */
+/** The longest section name a Bot keeps, which fits the sidebar's group label. */
+export const MAX_SECTION_LENGTH = 60;
+
+/**
+ * One edit the page sends; `message` is the user's text for the Bot's conversation, which edits no Bot. `rename-section`
+ * moves every Bot of section `from` to `to`, or out of any section for `null`, which removes the section.
+ */
 export type BotChange =
 	| { op: "save"; bot: BotSpec }
 	| { op: "remove"; id: BotId }
+	| { op: "pin"; id: BotId; pinned: boolean }
+	| { op: "move"; id: BotId; section: string | null }
+	| { op: "rename-section"; from: string; to: string | null }
 	| { op: "message"; id: BotId; text: string };
 
-/** What edits `bots.json`: a page's save or remove, or the server binding a Bot to the session its conversation runs in. */
+/** What edits `bots.json`: a page's change of a Bot or of where Bots list, or the server binding a Bot to the session its conversation runs in. */
 export type BotEdit = Exclude<BotChange, { op: "message" }> | { op: "bind"; id: BotId; sessionId: string };
 
 /** What a Bot's `set_job` tool asks of the server: Bot `botId`'s job becomes `job`, empty to clear it. */
@@ -85,27 +98,45 @@ export type BotLast = { at: number; from: "user" | "bot"; text: string } | { at:
 /** The tool a Bot's session writes its memory with; the page marks each finished call in the conversation. */
 export const REMEMBER_TOOL = "remember";
 
-/** `bots` after `edit`, or `bots` itself when it changes nothing. A save keeps the Bot's conversation; a remove forgets it but leaves its file. */
+/**
+ * `bots` after `edit`, or `bots` itself when it changes nothing. A save keeps the Bot's conversation and where it lists;
+ * a remove forgets it but leaves its file.
+ */
 export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
+	if (edit.op === "rename-section") {
+		if (!bots.some(bot => bot.section === edit.from) || edit.from === edit.to) return bots;
+		return bots.map(bot => (bot.section === edit.from ? { ...bot, section: edit.to } : bot));
+	}
 	const id = edit.op === "save" ? edit.bot.id : edit.id;
 	const index = bots.findIndex(bot => bot.id === id);
 	const stored = bots[index];
 	switch (edit.op) {
 		case "save": {
-			if (!stored) return [...bots, { ...edit.bot, sessionId: null, createdAt: now }];
+			if (!stored) return [...bots, { ...edit.bot, sessionId: null, createdAt: now, pinned: false, section: null }];
 			const { name, job, cwd, model, skill, shape, hue } = edit.bot;
 			if (name === stored.name && job === stored.job && cwd === stored.cwd && model === stored.model && skill === stored.skill && shape === stored.shape && hue === stored.hue) return bots;
-			return bots.with(index, { ...edit.bot, sessionId: stored.sessionId, createdAt: stored.createdAt });
+			return bots.with(index, { ...stored, ...edit.bot });
 		}
 		case "remove":
 			return stored ? bots.toSpliced(index, 1) : bots;
 		case "bind":
 			return !stored || stored.sessionId === edit.sessionId ? bots : bots.with(index, { ...stored, sessionId: edit.sessionId });
+		case "pin":
+			return !stored || stored.pinned === edit.pinned ? bots : bots.with(index, { ...stored, pinned: edit.pinned });
+		case "move":
+			return !stored || stored.section === edit.section ? bots : bots.with(index, { ...stored, section: edit.section });
 		default: {
 			const unhandled: never = edit;
 			return unhandled;
 		}
 	}
+}
+
+/** A section's name as typed, trimmed, or `null` when it is blank, too long, or not a string. */
+export function parseSectionName(value: unknown): string | null {
+	if (typeof value !== "string") return null;
+	const name = value.trim();
+	return name && name.length <= MAX_SECTION_LENGTH ? name : null;
 }
 
 /** An id names the Bot's memory directory, so it holds no path separator or dot. */
@@ -125,12 +156,15 @@ export function parseBotSpec(value: unknown): Parsed<BotSpec> {
 	return { ok: { id, name: name.trim(), job, cwd, model, skill: skill.ok, shape: shape as BotShape, hue: hue as BotHue } };
 }
 
+/** A saved Bot; one saved before it could be pinned or put in a section is neither. */
 function parseBot(value: unknown): Bot | null {
 	const spec = parseBotSpec(value);
 	if (!spec || !isObject(value)) return null;
-	const { sessionId, createdAt } = value;
-	if ((sessionId !== null && !isNonEmpty(sessionId)) || !isNonEmpty(createdAt)) return null;
-	return { ...spec.ok, sessionId, createdAt };
+	const { sessionId, createdAt, pinned = false, section = null } = value;
+	if ((sessionId !== null && !isNonEmpty(sessionId)) || !isNonEmpty(createdAt) || typeof pinned !== "boolean") return null;
+	const home = section === null ? null : parseSectionName(section);
+	if (section !== null && home === null) return null;
+	return { ...spec.ok, sessionId, createdAt, pinned, section: home };
 }
 
 /** `bots.json`'s list, or `null` when the file holds anything else. */
@@ -156,6 +190,20 @@ export function parseBotChange(value: unknown): BotChange | null {
 		case "remove": {
 			const id = parseBotId(value.id);
 			return id && { op: "remove", id };
+		}
+		case "pin": {
+			const id = parseBotId(value.id);
+			return id && typeof value.pinned === "boolean" ? { op: "pin", id, pinned: value.pinned } : null;
+		}
+		case "move": {
+			const id = parseBotId(value.id);
+			const section = value.section === null ? null : parseSectionName(value.section);
+			return id && (value.section === null || section !== null) ? { op: "move", id, section } : null;
+		}
+		case "rename-section": {
+			const from = parseSectionName(value.from);
+			const to = value.to === null ? null : parseSectionName(value.to);
+			return from !== null && (value.to === null || to !== null) ? { op: "rename-section", from, to } : null;
 		}
 		case "message": {
 			const id = parseBotId(value.id);

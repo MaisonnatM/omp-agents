@@ -65,8 +65,12 @@ A repository's main checkout, or a directory outside git, that sessions run in, 
 _Avoid_: Project, repo, folder
 
 **Pin**:
-A session id the server keeps at the top of the roster in every window.
+A session id the server keeps at the top of the roster in every window, or a Bot it keeps under **Pinned** at the top of the Bots tab and the gallery.
 _Avoid_: Favorite, bookmark
+
+**Section**:
+A named group of Bots in the Bots tab and the gallery, which exists while a Bot names it.
+_Avoid_: Folder, category
 
 **Notice**:
 An entry under the bell: what a check found or how an update went.
