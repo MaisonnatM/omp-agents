@@ -19,8 +19,10 @@
   Click a card to open the Bot's page.
   The last card, and **New Bot** in the header, open the New Bot form.
   Deleting a Bot returns to the gallery.
-- New Bot follows Grok's: name the Bot, pick a shape and a color, and choose **Create**; the form starts on a random shape and color.
-  Its optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it, and the name while the name is empty.
+- New Bot follows Grok's: name the Bot, pick a shape and a color, pick its **Type**, and choose **Create**; the form starts on a random shape and color, and on **Routines**.
+  The type stays what you picked: **Routines** works through its conversation and its routines, and **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says.
+  Picking **PR shepherd** fills its **Job** with its rules, and its name with **Shepherd** while the name is empty, and hides the job templates.
+  For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it, and the name while the name is empty.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
@@ -40,7 +42,7 @@
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
   Its tabs are **Details** and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
-  **Details** starts with the avatar, the name, whether the Bot's session runs, and its workspace.
+  **Details** starts with the avatar, the name, the Bot's type and whether its session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
   Below come its **Job**, its **Memory**, its **Routines**, and **Delete**.
@@ -60,3 +62,17 @@
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.
+
+## PR shepherds
+
+- A PR shepherd starts with one routine, **Pull request changed**, which runs whenever one of your pull requests becomes your move: it conflicts, its checks fail, it has comments, or it is ready to merge.
+  Each run names those pull requests, and the shepherd reads each one and acts only on the ones you wrote that are approved.
+- It never fixes a pull request in its own conversation.
+  It asks the dashboard to start the same session a quick action on the **Pull requests** page starts, **Fix CI and conflicts**, **Fix CI**, **Resolve conflicts**, or **Address comments**, on the pull request's branch.
+  That session shows in **Sessions**, linked to the pull request, and its next status change wakes the shepherd again.
+- Once nothing blocks a pull request, the shepherd queues its merge, squashing unless its job says otherwise, and the merge shows on the pull request as one you queued.
+- The dashboard checks each request when it applies it, and refuses one for a pull request you did not write, a draft, one that is not approved, one a session already works on, or a fix whose problem it no longer has.
+  It starts the same fix at most twice per pull request until it restarts.
+  It queues a merge only when the head has the same changes as a commit a reviewer approved, so a rebase keeps the approval and new code waits for a fresh review.
+  A refused request tells the shepherd why in its conversation, so it can tell you.
+- Its job is its rules, which you can edit like any Bot's: what it touches, what it asks you first, and how it merges.

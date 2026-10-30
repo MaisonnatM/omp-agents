@@ -95,7 +95,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
 | Pages: Email | view | `email`, `email/new`, `email/item` |
-| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`; `bot`, `routine` |
+| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`; `bot`, `routine` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |

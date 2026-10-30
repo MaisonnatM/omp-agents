@@ -9,6 +9,7 @@ import { errorText, isObject, parseJson } from "../json";
 import { readTail } from "../read-tail";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
 import { type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
+import type { ShepherdRequest } from "../shared/shepherd";
 
 /**
  * The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, the directory its
@@ -86,7 +87,7 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 }
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-function leave(dir: string, request: BotRoutineRequest | BotJobRequest): void {
+export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | ShepherdRequest): void {
 	try {
 		mkdirSync(dir, { recursive: true });
 		const name = `${Date.now()}-${randomUUID()}`;
@@ -98,7 +99,7 @@ function leave(dir: string, request: BotRoutineRequest | BotJobRequest): void {
 	}
 }
 
-const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }], details: undefined });
+export const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }], details: undefined });
 
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
 const NO_ROUTINES = "This session is not an omp-agents Bot, so it has no routines.";

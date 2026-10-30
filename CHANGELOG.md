@@ -6,6 +6,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-10-30
 
 - Behind the scenes: the starter kit's guide now names a reply's three parts the way the agent writes them, so it no longer confuses new readers.
+- New Bot now asks for a type: Routines, the Bots you had, or PR shepherd.
+- A PR shepherd watches your approved pull requests and starts a session to fix conflicts, failing checks, or review comments, then queues the merge.
+- A PR shepherd merges only what a reviewer approved: a rebase is fine, but new code waits for a fresh review, and it tells you why.
+- A PR shepherd tries each fix at most twice per pull request, then asks you.
 - Fixed: a session on a Cursor model asks you its questions with the question form instead of in plain text, because the starter kit now points it to omp's question tool.
 - Cmd+W now ends the focused session, in place of Cmd+Shift+X.
 - Cmd+Shift+W now closes the window, since Cmd+W ends a session.

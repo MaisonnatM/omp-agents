@@ -27,3 +27,6 @@ export const sessionVisualsExtension: string = packagedResources
 
 /** The omp extension a Bot's session loads (`src/omp/bot-extension.ts`): its bundle in a packaged app. */
 export const botExtension: string = packagedResources ? join(packagedResources, "bot-extension.js") : join(import.meta.dir, "..", "omp", "bot-extension.ts");
+
+/** The omp extension a PR shepherd Bot's session loads beside {@link botExtension} (`src/omp/shepherd-extension.ts`): its bundle in a packaged app. */
+export const shepherdExtension: string = packagedResources ? join(packagedResources, "shepherd-extension.js") : join(import.meta.dir, "..", "omp", "shepherd-extension.ts");
