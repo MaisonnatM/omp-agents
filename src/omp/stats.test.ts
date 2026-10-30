@@ -1,5 +1,6 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { creditRuns, listPrice, type ProviderRequest } from "./stats";
+import { creditRuns, listPrice, type ProviderRequest, sessionRows } from "./stats";
 
 const INSUFFICIENT = "402 Insufficient credits. Add more using https://openrouter.ai/settings/credits";
 
@@ -41,4 +42,18 @@ test("listPrice uses omp's bundled API rates with Claude's cache lifetimes, and 
 	expect(listPrice("anthropic", "claude-haiku-4-5-20251001", tokens, timestamp)).toBeCloseTo(7.35, 10);
 	expect(listPrice("anthropic", "claude-haiku-4-5-20251001", { ...tokens, cttl: { ephemeral5m: 500_000, ephemeral1h: 500_000 } }, timestamp)).toBeCloseTo(7.725, 10);
 	expect(listPrice("anthropic", "not-a-catalog-model", tokens, timestamp)).toBe(0);
+});
+
+test("sessionRows counts a session file and its subagents' files, and no neighbor whose name extends it", () => {
+	const db = new Database(":memory:");
+	db.run(`CREATE TABLE messages (session_file TEXT, folder TEXT, provider TEXT, model TEXT, stop_reason TEXT, input_tokens INT, output_tokens INT,
+		cache_read_tokens INT, cache_write_tokens INT, total_tokens INT, agent_type TEXT, cost_total REAL, timestamp INT)`);
+	const add = (file: string, input: number) => db.run("INSERT INTO messages VALUES (?, '/w', 'anthropic', 'opus', 'stop', ?, 0, 0, 0, ?, 'main', 0, 1)", [file, input, input]);
+	add("/s/p/1_abc.jsonl", 1);
+	add("/s/p/1_abc/0-task.jsonl", 10);
+	add("/s/p/1_abc/0-task/1-nested.jsonl", 100);
+	add("/s/p/1_abcd.jsonl", 1000);
+	add("/s/p/1_abc0/x.jsonl", 10000);
+	const rows = sessionRows(db, "/s/p/1_abc.jsonl");
+	expect(rows.reduce((sum, row) => sum + row.input, 0)).toBe(111);
 });

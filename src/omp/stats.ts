@@ -114,11 +114,14 @@ export async function readStats(range: AnalyticsRange): Promise<StatsRead> {
 	return { window, dashboard, tools, sync: statsLive.statsLive().status().sync, rows, providerSeries: statsRollup.getProviderTimeSeries(window) };
 }
 
-/** What one session file and its subagents' files used by model, over all time. */
-export async function readSessionRows(file: string): Promise<SessionModelRow[]> {
-	const db = await openLiveStats();
+/** What one session file and its subagents' files used by model in `db`, over all time. */
+export function sessionRows(db: Database, file: string): SessionModelRow[] {
 	const subagents = file.endsWith(".jsonl") ? file.slice(0, -".jsonl".length) : file;
 	return db.query<SessionModelRow, [string, string, string]>(ONE_SESSION_MODEL_ROWS).all(file, `${subagents}/`, `${subagents}0`);
+}
+
+export async function readSessionRows(file: string): Promise<SessionModelRow[]> {
+	return sessionRows(await openLiveStats(), file);
 }
 
 /** omp's list price from its bundled model catalog, as omp prices its own requests; 0 for a model the catalog does not list. */

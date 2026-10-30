@@ -1,6 +1,6 @@
 /** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
 import { Plus, Repeat, Trash2 } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import type { AnalyticsSession } from "../../../src/shared/analytics";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
@@ -241,10 +241,20 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 	);
 }
 
-/** What the Bot's conversation used over all time, its subagents folded in, read again when a turn ends. */
+/** How often the usage is read again while the Bot works, so a running turn's requests show as they land. */
+const LIVE_USAGE_MS = 5_000;
+
+/** What the Bot's conversation used over all time, its subagents folded in, read again every few seconds while it works and when a turn ends. */
 function BotUsage({ bot, host }: { bot: Bot; host: RosterHost | null }) {
 	const id = useId();
-	const { data: session, error, settled } = useRead<AnalyticsSession | null>(bot.sessionId === null ? null : `/api/analytics/session?${new URLSearchParams({ session: bot.sessionId })}`, host?.status);
+	const working = host?.status === "working";
+	const [tick, setTick] = useState(0);
+	useEffect(() => {
+		if (!working) return;
+		const timer = setInterval(() => setTick(n => n + 1), LIVE_USAGE_MS);
+		return () => clearInterval(timer);
+	}, [working]);
+	const { data: session, error, settled } = useRead<AnalyticsSession | null>(bot.sessionId === null ? null : `/api/analytics/session?${new URLSearchParams({ session: bot.sessionId })}`, `${host?.status}:${tick}`);
 	const muted = (text: string) => <p className="text-xs text-muted-foreground">{text}</p>;
 	let body: ReactNode;
 	if (session) {

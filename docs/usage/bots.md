@@ -56,6 +56,7 @@
   **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date; for a long memory it lists the newest 16 KB, the part the Bot reads.
   Only the Bot writes it, with its `remember` tool, when you tell it something worth keeping.
   **Usage** shows what the Bot's conversation has used since it began, its subagents included: its tokens and their cost at the API's list price, then its input, output, cache read, and cache write tokens, its requests, how many failed, its cache hit rate, and its subagents' tokens when they used any.
+  It updates every few seconds while the Bot works.
   It reads again each time the Bot starts or ends a turn, and says **No requests yet.** before the Bot's first reply.
   **Routines** lists the Bot's routines, each with its last run's dot, its schedules and triggers, and when it last ran and what that run did, or **Not run yet**.
   **All routines** opens the card of them in place of the conversation, `#bots/<id>/routines`, and **New routine** opens the editor of a new one, `#bots/<id>/routines/new`.
