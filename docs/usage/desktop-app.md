@@ -26,8 +26,8 @@ omp-agents runs as a desktop app: the packaged app, or `bun run desktop` from a 
   Get started's starter kit step runs that same non-forced installer, preserving your files and settings, and shows its result in the page instead of a system dialog.
 - Every link to another site opens in the default browser, and so does an integration's sign-in page.
   The window never leaves the dashboard.
-- Cmd+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.
-  The menu takes none of the dashboard's own shortcuts.
+- Cmd+Shift+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.
+  The menu takes none of the dashboard's own shortcuts, so Cmd+W ends the focused session instead of closing the window.
   Right-click in a text field for cut, copy, paste, and spelling suggestions, and on an image, such as one in the **Images** section's viewer, for **Copy Image**.
 - The window remembers its size and position.
 - The window title follows what the page shows: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, `Get started`, or `New session`, then `omp agents`.

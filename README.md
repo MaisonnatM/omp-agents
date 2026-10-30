@@ -122,7 +122,7 @@ The window signs itself in, so it needs no token from you.
 
 - If an omp-agents server already listens on the port, for example a headless `bun start` in another terminal, the window uses that server and leaves it running when you quit.
   Otherwise the app starts the server and stops it, with every session that the dashboard started, when you quit.
-- On macOS, closing the window (Cmd+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again.
+- On macOS, closing the window (Cmd+Shift+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again.
   Cmd+Q quits.
 - In the packaged app, **Open at Login** in the app menu starts the app, and with it your routines, when you log in, and **Install omp Starter Kit…** installs the starter kit.
 - Links to GitHub, Graphite, Linear, and every other site open in your default browser.

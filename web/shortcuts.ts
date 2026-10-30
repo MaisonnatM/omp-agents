@@ -116,6 +116,9 @@ export interface Chord {
 /** A chord, or G then a key, as GitHub, Gmail, and Linear go to a page. Both keys of a pair type text, so pairs work only outside text fields. */
 export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 
+/** Ends the focused session from anywhere on the page, and the selected session from its command menu entry. */
+export const END_SESSION: Chord = { key: "w", mod: true };
+
 /** The shortcuts dialog's tabs, in order. */
 export const SHORTCUT_CATEGORIES = [
 	{ id: "general", label: "General" },
@@ -173,7 +176,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		],
 	},
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
-	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: { key: "x", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: END_SESSION, scope: "anywhere" }] },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
 	{
 		id: "previousSession",
@@ -380,7 +383,7 @@ const KEY_LABEL: Record<string, string> = {
 	" ": "Space",
 };
 
-/** `⇧⌘X` on macOS, `Ctrl+Shift+X` elsewhere. */
+/** `⇧⌘K` on macOS, `Ctrl+Shift+K` elsewhere. */
 export function chordLabel({ key, mod, ctrl, alt, shift }: Chord): string {
 	const name = KEY_LABEL[key] ?? key.toUpperCase();
 	if (IS_MAC) return `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${shift ? "⇧" : ""}${mod ? "⌘" : ""}${name}`;

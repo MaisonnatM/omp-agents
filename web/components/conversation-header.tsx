@@ -90,17 +90,19 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
-					content={
-						endable.source === "dashboard"
-							? "Stop the omp process this dashboard started. Its transcript moves to Past sessions, where Resume continues it."
-							: `Stop the omp process running in its terminal (pid ${endable.pid}). Its transcript moves to Past sessions, where Resume continues it.`
-					}
+					content={`End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`}
 					shortcut={shortcutLabels("endSession")}
 					side="bottom"
 				>
-					<Button variant="primary" size="compact" leadingIcon={CircleStop} loading={ending} onClick={() => onEnd(view.instanceId)}>
-						End session
-					</Button>
+					<Button
+						variant="ghost"
+						size="icon-compact"
+						className="hover:text-destructive-foreground"
+						leadingIcon={CircleStop}
+						loading={ending}
+						aria-label={ending ? "Ending…" : "End session"}
+						onClick={() => onEnd(view.instanceId)}
+					/>
 				</Tooltip>
 			)}
 			{actions}

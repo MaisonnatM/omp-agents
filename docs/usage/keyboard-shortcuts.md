@@ -14,7 +14,7 @@ Alt is Option on macOS.
 | Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the title bar's Back and Forward buttons do |
 | Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
 | Cmd+F | Anywhere | Put the cursor in the sidebar's session search |
-| Cmd+Shift+X | Anywhere | End the focused session |
+| Cmd+W | Anywhere | End the focused session |
 | Cmd+Alt+↑ | Anywhere | Open the previous session in the sidebar |
 | Cmd+Alt+↓ | Anywhere | Open the next session in the sidebar |
 | ↓ / ↑ | Sessions, outside text fields | Open the next or previous session in the sidebar |
@@ -77,7 +77,7 @@ Alt is Option on macOS.
   A number with no tab is left to the window.
   In the default order with Linear connected, Cmd+1 opens **Pull requests**, Cmd+2 **Tickets**, Cmd+3 **Bots**, Cmd+4 **Sessions**, and Cmd+5 **Todo**; without Linear, each tab after **Pull requests** takes the number one lower.
   **Notes**, **Calendar**, and **Email**, the buttons in the header beside the command menu, take no number; Notes keeps G then N and Email keeps G then M.
-  Cmd with T, W, L, R, D, Q, O, P, S, Tab, or 6 through 0 is left to the window, whose menu takes Cmd+W, Cmd+R, Cmd+Q, and Cmd+0; see [Desktop app](desktop-app.md).
+  Cmd with T, L, R, D, Q, O, P, S, Tab, or 6 through 0 is left to the window, whose menu takes Cmd+R, Cmd+Q, and Cmd+0, and Cmd+Shift+W to close it; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
 - In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.
@@ -96,7 +96,7 @@ Alt is Option on macOS.
   What you type ranks every match by how well it matches and how much you use it, and the app remembers that.
   Enter runs the highlighted entry's main action, which opens a session in the focused pane, and Cmd+Enter runs its second, which opens a session in a split.
   A session from another workspace switches the sidebar to that workspace.
-  Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session, Cmd+Shift+C copies its path, and Cmd+Shift+X ends it, without opening that list.
+  Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session, Cmd+Shift+C copies its path, and Cmd+W ends it, without opening that list.
   **Choose workspace…** switches the sidebar's workspace, and **Create todo** asks for a todo's title; Esc or Backspace in the empty field goes back.
   **Update dashboard**, listed when the server runs from a git checkout, names the new commits on its branch and runs [Updating omp-agents](updating-omp-agents.md).
   The bar at the bottom names where you are, what Enter does, and **Actions**, which opens the same list as Cmd+K.
@@ -110,7 +110,7 @@ Alt is Option on macOS.
   From a subagent they step from its session's row.
 - Cmd+N opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
-  Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
+  Cmd+W ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
   It does nothing in a subagent, a read-only room, or a past session.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.

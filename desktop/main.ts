@@ -451,7 +451,7 @@ function applicationMenu(): Menu {
 			label: "View",
 			submenu: [{ role: "reload" }, { role: "toggleDevTools" }, SEPARATOR, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, SEPARATOR, { role: "togglefullscreen" }],
 		},
-		{ label: "Window", role: "window", submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "close" }, ...front] },
+		{ label: "Window", role: "window", submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "close", accelerator: "CommandOrControl+Shift+W" }, ...front] },
 	]);
 }
 

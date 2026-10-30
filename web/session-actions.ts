@@ -4,6 +4,7 @@ import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
 import { PAGE_ICON } from "./page-icons";
 import { hashForTickets, type OpenMode } from "./routing";
+import { END_SESSION } from "./shortcuts";
 
 /** A session as a row lists it: running, or past. */
 export type SessionEntry = { kind: "live"; host: RosterHost } | { kind: "past"; session: PastSession };
@@ -95,6 +96,6 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 		opening,
 		links,
 		copies,
-		[{ id: "end", title: context.ending ? "Ending…" : "End session", icon: CircleStop, disabled: context.ending, tone: "destructive", chord: { key: "x", mod: true, shift: true }, run: { kind: "do", fn: () => context.end(instanceId) } }],
+		[{ id: "end", title: context.ending ? "Ending…" : "End session", icon: CircleStop, disabled: context.ending, tone: "destructive", chord: END_SESSION, run: { kind: "do", fn: () => context.end(instanceId) } }],
 	];
 }
