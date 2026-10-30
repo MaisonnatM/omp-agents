@@ -49,9 +49,10 @@ export const UNREAD: ReadState<never> = { data: null, error: null };
 /** The models that omp lists, as the server answers a read or sends them to a session. */
 export type ModelList = ReadState<{ models: ModelEntry[] }>;
 
-type Refreshable<T> = ReadState<T> & { refreshing: boolean };
+/** `settled` once `url` answered or failed, so an answer of `null` reads apart from no answer yet. */
+type Refreshable<T> = ReadState<T> & { refreshing: boolean; settled: boolean };
 
-const UNREAD_IDLE: Refreshable<never> = { ...UNREAD, refreshing: false };
+const UNREAD_IDLE: Refreshable<never> = { ...UNREAD, refreshing: false, settled: false };
 
 /**
  * The server's answer at `url`, nothing while `url` is `null` or until it first answers for `url`, so an answer for a
@@ -74,7 +75,7 @@ export function useRead<T>(url: string | null, version?: unknown): Refreshable<T
 	}, [url, version]);
 	const current = read?.url === url ? read : null;
 	const refreshing = current !== null && !Object.is(current.version, version);
-	return useMemo(() => (current ? { data: current.data, error: current.error, refreshing } : UNREAD_IDLE), [current, refreshing]);
+	return useMemo(() => (current ? { data: current.data, error: current.error, refreshing, settled: true } : UNREAD_IDLE), [current, refreshing]);
 }
 
 /** Setup checks stay in memory and poll only while Get started is visible. Optional processes never delay local facts. */

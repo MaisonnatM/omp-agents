@@ -1,7 +1,8 @@
-/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and routines, then Delete; and its conversation's Tickets tab once it worked on any. */
-import { Plus, Trash2 } from "lucide-react";
-import { useId, useState } from "react";
+/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
+import { Plus, Repeat, Trash2 } from "lucide-react";
+import { type ReactNode, useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
+import type { AnalyticsSession } from "../../../src/shared/analytics";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,15 @@ import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../
 import { PAGE_ICON } from "../../page-icons";
 import { hashForBotRoutine, hashForBots } from "../../routing";
 import { age } from "../../labels";
+import { useRead } from "../../reads";
 import { runWords, startsWords } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
 import { DetailsSidebarFrame } from "../details-sidebar-frame";
 import { ticketsTabs } from "../session-details";
 import { TEXT_AREA } from "../form-field";
 import { RunDot } from "../routines/routine-marks";
+import { compact, dollars, full } from "../settings/analytics-format";
+import { percent } from "../settings/table";
 import { BotAvatar } from "./bot-avatar";
 import { BotLookPicker } from "./bot-look-picker";
 
@@ -180,22 +184,19 @@ function MemoryList({ bot, memory }: { bot: Bot; memory: string }) {
 	);
 }
 
-/** The Bot's routines, each opening the card of them with its row open in place of the conversation, the heading opening the card, and **New routine**; `open` is what the page shows, which they mark. */
+/** The Bot's routines, each opening the card of them with its row open in place of the conversation, **All routines** opening the card, and **New routine**; `open` is what the page shows, which they mark. */
 function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: readonly Routine[]; open: OpenRoutine; connected: boolean }) {
 	const openId = open.kind === "open" || open.kind === "edit" ? open.routine.id : null;
-	const id = useId();
 	return (
-		<section aria-labelledby={id} className="space-y-2">
+		<div className="space-y-2">
 			<div className="flex items-center justify-between gap-2">
-				<h3 id={id} className="text-xs font-medium text-muted-foreground">
-					<a
-						href={hashForBotRoutine(bot.id, { kind: "list" })}
-						aria-current={open.kind === "list" ? "page" : undefined}
-						className="rounded-sm underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:text-foreground"
-					>
-						Routines
-					</a>
-				</h3>
+				<a
+					href={hashForBotRoutine(bot.id, { kind: "list" })}
+					aria-current={open.kind === "list" ? "page" : undefined}
+					className="rounded-sm text-xs font-medium text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:text-foreground"
+				>
+					All routines
+				</a>
 				{connected ? (
 					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={Plus}>
 						<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined}>
@@ -236,6 +237,41 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 					})}
 				</ul>
 			)}
+		</div>
+	);
+}
+
+/** What the Bot's conversation used over all time, its subagents folded in, read again when a turn ends. */
+function BotUsage({ bot, host }: { bot: Bot; host: RosterHost | null }) {
+	const id = useId();
+	const { data: session, error, settled } = useRead<AnalyticsSession | null>(bot.sessionId === null ? null : `/api/analytics/session?${new URLSearchParams({ session: bot.sessionId })}`, host?.status);
+	const muted = (text: string) => <p className="text-xs text-muted-foreground">{text}</p>;
+	let body: ReactNode;
+	if (session) {
+		const { usage, subagentTokens } = session;
+		const { tokens } = usage;
+		body = (
+			<div className="space-y-0.5 tabular-nums">
+				<p className="text-lg font-semibold">
+					<span title={`${full.format(tokens.total)} tokens`}>{compact.format(tokens.total)} tokens</span>
+					<span className="text-muted-foreground"> · </span>
+					<span title="API list price, not your subscription bill">{dollars(usage.cost)}</span>
+				</p>
+				{muted(`${compact.format(tokens.input)} input · ${compact.format(tokens.output)} output · ${compact.format(tokens.cacheRead)} cache read · ${compact.format(tokens.cacheWrite)} cache write`)}
+				{muted(`${full.format(usage.requests)} ${usage.requests === 1 ? "request" : "requests"}${usage.failed > 0 ? `, ${full.format(usage.failed)} failed` : ""} · ${percent.format(usage.cacheRate)} cache hit rate`)}
+				{subagentTokens > 0 && muted(`${compact.format(subagentTokens)} tokens from subagents`)}
+			</div>
+		);
+	} else if (error) body = muted(`Cannot read usage: ${error}`);
+	else if (bot.sessionId === null || settled) body = muted("No requests yet.");
+	// Holds the numbers' height while they load, so Delete below does not jump.
+	else body = <div aria-hidden="true" className="h-16" />;
+	return (
+		<section aria-labelledby={id} className="space-y-2">
+			<h3 id={id} className="text-xs font-medium text-muted-foreground">
+				Usage
+			</h3>
+			{body}
 		</section>
 	);
 }
@@ -280,10 +316,22 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 							</div>
 							<JobEditor key={bot.job} bot={bot} connected={connected} />
 							<MemoryList bot={bot} memory={memory} />
-							<BotRoutines bot={bot} routines={routines} open={routine} connected={connected} />
+							<BotUsage bot={bot} host={host} />
 							<div className="border-t border-border pt-4">
 								<DeleteBot bot={bot} connected={connected} />
 							</div>
+						</div>
+					),
+				},
+				{
+					value: "routines",
+					icon: Repeat,
+					name: "Routines",
+					control: "bots.tab.routines",
+					count: routines.length,
+					content: (
+						<div className="px-4 pt-2 pb-4">
+							<BotRoutines bot={bot} routines={routines} open={routine} connected={connected} />
 						</div>
 					),
 				},
