@@ -8,8 +8,9 @@ import { selectorOf } from "./shared/models";
 /** How many sessions the page lists. */
 export const TOP_SESSIONS = 20;
 
-/** What the dashboard knows of a session from its file for Analytics: its title and the workspace it counts in. */
+/** What the dashboard knows of a session from its file for Analytics: the file, its title, and the workspace it counts in. */
 export interface SessionSummary {
+	file: string;
 	title: string | null;
 	workspace: string;
 }

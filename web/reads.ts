@@ -20,7 +20,7 @@ import {
 	type LocalEventsAnswer,
 } from "../src/shared/calendar";
 import { decodeEmailAnswer, type EmailAnswer, type MailThread, type ThreadAnswer } from "../src/shared/gmail";
-import { type Analytics, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
+import { type Analytics, type AnalyticsSession, type ContextReport, decodeAnalytics } from "../src/shared/analytics";
 import { type ActivityRead, decodeActivity } from "../src/shared/activity";
 import { decodePullRequestList, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestEdit, type PullRequestList, type PullRequestViewedEdit, type RepoPullRequests } from "../src/shared/github";
 import type { MergeQueueAnswer, MergeQueueChange } from "../src/shared/merge-queue";
@@ -82,6 +82,11 @@ export const terminalSessionsStore = createPolledStore<CollabAutoStart>({ url: (
 export const starterKitStore = createPolledStore<StarterKitStatus>({ url: () => "/api/readiness/starter-kit" });
 /** GitHub's and Graphite's CLIs, the pull settings, and the workspaces' repositories, as Settings' Source control tab shows them. */
 export const sourceControlStore = createPolledStore<SourceControlAnswer>({ url: () => "/api/source-control" });
+/** What one session used over all time, its subagents folded in, by session id; `null` before its first request. */
+export const sessionUsageStore = createPolledStore<AnalyticsSession | null>({
+	url: session => `/api/analytics/session?${new URLSearchParams({ session: session ?? "" })}`,
+	pollMs: 5_000,
+});
 
 export async function setTerminalAccess(access: TerminalAccess): Promise<void> {
 	const answer = await putJson<CollabAutoStart>("/api/readiness/terminal-sessions", { access });

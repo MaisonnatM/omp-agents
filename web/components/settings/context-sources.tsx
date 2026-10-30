@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import { folderName } from "../../labels";
 import { contextStore } from "../../reads";
 import { LoadNote } from "../sheet-details";
-import { compact, dollars, full } from "./analytics-format";
-import { Count, percent, RowHead } from "./table";
+import { compact, dollars, full, percent } from "./analytics-format";
+import { Count, RowHead } from "./table";
 
 const kindLabel: Record<ContextSourceKind, string> = {
 	file: "Instruction file",

@@ -7,10 +7,10 @@ import { folderName, modelLabel, modelOrg, providerLabel, readTime } from "../..
 import { analyticsStore } from "../../reads";
 import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
-import { compact, dollars, full } from "./analytics-format";
+import { compact, dollars, full, percent } from "./analytics-format";
 import { ContextSources } from "./context-sources";
 import { RangePicker, useRangedRead } from "./range";
-import { Count, percent, RowHead, Table } from "./table";
+import { Count, RowHead, Table } from "./table";
 
 // `recharts` is a chunk of its own, loaded when the tab first draws its chart.
 const ProviderTrend = lazy(() => import("./provider-trend").then(module => ({ default: module.ProviderTrend })));

@@ -6,6 +6,7 @@ import type { Database } from "bun:sqlite";
 import type { Pricer } from "../foreign/usage";
 import type { AnalyticsRange } from "../shared/analytics";
 import type { CreditsSubject } from "../shared/notices";
+import { artifactsDir } from "../subagents";
 import type { StatsDashboard, StatsProviderPoint, StatsSync, StatsToolDashboard } from "./modules";
 import { catalog, rateLimit, statsAggregator, statsDb, statsLive, statsRollup } from "./modules";
 
@@ -45,14 +46,20 @@ export interface StatsRead {
 	providerSeries: StatsProviderPoint[];
 }
 
-const SESSION_MODEL_ROWS = `
+const SESSION_MODEL_COLUMNS = `
 	SELECT session_file AS sessionFile, MAX(folder) AS folder, provider || '/' || model AS selector,
 		COUNT(*) AS requests, SUM(stop_reason = 'error') AS failed,
 		SUM(input_tokens) AS input, SUM(output_tokens) AS output,
 		SUM(cache_read_tokens) AS cacheRead, SUM(cache_write_tokens) AS cacheWrite,
 		SUM(CASE WHEN agent_type = 'subagent' THEN total_tokens ELSE 0 END) AS subagentTokens,
 		TOTAL(cost_total) AS cost, MAX(timestamp) AS lastAt
-	FROM messages WHERE timestamp >= ?
+	FROM messages`;
+
+const SESSION_MODEL_ROWS = `${SESSION_MODEL_COLUMNS} WHERE timestamp >= ? GROUP BY session_file, provider, model`;
+
+// `'0'` is the character after `/`, so the range holds every file under the session's subagent directory.
+const ONE_SESSION_MODEL_ROWS = `${SESSION_MODEL_COLUMNS}
+	WHERE session_file = ?1 OR (session_file > ?2 AND session_file < ?3)
 	GROUP BY session_file, provider, model`;
 
 const CREDITS_WINDOW_MS = 24 * 60 * 60_000;
@@ -106,6 +113,16 @@ export async function readStats(range: AnalyticsRange): Promise<StatsRead> {
 	const rows = db.query<SessionModelRow, [number]>(SESSION_MODEL_ROWS).all(cutoff ?? 0);
 	const window = { cutoff, bucketMs, now };
 	return { window, dashboard, tools, sync: statsLive.statsLive().status().sync, rows, providerSeries: statsRollup.getProviderTimeSeries(window) };
+}
+
+/** What one session file and its subagents' files used by model in `db`, over all time. */
+export function sessionRows(db: Database, file: string): SessionModelRow[] {
+	const subagents = artifactsDir(file);
+	return db.query<SessionModelRow, [string, string, string]>(ONE_SESSION_MODEL_ROWS).all(file, `${subagents}/`, `${subagents}0`);
+}
+
+export async function readSessionRows(file: string): Promise<SessionModelRow[]> {
+	return sessionRows(await openLiveStats(), file);
 }
 
 /** omp's list price from its bundled model catalog, as omp prices its own requests; 0 for a model the catalog does not list. */

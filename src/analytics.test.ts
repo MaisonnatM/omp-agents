@@ -11,7 +11,7 @@ function row(sessionFile: string, selector: string, total: number, lastAt: numbe
 }
 
 /** `beta`'s transcript was deleted, so only omp-stats remembers it. */
-const facts = (id: string) => (id === "alpha" ? { title: "Fix billing", workspace: "/work/app" } : null);
+const facts = (id: string) => (id === "alpha" ? { file: `${parent}.jsonl`, title: "Fix billing", workspace: "/work/app" } : null);
 
 describe("analytics session usage", () => {
 	test("a nested subagent folds into its parent, and a deleted session takes its workspace from a listed neighbor", () => {
@@ -216,7 +216,7 @@ test("foreign requests merge into the same totals, models, providers, buckets, w
 			{ provider: "openai", model: "gpt-a", timestamp: 2_100, failed: false, input: 3, output: 2, cacheRead: 5, cacheWrite: 0, cost: 4 },
 		] },
 	]);
-	const answer = buildAnalytics("7d", merged, root, id => id === "alpha" ? facts(id) : id === "beta" ? { title: "Codex fix", workspace: "/work/codex" } : null);
+	const answer = buildAnalytics("7d", merged, root, id => id === "alpha" ? facts(id) : id === "beta" ? { file: "/codex/2026/10/01/rollout-beta.jsonl", title: "Codex fix", workspace: "/work/codex" } : null);
 	expect(answer.totals).toEqual({ requests: 4, failed: 1, tokens: { input: 18, output: 12, cacheRead: 18, cacheWrite: 12, total: 60 }, cost: 10, cacheRate: 0.5 });
 	expect(answer.models).toEqual([
 		{ selector: "openai/gpt-a", tokensPerSecond: 20, requests: 2, failed: 0, tokens: { input: 13, output: 7, cacheRead: 10, cacheWrite: 0, total: 30 }, cost: 5, cacheRate: 10 / 23 },
