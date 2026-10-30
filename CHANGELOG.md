@@ -12,6 +12,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A Bot's Details tab now shows its Usage: the tokens its conversation used and what they would cost at list price, with its requests and cache hit rate.
 - Putting a pull request live from another folder now checks it in that folder, so the checks read the right pull request and its own review rules.
 - Putting live a pull request of another of your repositories is refused with the folder to run it from, where it used to skip the review checks.
+- A todo can name the workspace it is about, such as yampa or omp-agents: pick it from the open todo's Workspace button, and its row shows the workspace's name.
+- Work on it, Plan it, Start session, and the new-session board start a todo's session in its workspace instead of the sidebar's.
+- A todo an agent adds belongs to the workspace that session runs in, unless the agent names another.
+- When a session finds its work belongs in another project, it now moves itself there once its turn ends, and the sidebar follows; before, it asked you to type /move.
 - The End session button in a session's header is now a filled button, so it stands out.
 - The End session button in a session's header shows its stop icon again; it was an empty, invisible button.
 - You can pin a Bot to keep it at the top of the Bots tab and the gallery: right-click it and choose Pin.

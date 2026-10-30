@@ -81,6 +81,9 @@ A Collab terminal session has no `branch` frame, so only a dashboard session off
 omp's `/move` sends `config_update` too, and the state read after it finds a new session file: the session takes its working directory from that file's header, clears its subagents when the session id changed, and reports `switched`, so the roster and the views follow the moved file.
 omp writes a moved session that has no reply yet only with its first reply, so until that file exists the session keeps its old file and directory, and a later state read follows it.
 The composer's directory picker sends `/move <path>` as a plain `prompt`, only to an idle dashboard session, since omp refuses to move while a turn runs.
+`SessionMoves` in `src/server/session-moves.ts` lets the agent ask for the same move: `join` gives every dashboard-started main session but a Bot's conversation the strict host tool `move_session`, which takes an absolute or `~` path, since the tool cannot know the session's own directory, checks it is a directory, and answers that the move waits for the turn's end.
+A tool's closure cannot name its instance, since `reattachAll` builds the tools and `attach` from two `joinFor` calls, so the server binds the call through the session's own events: a `tool_execution_end` without error for that call's id queues the directory on the instance that reported it, the last call of a turn winning.
+At `turn-ended`, which the session reports just before it shows idle, the server waits a microtask, then sends `/move <path>` as the composer does when the session is idle, and otherwise keeps the move for the next turn end; `exited` drops it.
 The dashboard serializes model, effort, and fast-mode setters with state reads in a separate `SerialLane` from turn commands.
 Event-driven refreshes coalesce while queued, so a read cannot overwrite a later switch, and switching stays visible until every queued model change has finished.
 

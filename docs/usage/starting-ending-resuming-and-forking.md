@@ -4,7 +4,7 @@
   The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker in the composer, left of the model menu, shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   Above the composer, under **Start a session**, a board lists up to four items in each of three columns.
-  **Todos for agents** lists the open todos by status, as the Todo page orders them; clicking one starts a draft from it, as **Start** on the Todo page does.
+  **Todos for agents** lists the open todos by status, as the Todo page orders them; clicking one starts a draft from it, in the todo's workspace when it names one, as **Start session** on the Todo page does.
   **Pick up where you left off** lists the selected workspace's omp sessions, interrupted ones first, then the latest; clicking one resumes it.
   **Pull requests waiting** lists the Pull requests board's **Your move** column, keeping the pull requests that a quick action hands to an agent; clicking one runs that quick action, as its badge on the Pull requests page does.
   **All** opens the Todo page or the Pull requests page.
@@ -27,6 +27,9 @@
   The sidebar's workspace picker switches to the new directory's workspace, as for a session you start there, unless it shows all workspaces.
   The picker is disabled while a turn runs or waits on a question, since omp moves only an idle session.
   A typed `/move <path>` works the same way; in a session with no reply yet, the dashboard follows the move once omp writes the first reply.
+  A session's agent can ask for the move itself: when it finds the work belongs in another directory, its `move_session` tool queues the move, and the dashboard sends `/move <path>` once the turn ends, so the session, its header, and the sidebar's workspace picker follow as they do for the picker.
+  A turn that a queued message starts at once keeps the move waiting for the next idle end, and a move omp refuses shows its reason as a note in the conversation.
+  Only a session the dashboard started has the tool, except a Bot's conversation, whose directory stays fixed; a session in a terminal still asks you to type `/move`.
 - The draft's composer has the model menu at its bottom left, as a running session's does, without its Fast row.
   Until you pick one, it names the `default` role's model, such as **Opus 5.5**, which is the model omp starts on without `--model`.
   It reads **Default model** only when no `default` role names a model you are connected to.

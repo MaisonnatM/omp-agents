@@ -1,6 +1,6 @@
 # Todo list
 
-- The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a workspace, in place of the panes.
+- The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session, in place of the panes; a top-level todo can name the workspace it is about, and every list still shows todos of every workspace.
   The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Archive**, then your categories, each with how many top-level todos are open in it.
   Each category has a color checkbox, and its todos carry a badge of that color.
   Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, and `#todo/<category id>` address them.
@@ -11,7 +11,7 @@
   **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
 - The **+** beside **Categories** adds a category; type its name and press Enter, and the page opens it.
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
-- **Add a todo** at the end of a list's **Todo** group, or C outside a text field, starts a new todo in that list's category; type its title and press Enter.
+- **Add a todo** at the end of a list's **Todo** group, or C outside a text field, starts a new todo in that list's category, in the sidebar's selected workspace, or in none under **All workspaces**; type its title and press Enter.
   The **+** in a group's header starts one of that group's status instead.
   Enter then starts the next todo below it, of the same status, and Enter on an empty one, Esc, or a click elsewhere stops.
 - A new todo's title, here or in the command menu's **Create todo**, can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
@@ -19,7 +19,7 @@
   They set the todo's due day and category and leave its title, and a word that names neither stays in the title.
   A weekday names its next date, today included.
 - Cmd+Enter or Ctrl+Enter on a new or edited top-level todo saves it and opens its **Start session** draft.
-- A todo can hold todos of its own, one level down and no deeper, and they share its category.
+- A todo can hold todos of its own, one level down and no deeper, and they share its category and its workspace.
   Tab while typing a todo moves it under the todo above it, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
   Tab does nothing on a todo that holds todos of its own, since they would end up three deep, nor on one with links, which a todo under another cannot hold.
   The **+** that shows on hover adds a todo under that one.
@@ -63,7 +63,9 @@
   Outside a text field, ↓ and ↑ focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
   While a todo is open, ↓ and ↑ open the next and previous one instead, and Esc closes it.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
-  Under it, buttons show its status, its priority, its assignee, its category for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
+  Under it, buttons show its status, its priority, its assignee, its category and its **Workspace** for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
+  The **Workspace** menu lists **No workspace** and the workspaces the sidebar lists, each by folder name and path.
+  A top-level todo with a workspace shows a folder chip with its name in the list, whose tooltip gives the path its sessions start in.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
   Its notes follow, always formatted.
   Click into them and type: markdown at the start of a line formats it as you type, `# ` a heading, `- ` a bullet, `1. ` a numbered list, `[ ] ` or `[x] ` a check item, `> ` a quote, and ```` ``` ```` a code block.
@@ -81,11 +83,11 @@
 - A top-level todo shows what it links to: a session, a pull request, or a Linear issue, as an icon in the list and a chip under **Links** in the open todo, each opening it here.
   Each shows the icon of the sidebar tab it opens: **Sessions**, **Pull requests**, or **Tickets**.
   A running session shows its status dot; an open todo's **×** on a chip unlinks it.
-- An open top-level todo's **Work on it** and **Plan it** start a session at once, in the sidebar's workspace, through the pinned skill when one is pinned, and link it to the todo.
+- An open top-level todo's **Work on it** and **Plan it** start a session at once, in the todo's workspace, else the sidebar's, through the pinned skill when one is pinned, and link it to the todo.
   **Work on it** does what the todo asks from its title, notes, and open sub-todos, in a git worktree on a new branch when it changes code, then commits and reports without pushing.
   **Plan it**, on a todo not **In Progress** yet, reads what the todo concerns and reports a plan without changing anything.
   The button waits while the session starts, and a start that fails says why in the card, naming the todo by its title.
-- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's workspace, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it.
+- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the todo's workspace, else the sidebar's, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it, and its directory wins over the todo's.
   A session started from a todo links to it once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
   It reports success only once the server's todo list holds the link.
@@ -98,13 +100,14 @@
 
 ## Todos from agents
 
-- The `user_todo` tool lets an omp session list your todos, add one, check one off, which marks it **Done**, edit one's title, notes, due day, or category, or delete one; it cannot set another status, move a todo, or add, rename, or remove a category.
+- The `user_todo` tool lets an omp session list your todos, add one, check one off, which marks it **Done**, edit one's title, notes, due day, category, or workspace, or delete one; it cannot set another status, move a todo, or add, rename, or remove a category.
   It comes from `~/.omp/agent/extensions/todos.ts`, which `bun run omp-template` installs.
 - An agent adds a todo when it stops on a step outside the session that only you can take, such as setting up an account or a credential, running something on your machine, or reviewing a pull request.
   It asks for an approval or an answer in its reply, not in a todo.
   The todo lands last, as **Todo** with no priority, in no category unless the agent names one that exists; when the category it names does not exist, the todo lands in none and the agent is told which categories do, and its chip names the session that added it and opens it.
+  It lands in the workspace the session runs in, a linked worktree counting in its repository's main checkout, unless the agent names another directory, or an empty one for none; a path that is not a directory is refused.
 - An agent edits or deletes a todo when you ask it to, or to fix or drop one its session added.
-  `edit` changes only the fields it names: its notes replace the todo's, an empty `due` clears the due day, and an empty `section` takes a top-level todo out of its category; a todo under another has no category.
+  `edit` changes only the fields it names: its notes replace the todo's, an empty `due` clears the due day, an empty `section` takes a top-level todo out of its category, and an empty `workspace` takes it out of its workspace; a todo under another has no category or workspace of its own.
   `edit` and `delete` refuse an id the list lacks, and a deleted todo leaves the list and the archive with no undo.
 - At each prompt, a session is told which open top-level todo links to it, such as the one its **Work on it**, **Plan it**, or **Start session** started, and which open todos it added.
   Its agent checks a linked todo off once it finishes the work, and leaves it open while the work still waits on you.
@@ -112,4 +115,5 @@
   Any agent also checks off a todo whose work you ask it to do.
 - `add` and `check` take an empty `due`, `text`, or `id` as absent; `edit` refuses an empty `text`.
 - The tool leaves each change as a file in `todo-inbox/` beside `todos.json`, and the server applies it and deletes the file, so a todo an agent adds while the dashboard is down shows once it starts.
-  A file that is not a change an agent may make, an add, a check, an edit, or a deletion, moves to `<name>.invalid`.
+  A file that is not a change an agent may make, an add, a check, an edit, a workspace change, or a deletion, moves to `<name>.invalid`.
+  The server finds an added or changed workspace's main checkout through git, and applies the inbox's changes one at a time, so an edit never lands before the add it edits.
