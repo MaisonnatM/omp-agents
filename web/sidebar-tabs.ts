@@ -72,8 +72,8 @@ export const shownTabs = (layout: TabLayout, signedOut: ReadonlySet<SidebarTab>)
 /** The tabs of `shown` whose triggers sit at `place`, in their order. */
 export const placedTabs = (shown: readonly SidebarTab[], place: TabPlace): SidebarTab[] => shown.filter(tab => TAB_ROWS[tab].place === place);
 
-/** Whether `panel` belongs to the tab bar, which the sidebar draws above it; Settings and the header's tabs show their panel alone. */
-export const panelOnBar = (panel: SidebarPanel): boolean => panel !== "settings" && TAB_ROWS[panel].place === "bar";
+/** Whether the sidebar draws the tab bar above `panel`: Settings keeps it, with no tab selected, so a tab leads out of Settings; the header's tabs show their panel alone. */
+export const panelOnBar = (panel: SidebarPanel): boolean => panel === "settings" || TAB_ROWS[panel].place === "bar";
 
 /** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
