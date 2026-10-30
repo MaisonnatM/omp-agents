@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-30
 
+- Putting a pull request live from another folder now checks it in that folder, so the checks read the right pull request and its own review rules.
+- Putting live a pull request of another of your repositories is refused with the folder to run it from, where it used to skip the review checks.
 - The End session button in a session's header is now a filled button, so it stands out.
 - The End session button in a session's header shows its stop icon again; it was an empty, invisible button.
 - You can pin a Bot to keep it at the top of the Bots tab and the gallery: right-click it and choose Pin.
