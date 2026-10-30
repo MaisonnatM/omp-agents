@@ -6,12 +6,7 @@ When the user invokes `thermo-nuclear-code-quality-review`, asks for a thermonuc
 Its `model: "@plan"` frontmatter follows `modelRoles.plan` and that role's fallback chain on any provider.
 Pass the review scope and user arguments, then relay the findings verbatim.
 Run the skill through this agent, not in the session model.
-
-When the review targets a PR, add `- [x] Thermo-nuclear code quality review` only after the review's fixes are committed and pushed.
-A review that was only run, not applied, does not earn the checkbox.
-Read the current description with `pr_description({repo:"<owner>/<repo>", pr:<N>, change:{kind:"read"}})`, then update it with the same tool's `append` or `replace-text` change without overwriting other content.
-If the checkbox already exists, leave it unchanged.
-Append it under an existing checklist; otherwise add a `## Checks` section before any `<!-- CURSOR_SUMMARY -->` Bugbot block, or at the end when there is no such block.
+Apply the findings, commit and push, then add its checkbox as [Review checkboxes](#review-checkboxes) says.
 
 ## When a pull request needs the review
 
@@ -30,8 +25,16 @@ It then checks the change against the app's own design system, which it reads fr
 It flags a raw element where a shared component exists, a component that duplicates one, a shared component used against its siblings' pattern, hard-coded values where a token exists, and layout, state, or copy that departs from sibling screens, each citing the component, token, or sibling it should match.
 It also lists, under **New patterns**, each kind of UI the change presents in a new way where the app has one established way, such as a list shown as cards in an app whose lists are all tables, even when the PR justifies it.
 The kit does not ship those skills: when one is missing, the agent names it and stops without reviewing, and the user installs it before the stage resumes.
-Apply the findings in a fresh agent, commit and push, then append `- [x] Interface review` to the PR body the way the thermonuclear checkbox is added.
+Apply the findings in a fresh agent, commit and push, then add its checkbox as [Review checkboxes](#review-checkboxes) says.
+
+## Review checkboxes
+
+A review earns its PR checkbox however it ran: in `/ship`, through its reviewer agent, or with its skill invoked directly.
+When the reviewed change has a PR, add the checkbox once the review's fixes are committed and pushed: `- [x] Thermo-nuclear code quality review` for the thermonuclear review, `- [x] Interface review` for the interface review.
 A review that was only run, not applied, does not earn the checkbox.
+Read the current description with `pr_description({repo:"<owner>/<repo>", pr:<N>, change:{kind:"read"}})`, then update it with the same tool's `append` or `replace-text` change without overwriting other content.
+If the checkbox already exists, leave it unchanged.
+Append it under an existing checklist; otherwise add a `## Checks` section before any `<!-- CURSOR_SUMMARY -->` Bugbot block, or at the end when there is no such block.
 
 ## Proof boxes
 

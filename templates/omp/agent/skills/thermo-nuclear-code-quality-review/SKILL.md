@@ -190,3 +190,7 @@ Treat these as presumptive blockers unless the author can justify them clearly:
 - the PR duplicates an existing helper or puts logic in the wrong layer when there is a clear canonical home
 
 If those conditions are not met, leave explicit, actionable feedback and push for a cleaner decomposition.
+
+## After the Review
+
+When the reviewed change has a pull request, the session that applies the findings adds `- [x] Thermo-nuclear code quality review` to its description once those fixes are pushed, with `pr_description` as `~/.omp/agent/docs/review-workflow.md` says under **Review checkboxes**.
