@@ -140,6 +140,7 @@ export const CONTROLS = [
 	{ id: "browser.reload", label: "Browser reload", area: "Browser" },
 	{ id: "browser.server", label: "Browser dev server menu", area: "Browser" },
 	{ id: "browser.start-server", label: "Browser Start dev server", area: "Browser" },
+	{ id: "browser.stop-server", label: "Browser Stop dev server", area: "Browser" },
 	{ id: "browser.select-element", label: "Browser Pick in the app", area: "Browser" },
 	{ id: "browser.screenshot", label: "Browser Screenshot", area: "Browser" },
 	{ id: "browser.review-visuals", label: "Browser Review visuals", area: "Browser" },

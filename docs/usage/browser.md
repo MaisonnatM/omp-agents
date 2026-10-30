@@ -9,6 +9,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - The Browser opens on the address you last loaded for that session in the last 30 days, else on the first dev server the session runs.
   A dev server is a job or a service of the session, as the status bar's CPU card lists them, that listens on a port; omp's shared browser is never one.
   The server button lists every dev server the session runs, with its port, and picking one loads it.
+  Each reads as its command without the folders before each program, as the CPU card shows it, such as `dev-23456: zsh -l -c bun run dev`; hover one for the whole command.
   With none, the Browser says so; start one with **Start dev server** below, or type its address.
   **Start dev server**, under that message and at the bottom of the server menu, starts the project's dev server itself, in the worktree the session works in, as a service the session owns, and loads it in the Browser.
   It runs the `dev` script of the project's `package.json`, else its `start` script, with the package manager its lockfile names, bun, pnpm, yarn, or else npm, on a free port from 20000 to 39999, passed as `PORT` and, to a server that takes it, such as Vite, Next, Astro, or Nuxt, as `--port`.
@@ -18,6 +19,9 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   It leaves the start to the session when the script sets its own port, such as `--port 3000`, or runs several servers, such as with `concurrently` or `&`, since that port may be another checkout's or one you use.
   It does the same when the project's `.env`, `.env.local`, `.env.development`, or `.env.development.local` points the app at a server on this computer, such as `PUBLIC_API_URL=http://localhost:8000`, since the app would then talk to whatever runs there, maybe the API of another checkout; the session is asked to start that server from the same worktree on its own port too.
   When it cannot, because the project has no `package.json` or no `dev` or `start` script, for one of those reasons, or the server exits as it starts, it asks the session to run its dev server instead, with the reason and the server's last output, and a message shows the reason; a running turn gets it as a follow-up, and the Browser finds the server once it listens.
+- **Stop dev server**, below **Start dev server** in the server menu while the session runs one, stops it as the CPU card's **Stop** does, whether **Start dev server** or the session started it, and a message names what stopped.
+  With two or more, it opens a list of them, each with its ports, and picking one stops that one; a server that listens on several ports, such as Vite with its reload port, is one entry.
+  The page it served stays in the Browser until you reload or load another address.
 - The address field loads what you type when you press Enter; `localhost:5173` reads as `http://localhost:5173`.
   The address field loads only addresses on this computer, `localhost`, `127.0.0.1`, and `[::1]`.
   The app itself can go anywhere on the web, so a sign-in that goes through Google or another provider and comes back finishes in the Browser, and a sign-in popup opens as a small window of the app with the same sign-ins.

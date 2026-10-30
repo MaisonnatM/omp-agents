@@ -3,7 +3,7 @@
  * tab, where the elements selected and the marks drawn on the page land in the session's composer as one chip and its
  * picture, and a whole page as an image.
  */
-import { AppWindow, ArrowLeft, ArrowRight, Camera, ExternalLink, Eye, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server, Sparkles, X } from "lucide-react";
+import { AppWindow, ArrowLeft, ArrowRight, Camera, CircleStop, ExternalLink, Eye, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server, Sparkles, X } from "lucide-react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -11,16 +11,17 @@ import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
 import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuShortcut } from "@/components/ui/menu";
+import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { browserCandidates, initialAddress } from "../browser-model";
+import { browserCandidates, type DevServer, devServers, initialAddress } from "../browser-model";
+import { commandLabel } from "../labels";
 import { latestReviewPages, type ReviewPage, samePages } from "../review-pages";
 import { type PaneData, usePaneSelect } from "../pane-store";
-import { sessionProcessesStore, writeStartServer } from "../reads";
+import { sessionProcessesStore, writeProcessStop, writeStartServer } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
@@ -235,7 +236,8 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 	onReview: () => void;
 }) {
 	const { read } = sessionProcessesStore.use();
-	const candidates = useMemo(() => browserCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
+	const servers = useMemo(() => devServers(read?.data ?? null, view.instanceId), [read, view.instanceId]);
+	const candidates = useMemo(() => browserCandidates(servers), [servers]);
 	const ports = useMemo(
 		() => ({ session: candidates.map(candidate => candidate.port), other: read?.data.find(listed => listed.instanceId === view.instanceId)?.otherPorts ?? [] }),
 		[candidates, read, view.instanceId],
@@ -266,6 +268,10 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 		request({ t: "prompt", view, text: `${START_SERVER_PROMPT}\n\nStarting it directly failed: ${answer.fallback}`, images: [], delivery: "followUp" });
 		toasts.add({ title: "Asked the session to start its dev server", description: answer.fallback });
 	}, "Cannot start the dev server");
+	const stopServer = useAction(async (server: DevServer) => {
+		await writeProcessStop(view.instanceId, server.id);
+		toasts.add({ title: `Stopped ${commandLabel(server.label)}` });
+	}, "Cannot stop the dev server");
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
@@ -319,8 +325,8 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 						{read === null && <MenuItem disabled>Looking for dev servers…</MenuItem>}
 						{read !== null && candidates.length === 0 && <MenuItem disabled>This session runs no dev server</MenuItem>}
 						{candidates.map(candidate => (
-							<MenuItem key={candidate.url} onClick={() => webview.load(candidate.url)}>
-								<span className="min-w-0 flex-1 truncate">{candidate.label}</span>
+							<MenuItem key={candidate.url} title={candidate.label} onClick={() => webview.load(candidate.url)}>
+								<span className="min-w-0 flex-1 truncate">{commandLabel(candidate.label)}</span>
 								<span className="font-mono text-xs text-muted-foreground">:{candidate.port}</span>
 							</MenuItem>
 						))}
@@ -329,6 +335,29 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 							<Play />
 							{startServer.pending ? "Starting dev server…" : "Start dev server"}
 						</MenuItem>
+						{servers.length === 1 && (
+							<MenuItem {...activityControl("browser.stop-server")} disabled={stopServer.pending} onClick={() => stopServer.run(servers[0])}>
+								<CircleStop />
+								<span className="flex-1">{stopServer.pending ? "Stopping dev server…" : "Stop dev server"}</span>
+								<span className="font-mono text-xs text-muted-foreground">{servers[0].ports.map(port => `:${port}`).join(" ")}</span>
+							</MenuItem>
+						)}
+						{servers.length > 1 && (
+							<MenuSubmenu>
+								<MenuSubmenuTrigger {...activityControl("browser.stop-server")} disabled={stopServer.pending}>
+									<CircleStop />
+									{stopServer.pending ? "Stopping dev server…" : "Stop dev server"}
+								</MenuSubmenuTrigger>
+								<MenuSubmenuContent className="max-w-96">
+									{servers.map(server => (
+										<MenuItem key={server.id} title={server.label} onClick={() => stopServer.run(server)}>
+											<span className="min-w-0 flex-1 truncate">{commandLabel(server.label)}</span>
+											<span className="font-mono text-xs text-muted-foreground">{server.ports.map(port => `:${port}`).join(" ")}</span>
+										</MenuItem>
+									))}
+								</MenuSubmenuContent>
+							</MenuSubmenu>
+						)}
 					</DropdownMenuContent>
 				</DropdownMenu>
 				{CAPTURE_AVAILABLE && (
