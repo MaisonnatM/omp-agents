@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-30
 
+- Fixed: a helper agent that works on its own copy of a repository now puts its changes back only where its agent says, and the starter kit refuses to put them in your main copy while it is on main, keeping them aside for you instead.
 - When an agent shows you design options, it names each one, such as Mode chip, and uses that same name in previews, Slack posts, tickets, pull requests, and suggested prompts, so a number never points at the wrong design.
 - The End session button in a session's header is now a filled button, so it stands out.
 - The End session button in a session's header shows its stop icon again; it was an empty, invisible button.

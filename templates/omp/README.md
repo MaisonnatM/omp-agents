@@ -37,7 +37,7 @@ Settings, in `config.yml`:
 - `retry.fallbackChains`: Codex first, Cursor Composer for cheap roles, and open-weight OpenRouter last, with quota-aware skipping enabled.
   Cursor Grok is opt-in rather than an automatic fallback; existing fallback settings are preserved unless `--force` is used.
 - `modelProviderOrder`: the same four providers in the same order.
-- `task.isolation`: `isolated: true` subagents work in their own clone, and successful changes apply back as a patch.
+- `task.isolation`: `isolated: true` subagents work in their own clone of the checkout their `checkout` option names, the session's by default, and successful changes apply back there as a patch.
   At most two subagents run at once.
 - `collab.autoStart: control`: every terminal session publishes itself so that the omp-agents dashboard can drive it.
 
@@ -92,6 +92,7 @@ Files, in `agent/`:
   A file git ignores, such as `.env`, is in no worktree, so its edit there asks the user and goes ahead once approved; a declined edit, or one in a session that cannot ask, stays blocked.
   A clean checkout passes to the next session that changes it, and a session that ends gives up its claims.
   When HEAD is no longer where a session left it, because another process switched the branch, that session's changes there are blocked until a switch it runs as its own command succeeds, back or to the new branch.
+  The changes of an `isolated: true` subagent apply to the checkout its spawn names only where an edit could go, so an apply into the main checkout on its default branch, or into another live session's checkout with uncommitted changes, is refused and its patch kept; the agent names a linked worktree as the spawn's `checkout` instead.
   Reads, files outside git, and the clones omp makes for `isolated: true` subagents pass, and a change in a directory that a variable names is blocked until the command writes the directory out.
   If a session's process dies and you know its work is done, delete the claim file it names; the guard also replaces a claim whose process has ended.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, and delete changes; `add` and `edit` take the name of an existing section, and an `add` naming one that does not exist files the todo in none.

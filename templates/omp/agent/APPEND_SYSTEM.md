@@ -77,10 +77,12 @@ Before tests or a review, screenshot what you built in the same state as the sav
 
 # Subagent isolation
 
-When the checkout is on the default branch (`main`), pass `isolated: true` to
-every `task`/eval `agent()`/`workpool()` spawn that touches a git repo, so the
-subagent works in its own worktree/copy-on-write clone instead of the shared
-checkout. Successful isolated changes apply by patch
+When the checkout is on the default branch (`main`), create a worktree for the
+work and pass `isolated: true` with `checkout` set to that worktree's absolute
+path to every `task` or eval `agent()` spawn that edits a git repo, so the
+subagent works in its own clone of that worktree and its changes apply there.
+The worktree guard refuses to apply them into the main checkout on its default
+branch and keeps them as a patch. Successful isolated changes apply by patch
 (`task.isolation.merge: patch`, `task.isolation.apply: true`). Workspaces can
 remain after completion or interruption; audit them before any removal and
 preserve dirty, pinned, or in-use worktrees.

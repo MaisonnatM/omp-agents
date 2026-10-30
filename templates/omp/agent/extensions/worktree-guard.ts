@@ -5,6 +5,7 @@
 //   lives and the checkout holds uncommitted changes to tracked files, another process's edits, writes, and git, gt, or
 //   `gh pr checkout` commands that change the checkout are blocked, and that process works in a worktree of its own.
 // - Once HEAD is no longer where the owner left it, the owner's changes are blocked until a switch of its own succeeds.
+// - An isolated subagent's changes apply to the checkout its spawn names only where an edit could go; a refused apply keeps them as a patch.
 // Reads, files outside git, internal URLs such as `local://`, and the clones omp makes for isolated subagents pass.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -338,6 +339,17 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 			reason: ctx.hasUI
 				? `${ignoredHere} The user declined this edit. Ask the user how to proceed, and do not edit the file through the shell.`
 				: `${ignoredHere} Editing it there needs the user's approval, which this session cannot ask for. Ask the user to make the change, and do not edit the file through the shell.`,
+		};
+	});
+
+	// The apply writes the subagent's changes into the checkout like an edit, so it answers to the same rules; omp keeps the patch when this refuses.
+	pi.on("before_subagent_apply", (event, ctx) => {
+		const c = checkoutAt(event.checkout);
+		const reason = c && guard(c, "edit", `Applying the changes of isolated subagent ${event.agentId}`, ctx);
+		if (!reason) return;
+		return {
+			block: true,
+			reason: `${reason} Its changes were kept, not applied: apply the kept patch in the right checkout yourself, and spawn each later isolated subagent with \`checkout\` set to that checkout's path.`,
 		};
 	});
 

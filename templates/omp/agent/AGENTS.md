@@ -8,7 +8,7 @@ If `PI_CODING_AGENT_DIR` is set, substitute that directory for `~/.omp/agent` in
 Where to edit follows the branch of the checkout the session runs in, its cwd.
 On the default branch (`main`), a session that will edit starts by creating its worktree with a literal absolute path, `git worktree add -b <branch> ~/code/<repo>-wt/<topic> <base>`, or reuses an existing worktree for the same task.
 Name that absolute path in every later edit, check, and commit, written out with no shell variable or `cd -`: a relative path resolves to the session's cwd on `main`, and the worktree guard reads directories only as written.
-Every subagent that edits files uses `isolated: true`, since its cwd is still the checkout on `main`.
+Every subagent that edits files uses `isolated: true` with `checkout` set to that worktree's absolute path, since its cwd is still the checkout on `main`, where the worktree guard refuses to apply its changes.
 On any other local branch, including a linked worktree, work in place while your session is the one changing that checkout: edit, check, and commit on that branch alongside its existing local changes, and spawn editing subagents without `isolated` in the same checkout, in parallel only on disjoint files.
 When another live session has uncommitted work in that checkout, make a worktree of your own; the worktree guard enforces this, and its reason names the recovery when another process switches your branch.
 Read-only subagents, such as a scout or the thermonuclear reviewer, run without `isolated`; competing attempts at the same change, such as several runners given one task to compare, always use it.
