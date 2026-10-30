@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { REVIEW_OPEN_EVENT } from "./review-pages";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
@@ -104,11 +103,6 @@ export function App() {
 		},
 		[end],
 	);
-	useEffect(() => {
-		const onReview = (): void => latest.current.sidebars.setOpen("right", true);
-		window.addEventListener(REVIEW_OPEN_EVENT, onReview);
-		return () => window.removeEventListener(REVIEW_OPEN_EVENT, onReview);
-	}, []);
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);

@@ -2,7 +2,6 @@
 import type { Item } from "../src/shared/transcript";
 import { isLoopbackUrl } from "../src/shared/desktop-bridge";
 import { keyedStore } from "./keyed-store";
-import { storeOrRemove } from "./stored-state";
 
 /** One page to look at: where it is on this computer, what to call its tab, and how to reach a state its address cannot open. */
 export interface ReviewPage {
@@ -54,20 +53,8 @@ export function latestReviewPages(items: readonly Item[]): ReviewPage[] {
 
 export const NO_REVIEW_PAGES: readonly ReviewPage[] = [];
 
-/** Each live session's review pages, by instance id, which its transcript publishes and its header and Browser read. */
+/** Each live session's review pages, by instance id, which its transcript publishes and its Browser reads. */
 export const reviewPagesStore = keyedStore<readonly ReviewPage[]>(NO_REVIEW_PAGES);
 
 /** Each live session's latest **Review visuals** click, by instance id, which its Browser opens as tabs. */
 export const reviewRequestStore = keyedStore<number>(0);
-
-/** The right sidebar's tab key and default, as `session-details.tsx` keeps them. */
-const TAB_KEY = "omp-agents.plan-tab";
-
-export const REVIEW_OPEN_EVENT = "omp-agents:review-visuals";
-
-/** Shows the right sidebar on its Browser tab and asks session `instanceId`'s Browser to open each review page. */
-export function openReview(instanceId: string): void {
-	storeOrRemove(TAB_KEY, "browser", "pull-requests");
-	reviewRequestStore.set(instanceId, Date.now());
-	window.dispatchEvent(new Event(REVIEW_OPEN_EVENT));
-}

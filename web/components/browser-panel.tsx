@@ -3,7 +3,7 @@
  * tab, where the elements selected and the marks drawn on the page land in the session's composer as one chip and its
  * picture, and a whole page as an image.
  */
-import { AppWindow, ArrowLeft, ArrowRight, Camera, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server, Sparkles, X } from "lucide-react";
+import { AppWindow, ArrowLeft, ArrowRight, Camera, ExternalLink, Eye, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server, Sparkles, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
@@ -114,7 +114,7 @@ interface BrowserTab {
 const MAIN_TAB: BrowserTab = { id: "main", label: "App", page: null };
 
 /**
- * Live session `view`'s Browser: its own page, plus one tab per page it listed for review once **Review visuals** asks.
+ * Live session `view`'s Browser: its own page, plus one tab per page it listed for review once its toolbar's **Review visuals** asks.
  * Every tab stays mounted once opened, so each page keeps its state while another shows.
  */
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
@@ -199,7 +199,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 			{tabs.map(tab => (
 				<div key={tab.id} className={cn("flex min-h-0 flex-1 flex-col", tab.id !== active && "hidden")}>
 					{tab.page?.note && <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">{tab.page.note}</p>}
-					<BrowserPage view={view} sessionId={sessionId} page={tab.page} active={tab.id === active} />
+					<BrowserPage view={view} sessionId={sessionId} page={tab.page} active={tab.id === active} pages={pages} />
 				</div>
 			))}
 		</div>
@@ -211,7 +211,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
  * `sessionId`, else the first port its jobs and services listen on. Each **Attach** of what was picked in it is
  * appended to the view's composer.
  */
-function BrowserPage({ view, sessionId, page, active }: { view: LiveView; sessionId: string; page: ReviewPage | null; active: boolean }) {
+function BrowserPage({ view, sessionId, page, active, pages }: { view: LiveView; sessionId: string; page: ReviewPage | null; active: boolean; pages: readonly ReviewPage[] }) {
 	const { read } = sessionProcessesStore.use();
 	const candidates = useMemo(() => browserCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
 	const ports = useMemo(
@@ -312,7 +312,6 @@ function BrowserPage({ view, sessionId, page, active }: { view: LiveView; sessio
 					<ToolbarButton
 						label="Pick in the app"
 						control="browser.select-element"
-						ai
 						disabled={!webview.ready}
 						pressed={picking.mode !== null}
 						onClick={() => picking.stop() || picking.choose("select")}
@@ -321,8 +320,19 @@ function BrowserPage({ view, sessionId, page, active }: { view: LiveView; sessio
 					</ToolbarButton>
 				)}
 				{CAPTURE_AVAILABLE && (
-					<ToolbarButton label="Screenshot" control="browser.screenshot" ai disabled={!webview.ready} onClick={() => void picking.screenshot()}>
+					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void picking.screenshot()}>
 						<Camera />
+					</ToolbarButton>
+				)}
+				{pages.length > 0 && (
+					<ToolbarButton
+						label={`Review visuals: ${pages.map(each => each.label).join(" · ")}`}
+						control="browser.review-visuals"
+						ai
+						disabled={false}
+						onClick={() => reviewRequestStore.set(view.instanceId, Date.now())}
+					>
+						<Eye />
 					</ToolbarButton>
 				)}
 				<ToolbarButton
