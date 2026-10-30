@@ -7,6 +7,11 @@
   When a routine sent the last message, the line starts with that routine's name instead of **You:**, followed by its prompt or command.
   A blue dot marks a reply you have not read, and the most recent conversation comes first.
   The tab counts the Bots that wait on you: those asking you something, and those with a reply you have not read.
+- Right-click a Bot's row, or its card in the gallery, to **Pin** or **Unpin** it, to move it with **Move to section** into a section or a **New section…** you name, or to take it out with **Remove from section**.
+  Once any Bot is pinned or in a section, the tab and the gallery list **Pinned** first, then each section by name, then **Other Bots**, each most recent first.
+  A pinned Bot shows only under **Pinned**, and unpinning it puts it back in its section.
+  Click a group's name in the tab to fold it; the tab remembers which groups you folded.
+  A section's **⋯** in the tab offers **Rename section…** and **Remove section**, which moves its Bots to **Other Bots**; a section also goes away once its last Bot leaves it.
 - Each Bot's avatar is a colored shape with two eyes, which you pick when you make it and can change later, so a rename keeps its face.
   A Bot made before you could pick keeps the shape and color its id gave it.
   The avatar bobs and glances while the Bot works, or pulses gently when your system asks for reduced motion, and an amber dot marks a question waiting on you.

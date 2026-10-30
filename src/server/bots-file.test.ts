@@ -27,7 +27,7 @@ test("a saved Bot keeps the conversation the server bound it to through an edit 
 	file.apply({ op: "save", bot: { ...scout, job: "Watch the build. Ask before merging." } }, "2026-05-02T09:00:00.000Z");
 	await flushJsonFiles();
 
-	const expected = { ...scout, job: "Watch the build. Ask before merging.", sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z" };
+	const expected = { ...scout, job: "Watch the build. Ask before merging.", sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z", pinned: false, section: null };
 	expect(new BotsFile(path).value).toEqual([expected]);
 	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ bots: [expected] });
 });
@@ -69,4 +69,59 @@ test("a page's change names a Bot by an id that cannot leave its memory director
 	expect(parseBotChange({ op: "save", bot: { ...scout, hue: 26 } })).toBeNull();
 	expect(parseBotChange({ op: "save", bot: { ...scout, name: " Scout ", model: "anthropic/claude-sonnet-4" } })).toEqual({ op: "save", bot: { ...scout, model: "anthropic/claude-sonnet-4" } });
 	expect(parseBotChange({ op: "message", id: "b-1", text: "  " })).toBeNull();
+});
+
+test("a Bot saved before it could be pinned or put in a section is neither", () => {
+	const path = botsPath();
+	writeFileSync(path, JSON.stringify({ bots: [{ ...scout, sessionId: null, createdAt: "2026-05-01T09:00:00.000Z" }] }));
+	expect(new BotsFile(path).value.map(({ pinned, section }) => ({ pinned, section }))).toEqual([{ pinned: false, section: null }]);
+});
+
+test("pinning and moving a Bot survive a restart and an edit of its job, and a section renames or goes for all its Bots at once", async () => {
+	const path = botsPath();
+	const file = new BotsFile(path);
+	const ranger = { ...scout, id: "ranger" as BotId, name: "Ranger" };
+	const janitor = { ...scout, id: "janitor" as BotId, name: "Janitor" };
+	for (const bot of [scout, ranger, janitor]) file.apply({ op: "save", bot }, "2026-05-01T09:00:00.000Z");
+	file.apply({ op: "pin", id: scout.id, pinned: true }, "2026-05-01T09:01:00.000Z");
+	file.apply({ op: "move", id: scout.id, section: "Work" }, "2026-05-01T09:01:00.000Z");
+	file.apply({ op: "move", id: ranger.id, section: "Work" }, "2026-05-01T09:01:00.000Z");
+	file.apply({ op: "move", id: janitor.id, section: "Chores" }, "2026-05-01T09:01:00.000Z");
+	file.apply({ op: "save", bot: { ...scout, job: "Watch the deploy." } }, "2026-05-01T09:02:00.000Z");
+	await flushJsonFiles();
+	const placed = (bots: readonly { id: string; pinned: boolean; section: string | null }[]) => bots.map(({ id, pinned, section }) => [id, pinned, section]);
+	expect(placed(new BotsFile(path).value)).toEqual([["scout", true, "Work"], ["ranger", false, "Work"], ["janitor", false, "Chores"]]);
+
+	expect(file.apply({ op: "rename-section", from: "Work", to: "Day job" }, "2026-05-01T09:03:00.000Z")).toBe(true);
+	expect(placed(file.value)).toEqual([["scout", true, "Day job"], ["ranger", false, "Day job"], ["janitor", false, "Chores"]]);
+	expect(file.apply({ op: "rename-section", from: "Chores", to: null }, "2026-05-01T09:04:00.000Z")).toBe(true);
+	expect(placed(file.value)).toEqual([["scout", true, "Day job"], ["ranger", false, "Day job"], ["janitor", false, null]]);
+});
+
+test("a pin, move, or section rename that changes nothing leaves the Bots as they were", () => {
+	const file = new BotsFile(botsPath());
+	file.apply({ op: "save", bot: scout }, "2026-05-01T09:00:00.000Z");
+	file.apply({ op: "move", id: scout.id, section: "Work" }, "2026-05-01T09:00:00.000Z");
+	const before = file.value;
+	expect(file.apply({ op: "pin", id: scout.id, pinned: false }, "2026-05-01T09:01:00.000Z")).toBe(false);
+	expect(file.apply({ op: "move", id: scout.id, section: "Work" }, "2026-05-01T09:01:00.000Z")).toBe(false);
+	expect(file.apply({ op: "pin", id: "gone" as BotId, pinned: true }, "2026-05-01T09:01:00.000Z")).toBe(false);
+	expect(file.apply({ op: "rename-section", from: "Work", to: "Work" }, "2026-05-01T09:01:00.000Z")).toBe(false);
+	expect(file.apply({ op: "rename-section", from: "Nowhere", to: "Work" }, "2026-05-01T09:01:00.000Z")).toBe(false);
+	expect(file.value).toBe(before);
+});
+
+test("a page's pin, move, and section rename name a section of 1 to 60 characters, trimmed", () => {
+	expect(parseBotChange({ op: "pin", id: "b-1", pinned: true })).toEqual({ op: "pin", id: "b-1" as BotId, pinned: true });
+	expect(parseBotChange({ op: "pin", id: "b-1", pinned: "yes" })).toBeNull();
+	expect(parseBotChange({ op: "move", id: "b-1", section: "  Work  " })).toEqual({ op: "move", id: "b-1" as BotId, section: "Work" });
+	expect(parseBotChange({ op: "move", id: "b-1", section: null })).toEqual({ op: "move", id: "b-1" as BotId, section: null });
+	expect(parseBotChange({ op: "move", id: "b-1", section: "   " })).toBeNull();
+	expect(parseBotChange({ op: "move", id: "b-1", section: "x".repeat(61) })).toBeNull();
+	expect(parseBotChange({ op: "move", id: "b-1", section: "x".repeat(60) })).toEqual({ op: "move", id: "b-1" as BotId, section: "x".repeat(60) });
+	expect(parseBotChange({ op: "move", id: "b-1" })).toBeNull();
+	expect(parseBotChange({ op: "rename-section", from: " Work ", to: "Day job" })).toEqual({ op: "rename-section", from: "Work", to: "Day job" });
+	expect(parseBotChange({ op: "rename-section", from: "Work", to: null })).toEqual({ op: "rename-section", from: "Work", to: null });
+	expect(parseBotChange({ op: "rename-section", from: "", to: "Day job" })).toBeNull();
+	expect(parseBotChange({ op: "rename-section", from: "Work", to: "" })).toBeNull();
 });

@@ -15,7 +15,7 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const shepherd: Bot = { id: "herd" as BotId, kind: "pr-shepherd", name: "Shepherd", job: "", cwd: "/work", model: null, skill: null, shape: "pill", hue: 25, sessionId: "s1", createdAt: "2026-10-30T09:00:00.000Z" };
+const shepherd: Bot = { id: "herd" as BotId, kind: "pr-shepherd", name: "Shepherd", job: "", cwd: "/work", model: null, skill: null, shape: "pill", hue: 25, sessionId: "s1", createdAt: "2026-10-30T09:00:00.000Z", pinned: false, section: null };
 const helper: Bot = { ...shepherd, id: "helper" as BotId, kind: "routines", name: "Helper" };
 
 const pr = (fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
