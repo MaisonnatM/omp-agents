@@ -47,7 +47,6 @@ When a finished reply leaves a next step, offer one to three prompts in
   a draft PR": the user merges on main there.
 - Each prompt is an imperative the user can send as is, under 80 characters,
   for work this session can do now from its own checkout.
-- After a UI change, show a screenshot with the reply.
 - When the user asks for ideas, offer product moves drawn from how they use the
   product, not only code tasks.
 - A prompt may end the session: do its work, then call `end_session`, which
@@ -78,6 +77,16 @@ Keep every prototype and variant screenshot in the session's worktree, in a dire
 Use the repository's own such directory, such as `tmp/` in omp-agents or `.agents/skills/verify-yampa/artifacts/` in yampa; otherwise create `prototypes/` and add it to the file `git rev-parse --git-path info/exclude` prints.
 Never put them in `/tmp` or elsewhere outside the worktree, where they vanish or get lost and must be rebuilt from memory.
 Serve a prototype through a named `bash` service, never a bare background process.
+
+# Handing off a UI change
+
+Outside a `/ship` session, in a thread about a prototype or a UI change, "live" means a running localhost URL the user can open, not a merge or a deploy.
+When a UI change or a prototype is ready to test, hand it off running:
+
+1. Start the project's dev server yourself as a named long-lived service: `bash` with `name` and `ready`, on a port the Test servers rule in `~/.omp/agent/AGENTS.md` allows. Leave it running after the reply.
+2. Open that URL headless and screenshot the changed page in the state the user will check.
+3. `read` each screenshot before you show it. Retake one that is blank, white, cropped, still loading, or framed differently from the real page, such as extra padding around it.
+4. Show the checked screenshots with the reply, with the running server's URLs.
 
 # Subagent isolation
 
