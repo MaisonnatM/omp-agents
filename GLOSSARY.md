@@ -100,6 +100,15 @@ _Avoid_: Hook, webhook, event listener
 A named teammate with one conversation you come back to, a job, and a memory that only its `remember` tool writes.
 _Avoid_: Agent, assistant, persona
 
+**Bot type**:
+What a Bot is for, picked when it is made and kept after: **Routines**, or **PR shepherd**.
+The code calls it the Bot's `kind`.
+_Avoid_: Bot class, role
+
+**PR shepherd**:
+A Bot type that drives your approved pull requests to merged: it starts quick-action sessions to fix them, then queues their merge.
+_Avoid_: Babysitter, merge bot
+
 **Scheduled send**:
 One message to a session, or one new session's start, that waits for a time.
 _Avoid_: Delayed message, routine

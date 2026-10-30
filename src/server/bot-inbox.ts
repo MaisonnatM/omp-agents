@@ -15,8 +15,8 @@ function parseJobSave(value: unknown, bots: readonly Bot[]): InboxEntry<BotSave>
 	const { botId, job } = request.ok;
 	const bot = bots.find(({ id }) => id === botId);
 	if (!bot) return { invalid: `there is no Bot ${botId}; it may have been deleted since` };
-	const { id, name, cwd, model, skill, shape, hue } = bot;
-	return { item: { op: "save", bot: { id, name, job, cwd, model, skill, shape, hue } } };
+	const { id, kind, name, cwd, model, skill, shape, hue } = bot;
+	return { item: { op: "save", bot: { id, kind, name, job, cwd, model, skill, shape, hue } } };
 }
 
 export class BotInbox extends JsonInboxDir<BotSave> {

@@ -6,10 +6,13 @@ A Bot is a named, long-lived teammate: one conversation, a job, and a memory.
 A save keeps the Bot's `sessionId`, and a remove forgets the Bot but leaves its session file and its memory directory; the `Dashboard` removes the Bot's routines first.
 A Bot's `shape` and `hue`, one of `BOT_SHAPES` and `BOT_HUES`, are its avatar's look; `parseBotSpec` gives an entry saved before them the look `defaultLook` hashes from its id, so an old Bot keeps its face.
 A new Bot's `job` is empty until its first conversation gives it one: the extension then tells the Bot to ask for it and call `set_job` with the answer.
+A Bot's `kind`, one of `BOT_KINDS`, is its type: `routines`, or `pr-shepherd`, described in [PR shepherds](#pr-shepherds).
+The page picks it when it makes the Bot, `parseBotSpec` reads an entry saved before kinds as `routines`, and `applyBot` keeps the stored kind through every later save, so a Bot never changes type.
 
 `Bots` in `src/server/bots.ts` binds each Bot to the session its conversation runs in.
 A new session whose `StartRequest` names a `bot`, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, the `bot-inbox/` directory beside it, its `memory.md` path, the `routines.json` path, and the `routine-inbox/` directory beside it.
 Only `Bots` sets `bot`, since `parseNewSessionRequest` never reads one, so a page cannot start a Bot's session.
+A PR shepherd's session also loads `src/omp/shepherd-extension.ts` with a second `-e`, and the flags in `SHEPHERD_FLAGS`: the Bot's id and the `shepherd-inbox/` directory beside `bots.json`.
 Any other start launches plain, so no other session loads the extension.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
 
@@ -53,3 +56,21 @@ The details in the right sidebar, `BotDetails`, list its routines, `#bots/<id>/r
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts that view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.
 `useDashboard` works out the open Bot once with `openBot` in `web/bots-model.ts` and hands it to the page, the details, `watched`, and `useAttention`: its conversation's view is the live session that runs it, else its saved one, and none while the page shows the routines card, a routine editor, or a routine its address names but the Bot does not have.
+
+## PR shepherds
+
+A new `pr-shepherd` Bot's save, in the list registry's `bots` entry in `src/server/dashboard.ts`, also saves `shepherdRoutine` from `src/shared/shepherd.ts`: routine `<bot id>-pull-requests`, with a `pull-request` trigger and a prompt task, so the routine runner wakes the shepherd with the pull requests that became your move.
+The page fills a new shepherd's job with `SHEPHERD_JOB` and its name with `SHEPHERD_NAME`; the server does not, so the job stays one the user can edit.
+The shepherd extension adds its rules to the main agent's system prompt and registers two tools, which load as `essential` and ask approval as writes.
+`fix_pull_request` takes `owner`, `repo`, `number`, and an `action` from `SHEPHERD_FIXES`, the repairing quick actions of `PULL_REQUEST_ACTIONS` (`src/pull-request-actions.ts`).
+`queue_merge` takes `owner`, `repo`, `number`, and an optional `method`, `squash` when left out.
+Each checks the pull request's name with `parsePullRequest` and writes one `ShepherdRequest` into `shepherd-inbox/` as the routine tools write theirs.
+
+`ShepherdInbox` in `src/server/shepherd-inbox.ts` drains it on the server that owns the lock.
+It sets aside a file that is no request, or one from a Bot that is gone or is not a shepherd.
+It reads the pull requests fresh with `loadPullRequests` over the known workspaces, finds the one the request names, and asks `shepherdRefusal`, which refuses a pull request you did not write, a draft or a merged one, one that is not approved, and one a running session works on (`agentOn`).
+A fix is refused too when its action no longer applies (`pullRequestActions`), or once it started `MAX_FIXES_PER_PULL_REQUEST`, 2, times on that pull request since the server started; otherwise the inbox starts `newSessionRequest` in the repository's first workspace with the action's prompt, its branch as a `work` branch, and the pull request as its subject, as the page's quick action does.
+A merge is refused unless `readyToMerge` or `readyOnceChecksPass` holds, and unless `unapprovedChange` in `src/pull-request-approval.ts` finds the head's stable `git patch-id` equal to an approved review's commit's; it then adds the pull request to the merge queue with `head: null`, so the queue pins the head it reads.
+A refusal, a failed start, and any error post `The dashboard did not … : <why>.` into the shepherd's conversation through `Bots.message`, and delete the file, so the Bot can tell you instead of asking again.
+See `2026-10-30-pr-shepherd-is-a-bot-type-over-quick-actions-and-the-merge-queue` and `2026-10-30-a-shepherd-merges-only-a-head-with-an-approved-commits-patch-id` in [decisions](../decisions/).
+

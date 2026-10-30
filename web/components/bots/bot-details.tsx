@@ -2,7 +2,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
-import { type Bot, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
+import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -21,7 +21,7 @@ import { RunDot } from "../routines/routine-marks";
 import { BotAvatar } from "./bot-avatar";
 import { BotLookPicker } from "./bot-look-picker";
 
-const botSpec = ({ id, name, job, cwd, model, skill, shape, hue }: Bot): BotSpec => ({ id, name, job, cwd, model, skill, shape, hue });
+const botSpec = ({ id, kind, name, job, cwd, model, skill, shape, hue }: Bot): BotSpec => ({ id, kind, name, job, cwd, model, skill, shape, hue });
 
 /** The sidebar's tab, kept across Bots apart from a session's. */
 const TAB_KEY = "omp-agents.bot-details-tab";
@@ -270,7 +270,9 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 								<LookButton bot={bot} host={host} connected={connected} />
 								<div className="min-w-0 flex-1">
 									<NameField key={bot.name} bot={bot} connected={connected} />
-									<p className="truncate text-xs text-muted-foreground first-letter:uppercase">{status}</p>
+									<p className="truncate text-xs text-muted-foreground first-letter:uppercase">
+										{BOT_KIND_INFO[bot.kind].label} · {status}
+									</p>
 									<p className="truncate font-mono text-xs text-muted-foreground" title={bot.cwd}>
 										{bot.cwd}
 									</p>

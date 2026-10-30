@@ -17,7 +17,7 @@ function botsPath(): string {
 	return join(dir, "bots.json");
 }
 
-const scout = { id: "scout" as BotId, name: "Scout", job: "Watch the build.", cwd: "~/code/app", model: null, skill: null, shape: "pill", hue: 25 } as const;
+const scout = { id: "scout" as BotId, kind: "routines", name: "Scout", job: "Watch the build.", cwd: "~/code/app", model: null, skill: null, shape: "pill", hue: 25 } as const;
 
 test("a saved Bot keeps the conversation the server bound it to through an edit of its job, and a restart reads both", async () => {
 	const path = botsPath();
@@ -30,6 +30,16 @@ test("a saved Bot keeps the conversation the server bound it to through an edit 
 	const expected = { ...scout, job: "Watch the build. Ask before merging.", sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z" };
 	expect(new BotsFile(path).value).toEqual([expected]);
 	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ bots: [expected] });
+});
+
+test("a Bot saved before types existed reads as a routines Bot, and a later save keeps the type it was made with", () => {
+	const { kind: _, ...untyped } = scout;
+	expect(parseBotChange({ op: "save", bot: untyped })).toEqual({ op: "save", bot: scout });
+	expect(parseBotChange({ op: "save", bot: { ...scout, kind: "janitor" } })).toBeNull();
+	const file = new BotsFile(botsPath());
+	file.apply({ op: "save", bot: { ...scout, kind: "pr-shepherd" } }, "2026-05-01T09:00:00.000Z");
+	file.apply({ op: "save", bot: { ...scout, job: "Merge my pull requests." } }, "2026-05-01T10:00:00.000Z");
+	expect(file.value[0]).toMatchObject({ kind: "pr-shepherd", job: "Merge my pull requests." });
 });
 
 test("a save sent twice, a bind to the same session, and a remove of a gone Bot change nothing", () => {

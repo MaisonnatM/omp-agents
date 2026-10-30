@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -76,6 +76,9 @@ import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
 import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutineInbox } from "./routine-inbox";
+import { ShepherdInbox } from "./shepherd-inbox";
+import { shepherdRoutine } from "../shared/shepherd";
+import { unapprovedChange } from "../pull-request-approval";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
@@ -89,7 +92,7 @@ import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
 import { Discussions } from "./discussions";
 import { createClientHandler } from "./socket";
-import { botExtension } from "./resources";
+import { botExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
@@ -152,6 +155,7 @@ export class Dashboard {
 	readonly #noteInbox: NoteInbox;
 	readonly #routineInbox: RoutineInbox;
 	readonly #botInbox: BotInbox;
+	readonly #shepherdInbox: ShepherdInbox;
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -307,7 +311,11 @@ export class Dashboard {
 				apply: change => {
 					// Deleting a Bot deletes its routines, first, so a crash between the two saves leaves no routine without its Bot.
 					if (change.op === "remove" && routines.removeBot(change.id)) this.#broadcasts.pushList("routines");
-					return this.#botsFile.apply(change, new Date().toISOString());
+					const created = change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.bot.id);
+					if (!this.#botsFile.apply(change, new Date().toISOString())) return false;
+					// A new PR shepherd starts with the routine that wakes it as your pull requests change, after the Bot it belongs to is saved.
+					if (created && change.bot.kind === "pr-shepherd" && routines.apply({ op: "save", routine: shepherdRoutine(change.bot.id) }, Date.now())) this.#broadcasts.pushList("routines");
+					return true;
 				},
 			},
 		}, kind => this.#broadcasts.pushList(kind)));
@@ -392,7 +400,7 @@ export class Dashboard {
 			live: sessionId => sessions.bySessionId(sessionId),
 			session: instanceId => sessions.get(instanceId),
 			savedFile: files.pathOf,
-			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir },
+			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir },
 			now: () => new Date().toISOString(),
 			onChange: () => broadcasts.pushList("bots"),
 		});
@@ -464,6 +472,19 @@ export class Dashboard {
 			onChange: () => broadcasts.pushList("merges"),
 			onMerged: pr => void mergeCleanup.merged(pr),
 		});
+		this.#shepherdInbox = new ShepherdInbox(
+			shepherdInboxDir,
+			{
+				bots: () => this.#botsFile.value,
+				pullRequests: () => loadPullRequests(this.knownWorkspaces(), true),
+				agent: () => agentOn(sessions.rows(files.factsOf)),
+				start: startSession,
+				queueMerge: change => this.#mergeQueue.apply(change),
+				unapprovedChange,
+				tell: (botId, text) => this.#bots.message(botId, text),
+			},
+			{ active: () => ownerLock.held },
+		);
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
 				if (broadcasts.listening()) await this.#listRegistry();
@@ -661,6 +682,7 @@ export class Dashboard {
 		this.#noteInbox.watch();
 		this.#routineInbox.watch();
 		this.#botInbox.watch();
+		this.#shepherdInbox.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
@@ -688,6 +710,7 @@ export class Dashboard {
 		this.#noteInbox.stop();
 		this.#routineInbox.stop();
 		this.#botInbox.stop();
+		this.#shepherdInbox.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
 		this.terminals.dispose();
@@ -858,6 +881,7 @@ export class Dashboard {
 			void this.#noteInbox.drain();
 			void this.#routineInbox.drain();
 			void this.#botInbox.drain();
+			void this.#shepherdInbox.drain();
 			// It learned what the triggers see while another server ran routines, which that server fired.
 			this.#triggerWatch.forget();
 		}
