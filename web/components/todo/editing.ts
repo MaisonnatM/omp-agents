@@ -107,16 +107,17 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 	};
 	/**
 	 * Adds `text` as a todo; a trailing due day or `#category` sets that field instead of staying in the title. Returns
-	 * where the next draft goes: after the new todo, or in its place when the parsed fields move the todo out of this list.
+	 * the `add` it sent and where the next draft goes: after the new todo, or in its place when the parsed fields move
+	 * the todo out of this list.
 	 */
-	const add = (draft: Draft, text: string): { id: string; afterId: string | null; workspace: string | null } | null => {
+	const add = (draft: Draft, text: string): { change: Extract<UserTodoChange, { op: "add" }>; afterId: string | null } | null => {
 		const { parentId, afterId, categoryId, status } = draft;
 		const dueToday = parentId === null && kind.add?.dueToday === true;
 		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId, workspace, status, due: dueToday ? day : null });
 		if (!change) return null;
 		onChange(change);
 		const leaves = change.categoryId !== categoryId || (dueToday && change.due !== null && change.due > day);
-		return { id: change.id, afterId: leaves ? afterId : change.id, workspace: change.workspace };
+		return { change, afterId: leaves ? afterId : change.id };
 	};
 
 	return {
@@ -169,7 +170,7 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 			switch (key) {
 				case "enter": {
 					const added = add(draft, text);
-					setEditing(added ? { ...draft, afterId: added.afterId, addedId: added.id, text: "" } : NOT_EDITING);
+					setEditing(added ? { ...draft, afterId: added.afterId, addedId: added.change.id, text: "" } : NOT_EDITING);
 					return true;
 				}
 				case "start": {
@@ -177,7 +178,7 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 					const added = add(draft, text);
 					if (!added) return false;
 					setEditing(NOT_EDITING);
-					location.hash = hashForNewSession(todoCwd(added, newSessionCwd), added.id);
+					location.hash = hashForNewSession(todoCwd(added.change, newSessionCwd), added.change.id);
 					return true;
 				}
 				case "escape":

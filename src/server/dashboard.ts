@@ -136,7 +136,6 @@ export class Dashboard {
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
 		isBot: request => this.#bots.botOf(request) !== null,
-		note: (instanceId, text) => this.#views.note(instanceId, null, "error", text),
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
@@ -829,7 +828,6 @@ export class Dashboard {
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
-				this.#moves.turnEnded(instanceId);
 				return;
 			}
 			default: {

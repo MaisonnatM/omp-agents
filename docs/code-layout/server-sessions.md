@@ -10,7 +10,7 @@
   `src/prompt-turn.ts` holds its `PromptTurn`: whether the main agent's turn runs and which prompt omp admitted while idle has not shown yet, with one method per event that moves them.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
-- `src/serial-lane.ts`: `SerialLane`, which runs work one call at a time in arrival order; both transports order a session's prompts, aborts, and flushes with it, and the routine runner serializes ticks and run-now claims.
+- `src/serial-lane.ts`: `SerialLane`, which runs work one call at a time in arrival order; both transports order a session's prompts, aborts, and flushes with it, the routine runner serializes ticks and run-now claims, and `JsonInboxDir` applies its files.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
 - `src/tail.ts`: reads one transcript file incrementally, decodes each line through its format's `decode` from `src/session-formats.ts`, and feeds each entry to both folds below.

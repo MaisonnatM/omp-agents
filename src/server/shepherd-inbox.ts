@@ -12,7 +12,6 @@ import type { MergeQueueChange } from "../shared/merge-queue";
 import { type AgentOn, readyOnceChecksPass, readyToMerge } from "../shared/moves";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { MAX_FIXES_PER_PULL_REQUEST, parseShepherdRequest, type ShepherdChange, type ShepherdRequest } from "../shared/shepherd";
-import { SerialLane } from "../serial-lane";
 import { type InboxOptions, JsonInboxDir } from "./json-inbox";
 
 /** Why the server refuses `change` on `pr`, as GitHub reports it now, `null` when it may go ahead; `fixes` counts the starts of the same fix on it so far. */
@@ -53,8 +52,6 @@ export class ShepherdInbox extends JsonInboxDir<ShepherdRequest> {
 	constructor(dir: string, deps: ShepherdDeps, options?: InboxOptions) {
 		/** How many times each fix started on each pull request since the server started, by `<pr key>:<action>`. */
 		const fixes = new Map<string, number>();
-		/** One request at a time, so a second ask for the same fix sees the session the first started. */
-		const lane = new SerialLane();
 		super(
 			dir,
 			{
@@ -65,7 +62,8 @@ export class ShepherdInbox extends JsonInboxDir<ShepherdRequest> {
 					if (!bot) return { invalid: `there is no Bot ${request.ok.botId}` };
 					return bot.kind === "pr-shepherd" ? { item: request.ok } : { invalid: `Bot ${bot.id} is not a PR shepherd` };
 				},
-				apply: ({ botId, change }) => lane.run(async () => {
+				// The inbox applies one request at a time, so a second ask for the same fix sees the session the first started.
+				apply: async ({ botId, change }) => {
 					const name = pullRequestName(change.pr);
 					const verb = change.op === "fix" ? `start ${change.action} on` : "queue the merge of";
 					const refuse = (why: string) => deps.tell(botId, `The dashboard did not ${verb} ${name}: ${why}.`).then(() => true);
@@ -98,7 +96,7 @@ export class ShepherdInbox extends JsonInboxDir<ShepherdRequest> {
 					} catch (error) {
 						return await refuse(errorText(error));
 					}
-				}),
+				},
 			},
 			options,
 		);

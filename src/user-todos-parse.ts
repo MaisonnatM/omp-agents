@@ -50,15 +50,12 @@ const STORED: Fields = { id: isString, text: isString, body: isString, workspace
 /** A todo or category id a change names: not blank, within `MAX_TODO_ID`. */
 export const isTodoId = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_TODO_ID;
 
-/** A Workspace a change names: an absolute path within `MAX_TODO_WORKSPACE`. Whether it exists is not checked here. */
-const isWorkspace = (value: unknown): value is string =>
-	typeof value === "string" && value.startsWith("/") && value.length <= MAX_TODO_WORKSPACE && !value.includes("\0");
-
 const SENT: Fields = {
 	id: isTodoId,
 	text: (value): value is string => typeof value === "string" && value.length <= MAX_TODO_TEXT,
 	body: (value): value is string => typeof value === "string" && value.length <= MAX_TODO_BODY,
-	workspace: isWorkspace,
+	/** An absolute path within `MAX_TODO_WORKSPACE`; whether it exists is not checked here. */
+	workspace: (value): value is string => typeof value === "string" && value.startsWith("/") && value.length <= MAX_TODO_WORKSPACE && !value.includes("\0"),
 };
 
 export function parseTodoLink(value: unknown): UserTodoLink | null {
@@ -162,7 +159,7 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 		case "add": {
 			const { parentId, workspace = null, body = "", due = null, links = [], addedBy = null, status = "todo", priority = 0, assignee = null, createdAt = null } = value;
 			const parsed = parseAll(links, parseTodoLink);
-			if (!SENT.text(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId) || !isOptional(workspace, isWorkspace) || !SENT.body(body)) return null;
+			if (!SENT.text(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId) || !isOptional(workspace, SENT.workspace) || !SENT.body(body)) return null;
 			if (!isOptional(due, isDay) || !isOptionalId(addedBy) || !parsed || !isStatus(status) || !isPriority(priority) || !isOptional(assignee, isAssignee)) return null;
 			if (!isOptional(createdAt, isTime)) return null;
 			return { op, id, parentId, afterId, categoryId, workspace, text, body, due, links: parsed, addedBy, status, priority, assignee, createdAt };
@@ -189,7 +186,7 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 		case "categorize":
 			return isOptionalId(categoryId) ? { op, id, categoryId } : null;
 		case "set-workspace":
-			return isOptional(value.workspace, isWorkspace) ? { op, id, workspace: value.workspace } : null;
+			return isOptional(value.workspace, SENT.workspace) ? { op, id, workspace: value.workspace } : null;
 		case "add-category":
 		case "rename-category":
 			return isNonEmpty(name) && SENT.text(name) ? { op, id, name } : null;

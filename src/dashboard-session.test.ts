@@ -319,6 +319,50 @@ describe("DashboardSession turns", () => {
 	});
 });
 
+describe("DashboardSession move after turn", () => {
+	test("sends /move once, when the turn ends idle, to the last directory asked", async () => {
+		const { session, client } = await startSession();
+		client.fire({ type: "agent_start" });
+		session.moveAfterTurn("/tmp/first");
+		session.moveAfterTurn("/tmp/second");
+		await settle();
+		expect(client.calls).toEqual([]);
+
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect(client.calls).toEqual(["prompt /move /tmp/second"]);
+	});
+
+	test("a session busy again at its turn's end moves at the next one", async () => {
+		const { session, client } = await startSession();
+		session.moveAfterTurn("/tmp/elsewhere");
+		await session.prompt(null, "next", [], "steer");
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect([client.calls, session.status]).toEqual([["prompt next"], "working"]);
+
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "message_start", message: { role: "user", timestamp: 1, content: "next" } });
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect(client.calls).toEqual(["prompt next", "prompt /move /tmp/elsewhere"]);
+	});
+
+	test("a move omp refuses shows in the conversation", async () => {
+		const { session, client, updates } = await startSession();
+		client.prompt = async () => {
+			throw new Error("busy");
+		};
+		session.moveAfterTurn("/tmp/elsewhere");
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect(updates).toContainEqual({ kind: "note", agentId: null, level: "error", text: "Could not move to /tmp/elsewhere: busy" });
+	});
+});
+
 describe("DashboardSession starting prompt", () => {
 	const image = { data: "aGk=", mimeType: "image/png" };
 

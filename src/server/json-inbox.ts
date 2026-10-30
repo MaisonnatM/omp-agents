@@ -9,6 +9,7 @@ import { type FSWatcher, mkdirSync, watch } from "node:fs";
 import { readdir, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { errorText } from "../json";
+import { SerialLane } from "../serial-lane";
 
 /** What one file holds: the request it makes, or why it is no request. */
 export type InboxEntry<T> = { item: T } | { invalid: string };
@@ -33,6 +34,8 @@ export class JsonInboxDir<T> {
 	readonly #active: () => boolean;
 	/** Files a drain listed and has not finished with, so a drain that starts meanwhile does not apply one twice. */
 	readonly #busy = new Set<string>();
+	/** Handles one file at a time, so an async `apply` too acts in name order, and after the files of a drain already under way. */
+	readonly #lane = new SerialLane();
 	#watcher: FSWatcher | undefined;
 
 	constructor(dir: string, handler: InboxHandler<T>, options: InboxOptions = {}) {
@@ -41,7 +44,7 @@ export class JsonInboxDir<T> {
 		this.#active = options.active ?? (() => true);
 	}
 
-	/** Applies every request waiting, oldest name first, and settles once each is handled. Never rejects. */
+	/** Applies every request waiting, oldest name first, after those a drain under way still applies, and settles once each is handled. Never rejects. */
 	async drain(): Promise<void> {
 		if (!this.#active()) return;
 		let names: string[];
@@ -53,8 +56,7 @@ export class JsonInboxDir<T> {
 		const claimed = names.filter(name => !this.#busy.has(name));
 		for (const name of claimed) this.#busy.add(name);
 		const values = await Promise.all(claimed.map(name => this.#read(join(this.#dir, name))));
-		// Each `handle` runs up to its first await at once, so synchronous handlers apply in name order.
-		await Promise.all(claimed.map((name, i) => this.#handle(name, values[i]!).finally(() => this.#busy.delete(name))));
+		await Promise.all(claimed.map((name, i) => this.#lane.run(() => this.#handle(name, values[i]!)).finally(() => this.#busy.delete(name))));
 	}
 
 	/** Drains now and on every change to the directory, which it creates. */

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TodoStatus, UserTodo, UserTodoList } from "../src/user-todos-shared";
-import { moveTo, todosOf } from "./todo-views";
+import { inWorkspace, leftIn, moveTo, todosOf } from "./todo-views";
 
 const todo = (id: string, status: TodoStatus): UserTodo => ({
 	id,
@@ -35,20 +35,22 @@ describe("moveTo", () => {
 	});
 });
 
-describe("todosOf under a workspace", () => {
+describe("inWorkspace", () => {
 	const at = (id: string, workspace: string | null, categoryId: string | null = null): UserTodo => ({ ...todo(id, "todo"), workspace, categoryId });
 	const list: UserTodoList = {
 		categories: [{ id: "work", name: "Work" }],
 		todos: [at("yampa", "/code/yampa", "work"), at("agents", "/code/omp-agents", "work"), at("none", null)],
 		archive: [at("old-yampa", "/code/yampa"), at("old-none", null)],
 	};
-	const ids = (view: Parameters<typeof todosOf>[1], workspace: string | null) =>
-		todosOf(list, view, "2026-10-30", { hosts: [], past: [] }, { hidden: new Set(), workspace }).map(({ id }) => id);
+	const sessions = { hosts: [], past: [] };
+	const ids = (view: Parameters<typeof todosOf>[1], workspace: string | null) => inWorkspace(todosOf(list, view, "2026-10-30", sessions, new Set()), workspace).map(({ id }) => id);
 
 	test("a selected workspace keeps only the todos naming it, in every list and the archive", () => {
 		expect(ids({ kind: "all" }, "/code/yampa")).toEqual(["yampa"]);
 		expect(ids({ kind: "category", id: "work" }, "/code/omp-agents")).toEqual(["agents"]);
 		expect(ids({ kind: "archive" }, "/code/yampa")).toEqual(["old-yampa"]);
+		expect(leftIn(list, { kind: "all" }, "2026-10-30", sessions, new Set(), "/code/yampa")).toBe(1);
+		expect(leftIn(list, { kind: "archive" }, "2026-10-30", sessions, new Set(), "/code/yampa")).toBe(1);
 	});
 
 	test("All workspaces shows every todo, those naming none included", () => {

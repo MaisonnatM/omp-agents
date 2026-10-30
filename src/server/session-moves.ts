@@ -3,7 +3,7 @@
  * does, once the turn that asked for it ends: omp refuses `/move` while a turn runs.
  */
 import type { DashboardSession } from "../dashboard-session";
-import { errorText, isObject } from "../json";
+import { isObject } from "../json";
 import type { RpcHostTool } from "../omp/modules";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { directoryOf } from "../paths";
@@ -14,11 +14,9 @@ export const MOVE_SESSION_TOOL = "move_session";
 
 export interface SessionMovesDeps {
 	/** Dashboard session `instanceId`, while it runs. */
-	session(instanceId: string): Pick<DashboardSession, "status" | "prompt"> | undefined;
+	session(instanceId: string): Pick<DashboardSession, "moveAfterTurn"> | undefined;
 	/** Whether `request` starts or resumes a Bot's conversation, which stays in its Bot's directory. */
 	isBot(request: StartRequest): boolean;
-	/** Shows `text` as an error in session `instanceId`'s conversation. */
-	note(instanceId: string, text: string): void;
 }
 
 export class SessionMoves {
@@ -28,8 +26,8 @@ export class SessionMoves {
 	 * know its session, since a reattached session gets its tools before it is listed.
 	 */
 	readonly #called = new Map<string, string>();
-	/** The directory each session moves to when its turn ends, by instance id; a later call in the turn replaces it. */
-	readonly #pending = new Map<string, string>();
+	/** The instance id of each move call a session started, by tool call id, so a turn cut off before the call's end forgets it. */
+	readonly #callers = new Map<string, string>();
 	readonly #tool: RpcHostTool = {
 		name: MOVE_SESSION_TOOL,
 		label: "Move session",
@@ -63,31 +61,32 @@ export class SessionMoves {
 		return { rpc: this.#deps.isBot(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#tool] }, attach() {} };
 	}
 
-	/** Session `instanceId` reported `event`; the successful end of a move call makes the move wait on the turn's end. */
-	heard(instanceId: string, event: unknown): void {
-		if (!isObject(event) || event.type !== "tool_execution_end" || typeof event.toolCallId !== "string") return;
-		const dir = this.#called.get(event.toolCallId);
-		if (dir === undefined) return;
-		this.#called.delete(event.toolCallId);
-		if (event.isError !== true) this.#pending.set(instanceId, dir);
-	}
-
 	/**
-	 * Session `instanceId` ended a turn: its waiting move goes in as `/move`. The session reports the end before it shows
-	 * idle, so the move waits a microtask; a session busy again by then keeps it for its next turn's end.
+	 * Session `instanceId` reported `event`: the successful end of a move call hands the session its move for the turn's
+	 * end, and the end of a turn forgets the session's move calls it cut off.
 	 */
-	turnEnded(instanceId: string): void {
-		if (!this.#pending.has(instanceId)) return;
-		queueMicrotask(() => {
-			const dir = this.#pending.get(instanceId);
-			const session = this.#deps.session(instanceId);
-			if (dir === undefined || session?.status !== "idle") return;
-			this.#pending.delete(instanceId);
-			session.prompt(null, `/move ${dir}`, [], "steer").catch((err: unknown) => this.#deps.note(instanceId, `Could not move to ${dir}: ${errorText(err)}`));
-		});
+	heard(instanceId: string, event: unknown): void {
+		if (!isObject(event)) return;
+		if (event.type === "agent_end") return this.#forget(instanceId);
+		if (typeof event.toolCallId !== "string") return;
+		if (event.type === "tool_execution_start" && event.toolName === MOVE_SESSION_TOOL) this.#callers.set(event.toolCallId, instanceId);
+		if (event.type !== "tool_execution_end") return;
+		const dir = this.#called.get(event.toolCallId);
+		this.#called.delete(event.toolCallId);
+		this.#callers.delete(event.toolCallId);
+		if (dir !== undefined && event.isError !== true) this.#deps.session(instanceId)?.moveAfterTurn(dir);
 	}
 
+	/** Session `instanceId` exited, ending any move call it left running. */
 	exited(instanceId: string): void {
-		this.#pending.delete(instanceId);
+		this.#forget(instanceId);
+	}
+
+	#forget(instanceId: string): void {
+		for (const [toolCallId, caller] of this.#callers) {
+			if (caller !== instanceId) continue;
+			this.#callers.delete(toolCallId);
+			this.#called.delete(toolCallId);
+		}
 	}
 }

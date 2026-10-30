@@ -46,20 +46,13 @@ async function inWorkspace(change: UserTodoChange, workspaceOf: (cwd: string) =>
 
 export class TodoInbox extends JsonInboxDir<UserTodoChange> {
 	constructor(dir: string, apply: (change: UserTodoChange) => void, workspaceOf: (cwd: string) => Promise<string>, options?: InboxOptions) {
-		// The changes in the order the drain hands them over. Finding a Workspace waits on git, and a drain hands over its
-		// files at once, so without it an agent's `edit` could reach the list before the `add` of the todo it edits.
-		let applied: Promise<unknown> = Promise.resolve();
 		super(
 			dir,
 			{
 				parse: (_name, value) => parseTodoChange(value),
-				apply: change => {
-					const next = applied.then(async () => {
-						apply(await inWorkspace(change, workspaceOf));
-						return true;
-					});
-					applied = next.catch(() => undefined);
-					return next;
+				apply: async change => {
+					apply(await inWorkspace(change, workspaceOf));
+					return true;
 				},
 			},
 			options,

@@ -1,5 +1,6 @@
-/** A todo's status, priority, assignee, and due day as pickers, as an icon on its row or a labeled button in its details. */
-import { BotMessageSquare, CalendarClock, CircleDashed, type LucideIcon, User } from "lucide-react";
+/** A todo's status, priority, assignee, due day, and Workspace as pickers, as an icon on its row or a labeled button in its details. */
+import { BotMessageSquare, CalendarClock, CircleDashed, Folder, type LucideIcon, User } from "lucide-react";
+import type { Workspace } from "../../../src/shared/workspaces";
 import {
 	TODO_ASSIGNEES,
 	TODO_PRIORITIES,
@@ -7,10 +8,12 @@ import {
 	type TodoAssignee,
 	type TodoPriority,
 	type TodoStatus,
+	type UserTodo,
 	type UserTodoChange,
 	type UserTodoLeaf,
 } from "../../../src/user-todos-shared";
 import { cn } from "@/lib/utils";
+import { folderName } from "../../labels";
 import { PRIORITY_LABEL } from "../../tickets-model";
 import { dueLabel, TODO_STATUS } from "../../todo-views";
 import { type Choice, DuePicker, FieldPicker } from "../field-picker";
@@ -171,6 +174,37 @@ export function TodoDuePicker({ todo, look, day, onChange, ...props }: TodoField
 			}
 			className={cn(BUTTON[look], look === "icon" ? "w-auto px-1 text-xs [&_svg]:size-3" : "[&_svg]:size-4")}
 			onChange={due => onChange({ op: "set-due", id: todo.id, due })}
+		/>
+	);
+}
+
+/** A top-level todo's Workspace, where its sessions start: none, or a Workspace the sidebar lists. One it no longer lists stays a choice, as its path. */
+export function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { todo: UserTodo; workspaces: Workspace[]; disabled: boolean; onChange: (change: UserTodoChange) => void }) {
+	const { workspace } = todo;
+	const offered = workspace === null || workspaces.some(({ cwd }) => cwd === workspace) ? workspaces : [...workspaces, { cwd: workspace, cwdDisplay: workspace }];
+	const current = workspace === null ? "No workspace" : (folderName(workspace) ?? workspace);
+	const choices: Choice[] = [
+		{ value: "", label: "No workspace", icon: <Folder aria-hidden className="size-4 text-muted-foreground" /> },
+		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <Folder aria-hidden className="size-4" /> })),
+	];
+	return (
+		<FieldPicker
+			field="Workspace"
+			current={current}
+			trigger={
+				<>
+					<Folder aria-hidden className={cn("size-4 shrink-0", workspace === null && "text-muted-foreground")} />
+					<span className="truncate">{current}</span>
+				</>
+			}
+			className={PROPERTY_BUTTON}
+			choices={choices}
+			selected={[workspace ?? ""]}
+			disabled={disabled}
+			onPick={value => {
+				const next = value || null;
+				if (next !== workspace) onChange({ op: "set-workspace", id: todo.id, workspace: next });
+			}}
 		/>
 	);
 }

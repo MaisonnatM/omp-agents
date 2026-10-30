@@ -10,7 +10,7 @@ import { localDay } from "../../../src/shared/days";
 import { folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
-import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
+import { byStatus, inWorkspace, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
@@ -74,26 +74,24 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
 	const [hidden] = useHiddenTodoCategories();
-	const scope = { hidden, workspace };
-	const listed = todosOf(list, view, day, sessions, scope);
+	const spanning = todosOf(list, view, day, sessions, hidden);
+	const listed = inWorkspace(spanning, workspace);
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
 	// Looked up before the search and the sidebar's workspace narrow the list, so neither takes the open todo off screen.
-	const open = openId === null ? null : (placeIn([workspace === null ? listed : todosOf(list, view, day, sessions, { hidden, workspace: null })], openId)?.entry ?? null);
+	const open = openId === null ? null : (placeIn([spanning], openId)?.entry ?? null);
 	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
 	const drag = useTodoDrag(kind.canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
 	const title = titleOf(list, view);
-	const left = leftIn(list, view, day, sessions, scope);
+	const left = leftIn(list, view, day, sessions, hidden, workspace);
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
-	const empty =
-		section.todos.length > 0
-			? null
-			: query
-				? `No todo matches “${query}”.`
-				: workspace !== null
-					? `No todo here names ${folderName(workspace) ?? workspace}, the workspace the sidebar shows. Choose All workspaces in the sidebar to see every todo.`
-					: kind.empty;
+	const emptyText = (): string | null => {
+		if (query) return `No todo matches “${query}”.`;
+		if (workspace !== null) return `No todo here names ${folderName(workspace) ?? workspace}, the workspace the sidebar shows. Choose All workspaces in the sidebar to see every todo.`;
+		return kind.empty;
+	};
+	const empty = section.todos.length > 0 ? null : emptyText();
 	const groups = (kind.readOnly ? [] : byStatus(section.todos))
 		.filter(group => group.todos.length > 0 || (group.status === "todo" && canAdd))
 		// A search shows every match, closed ones too.

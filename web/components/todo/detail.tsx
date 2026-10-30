@@ -1,4 +1,4 @@
-import { ChevronRight, Folder, Play, Plus, Ticket } from "lucide-react";
+import { ChevronRight, Play, Plus, Ticket } from "lucide-react";
 import { useContext, useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
-import { dayLabel, folderName } from "../../labels";
+import { dayLabel } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type QuickItem, quickOn, todoActions, todoStart, type WorkActionId } from "../../quick-actions";
 import { hashForNewSession, hashForNotes } from "../../routing";
@@ -25,7 +25,7 @@ import { NotesEditor } from "../notes-editor";
 import { QuickActionButton, QuickStartNotice } from "../quick-actions";
 import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar } from "../list-split";
-import { PROPERTY_BUTTON, StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
+import { PROPERTY_BUTTON, StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker, TodoWorkspacePicker } from "./fields";
 import { TodoInput } from "./input";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
@@ -154,37 +154,6 @@ interface TodoDetailProps {
 
 function CategoryDot({ categoryId }: { categoryId: string | null }) {
 	return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(categoryId)] }} />;
-}
-
-/** A top-level todo's Workspace, where its sessions start: none, or a Workspace the sidebar lists. One it no longer lists stays a choice, as its path. */
-function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { todo: UserTodo; workspaces: Workspace[]; disabled: boolean; onChange: (change: UserTodoChange) => void }) {
-	const { workspace } = todo;
-	const offered = workspace === null || workspaces.some(({ cwd }) => cwd === workspace) ? workspaces : [...workspaces, { cwd: workspace, cwdDisplay: workspace }];
-	const current = workspace === null ? "No workspace" : (folderName(workspace) ?? workspace);
-	const choices: Choice[] = [
-		{ value: "", label: "No workspace", icon: <Folder aria-hidden className="size-4 text-muted-foreground" /> },
-		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <Folder aria-hidden className="size-4" /> })),
-	];
-	return (
-		<FieldPicker
-			field="Workspace"
-			current={current}
-			trigger={
-				<>
-					<Folder aria-hidden className={cn("size-4 shrink-0", workspace === null && "text-muted-foreground")} />
-					<span className="truncate">{current}</span>
-				</>
-			}
-			className={PROPERTY_BUTTON}
-			choices={choices}
-			selected={[workspace ?? ""]}
-			disabled={disabled}
-			onPick={value => {
-				const next = value || null;
-				if (next !== workspace) onChange({ op: "set-workspace", id: todo.id, workspace: next });
-			}}
-		/>
-	);
 }
 
 /** A top-level todo's sub-todos: how many are done, a row per sub-todo with its own status and its priority when set, and a way to add one. */

@@ -149,6 +149,8 @@ export class DashboardSession implements LiveSession {
 	#refreshQueued = false;
 	/** Whether the automatic `/rename` was sent for this session; one try, so a title omp never makes does not repeat the note. */
 	#titled = false;
+	/** Where the session moves once a turn ends with it idle, as its `move_session` tool asked; a later call replaces it. */
+	#moveTo: string | null = null;
 
 	private constructor(
 		instanceId: string,
@@ -634,6 +636,19 @@ export class DashboardSession implements LiveSession {
 		return this.#child.client.stop();
 	}
 
+	/** Moves the session to `dir` as the user's `/move` does, once a turn ends with it idle: omp refuses `/move` while a turn runs. */
+	moveAfterTurn(dir: string): void {
+		this.#moveTo = dir;
+	}
+
+	/** Sends the move waiting for this turn's end, unless the session is busy again, which keeps it for the next one. */
+	#moveIfIdle(): void {
+		const dir = this.#moveTo;
+		if (dir === null || this.status !== "idle") return;
+		this.#moveTo = null;
+		this.prompt(null, `/move ${dir}`, [], "steer").catch((err: unknown) => this.#fail(`Could not move to ${dir}`, err));
+	}
+
 	#fail(what: string, err: unknown, agentId: string | null = null): void {
 		this.#emit({ kind: "note", agentId, level: "error", text: `${what}: ${errorText(err)}` });
 	}
@@ -663,6 +678,7 @@ export class DashboardSession implements LiveSession {
 			// Before the change that shows the session idle, so a listener can hold a session a usage limit stopped first.
 			this.#emit(turn);
 			this.#change(() => this.#prompt.turnEnded());
+			this.#moveIfIdle();
 			this.#refresh();
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };

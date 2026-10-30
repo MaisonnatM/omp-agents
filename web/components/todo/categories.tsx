@@ -122,7 +122,7 @@ export function TodoCategories({ list, view, workspace, disabled, onChange, sess
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = localDay();
 	const link = (target: TodoListView, name: string, icon: ReactNode) => {
-		const count = leftIn(list, target, day, sessions, { hidden, workspace });
+		const count = leftIn(list, target, day, sessions, hidden, workspace);
 		const active = sameTodoView(view, target);
 		return (
 			<>
