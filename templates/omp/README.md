@@ -59,7 +59,9 @@ Files, in `agent/`:
   When GitHub rejects a token that gh reads from an environment variable, such as `GITHUB_TOKEN` from a project `.env`, while a stored gh login works, this extension and `pr_description` run gh without that variable for the rest of the session, which the agent's own `env -u` cannot do for omp's process.
   When no stored login works, the gate names the rejected credential and the project `.env` file omp read it from at startup, never the token itself.
   A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
-  `gh pr ready` on a repository whose owner differs from the cwd repository's, such as a contribution to someone else's project, skips the review gates.
+  The gate reads the PR and the review paths in the checkout the publishing command runs in, which a `cd`, `env -C`, `bash -c`, `gt --cwd`, or the bash call's cwd names.
+  It refuses the command when that checkout is not one of the PR's repository, such as `gh pr ready 7 -R other/repo` from this repository, when a variable or `cd -` hides the directory, and when the command sets `GH_REPO` or `GH_HOST` inline.
+  A PR on a repository you cannot push to, such as a contribution to someone else's project, skips the review gates.
   A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live; the extension checks the box, not a screenshot.
   Dashboard and CLI GitHub calls share separate GraphQL/REST reset cooldowns; exhausted quota is not reported as bad credentials or a fresh successful read, and stale `/ship` status cannot advance a gate.
 - `extensions/pr-description.ts`: the essential `pr_description` tool reads and edits descriptions with checked fresh reads, private original backups, and guards against accidental empty output, missing or ambiguous replacement anchors, and concurrent changes observed before the write.

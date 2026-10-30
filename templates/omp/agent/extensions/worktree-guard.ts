@@ -8,9 +8,9 @@
 // Reads, files outside git, internal URLs such as `local://`, and the clones omp makes for isolated subagents pass.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { program, split } from "./shell/commands";
+import { located, positionals, within } from "./shell/commands";
 
 /** What a command does to the checkout it runs in: `switch` moves HEAD to a named branch or commit. */
 type Effect = "read" | "switch" | "write";
@@ -42,9 +42,6 @@ const CHANGES: Record<"git" | "gt" | "gh", Record<string, Effect | ((args: strin
 		pr: args => (args[0] === "checkout" ? "switch" : "read"),
 	},
 };
-/** Commands that run the command after their own flags and `NAME=value` settings; `program` reads `env`, whose `-C` changes directory. */
-const WRAPPERS: Record<string, true> = { builtin: true, command: true, exec: true, nice: true, nohup: true, sudo: true, time: true };
-const SHELLS: Record<string, true> = { bash: true, sh: true, zsh: true };
 
 /** The claim lives in a checkout's own git dir: `.git/` for a main checkout, `.git/worktrees/<name>/` for a linked one. */
 const CLAIM = "omp-checkout-owner.json";
@@ -206,29 +203,6 @@ function guard(c: Checkout, kind: Kind, what: string, ctx: ExtensionContext): st
 	return undefined;
 }
 
-/** A command's positional words: not flags, and not redirections such as `>/dev/null`, `2>&1`, or a bare `>` and its target. */
-function positionals(args: string[]): string[] {
-	const out: string[] = [];
-	for (let i = 0; i < args.length; i++) {
-		const redirect = args[i].match(/^(?:\d*|&)(?:>>|>&|<&|>|<)(.*)$/);
-		if (redirect) {
-			if (!redirect[1]) i++;
-		} else if (args[i] === "-" || !args[i].startsWith("-")) {
-			out.push(args[i]);
-		}
-	}
-	return out;
-}
-
-/** `path`, which defaults to home, resolved from `dir` with `~` and `$HOME` expanded; `null` when another variable, a command substitution, or an unknown `dir` decides it. */
-function within(dir: string | null, path: string | undefined): string | null {
-	const home = process.env.HOME ?? "";
-	const expanded = (path ?? home).replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/|$)/, home);
-	if (/[$`]/.test(expanded)) return null;
-	if (isAbsolute(expanded)) return expanded;
-	return dir === null ? null : resolve(dir, expanded);
-}
-
 interface Change {
 	effect: Exclude<Effect, "read">;
 	/** The directory the command runs in, or `null` when the line names it through a variable. */
@@ -236,34 +210,13 @@ interface Change {
 	words: string[];
 }
 
-/** The commands of a bash line run from `cwd` that change a checkout, following `cd`, `pushd`, `env -C`, `git -C`, `gt --cwd`, wrappers such as `nohup`, and `bash -c` scripts. */
+/** The commands of a bash line run from `cwd` that change a checkout, in the directories `located` gives, then `git -C`, `gt --cwd`, and the worktree `git worktree` names. */
 function changes(line: string, cwd: string | null): Change[] {
 	const out: Change[] = [];
-	let dir = cwd;
-	for (let words of split(line)) {
-		// The directory this command alone runs in, after any `env -C`.
-		let here = dir;
-		for (;;) {
-			const run = program(words);
-			for (const to of run.chdir) here = within(here, to);
-			words = run.words;
-			if (words[0] === undefined || !Object.hasOwn(WRAPPERS, words[0])) break;
-			let k = 1;
-			while (k < words.length && (words[k].startsWith("-") || /^[A-Za-z_]\w*=/.test(words[k]))) k++;
-			words = words.slice(k);
-		}
-		const [tool = "", ...rest] = words;
-		if (tool === "cd" || tool === "pushd") {
-			const [to] = positionals(rest);
-			dir = to === "-" || (tool === "pushd" && to === undefined) ? null : within(dir, to);
-		} else if (tool === "popd") {
-			dir = null;
-		} else if (Object.hasOwn(SHELLS, tool)) {
-			const flag = rest.findIndex(a => /^-\w*c\w*$/.test(a));
-			if (flag !== -1 && rest[flag + 1] !== undefined) out.push(...changes(rest[flag + 1], here));
-		}
+	for (const { words, dir } of located(line, cwd)) {
+		const [tool, ...rest] = words;
 		if (tool !== "git" && tool !== "gt" && tool !== "gh") continue;
-		let at = here;
+		let at = dir;
 		let i = 0;
 		for (; i < rest.length && rest[i].startsWith("-"); i++) {
 			const flag = rest[i];
