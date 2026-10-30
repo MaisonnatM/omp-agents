@@ -47,7 +47,6 @@ When a finished reply leaves a next step, offer one to three prompts in
   a draft PR": the user merges on main there.
 - Each prompt is an imperative the user can send as is, under 80 characters,
   for work this session can do now from its own checkout.
-- After a UI change, show a screenshot with the reply.
 - When the user asks for ideas, offer product moves drawn from how they use the
   product, not only code tasks.
 - A prompt may end the session: do its work, then call `end_session`, which
@@ -74,6 +73,16 @@ That name is the variant's ID, and every surface quotes it unchanged: the previe
 Refer to a variant by its name alone, never by a number or letter: sharing two of five renumbers them, and the Suggestions block numbers its prompts with the same digits.
 A pick that names a variant or shows its screenshot is settled, so build it without asking again; ask only when a pick by number could mean a variant or a suggested prompt.
 Before tests or a review, screenshot what you built in the same state as the saved screenshot and compare the two; fix each difference, or name it in the report with its reason.
+
+# Handing off a UI change
+
+In a thread about a prototype or a UI change, "live" means a running localhost URL the user can open, not a merge or a deploy.
+When a UI change or a prototype is ready to test, hand it off running:
+
+1. Start the project's dev server yourself as a named long-lived service: `bash` with `name` and `ready`, on the port the repository's docs name or a free one per the Test servers rule in `AGENTS.md`. Leave it running after the reply.
+2. Open that URL headless and screenshot the changed page in the state the user will check.
+3. `read` each screenshot before you show it. Retake one that is blank, white, cropped, still loading, or framed differently from the real page, such as extra padding around it.
+4. Show the checked screenshots with the reply. In an omp-agents dashboard session, also add its `review-pages` block, in the format its prompt gives, with the running server's URLs before the `Suggestions:` block.
 
 # Subagent isolation
 
