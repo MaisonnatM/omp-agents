@@ -4,7 +4,6 @@ import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { activityControl } from "../activity";
 import { hostLabel } from "../labels";
 import { OpenPullRequestButton } from "../open-pull-request";
 import { shortcutLabels } from "../shortcuts";
