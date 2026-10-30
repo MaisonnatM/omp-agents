@@ -8,6 +8,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: Remove merged in Settings › Worktrees, and ending a session, no longer delete a worktree that another running session still works in, even a session started in another project.
 - The server log now names each worktree it removes and what asked for it.
 - After you run the thermonuclear or interface review yourself on a pull request, the agent now ticks its review checkbox once the fixes are pushed, so marking the pull request ready is no longer blocked for a missing tick.
+- When an agent builds a prototype or design screenshots, it keeps them in its own copy of the project and serves the prototype so it stays up, so they no longer disappear and get rebuilt from memory.
 - Behind the scenes: the pull request rebase tests build their repositories once and copy them for each test, and wait up to 30 seconds, so they pass when the machine is busy.
 - Fixed: a helper agent that works on its own copy of a repository now puts its changes back only where its agent says, and the starter kit refuses to put them in your main copy while it is on main, keeping them aside for you instead.
 - When an agent shows you design options, it names each one, such as Mode chip, and uses that same name in previews, Slack posts, tickets, pull requests, and suggested prompts, so a number never points at the wrong design.
