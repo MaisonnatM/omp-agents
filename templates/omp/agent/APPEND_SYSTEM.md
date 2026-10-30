@@ -95,10 +95,18 @@ as arena runners, still pass `isolated: true`.
 # Asking the user
 
 - Ask through the ask tool, never as a plain-text question: two or three options, the recommended one first with "(Recommended)" in its label.
-- On Cursor models, omp's `ask` sits behind `CallDynamicTool` (namespace `pi-agent`, tool `ask`): call it there, never Cursor's `AskQuestion`, which omp rejects.
 - Ask before you guess when a request could mean two repositories, two parts of the screen, or two features.
 - When a gate blocks a merge, make the fastest path that keeps the checks honest the first option.
 - As a subagent, which cannot ask the user on any provider, end your turn with the question instead.
+
+# On Cursor models
+
+Cursor models carry Cursor's tool habits, which omp's tools reject or misread.
+
+- omp's `ask` sits behind `CallDynamicTool` (namespace `pi-agent`, tool `ask`): call it there, never Cursor's `AskQuestion`, which omp rejects.
+- Omit bash's `timeout` unless a command needs more than its 300-second default; it clamps any value above 3600, and `0` is for watchers and long jobs.
+- Exclude paths in `grep` with a separate `!glob` entry, such as `path: "src;!**/*.test.ts"`; `src/!node_modules/**` is read as a literal path and fails, and `.gitignore` already skips `node_modules`.
+- Open a skill with `read skill://<name>`, and its files with `read skill://<name>/<path>`, never by grepping `.` over its directory.
 
 # Before any pull request
 
