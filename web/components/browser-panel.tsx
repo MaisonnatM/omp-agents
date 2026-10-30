@@ -3,7 +3,7 @@
  * tab, where the elements selected and the marks drawn on the page land in the session's composer as one chip and its
  * picture, and a whole page as an image.
  */
-import { ArrowLeft, ArrowRight, Camera, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server } from "lucide-react";
+import { AppWindow, ArrowLeft, ArrowRight, Camera, ExternalLink, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server, Sparkles, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
@@ -36,21 +36,42 @@ export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesk
 /** The window's shell takes capture requests and picks in the app: the desktop app, from the build that added **Screenshot** and T3 Code's picking. */
 const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.captureBrowser === "function";
 
+/** The sparkles the page marks agent-made things with, as the notification bell's Updates do. */
+export const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
+
+/** The sparkles on an icon button's top right corner, for an action whose result goes to the agent. */
+export function AiBadge() {
+	return <Sparkles aria-hidden className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! fill-current", AI_SPARKLES)} />;
+}
+
 /** A toolbar control of the Browser, named by its tooltip. */
-function ToolbarButton({ label, control, disabled, shortcut, pressed, onClick, children }: {
+function ToolbarButton({ label, control, disabled, shortcut, pressed, ai, onClick, children }: {
 	label: string;
 	control: ControlId;
 	disabled: boolean;
 	shortcut?: readonly string[];
 	/** Set for a toggle: whether it is on. */
 	pressed?: boolean;
+	/** What it makes goes to the session's agent, which a sparkles badge marks. */
+	ai?: boolean;
 	onClick: () => void;
 	children: ReactNode;
 }) {
 	return (
 		<Tooltip content={label} shortcut={shortcut} side="bottom" disabled={disabled}>
-			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} aria-pressed={pressed} active={pressed} disabled={disabled} onClick={onClick}>
+			<Button
+				{...activityControl(control)}
+				variant="ghost"
+				size="icon-compact"
+				aria-label={label}
+				aria-pressed={pressed}
+				active={pressed}
+				disabled={disabled}
+				onClick={onClick}
+				className={ai ? "relative" : undefined}
+			>
 				{children}
+				{ai && <AiBadge />}
 			</Button>
 		</Tooltip>
 	);
@@ -108,27 +129,71 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 		setTabs([MAIN_TAB, ...review]);
 		if (review[0]) setActive(review[0].id);
 	}
+	const close = (id: string): void => {
+		const at = tabs.findIndex(tab => tab.id === id);
+		const rest = tabs.filter(tab => tab.id !== id);
+		setTabs(rest);
+		if (id === active) setActive((rest[at] ?? rest[at - 1] ?? MAIN_TAB).id);
+	};
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
 			{tabs.length > 1 && (
-				<div role="tablist" aria-label="Browser tabs" className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-border px-1.5 py-1 [scrollbar-width:none]">
-					{tabs.map(tab => (
-						<button
-							{...activityControl("browser.tab")}
-							key={tab.id}
-							type="button"
-							role="tab"
-							aria-selected={tab.id === active}
-							title={tab.page?.url ?? "The session's app"}
-							onClick={() => setActive(tab.id)}
-							className={cn(
-								"h-6 max-w-44 shrink-0 truncate rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground",
-								tab.id === active && "bg-muted text-foreground",
-							)}
-						>
-							{tab.label}
-						</button>
-					))}
+				<div role="tablist" aria-label="Browser tabs" className="flex h-9 shrink-0 items-end overflow-x-auto bg-muted/60 px-2 pt-1.5 [scrollbar-width:none]">
+					{tabs.map((tab, at) => {
+						const selected = tab.id === active;
+						// Chrome draws a divider between two tabs that are neither the selected one.
+						const divided = at > 0 && !selected && tabs[at - 1]!.id !== active;
+						const Icon = tab.page ? Sparkles : AppWindow;
+						return (
+							<div
+								key={tab.id}
+								className={cn(
+									// The session's own tab is pinned, as in Chrome: its icon alone, so the review tabs keep room for their names.
+									"group/tab relative flex h-full items-center rounded-t-lg text-xs",
+									tab.page ? "min-w-16 max-w-52 flex-1" : "w-9 flex-none",
+									selected ? "z-10 bg-background text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+									divided && "before:absolute before:top-2 before:bottom-2 before:-left-px before:w-px before:bg-border group-hover/tab:before:hidden",
+									// The selected tab's feet curve into the toolbar below it, as in Chrome.
+									selected &&
+										"before:absolute before:bottom-0 before:-left-2 before:size-2 before:bg-[radial-gradient(circle_at_0_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))] after:absolute after:-right-2 after:bottom-0 after:size-2 after:bg-[radial-gradient(circle_at_100%_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))]",
+								)}
+							>
+								<button
+									{...activityControl("browser.tab")}
+									type="button"
+									role="tab"
+									aria-selected={selected}
+									title={tab.page?.url ?? "The session's app"}
+									onClick={() => setActive(tab.id)}
+									onAuxClick={event => event.button === 1 && tab.page && close(tab.id)}
+									className={cn(
+										"flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-t-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+										tab.page ? "px-2" : "justify-center",
+									)}
+								>
+									<Icon aria-hidden className={cn("size-3.5 shrink-0", tab.page ? AI_SPARKLES : "text-muted-foreground")} />
+									<span
+										className={cn(
+											"min-w-0 truncate",
+											tab.page ? "group-focus-within/tab:mask-[linear-gradient(to_left,transparent_1rem,black_2rem)] group-hover/tab:mask-[linear-gradient(to_left,transparent_1rem,black_2rem)]" : "sr-only",
+										)}
+									>
+										{tab.label}
+									</span>
+								</button>
+								{tab.page && (
+									<button
+										type="button"
+										aria-label={`Close ${tab.label}`}
+										onClick={() => close(tab.id)}
+										className="absolute top-1/2 right-1 grid size-4 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 hover:bg-foreground/10 hover:text-foreground"
+									>
+										<X aria-hidden className="size-3" />
+									</button>
+								)}
+							</div>
+						);
+					})}
 				</div>
 			)}
 			{tabs.map(tab => (
@@ -247,6 +312,7 @@ function BrowserPage({ view, sessionId, page, active }: { view: LiveView; sessio
 					<ToolbarButton
 						label="Pick in the app"
 						control="browser.select-element"
+						ai
 						disabled={!webview.ready}
 						pressed={picking.mode !== null}
 						onClick={() => picking.stop() || picking.choose("select")}
@@ -255,7 +321,7 @@ function BrowserPage({ view, sessionId, page, active }: { view: LiveView; sessio
 					</ToolbarButton>
 				)}
 				{CAPTURE_AVAILABLE && (
-					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void picking.screenshot()}>
+					<ToolbarButton label="Screenshot" control="browser.screenshot" ai disabled={!webview.ready} onClick={() => void picking.screenshot()}>
 						<Camera />
 					</ToolbarButton>
 				)}

@@ -37,6 +37,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   Escape drops the selection and the marks.
   V, R, D, and E switch to **Select**, **Region**, **Draw**, and **Erase** while picking, as in T3 Code, pressed in the app too.
 - **Screenshot**, the camera button, attaches a picture of all the app shows to the composer at once.
+- **Pick in the app**, **Screenshot**, and **Review visuals** carry small violet sparkles on their icon's corner, since what they make goes to the agent or comes from it.
   A picture needs the session's conversation open, since attachments live in its composer.
   When the picture cannot be taken or the conversation is closed, **Attach** adds nothing and keeps picking, with the selection and the marks, so you can try again.
 - The Browser keeps its own cookies and storage across launches, apart from the dashboard's, so an app you signed in to stays signed in.
@@ -45,6 +46,8 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 
 - A session the dashboard started ends a reply with a list of pages to review after it changes something you should look at; the reply shows the list as a card, with each page's name and how to reach it.
 - **Review visuals · N**, in the conversation's header once a reply lists pages, opens the right sidebar on the **Browser** with one tab per page, up to 8, after the session's own **App** tab, and shows the first; its tooltip names the pages.
+- The tabs look like a browser's: the shown tab joins the toolbar below it, the **App** tab is pinned at the start as its icon alone, and each review tab has the sparkles the page marks the agent's work with, then its name.
+- Hover a review tab, or tab to it, to show its close button; a middle click closes it too, and closing the shown tab shows the one after it, else the one before.
 - Each tab keeps its page loaded while another shows, and a page's note, such as "Open the Sync tab", shows above it.
 - Picking and **Screenshot** work on the tab shown, as on the **App** tab.
 - A review tab does not change the address the **App** tab opens on next time.
