@@ -11,7 +11,7 @@ import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
 import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
+import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -26,6 +26,7 @@ import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
 import { Picking, usePicking } from "./browser-capture";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
+import { MoreActionsMenu } from "./more-actions-menu";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
 
@@ -278,9 +279,10 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 			ref={sectionRef}
 			aria-label="Browser"
 			// Maximized, it covers the window below its title bar (`DesktopTitleBar`'s h-9), whose window buttons and drag strip stay usable.
-			className={cn("flex min-h-0 flex-col bg-background", maximized ? cn("fixed inset-x-0 bottom-0 z-30", DESKTOP_TITLE_BAR ? "top-9" : "top-0") : "flex-1")}
+			className={cn("@container/browser flex min-h-0 flex-col bg-background", maximized ? cn("fixed inset-x-0 bottom-0 z-30", DESKTOP_TITLE_BAR ? "top-9" : "top-0") : "flex-1")}
 		>
-			<div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border px-1.5">
+			{/* In a narrow Browser, such as the sidebar at its default width, the address field takes a row of its own below the buttons. */}
+			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-1.5 @max-[24rem]/browser:pt-1">
 				<ToolbarButton label="Back" control="browser.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
 					<ArrowLeft />
 				</ToolbarButton>
@@ -291,7 +293,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 					<RotateCw />
 				</ToolbarButton>
 				<form
-					className="mx-1 min-w-0 flex-1"
+					className="mx-1 min-w-0 flex-1 @max-[24rem]/browser:order-last @max-[24rem]/browser:mx-0 @max-[24rem]/browser:basis-full @max-[24rem]/browser:pb-1.5"
 					onSubmit={event => {
 						event.preventDefault();
 						webview.load(webview.address);
@@ -356,27 +358,19 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 						<Eye />
 					</ToolbarButton>
 				)}
-				<ToolbarButton
-					label={maximized ? "Restore Browser" : "Maximize Browser"}
-					control="browser.maximize"
-					disabled={false}
-					shortcut={maximized ? shortcutLabels("browserRestore") : undefined}
-					onClick={() => setMaximized(!maximized)}
-				>
-					{maximized ? <Minimize2 /> : <Maximize2 />}
-				</ToolbarButton>
-				<Tooltip content="Open in default browser" side="bottom" disabled={!mounted}>
-					<Button
-						{...activityControl("browser.open-in-browser")}
-						variant="ghost"
-						size="icon-compact"
-						aria-label="Open in default browser"
-						disabled={!mounted}
-						render={mounted ? <a href={webview.address} target="_blank" rel="noopener noreferrer" /> : undefined}
-					>
-						<ExternalLink />
-					</Button>
-				</Tooltip>
+				<MoreActionsMenu name="the Browser">
+					<MenuItem {...activityControl("browser.maximize")} onClick={() => setMaximized(!maximized)}>
+						{maximized ? <Minimize2 /> : <Maximize2 />}
+						{maximized ? "Restore Browser" : "Maximize Browser"}
+						{maximized && <MenuShortcut>{shortcutLabels("browserRestore").join(" ")}</MenuShortcut>}
+					</MenuItem>
+					{mounted && (
+						<MenuLinkItem {...activityControl("browser.open-in-browser")} href={webview.address} target="_blank" rel="noopener noreferrer">
+							<ExternalLink />
+							Open in default browser
+						</MenuLinkItem>
+					)}
+				</MoreActionsMenu>
 			</div>
 			{webview.problem && (
 				<p role="status" className="shrink-0 border-b border-border px-3 py-1.5 text-xs text-destructive">

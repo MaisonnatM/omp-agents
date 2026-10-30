@@ -25,8 +25,10 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   A sign-in that comes back to another server of yours, such as the app's API on `8000`, goes there as is.
   A link that opens a new tab opens in your default browser.
   An address that fails to load says why under the address.
-- Back, Forward, and Reload work as in a browser, and the arrow button opens the current address in your default browser.
-- **Maximize Browser**, the expand button, fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, the same button, or Escape, pressed in the app too, puts it back in the sidebar.
+- Back, Forward, and Reload work as in a browser.
+- The **⋯** button at the end of the toolbar holds two actions, so the address field keeps its room in the sidebar:
+  **Open in default browser** opens the current address in your default browser, once a page has loaded.
+  **Maximize Browser** fills the app's window below its title bar with the Browser, toolbar included, and hides the rest of the page from Tab and screen readers until **Restore Browser**, in the same menu, or Escape, pressed in the app too, puts it back in the sidebar.
 - **Pick in the app**, the pointer button, starts picking, as in T3 Code: a **Select**, **Region**, **Draw**, and **Erase** switch floats at the top of the app, and the button or Escape stops it.
   **Select**, where picking starts, outlines the element under the pointer, and a click selects it without pressing it in the app; Shift+click adds another, and a click on a selected element drops it.
   Each outline is labeled with the element's React component, else its tag with its id and first two classes, as in T3 Code.
