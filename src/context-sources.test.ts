@@ -157,7 +157,7 @@ describe("buildContextReport", () => {
 	});
 
 	test("a listed session's workspace wins over its file's directory", () => {
-		const facts: SessionSummary = { workspace: "/code/listed", title: "Listed" };
+		const facts: SessionSummary = { file: main("s2"), workspace: "/code/listed", title: "Listed" };
 		const { input, sessions } = report("/code/listed", null, id => (id === "s2" ? facts : null));
 		expect(input).toBe(300);
 		expect(sessions).toEqual([{ sessionId: "s2", title: "Listed", input: 300 }]);

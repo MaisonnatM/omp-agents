@@ -583,7 +583,7 @@ export class Dashboard {
 				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
 				summaryOf(sessionId) {
 					const saved = files.savedOf(sessionId);
-					return saved && { title: saved.title, workspace: files.facts.placement.cwdOf(saved.cwd) };
+					return saved && { file: saved.path, title: saved.title, workspace: files.facts.placement.cwdOf(saved.cwd) };
 				},
 				foreignUsage: () => this.#foreignUsage.read(),
 				placeOf(sessionId) {

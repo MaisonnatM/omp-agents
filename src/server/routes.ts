@@ -5,7 +5,7 @@
  */
 import type { Server } from "bun";
 import { join } from "node:path";
-import { buildAnalytics, type SessionSummary, withForeignUsage } from "../analytics";
+import { buildAnalytics, foldSessions, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
 import { readDecisions } from "../decisions";
 import { readFavicon } from "../favicon";
@@ -25,7 +25,7 @@ import { isTerminalAccess } from "../shared/readiness";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { contextIndex } from "../omp/context-index";
 import { sessionsDir } from "../omp/sessions";
-import { readStats, windowOf } from "../omp/stats";
+import { readSessionRows, readStats, windowOf } from "../omp/stats";
 import { directoryOf } from "../paths";
 import { attachToPullRequest, loadPullRequestOptions, markPullRequestFileViewed, savePullRequest } from "../pull-request-edit";
 import { InvalidPullRequestCommit, listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
@@ -80,7 +80,7 @@ export interface SessionRoutesEnv {
 	addedCwds(): string[];
 	/** Apply `change` to the workspaces and send every socket the workspaces after it. */
 	changeWorkspaces(change: WorkspaceChange): void;
-	/** The listed file of a session, for Analytics' title and the workspace it counts in. */
+	/** The listed file of a session, for Analytics' title, the workspace it counts in, and one session's usage. */
 	summaryOf(sessionId: string): SessionSummary | null;
 	/** The requests Claude Code's and Codex's transcripts record, each transcript read past what earlier reads folded. */
 	foreignUsage(): Promise<FileUsage[]>;
@@ -290,6 +290,15 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		});
 	});
 
+	/** `GET /api/analytics/session?session=<id>`: what that session used over all time, its subagents folded in; `null` before its first request. */
+	const sessionUsage = get(params => {
+		const sessionId = params.get("session");
+		if (!sessionId) return fail(400, "Expected ?session= naming a session");
+		const summary = env.summaryOf(sessionId);
+		if (!summary) return fail(404, "No such session");
+		return answer(async () => foldSessions(await readSessionRows(summary.file), sessionsDir, env.summaryOf)[0] ?? null);
+	});
+
 	/** `GET /api/skills?cwd=<dir>`: the skills a session started in that directory can invoke. */
 	const skills = get(async params => {
 		const cwd = await dirParam(params);
@@ -386,6 +395,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/replay/compare": { GET: replayRead(true) },
 		"/api/analytics": { GET: analytics },
 		"/api/analytics/context": { GET: contextReport },
+		"/api/analytics/session": { GET: sessionUsage },
 		"/api/skills": { GET: skills },
 		"/api/pull-requests": { GET: pullRequests },
 		"/api/workspaces": { PUT: workspaceChange },
