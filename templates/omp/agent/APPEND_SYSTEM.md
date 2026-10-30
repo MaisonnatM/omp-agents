@@ -85,9 +85,10 @@ as arena runners, still pass `isolated: true`.
 # Asking the user
 
 - Ask through the ask tool, never as a plain-text question: two or three options, the recommended one first with "(Recommended)" in its label.
+- On Cursor models, omp's `ask` sits behind `CallDynamicTool` (namespace `pi-agent`, tool `ask`): call it there, never Cursor's `AskQuestion`, which omp rejects.
 - Ask before you guess when a request could mean two repositories, two parts of the screen, or two features.
 - When a gate blocks a merge, make the fastest path that keeps the checks honest the first option.
-- As a subagent, end your turn with the question instead.
+- As a subagent, which cannot ask the user on any provider, end your turn with the question instead.
 
 # Before any pull request
 
