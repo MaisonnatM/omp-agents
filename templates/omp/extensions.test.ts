@@ -28,8 +28,8 @@ function load(extension) {
 		on(name, handler) { hooks[name] = handler; },
 		registerTool(registered) { tool = registered; },
 		appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
-		// input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.response answers the rest.
-		async exec(command, args) {
+		// input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.at answers by directory first; input.response answers the rest.
+		async exec(command, args, options) {
 			// gh run as "env -u NAME… gh args" is recorded as "env -u NAME… args".
 			const unset = [];
 			let rest = args;
@@ -43,7 +43,7 @@ function load(extension) {
 			const prefix = unset.length ? ["env", ...unset] : [];
 			executed.push([...prefix, ...rest]);
 			const key = [...prefix, ...rest.slice(0, 2)].join(" ");
-			return input.sequence?.shift() ?? input.responses?.[key] ?? input.response;
+			return input.sequence?.shift() ?? input.at?.[options.cwd]?.[key] ?? input.responses?.[key] ?? input.response;
 		},
 	});
 	return hooks;
@@ -52,7 +52,7 @@ function load(extension) {
 const hooks = load((await import(process.argv[3])).default);
 if (input.command) {
 	if (!hooks.tool_call) throw new Error("No command gate registered");
-	const result = await hooks.tool_call({ toolName: "bash", input: { command: input.command } }, {
+	const result = await hooks.tool_call({ toolName: "bash", input: { command: input.command, cwd: input.bashCwd } }, {
 		cwd: input.cwd ?? process.cwd(), hasUI: true,
 		ui: { async confirm() { confirmations++; return input.approve; } },
 	});
@@ -136,20 +136,33 @@ function quotaConfig(): Record<string, string> {
 
 const checkouts: string[] = [];
 afterAll(() => { for (const dir of checkouts) rmSync(dir, { recursive: true, force: true }); });
-/** A checkout of the test's own, with `reviewPaths` as its `.omp/review-paths` and `uiPaths` as its `.omp/ui-paths` when given, so this repository's files reach no test. */
-function checkout(reviewPaths?: string, uiPaths?: string): string {
+/**
+ * A checkout of the test's own, with `reviewPaths` as its `.omp/review-paths` and `uiPaths` as its `.omp/ui-paths` when given, so this repository's files reach no test.
+ * With `mainCheckout` it is a linked worktree of that checkout, whose `.git` is a file.
+ */
+function checkout(reviewPaths?: string, uiPaths?: string, mainCheckout?: string): string {
 	const dir = mkdtempSync(join(tmpdir(), "ship-checkout-"));
 	checkouts.push(dir);
-	mkdirSync(join(dir, ".git"));
+	if (mainCheckout) writeFileSync(join(dir, ".git"), `gitdir: ${join(mainCheckout, ".git/worktrees", basename(dir))}\n`);
+	else mkdirSync(join(dir, ".git"));
 	mkdirSync(join(dir, ".omp"));
 	if (reviewPaths !== undefined) writeFileSync(join(dir, ".omp/review-paths"), reviewPaths);
 	if (uiPaths !== undefined) writeFileSync(join(dir, ".omp/ui-paths"), uiPaths);
 	return dir;
 }
 
-/** `gh pr view --json body,changedFiles,files` answering with this body and changed files. */
-function prView(body: string, files: string[] = []) {
-	return { code: 0, stdout: JSON.stringify({ body, changedFiles: files.length, files: files.map(path => ({ path })) }), stderr: "" };
+/** `gh pr view --json body,changedFiles,files,url` answering with this body and changed files, for PR 7 of `repository`. */
+function prView(body: string, files: string[] = [], repository = "me/app") {
+	return { code: 0, stdout: JSON.stringify({ body, changedFiles: files.length, files: files.map(path => ({ path })), url: `https://github.com/${repository}/pull/7` }), stderr: "" };
+}
+
+/** gh's answers in a checkout of `checkoutOf`: `view` for the PR, and whether the user may push to the PR's repository `pr`, where `push: "error"` fails that read. */
+function answers(view: object, { checkoutOf = "me/app", pr = "me/app", push = true as boolean | "error" } = {}) {
+	return {
+		"pr view": view,
+		[`api repos/${pr}`]: push === "error" ? { code: 1, stdout: "", stderr: "HTTP 404: Not Found" } : { code: 0, stdout: `${push}\n`, stderr: "" },
+		"repo view": { code: 0, stdout: `${checkoutOf}\n`, stderr: "" },
+	};
 }
 
 describe("ship publication gate", () => {
@@ -176,7 +189,7 @@ describe("ship publication gate", () => {
 	test("an unreviewed PR cannot reach operator approval", () => {
 		const { result, confirmations } = exercise("ship", {
 			command: "gt submit --publish", approve: true, cwd: checkout(),
-			response: prView("Unreviewed PR", ["README.md"]),
+			responses: answers(prView("Unreviewed PR", ["README.md"])),
 		});
 		expect(result?.block).toBe(true);
 		expect(confirmations).toBe(0);
@@ -185,7 +198,7 @@ describe("ship publication gate", () => {
 	test.each([["README.md", false], ["src/shared/protocol.ts", true]])("with review paths, an unreviewed PR changing %s is blocked: %s", (file, blocked) => {
 		const { result, confirmations } = exercise("ship", {
 			command: "gh pr ready 7", approve: true, cwd: checkout("# Shared contracts\nsrc/shared/**\n"),
-			responses: { "pr view": prView("Unreviewed PR", [file]) },
+			responses: answers(prView("Unreviewed PR", [file])),
 		});
 		expect(result?.block ?? false).toBe(blocked);
 		expect(confirmations).toBe(blocked ? 0 : 1);
@@ -194,7 +207,7 @@ describe("ship publication gate", () => {
 	test.each([false, true])("a reviewed PR requires operator approval (%s)", approve => {
 		const { result, confirmations } = exercise("ship", {
 			command: "gt submit --publish", approve, cwd: checkout(),
-			response: prView("- [x] Thermo-nuclear code quality review"),
+			responses: answers(prView("- [x] Thermo-nuclear code quality review")),
 		});
 		expect(result?.block ?? false).toBe(!approve);
 		expect(confirmations).toBe(1);
@@ -203,7 +216,7 @@ describe("ship publication gate", () => {
 	test.each([["- [ ] Browser proof (UI changes: run verify-yampa, attach screenshot)", true], ["- [x] Browser proof (UI changes: run verify-yampa, attach screenshot)", false]])("a reviewed PR with %j is blocked: %s", (box, blocked) => {
 		const { result, confirmations } = exercise("ship", {
 			command: "gh pr ready 7", approve: true, cwd: checkout(),
-			responses: { "pr view": prView(`## Checks\n${box}\n- [x] Thermo-nuclear code quality review`) },
+			responses: answers(prView(`## Checks\n${box}\n- [x] Thermo-nuclear code quality review`)),
 		});
 		expect(result?.block ?? false).toBe(blocked);
 		expect(confirmations).toBe(blocked ? 0 : 1);
@@ -213,29 +226,75 @@ describe("ship publication gate", () => {
 	test.each([[undefined, false], ["web/**/*.tsx\n", true]])("a reviewed PR changing web/app.tsx without the interface box, with ui paths %j, is blocked: %s", (uiPaths, blocked) => {
 		const { result, confirmations } = exercise("ship", {
 			command: "gh pr ready 7", approve: true, cwd: checkout(undefined, uiPaths),
-			responses: { "pr view": prView("- [x] Thermo-nuclear code quality review", ["web/app.tsx"]) },
+			responses: answers(prView("- [x] Thermo-nuclear code quality review", ["web/app.tsx"])),
 		});
 		expect(result?.block ?? false).toBe(blocked);
 		expect(confirmations).toBe(blocked ? 0 : 1);
 		if (blocked) expect(result?.reason).toContain("- [x] Interface review");
 	});
 
-	test.each([["dustinspecker/awesome-eslint", false], ["me/app", true], ["ME/other", true]])("gh pr ready -R %s is gated: %s", (repo, gated) => {
+	// A reviewed PR, so an exempt one is never asked about, one of the user's is asked about, and one of another checkout's repository is refused.
+	test.each<[string, string, boolean | "error", "unchecked" | "asked" | "refused"]>([
+		["gh pr ready 7 -R dustinspecker/awesome-eslint >/dev/null", "dustinspecker/awesome-eslint", false, "unchecked"],
+		["gh pr ready 7 -R me/app", "me/app", true, "asked"],
+		["gh pr ready 7 -R ME/App", "me/app", true, "asked"],
+		["gh pr ready 7 -R me/app", "me/app", "error", "asked"],
+		["gh pr ready 7 -R acme/app", "acme/app", true, "refused"],
+		["gh pr ready 7 -R acme/app", "acme/app", "error", "refused"],
+		["gh pr ready https://github.com/acme/app/pull/7", "acme/app", true, "refused"],
+	])("from a checkout of me/app, `%s` on a PR of %s with push permission %p is %s", (command, pr, push, outcome) => {
 		const { result, confirmations } = exercise("ship", {
-			command: `gh pr ready 5 -R ${repo} >/dev/null`, approve: true, cwd: checkout(),
-			responses: {
-				"repo view": { code: 0, stdout: "me/app", stderr: "" },
-				"pr view": prView("Unreviewed PR"),
-			},
+			command, approve: true, cwd: checkout(),
+			responses: answers(prView("- [x] Thermo-nuclear code quality review", [], pr), { pr, push }),
 		});
-		expect(result?.block ?? false).toBe(gated);
+		expect(result?.block ?? false).toBe(outcome === "refused");
+		expect(confirmations).toBe(outcome === "asked" ? 1 : 0);
+		if (outcome === "refused") expect(result?.reason).toContain("a checkout of acme/app");
+	});
+
+	test.each<[string, (dir: string) => { command: string; bashCwd?: string }]>([
+		["cd", dir => ({ command: `cd ${dir} && gh pr ready 7` })],
+		["env -C", dir => ({ command: `env -C ${dir} gh pr ready 7` })],
+		["bash -c", dir => ({ command: `bash -c 'cd ${dir} && gh pr ready 7'` })],
+		["the bash call's cwd", dir => ({ command: "gh pr ready 7", bashCwd: dir })],
+	])("a publish run in another repository's checkout through %s reads the PR there", (_, call) => {
+		const session = checkout();
+		const app = checkout();
+		const missing = { code: 1, stdout: "", stderr: "GraphQL: Could not resolve to a PullRequest with the number of 7. (repository.pullRequest)" };
+		const { result, confirmations } = exercise("ship", {
+			...call(app), approve: true, cwd: session,
+			at: { [session]: answers(missing, { checkoutOf: "me/agents" }), [app]: answers(prView("- [x] Thermo-nuclear code quality review")) },
+		});
+		expect(result).toBeNull();
+		expect(confirmations).toBe(1);
+	});
+
+	test.each([["the linked worktree, which lists docs/**", false], ["the main checkout, which lists src/**", true]])("an unreviewed PR changing src/x.ts, published with a cd into %s, is blocked: %p", (target, blocked) => {
+		const main = checkout("src/**\n");
+		const worktree = checkout("docs/**\n", undefined, main);
+		const [from, into] = target.startsWith("the main checkout") ? [worktree, main] : [main, worktree];
+		const { result, confirmations } = exercise("ship", {
+			command: `cd ${into} && gh pr ready 7`, approve: true, cwd: from,
+			responses: answers(prView("Unreviewed PR", ["src/x.ts"])),
+		});
+		expect(result?.block ?? false).toBe(blocked);
+		expect(confirmations).toBe(blocked ? 0 : 1);
+	});
+
+	test("a publish in a directory the gate cannot locate is blocked before gh reads any checkout", () => {
+		const { result, confirmations, executed } = exercise("ship", {
+			command: 'cd "$REPO" && gh pr ready 7', approve: true, cwd: checkout(),
+			responses: answers(prView("- [x] Thermo-nuclear code quality review")),
+		});
+		expect(result?.block).toBe(true);
 		expect(confirmations).toBe(0);
+		expect(executed).toEqual([]);
 	});
 
 	test("a publish run through `env` is gated", () => {
 		const { result, confirmations } = exercise("ship", {
 			command: "env -u GITHUB_TOKEN gt submit --publish", approve: true, cwd: checkout(),
-			response: prView("Unreviewed PR"),
+			responses: answers(prView("Unreviewed PR")),
 		});
 		expect(result?.block).toBe(true);
 		expect(confirmations).toBe(0);
@@ -253,14 +312,18 @@ describe("ship publication gate", () => {
 				"pr view": unauthorized,
 				"auth status": authStatus([rejectedToken, keyringLogin]),
 				"env -u GITHUB_TOKEN pr view": prView("- [x] Thermo-nuclear code quality review"),
+				"env -u GITHUB_TOKEN api repos/me/app": { code: 0, stdout: "true\n", stderr: "" },
+				"env -u GITHUB_TOKEN repo view": { code: 0, stdout: "me/app\n", stderr: "" },
 			},
 		}, { GITHUB_TOKEN: "ghp_rejectedTokenForTest0000000000000000" });
 		expect(result).toBeNull();
 		expect(confirmations).toBe(1);
 		expect(executed).toEqual([
-			["pr", "view", "--json", "body,changedFiles,files"],
+			["pr", "view", "--json", "body,changedFiles,files,url"],
 			["auth", "status", "--json", "hosts"],
-			["env", "-u", "GITHUB_TOKEN", "pr", "view", "--json", "body,changedFiles,files"],
+			["env", "-u", "GITHUB_TOKEN", "pr", "view", "--json", "body,changedFiles,files,url"],
+			["env", "-u", "GITHUB_TOKEN", "api", "repos/me/app", "--jq", ".permissions.push"],
+			["env", "-u", "GITHUB_TOKEN", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
 		]);
 	});
 
