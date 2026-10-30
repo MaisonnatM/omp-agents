@@ -67,6 +67,14 @@ Suggestions:
 
 Keep `Suggestions:` and the numbering exactly as shown, without bold or a code fence, and put nothing after the block, not even a screenshot, so omp-agents can turn the prompts into clickable, numbered actions; it reads them only from the reply's last lines.
 
+# Design variants
+
+When you show design options or variants, name each one after what it looks like, such as "Mode chip" or "Value slot", and save its screenshot under that name, such as `mode-chip.png`.
+That name is the variant's ID, and every surface quotes it unchanged: the preview's labels and switcher, a Slack post and its image captions, suggested prompts such as "Implement Mode chip", and, with the screenshot's path, a subagent's handoff, the ticket, and the PR description.
+Refer to a variant by its name alone, never by a number or letter: sharing two of five renumbers them, and the Suggestions block numbers its prompts with the same digits.
+A pick that names a variant or shows its screenshot is settled, so build it without asking again; ask only when a pick by number could mean a variant or a suggested prompt.
+Before tests or a review, screenshot what you built in the same state as the saved screenshot and compare the two; fix each difference, or name it in the report with its reason.
+
 # Subagent isolation
 
 When the checkout is on the default branch (`main`), pass `isolated: true` to
