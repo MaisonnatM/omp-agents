@@ -6,7 +6,7 @@
   Click the **Routines** heading to open the Bot's routines card in place of the conversation, at `#bots/<Bot id>/routines`, or click one routine to open the card with its row open, at `#bots/<Bot id>/routines/<routine id>`.
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
-- **New routine**, under **Routines** in the Bot's details or at the top of its routines card, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
+- **New routine**, in the **Routines** tab of the Bot's details or at the top of its routines card, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
   The task is **Send a message**, a message that goes into the Bot's conversation as a routine run card, or **Run a command**, a shell command.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run a schedule or **Run now** started, or runs at a time of day on the days you pick.
   **Weekdays** and **Every day** pick those days at once.

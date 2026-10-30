@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-30
 
+- A Bot's details now have their own Routines tab, which lists its routines and counts them on the tab.
+- A Bot's Details tab now shows its Usage: the tokens its conversation used and what they would cost at list price, with its requests and cache hit rate.
 - The End session button in a session's header is now a filled button, so it stands out.
 - The End session button in a session's header shows its stop icon again; it was an empty, invisible button.
 - You can pin a Bot to keep it at the top of the Bots tab and the gallery: right-click it and choose Pin.

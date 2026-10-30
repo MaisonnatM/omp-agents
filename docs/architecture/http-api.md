@@ -23,6 +23,8 @@ The answer includes totals, time buckets with per-provider usage, provider total
 `GET /api/analytics/context?range=<range>[&cwd=<directory>][&session=<id>]` answers `ContextReport`, the context sources over the range, defaulting to `24h`, for every workspace, one working directory, or one session; an unknown range returns 400.
 It includes the requests, their input tokens and input cost, the sources by tokens, the workspaces with input in the range, the 20 sessions with the most input in the chosen workspace, and the index's progress while it syncs.
 
+`GET /api/analytics/session?session=<id>` answers `AnalyticsSession`, what that session's file and its subagents' files used over all time, from omp-stats, or `null` before its first request; a missing `session` returns 400, and a session whose file is not listed returns 404.
+
 `GET /api/activity?range=<range>` answers `ActivityRead`, the page's activity over the range, defaulting to `30d`, with the same ranges as Analytics; an unknown range returns 400 `Unknown activity range`.
 It includes each feature's uses, every feature's last use over all stored rows, the moves between views, the time on each view, each local day's active time, visits, and actions, and `serverActions`, every route that takes a `PUT`, for the inventory; see [Activity](activity.md).
 

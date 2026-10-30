@@ -46,24 +46,27 @@
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  Its tabs are **Details** and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
+  Its tabs are **Details**, **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
   **Details** starts with the avatar, the name, the Bot's type and whether its session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
-  Below come its **Job**, its **Memory**, its **Routines**, and **Delete**.
+  Below come its **Job**, its **Memory**, its **Usage**, and **Delete**.
   Editing the job shows **Save job** and **Revert**; every turn's system prompt carries the saved job.
   You can also tell the Bot in its conversation to change its job, and it saves the new one to its **Job** field once the dashboard applies it.
   **Memory** lists what the Bot keeps in `bots/<id>/memory.md` under the data directory, newest last, each with its date; for a long memory it lists the newest 16 KB, the part the Bot reads.
   Only the Bot writes it, with its `remember` tool, when you tell it something worth keeping.
-  **Routines** lists the Bot's routines, each with its last run's dot, its schedules and triggers, and when it last ran and what that run did, or **Not run yet**; **New routine** opens the editor of a new one, `#bots/<id>/routines/new`.
-  Click a routine to open it in place of the conversation, `#bots/<id>/routines/<routine id>`, and the details mark it; **Edit** in its menu opens its editor at `#bots/<id>/routines/<routine id>/edit`, so Back returns to the routine.
+  **Usage** shows what the Bot's conversation has used since it began, its subagents included: its tokens and their cost at the API's list price, then its input, output, cache read, and cache write tokens, its requests, how many failed, its cache hit rate, and its subagents' tokens when they used any.
+  It reads again each time the Bot starts or ends a turn, and says **No requests yet.** before the Bot's first reply.
+  **Routines** lists the Bot's routines, each with its last run's dot, its schedules and triggers, and when it last ran and what that run did, or **Not run yet**.
+  **All routines** opens the card of them in place of the conversation, `#bots/<id>/routines`, and **New routine** opens the editor of a new one, `#bots/<id>/routines/new`.
+  Click a routine to open it in place of the conversation, `#bots/<id>/routines/<routine id>`, and the **Routines** tab marks it; **Edit** in its menu opens its editor at `#bots/<id>/routines/<routine id>/edit`, so Back returns to the routine.
   An address that names a routine the Bot does not have, such as one deleted, shows that, with a link back to the conversation.
   Saving a routine opens it once the server has saved it; a save it refuses says why and keeps the editor open.
   The page offers no **End session**, and Cmd+W does nothing there, so the Bot's one conversation stays open; a session that ended another way resumes with your next message.
 - **Delete**, in red, asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
 - Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, a calendar event, or unread mail triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
-  You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees a short line for each of its own routines on every turn, with the start of its prompt or command, and what it saves shows under its **Routines** once the dashboard applies it.
+  You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees a short line for each of its own routines on every turn, with the start of its prompt or command, and what it saves shows in its **Routines** tab once the dashboard applies it.
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.

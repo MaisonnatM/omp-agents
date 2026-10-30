@@ -24,6 +24,7 @@
   `useRead` reads one URL, such as a pull request's stack, the settings page's model catalog, or the new-session draft's model list.
   A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.
   A URL change never returns the previous URL's answer.
+  `settled` holds once the URL answered or failed, so an answer of `null` reads apart from one still loading.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per workspace, one for the tickets, with one entry, since Linear is not per workspace, one for the MCP integrations, one for the Google calendars shown, one for the Calendar page's Google events, with one entry per month, one for its events kept on this computer, with one entry, and one for the Gmail inbox, with one entry.
   A tick while the page is hidden reads nothing, and each scope that skipped one reads once when the page shows again.
   Each kept store reads its localStorage back through its `cache.decode` and drops a read the decoder refuses, so a record kept by an older version, or damaged, reads the server again instead of reaching a component.
