@@ -95,6 +95,6 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 		opening,
 		links,
 		copies,
-		[{ id: "end", title: context.ending ? "Ending…" : "End session", icon: CircleStop, disabled: context.ending, tone: "destructive", chord: { key: "x", mod: true, shift: true }, run: { kind: "do", fn: () => context.end(instanceId) } }],
+		[{ id: "end", title: context.ending ? "Ending…" : "End session", icon: CircleStop, disabled: context.ending, tone: "destructive", chord: { key: "w", mod: true }, run: { kind: "do", fn: () => context.end(instanceId) } }],
 	];
 }

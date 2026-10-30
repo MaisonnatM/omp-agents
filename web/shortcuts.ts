@@ -173,7 +173,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		],
 	},
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
-	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: { key: "x", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: { key: "w", mod: true }, scope: "anywhere" }] },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
 	{
 		id: "previousSession",
@@ -380,7 +380,7 @@ const KEY_LABEL: Record<string, string> = {
 	" ": "Space",
 };
 
-/** `⇧⌘X` on macOS, `Ctrl+Shift+X` elsewhere. */
+/** `⇧⌘K` on macOS, `Ctrl+Shift+K` elsewhere. */
 export function chordLabel({ key, mod, ctrl, alt, shift }: Chord): string {
 	const name = KEY_LABEL[key] ?? key.toUpperCase();
 	if (IS_MAC) return `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${shift ? "⇧" : ""}${mod ? "⌘" : ""}${name}`;

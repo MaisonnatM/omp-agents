@@ -183,7 +183,7 @@ Drive the window through the Chrome DevTools Protocol: `osascript` keys go to th
 
 - Page: `http://127.0.0.1:<page port>/json` lists it; `Runtime.evaluate` runs JS and `Page.captureScreenshot` captures it.
 - Main process: `http://127.0.0.1:<main port>/json` lists it; evaluate `process.mainModule.require("electron")` to reach `app`, `BrowserWindow`, and `Menu`.
-  `BrowserWindow.getAllWindows()[0].close()` is what Cmd+W does, `app.emit("activate")` a Dock click, which shows the window only without `OMP_AGENTS_HEADLESS`, and `app.quit()` Cmd+Q.
+  `BrowserWindow.getAllWindows()[0].close()` is what Cmd+Shift+W does, `app.emit("activate")` a Dock click, which shows the window only without `OMP_AGENTS_HEADLESS`, and `app.quit()` Cmd+Q.
   Replace `shell.openExternal` with a function recording its address to verify links without opening the user's browser.
 
 Evaluate through a helper that throws when the script throws.
@@ -218,4 +218,4 @@ async function ev(expression: string) {
 The page's content security policy limits `fetch` to its own origin, so `fetch` of a `blob:` image URL fails.
 Read such an image by drawing it on a canvas and calling `toDataURL()`.
 
-The page's `window.close()` destroys the window and quits the app, unlike Cmd+W.
+The page's `window.close()` destroys the window and quits the app, unlike Cmd+Shift+W.
