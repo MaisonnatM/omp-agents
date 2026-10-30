@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-30
 
+- The End session button in a session's header shows its stop icon again; it was an empty, invisible button.
 - You can pin a Bot to keep it at the top of the Bots tab and the gallery: right-click it and choose Pin.
 - You can group your Bots into sections: right-click a Bot, choose Move to section, then New section.
 - A section's menu in the Bots tab renames it or removes it, and you can fold any group of Bots.
