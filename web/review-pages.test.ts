@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared/transcript";
-import { latestReviewPages, MAX_REVIEW_PAGES, parseReviewPages } from "./review-pages";
+import { latestReviewPages, MAX_REVIEW_PAGES, parseReviewPages, samePages } from "./review-pages";
 
 const reply = (id: string, text: string, streaming = false): Item => ({ id, kind: "assistant", text, streaming, suggestions: [] });
 const fence = (pages: unknown): string => `Done.\n\n\`\`\`review-pages\n${JSON.stringify(pages)}\n\`\`\``;
@@ -46,5 +46,20 @@ describe("latestReviewPages", () => {
 
 	test("lists nothing before a reply names pages", () => {
 		expect(latestReviewPages([reply("a", "No visual change.")])).toEqual([]);
+	});
+});
+
+describe("samePages", () => {
+	const home = { label: "Home", url: "http://localhost:3000/", note: null };
+	test("matches the same pages in the same order", () => {
+		expect(samePages([home], [{ ...home }])).toBe(true);
+	});
+
+	test("tells apart a changed label, note, order, or length", () => {
+		const menu = { label: "Menu", url: "http://localhost:3000/menu", note: null };
+		expect(samePages([home], [{ ...home, label: "Start" }])).toBe(false);
+		expect(samePages([home], [{ ...home, note: "Open the menu" }])).toBe(false);
+		expect(samePages([home, menu], [menu, home])).toBe(false);
+		expect(samePages([home], [home, menu])).toBe(false);
 	});
 });

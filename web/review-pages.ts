@@ -1,7 +1,6 @@
-/** The pages a session asks you to review visually: the latest `review-pages` fence in its agent's replies, and the request that opens them in the Browser. */
+/** The pages a session asks you to review visually: the latest `review-pages` fence in its agent's replies. */
 import type { Item } from "../src/shared/transcript";
 import { isLoopbackUrl } from "../src/shared/desktop-bridge";
-import { keyedStore } from "./keyed-store";
 
 /** One page to look at: where it is on this computer, what to call its tab, and how to reach a state its address cannot open. */
 export interface ReviewPage {
@@ -51,10 +50,6 @@ export function latestReviewPages(items: readonly Item[]): ReviewPage[] {
 	return [];
 }
 
-export const NO_REVIEW_PAGES: readonly ReviewPage[] = [];
-
-/** Each live session's review pages, by instance id, which its transcript publishes and its Browser reads. */
-export const reviewPagesStore = keyedStore<readonly ReviewPage[]>(NO_REVIEW_PAGES);
-
-/** Each live session's latest **Review visuals** click, by instance id, which its Browser opens as tabs. */
-export const reviewRequestStore = keyedStore<number>(0);
+/** Whether two lists name the same pages, in the same order, so a reader renders only when the list changes. */
+export const samePages = (a: readonly ReviewPage[], b: readonly ReviewPage[]): boolean =>
+	a.length === b.length && a.every((page, at) => page.url === b[at]!.url && page.label === b[at]!.label && page.note === b[at]!.note);

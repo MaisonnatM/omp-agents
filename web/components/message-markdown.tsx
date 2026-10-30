@@ -261,7 +261,7 @@ function ReviewPagesCard({ pages }: { pages: readonly ReviewPage[] }) {
 		<div className="my-2 rounded-lg border border-border px-3 py-2 text-xs">
 			<p className="flex items-center gap-1.5 font-medium">
 				<Eye aria-hidden className="size-3.5" />
-				{pages.length === 0 ? "No pages to review on this computer" : `${pages.length} ${pages.length === 1 ? "page" : "pages"} to review, opened by Review visuals`}
+				{pages.length === 0 ? "No pages to review on this computer" : `${pages.length} ${pages.length === 1 ? "page" : "pages"} to review: click Review visuals in the Browser to open ${pages.length === 1 ? "it" : "them"}`}
 			</p>
 			{pages.length > 0 && (
 				<ul className="mt-1 space-y-0.5 text-muted-foreground">

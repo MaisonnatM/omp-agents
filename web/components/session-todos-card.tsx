@@ -1,5 +1,5 @@
 import { ChevronRight, ListChecks, Ship } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
-import { latestReviewPages, NO_REVIEW_PAGES, reviewPagesStore } from "../review-pages";
 import { latestTodos } from "../transcript-view";
 import { type ChangesSession, ChangesSections, useChanges } from "./todos-card-changes";
 import { Stepper } from "./arc/stepper";
@@ -306,12 +305,6 @@ interface SessionTodosCardProps {
  */
 export function SessionTodosCard({ items, view, working, changes, ship }: SessionTodosCardProps) {
 	const phases = useMemo(() => latestTodos(items), [items]);
-	const reviewPages = useMemo(() => latestReviewPages(items), [items]);
-	const reviewKey = view.kind === "live" && view.agentId === null ? view.instanceId : null;
-	useEffect(() => {
-		if (reviewKey === null) return;
-		reviewPagesStore.set(reviewKey, reviewPages.length > 0 ? reviewPages : NO_REVIEW_PAGES);
-	}, [reviewKey, reviewPages]);
 	const [todosShown] = useTodosCardShown();
 	const todos = todosShown && phases.length > 0;
 	const found = useChanges(view, changes);

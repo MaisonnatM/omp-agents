@@ -4,7 +4,9 @@
  * picture, and a whole page as an image.
  */
 import { AppWindow, ArrowLeft, ArrowRight, Camera, ExternalLink, Eye, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server, Sparkles, X } from "lucide-react";
+import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
 import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
@@ -16,7 +18,8 @@ import { activityControl } from "../activity";
 import { liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
 import { browserCandidates, initialAddress } from "../browser-model";
-import { type ReviewPage, reviewPagesStore, reviewRequestStore } from "../review-pages";
+import { latestReviewPages, type ReviewPage, samePages } from "../review-pages";
+import { type PaneData, usePaneSelect } from "../pane-store";
 import { sessionProcessesStore, writeStartServer } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
@@ -37,10 +40,10 @@ export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesk
 const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.captureBrowser === "function";
 
 /** The sparkles the page marks agent-made things with, as the notification bell's Updates do. */
-export const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
+const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
 
-/** The sparkles on an icon button's top right corner, for an action whose result goes to the agent. */
-export function AiBadge() {
+/** The sparkles on an icon button's top right corner, for an action on what the agent made. */
+function AiBadge() {
 	return <Sparkles aria-hidden className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! fill-current", AI_SPARKLES)} />;
 }
 
@@ -52,24 +55,14 @@ function ToolbarButton({ label, control, disabled, shortcut, pressed, ai, onClic
 	shortcut?: readonly string[];
 	/** Set for a toggle: whether it is on. */
 	pressed?: boolean;
-	/** What it makes goes to the session's agent, which a sparkles badge marks. */
+	/** It acts on what the session's agent made, which a sparkles badge marks. */
 	ai?: boolean;
 	onClick: () => void;
 	children: ReactNode;
 }) {
 	return (
 		<Tooltip content={label} shortcut={shortcut} side="bottom" disabled={disabled}>
-			<Button
-				{...activityControl(control)}
-				variant="ghost"
-				size="icon-compact"
-				aria-label={label}
-				aria-pressed={pressed}
-				active={pressed}
-				disabled={disabled}
-				onClick={onClick}
-				className={ai ? "relative" : undefined}
-			>
+			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} aria-pressed={pressed} active={pressed} disabled={disabled} onClick={onClick}>
 				{children}
 				{ai && <AiBadge />}
 			</Button>
@@ -104,105 +97,125 @@ function inertAround(kept: HTMLElement): () => void {
 /** The address each session's Browser last loaded, by omp session id, dropped once unused for 30 days. */
 const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 * 60 * 1000);
 
-/** A tab of the Browser: the session's own page, or a page the session listed for review. */
-interface BrowserTab {
-	id: string;
-	label: string;
-	page: ReviewPage | null;
-}
+/** The value of the Browser's tab for the session's own page; a review tab's value is its page's address. */
+const APP_TAB = "app";
 
-const MAIN_TAB: BrowserTab = { id: "main", label: "App", page: null };
+/** With no tab strip, the session's page is not a tab panel. */
+const LONE_PANEL = { role: undefined, "aria-labelledby": undefined } as const;
+
+const reviewPagesOf = (pane: PaneData): ReviewPage[] => latestReviewPages(pane.items);
 
 /**
- * Live session `view`'s Browser: its own page, plus one tab per page it listed for review once its toolbar's **Review visuals** asks.
- * Every tab stays mounted once opened, so each page keeps its state while another shows.
+ * Live session `view`'s Browser: its own page, plus one tab per page its latest reply listed for review once the
+ * toolbar's **Review visuals** opens them. Every tab stays mounted once opened, so each page keeps its state while another shows.
  */
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
-	const pages = reviewPagesStore.use(view.instanceId);
-	const requested = reviewRequestStore.use(view.instanceId);
-	const [tabs, setTabs] = useState<BrowserTab[]>([MAIN_TAB]);
-	const [active, setActive] = useState(MAIN_TAB.id);
-	const [handled, setHandled] = useState(0);
-	if (requested !== handled) {
-		setHandled(requested);
-		const review = pages.map(page => ({ id: `review:${page.url}`, label: page.label, page }));
-		setTabs([MAIN_TAB, ...review]);
-		if (review[0]) setActive(review[0].id);
-	}
-	const close = (id: string): void => {
-		const at = tabs.findIndex(tab => tab.id === id);
-		const rest = tabs.filter(tab => tab.id !== id);
-		setTabs(rest);
-		if (id === active) setActive((rest[at] ?? rest[at - 1] ?? MAIN_TAB).id);
+	const pages = usePaneSelect(view, reviewPagesOf, samePages);
+	const [open, setOpen] = useState<readonly ReviewPage[]>([]);
+	const [active, setActive] = useState(APP_TAB);
+	const rootRef = useRef<HTMLDivElement>(null);
+	const review = (): void => {
+		setOpen(pages);
+		setActive(pages[0]?.url ?? APP_TAB);
 	};
+	const close = (url: string, refocus: boolean): void => {
+		const at = open.findIndex(page => page.url === url);
+		const rest = open.filter(page => page.url !== url);
+		const next = url === active ? ((rest[at] ?? rest[at - 1])?.url ?? APP_TAB) : active;
+		flushSync(() => {
+			setOpen(rest);
+			setActive(next);
+		});
+		// The close button left with its tab: the shown tab takes the focus, or once the strip is gone, the address field.
+		if (refocus) rootRef.current?.querySelector<HTMLElement>(':scope > [role="tablist"] [data-state="active"], :scope > [data-state="active"] input[aria-label="Address"]')?.focus();
+	};
+	const strip = open.length > 0;
 	return (
-		<div className="flex min-h-0 flex-1 flex-col">
-			{tabs.length > 1 && (
-				<div role="tablist" aria-label="Browser tabs" className="flex h-9 shrink-0 items-end overflow-x-auto bg-muted/60 px-2 pt-1.5 [scrollbar-width:none]">
-					{tabs.map((tab, at) => {
-						const selected = tab.id === active;
-						// Chrome draws a divider between two tabs that are neither the selected one.
-						const divided = at > 0 && !selected && tabs[at - 1]!.id !== active;
-						const Icon = tab.page ? Sparkles : AppWindow;
-						return (
-							<div
-								key={tab.id}
+		<TabsPrimitive.Root ref={rootRef} value={active} onValueChange={setActive} className="flex min-h-0 flex-1 flex-col">
+			{strip && <BrowserTabStrip pages={open} active={active} onClose={close} />}
+			{[null, ...open].map(page => {
+				const value = page?.url ?? APP_TAB;
+				return (
+					<TabsPrimitive.Content
+						key={value}
+						value={value}
+						forceMount
+						tabIndex={undefined}
+						{...(strip ? null : LONE_PANEL)}
+						className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+					>
+						{page?.note && <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">{page.note}</p>}
+						<BrowserPage view={view} sessionId={sessionId} page={page} active={value === active} pages={pages} onReview={review} />
+					</TabsPrimitive.Content>
+				);
+			})}
+		</TabsPrimitive.Root>
+	);
+}
+
+/**
+ * The Browser's tabs, drawn as a web browser's: the session's own page pinned first as its icon alone, then each review
+ * page by name, which its close button or a middle click closes.
+ */
+function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPage[]; active: string; onClose: (url: string, refocus: boolean) => void }) {
+	const tabs = [null, ...pages];
+	return (
+		<TabsPrimitive.List aria-label="Browser tabs" className="flex h-9 shrink-0 items-end overflow-x-auto bg-muted/60 px-2 pt-1.5 [scrollbar-width:none]">
+			{tabs.map((page, at) => {
+				const value = page?.url ?? APP_TAB;
+				const selected = value === active;
+				// Chrome draws a divider between two tabs that are neither the selected one.
+				const divided = at > 0 && !selected && (tabs[at - 1]?.url ?? APP_TAB) !== active;
+				const Icon = page ? Sparkles : AppWindow;
+				return (
+					<div
+						key={value}
+						className={cn(
+							"group/tab relative flex h-full items-center rounded-t-lg text-xs",
+							page ? "min-w-16 max-w-52 flex-1" : "w-9 flex-none",
+							selected ? "z-10 bg-background text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+							divided && "before:absolute before:top-2 before:bottom-2 before:-left-px before:w-px before:bg-border group-hover/tab:before:hidden",
+							// The selected tab's feet curve into the toolbar below it, as in Chrome.
+							selected &&
+								"before:absolute before:bottom-0 before:-left-2 before:size-2 before:bg-[radial-gradient(circle_at_0_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))] after:absolute after:-right-2 after:bottom-0 after:size-2 after:bg-[radial-gradient(circle_at_100%_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))]",
+						)}
+					>
+						<TabsPrimitive.Trigger
+							{...activityControl("browser.tab")}
+							value={value}
+							title={page?.url ?? "The session's app"}
+							onAuxClick={event => event.button === 1 && page && onClose(page.url, false)}
+							className={cn(
+								"flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-t-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+								page ? "px-2" : "justify-center",
+							)}
+						>
+							<Icon aria-hidden className={cn("size-3.5 shrink-0", page ? AI_SPARKLES : "text-muted-foreground")} />
+							<span
 								className={cn(
-									// The session's own tab is pinned, as in Chrome: its icon alone, so the review tabs keep room for their names.
-									"group/tab relative flex h-full items-center rounded-t-lg text-xs",
-									tab.page ? "min-w-16 max-w-52 flex-1" : "w-9 flex-none",
-									selected ? "z-10 bg-background text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-									divided && "before:absolute before:top-2 before:bottom-2 before:-left-px before:w-px before:bg-border group-hover/tab:before:hidden",
-									// The selected tab's feet curve into the toolbar below it, as in Chrome.
-									selected &&
-										"before:absolute before:bottom-0 before:-left-2 before:size-2 before:bg-[radial-gradient(circle_at_0_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))] after:absolute after:-right-2 after:bottom-0 after:size-2 after:bg-[radial-gradient(circle_at_100%_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))]",
+									"min-w-0 truncate",
+									page ? "group-focus-within/tab:mask-[linear-gradient(to_left,transparent_1.5rem,black_2.5rem)] group-hover/tab:mask-[linear-gradient(to_left,transparent_1.5rem,black_2.5rem)]" : "sr-only",
 								)}
 							>
-								<button
-									{...activityControl("browser.tab")}
-									type="button"
-									role="tab"
-									aria-selected={selected}
-									title={tab.page?.url ?? "The session's app"}
-									onClick={() => setActive(tab.id)}
-									onAuxClick={event => event.button === 1 && tab.page && close(tab.id)}
-									className={cn(
-										"flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-t-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-										tab.page ? "px-2" : "justify-center",
-									)}
-								>
-									<Icon aria-hidden className={cn("size-3.5 shrink-0", tab.page ? AI_SPARKLES : "text-muted-foreground")} />
-									<span
-										className={cn(
-											"min-w-0 truncate",
-											tab.page ? "group-focus-within/tab:mask-[linear-gradient(to_left,transparent_1rem,black_2rem)] group-hover/tab:mask-[linear-gradient(to_left,transparent_1rem,black_2rem)]" : "sr-only",
-										)}
-									>
-										{tab.label}
-									</span>
-								</button>
-								{tab.page && (
-									<button
-										type="button"
-										aria-label={`Close ${tab.label}`}
-										onClick={() => close(tab.id)}
-										className="absolute top-1/2 right-1 grid size-4 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 hover:bg-foreground/10 hover:text-foreground"
-									>
-										<X aria-hidden className="size-3" />
-									</button>
-								)}
-							</div>
-						);
-					})}
-				</div>
-			)}
-			{tabs.map(tab => (
-				<div key={tab.id} className={cn("flex min-h-0 flex-1 flex-col", tab.id !== active && "hidden")}>
-					{tab.page?.note && <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">{tab.page.note}</p>}
-					<BrowserPage view={view} sessionId={sessionId} page={tab.page} active={tab.id === active} pages={pages} />
-				</div>
-			))}
-		</div>
+								{page?.label ?? "App"}
+							</span>
+						</TabsPrimitive.Trigger>
+						{page && (
+							<button
+								type="button"
+								aria-label={`Close ${page.label}`}
+								onClick={() => onClose(page.url, true)}
+								className="group/close absolute top-1/2 right-0.5 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 hover:text-foreground"
+							>
+								<span className="grid size-4 place-items-center rounded-full group-hover/close:bg-foreground/10">
+									<X aria-hidden className="size-3" />
+								</span>
+							</button>
+						)}
+					</div>
+				);
+			})}
+		</TabsPrimitive.List>
 	);
 }
 
@@ -211,7 +224,15 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
  * `sessionId`, else the first port its jobs and services listen on. Each **Attach** of what was picked in it is
  * appended to the view's composer.
  */
-function BrowserPage({ view, sessionId, page, active, pages }: { view: LiveView; sessionId: string; page: ReviewPage | null; active: boolean; pages: readonly ReviewPage[] }) {
+function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
+	view: LiveView;
+	sessionId: string;
+	page: ReviewPage | null;
+	active: boolean;
+	/** The pages the latest reply listed, which **Review visuals** opens as tabs. */
+	pages: readonly ReviewPage[];
+	onReview: () => void;
+}) {
 	const { read } = sessionProcessesStore.use();
 	const candidates = useMemo(() => browserCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
 	const ports = useMemo(
@@ -330,7 +351,7 @@ function BrowserPage({ view, sessionId, page, active, pages }: { view: LiveView;
 						control="browser.review-visuals"
 						ai
 						disabled={false}
-						onClick={() => reviewRequestStore.set(view.instanceId, Date.now())}
+						onClick={onReview}
 					>
 						<Eye />
 					</ToolbarButton>
