@@ -762,7 +762,7 @@ function fileRoutes({ get, media, write }: RouteKit, env: FileRoutesEnv): Routes
 	/** `PUT /api/worktrees/removal`: preview a removal, only of merged work when `merged` is set, or remove checkouts whose confirmation still matches. */
 	const worktreeRemoval = write(
 		body => checked(parseWorktreeRemoval(body), `Expected a preview with targets or removal with confirmed plans, up to ${MAX_WORKTREE_BATCH} worktrees.`),
-		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets, removal.merged) } : { results: await env.worktrees.remove(removal.plans) }),
+		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets, removal.merged) } : { results: await env.worktrees.remove(removal.plans, "Settings › Worktrees") }),
 	);
 
 	/** `PUT /api/worktree/release` `{ cwd, branch }`: remove the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */

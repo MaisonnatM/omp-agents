@@ -1,10 +1,11 @@
 /** Git worktree inventory and removal. Git remains the authority for what is registered. */
 import { createHash } from "node:crypto";
 import { lstat, readdir } from "node:fs/promises";
-import { basename, isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonical, commonDir, git, holderOf, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
+import { displayPath } from "./paths";
 import { run } from "./proc";
 import type { MergedPullRequest } from "./pull-requests";
 import type { BranchRelease } from "./shared/git";
@@ -61,6 +62,20 @@ function unwrap<T>(probed: Probed<T> | undefined): T {
 	if (!probed) throw new Error("No probe ran here.");
 	if (!probed.ok) throw probed.error;
 	return probed.value;
+}
+
+/**
+ * `path` canonical as far as the server may look.
+ * A session can name a path under a folder the server cannot read, such as one macOS guards; that path still marks the checkout it sits in, where `canonical` would throw and leave every preview unreadable.
+ */
+async function canonicalAsFarAsReadable(path: string): Promise<string> {
+	try {
+		return await canonical(path);
+	} catch (error) {
+		const parent = dirname(path);
+		if (parent === path) throw error;
+		return join(await canonicalAsFarAsReadable(parent), basename(path));
+	}
 }
 
 /** `probe` of each distinct key once, at most `PROBE_PARALLEL` at once, by key: most sessions share a handful of directories. */
@@ -148,22 +163,19 @@ export class Worktrees {
 	/** Known actor directories and the repository scopes of actors whose location is still unresolved. */
 	async #liveOccupants(): Promise<OccupantUse[]> {
 		const live = await this.env.live();
-		const canonicalOf = await probeEach(live.map(occupant => occupant.kind === "located" ? occupant.cwd : occupant.scopeCwd), canonical);
-		const scopes = live.flatMap(occupant => {
-			if (occupant.kind === "located") return [];
-			const probed = canonicalOf.get(occupant.scopeCwd);
-			return probed?.ok ? [probed.value] : [];
-		});
+		const locatedOf = await probeEach(live.flatMap(occupant => occupant.kind === "located" ? [occupant.cwd] : []), canonicalAsFarAsReadable);
+		const canonicalOf = await probeEach(live.flatMap(occupant => occupant.kind === "unlocated" ? [occupant.scopeCwd] : []), canonical);
+		const scopes = [...canonicalOf.values()].flatMap(probed => probed.ok ? [probed.value] : []);
 		const repositoryOf = await probeEach(scopes, commonDir);
 		return live.map((occupant): OccupantUse => {
-			if (occupant.kind === "located") return { kind: "located", path: unwrap(canonicalOf.get(occupant.cwd)), label: occupant.label };
+			if (occupant.kind === "located") return { kind: "located", path: unwrap(locatedOf.get(occupant.cwd)), label: occupant.label };
 			const path = canonicalOf.get(occupant.scopeCwd);
 			const repository = path?.ok ? repositoryOf.get(path.value) : undefined;
 			return { kind: "unlocated", scopeCwd: path?.ok ? path.value : occupant.scopeCwd, repository: repository?.ok ? repository.value : null, label: occupant.label };
 		});
 	}
 
-	/** Every known live actor directory, idle and waiting ones included, and the server's own. */
+	/** Every known live actor directory, idle and waiting ones included, each path a live session's tool calls named, and the server's own directory. */
 	async inUse(): Promise<string[]> {
 		const [occupants, server] = await Promise.all([this.#liveOccupants(), this.#serverPath()]);
 		return [...new Set([...occupants.flatMap(occupant => occupant.kind === "located" ? [occupant.path] : []), server])];
@@ -198,7 +210,11 @@ export class Worktrees {
 			}
 		}
 		return [
-			...[...located].map(([label, paths]): WorktreeBlocker => ({ code: "occupied", message: `${label} uses ${[...paths].join(", ")}.` })),
+			...[...located].map(([label, paths]): WorktreeBlocker => {
+				// A session can name one path for each file it touched here, so name the shallowest and count the rest.
+				const [first, ...rest] = [...paths].sort((a, b) => a.length - b.length);
+				return { code: "occupied", message: `${label} uses ${first}${rest.length ? ` and ${rest.length} more ${rest.length === 1 ? "path" : "paths"} in this checkout` : ""}.` };
+			}),
 			...[...unlocated].map(([label, scopes]): WorktreeBlocker => ({ code: "unknown-agent-location", message: `Cannot locate ${label} from ${[...scopes].join(", ")}; its checkout may still be in use.` })),
 		];
 	}
@@ -454,7 +470,8 @@ export class Worktrees {
 		}
 	}
 
-	async remove(plans: WorktreeConfirmation[]): Promise<WorktreeRemovalResult[]> {
+	/** Removes each of `plans` its fresh preview still confirms, and logs each removal as asked for by `by`, such as "ended session <id>". */
+	async remove(plans: WorktreeConfirmation[], by: string): Promise<WorktreeRemovalResult[]> {
 		const removal = this.checkout(async () => {
 			await Promise.allSettled([...this.#starting]);
 			const snapshot = await this.#snapshot();
@@ -469,6 +486,7 @@ export class Worktrees {
 						const removed = await run(["git", "-C", current.repository, "worktree", "remove", "--", current.path], { timeoutMs: 30000 });
 						if (removed.code !== 0) throw new Error(removed.stderr.trim() || "Git refused removal.");
 						result.removed = true;
+						console.log(`omp-agents: removed the worktree ${displayPath(current.path)} for ${by}`);
 					} catch (err) {
 						result.error = errorText(err);
 					}
@@ -490,7 +508,7 @@ export class Worktrees {
 	 * when `cwd` is in none, such as a main checkout or a directory outside git.
 	 * A session that was just ended takes a moment to leave, so an `occupied` checkout is tried again until `waitMs` passes.
 	 */
-	async removeCheckout(cwd: string, waitMs = 15000): Promise<WorktreeRemovalResult | null> {
+	async removeCheckout(cwd: string, by: string, waitMs = 15000): Promise<WorktreeRemovalResult | null> {
 		const at = await worktreeAt(cwd);
 		if (!at?.linked) return null;
 		const target = { repository: await canonical(at.common), path: await canonical(at.top) };
@@ -500,7 +518,7 @@ export class Worktrees {
 		const plan = await this.preview(target);
 		// An unreadable plan always names its blocker.
 		if (plan.blockers.length || plan.kind === "unreadable") return { ...target, removed: false, blockers: plan.blockers, error: null };
-		const [result] = await this.remove([{ ...target, confirmation: plan.confirmation }]);
+		const [result] = await this.remove([{ ...target, confirmation: plan.confirmation }], by);
 		if (!result) throw new Error("Git worktree removal returned no result.");
 		return result;
 	}
@@ -511,7 +529,7 @@ export class Worktrees {
 	 */
 	async releaseBranch(cwd: string, branch: string): Promise<BranchRelease> {
 		const holder = await holderOf(cwd, branch);
-		const result = holder && !holder.main ? await this.removeCheckout(holder.path, 0) : null;
+		const result = holder && !holder.main ? await this.removeCheckout(holder.path, `releasing branch ${branch}`, 0) : null;
 		if (!result) return { kind: "none" };
 		if (result.removed) return { kind: "removed", path: result.path };
 		return { kind: "kept", path: result.path, why: result.error ?? result.blockers.map(blocker => blocker.message).join(" ") };

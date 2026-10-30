@@ -864,7 +864,7 @@ export class Dashboard {
 	 */
 	async #endLive(session: LiveSession): Promise<void> {
 		const { sessionId } = session;
-		await endSession({ sessionId, workDir: this.#files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() }, dir => this.#worktrees.removeCheckout(dir));
+		await endSession({ sessionId, workDir: this.#files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() }, dir => this.#worktrees.removeCheckout(dir, `ended session ${sessionId}`));
 		this.#autoContinue.cancel(sessionId);
 	}
 

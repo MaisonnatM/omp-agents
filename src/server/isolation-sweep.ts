@@ -34,7 +34,7 @@ export interface IsolationSweepDeps {
 	ownerLive(dir: string): Promise<boolean>;
 	/** Stops the native mount a retained sandbox `dir` records, if any; throws when it cannot, which keeps the sandbox. */
 	stopMount(dir: string): Promise<void>;
-	/** The canonical directories live sessions and the server run in, `Worktrees.inUse`. */
+	/** The canonical directories live sessions and the server run in, and the paths live sessions' tool calls named, `Worktrees.inUse`. */
 	inUse(): Promise<string[]>;
 	now(): number;
 }

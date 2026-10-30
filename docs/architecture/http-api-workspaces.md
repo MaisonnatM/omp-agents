@@ -26,17 +26,23 @@ A preview with `merged: true`, which **Remove merged** sends, adds the `unmerged
 Removal uses `git worktree remove` without `--force`, so Git keeps the branch and still refuses a dirty or locked checkout.
 The preview reads the status with executable-mode detection forced on, and refuses a checkout whose index hides changes with assume-unchanged or skip-worktree flags.
 A missing directory is removed the same way, which drops only that registration.
+`Worktrees.remove` logs each checkout it removes as `omp-agents: removed the worktree <path> for <who asked>`: `Settings › Worktrees`, `ended session <id>`, or `releasing branch <branch>`.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
 Starts that create no worktree, such as a resume or a Bot's session, stay parallel and wait only while a removal runs.
 
 `WorktreeOccupants` supplies named, located directories and unresolved repository scopes to `Worktrees`.
-It protects each live session's default directory and reported worktree, plus each resident subagent's native default directory and every declared Bash `cwd`.
+It protects each live session's default directory and reported worktree, plus each resident subagent's native default directory.
+It also protects every path the tool calls of a live session or a resident subagent name in its transcript: a Bash `cwd`, a `path` argument, and the files an `edit` patch heads.
+For a shell command it takes the worktree guard's walk, `located` in `templates/omp/agent/extensions/shell/commands.ts`: each directory a command runs in, such as the target of a `cd`, and each word rooted at `/` or the home directory.
+So a session that works in another repository's checkout keeps that checkout while it runs, though its own directory is elsewhere.
 Terminal idle and parked subagents remain resident. Dashboard subagents remain resident while running, including descendants whose parent already completed.
-Missing or unreadable transcripts, incomplete writes, and malformed working-directory records add an unresolved scope without dropping earlier known directories.
+A subagent's missing or unreadable transcript, incomplete write, or malformed working-directory record adds an unresolved scope without dropping earlier known directories.
+A live session's own transcript only adds paths: its default directory already protects it, so a missing or partial transcript widens nothing.
 Changed transcripts are fingerprinted to distinguish appends from rewritten prefixes. A rewrite rereads the native header and working-directory records while retaining earlier protected paths.
 A disconnected roster or surviving child's parent session switch retains earlier child evidence until a live roster confirms departure or the parent process leaves.
-Known directories protect only their containing canonical checkout, including another repository. Unresolved scopes protect their repository, or every checkout when that repository cannot be identified.
-These checks use declared working directories, not every filesystem path a tool touches.
+Known paths protect only their containing canonical checkout, including another repository. Unresolved scopes protect their repository, or every checkout when that repository cannot be identified.
+A path under a folder the server cannot read, such as one macOS guards, counts where it is written, with its readable folders resolved.
+The `occupied` blocker names the session and the shallowest path it uses in the checkout, and counts the others.
 
 `PUT /api/worktree/release` takes `{ cwd, branch }`, an absolute directory in a repository and a branch name, checked by `parseBranchRelease` in `src/server/wire.ts`, and answers 404 when `cwd` is not a directory.
 `Worktrees.releaseBranch` lists the repository's worktrees, picks the linked one that has `branch` checked out, never the main, a bare, or a prunable registration, and removes it through `removeCheckout` without waiting for a session to leave.
