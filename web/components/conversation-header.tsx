@@ -1,4 +1,4 @@
-import { CircleStop } from "lucide-react";
+import { CircleStop, Eye } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { OpenPullRequestButton } from "../open-pull-request";
+import { openReview, reviewPagesStore } from "../review-pages";
 import { shortcutLabels } from "../shortcuts";
+import { BROWSER_AVAILABLE } from "./browser-panel";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
 import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./session-meta";
@@ -37,6 +39,19 @@ interface ConversationHeaderProps {
  * linked worktree when clicked; **Open PR** while its branch can take one; its directory in Cursor;
  * and End session, which shows it is ending until the server answers, though the session may leave the roster before then.
  */
+/** **Review visuals · N**, once the session listed pages to review, which opens each in its own Browser tab. */
+function ReviewVisualsButton({ instanceId }: { instanceId: string }) {
+	const pages = reviewPagesStore.use(instanceId);
+	if (pages.length === 0) return null;
+	return (
+		<Tooltip content={pages.map(page => page.label).join(" · ")} side="bottom">
+			<Button variant="outline" size="compact" leadingIcon={Eye} onClick={() => openReview(instanceId)}>
+				Review visuals · {pages.length}
+			</Button>
+		</Tooltip>
+	);
+}
+
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
 	const { open } = useDashboardActions();
@@ -88,6 +103,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 		>
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
+			{subject.kind === "session" && BROWSER_AVAILABLE && <ReviewVisualsButton instanceId={view.instanceId} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={

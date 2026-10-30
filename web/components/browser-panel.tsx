@@ -16,6 +16,7 @@ import { activityControl } from "../activity";
 import { liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
 import { browserCandidates, initialAddress } from "../browser-model";
+import { type ReviewPage, reviewPagesStore, reviewRequestStore } from "../review-pages";
 import { sessionProcessesStore, writeStartServer } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
@@ -82,11 +83,69 @@ function inertAround(kept: HTMLElement): () => void {
 /** The address each session's Browser last loaded, by omp session id, dropped once unused for 30 days. */
 const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 * 60 * 1000);
 
+/** A tab of the Browser: the session's own page, or a page the session listed for review. */
+interface BrowserTab {
+	id: string;
+	label: string;
+	page: ReviewPage | null;
+}
+
+const MAIN_TAB: BrowserTab = { id: "main", label: "App", page: null };
+
 /**
- * Live session `view`'s app in a `<webview>`, opened on the address last loaded for `sessionId`, else on the first port
- * its jobs and services listen on. Each **Attach** of what was picked in it is appended to the view's composer.
+ * Live session `view`'s Browser: its own page, plus one tab per page it listed for review once **Review visuals** asks.
+ * Every tab stays mounted once opened, so each page keeps its state while another shows.
  */
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
+	const pages = reviewPagesStore.use(view.instanceId);
+	const requested = reviewRequestStore.use(view.instanceId);
+	const [tabs, setTabs] = useState<BrowserTab[]>([MAIN_TAB]);
+	const [active, setActive] = useState(MAIN_TAB.id);
+	const [handled, setHandled] = useState(0);
+	if (requested !== handled) {
+		setHandled(requested);
+		const review = pages.map(page => ({ id: `review:${page.url}`, label: page.label, page }));
+		setTabs([MAIN_TAB, ...review]);
+		if (review[0]) setActive(review[0].id);
+	}
+	return (
+		<div className="flex min-h-0 flex-1 flex-col">
+			{tabs.length > 1 && (
+				<div role="tablist" aria-label="Browser tabs" className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-border px-1.5 py-1 [scrollbar-width:none]">
+					{tabs.map(tab => (
+						<button
+							key={tab.id}
+							type="button"
+							role="tab"
+							aria-selected={tab.id === active}
+							title={tab.page?.url ?? "The session's app"}
+							onClick={() => setActive(tab.id)}
+							className={cn(
+								"h-6 max-w-44 shrink-0 truncate rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground",
+								tab.id === active && "bg-muted text-foreground",
+							)}
+						>
+							{tab.label}
+						</button>
+					))}
+				</div>
+			)}
+			{tabs.map(tab => (
+				<div key={tab.id} className={cn("flex min-h-0 flex-1 flex-col", tab.id !== active && "hidden")}>
+					{tab.page?.note && <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">{tab.page.note}</p>}
+					<BrowserPage view={view} sessionId={sessionId} page={tab.page} active={tab.id === active} />
+				</div>
+			))}
+		</div>
+	);
+}
+
+/**
+ * One page of `view`'s Browser in a `<webview>`: a review page's address, else the address last loaded for
+ * `sessionId`, else the first port its jobs and services listen on. Each **Attach** of what was picked in it is
+ * appended to the view's composer.
+ */
+function BrowserPage({ view, sessionId, page, active }: { view: LiveView; sessionId: string; page: ReviewPage | null; active: boolean }) {
 	const { read } = sessionProcessesStore.use();
 	const candidates = useMemo(() => browserCandidates(read?.data ?? null, view.instanceId), [read, view.instanceId]);
 	const ports = useMemo(
@@ -96,9 +155,11 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const [saved] = useState(() => addresses.get(sessionId));
 	const [maximized, setMaximized] = useState(false);
 	const webview = useWebview({
-		initial: initialAddress(saved, candidates),
+		initial: page?.url ?? initialAddress(saved, candidates),
 		onSelection: boxes => picking.onSelection(boxes),
-		onNavigate: url => addresses.set(sessionId, url),
+		onNavigate: url => {
+			if (page === null) addresses.set(sessionId, url);
+		},
 		// The app has the focus while maximized, so its Escape stops picking or restores too.
 		onEscape: () => picking.stop() || setMaximized(false),
 		onPickKey: key => picking.pickKey(key),
@@ -120,7 +181,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
-	useShortcuts({ browserRestore: () => picking.stop() || (maximized ? setMaximized(false) : false) });
+	useShortcuts({ browserRestore: () => active && (picking.stop() || (maximized ? setMaximized(false) : false)) });
 	const sectionRef = useRef<HTMLElement>(null);
 	// What the maximized Browser covers leaves the tab order and the accessibility tree.
 	useEffect(() => (maximized && sectionRef.current ? inertAround(sectionRef.current) : undefined), [maximized]);
