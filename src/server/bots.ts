@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { isObject, parseJson, str } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
+import { SHEPHERD_FLAGS } from "../omp/shepherd-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { type Bot, type BotEdit, type BotId, type BotLast, MAX_MEMORY_BYTES } from "../shared/bots";
 import type { ServerMsg } from "../shared/protocol";
@@ -100,8 +101,12 @@ export interface BotsDeps {
 	live(sessionId: string): BotSession | undefined;
 	session(instanceId: string): BotSession | undefined;
 	savedFile(sessionId: string): string | null;
-	/** The extension a Bot's session loads, the `bots.json` it reads and the inbox its `set_job` tool writes, the directory of the Bots' memories, and the `routines.json` and routine inbox its routine tools read and write. */
-	paths: { extension: string; botsFile: string; botInboxDir: string; botsDir: string; routinesFile: string; routineInboxDir: string };
+	/**
+	 * The extension a Bot's session loads, the `bots.json` it reads and the inbox its `set_job` tool writes, the directory of
+	 * the Bots' memories, the `routines.json` and routine inbox its routine tools read and write, and the extension a PR
+	 * shepherd's session loads beside it, with the inbox its tools write.
+	 */
+	paths: { extension: string; botsFile: string; botInboxDir: string; botsDir: string; routinesFile: string; routineInboxDir: string; shepherdExtension: string; shepherdInboxDir: string };
 	now(): string;
 	/** A Bot's conversation moved to another session, which the list registry did not publish. */
 	onChange(): void;
@@ -162,22 +167,26 @@ export class Bots {
 
 	/**
 	 * How `request` joins the server: a new session that names a Bot, or the resume of a Bot's conversation, launches with
-	 * the Bot extension and binds the Bot to the session once it is live. Any other start launches plain.
+	 * the Bot extension, and a PR shepherd's with the shepherd extension too, and binds the Bot to the session once it is
+	 * live. Any other start launches plain.
 	 */
 	join(request: StartRequest): SessionJoin {
 		const id = request.kind === "new" ? request.bot : request.kind === "resume" ? this.list.find(bot => bot.sessionId === request.sessionId)?.id : undefined;
 		if (!id) return { rpc: PLAIN_LAUNCH, attach() {} };
-		const { extension, botsFile, botInboxDir, routinesFile, routineInboxDir } = this.#deps.paths;
-		const flags = {
+		const { extension, botsFile, botInboxDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir } = this.#deps.paths;
+		const shepherd = this.list.find(bot => bot.id === id)?.kind === "pr-shepherd";
+		const flags: Record<string, string> = {
 			[BOT_FLAGS.bot]: id,
 			[BOT_FLAGS.bots]: botsFile,
 			[BOT_FLAGS.botInbox]: botInboxDir,
 			[BOT_FLAGS.memory]: this.#memoryPath(id),
 			[BOT_FLAGS.routines]: routinesFile,
 			[BOT_FLAGS.routineInbox]: routineInboxDir,
+			...(shepherd ? { [SHEPHERD_FLAGS.bot]: id, [SHEPHERD_FLAGS.inbox]: shepherdInboxDir } : {}),
 		};
+		const extensions = shepherd ? ["-e", extension, "-e", shepherdExtension] : ["-e", extension];
 		return {
-			rpc: { ...PLAIN_LAUNCH, args: ["-e", extension, ...Object.entries(flags).flatMap(([name, value]) => [`--${name}`, value])] },
+			rpc: { ...PLAIN_LAUNCH, args: [...extensions, ...Object.entries(flags).flatMap(([name, value]) => [`--${name}`, value])] },
 			attach: session => {
 				this.#live.set(session.instanceId, id);
 				this.#bind(id, session.sessionId);

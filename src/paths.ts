@@ -45,6 +45,8 @@ export const routineInboxDir = join(configDir, "routine-inbox");
 export const botsFile = join(configDir, "bots.json");
 /** Where a Bot's `set_job` tool leaves the job it gives itself, one JSON file each, so the server stays the only writer of {@link botsFile}. */
 export const botInboxDir = join(configDir, "bot-inbox");
+/** Where a PR shepherd Bot's `fix_pull_request` and `queue_merge` tools leave their requests, one JSON file each. */
+export const shepherdInboxDir = join(configDir, "shepherd-inbox");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */

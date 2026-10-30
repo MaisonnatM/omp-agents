@@ -30,8 +30,26 @@ export function defaultLook(id: BotId): BotLook {
 	return { shape: BOT_SHAPES[hash % BOT_SHAPES.length]!, hue: BOT_HUES[Math.floor(hash / BOT_SHAPES.length) % BOT_HUES.length]! };
 }
 
+/**
+ * What a Bot is for, picked when it is made and kept after: `routines` works through its routines and conversation alone,
+ * and `pr-shepherd` also drives your approved pull requests to merged, through the tools only its session loads.
+ */
+export const BOT_KINDS = ["routines", "pr-shepherd"] as const;
+
+export type BotKind = (typeof BOT_KINDS)[number];
+
+/** How the New Bot form offers each kind. */
+export const BOT_KIND_INFO: Record<BotKind, { label: string; description: string }> = {
+	routines: { label: "Routines", description: "Works through its conversation and the routines you give it." },
+	"pr-shepherd": {
+		label: "PR shepherd",
+		description: "Watches your approved pull requests and fixes conflicts, failing checks, and review comments until they merge.",
+	},
+};
+
 export interface Bot extends BotLook {
 	id: BotId;
+	kind: BotKind;
 	/** Shown in the sidebar and the Bot's header. */
 	name: string;
 	/** Markdown: what the Bot does, and what it asks before doing; empty until you give it one. */
@@ -99,8 +117,8 @@ export type BotLast = { at: number; from: "user" | "bot"; text: string } | { at:
 export const REMEMBER_TOOL = "remember";
 
 /**
- * `bots` after `edit`, or `bots` itself when it changes nothing. A save keeps the Bot's conversation and where it lists;
- * a remove forgets it but leaves its file.
+ * `bots` after `edit`, or `bots` itself when it changes nothing. A save keeps the Bot's conversation, its kind, and where
+ * it lists; a remove forgets it but leaves its file.
  */
 export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
 	if (edit.op === "rename-section") {
@@ -115,7 +133,7 @@ export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
 			if (!stored) return [...bots, { ...edit.bot, sessionId: null, createdAt: now, pinned: false, section: null }];
 			const { name, job, cwd, model, skill, shape, hue } = edit.bot;
 			if (name === stored.name && job === stored.job && cwd === stored.cwd && model === stored.model && skill === stored.skill && shape === stored.shape && hue === stored.hue) return bots;
-			return bots.with(index, { ...stored, ...edit.bot });
+			return bots.with(index, { ...stored, ...edit.bot, kind: stored.kind });
 		}
 		case "remove":
 			return stored ? bots.toSpliced(index, 1) : bots;
@@ -142,18 +160,22 @@ export function parseSectionName(value: unknown): string | null {
 /** An id names the Bot's memory directory, so it holds no path separator or dot. */
 export const parseBotId = (value: unknown): BotId | null => (typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? (value as BotId) : null);
 
-/** A Bot as the page saves it, or `null` when a field is missing, of the wrong type, or too long; other fields drop. A Bot saved without a look gets {@link defaultLook}. */
+/**
+ * A Bot as the page saves it, or `null` when a field is missing, of the wrong type, or too long; other fields drop. A Bot
+ * saved without a look gets {@link defaultLook}, and one saved before kinds existed is a `routines` Bot.
+ */
 export function parseBotSpec(value: unknown): Parsed<BotSpec> {
 	if (!isObject(value)) return null;
-	const { name, job, cwd, model = null } = value;
+	const { name, job, cwd, model = null, kind = "routines" } = value;
 	const id = parseBotId(value.id);
 	const skill = parseSkill(value.skill);
 	if (!id || !isNonEmpty(name) || typeof job !== "string" || job.length > MAX_JOB_LENGTH || !isNonEmpty(cwd) || !skill) return null;
 	if (model !== null && (typeof model !== "string" || !modelOfSelector(model))) return null;
+	if (!BOT_KINDS.includes(kind as BotKind)) return null;
 	const look = defaultLook(id);
 	const { shape = look.shape, hue = look.hue } = value;
 	if (!BOT_SHAPES.includes(shape as BotShape) || !BOT_HUES.includes(hue as BotHue)) return null;
-	return { ok: { id, name: name.trim(), job, cwd, model, skill: skill.ok, shape: shape as BotShape, hue: hue as BotHue } };
+	return { ok: { id, kind: kind as BotKind, name: name.trim(), job, cwd, model, skill: skill.ok, shape: shape as BotShape, hue: hue as BotHue } };
 }
 
 /** A saved Bot; one saved before it could be pinned or put in a section is neither. */

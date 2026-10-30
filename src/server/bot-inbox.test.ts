@@ -17,7 +17,7 @@ function inboxDir(): string {
 	return join(dir, "bot-inbox");
 }
 
-const scout: Bot = { id: "scout" as BotId, name: "Scout", job: "", cwd: "/work/webapp", model: null, skill: null, shape: "hexagon", hue: 150, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z", pinned: false, section: null };
+const scout: Bot = { id: "scout" as BotId, kind: "routines", name: "Scout", job: "", cwd: "/work/webapp", model: null, skill: null, shape: "hexagon", hue: 150, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z", pinned: false, section: null };
 const relay: Bot = { ...scout, id: "relay" as BotId, name: "Relay", job: "Relay the mail.", sessionId: null };
 
 /** An inbox over Bots that start as `initial`, which each save it applies edits as the dashboard's would, unless `refuse`. */

@@ -13,7 +13,7 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const scout: BotSpec = { id: "scout" as BotId, name: "Scout", job: "Watch the build.", cwd: "/work/webapp", model: null, skill: null, shape: "circle", hue: 25 };
+const scout: BotSpec = { id: "scout" as BotId, kind: "routines", name: "Scout", job: "Watch the build.", cwd: "/work/webapp", model: null, skill: null, shape: "circle", hue: 25 };
 
 interface FakeSession {
 	instanceId: string;
@@ -57,7 +57,7 @@ function harness() {
 		live: sessionId => live(sessions.find(session => session.sessionId === sessionId && !session.ended)),
 		session: instanceId => live(sessions.find(session => session.instanceId === instanceId)),
 		savedFile: sessionId => (saved.has(sessionId) ? join(dir, `${sessionId}.jsonl`) : null),
-		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botInboxDir: join(dir, "bot-inbox"), botsDir: join(dir, "bots"), routinesFile: join(dir, "routines.json"), routineInboxDir: join(dir, "routine-inbox") },
+		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botInboxDir: join(dir, "bot-inbox"), botsDir: join(dir, "bots"), routinesFile: join(dir, "routines.json"), routineInboxDir: join(dir, "routine-inbox"), shepherdExtension: "/ext/shepherd.ts", shepherdInboxDir: join(dir, "shepherd-inbox") },
 		now: () => "2026-05-02T09:00:00.000Z",
 		onChange: () => {},
 	});
@@ -94,6 +94,19 @@ describe("Bots", () => {
 		expect(await bots.message(scout.id, "And now?")).toBe("s1");
 		expect(requests).toHaveLength(1);
 		expect(sessions[0]?.heard).toEqual(["steer Remember that I prefer short answers.", "followUp And now?"]);
+	});
+
+	test("a PR shepherd's conversation also loads the shepherd extension with its id and inbox, and a routines Bot's does not", async () => {
+		const { bots, file, sessions, dir } = harness();
+		const herd = { ...scout, id: "herd" as BotId, kind: "pr-shepherd" } as const;
+		file.apply({ op: "save", bot: herd }, "2026-05-01T09:00:00.000Z");
+		await bots.message(herd.id, "Check my pull requests.");
+		await bots.message(scout.id, "Hello.");
+		const [shepherdArgs, scoutArgs] = sessions.map(session => session.args);
+		expect(shepherdArgs?.slice(0, 4)).toEqual(["-e", "/ext/bot.ts", "-e", "/ext/shepherd.ts"]);
+		expect(shepherdArgs?.slice(-4)).toEqual(["--omp-agents-shepherd", "herd", "--omp-agents-shepherd-inbox", join(dir, "shepherd-inbox")]);
+		expect(scoutArgs).not.toContain("/ext/shepherd.ts");
+		expect(scoutArgs).not.toContain("--omp-agents-shepherd");
 	});
 
 	test("after its session ended, a message resumes the same conversation with the extension and sends the text", async () => {

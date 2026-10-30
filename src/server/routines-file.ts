@@ -30,6 +30,7 @@ export const ROUTINES_BOT_ID = "routines" as BotId;
 /** The Bot {@link RoutinesFile.migrate} creates for the routines that had none, working in `cwd`. */
 export const routinesBot = (cwd: string): BotSpec => ({
 	id: ROUTINES_BOT_ID,
+	kind: "routines",
 	name: "Routines",
 	job: "Run the routines that moved here from the Routines page.\nDo what each routine's message asks without asking questions, and answer briefly.\nIf something blocks you, say what and stop.",
 	cwd,

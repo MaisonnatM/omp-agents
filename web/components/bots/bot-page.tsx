@@ -2,7 +2,8 @@
 import { BookmarkCheck } from "lucide-react";
 import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import type { RoutineSpec } from "../../../src/routines";
-import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
+import { BOT_HUES, BOT_KIND_INFO, BOT_KINDS, BOT_SHAPES, type Bot, type BotId, type BotKind, type BotLook, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
+import { SHEPHERD_JOB, SHEPHERD_NAME } from "../../../src/shared/shepherd";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -240,9 +241,17 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 	const id = useId();
 	const [name, setName] = useState("");
 	const [look, setLook] = useState<BotLook>(() => ({ shape: randomOf(BOT_SHAPES), hue: randomOf(BOT_HUES) }));
+	const [kind, setKind] = useState<BotKind>("routines");
 	const [job, setJob] = useState("");
 	const [cwd, setCwd] = useState(defaultCwd);
 	const [tried, setTried] = useState(false);
+	const pickKind = (next: BotKind) => {
+		setKind(next);
+		if (next === "pr-shepherd") {
+			setJob(SHEPHERD_JOB);
+			if (!name.trim()) setName(SHEPHERD_NAME);
+		} else if (job === SHEPHERD_JOB) setJob("");
+	};
 	const fix = !name.trim() ? "Name the Bot." : !cwd.trim() ? "Pick the workspace it works in." : null;
 	return (
 		<PageFrame title="New Bot" meta="A teammate with one conversation you come back to, a job, and a memory">
@@ -253,7 +262,7 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 					setTried(true);
 					if (fix) return;
 					const botId = crypto.randomUUID() as BotId;
-					changeBot({ op: "save", bot: { id: botId, name: name.trim(), job: job.trim(), cwd, model: null, skill: null, ...look } });
+					changeBot({ op: "save", bot: { id: botId, kind, name: name.trim(), job: job.trim(), cwd, model: null, skill: null, ...look } });
 					location.hash = hashForBots(botId);
 				}}
 			>
@@ -269,9 +278,27 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 				/>
 				<div className="w-full space-y-6">
 					<BotLookPicker name={id} look={look} onLook={setLook} />
-					<Field label="Job" hint="Optional. Leave it empty and tell it in your first message.">
+					<Field label="Type" hint={BOT_KIND_INFO[kind].description}>
+						<div role="group" aria-label="Type" className="flex flex-wrap gap-1.5">
+							{BOT_KINDS.map(option => (
+								<Button
+									key={option}
+									{...activityControl("bots.kind")}
+									type="button"
+									variant="outline"
+									size="compact"
+									active={kind === option}
+									aria-pressed={kind === option}
+									onClick={() => pickKind(option)}
+								>
+									{BOT_KIND_INFO[option].label}
+								</Button>
+							))}
+						</div>
+					</Field>
+					<Field label="Job" hint={kind === "pr-shepherd" ? "Its rules. Edit them to fit how you merge." : "Optional. Leave it empty and tell it in your first message."}>
 						<div className="space-y-2">
-							<div role="group" aria-label="Start from a job" className="flex flex-wrap gap-1.5">
+							<div role="group" aria-label="Start from a job" hidden={kind !== "routines"} className="flex flex-wrap gap-1.5">
 								{JOB_TEMPLATES.map(template => (
 									<Button
 										key={template.label}

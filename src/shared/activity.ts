@@ -114,6 +114,7 @@ export const CONTROLS = [
 	{ id: "bots.delete", label: "Bot Delete, before it is confirmed", area: "Bots" },
 	{ id: "bots.details", label: "Bot details sidebar, shown or hidden from its name", area: "Bots" },
 	{ id: "bots.job.revert", label: "Bot job edit reverted", area: "Bots" },
+	{ id: "bots.kind", label: "New Bot type", area: "Bots" },
 	{ id: "bots.job.template", label: "New Bot job template", area: "Bots" },
 	{ id: "bots.look", label: "Bot shape and color picker", area: "Bots" },
 	{ id: "bots.routine.delete", label: "Bot routine Delete, before it is confirmed", area: "Bots" },
