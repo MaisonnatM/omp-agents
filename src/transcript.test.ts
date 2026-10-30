@@ -406,9 +406,17 @@ describe("splitSuggestions", () => {
 			"Done.\nSuggestions:",
 			"See the Suggestions below\n1. Open the PR",
 			"Done.\n**Suggestions:**\n1. Open the PR",
+			"Done.\n\nSuggestions:\n1. Merge on main\n\n![Settings](/tmp/s.png)",
 		]) {
 			expect(splitSuggestions(text)).toEqual({ body: text, suggestions: [] });
 		}
+	});
+
+	test("a screenshot above the block stays in the body, and the prompts still split off", () => {
+		expect(splitSuggestions("Done.\n\n![Settings](/tmp/s.png)\n\nSuggestions:\n1. Merge on main")).toEqual({
+			body: "Done.\n\n![Settings](/tmp/s.png)",
+			suggestions: ["Merge on main"],
+		});
 	});
 
 	test("a reply's item carries its suggestions and shows only the body", () => {

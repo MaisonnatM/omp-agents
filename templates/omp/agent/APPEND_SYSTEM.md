@@ -65,8 +65,7 @@ Suggestions:
 1. Merge on main, then end the session
 2. Fix the empty-state copy, then merge on main
 
-Keep `Suggestions:` and the numbering exactly as shown, without bold or a code
-fence, so omp-agents can turn the prompts into clickable, numbered actions.
+Keep `Suggestions:` and the numbering exactly as shown, without bold or a code fence, and put nothing after the block, not even a screenshot, so omp-agents can turn the prompts into clickable, numbered actions; it reads them only from the reply's last lines.
 
 # Subagent isolation
 
