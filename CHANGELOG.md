@@ -5,6 +5,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-30
 
+- You can click Review visuals, the eye in the Browser's toolbar, to open every page the agent asks you to look at, each in its own Browser tab.
+- An agent's list of pages to review now shows as a small card in its reply.
+- The Browser's tabs look like a web browser's, with the App tab pinned first and a close button on each review tab.
+- Maximize Browser and Open in default browser now sit in the Browser's ⋯ menu, which leaves the address field more room.
 - Fixed: Settings › Source control now looks for `gh` and `gt` on the app's current `PATH`, not only the one it started with.
 - Fixed: a reply that shows a screenshot keeps its suggested prompts, because the starter kit now has the agent put the screenshot above them.
 - Fixed: Settings, Notes, Calendar, and Email show the sidebar's tab bar again, so a tab such as Sessions takes you back.
