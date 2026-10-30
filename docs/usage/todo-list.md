@@ -66,7 +66,7 @@
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
   Under it, buttons show its status, its priority, its assignee, its category and its **Workspace** for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
   The **Workspace** menu lists **No workspace** and the workspaces the sidebar lists, each by folder name and path.
-  Under **All workspaces**, a top-level todo with a workspace shows a folder chip with its name in the list, whose tooltip gives the path its sessions start in.
+  Under **All workspaces**, a top-level todo with a workspace shows its folder name as a badge in the list, as a session row does; under a picked workspace, a list with no todo naming it says so and points to **All workspaces**, and a todo you open keeps showing after you give it another workspace.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
   Its notes follow, always formatted.
   Click into them and type: markdown at the start of a line formats it as you type, `# ` a heading, `- ` a bullet, `1. ` a numbered list, `[ ] ` or `[x] ` a check item, `> ` a quote, and ```` ``` ```` a code block.

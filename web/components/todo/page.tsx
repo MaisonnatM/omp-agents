@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../../src/shared/days";
+import { folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
 import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
@@ -76,8 +77,8 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const scope = { hidden, workspace };
 	const listed = todosOf(list, view, day, sessions, scope);
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
-	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
-	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
+	// Looked up before the search and the sidebar's workspace narrow the list, so neither takes the open todo off screen.
+	const open = openId === null ? null : (placeIn([workspace === null ? listed : todosOf(list, view, day, sessions, { hidden, workspace: null })], openId)?.entry ?? null);
 	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
 	const drag = useTodoDrag(kind.canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
@@ -85,7 +86,14 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const title = titleOf(list, view);
 	const left = leftIn(list, view, day, sessions, scope);
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
-	const empty = section.todos.length === 0 ? (query ? `No todo matches “${query}”.` : kind.empty) : null;
+	const empty =
+		section.todos.length > 0
+			? null
+			: query
+				? `No todo matches “${query}”.`
+				: workspace !== null
+					? `No todo here names ${folderName(workspace) ?? workspace}, the workspace the sidebar shows. Choose All workspaces in the sidebar to see every todo.`
+					: kind.empty;
 	const groups = (kind.readOnly ? [] : byStatus(section.todos))
 		.filter(group => group.todos.length > 0 || (group.status === "todo" && canAdd))
 		// A search shows every match, closed ones too.

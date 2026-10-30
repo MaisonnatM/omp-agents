@@ -1,15 +1,16 @@
 /** The Todo page's rows: a todo's row, an archived todo's row, and a new todo's draft row. */
-import { Archive, Folder, GripVertical, NotebookText, Pencil, Plus, RotateCcw, SquareArrowOutUpRight, Trash2, X } from "lucide-react";
+import { Archive, GripVertical, NotebookText, Pencil, Plus, RotateCcw, SquareArrowOutUpRight, Trash2, X } from "lucide-react";
 import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf } from "../../../src/user-todos-shared";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { DAY_FORMAT, dayLabel, folderName } from "../../labels";
+import { DAY_FORMAT, dayLabel } from "../../labels";
 import { categoryColor, type Section, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoDrag } from "../../use-todo-drag";
 import type { TodoField } from "../../use-todo-keys";
+import { WorkspaceBadge } from "../session-row";
 import type { Draft, TodoEditing } from "./editing";
 import { StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
@@ -107,14 +108,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 						{category.name}
 					</Badge>
 				)}
-				{workspace && (
-					<Tooltip content={`Starts its sessions in ${workspace}`}>
-						<span className="inline-flex max-w-28 shrink-0 items-center gap-1 rounded-md px-1 text-xs text-muted-foreground [&>svg]:size-3 [&>svg]:shrink-0">
-							<Folder aria-hidden />
-							<span className="truncate">{folderName(workspace) ?? workspace}</span>
-						</span>
-					</Tooltip>
-				)}
+				{workspace && <WorkspaceBadge cwdDisplay={workspace} />}
 				<TodoDuePicker todo={todo} look="icon" day={day} disabled={disabled} {...pickerOf("due")} onChange={onChange} />
 				<TodoAssigneePicker todo={todo} look="icon" disabled={disabled} {...pickerOf("assignee")} onChange={onChange} />
 				{top?.links.filter(link => link.kind !== "session").map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} compact />)}

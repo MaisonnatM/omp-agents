@@ -44,9 +44,12 @@ const ASSIGNEE_CHOICES: Choice[] = [null, ...TODO_ASSIGNEES].map(assignee => ({ 
 /** How a picker's button looks: a bare icon on a row, or a labeled button in the details' property row. */
 export type FieldLook = "icon" | "property";
 
+/** A picker's button in the open todo's property row. */
+export const PROPERTY_BUTTON = "h-7 shrink-0 justify-start border border-border px-2 text-[13px] font-normal text-foreground";
+
 const BUTTON: Record<FieldLook, string> = {
 	icon: "h-6 w-6 shrink-0 justify-center px-0",
-	property: "h-7 shrink-0 justify-start border border-border px-2 text-[13px] font-normal text-foreground",
+	property: PROPERTY_BUTTON,
 };
 
 interface TodoFieldProps {

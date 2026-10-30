@@ -25,7 +25,7 @@ import { NotesEditor } from "../notes-editor";
 import { QuickActionButton, QuickStartNotice } from "../quick-actions";
 import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar } from "../list-split";
-import { StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
+import { PROPERTY_BUTTON, StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
@@ -152,9 +152,6 @@ interface TodoDetailProps {
 	linearConnected: boolean;
 }
 
-/** A property picker's button in the open todo's property row. */
-const PROPERTY_BUTTON = "h-7 shrink-0 justify-start border border-border px-2 text-[13px] font-normal text-foreground";
-
 function CategoryDot({ categoryId }: { categoryId: string | null }) {
 	return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(categoryId)] }} />;
 }
@@ -165,8 +162,8 @@ function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { todo: U
 	const offered = workspace === null || workspaces.some(({ cwd }) => cwd === workspace) ? workspaces : [...workspaces, { cwd: workspace, cwdDisplay: workspace }];
 	const current = workspace === null ? "No workspace" : (folderName(workspace) ?? workspace);
 	const choices: Choice[] = [
-		{ value: "", label: "No workspace" },
-		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <Folder aria-hidden className="size-3.5 text-muted-foreground" /> })),
+		{ value: "", label: "No workspace", icon: <Folder aria-hidden className="size-4 text-muted-foreground" /> },
+		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <Folder aria-hidden className="size-4" /> })),
 	];
 	return (
 		<FieldPicker
@@ -174,7 +171,7 @@ function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { todo: U
 			current={current}
 			trigger={
 				<>
-					<Folder aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+					<Folder aria-hidden className={cn("size-4 shrink-0", workspace === null && "text-muted-foreground")} />
 					<span className="truncate">{current}</span>
 				</>
 			}
