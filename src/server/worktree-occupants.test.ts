@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { HOME } from "../paths";
@@ -74,6 +74,11 @@ function native(path: string, cwd: string, workDirs: string[] = []): string {
 	return path;
 }
 
+/** Every subagent's transcript at `path`; the session's own none. */
+function childFile(path: string | null): (host: RosterHost, agentId: string | null) => string | null {
+	return (_host, agentId) => (agentId === null ? null : path);
+}
+
 function worktrees(occupants: WorktreeOccupant[]): Worktrees {
 	return new Worktrees({
 		knownCwds: () => [], activity: () => [], live: () => occupants,
@@ -93,7 +98,7 @@ describe("resident checkout protection", () => {
 		mkdirSync(join(second.path, "src"));
 		mkdirSync(join(foreign.path, "front"));
 		const path = native(join(root, "child.jsonl"), defaulted.path, [relative(defaulted.path, first.path), `~/${relative(HOME, join(second.path, "src"))}`, join(foreign.path, "front")]);
-		const occupants = await new WorktreeOccupants().snapshot([terminal(main, [agent("Child")], { worktree: assigned.path })], () => path);
+		const occupants = await new WorktreeOccupants().snapshot([terminal(main, [agent("Child")], { worktree: assigned.path })], childFile(path));
 		for (const target of [defaulted, first, second, assigned, foreign]) expect(await codes(occupants, target)).toEqual(["occupied"]);
 		expect(await codes(occupants, unused)).toEqual([]);
 		expect(await codes(occupants, foreignUnused)).toEqual([]);
@@ -113,10 +118,29 @@ describe("resident checkout protection", () => {
 			call("read", { path: `${join(read.path, "README.md")}:1-20` }, "read"),
 			call("edit", { input: `[${join(edited.path, "src", "a.ts")}#1A2B]\nPUT 1.=1:\n+x\n` }, "edit"),
 		].map(entry => `${JSON.stringify(entry)}\n`).join(""));
-		const occupants = await new WorktreeOccupants().snapshot([terminal(main, [])], (_host, id) => (id ? null : own));
+		const occupants = await new WorktreeOccupants().snapshot([terminal(main, [])], (_host, id) => (id === null ? own : null));
 		for (const target of [ranIn, changedInto, read, edited]) expect(await codes(occupants, target)).toEqual(["occupied"]);
 		expect(await codes(occupants, unused)).toEqual([]);
 		expect((await worktrees(occupants).preview(changedInto)).blockers[0]?.message).toContain("Checkout session");
+		const unwritten = await new WorktreeOccupants().snapshot([terminal(main, [])], (_host, id) => (id === null ? join(root, "unwritten.jsonl") : null));
+		expect(await codes(unwritten, unused)).toEqual([]);
+	});
+
+	test("keeps previews readable when a session named a path under a folder the server cannot read", async () => {
+		const { root, main, targets: [used, unused] } = await repository(["used", "unused"]);
+		if (!used || !unused) throw new Error("Missing fixture worktree");
+		const sealed = join(root, "sealed");
+		mkdirSync(join(sealed, "inner"), { recursive: true });
+		const own = native(join(root, "own.jsonl"), main, [used.path]);
+		appendFileSync(own, `${JSON.stringify(call("bash", { command: `cat ${join(sealed, "inner", "secret")}` }, "sealed"))}\n`);
+		chmodSync(sealed, 0o000);
+		try {
+			const occupants = await new WorktreeOccupants().snapshot([terminal(main, [])], (_host, id) => (id === null ? own : null));
+			expect(await codes(occupants, used)).toEqual(["occupied"]);
+			expect(await codes(occupants, unused)).toEqual([]);
+		} finally {
+			chmodSync(sealed, 0o755);
+		}
 	});
 
 	test("keeps the parent scope for a missing transcript and releases it when a native child file appears", async () => {
@@ -125,13 +149,13 @@ describe("resident checkout protection", () => {
 		const collector = new WorktreeOccupants();
 		const hosts = [terminal(main)];
 		const path = join(root, "later.jsonl");
-		const missing = await collector.snapshot(hosts, () => path);
+		const missing = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(missing, unused)).toEqual(["unknown-agent-location"]);
 		const plan = await worktrees(missing).preview(unused);
 		expect(plan.blockers[0]?.message).toContain("parent");
 		expect(plan.blockers[0]?.message).toContain("Child");
 		native(path, used.path);
-		const appeared = await collector.snapshot(hosts, () => path);
+		const appeared = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(appeared, used)).toEqual(["occupied"]);
 		expect(await codes(appeared, unused)).toEqual([]);
 	});
@@ -147,11 +171,11 @@ describe("resident checkout protection", () => {
 		const noHeader = join(root, "no-header.jsonl");
 		writeFileSync(noHeader, `${JSON.stringify(bash(main))}\n`);
 		for (const path of [null, "relative-transcript.jsonl", directory, malformed, relativeHeader, noHeader]) {
-			const occupants = await new WorktreeOccupants().snapshot([terminal(main)], () => path);
+			const occupants = await new WorktreeOccupants().snapshot([terminal(main)], childFile(path));
 			expect(await codes(occupants, unused)).toEqual(["unknown-agent-location"]);
 		}
 		const valid = native(join(root, "valid.jsonl"), unused.path);
-		expect(await codes(await new WorktreeOccupants().snapshot([terminal(main)], () => valid), unused)).toEqual(["occupied"]);
+		expect(await codes(await new WorktreeOccupants().snapshot([terminal(main)], childFile(valid)), unused)).toEqual(["occupied"]);
 	});
 
 	test("retries a bad header and retains absolute Bash evidence even before the default is known", async () => {
@@ -161,12 +185,12 @@ describe("resident checkout protection", () => {
 		writeFileSync(path, `not a native header\n${JSON.stringify(bash(used.path))}\n`);
 		const collector = new WorktreeOccupants();
 		const hosts = [terminal(main)];
-		const invalid = await collector.snapshot(hosts, () => path);
+		const invalid = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(invalid, used)).toEqual(["occupied", "unknown-agent-location"]);
 		expect(await codes(invalid, unused)).toEqual(["unknown-agent-location"]);
 		native(path, used.path);
-		await collector.snapshot(hosts, () => path);
-		const recovered = await collector.snapshot(hosts, () => path);
+		await collector.snapshot(hosts, childFile(path));
+		const recovered = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(recovered, used)).toEqual(["occupied"]);
 		expect(await codes(recovered, unused)).toEqual([]);
 	});
@@ -181,7 +205,7 @@ describe("resident checkout protection", () => {
 			Descendant: native(join(root, "descendant.jsonl"), descendant.path),
 		};
 		const agents = [agent("Idle", "idle"), agent("Parked", "parked"), agent("Aborted", "aborted"), agent("Descendant", "running", "Aborted")];
-		const occupants = await new WorktreeOccupants().snapshot([terminal(main, agents)], (_host, id) => paths[id] ?? null);
+		const occupants = await new WorktreeOccupants().snapshot([terminal(main, agents)], (_host, id) => (id === null ? null : (paths[id] ?? null)));
 		for (const target of [idle, parked, descendant]) expect(await codes(occupants, target)).toEqual(["occupied"]);
 		expect(await codes(occupants, aborted)).toEqual([]);
 		expect(await codes(occupants, unused)).toEqual([]);
@@ -193,7 +217,7 @@ describe("resident checkout protection", () => {
 		const done = native(join(root, "completed.jsonl"), completed.path);
 		const running = native(join(root, "running.jsonl"), descendant.path);
 		const host: RosterHost = { ...terminal(main, [agent("Completed", "parked"), agent("Idle", "idle"), agent("Aborted", "aborted"), agent("Descendant", "running", "Completed")]), source: "dashboard", thinkingLevels: [], switching: false, fast: null };
-		const occupants = await new WorktreeOccupants().snapshot([host], (_host, id) => id === "Descendant" ? running : done);
+		const occupants = await new WorktreeOccupants().snapshot([host], (_host, id) => (id === null ? null : id === "Descendant" ? running : done));
 		expect(await codes(occupants, descendant)).toEqual(["occupied"]);
 		expect(await codes(occupants, completed)).toEqual([]);
 		expect(await codes(occupants, unused)).toEqual([]);
@@ -219,15 +243,15 @@ describe("resident checkout protection", () => {
 		const collector = new WorktreeOccupants();
 		const hosts = [terminal(main)];
 		const path = native(join(root, "child.jsonl"), defaulted.path);
-		const initial = await collector.snapshot(hosts, () => path);
+		const initial = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(initial, defaulted)).toEqual(["occupied"]);
 		expect(await codes(initial, unused)).toEqual([]);
 		appendFileSync(path, JSON.stringify(bash(declared.path)));
-		const partial = await collector.snapshot(hosts, () => path);
+		const partial = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(partial, defaulted)).toEqual(["occupied", "unknown-agent-location"]);
 		expect(await codes(partial, unused)).toEqual(["unknown-agent-location"]);
 		appendFileSync(path, "\n");
-		const completed = await collector.snapshot(hosts, () => path);
+		const completed = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(completed, defaulted)).toEqual(["occupied"]);
 		expect(await codes(completed, declared)).toEqual(["occupied"]);
 		expect(await codes(completed, unused)).toEqual([]);
@@ -239,15 +263,15 @@ describe("resident checkout protection", () => {
 		const collector = new WorktreeOccupants();
 		const hosts = [terminal(main)];
 		const path = native(join(root, "child.jsonl"), used.path);
-		await collector.snapshot(hosts, () => path);
+		await collector.snapshot(hosts, childFile(path));
 		appendFileSync(path, '{"type":"message","cwd":\n');
 		for (let i = 0; i < 2; i++) {
-			const corrupt = await collector.snapshot(hosts, () => path);
+			const corrupt = await collector.snapshot(hosts, childFile(path));
 			expect(await codes(corrupt, used)).toEqual(["occupied", "unknown-agent-location"]);
 			expect(await codes(corrupt, unused)).toEqual(["unknown-agent-location"]);
 		}
 		native(path, used.path);
-		const recovered = await collector.snapshot(hosts, () => path);
+		const recovered = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(recovered, used)).toEqual(["occupied"]);
 		expect(await codes(recovered, unused)).toEqual([]);
 	});
@@ -259,15 +283,15 @@ describe("resident checkout protection", () => {
 		const collector = new WorktreeOccupants();
 		const hosts = [terminal(main)];
 		const path = native(join(root, "child.jsonl"), used.path, [foreign.path]);
-		await collector.snapshot(hosts, () => path);
+		await collector.snapshot(hosts, childFile(path));
 		writeFileSync(path, "");
 		for (const candidate of [path, null]) {
-			const missing = await collector.snapshot(hosts, () => candidate);
+			const missing = await collector.snapshot(hosts, childFile(candidate));
 			for (const target of [used, foreign]) expect(await codes(missing, target)).toEqual(["occupied", "unknown-agent-location"]);
 			for (const target of [unused, foreignUnused]) expect(await codes(missing, target)).toEqual(["unknown-agent-location"]);
 		}
 		native(path, used.path);
-		const recovered = await collector.snapshot(hosts, () => path);
+		const recovered = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(recovered, used)).toEqual(["occupied"]);
 		expect(await codes(recovered, foreign)).toEqual(["occupied"]);
 		expect(await codes(recovered, unused)).toEqual([]);
@@ -281,16 +305,16 @@ describe("resident checkout protection", () => {
 		const hosts = [terminal(main)];
 		const path = native(join(root, "child.jsonl"), alpha.path);
 		const size = statSync(path).size;
-		await collector.snapshot(hosts, () => path);
+		await collector.snapshot(hosts, childFile(path));
 		native(path, bravo.path);
 		expect(statSync(path).size).toBe(size);
-		const rewritten = await collector.snapshot(hosts, () => path);
+		const rewritten = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(rewritten, alpha)).toEqual(["occupied"]);
 		expect(await codes(rewritten, bravo)).toEqual(["occupied"]);
 		expect(await codes(rewritten, unused)).toEqual([]);
 		const replacement = native(join(root, "replacement.jsonl"), delta.path);
 		renameSync(replacement, path);
-		const replaced = await collector.snapshot(hosts, () => path);
+		const replaced = await collector.snapshot(hosts, childFile(path));
 		for (const target of [alpha, bravo, delta]) expect(await codes(replaced, target)).toEqual(["occupied"]);
 		expect(await codes(replaced, unused)).toEqual([]);
 	});
@@ -301,11 +325,11 @@ describe("resident checkout protection", () => {
 		const collector = new WorktreeOccupants();
 		const host = terminal(main);
 		const path = native(join(root, "child.jsonl"), former.path);
-		expect(await codes(await collector.snapshot([host], () => path), former)).toEqual(["occupied"]);
-		const ended = await collector.snapshot([{ ...host, agents: [agent("Child", "aborted")] }], () => path);
+		expect(await codes(await collector.snapshot([host], childFile(path)), former)).toEqual(["occupied"]);
+		const ended = await collector.snapshot([{ ...host, agents: [agent("Child", "aborted")] }], childFile(path));
 		expect(await codes(ended, former)).toEqual([]);
 		native(path, current.path);
-		const resumed = await collector.snapshot([host], () => path);
+		const resumed = await collector.snapshot([host], childFile(path));
 		expect(await codes(resumed, current)).toEqual(["occupied"]);
 		expect(await codes(resumed, former)).toEqual([]);
 	});
@@ -317,7 +341,7 @@ describe("resident checkout protection", () => {
 		const collector = new WorktreeOccupants();
 		const host = terminal(main);
 		const path = native(join(root, "child.jsonl"), foreign.path);
-		expect(await codes(await collector.snapshot([host], () => path), foreign)).toEqual(["occupied"]);
+		expect(await codes(await collector.snapshot([host], childFile(path)), foreign)).toEqual(["occupied"]);
 		const disconnected = { ...host, agents: [], control: { phase: "reconnecting", reason: "lost roster" } } satisfies RosterHost;
 		const retained = await collector.snapshot([disconnected], () => null);
 		expect(await codes(retained, foreign)).toEqual(["occupied", "unknown-agent-location"]);
@@ -327,7 +351,7 @@ describe("resident checkout protection", () => {
 		const live = await collector.snapshot([{ ...host, agents: [] }], () => null);
 		expect(await codes(live, foreign)).toEqual([]);
 		expect(await codes(live, foreignUnused)).toEqual([]);
-		expect(await codes(await collector.snapshot([host], () => path), foreign)).toEqual(["occupied"]);
+		expect(await codes(await collector.snapshot([host], childFile(path)), foreign)).toEqual(["occupied"]);
 		await collector.snapshot([disconnected], () => null);
 		const gone = await collector.snapshot([], () => null);
 		expect(await codes(gone, foreign)).toEqual([]);
@@ -341,15 +365,15 @@ describe("resident checkout protection", () => {
 		const collector = new WorktreeOccupants();
 		const hosts = [terminal(main)];
 		const path = native(join(root, "child.jsonl"), foreign.path);
-		await collector.snapshot(hosts, () => path);
+		await collector.snapshot(hosts, childFile(path));
 		const moved = join(root, "moved.jsonl");
 		renameSync(path, moved);
-		const missing = await collector.snapshot(hosts, () => path);
+		const missing = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(missing, foreign)).toEqual(["occupied", "unknown-agent-location"]);
 		expect(await codes(missing, foreignUnused)).toEqual(["unknown-agent-location"]);
 		expect(await codes(missing, unused)).toEqual(["unknown-agent-location"]);
 		renameSync(moved, path);
-		const recovered = await collector.snapshot(hosts, () => path);
+		const recovered = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(recovered, foreign)).toEqual(["occupied"]);
 		expect(await codes(recovered, foreignUnused)).toEqual([]);
 		expect(await codes(recovered, unused)).toEqual([]);
@@ -364,14 +388,14 @@ describe("resident evidence transitions", () => {
 		const collector = new WorktreeOccupants();
 		const host = terminal(main);
 		const path = native(join(root, "surviving.jsonl"), foreign.path);
-		expect(await codes(await collector.snapshot([host], () => path), foreign)).toEqual(["occupied"]);
+		expect(await codes(await collector.snapshot([host], childFile(path)), foreign)).toEqual(["occupied"]);
 		const switched = { ...host, sessionId: "continued-parent", sessionName: "Continued session" };
 		const unresolved = await collector.snapshot([switched], () => null);
 		expect(await codes(unresolved, foreign)).toEqual(["occupied", "unknown-agent-location"]);
 		expect(await codes(unresolved, foreignUnused)).toEqual(["unknown-agent-location"]);
 		expect(await codes(unresolved, localUnused)).toEqual(["unknown-agent-location"]);
 		expect((await worktrees(unresolved).preview(foreign)).blockers[0]?.message).toContain("continued-parent");
-		const resolved = await collector.snapshot([switched], () => path);
+		const resolved = await collector.snapshot([switched], childFile(path));
 		expect(await codes(resolved, foreign)).toEqual(["occupied"]);
 		expect(await codes(resolved, foreignUnused)).toEqual([]);
 		const ended = await collector.snapshot([{ ...switched, agents: [] }], () => null);
@@ -386,11 +410,11 @@ describe("resident evidence transitions", () => {
 			const hosts = [terminal(main)];
 			const path = native(join(root, `growing-${rewriteHeader}.jsonl`), alpha.path, [bravo.path]);
 			const before = statSync(path);
-			await collector.snapshot(hosts, () => path);
+			await collector.snapshot(hosts, childFile(path));
 			native(path, rewriteHeader ? delta.path : alpha.path, [rewriteHeader ? bravo.path : delta.path, extra.path]);
 			expect(statSync(path).ino).toBe(before.ino);
 			expect(statSync(path).size > before.size).toBe(true);
-			const rewritten = await collector.snapshot(hosts, () => path);
+			const rewritten = await collector.snapshot(hosts, childFile(path));
 			for (const target of [alpha, bravo, delta, extra]) expect(await codes(rewritten, target)).toEqual(["occupied"]);
 			expect(await codes(rewritten, unused)).toEqual([]);
 		}
@@ -404,14 +428,14 @@ describe("resident evidence transitions", () => {
 		const path = native(join(root, "preserved.jsonl"), alpha.path);
 		utimesSync(path, 100, 100);
 		await readSessionFile(path);
-		expect(await codes(await collector.snapshot(hosts, () => path), alpha)).toEqual(["occupied"]);
+		expect(await codes(await collector.snapshot(hosts, childFile(path)), alpha)).toEqual(["occupied"]);
 		const before = statSync(path);
 		const replacement = native(join(root, "replacement.jsonl"), bravo.path);
 		utimesSync(replacement, 100, 100);
 		renameSync(replacement, path);
 		expect(statSync(path).mtimeMs).toBe(before.mtimeMs);
 		expect(statSync(path).size).toBe(before.size);
-		const replaced = await collector.snapshot(hosts, () => path);
+		const replaced = await collector.snapshot(hosts, childFile(path));
 		expect(await codes(replaced, alpha)).toEqual(["occupied"]);
 		expect(await codes(replaced, bravo)).toEqual(["occupied"]);
 		expect(await codes(replaced, unused)).toEqual([]);

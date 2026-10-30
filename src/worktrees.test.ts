@@ -60,7 +60,7 @@ describe("worktree removal", () => {
 		const repository = listed.repositories[0]?.repository ?? "";
 		const plan = readable(await quiet.preview({ repository, path: main }));
 		expect(plan.blockers.some(blocker => blocker.code === "main")).toBe(true);
-		expect((await quiet.remove([plan])).map(result => result.removed)).toEqual([false]);
+		expect((await quiet.remove([plan], "test")).map(result => result.removed)).toEqual([false]);
 		expect(existsSync(main)).toBe(true);
 	});
 
@@ -74,7 +74,7 @@ describe("worktree removal", () => {
 		const plan = readable(await quiet.preview({ repository: await common(main), path }));
 		expect(plan.blockers).toEqual([]);
 		expect(plan.ignored).toContain(".env");
-		expect((await quiet.remove([plan]))[0]?.removed).toBe(true);
+		expect((await quiet.remove([plan], "test"))[0]?.removed).toBe(true);
 		expect(existsSync(path)).toBe(false);
 		expect((await git(main, "show-ref", "--verify", "refs/heads/keep-me")).trim()).toContain("refs/heads/keep-me");
 	});
@@ -90,13 +90,13 @@ describe("worktree removal", () => {
 			serverCwd: "/no/such/dashboard",
 			mergedPullRequests: noPullRequests,
 		});
-		expect((await worktrees.removeCheckout(join(path, ".")))?.removed).toBe(true);
+		expect((await worktrees.removeCheckout(join(path, "."), "test"))?.removed).toBe(true);
 		expect(existsSync(path)).toBe(false);
-		expect(await worktrees.removeCheckout(main)).toBeNull();
-		expect(await worktrees.removeCheckout(parent)).toBeNull();
+		expect(await worktrees.removeCheckout(main, "test")).toBeNull();
+		expect(await worktrees.removeCheckout(parent, "test")).toBeNull();
 		const stuck = await linked(parent, main, "stuck");
 		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ kind: "located", cwd: stuck, label: "Session stuck" }], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
-		expect((await busy.removeCheckout(stuck, 0))?.blockers.map(blocker => blocker.code)).toEqual(["occupied"]);
+		expect((await busy.removeCheckout(stuck, "test", 0))?.blockers.map(blocker => blocker.code)).toEqual(["occupied"]);
 	});
 
 	test("refuses a dirty checkout, a lock, a live session, an unknown subagent, and the server checkout", async () => {
@@ -124,7 +124,7 @@ describe("worktree removal", () => {
 		expect(lockedPlan.blockers.map(blocker => blocker.code)).toContain("locked");
 		expect(lockedPlan.blockers.map(blocker => blocker.code)).toContain("server");
 		expect((await trees.preview({ repository, path: occupied })).blockers.map(blocker => blocker.code)).toEqual(expect.arrayContaining(["occupied", "unknown-agent-location"]));
-		expect((await trees.remove([lockedPlan]))[0]?.removed).toBe(false);
+		expect((await trees.remove([lockedPlan], "test"))[0]?.removed).toBe(false);
 		expect(existsSync(locked)).toBe(true);
 		expect(existsSync(join(dirty, "untracked.txt"))).toBe(true);
 	});
@@ -134,7 +134,7 @@ describe("worktree removal", () => {
 		const path = await linked(parent, main, "drift");
 		const plan = readable(await quiet.preview({ repository: await common(main), path }));
 		writeFileSync(join(path, "later.txt"), "later\n");
-		const result = (await quiet.remove([plan]))[0];
+		const result = (await quiet.remove([plan], "test"))[0];
 		expect(result?.removed).toBe(false);
 		expect(result?.blockers.some(blocker => blocker.code === "drift" || blocker.code === "changed")).toBe(true);
 		expect(existsSync(join(path, "later.txt"))).toBe(true);
@@ -157,7 +157,7 @@ describe("worktree removal", () => {
 		const registration = readable(await quiet.preview({ repository, path: gone }));
 		expect(registration.kind).toBe("registration");
 		expect(registration.detachedCommitLoss).toBe(false);
-		expect((await quiet.remove([registration]))[0]?.removed).toBe(true);
+		expect((await quiet.remove([registration], "test"))[0]?.removed).toBe(true);
 		expect(await git(main, "worktree", "list", "--porcelain")).not.toContain(gone);
 		expect((await git(main, "show-ref", "--verify", "refs/heads/gone")).trim()).toContain("refs/heads/gone");
 
@@ -178,7 +178,7 @@ describe("worktree removal", () => {
 		const repository = await common(main);
 		const foreign = readable(await quiet.preview({ repository, path }));
 		expect(foreign.blockers.some(blocker => blocker.code === "foreign" || blocker.code === "unreadable")).toBe(true);
-		expect((await quiet.remove([foreign]))[0]?.removed).toBe(false);
+		expect((await quiet.remove([foreign], "test"))[0]?.removed).toBe(false);
 		expect(existsSync(path)).toBe(true);
 
 		const nested = await linked(parent, main, "nested");
@@ -190,7 +190,7 @@ describe("worktree removal", () => {
 		await git(inner, "init", "-q", "-b", "main");
 		const plan = readable(await quiet.preview({ repository, path: nested }));
 		expect(plan.blockers.some(blocker => blocker.code === "nested-repository")).toBe(true);
-		expect((await quiet.remove([plan]))[0]?.removed).toBe(false);
+		expect((await quiet.remove([plan], "test"))[0]?.removed).toBe(false);
 		expect(existsSync(join(inner, ".git"))).toBe(true);
 
 		const bare = join(nested, "node_modules", "archive.git");
@@ -382,13 +382,13 @@ describe("worktree removal", () => {
 		]);
 		expect(await trees.inUse()).toEqual([first.main, inside, otherInside]);
 		const siblingPlan = readable(plans[1]!);
-		expect((await trees.remove([siblingPlan])).map(result => result.removed)).toEqual([true]);
+		expect((await trees.remove([siblingPlan], "test")).map(result => result.removed)).toEqual([true]);
 		expect(existsSync(sibling)).toBe(false);
 		expect(existsSync(occupied)).toBe(true);
 		expect(existsSync(other)).toBe(true);
 	});
 
-	test("canonical child directories deduplicate one actor while retaining every named actor and path", async () => {
+	test("canonical child directories deduplicate one actor's paths while keeping every named actor and path in use", async () => {
 		const { parent, main } = await repo();
 		const path = await linked(parent, main);
 		const inside = join(path, "src", "nested");
@@ -412,10 +412,10 @@ describe("worktree removal", () => {
 		const plan = await trees.preview({ repository: await common(main), path });
 		expect(plan.blockers.map(blocker => blocker.code)).toEqual(["occupied", "occupied"]);
 		expect(plan.blockers[0]?.message).toContain("Session build subagent A");
-		expect(plan.blockers[0]?.message).toContain(inside);
-		expect(plan.blockers[0]?.message).toContain(extra);
+		// The alias and its target count once: the shallowest path, then one more.
+		expect(plan.blockers[0]?.message).toContain(`uses ${extra} and 1 more path in this checkout.`);
 		expect(plan.blockers[1]?.message).toContain("Session build subagent B");
-		expect(plan.blockers[1]?.message).toContain(inside);
+		expect(plan.blockers[1]?.message).toContain(`uses ${inside}.`);
 		expect(await trees.inUse()).toEqual([inside, extra, main]);
 	});
 
@@ -505,7 +505,7 @@ describe("worktree removal", () => {
 		const plan = readable(await trees.preview(target));
 		expect(plan.blockers).toEqual([]);
 		live = [{ kind: "located", cwd: inside, label: "Session started subagent child" }];
-		const results = await trees.remove([plan]);
+		const results = await trees.remove([plan], "test");
 		expect(results.map(result => ({ removed: result.removed, codes: result.blockers.map(blocker => blocker.code), error: result.error }))).toEqual([
 			{ removed: false, codes: ["occupied"], error: null },
 		]);
@@ -513,7 +513,7 @@ describe("worktree removal", () => {
 		expect(results[0]?.blockers[0]?.message).toContain(inside);
 		expect(existsSync(path)).toBe(true);
 		live = [{ kind: "unlocated", scopeCwd: main, label: "Session started subagent unresolved" }];
-		const unresolved = await trees.remove([plan]);
+		const unresolved = await trees.remove([plan], "test");
 		expect(unresolved.map(result => ({ removed: result.removed, codes: result.blockers.map(blocker => blocker.code), error: result.error }))).toEqual([
 			{ removed: false, codes: ["unknown-agent-location"], error: null },
 		]);
@@ -535,7 +535,7 @@ test("hidden index flags fail closed for removal", async () => {
 		writeFileSync(join(path, "file.txt"), "hidden changes");
 		const plan = await quiet.preview({ repository, path });
 		expect(plan.kind).toBe("unreadable");
-		expect((await quiet.remove([confirmation]))[0]?.removed).toBe(false);
+		expect((await quiet.remove([confirmation], "test"))[0]?.removed).toBe(false);
 		expect(existsSync(path)).toBe(true);
 	}
 });
