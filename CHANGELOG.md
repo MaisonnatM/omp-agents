@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-30
 
+- Behind the scenes: the starter kit's guide now names a reply's three parts the way the agent writes them, so it no longer confuses new readers.
 - Fixed: a session on a Cursor model asks you its questions with the question form instead of in plain text, because the starter kit now points it to omp's question tool.
 - You can click Review visuals, the eye in the Browser's toolbar, to open every page the agent asks you to look at, each in its own Browser tab.
 - An agent's list of pages to review now shows as a small card in its reply.
