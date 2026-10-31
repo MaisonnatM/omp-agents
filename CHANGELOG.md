@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-10-31
+
+- With the starter kit, when you say "Merge on main", the agent now merges your branch into a fresh copy of main, runs the project's checks on the result, and only then pushes.
+- Agents can no longer push or merge straight into main in a project set up this way, so a change that breaks the checks never lands.
+
 ## 2026-10-30
 
 - Fixed: Remove merged in Settings › Worktrees, and ending a session, no longer delete a worktree that another running session still works in, even a session started in another project.

@@ -16,7 +16,8 @@ Isolation fails when the session's cwd is not a Git repository: create a worktre
 Read-only investigation needs no worktree; a request to work in place on `main` still needs a branch, which `git switch -c <branch>` in the main checkout gives.
 Before opening or adopting a PR, auditing Graphite registration, or branching in a Graphite repository, read `~/.omp/agent/docs/git-workflow.md`.
 
-After merging or committing into local `main`, immediately run `git push origin main` and confirm `git status -sb` has no ahead count.
+In a repository that commits `.omp/land.json`, "merge on main" means calling the `land` tool from the branch's checkout once its work is committed; it merges into a fresh copy of `origin/main`, runs the file's checks on the merged result, and pushes, and merging or pushing into `main` yourself is blocked there.
+In any other repository, after merging or committing into local `main`, immediately run `git push origin main` and confirm `git status -sb` has no ahead count.
 Force-pushes and rewriting `main` still require explicit approval.
 
 Ending a session, from the dashboard's **End session** or the `end_session` tool, removes its worktree, so end yours only once its work is merged or pushed; the dashboard's **Settings → Worktrees** tab removes others, and both keep dirty, locked, and in-use checkouts.

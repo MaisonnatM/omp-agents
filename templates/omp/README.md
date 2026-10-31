@@ -72,6 +72,13 @@ Files, in `agent/`:
   A five-minute cache write costs 1.25 times the input price and an hour-long one twice that, and a conversation tail is read again within seconds, so this cuts the write bill without losing the warm head after a pause.
   It also stops cache warming while the session is idle.
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
+- `extensions/land.ts`, with `extensions/land/`: the `land` tool lands a committed branch on `main` in a repository that commits `.omp/land.json`, the way [Ultimate](https://github.com/HazAT/ultimate)'s lander does, with no model in the loop.
+  It merges the branch's tip into a fresh temporary worktree of `origin/main` with a merge commit whose message carries the agent's divergence note, runs the setup and checks the file lists on that merged result, and pushes the merge commit, never forced.
+  `land.json` holds `target` (default `main`), `remote` (default `origin`), `setup`, commands run in the worktree first, and `checks`, each a command or a list of commands that run at the same time; checks get `LAND_BASE` and `LAND_TIP`, the target and branch commits.
+  A check is stopped after 2 minutes without output or 10 in all, and a failed one runs once more: passing then lands with a flaky warning, failing again returns its output.
+  A conflict names the files and pushes nothing; a push that loses a race to another landing starts again from the new tip, three times at most.
+  Afterwards the local `main` moves forward to the landed commit only when it can without touching uncommitted changes, and worktrees left by an omp process that died are removed at the next landing.
+  In such a repository the extension blocks an agent's `git push` to `main`, `git merge` into a checked-out `main` other than `--ff-only` from `origin/main`, and `gh pr merge`, so an agent lands only through `land`; your own terminal is not affected, and a subagent cannot land.
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over, and the omp-agents dashboard removes its worktree as **End session** does, so a prompt such as "Merge on main, then end the session" runs to the end.
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
   When you linked addresses to the session's workspace in the dashboard's Settings › Integrations, it also tells the session to use those for the workspace's mail and calendar unless you name another account.
