@@ -79,6 +79,7 @@ import { RoutineInbox } from "./routine-inbox";
 import { ShepherdInbox } from "./shepherd-inbox";
 import { shepherdRoutine } from "../shared/shepherd";
 import { unapprovedChange } from "../pull-request-approval";
+import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
@@ -488,6 +489,7 @@ export class Dashboard {
 				start: startSession,
 				queueMerge: change => this.#mergeQueue.apply(change),
 				unapprovedChange,
+				landTarget: cwd => configAt(cwd)?.target ?? null,
 				tell: (botId, text) => this.#bots.message(botId, text),
 			},
 			{ active: () => ownerLock.held },

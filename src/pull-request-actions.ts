@@ -101,3 +101,7 @@ const PULL_REQUEST_IDS = Object.keys(PULL_REQUEST_ACTIONS) as PullRequestActionI
 
 /** The actions that apply to `pr`, in registry order. */
 export const pullRequestActions = (pr: PullRequestSummary): PullRequestActionId[] => PULL_REQUEST_IDS.filter(id => PULL_REQUEST_ACTIONS[id].applies(pr));
+
+/** The prompt of the session that lands `pr` through the `land` tool, for a repository that commits `.omp/land.json` and whose PR shepherd asked to merge it. */
+export const landPrompt = (pr: PullRequestSummary): string =>
+	`${pullRequestContext(pr)} Its PR shepherd asked to merge it, and this repository lands on \`${pr.base}\` only through the \`land\` tool, which runs the repository's checks on the merged result before it pushes. ${ON_BRANCH} First make the branch match the pull request: run \`git fetch origin\`, then \`git merge --ff-only origin/${pr.head}\`; if the branch has commits the pull request lacks, stop and say so. Then call \`land\` with the divergence "None". If \`land\` reports a conflict or a failed check, do not change the code: report what it returned, so the user can start a fix on the pull request.`;
