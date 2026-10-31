@@ -121,3 +121,10 @@ export function parseJson(text: string): unknown {
 		return undefined;
 	}
 }
+
+/** `value` as JSON text that does not depend on the order its keys were written in. */
+export function canonicalJson(value: unknown): string {
+	const sorted = (node: unknown): unknown =>
+		Array.isArray(node) ? node.map(sorted) : isObject(node) ? Object.fromEntries(Object.keys(node).sort().map(key => [key, sorted(node[key])])) : node;
+	return `${JSON.stringify(sorted(value), null, "\t")}\n`;
+}

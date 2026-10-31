@@ -9,7 +9,7 @@ import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -424,6 +424,23 @@ describe("parseWorkspaceChange", () => {
 		expect(parseWorkspaceChange({ op: "show", cwd: "app" })).toBeNull();
 		expect(parseWorkspaceChange({ op: "remove", cwd: "/home/user/app" })).toBeNull();
 		expect(parseWorkspaceChange({ op: "add", cwd: "" })).toBeNull();
+	});
+});
+describe("parseTrustChange", () => {
+	test("trusts pieces by id and hash alone, and forgets a project, by its absolute root", () => {
+		expect(parseTrustChange({ op: "trust", root: "/repo", code: [{ id: ".omp/tools/t.ts", hash: "h", kind: "tool", name: "t" }] })?.ok).toEqual({ op: "trust", root: "/repo", code: [{ id: ".omp/tools/t.ts", hash: "h" }] });
+		expect(parseTrustChange({ op: "forget", root: "/repo", code: [] })?.ok).toEqual({ op: "forget", root: "/repo" });
+	});
+
+	test("rejects a relative root, an unknown op, trusting no pieces, and a piece without an id or hash", () => {
+		expect(parseTrustChange({ op: "forget", root: "repo" })).toBeNull();
+		expect(parseTrustChange({ op: "trust", root: "~/repo", code: [{ id: "a", hash: "h" }] })).toBeNull();
+		expect(parseTrustChange({ op: "revoke", root: "/repo" })).toBeNull();
+		expect(parseTrustChange({ op: "trust", root: "/repo", code: [] })).toBeNull();
+		expect(parseTrustChange({ op: "trust", root: "/repo" })).toBeNull();
+		expect(parseTrustChange({ op: "trust", root: "/repo", code: [{ id: "a", hash: "h" }, { id: "b" }] })).toBeNull();
+		expect(parseTrustChange({ op: "trust", root: "/repo", code: [{ id: "", hash: "h" }] })).toBeNull();
+		expect(parseTrustChange({ op: "trust", root: "/repo", code: ["a"] })).toBeNull();
 	});
 });
 describe("parsePullRequestQuery", () => {

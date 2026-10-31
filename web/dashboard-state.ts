@@ -3,7 +3,7 @@ import { applyBot, type Bot, type BotChange, type BotId, type BotLast } from "..
 import type { PlanUsage } from "../src/shared/models";
 import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
-import type { TrustAsk, TrustedProject } from "../src/shared/project-trust";
+import type { TrustedProject } from "../src/shared/project-trust";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import { applyPins, type PinChange } from "../src/shared/pins";
@@ -20,7 +20,7 @@ import type { Completions } from "./pane-store";
 import { changePanes, DEFAULT_SPLIT_RATIOS, type PaneCommand, type PaneNavigation, type SplitRatios } from "./pane-navigation";
 import type { ModelList } from "./reads";
 import { EMPTY_LAYOUT, endSession, hashForLayout, hashForRoute, type Layout, type Page, type Route, sameView } from "./routing";
-import { beginStart, dismissSettled, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
+import { answerTrust, beginStart, dismissSettled, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
 
 export interface DashboardState extends PaneNavigation {
 	connected: boolean;
@@ -64,8 +64,6 @@ export interface DashboardState extends PaneNavigation {
 	workspaceList: WorkspaceList<Workspace>;
 	/** The projects whose agent code the user trusted, empty until the server first sends them. */
 	trustedProjects: TrustedProject[];
-	/** The start this page made that refused for untrusted project code, and what to ask about, until the user answers. */
-	trustAsk: { op: StartOp; ask: TrustAsk } | null;
 	/** The pinned sessions' ids, empty until the server first sends them; a change shows here before the server answers. */
 	pins: string[];
 	/** What the bell lists, empty until the server first sends it. */
@@ -101,8 +99,8 @@ export type Action =
 	| { t: "user-note"; change: UserNoteChange }
 	| { t: "pin"; change: PinChange }
 	| { t: "bot"; change: Exclude<BotChange, { op: "message" }>; now: string }
-	/** The trust dialog closed, by trusting or by **Cancel**. */
-	| { t: "trust-dismiss" }
+	/** The trust dialog of start `reqId` closed, by trusting or by **Cancel**. */
+	| { t: "trust-dismiss"; reqId: number }
 	| ServerAction;
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
@@ -207,10 +205,9 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		case "past":
 			return { ...state, past: applyDelta(state.past, action.reset, action.sessions, session => session.sessionId, action.removed).sort(newestPastFirst), listed: true };
 		case "started": {
-			const pending = pendingStart(state.starts, action.reqId);
-			if (!pending) return state;
+			if (!pendingStart(state.starts, action.reqId)) return state;
 			const starts = settleStart(state.starts, action.reqId, action.result);
-			if (!action.result.ok) return { ...state, starts, trustAsk: action.result.trust ? { op: pending.op, ask: action.result.trust } : state.trustAsk };
+			if (!action.result.ok) return { ...state, starts };
 			const { instanceId, workspace } = action.result;
 			return { ...state, starts, started: { instanceId, workspace } };
 		}
@@ -239,8 +236,10 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, workspaceList: action.list };
 		case "project-trust":
 			return { ...state, trustedProjects: action.projects };
-		case "trust-dismiss":
-			return state.trustAsk ? { ...state, trustAsk: null } : state;
+		case "trust-dismiss": {
+			const starts = answerTrust(state.starts, action.reqId);
+			return starts === state.starts ? state : { ...state, starts };
+		}
 		case "pins":
 			return { ...state, pins: action.sessionIds };
 		case "notices":
@@ -291,7 +290,6 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		trustedProjects: [],
-		trustAsk: null,
 		pins: [],
 		notices: [],
 		merges: [],

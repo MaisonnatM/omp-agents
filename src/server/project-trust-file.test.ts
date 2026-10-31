@@ -2,9 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { discoverProjectCode } from "../omp/discovery";
-import type { ProjectCode } from "../shared/project-trust";
-import { ProjectTrustFile, projectOf, untrustedCode } from "./project-trust-file";
+import { untrustedText } from "../shared/project-trust";
+import { ProjectTrustFile, projectOf, UntrustedProjectError } from "./project-trust-file";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -40,7 +39,6 @@ function repo(files: Record<string, string>): string {
 }
 
 const trustPath = (): string => join(tempDir("omp-agents-trust-file-"), "project-trust.json");
-const kindsAndIds = (code: readonly ProjectCode[]) => code.map(({ kind, id }) => [kind, id]);
 
 const MCP = JSON.stringify({
 	mcpServers: {
@@ -49,66 +47,11 @@ const MCP = JSON.stringify({
 	},
 });
 
-describe("the project code census", () => {
-	test("finds every piece omp would run from a project, through omp's own discovery, each with a hash", async () => {
-		const dir = repo({
-			".omp/extensions/a.ts": "export default () => {};",
-			".omp/extensions/pkg/index.ts": "import './helper';",
-			".omp/extensions/pkg/helper.ts": "export {};",
-			".omp/tools/t.ts": "export default {};",
-			".omp/tools/readme.md": "# not a tool",
-			".omp/commands/deploy/index.ts": "export default {};",
-			".omp/mcp.json": MCP,
-			".omp/skills/s/SKILL.md": "---\nname: s\ndescription: d\n---\nbody",
-			".omp/config.yml": "extensions:\n  - ./x.ts\n",
-			"lsp.json": "{}",
-		});
-		const code = await discoverProjectCode(dir, dir);
-		expect(kindsAndIds(code)).toEqual([
-			["extension", ".omp/extensions/a.ts"],
-			["extension", ".omp/extensions/pkg/index.ts"],
-			["tool", ".omp/tools/t.ts"],
-			["command", ".omp/commands/deploy/index.ts"],
-			["mcp-server", "mcp:local"],
-			["mcp-server", "mcp:remote"],
-			["settings", ".omp/config.yml"],
-			["lsp", "lsp.json"],
-		]);
-		expect(code.every(({ hash }) => /^[0-9a-f]{64}$/.test(hash))).toBe(true);
-	});
-
-	test("a URL MCP server is a piece, since its header values may run commands", async () => {
-		const dir = repo({ ".omp/mcp.json": JSON.stringify({ mcpServers: { remote: { url: "https://example.com/mcp", headers: { Authorization: "!cat .token" } } } }) });
-		expect(kindsAndIds(await discoverProjectCode(dir, dir))).toEqual([["mcp-server", "mcp:remote"]]);
-	});
-
-	test("a settings file is a piece whatever keys it sets, since many name commands", async () => {
-		const dir = repo({ ".omp/config.yml": "python:\n  interpreter: ./run-me\n" });
-		expect(kindsAndIds(await discoverProjectCode(dir, dir))).toEqual([["settings", ".omp/config.yml"]]);
-	});
-
-	test("a project of skills and agents only runs no code", async () => {
-		const dir = repo({ ".omp/skills/s/SKILL.md": "---\nname: s\ndescription: d\n---\nbody", ".omp/agents/a.md": "---\nname: a\ndescription: d\n---\nbody", "AGENTS.md": "# rules" });
-		expect(await discoverProjectCode(dir, dir)).toEqual([]);
-	});
-
-	test("an edit to a file beside a package's entry changes the package's hash; a change since the last census shows", async () => {
-		const dir = repo({ ".omp/extensions/pkg/index.ts": "import './helper';", ".omp/extensions/pkg/helper.ts": "export {};" });
-		const [before] = await discoverProjectCode(dir, dir);
-		write(dir, { ".omp/extensions/pkg/helper.ts": "export const x = 1;" });
-		const [after] = await discoverProjectCode(dir, dir);
-		expect(after?.id).toBe(".omp/extensions/pkg/index.ts");
-		expect(after?.hash).not.toBe(before?.hash);
-		write(dir, { ".omp/tools/t.ts": "export default {};" });
-		expect(kindsAndIds(await discoverProjectCode(dir, dir))).toContainEqual(["tool", ".omp/tools/t.ts"]);
-	});
-});
-
 describe("the trust gate", () => {
 	test("asks for every piece at first, then only for a piece added or changed since", async () => {
 		const dir = repo({ ".omp/extensions/a.ts": "export default () => {};", ".omp/mcp.json": MCP });
 		const file = new ProjectTrustFile(trustPath());
-		const first = await untrustedCode(file, dir);
+		const first = await file.untrustedCode(dir);
 		expect(first?.root).toBe(dir);
 		expect(first?.code.map(({ id, change }) => [id, change])).toEqual([
 			[".omp/extensions/a.ts", "new"],
@@ -116,16 +59,26 @@ describe("the trust gate", () => {
 			["mcp:remote", "new"],
 		]);
 		file.apply({ op: "trust", root: dir, code: first?.code ?? [] });
-		expect(await untrustedCode(file, dir)).toBeNull();
+		expect(await file.untrustedCode(dir)).toBeNull();
 		write(dir, { ".omp/extensions/a.ts": "export default () => { fetch('x'); };" });
-		expect((await untrustedCode(file, dir))?.code.map(({ id, change }) => [id, change])).toEqual([[".omp/extensions/a.ts", "changed"]]);
+		expect((await file.untrustedCode(dir))?.code.map(({ id, change }) => [id, change])).toEqual([[".omp/extensions/a.ts", "changed"]]);
 		write(dir, { ".omp/extensions/a.ts": "export default () => {};", ".omp/tools/t.ts": "export default {};" });
-		expect((await untrustedCode(file, dir))?.code.map(({ id, change }) => [id, change])).toEqual([[".omp/tools/t.ts", "new"]]);
+		expect((await file.untrustedCode(dir))?.code.map(({ id, change }) => [id, change])).toEqual([[".omp/tools/t.ts", "new"]]);
 	});
 
 	test("a project with no code never asks", async () => {
 		const dir = repo({ "README.md": "hi" });
-		expect(await untrustedCode(new ProjectTrustFile(trustPath()), dir)).toBeNull();
+		expect(await new ProjectTrustFile(trustPath()).untrustedCode(dir)).toBeNull();
+	});
+
+	test("admitting a directory throws the ask while its code is untrusted, and passes once it is trusted", async () => {
+		const dir = repo({ ".omp/extensions/a.ts": "export default () => {};" });
+		const file = new ProjectTrustFile(trustPath());
+		const refused = await file.admit(dir).then(() => null, (error: unknown) => error);
+		if (!(refused instanceof UntrustedProjectError)) throw new Error("expected an UntrustedProjectError");
+		expect(refused.message).toBe(untrustedText(refused.ask));
+		file.apply({ op: "trust", root: dir, code: refused.ask.code });
+		expect(await file.admit(dir)).toBeUndefined();
 	});
 
 	test("a linked worktree shares its main checkout's trust, and forgetting asks again", async () => {
@@ -134,24 +87,24 @@ describe("the trust gate", () => {
 		git(dir, "worktree", "add", "-q", "-b", "feature", worktree);
 		expect(await projectOf(worktree)).toEqual({ root: dir, top: realpathSync(worktree) });
 		const file = new ProjectTrustFile(trustPath());
-		const ask = await untrustedCode(file, worktree);
+		const ask = await file.untrustedCode(worktree);
 		expect(ask?.root).toBe(dir);
 		file.apply({ op: "trust", root: dir, code: ask?.code ?? [] });
-		expect(await untrustedCode(file, dir)).toBeNull();
-		expect(await untrustedCode(file, worktree)).toBeNull();
+		expect(await file.untrustedCode(dir)).toBeNull();
+		expect(await file.untrustedCode(worktree)).toBeNull();
 		file.apply({ op: "forget", root: dir });
-		expect(await untrustedCode(file, worktree)).not.toBeNull();
+		expect(await file.untrustedCode(worktree)).not.toBeNull();
 	});
 
-	test("another server's trust counts at the next start, and the list names each piece trusted", async () => {
+	test("another server's trust counts at the next start, and the list counts the pieces trusted", async () => {
 		const dir = repo({ ".omp/extensions/a.ts": "export default () => {};" });
 		const path = trustPath();
 		const page = new ProjectTrustFile(path);
 		const other = new ProjectTrustFile(path);
-		const ask = await untrustedCode(page, dir);
+		const ask = await page.untrustedCode(dir);
 		other.apply({ op: "trust", root: dir, code: ask?.code ?? [] });
-		expect(await untrustedCode(page, dir)).toBeNull();
-		expect(page.projects()).toEqual([{ root: dir, rootDisplay: dir, ids: [".omp/extensions/a.ts"] }]);
+		expect(await page.untrustedCode(dir)).toBeNull();
+		expect(page.projects()).toEqual([{ root: dir, rootDisplay: dir, pieces: 1 }]);
 	});
 
 	test("a file that holds something else moves aside, and every piece asks again", async () => {
@@ -162,6 +115,6 @@ describe("the trust gate", () => {
 		const file = new ProjectTrustFile(path);
 		expect(file.value).toEqual({});
 		expect(existsSync(`${path}.invalid`)).toBe(true);
-		expect((await untrustedCode(file, dir))?.code).toHaveLength(1);
+		expect((await file.untrustedCode(dir))?.code).toHaveLength(1);
 	});
 });

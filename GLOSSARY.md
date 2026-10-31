@@ -69,8 +69,8 @@ The extensions, hooks, tools, TypeScript slash commands, MCP servers, settings, 
 _Avoid_: Project setup, plugins
 
 **Trusted project**:
-A workspace whose project code you trusted piece by piece in the trust dialog, each piece by its contents, so a new or changed piece asks again.
-_Avoid_: Allowed project, approved folder
+A repository's main checkout, or a folder outside git, whose project code you trusted piece by piece in the trust dialog, each piece by its contents, so a new or changed piece asks again; every worktree of the repository shares its trust.
+_Avoid_: Allowed project, approved folder, trusted workspace
 
 **Pin**:
 A session id the server keeps at the top of the roster in every window, or a Bot it keeps under **Pinned** at the top of the Bots tab and the gallery.

@@ -1,10 +1,24 @@
 /** The ask a start refused for untrusted project code opens: the pieces the project would run, to trust and start, or cancel. */
 import { useState } from "react";
 import { errorText } from "../../src/json";
-import { codeLabel, type TrustAsk } from "../../src/shared/project-trust";
+import type { ProjectCodeKind, TrustAsk } from "../../src/shared/project-trust";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ERROR_TEXT, FormDialog, FormDialogHeader, type Submit } from "./form-dialog";
+import { ERROR_TEXT, FormDialog, FormDialogHeader } from "./form-dialog";
+
+/** The label each piece shows before its path or server name. */
+const KIND_LABELS: Record<ProjectCodeKind, string> = {
+	extension: "Extension",
+	hook: "Hook",
+	tool: "Tool",
+	command: "Slash command",
+	"mcp-server": "MCP server",
+	settings: "Settings",
+	lsp: "Language servers",
+};
+
+/** Where the answer stands: asked, saving the trust, or refused with why it could not be saved. */
+type Answer = { kind: "asking" } | { kind: "trusting" } | { kind: "failed"; error: string };
 
 interface ProjectTrustDialogProps {
 	ask: TrustAsk;
@@ -15,11 +29,11 @@ interface ProjectTrustDialogProps {
 }
 
 export function ProjectTrustDialog({ ask, onTrust, onCancel }: ProjectTrustDialogProps) {
-	const [submit, setSubmit] = useState<Submit>({ kind: "writing" });
-	const busy = submit.kind === "creating";
+	const [answer, setAnswer] = useState<Answer>({ kind: "asking" });
+	const busy = answer.kind === "trusting";
 	const trust = (): void => {
-		setSubmit({ kind: "creating" });
-		onTrust().catch((error: unknown) => setSubmit({ kind: "failed", error: errorText(error) }));
+		setAnswer({ kind: "trusting" });
+		onTrust().catch((error: unknown) => setAnswer({ kind: "failed", error: errorText(error) }));
 	};
 	return (
 		<FormDialog busy={busy} onClose={onCancel} className="top-12 w-[min(36rem,calc(100vw-2rem))]">
@@ -32,9 +46,9 @@ export function ProjectTrustDialog({ ask, onTrust, onCancel }: ProjectTrustDialo
 				<ul className="space-y-1.5" aria-label="Agent code in this project">
 					{ask.code.map(piece => (
 						<li key={piece.id} className="flex items-center gap-2 text-sm">
-							<span className="shrink-0 text-muted-foreground">{codeLabel(piece.kind)}</span>
-							<span className="min-w-0 truncate font-mono text-xs" title={piece.id}>
-								{piece.kind === "mcp-server" ? piece.id.slice("mcp:".length) : piece.id}
+							<span className="shrink-0 text-muted-foreground">{KIND_LABELS[piece.kind]}</span>
+							<span className="min-w-0 truncate font-mono text-xs" title={piece.name}>
+								{piece.name}
 							</span>
 							<Badge variant="dot" size="compact" color={piece.change === "new" ? "blue" : "amber"} className="ml-auto shrink-0">
 								{piece.change === "new" ? "New" : "Changed"}
@@ -42,7 +56,7 @@ export function ProjectTrustDialog({ ask, onTrust, onCancel }: ProjectTrustDialo
 						</li>
 					))}
 				</ul>
-				{submit.kind === "failed" && <p role="alert" className={ERROR_TEXT}>{submit.error}</p>}
+				{answer.kind === "failed" && <p role="alert" className={ERROR_TEXT}>{answer.error}</p>}
 				<div className="flex justify-end gap-2">
 					<Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
 					<Button type="button" disabled={busy} onClick={trust}>{busy ? "Trusting…" : "Trust and start"}</Button>

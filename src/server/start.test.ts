@@ -17,6 +17,7 @@ import * as rpc from "../omp/rpc";
 import { refuseUntil } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { LiveSessions } from "./live-sessions";
+import { UntrustedProjectError } from "./project-trust-file";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 
 afterEach(() => mock.restore());
@@ -38,7 +39,7 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
 		mayDiscardReplay: async () => null,
-		untrustedCode: async () => { throw new Error("A read-only start must not take a census."); },
+		admit: async () => { throw new Error("A read-only start must not take a census."); },
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 	});
 	expect(await start({ kind: "resume", sessionId: "c1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
@@ -129,7 +130,7 @@ function claimedStarter(
 	sessions: LiveSessions,
 	savedFile: string | null = null,
 	factsFor: () => SessionFacts = () => ({ tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null }),
-	untrustedCode: (cwd: string) => Promise<TrustAsk | null> = async () => null,
+	admit: (cwd: string) => Promise<void> = async () => {},
 ) {
 	return createStarter({
 		sessions,
@@ -141,7 +142,7 @@ function claimedStarter(
 		linkTodo: () => {},
 		mayDiscardReplay: async () => null,
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
-		untrustedCode,
+		admit,
 	});
 }
 
@@ -201,36 +202,39 @@ test("a failed spawn releases its claim, while distinct explicit tasks may inten
 	}
 });
 
-test("a start in a project with untrusted code spawns nothing, asks with the pieces, and releases its claim", async () => {
+test("a start in a project with untrusted code spawns no omp, asks with the pieces, and releases its claim", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-trust-");
 	try {
-		const ask: TrustAsk = { root: dir, rootDisplay: dir, code: [{ kind: "extension", id: ".omp/extensions/a.ts", hash: "h1", change: "new" }] };
+		const ask: TrustAsk = { root: dir, rootDisplay: dir, code: [{ kind: "extension", id: ".omp/extensions/a.ts", name: ".omp/extensions/a.ts", hash: "h1", change: "new" }] };
 		let trusted = false;
-		const census = mock(async (_cwd: string) => (trusted ? null : ask));
-		const start = claimedStarter(new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json"))), null, undefined, census);
+		const admit = mock(async (_cwd: string) => {
+			if (!trusted) throw new UntrustedProjectError(ask);
+		});
+		const start = claimedStarter(new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json"))), null, undefined, admit);
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
-		const spawn = spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
+		const keeper = spyOn(keeperLink, "startKeeper").mockRejectedValue(new Error("no omp should start"));
 		const request = newSessionRequest(dir, "/ship ENG2650");
 		expect(await start(request)).toEqual({ ok: false, error: untrustedText(ask), trust: ask });
-		expect(census).toHaveBeenCalledWith(dir);
-		expect(spawn).not.toHaveBeenCalled();
+		expect(admit).toHaveBeenCalledWith(dir);
+		expect(keeper).not.toHaveBeenCalled();
 		trusted = true;
+		spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
 		expect((await start(request)).ok).toBe(true);
-		expect(spawn).toHaveBeenCalledTimes(1);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
 
-test("a start whose census fails spawns nothing and says why", async () => {
+test("a start whose admission fails spawns no omp and says why", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-trust-");
 	try {
-		const start = claimedStarter(new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json"))), null, undefined, async () => { throw new Error("unreadable"); });
+		const start = claimedStarter(new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json"))), null, undefined, async cwd => { throw new Error(`Cannot check the agent code in ${cwd}: unreadable`); });
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
-		const spawn = spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
-		expect(await start(newSessionRequest(dir, "hello"))).toEqual({ ok: false, error: `Cannot check the agent code in ${dir}: unreadable` });
-		expect(spawn).not.toHaveBeenCalled();
+		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
+		const keeper = spyOn(keeperLink, "startKeeper").mockRejectedValue(new Error("no omp should start"));
+		expect(await start(newSessionRequest(dir, "hello"))).toEqual({ ok: false, error: `Cannot start omp: Cannot check the agent code in ${dir}: unreadable` });
+		expect(keeper).not.toHaveBeenCalled();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

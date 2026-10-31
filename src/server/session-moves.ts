@@ -7,7 +7,6 @@ import { isObject } from "../json";
 import type { RpcHostTool } from "../omp/modules";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { directoryOf } from "../paths";
-import { type TrustAsk, untrustedText } from "../shared/project-trust";
 import type { StartRequest } from "../shared/sessions";
 import type { SessionJoin } from "./start";
 
@@ -18,8 +17,8 @@ export interface SessionMovesDeps {
 	session(instanceId: string): Pick<DashboardSession, "moveAfterTurn"> | undefined;
 	/** Whether `request` starts or resumes a Bot's conversation, which stays in its Bot's directory. */
 	isBot(request: StartRequest): boolean;
-	/** The agent code a session in `dir` would run that the user has not trusted as it is now, `null` when there is none. */
-	untrustedCode(dir: string): Promise<TrustAsk | null>;
+	/** Lets a session run in `dir`, or throws while the project code there is not trusted as it is now. */
+	admit(dir: string): Promise<void>;
 }
 
 export class SessionMoves {
@@ -51,8 +50,7 @@ export class SessionMoves {
 			const dir = await directoryOf(path);
 			if (!dir) throw new Error(`Not a directory: ${path.trim()}`);
 			// A move reloads omp in the new directory, which runs that project's code as a start would.
-			const untrusted = await this.#deps.untrustedCode(dir);
-			if (untrusted) throw new Error(untrustedText(untrusted));
+			await this.#deps.admit(dir);
 			this.#called.set(toolCallId, dir);
 			return `When this turn ends, the dashboard moves this session to ${dir} and reloads its context files. End your turn now; do not work in ${dir} before the move.`;
 		},

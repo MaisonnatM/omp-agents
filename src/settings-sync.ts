@@ -8,7 +8,7 @@ import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteText, JsonFile, type ReducerFile } from "./fs";
 import { ensurePrivateRepo } from "./github";
-import { errorText, isObject, type Parsed, parseJson } from "./json";
+import { canonicalJson, errorText, isObject, type Parsed, parseJson } from "./json";
 import { SerialLane } from "./serial-lane";
 import type { HiddenCalendars } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
@@ -56,13 +56,6 @@ const SHOWN_CHARS = 20_000;
 type Version = RepoFile | null;
 
 const same = (a: Version | undefined, b: Version | undefined): boolean => (a ?? null) === (b ?? null) || (!!a && !!b && a.text === b.text && a.executable === b.executable);
-
-/** `value` as JSON text that does not depend on the order its keys were written in. */
-export function canonicalJson(value: unknown): string {
-	const sorted = (node: unknown): unknown =>
-		Array.isArray(node) ? node.map(sorted) : isObject(node) ? Object.fromEntries(Object.keys(node).sort().map(key => [key, sorted(node[key])])) : node;
-	return `${JSON.stringify(sorted(value), null, "\t")}\n`;
-}
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
 

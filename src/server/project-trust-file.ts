@@ -1,10 +1,10 @@
 /** The project code the user trusted, saved in `project-trust.json`, and the check every dashboard start makes against it. */
 import { ReducerFile } from "../fs";
 import { canonical, mainCheckoutOf, worktreeAt } from "../git";
-import { isObject } from "../json";
-import { discoverProjectCode } from "../omp/discovery";
+import { errorText, isObject } from "../json";
 import { displayPath } from "../paths";
-import { applyTrust, type ProjectCode, type ProjectTrust, type TrustAsk, type TrustChange, type TrustedProject, untrustedOf } from "../shared/project-trust";
+import { applyTrust, type ProjectTrust, type TrustAsk, type TrustChange, type TrustedProject, untrustedOf, untrustedText } from "../shared/project-trust";
+import { projectCensus } from "./project-code";
 
 const isHashes = (value: unknown): value is Record<string, string> => isObject(value) && Object.values(value).every(hash => typeof hash === "string");
 
@@ -12,6 +12,13 @@ export function parseProjectTrust(value: unknown): ProjectTrust | null {
 	if (!isObject(value)) return null;
 	const entries = Object.entries(value);
 	return entries.every(([root, hashes]) => root.startsWith("/") && isHashes(hashes)) ? Object.fromEntries(entries) as ProjectTrust : null;
+}
+
+/** A start or a move refused because its directory runs project code the user has not trusted as it is now. */
+export class UntrustedProjectError extends Error {
+	constructor(readonly ask: TrustAsk) {
+		super(untrustedText(ask));
+	}
 }
 
 export class ProjectTrustFile extends ReducerFile<ProjectTrust, [TrustChange]> {
@@ -23,8 +30,32 @@ export class ProjectTrustFile extends ReducerFile<ProjectTrust, [TrustChange]> {
 	/** The projects trusted, as Settings › Workspaces lists them. */
 	projects(): TrustedProject[] {
 		return Object.entries(this.value)
-			.map(([root, hashes]) => ({ root, rootDisplay: displayPath(root), ids: Object.keys(hashes).sort() }))
+			.map(([root, hashes]) => ({ root, rootDisplay: displayPath(root), pieces: Object.keys(hashes).length }))
 			.sort((a, b) => a.rootDisplay.localeCompare(b.rootDisplay));
+	}
+
+	/**
+	 * The pieces of agent code a session in `dir` would run that this file holds no trust for as they are now, `null` when
+	 * there are none. The file is read again first, for a trust another server on this computer saved.
+	 */
+	async untrustedCode(dir: string): Promise<TrustAsk | null> {
+		const { root, top } = await projectOf(dir);
+		const code = await projectCensus(dir, top);
+		if (code.length === 0) return null;
+		this.reload();
+		const untrusted = untrustedOf(code, this.value[root] ?? {});
+		return untrusted.length === 0 ? null : { root, rootDisplay: displayPath(root), code: untrusted };
+	}
+
+	/** Lets a session run in `dir`, or throws {@link UntrustedProjectError} when its project code is not trusted as it is now. */
+	async admit(dir: string): Promise<void> {
+		let ask: TrustAsk | null;
+		try {
+			ask = await this.untrustedCode(dir);
+		} catch (error) {
+			throw new Error(`Cannot check the agent code in ${dir}: ${errorText(error)}`);
+		}
+		if (ask) throw new UntrustedProjectError(ask);
 	}
 }
 
@@ -42,21 +73,4 @@ export async function projectOf(dir: string): Promise<{ root: string; top: strin
 	const top = await canonical(at.top);
 	const main = mainCheckoutOf(at);
 	return { root: main ? await canonical(main) : top, top };
-}
-
-/**
- * The pieces of agent code a session in `dir` would run that `file` holds no trust for as they are now, `null` when there
- * are none. The file is read again first, for a trust another server on this computer saved.
- */
-export async function untrustedCode(
-	file: ProjectTrustFile,
-	dir: string,
-	census: (cwd: string, top: string) => Promise<ProjectCode[]> = discoverProjectCode,
-): Promise<TrustAsk | null> {
-	const { root, top } = await projectOf(dir);
-	const code = await census(dir, top);
-	if (code.length === 0) return null;
-	file.reload();
-	const untrusted = untrustedOf(code, file.value[root] ?? {});
-	return untrusted.length === 0 ? null : { root, rootDisplay: displayPath(root), code: untrusted };
 }

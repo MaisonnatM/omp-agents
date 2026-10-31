@@ -3,6 +3,7 @@ import type { TrustAsk } from "../src/shared/project-trust";
 import type { LiveView, RosterHost, View } from "../src/shared/sessions";
 import { type DashboardState, initialState, reduce } from "./dashboard-state";
 import type { Layout } from "./routing";
+import { refusedStart } from "./starts";
 
 const layout = (panes: View[], focus = 0): Layout => ({ panes, focus, maximized: false });
 const live = (instanceId: string): LiveView => ({ kind: "live", instanceId, agentId: null });
@@ -54,16 +55,17 @@ describe("dashboard state", () => {
 		expect(reduce(blank(), { t: "started", reqId: 9, result: { ok: true, instanceId: "z", workspace: "/", prompt: null } })).toEqual(blank());
 	});
 
-	test("a start refused for untrusted project code keeps its error and asks with its op, until the dialog closes", () => {
+	test("a start refused for untrusted project code keeps its error and asks with its op, until the dialog closes or the start is sent again", () => {
 		const resume = { kind: "resume", sessionId: "s" } as const;
-		const trust: TrustAsk = { root: "/repo", rootDisplay: "/repo", code: [{ kind: "tool", id: ".omp/tools/t.ts", hash: "h", change: "new" }] };
+		const trust: TrustAsk = { root: "/repo", rootDisplay: "/repo", code: [{ kind: "tool", id: ".omp/tools/t.ts", name: ".omp/tools/t.ts", hash: "h", change: "new" }] };
 		const refused = reduce(reduce(blank(), { t: "start", reqId: 1, op: resume }), { t: "started", reqId: 1, result: { ok: false, error: "not trusted", trust } });
-		expect(refused.trustAsk).toEqual({ op: resume, ask: trust });
-		expect(refused.starts.get(1)).toEqual({ op: resume, phase: "failed", error: "not trusted" });
-		const closed = reduce(refused, { t: "trust-dismiss" });
-		expect(closed.trustAsk).toBeNull();
+		expect(refusedStart(refused.starts)).toEqual({ reqId: 1, op: resume, trust });
+		expect(refusedStart(reduce(refused, { t: "route", route: { kind: "panes", layout: layout([live("a")]) } }).starts)).toEqual({ reqId: 1, op: resume, trust });
+		const closed = reduce(refused, { t: "trust-dismiss", reqId: 1 });
+		expect(refusedStart(closed.starts)).toBeNull();
 		expect(closed.starts.get(1)).toEqual({ op: resume, phase: "failed", error: "not trusted" });
-		expect(reduce(closed, { t: "trust-dismiss" })).toBe(closed);
+		expect(reduce(closed, { t: "trust-dismiss", reqId: 1 })).toBe(closed);
+		expect(refusedStart(reduce(refused, { t: "start", reqId: 2, op: resume }).starts)).toBeNull();
 	});
 
 	test("a pin shows before the server answers, one that changes nothing keeps the state, and the server's pins replace them", () => {

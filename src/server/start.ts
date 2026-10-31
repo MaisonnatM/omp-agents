@@ -5,13 +5,14 @@ import { checkoutDir, worktreeAt } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
 import { keptSessions, type RpcLaunch } from "../omp/rpc";
-import { type PreparedReplay, prepareReplay } from "../replay";
+import { prepareReplay } from "../replay";
 import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
-import { type TrustAsk, untrustedText } from "../shared/project-trust";
+import type { TrustAsk } from "../shared/project-trust";
 import { type PromptImage, type SessionFacts, type StartRequest, type StartResult, type View } from "../shared/sessions";
 import { pullRequestTask, taskConflict, taskIdentity, ticketTask } from "../task-claims";
 import type { LiveSessions } from "./live-sessions";
+import { UntrustedProjectError } from "./project-trust-file";
 
 /** How a start joins the server: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
 export interface SessionJoin {
@@ -51,8 +52,8 @@ export interface StartEnv {
 	/** How a start, or the resume of an attached session, joins the server. */
 	joinFor(request: StartRequest): SessionJoin;
 	mayDiscardReplay(cwd: string): Promise<string | null>;
-	/** The agent code a session in `cwd` would run that the user has not trusted as it is now, `null` when there is none. */
-	untrustedCode(cwd: string): Promise<TrustAsk | null>;
+	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
+	admit(cwd: string): Promise<void>;
 }
 
 export type Starter = (request: StartRequest) => Promise<StartResult>;
@@ -68,6 +69,7 @@ export function createStarter(env: StartEnv): Starter {
 		try {
 			return { started: await spawn(instanceId, emit) };
 		} catch (err) {
+			if (err instanceof UntrustedProjectError) return { error: err.message, trust: err.ask };
 			return { error: `${failure}: ${errorText(err)}` };
 		}
 	}
@@ -106,17 +108,7 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	/** The refusal a start in `cwd` gets while its project's agent code is untrusted; `null` when it may start. */
-	async function refusedIn(cwd: string): Promise<Failure | null> {
-		try {
-			const trust = await env.untrustedCode(cwd);
-			return trust && { error: untrustedText(trust), trust };
-		} catch (error) {
-			return { error: `Cannot check the agent code in ${cwd}: ${errorText(error)}` };
-		}
-	}
-
-	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools. */
+	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools, and admits its directory before omp spawns. */
 	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<Outcome> {
 		switch (request.kind) {
 			case "new": {
@@ -135,8 +127,6 @@ export function createStarter(env: StartEnv): Starter {
 							return { error: `Cannot check out ${branch.name}: ${errorText(err)}` };
 						}
 					}
-					const refused = await refusedIn(cwd);
-					if (refused) return refused;
 					let text: string;
 					try {
 						text = await withPinnedSkill(cwd, skill, request.prompt);
@@ -154,32 +144,14 @@ export function createStarter(env: StartEnv): Starter {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
-				let cwd: string;
-				try {
-					cwd = await recordedCwd(source);
-				} catch (error) {
-					return { error: `Cannot fork: ${errorText(error)}` };
-				}
-				const refused = await refusedIn(cwd);
-				if (refused) return refused;
 				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, rpcLaunch, emit));
 			}
 			case "replay": {
 				const source = env.pathFor(request.view);
 				if (!source || request.view.kind === "live" && request.view.agentId !== null) return { error: "Cannot replay: the main session's file is unavailable." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot replay: this session is read-only. Only omp sessions replay here." };
-				let prepared: PreparedReplay;
-				try {
-					prepared = await prepareReplay(request, source, env.mayDiscardReplay);
-				} catch (error) {
-					return { error: `Cannot replay: ${errorText(error)}` };
-				}
-				const refused = await refusedIn(prepared.cwd);
-				if (refused) {
-					const cleanup = await prepared.discard().then(() => "", (error: unknown) => `; ${errorText(error)}`);
-					return { ...refused, error: `${refused.error}${cleanup}` };
-				}
 				return launch("Cannot replay", async (id, emit) => {
+					const prepared = await prepareReplay(request, source, env.mayDiscardReplay);
 					try {
 						return { session: await DashboardSession.replay(id, prepared, rpcLaunch, emit), prompt: null, first: prepared.first, discard: prepared.discard };
 					} catch (error) {
@@ -207,8 +179,6 @@ export function createStarter(env: StartEnv): Starter {
 					} catch (error) {
 						return { error: `Cannot resume: ${errorText(error)}` };
 					}
-					const refused = await refusedIn(cwd);
-					if (refused) return refused;
 					return await claimed(identity, cwd, allocated => launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }), allocated));
 				} finally {
 					resuming.delete(sessionId);
@@ -219,8 +189,8 @@ export function createStarter(env: StartEnv): Starter {
 
 	return async request => {
 		const join = env.joinFor(request);
-		const outcome = await spawnFor(request, join.rpc);
-		if ("error" in outcome) return { ok: false, ...outcome };
+		const outcome = await spawnFor(request, { ...join.rpc, admit: env.admit });
+		if ("error" in outcome) return outcome.trust ? { ok: false, error: outcome.error, trust: outcome.trust } : { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
 		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) {

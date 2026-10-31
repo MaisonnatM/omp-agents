@@ -86,7 +86,7 @@ import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
 import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
-import { ProjectTrustFile, untrustedCode } from "./project-trust-file";
+import { ProjectTrustFile } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
@@ -135,10 +135,11 @@ export class Dashboard {
 	readonly #botsFile = new BotsFile(botsFile);
 	readonly #bots: Bots;
 	readonly #projectTrust = new ProjectTrustFile(projectTrustFile);
+	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
 		isBot: request => this.#bots.botOf(request) !== null,
-		untrustedCode: dir => untrustedCode(this.#projectTrust, dir),
+		admit: this.#admit,
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
@@ -369,7 +370,7 @@ export class Dashboard {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
 			joinFor: request => this.#joinFor(request),
-			untrustedCode: cwd => untrustedCode(this.#projectTrust, cwd),
+			admit: this.#admit,
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
