@@ -379,17 +379,13 @@ export interface CatalogModule {
 /**
  * Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. `name` is a skill's, a
  * slash command's, or an MCP server's resolved name (src/capability/skill.ts, slash-command.ts, mcp.ts); `frontmatter` is a
- * skill's parsed frontmatter. `path` is the module an extension, hook, or tool loads, or a settings file; `command` and `url`
- * are an MCP server's, which runs `command` itself and only connects to `url`; `data` is a settings file's parsed contents.
+ * skill's parsed frontmatter. `path` is the module an extension, hook, or tool loads, or a settings file.
  */
 export interface CapabilityItem {
 	_source: { provider: string; path: string; level: "user" | "project" | "native" };
 	name?: string;
 	frontmatter?: Record<string, unknown>;
 	path?: string;
-	command?: string;
-	url?: string;
-	data?: Record<string, unknown>;
 }
 /** `providers` loads only those providers' items (src/capability/types.ts LoadOptions); `filter` drops items before omp dedupes them by name. */
 export interface CapabilityLoadOptions {

@@ -20,7 +20,7 @@ import type { Completions } from "./pane-store";
 import { changePanes, DEFAULT_SPLIT_RATIOS, type PaneCommand, type PaneNavigation, type SplitRatios } from "./pane-navigation";
 import type { ModelList } from "./reads";
 import { EMPTY_LAYOUT, endSession, hashForLayout, hashForRoute, type Layout, type Page, type Route, sameView } from "./routing";
-import { answerTrust, beginStart, dismissSettled, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
+import { beginStart, dismissSettled, dismissTrust, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
 
 export interface DashboardState extends PaneNavigation {
 	connected: boolean;
@@ -237,7 +237,7 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		case "project-trust":
 			return { ...state, trustedProjects: action.projects };
 		case "trust-dismiss": {
-			const starts = answerTrust(state.starts, action.reqId);
+			const starts = dismissTrust(state.starts, action.reqId);
 			return starts === state.starts ? state : { ...state, starts };
 		}
 		case "pins":

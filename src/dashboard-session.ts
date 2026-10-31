@@ -9,7 +9,7 @@ import { errorText, isObject, isTexts } from "./json";
 import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused, turnUpdate } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
-import { attachRpc, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
+import { type AdmittedLaunch, attachRpc, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import type { PreparedReplay } from "./replay";
 import { launchForReplayResume, readReplayMarker, replayLaunch, requireReplayReady } from "./omp/replay-launch";
@@ -28,7 +28,7 @@ import { sessionVisualsExtension } from "./server/resources";
  * `launch` with the extension that tells omp which fenced blocks the dashboard draws as diagrams and charts. A replay
  * goes without it, as its requests must match the original's system prompt.
  */
-function withSessionVisuals(launch: RpcLaunch): RpcLaunch {
+function withSessionVisuals(launch: AdmittedLaunch): AdmittedLaunch {
 	return { ...launch, args: ["-e", sessionVisualsExtension, ...launch.args] };
 }
 
@@ -89,8 +89,8 @@ function withdrawn({ text, images = [] }: { text: string; images?: readonly Prom
 
 /** How a session reaches its omp, which decides what a failed opening does to it. */
 type Opening =
-	/** A new omp in `cwd` with `launch`, which a failed opening stops, so no process outlives a failed start. */
-	| { kind: "spawn"; cwd: string; launch: RpcLaunch }
+	/** A new omp in `cwd` with `launch`, once `launch` admits `cwd`, which a failed opening stops, so no process outlives a failed start. */
+	| { kind: "spawn"; cwd: string; launch: AdmittedLaunch }
 	/** The omp a previous server started, which a failed opening leaves running, turn and all, for the next server. */
 	| { kind: "attach" };
 
@@ -203,7 +203,7 @@ export class DashboardSession implements LiveSession {
 		cwd: string,
 		model: ModelOption | null,
 		thinking: string | null,
-		launch: RpcLaunch,
+		launch: AdmittedLaunch,
 		emit: (update: DashboardUpdate) => void,
 	): Promise<DashboardSession> {
 		return DashboardSession.#spawn(instanceId, cwd, withSessionVisuals(launch), emit, async client => {
@@ -216,7 +216,7 @@ export class DashboardSession implements LiveSession {
 		});
 	}
 
-	static async replay(instanceId: string, prepared: PreparedReplay, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+	static async replay(instanceId: string, prepared: PreparedReplay, launch: AdmittedLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		const launchWithGuard = replayLaunch(prepared.config, launch);
 		const session = await DashboardSession.#spawn(instanceId, prepared.cwd, launchWithGuard, emit, async client => {
 			if ((await client.switchSession(prepared.forkFile)).cancelled) throw new Error("An omp extension cancelled opening the replay.");
@@ -238,7 +238,7 @@ export class DashboardSession implements LiveSession {
 	 * Spawn omp with `launch` holding the history of `sourceFile` before its user prompt `entryId`, as omp's
 	 * `/branch` does. omp writes the fork to a new file; `sourceFile` is only read.
 	 */
-	static async fork(instanceId: string, sourceFile: string, entryId: string, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<ForkedSession> {
+	static async fork(instanceId: string, sourceFile: string, entryId: string, launch: AdmittedLaunch, emit: (update: DashboardUpdate) => void): Promise<ForkedSession> {
 		// omp would repair such a file in place on open.
 		if (await endsMidTurn(sourceFile)) throw new Error("this session ended mid-turn. Resume it in omp once, then fork.");
 		let prompt = "";
@@ -258,7 +258,7 @@ export class DashboardSession implements LiveSession {
 	}
 
 	/** Spawn omp with `launch` holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
-	static async resume(instanceId: string, sessionFile: string, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+	static async resume(instanceId: string, sessionFile: string, launch: AdmittedLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		const replay = await launchForReplayResume(sessionFile, launch);
 		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.marker ? replay.launch : withSessionVisuals(replay.launch), emit, async client => {
 			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
@@ -294,7 +294,7 @@ export class DashboardSession implements LiveSession {
 	static #spawn(
 		instanceId: string,
 		cwd: string,
-		launch: RpcLaunch,
+		launch: AdmittedLaunch,
 		emit: (update: DashboardUpdate) => void,
 		prepare: (client: RpcClient) => Promise<void>,
 	): Promise<DashboardSession> {

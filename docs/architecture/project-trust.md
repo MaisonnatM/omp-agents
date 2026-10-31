@@ -21,8 +21,9 @@ Skills, agents, rules, markdown commands, and context files are prompt text and 
 A piece's `id` is opaque and names one piece: its path from `top`, the realpath of the checkout's top, with `/` separators, or the absolute realpath for a file outside it, or `mcp:<name>` for an MCP server.
 Its `name` is what the dialog shows, the same path, or the MCP server's name.
 Two discoveries reach one file only through a linked config directory, so the census keeps one piece per id.
-Its `hash` is the SHA-256 of its file, of a package directory's files when an extension, tool, or command is a directory, skipping `node_modules` and `.git`, or of an MCP server's settings without `_source` in `canonicalJson`, so linked worktrees and any key order hash it alike.
+Its `hash` is the SHA-256 of its file, of a package directory's files when an extension, tool, or command is a subdirectory of its kind's `extensions/`, `tools/`, or `commands/` directory, skipping `node_modules` and `.git` and listed in code unit order of their paths so no locale changes it, or of an MCP server's settings without `_source` in `canonicalJson`, so linked worktrees and any key order hash it alike.
 A file that cannot be read hashes as the word `unreadable`, so it still asks once it can be read.
+omp names every extension, hook, tool, and settings file and every MCP server; an item without one throws, so the census refuses rather than skipping a piece it cannot hash.
 
 ## The store
 
@@ -33,12 +34,14 @@ The file is machine-specific and is not part of [settings sync](settings-sync.md
 
 `projectOf(dir)` names the root trust is kept for: the main checkout of the repository's linked worktree, else the worktree's top, else the directory's realpath outside git.
 `ProjectTrustFile.untrustedCode(dir)` takes the census and answers a `TrustAsk`, `{ root, rootDisplay, code }`, with each piece missing from the root's trust marked `new` and each with another hash marked `changed`, or `null` when nothing is untrusted.
-`ProjectTrustFile.admit(dir)` throws an `UntrustedProjectError` carrying that ask, whose message is `untrustedText(ask)`, and a census that throws as `Cannot check the agent code in <dir>: <reason>`.
+`ProjectTrustFile.admit(dir)` throws an `UntrustedProjectError` carrying that ask, whose message is `untrustedText(ask)` from the same file, and a census that throws as `Cannot check the agent code in <dir>: <reason>`.
 
 ## The gate
 
-`startRpc` in `src/omp/rpc.ts` is the one place a dashboard session's omp spawns, and it awaits `RpcLaunch.admit` in the session's directory before it does.
-`createStarter` in `src/server/start.ts` hands `StartEnv.admit`, which `src/server/dashboard.ts` binds to `ProjectTrustFile.admit`, into every launch, so a new session, a fork, a replay, and a resume are each checked in the directory omp would run in.
+`startRpc` in `src/omp/rpc.ts` is the one place a dashboard session's omp spawns.
+It takes an `AdmittedLaunch`, an `RpcLaunch` with a required `admit`, and awaits `admit` in the session's directory before it spawns.
+`DashboardSession.start`, `fork`, `resume`, and `replay`, and the replay launches `src/omp/replay-launch.ts` builds, take an `AdmittedLaunch` too, so no spawn compiles without a check, while what a start's joins build (`SessionJoin.rpc`) stays a plain `RpcLaunch`.
+`createStarter` in `src/server/start.ts` adds `StartEnv.admit`, which `src/server/dashboard.ts` binds to `ProjectTrustFile.admit`, to the joined launch, so a new session, a fork, a replay, and a resume are each checked in the directory omp would run in.
 A replay refused there discards its detached checkout as any failed replay does.
 `launch` maps an `UntrustedProjectError` to `{ ok: false, error, trust }` in the start's `started` message, where `error` is `untrustedText(trust)`, so a bot, a routine, a scheduled send, and the shepherd, which start through the same starter, fail with plain text naming the folder.
 A census that throws refuses too, with its error after the start's own prefix, such as `Cannot start omp: `.

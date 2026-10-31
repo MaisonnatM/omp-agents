@@ -57,4 +57,4 @@ A request's `?cwd=` may name an added directory, as the settings under **This wo
 The page lists added directories after those sessions ran in, and drops a hidden directory, not the directories inside it, from its pickers, session lists, counts, and search, as it does `/tmp`.
 
 `PUT /api/project-trust` takes a `TrustChange`, `{ op: "trust", root, code }` with each piece's `id` and `hash`, or `{ op: "forget", root }`, checked by `parseTrustChange` in `src/server/wire.ts`; [Project trust](project-trust.md) covers the gate it feeds.
-A change that changes the store saves `project-trust.json` and sends every socket a `project-trust` message, its `projects` each with `root`, `rootDisplay`, and the trusted `ids`, also sent when a socket opens.
+A change that changes the store saves `project-trust.json` and sends every socket a `project-trust` message, its `projects` each with `root`, `rootDisplay`, and how many `pieces` it trusts, also sent when a socket opens.

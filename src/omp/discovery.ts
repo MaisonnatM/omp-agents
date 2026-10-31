@@ -80,6 +80,12 @@ export interface ProjectMcpServer {
 
 const ofKind = (kind: ProjectFile["kind"], paths: string[]): ProjectFile[] => paths.map(path => ({ kind, path }));
 
+/** The file of an extension, hook, tool, or settings item, which omp always names (src/capability/*.ts); one with none fails the census, as it could not be hashed. */
+function pathOf({ path, _source }: CapabilityItem): string {
+	if (path === undefined) throw new Error(`omp's ${_source.provider} provider found an item in ${_source.path} with no file`);
+	return path;
+}
+
 /**
  * Empties omp's capability file cache, which keeps every file a load read for the process's life. It is the whole
  * process's cache, so the next {@link discoverOmpFiles} reads the disk again too.
@@ -106,17 +112,20 @@ export async function discoverProjectCode(cwd: string): Promise<{ files: Project
 		projectItems("settings"),
 		customCommands.discoverCustomCommands({ cwd }),
 	]);
-	const pathsOf = (items: CapabilityItem[]): string[] => items.map(item => item.path ?? item._source.path);
 	const lspDirs = [cwd, ...configFiles.getConfigDirPaths("", { user: false, project: true, cwd })];
 	const files = [
-		...ofKind("extension", pathsOf(extensions)),
+		...ofKind("extension", extensions.map(pathOf)),
 		// The extension loader binds only JS and TS hooks (isExtensionFile).
-		...ofKind("hook", pathsOf(hooks).filter(path => path.endsWith(".ts") || path.endsWith(".js"))),
-		...ofKind("tool", pathsOf(tools)),
+		...ofKind("hook", hooks.map(pathOf).filter(path => path.endsWith(".ts") || path.endsWith(".js"))),
+		...ofKind("tool", tools.map(pathOf)),
 		...ofKind("command", commands.paths.flatMap(({ path, source }) => (source === "project" ? [path] : []))),
-		...ofKind("settings", pathsOf(settings)),
+		...ofKind("settings", settings.map(pathOf)),
 		...ofKind("lsp", lspDirs.flatMap(dir => LSP_FILES.map(name => join(dir, name))).filter(path => existsSync(path))),
 	];
-	const mcpServers = mcps.flatMap(({ _source, ...config }): ProjectMcpServer[] => (config.name ? [{ name: config.name, config }] : []));
+	// omp names every MCP server (src/capability/mcp.ts); one with no name fails the census, as it could not be hashed.
+	const mcpServers = mcps.map(({ _source, ...config }): ProjectMcpServer => {
+		if (config.name === undefined) throw new Error(`omp's ${_source.provider} provider found an MCP server in ${_source.path} with no name`);
+		return { name: config.name, config };
+	});
 	return { files, mcpServers };
 }

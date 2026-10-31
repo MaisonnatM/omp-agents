@@ -118,12 +118,15 @@ export interface RpcChild {
 	detach(): void;
 }
 
-/** What a session gets on top of a plain one: extra `omp` arguments, the tools this process serves it, and the check its directory must pass. */
+/** What a session gets on top of a plain one: extra `omp` arguments, and the tools this process serves it. */
 export interface RpcLaunch {
 	args: string[];
 	tools: RpcHostTool[];
-	/** Rejects to keep a fresh omp from spawning in `cwd`; an attach to a running omp never asks. */
-	admit?: (cwd: string) => Promise<void>;
+}
+
+/** A launch that spawns a fresh omp, which `admit` keeps from spawning in `cwd` by rejecting. An attach to a running omp never asks. */
+export interface AdmittedLaunch extends RpcLaunch {
+	admit: (cwd: string) => Promise<void>;
 }
 
 export const PLAIN_LAUNCH: RpcLaunch = { args: [], tools: [] };
@@ -185,8 +188,8 @@ async function drive(link: (agentArgs: string[]) => Promise<KeeperLink>, onFrame
  * `cwd`. Resolves once omp reports ready. `onFrame` gets every frame of {@link UNROUTED_FRAMES} from spawn on, so a
  * dialog raised while the session opens is not lost.
  */
-export async function startRpc(instanceId: string, cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
-	await launch.admit?.(cwd);
+export async function startRpc(instanceId: string, cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: AdmittedLaunch): Promise<RpcChild> {
+	await launch.admit(cwd);
 	return drive(
 		agentArgs => startKeeper(keepersDir, instanceId, { cwd, argv: [...ompCommand, ...agentArgs], env: childEnv(), frameModule: rpcFrameFile, meta: { startedAt: Date.now(), cwd } }),
 		onFrame,

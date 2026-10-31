@@ -67,11 +67,3 @@ export function applyTrust(trust: ProjectTrust, change: TrustChange): ProjectTru
 		}
 	}
 }
-
-/** The pieces of `code` that `trusted`, one project's trusted hashes, does not hold as they are now. */
-export const untrustedOf = (code: readonly ProjectCode[], trusted: Readonly<Record<string, string>>): UntrustedCode[] =>
-	code.flatMap(piece => (trusted[piece.id] === piece.hash ? [] : [{ ...piece, change: Object.hasOwn(trusted, piece.id) ? "changed" : "new" }]));
-
-/** Why a start refused to run: the text a page shows under the start, and all a bot, a schedule, the shepherd, or a move gets. */
-export const untrustedText = (ask: TrustAsk): string =>
-	`The agent code in ${ask.rootDisplay} is not trusted yet; a session started there from the dashboard asks you to review and trust it.`;

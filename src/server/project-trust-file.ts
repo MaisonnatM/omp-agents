@@ -3,7 +3,7 @@ import { ReducerFile } from "../fs";
 import { canonical, mainCheckoutOf, worktreeAt } from "../git";
 import { errorText, isObject } from "../json";
 import { displayPath } from "../paths";
-import { applyTrust, type ProjectTrust, type TrustAsk, type TrustChange, type TrustedProject, untrustedOf, untrustedText } from "../shared/project-trust";
+import { applyTrust, type ProjectTrust, type TrustAsk, type TrustChange, type TrustedProject, type UntrustedCode } from "../shared/project-trust";
 import { projectCensus } from "./project-code";
 
 const isHashes = (value: unknown): value is Record<string, string> => isObject(value) && Object.values(value).every(hash => typeof hash === "string");
@@ -13,6 +13,10 @@ export function parseProjectTrust(value: unknown): ProjectTrust | null {
 	const entries = Object.entries(value);
 	return entries.every(([root, hashes]) => root.startsWith("/") && isHashes(hashes)) ? Object.fromEntries(entries) as ProjectTrust : null;
 }
+
+/** The error a start or a move refused for untrusted code fails with: all a bot, a schedule, the shepherd, or a move gets, and what the page shows under the start. */
+export const untrustedText = (ask: TrustAsk): string =>
+	`The agent code in ${ask.rootDisplay} is not trusted yet; a session started there from the dashboard asks you to review and trust it.`;
 
 /** A start or a move refused because its directory runs project code the user has not trusted as it is now. */
 export class UntrustedProjectError extends Error {
@@ -43,7 +47,8 @@ export class ProjectTrustFile extends ReducerFile<ProjectTrust, [TrustChange]> {
 		const code = await projectCensus(dir, top);
 		if (code.length === 0) return null;
 		this.reload();
-		const untrusted = untrustedOf(code, this.value[root] ?? {});
+		const trusted = this.value[root] ?? {};
+		const untrusted = code.flatMap((piece): UntrustedCode[] => (trusted[piece.id] === piece.hash ? [] : [{ ...piece, change: Object.hasOwn(trusted, piece.id) ? "changed" : "new" }]));
 		return untrusted.length === 0 ? null : { root, rootDisplay: displayPath(root), code: untrusted };
 	}
 

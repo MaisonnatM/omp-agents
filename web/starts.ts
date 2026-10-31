@@ -97,7 +97,10 @@ export function settleStart(starts: Starts, reqId: number, result: StartResult):
 	if (!start) return starts;
 	const next = new Map(starts);
 	if (result.ok) next.delete(reqId);
-	else next.set(reqId, result.trust ? { op: start.op, phase: "failed", error: result.error, trust: result.trust } : { op: start.op, phase: "failed", error: result.error });
+	else {
+		const { ok: _ok, ...failure } = result;
+		next.set(reqId, { op: start.op, phase: "failed", ...failure });
+	}
 	return next;
 }
 
@@ -158,7 +161,7 @@ export function refusedStart(starts: Starts): RefusedStart | null {
 }
 
 /** The trust dialog of start `reqId` closed: its failure keeps its reason and asks no more. */
-export function answerTrust(starts: Starts, reqId: number): Starts {
+export function dismissTrust(starts: Starts, reqId: number): Starts {
 	const start = starts.get(reqId);
 	return start?.phase === "failed" && start.trust ? new Map(starts).set(reqId, { op: start.op, phase: "failed", error: start.error }) : starts;
 }

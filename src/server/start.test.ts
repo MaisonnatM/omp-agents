@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DashboardSession } from "../dashboard-session";
 import * as commands from "../commands";
 import * as git from "../git";
-import { type TrustAsk, untrustedText } from "../shared/project-trust";
+import type { TrustAsk } from "../shared/project-trust";
 import { newSessionRequest, type SessionFacts } from "../shared/sessions";
 import { TaskClaims } from "../task-claims";
 import { claudeCodeRoot } from "../foreign/claude-code";
@@ -17,7 +17,7 @@ import * as rpc from "../omp/rpc";
 import { refuseUntil } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { LiveSessions } from "./live-sessions";
-import { UntrustedProjectError } from "./project-trust-file";
+import { UntrustedProjectError, untrustedText } from "./project-trust-file";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 
 afterEach(() => mock.restore());

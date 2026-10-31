@@ -3,39 +3,41 @@ import { readdir, readFile, realpath } from "node:fs/promises";
 import { basename, dirname, join, relative, sep } from "node:path";
 import { canonicalJson } from "../json";
 import { discoverProjectCode, forgetReadFiles } from "../omp/discovery";
-import { PROJECT_CODE_KINDS, type ProjectCode } from "../shared/project-trust";
+import { PROJECT_CODE_KINDS, type ProjectCode, type ProjectCodeKind } from "../shared/project-trust";
 
-/** The directories whose subdirectories each hold one extension, tool, or slash command package. */
-const PACKAGE_PARENTS: Record<string, true> = { extensions: true, tools: true, commands: true };
+/** For each kind omp loads as packages, the directory whose subdirectories each hold one package. */
+const PACKAGE_DIRS: Partial<Record<ProjectCodeKind, string>> = { extension: "extensions", tool: "tools", command: "commands" };
 
 const sha256 = (data: string | Uint8Array): string => new Bun.CryptoHasher("sha256").update(data).digest("hex");
 
 /** The hash of `file`'s bytes; a file that cannot be read hashes as such, so it asks again once it can. */
 const hashFile = async (file: string): Promise<string> => sha256(await readFile(file).catch(() => "unreadable"));
 
-/** The hash of every file under `dir`, by path, leaving out installed dependencies and git's own files. */
+/** The hash of every file under `dir`, by path in code unit order, leaving out installed dependencies and git's own files. */
 async function hashDir(dir: string): Promise<string> {
-	const lines: string[] = [];
+	const files: string[] = [];
 	const walk = async (at: string): Promise<void> => {
-		const entries = await readdir(at, { withFileTypes: true }).catch(() => []);
-		for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+		for (const entry of await readdir(at, { withFileTypes: true }).catch(() => [])) {
 			if (entry.name === "node_modules" || entry.name === ".git") continue;
 			const path = join(at, entry.name);
 			if (entry.isDirectory()) await walk(path);
-			else lines.push(`${relative(dir, path)}\0${await hashFile(path)}`);
+			else files.push(relative(dir, path));
 		}
 	};
 	await walk(dir);
-	return sha256(lines.join("\n"));
+	// Code unit order: `localeCompare` follows the server's locale, so the same files could hash differently.
+	files.sort();
+	const hashes = await Promise.all(files.map(file => hashFile(join(dir, file))));
+	return sha256(files.map((file, index) => `${file}\0${hashes[index]}`).join("\n"));
 }
 
 /**
- * The package `file` is the entry of: the subdirectory of the nearest `extensions/`, `tools/`, or `commands/` above it
- * that holds it, or `null` when it sits directly in one or under none. Looks no higher than `stop`.
+ * The package `file` is the entry of: the subdirectory of the nearest `parent` directory above it that holds it, or
+ * `null` when it sits directly in one or under none. Looks no higher than `stop`.
  */
-function packageDirOf(file: string, stop: string | null): string | null {
+function packageDirOf(file: string, parent: string, stop: string | null): string | null {
 	for (let child = file, dir = dirname(file); dir !== stop && dir !== dirname(dir); child = dir, dir = dirname(dir)) {
-		if (PACKAGE_PARENTS[basename(dir)]) return child === file ? null : child;
+		if (basename(dir) === parent) return child === file ? null : child;
 	}
 	return null;
 }
@@ -57,7 +59,8 @@ export async function projectCensus(cwd: string, top: string): Promise<ProjectCo
 				const inside = rel !== "" && !rel.startsWith("..");
 				const id = inside ? rel.split(sep).join("/") : real;
 				// A package's entry runs the files beside it, so its whole package directory is what is hashed.
-				const pkg = kind === "extension" || kind === "tool" || kind === "command" ? packageDirOf(real, inside ? top : null) : null;
+				const parent = PACKAGE_DIRS[kind];
+				const pkg = parent ? packageDirOf(real, parent, inside ? top : null) : null;
 				return { kind, id, name: id, hash: pkg ? await hashDir(pkg) : await hashFile(real) };
 			}),
 		)),

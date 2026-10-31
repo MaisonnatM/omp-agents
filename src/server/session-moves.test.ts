@@ -3,9 +3,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId } from "../shared/bots";
-import { type TrustAsk, untrustedText } from "../shared/project-trust";
+import type { TrustAsk } from "../shared/project-trust";
 import { newSessionRequest, type StartRequest } from "../shared/sessions";
-import { UntrustedProjectError } from "./project-trust-file";
+import { UntrustedProjectError, untrustedText } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
 
 const dirs: string[] = [];

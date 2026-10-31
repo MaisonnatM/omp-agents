@@ -2,8 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { untrustedText } from "../shared/project-trust";
-import { ProjectTrustFile, projectOf, UntrustedProjectError } from "./project-trust-file";
+import { ProjectTrustFile, projectOf, UntrustedProjectError, untrustedText } from "./project-trust-file";
 
 const dirs: string[] = [];
 afterEach(() => {
