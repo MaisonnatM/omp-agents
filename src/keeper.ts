@@ -14,7 +14,7 @@ import { unlinkSync, writeFileSync } from "node:fs";
 import { createServer, type Socket } from "node:net";
 import { isObject } from "./json";
 import { HELLO, type KeeperHello, pidFileOf, STOP } from "./keeper-wire";
-import type { RpcFrameModule } from "./omp/modules";
+import type { RpcFrameModule } from "./omp/module-types/rpc";
 import { ProcessCensus } from "./process-census";
 
 /** How long omp and what it started get to exit on SIGTERM before SIGKILL. */

@@ -5,7 +5,8 @@ import { createConnection } from "node:net";
 import { join } from "node:path";
 import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "./keeper-link";
 import { STOP } from "./keeper-wire";
-import { rpc, rpcFrameFile, type RpcHostTool, utils } from "./omp/modules";
+import { rpc, rpcFrameFile, utils } from "./omp/modules";
+import type { RpcHostTool } from "./omp/module-types/rpc";
 import type { RpcClient } from "./omp/rpc";
 
 /**

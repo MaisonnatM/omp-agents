@@ -1,10 +1,10 @@
 /** The files omp reads for a workspace, and the agent code a project commits, found through omp's own discovery. */
-import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { OmpFileKind } from "../shared/models";
 import type { ProjectCodeKind } from "../shared/project-trust";
 import { agentDir } from "./config";
-import { agentDiscovery, type CapabilityItem, type CapabilityLoadOptions, configFiles, customCommands, discovery } from "./modules";
+import { agentDiscovery, configFiles, configSources, customCommands, discovery } from "./modules";
+import type { CapabilityItem, CapabilityLoadOptions } from "./module-types/discovery";
 
 /** omp capabilities that load files, and the kind of file each loads. */
 const FILE_CAPABILITIES: [string, OmpFileKind][] = [
@@ -63,9 +63,6 @@ export async function discoverOmpFiles(cwd: string, disabledExtensions: string[]
 	return [...capabilityFiles.flat(), ...appendSystem, ...agentFiles];
 }
 
-/** The names omp reads a language server config from, in the project and in each of its config directories (src/utils/config-file-sources.ts). */
-const LSP_FILES = ["lsp.json", ".lsp.json", "lsp.yaml", ".lsp.yaml", "lsp.yml", ".lsp.yml"];
-
 /** A file of a project's own agent code that a session would load, as omp names it. */
 export interface ProjectFile {
 	kind: Exclude<ProjectCodeKind, "mcp-server">;
@@ -112,7 +109,10 @@ export async function discoverProjectCode(cwd: string): Promise<{ files: Project
 		projectItems("settings"),
 		customCommands.discoverCustomCommands({ cwd }),
 	]);
-	const lspDirs = [cwd, ...configFiles.getConfigDirPaths("", { user: false, project: true, cwd })];
+	// omp's LSP loader (lsp/config.ts) reads `cwd`'s config files and its config directories' before the user's; the
+	// census keeps those. At the home directory a file is both the project's and the user's, so it comes twice.
+	const projectDirs = new Set([cwd, ...configFiles.getConfigDirPaths("", { user: false, project: true, cwd })]);
+	const lspFiles = configSources.configFileSources("lsp", cwd, (_content, path) => (projectDirs.has(dirname(path)) ? path : null)).flatMap(source => source.read() ?? []);
 	const files = [
 		...ofKind("extension", extensions.map(pathOf)),
 		// The extension loader binds only JS and TS hooks (isExtensionFile).
@@ -120,7 +120,7 @@ export async function discoverProjectCode(cwd: string): Promise<{ files: Project
 		...ofKind("tool", tools.map(pathOf)),
 		...ofKind("command", commands.paths.flatMap(({ path, source }) => (source === "project" ? [path] : []))),
 		...ofKind("settings", settings.map(pathOf)),
-		...ofKind("lsp", lspDirs.flatMap(dir => LSP_FILES.map(name => join(dir, name))).filter(path => existsSync(path))),
+		...ofKind("lsp", [...new Set(lspFiles)]),
 	];
 	// omp names every MCP server (src/capability/mcp.ts); one with no name fails the census, as it could not be hashed.
 	const mcpServers = mcps.map(({ _source, ...config }): ProjectMcpServer => {

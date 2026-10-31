@@ -10,6 +10,7 @@ src/shared/startup.ts
 src/shared/desktop-bridge.ts
 src/live-session.ts
 src/omp/modules.ts
+src/omp/module-types/**
 
 # Central server and page files.
 src/server/wire.ts

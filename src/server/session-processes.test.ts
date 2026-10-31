@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { DaemonReport } from "../omp/modules";
+import type { DaemonReport } from "../omp/module-types/processes";
 import { parsePs } from "../process-census";
 import { SessionProcessWatch, type WatchedSession } from "./session-processes";
 

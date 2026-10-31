@@ -15,7 +15,7 @@ It calls `forgetReadFiles` first, which resets omp's process-wide capability cac
 - TypeScript slash commands come from omp's `discoverCustomCommands`, those with `source === "project"`.
 - Every project `settings` item is a piece, since a settings key can name a command, an extension, or a shell.
 - Every MCP server is a piece, a URL server too, since its headers and auth can run commands.
-- Language server configs are the `lsp.json`, `lsp.yaml`, and `lsp.yml` files, with or without a leading dot, in `cwd` and in each project config directory `getConfigDirPaths` names.
+- Language server configs are the readable files of omp's `configFileSources` stack for `lsp`, the one omp's LSP loader reads, that sit in `cwd` or in a project config directory `getConfigDirPaths` names.
 Skills, agents, rules, markdown commands, and context files are prompt text and never pieces.
 
 A piece's `id` is opaque and names one piece: its path from `top`, the realpath of the checkout's top, with `/` separators, or the absolute realpath for a file outside it, or `mcp:<name>` for an MCP server.

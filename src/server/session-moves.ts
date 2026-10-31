@@ -4,7 +4,7 @@
  */
 import type { DashboardSession } from "../dashboard-session";
 import { isObject } from "../json";
-import type { RpcHostTool } from "../omp/modules";
+import type { RpcHostTool } from "../omp/module-types/rpc";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { directoryOf } from "../paths";
 import type { StartRequest } from "../shared/sessions";

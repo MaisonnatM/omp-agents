@@ -9,7 +9,9 @@ import { keepersDir } from "../paths";
 import type { Frame } from "./collab";
 import { childEnv } from "../proc";
 import { ompCommand } from "./install";
-import { type RpcHostTool, rpc, rpcFrameFile, rpcFrames, type ServiceTierModel, utils } from "./modules";
+import { rpc, rpcFrameFile, rpcFrames, utils } from "./modules";
+import type { ServiceTierModel } from "./module-types/models";
+import type { RpcHostTool } from "./module-types/rpc";
 
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {

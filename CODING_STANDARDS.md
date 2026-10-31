@@ -42,7 +42,7 @@ The pre-push hook refuses a push to `main` whose commits leave `CHANGELOG.md` un
 
 Import omp's code instead of reimplementing a protocol or file format.
 Import omp's modules only from `src/omp/`, and only through `src/omp/modules.ts`.
-It checks each export this app uses at startup, so add a new export there.
+It checks each export this app uses at startup, so add a new export there, and the interface it reads to its area's file in `src/omp/module-types/`.
 
 ## omp internals
 

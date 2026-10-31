@@ -8,7 +8,8 @@ import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { attributeTurns, type ContextFileRow, type ContextSourceRow, type SessionReading, type TokenCounter, type Turn } from "../context-sources";
 import { errorText, isObject, str } from "../json";
-import { dirs, type FileEntry, loader, modelTokenizer, sessionContext, tokenizer } from "./modules";
+import { dirs, loader, modelTokenizer, sessionContext, tokenizer } from "./modules";
+import type { FileEntry } from "./module-types/session";
 
 /** Raise when attribution changes: an index of another version is read again from the session files. */
 const INDEX_VERSION = 1;

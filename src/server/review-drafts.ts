@@ -3,7 +3,7 @@
  * served over omp's RPC; the page's edits; and the post of a draft as one GitHub review, at most
  * once, however often it is asked.
  */
-import type { RpcHostTool } from "../omp/modules";
+import type { RpcHostTool } from "../omp/module-types/rpc";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { MAX_COMMENT_BODY, type PullRequest, prKey, pullRequestName } from "../shared/github";
 import {
