@@ -41,6 +41,7 @@ import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-
 import { type DevServerStart, type LiveSessionProcesses, parseProcessSettings, type ProcessSettings, type ProcessStop } from "../shared/processes";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
+import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
 import type { ReplayComparison, ReplayDetail } from "../shared/replay";
 import { MEDIA_FILE_TYPES } from "../shared/transcript";
@@ -56,7 +57,7 @@ import { mailDocument } from "./mail-document";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
 	MAX_QUEUED_STACK, parseBranchRelease, parseGoogleClient, parseGoogleLinks, parseGraphiteToken, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
-	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRepoName, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
+	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRepoName, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
 } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
@@ -80,6 +81,8 @@ export interface SessionRoutesEnv {
 	addedCwds(): string[];
 	/** Apply `change` to the workspaces and send every socket the workspaces after it. */
 	changeWorkspaces(change: WorkspaceChange): void;
+	/** Apply `change` to the trusted project code and send every socket the trusted projects after it. */
+	changeProjectTrust(change: TrustChange): void;
 	/** The listed file of a session, for Analytics' title, the workspace it counts in, and one session's usage. */
 	summaryOf(sessionId: string): SessionSummary | null;
 	/** The requests Claude Code's and Codex's transcripts record, each transcript read past what earlier reads folded. */
@@ -334,6 +337,15 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		},
 	);
 
+	/** `PUT /api/project-trust` `{ op: "trust", root, code }` or `{ op: "forget", root }`: trust the pieces the trust dialog listed, or Settings › Workspaces' **Stop trusting**. */
+	const trustChange = write(
+		body => checked(parseTrustChange(body), "Expected { op: \"trust\", root, code: [{ id, hash }] } or { op: \"forget\", root }"),
+		async change => {
+			env.changeProjectTrust(change);
+			return {};
+		},
+	);
+
 	/** `GET /api/source-control`: GitHub's and Graphite's CLIs, the automatic pull setting, and the workspaces' repositories. */
 	const sourceControl = get(() => answer(() => env.sourceControl()));
 
@@ -399,6 +411,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/skills": { GET: skills },
 		"/api/pull-requests": { GET: pullRequests },
 		"/api/workspaces": { PUT: workspaceChange },
+		"/api/project-trust": { PUT: trustChange },
 		"/api/source-control": { GET: sourceControl, PUT: sourceControlChange },
 		"/api/source-control/graphite-sign-in": { PUT: graphiteSignIn },
 		"/api/changes": { GET: changes },

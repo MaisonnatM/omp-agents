@@ -5,6 +5,7 @@ import type { BotId } from "./bots";
 import type { BranchChoice } from "./git";
 import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
+import type { TrustAsk } from "./project-trust";
 import type { ReplayFacts } from "./replay";
 import { TICKET_ID } from "./tickets";
 import type { Workspace } from "./workspaces";
@@ -427,9 +428,10 @@ export interface SkillOption {
 /**
  * `workspace` is the absolute directory of the workspace the session counts in: its repository's main checkout when it
  * runs in a linked worktree, else the directory it runs in. `prompt` is the text of the prompt a fork branched at, for the
- * composer; `null` for the other kinds.
+ * composer; `null` for the other kinds. A failure has `trust` when the start refused because the project's agent code is
+ * not trusted yet, for the page to ask.
  */
-export type StartResult = { ok: true; instanceId: string; workspace: string; prompt: string | null } | { ok: false; error: string };
+export type StartResult = { ok: true; instanceId: string; workspace: string; prompt: string | null } | { ok: false; error: string; trust?: TrustAsk };
 /** Where `/` and `@` resolve: an open live view's session, or the directory the new-session draft will start omp in. */
 export type CompletionScope = { kind: "live"; view: LiveView } | { kind: "new"; cwd: string };
 /** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */

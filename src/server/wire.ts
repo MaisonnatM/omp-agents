@@ -71,6 +71,7 @@ import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
+import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { parseNoteChange } from "../user-notes-parse";
@@ -934,4 +935,13 @@ const isWorkspaceOp = oneOf(["add", "hide", "show"] as const);
 export function parseWorkspaceChange(body: unknown): Parsed<WorkspaceChange> {
 	if (!isObject(body) || !isWorkspaceOp(body.op) || !isNonEmpty(body.cwd)) return null;
 	return body.op === "add" || body.cwd.startsWith("/") ? { ok: { op: body.op, cwd: body.cwd } } : null;
+}
+
+/** The body of `PUT /api/project-trust`: `{ op: "trust", root, code: [{ id, hash }] }` or `{ op: "forget", root }`, `root` absolute. */
+export function parseTrustChange(body: unknown): Parsed<TrustChange> {
+	if (!isObject(body) || !isNonEmpty(body.root) || !body.root.startsWith("/")) return null;
+	if (body.op === "forget") return { ok: { op: "forget", root: body.root } };
+	if (body.op !== "trust" || !Array.isArray(body.code) || body.code.length === 0) return null;
+	const code = body.code.map(piece => (isObject(piece) && isNonEmpty(piece.id) && isNonEmpty(piece.hash) ? { id: piece.id, hash: piece.hash } : null));
+	return code.every(piece => piece !== null) ? { ok: { op: "trust", root: body.root, code } } : null;
 }

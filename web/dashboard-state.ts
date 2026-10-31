@@ -3,6 +3,7 @@ import { applyBot, type Bot, type BotChange, type BotId, type BotLast } from "..
 import type { PlanUsage } from "../src/shared/models";
 import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
+import type { TrustAsk, TrustedProject } from "../src/shared/project-trust";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import { applyPins, type PinChange } from "../src/shared/pins";
@@ -61,6 +62,10 @@ export interface DashboardState extends PaneNavigation {
 	scheduled: ScheduledSend[];
 	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
 	workspaceList: WorkspaceList<Workspace>;
+	/** The projects whose agent code the user trusted, empty until the server first sends them. */
+	trustedProjects: TrustedProject[];
+	/** The start this page made that refused for untrusted project code, and what to ask about, until the user answers. */
+	trustAsk: { op: StartOp; ask: TrustAsk } | null;
 	/** The pinned sessions' ids, empty until the server first sends them; a change shows here before the server answers. */
 	pins: string[];
 	/** What the bell lists, empty until the server first sends it. */
@@ -74,7 +79,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "scheduled" | "workspaces" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -96,6 +101,8 @@ export type Action =
 	| { t: "user-note"; change: UserNoteChange }
 	| { t: "pin"; change: PinChange }
 	| { t: "bot"; change: Exclude<BotChange, { op: "message" }>; now: string }
+	/** The trust dialog closed, by trusting or by **Cancel**. */
+	| { t: "trust-dismiss" }
 	| ServerAction;
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
@@ -200,9 +207,10 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		case "past":
 			return { ...state, past: applyDelta(state.past, action.reset, action.sessions, session => session.sessionId, action.removed).sort(newestPastFirst), listed: true };
 		case "started": {
-			if (!pendingStart(state.starts, action.reqId)) return state;
+			const pending = pendingStart(state.starts, action.reqId);
+			if (!pending) return state;
 			const starts = settleStart(state.starts, action.reqId, action.result);
-			if (!action.result.ok) return { ...state, starts };
+			if (!action.result.ok) return { ...state, starts, trustAsk: action.result.trust ? { op: pending.op, ask: action.result.trust } : state.trustAsk };
 			const { instanceId, workspace } = action.result;
 			return { ...state, starts, started: { instanceId, workspace } };
 		}
@@ -229,6 +237,10 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, scheduled: action.sends };
 		case "workspaces":
 			return { ...state, workspaceList: action.list };
+		case "project-trust":
+			return { ...state, trustedProjects: action.projects };
+		case "trust-dismiss":
+			return state.trustAsk ? { ...state, trustAsk: null } : state;
 		case "pins":
 			return { ...state, pins: action.sessionIds };
 		case "notices":
@@ -278,6 +290,8 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		botLasts: {},
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
+		trustedProjects: [],
+		trustAsk: null,
 		pins: [],
 		notices: [],
 		merges: [],

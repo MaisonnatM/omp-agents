@@ -377,22 +377,43 @@ export interface CatalogModule {
 }
 
 /**
- * Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. `name` is a skill's or
- * a slash command's resolved name (src/capability/skill.ts, slash-command.ts); `frontmatter` is a skill's parsed frontmatter.
+ * Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. `name` is a skill's, a
+ * slash command's, or an MCP server's resolved name (src/capability/skill.ts, slash-command.ts, mcp.ts); `frontmatter` is a
+ * skill's parsed frontmatter. `path` is the module an extension, hook, or tool loads, or a settings file; `command` and `url`
+ * are an MCP server's, which runs `command` itself and only connects to `url`; `data` is a settings file's parsed contents.
  */
 export interface CapabilityItem {
 	_source: { provider: string; path: string; level: "user" | "project" | "native" };
 	name?: string;
 	frontmatter?: Record<string, unknown>;
+	path?: string;
+	command?: string;
+	url?: string;
+	data?: Record<string, unknown>;
+}
+/** `providers` loads only those providers' items (src/capability/types.ts LoadOptions); `filter` drops items before omp dedupes them by name. */
+export interface CapabilityLoadOptions {
+	cwd: string;
+	disabledExtensions?: string[];
+	providers?: string[];
+	filter?: (item: CapabilityItem) => boolean;
 }
 export interface DiscoveryModule {
-	loadCapability(id: string, options: { cwd: string; disabledExtensions?: string[] }): Promise<{ items: CapabilityItem[] }>;
+	loadCapability(id: string, options: CapabilityLoadOptions): Promise<{ items: CapabilityItem[] }>;
+	/** Empties the file cache capability loads read through (src/capability/fs.ts), which otherwise keeps every file it read for the process's life. */
+	reset(): void;
+}
+/** omp's TypeScript slash commands (src/extensibility/custom-commands/loader.ts): the module of each, and whose it is. */
+export interface CustomCommandsModule {
+	discoverCustomCommands(options: { cwd: string }): Promise<{ paths: { path: string; source: "bundled" | "user" | "project" }[] }>;
 }
 export interface AgentDiscoveryModule {
 	discoverAgents(cwd: string): Promise<{ agents: { source: string; filePath?: string }[] }>;
 }
 export interface ConfigFilesModule {
 	findConfigFile(subpath: string, options: { user?: boolean; project?: boolean; cwd?: string }): string | undefined;
+	/** The config directories `subpath` is looked up in, such as `<cwd>/.omp`, `.pi`, and `.claude` for the project. */
+	getConfigDirPaths(subpath: string, options: { user?: boolean; project?: boolean; cwd?: string }): string[];
 }
 /** omp's document conversion (src/utils/markit.ts), the one its read tool and `@file` arguments use. */
 export interface MarkitModule {
@@ -915,9 +936,12 @@ export const catalog = await load<CatalogModule>(join(dirname(packageDir), "pi-c
 	calculateCost: "function",
 });
 
-export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function" });
+export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function", reset: "function" });
+export const customCommands = await load<CustomCommandsModule>(join(srcDir, "extensibility", "custom-commands", "loader.ts"), {
+	discoverCustomCommands: "function",
+});
 export const agentDiscovery = await load<AgentDiscoveryModule>(join(srcDir, "task", "discovery.ts"), { discoverAgents: "function" });
-export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts"), { findConfigFile: "function" });
+export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts"), { findConfigFile: "function", getConfigDirPaths: "function" });
 export const markit = await load<MarkitModule>(join(srcDir, "utils", "markit.ts"), { convertBufferWithMarkit: "function" });
 export const mcpRpc = await load<McpRpcModule>(join(srcDir, "mcp", "json-rpc.ts"), { callMCP: "function" });
 export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config.ts"), { loadAllMCPConfigs: "function" });

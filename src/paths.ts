@@ -55,6 +55,8 @@ export const scheduledFile = join(configDir, "scheduled.json");
 export const workspacesFile = join(configDir, "workspaces.json");
 /** Where an older version kept the {@link workspacesFile} list, beside {@link tokenFile}; the server moves it at startup. */
 export const oldWorkspacesFile = join(configDir, "projects.json");
+/** The project code the user trusted, by project, with the hash of each piece as it was trusted, beside {@link tokenFile}. */
+export const projectTrustFile = join(configDir, "project-trust.json");
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
 /** The page's preferences that follow the user to every machine, beside {@link tokenFile}. */

@@ -10,6 +10,7 @@ import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
 import type { PagePreferences, PreferenceChange } from "./preferences";
+import type { TrustedProject } from "./project-trust";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
@@ -59,6 +60,8 @@ export type ServerMsg =
 	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
 	| { t: "workspaces"; list: WorkspaceList<Workspace> }
+	/** The projects whose agent code the user trusted, whole, sent when a socket opens and after every change. */
+	| { t: "project-trust"; projects: TrustedProject[] }
 	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
 	| { t: "pins"; sessionIds: string[] }
 	/** The page's portable preferences, whole, sent when a socket opens and after every change; `null` until a page seeds them. */

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
 import type { BotChange } from "../src/shared/bots";
 import type { PinChange } from "../src/shared/pins";
+import type { TrustChange } from "../src/shared/project-trust";
 import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
-import { openSocket } from "./api";
+import { openSocket, putJson } from "./api";
 import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
@@ -98,6 +99,10 @@ export interface Dashboard {
 	changePins: (change: PinChange) => void;
 	/** Add, change, or delete a Bot, which shows at once and reaches the server and every other window. */
 	changeBot: (change: Exclude<BotChange, { op: "message" }>) => void;
+	/** Trust the pieces the trust dialog lists, then send its start again; rejects with why the trust could not be saved. */
+	trustAndStart: () => Promise<void>;
+	/** Close the trust dialog, leaving the refused start's error showing. */
+	dismissTrust: () => void;
 }
 
 /** The Bot `page` opens, its conversation's view kept while it names the same conversation, since the roster changes far more often than which conversation shows. */
@@ -260,6 +265,7 @@ export function useDashboard(): Dashboard {
 					case "bots":
 					case "scheduled":
 					case "workspaces":
+					case "project-trust":
 					case "notices":
 					case "merges":
 					case "review-drafts":
@@ -371,6 +377,15 @@ export function useDashboard(): Dashboard {
 		},
 		[send],
 	);
+	const dismissTrust = useCallback(() => dispatch({ t: "trust-dismiss" }), []);
+	const trustAsk = state.trustAsk;
+	const trustAndStart = useCallback(async () => {
+		if (!trustAsk) return;
+		const { op, ask } = trustAsk;
+		await putJson("/api/project-trust", { op: "trust", root: ask.root, code: ask.code.map(({ id, hash }) => ({ id, hash })) } satisfies TrustChange);
+		dispatch({ t: "trust-dismiss" });
+		start(op);
+	}, [trustAsk, start]);
 
-	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot };
+	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot, trustAndStart, dismissTrust };
 }
