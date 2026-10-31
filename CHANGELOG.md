@@ -8,6 +8,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - With the starter kit, when you say "Merge on main", the agent now merges your branch into a fresh copy of main, runs the project's checks on the result, and only then pushes.
 - Agents can no longer push or merge straight into main in a project set up this way, so a change that breaks the checks never lands.
 - When a check stops a merge, the agent is told which tests failed, even in a long test run, so it can fix them without running everything again.
+- With the starter kit, sessions in the same project now share a memory: a new session starts with the project's remembered decisions, facts, and lessons and the work that last landed, and a running one hears when another session lands work or changes the memory, starting with work that touches the same files.
 
 ## 2026-10-30
 
