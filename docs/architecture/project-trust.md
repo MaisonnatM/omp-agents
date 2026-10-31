@@ -43,7 +43,8 @@ It takes an `AdmittedLaunch`, an `RpcLaunch` with a required `admit`, and awaits
 `DashboardSession.start`, `fork`, `resume`, and `replay`, and the replay launches `src/omp/replay-launch.ts` builds, take an `AdmittedLaunch` too, so no spawn compiles without a check, while what a start's joins build (`SessionJoin.rpc`) stays a plain `RpcLaunch`.
 `createStarter` in `src/server/start.ts` adds `StartEnv.admit`, which `src/server/dashboard.ts` binds to `ProjectTrustFile.admit`, to the joined launch, so a new session, a fork, a replay, and a resume are each checked in the directory omp would run in.
 A replay refused there discards its detached checkout as any failed replay does.
-`launch` maps an `UntrustedProjectError` to `{ ok: false, error, trust }` in the start's `started` message, where `error` is `untrustedText(trust)`, so a bot, a routine, a scheduled send, and the shepherd, which start through the same starter, fail with plain text naming the folder.
+`launch` maps an `UntrustedProjectError` to `{ ok: false, error, trust }`, where `error` is `untrustedText(trust)`, so a bot, a routine, a scheduled send, and the shepherd, which start through the same starter, fail with plain text naming the folder.
+The socket answers a `start` the page sent through `forPage`, which reads that refusal as `refusedText(trust)`, since whoever sent it has the dialog in front of them.
 A census that throws refuses too, with its error after the start's own prefix, such as `Cannot start omp: `.
 Reattaching to a running session goes through `attachRpc` and is not gated: its omp already runs.
 
@@ -52,7 +53,9 @@ Reattaching to a running session goes through `attachRpc` and is not gated: its 
 ## The page
 
 `settleStart` in `web/starts.ts` keeps a refused start's `trust` on its failed state, and `refusedStart` picks the one the dialog asks about.
+**Resume all** carries `trust` on its `resumed-all` message for the first session it refused, which `settleResumeAll` keeps like a start's, so the dialog asks there too and trusting it resumes the batch again.
 `ProjectTrustDialog` in `web/components/project-trust-dialog.tsx` shows it with each kind's label from its own table; **Trust and start** sends `PUT /api/project-trust` with every listed piece's id and hash, then sends the same start op again, which replaces the refused start and so closes the dialog, and **Cancel** drops `trust` only, leaving the error.
+**Trust and start** stays disabled while the page's socket is down, since the trust saves over HTTP and the start goes over the socket.
 A refused start stays while the dialog asks, even when no pane shows its view.
 `PUT /api/project-trust` takes a `TrustChange`, checked by `parseTrustChange` in `src/server/wire.ts`.
 A change that changes the store saves it and sends every socket a `project-trust` message with its `projects`, each `TrustedProject` with its `root`, `rootDisplay`, and how many `pieces` it trusts, also sent when a socket opens.

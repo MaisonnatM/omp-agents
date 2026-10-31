@@ -105,13 +105,13 @@ export function settleStart(starts: Starts, reqId: number, result: StartResult):
 }
 
 /** The server's answer to **Resume all** `reqId`: it leaves the map once every session resumed, else fails with the first reason. */
-export function settleResumeAll(starts: Starts, reqId: number, errors: string[]): Starts {
+export function settleResumeAll(starts: Starts, reqId: number, errors: string[], trust?: TrustAsk): Starts {
 	const start = pendingStart(starts, reqId);
 	if (!start) return starts;
 	const next = new Map(starts);
 	const [first] = errors;
 	if (first === undefined) next.delete(reqId);
-	else next.set(reqId, { op: start.op, phase: "failed", error: `Could not resume ${errors.length === 1 ? "1 session" : `${errors.length} sessions`}. ${first}` });
+	else next.set(reqId, { op: start.op, phase: "failed", error: `Could not resume ${errors.length === 1 ? "1 session" : `${errors.length} sessions`}. ${first}`, ...(trust ? { trust } : {}) });
 	return next;
 }
 

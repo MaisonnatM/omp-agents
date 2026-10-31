@@ -212,7 +212,7 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, starts, started: { instanceId, workspace } };
 		}
 		case "resumed-all": {
-			const starts = settleResumeAll(state.starts, action.reqId, action.errors);
+			const starts = settleResumeAll(state.starts, action.reqId, action.errors, action.trust);
 			return starts === state.starts ? state : { ...state, starts };
 		}
 		case "usage":

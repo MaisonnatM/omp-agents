@@ -10,7 +10,7 @@ import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
 import type { PagePreferences, PreferenceChange } from "./preferences";
-import type { TrustedProject } from "./project-trust";
+import type { TrustAsk, TrustedProject } from "./project-trust";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
@@ -38,8 +38,8 @@ export type ServerMsg =
 	| { t: "turns"; view: View; reset: boolean; turns: Turn[] }
 	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */
 	| { t: "started"; reqId: number; result: StartResult }
-	/** Answers this socket's `resume-all` with `reqId` once every session is ready or failed to start. */
-	| { t: "resumed-all"; reqId: number; started: { sessionId: string; instanceId: string }[]; errors: string[] }
+	/** Answers this socket's `resume-all` with `reqId` once every session is ready or failed to start; `trust` is the first refusal for untrusted project code. */
+	| { t: "resumed-all"; reqId: number; started: { sessionId: string; instanceId: string }[]; errors: string[]; trust?: TrustAsk }
 	/** Answers this socket's `complete` for `scope`; `reqId` counts per composer. */
 	| { t: "completions"; scope: CompletionScope; reqId: number; items: CompletionItem[]; error: string | null }
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */

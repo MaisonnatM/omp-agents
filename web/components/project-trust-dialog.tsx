@@ -14,7 +14,7 @@ const KIND_LABELS: Record<ProjectCodeKind, string> = {
 	command: "Slash command",
 	"mcp-server": "MCP server",
 	settings: "Settings",
-	lsp: "Language servers",
+	lsp: "Language server config",
 };
 
 /** Where the answer stands: asked, saving the trust, or refused with why it could not be saved. */
@@ -22,13 +22,15 @@ type Answer = { kind: "asking" } | { kind: "trusting" } | { kind: "failed"; erro
 
 interface ProjectTrustDialogProps {
 	ask: TrustAsk;
+	/** Whether the page's socket is open; the trust is saved over HTTP and the start sent over it. */
+	connected: boolean;
 	/** Trusts every piece listed, then sends the refused start again; rejects with why the trust could not be saved. */
 	onTrust: () => Promise<void>;
 	/** Closes the dialog; the refused start's error stays where it shows. */
 	onCancel: () => void;
 }
 
-export function ProjectTrustDialog({ ask, onTrust, onCancel }: ProjectTrustDialogProps) {
+export function ProjectTrustDialog({ ask, connected, onTrust, onCancel }: ProjectTrustDialogProps) {
 	const [answer, setAnswer] = useState<Answer>({ kind: "asking" });
 	const busy = answer.kind === "trusting";
 	const trust = (): void => {
@@ -47,7 +49,7 @@ export function ProjectTrustDialog({ ask, onTrust, onCancel }: ProjectTrustDialo
 					{ask.code.map(piece => (
 						<li key={piece.id} className="flex items-center gap-2 text-sm">
 							<span className="shrink-0 text-muted-foreground">{KIND_LABELS[piece.kind]}</span>
-							<span className="min-w-0 truncate font-mono text-xs" title={piece.name}>
+							<span className="min-w-0 break-all font-mono text-xs">
 								{piece.name}
 							</span>
 							<Badge variant="dot" size="compact" color={piece.change === "new" ? "blue" : "amber"} className="ml-auto shrink-0">
@@ -59,7 +61,7 @@ export function ProjectTrustDialog({ ask, onTrust, onCancel }: ProjectTrustDialo
 				{answer.kind === "failed" && <p role="alert" className={ERROR_TEXT}>{answer.error}</p>}
 				<div className="flex justify-end gap-2">
 					<Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
-					<Button type="button" disabled={busy} onClick={trust}>{busy ? "Trusting…" : "Trust and start"}</Button>
+					<Button type="button" disabled={busy || !connected} onClick={trust}>{busy ? "Trusting…" : "Trust and start"}</Button>
 				</div>
 			</div>
 		</FormDialog>

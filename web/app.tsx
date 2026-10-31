@@ -324,7 +324,7 @@ export function App() {
 										</DashboardSidebar>
 									)}
 									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />
-									{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
+									{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
 									<GetStarted
 										route={page?.kind === "get-started"}
 										vacantHome={!page && layout.panes.length === 0}

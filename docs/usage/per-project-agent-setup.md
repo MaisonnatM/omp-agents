@@ -28,6 +28,7 @@ A start nobody is watching, such as a Bot's routine, a scheduled send, or the pu
 
 Trust belongs to the project's main checkout, so a linked worktree of a trusted repository shares its decision.
 A pull request checked out into a worktree that adds or edits a piece still asks, because only the exact pieces you approved are trusted.
+**Resume all** asks the same way, for the first interrupted project it cannot resume, and trusting it resumes the batch again.
 When an agent's `move_session` tool asks to move into a project with untrusted code, the move is refused with the same message.
 
 ## Stop trusting

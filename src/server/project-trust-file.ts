@@ -18,6 +18,9 @@ export function parseProjectTrust(value: unknown): ProjectTrust | null {
 export const untrustedText = (ask: TrustAsk): string =>
 	`The agent code in ${ask.rootDisplay} is not trusted yet; a session started there from the dashboard asks you to review and trust it.`;
 
+/** The same refusal for a start the page asked for, whose dialog offers the trust, rather than for a start nobody watches. */
+export const refusedText = (ask: TrustAsk): string => `The agent code in ${ask.rootDisplay} is not trusted yet. Trust it to start a session there.`;
+
 /** A start or a move refused because its directory runs project code the user has not trusted as it is now. */
 export class UntrustedProjectError extends Error {
 	constructor(readonly ask: TrustAsk) {

@@ -14,6 +14,13 @@ import type { Peer, Run } from "./request-ledger";
 import type { Views } from "./views";
 import type { ActivityStore } from "./activity-store";
 import type { MsgOf } from "./wire";
+import { refusedText } from "./project-trust-file";
+
+/** Why `result` failed, as the page reads it: a refusal for untrusted project code tells whoever sits at the page to trust it, where an unattended start is told to ask them. */
+const pageError = (result: StartResult): string => (result.ok ? "" : result.trust ? refusedText(result.trust) : result.error);
+
+/** `result` as the page reads it, through {@link pageError}. */
+const forPage = (result: StartResult): StartResult => (result.ok ? result : { ...result, error: pageError(result) });
 
 export interface SocketEnv {
 	sessions: LiveSessions;
@@ -109,7 +116,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	},
 	"cancel-agent": ({ sessions }, _peer, { view }) => sessions.get(view.instanceId)?.cancelAgent(view.agentId),
 	async start({ start }, peer, msg) {
-		peer.send({ t: "started", reqId: msg.reqId, result: await start(msg) });
+		peer.send({ t: "started", reqId: msg.reqId, result: forPage(await start(msg)) });
 	},
 	async "resume-all"({ sessions, start, stoppedMidTurn }, peer, { reqId, sessionIds }) {
 		const results = await Promise.all(
@@ -122,11 +129,14 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 				return { sessionId, result };
 			}),
 		);
+		// The dialog asks about one project at a time; trusting it and resuming again asks about the next.
+		const [trust] = results.flatMap(({ result }) => (!result.ok && result.trust ? [result.trust] : []));
 		peer.send({
 			t: "resumed-all",
 			reqId,
 			started: results.flatMap(({ sessionId, result }) => (result.ok ? [{ sessionId, instanceId: result.instanceId }] : [])),
-			errors: results.flatMap(({ result }) => (result.ok ? [] : [result.error])),
+			errors: results.flatMap(({ result }) => (result.ok ? [] : [pageError(result)])),
+			...(trust ? { trust } : {}),
 		});
 	},
 	"dismiss-interrupted": ({ dismissInterrupted }, _peer, { sessionId }) => dismissInterrupted(sessionId),

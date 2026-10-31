@@ -26,6 +26,7 @@
   `index.html` is `no-store`, and every other file of the build, which Bun names by the hash of its content, `private, max-age=31536000, immutable`, so a reload reads only `index.html` and a new build's renamed chunks.
   The server sends the files uncompressed, since it listens only on `127.0.0.1`.
   `src/shared/access.ts` holds the storage keys and socket subprotocol that the page and the server share.
+  `src/server/socket.test.ts` runs the start and Resume all handlers over a stub env and checks the refusal the page reads: a project's untrusted code tells whoever sent the start to trust it, and Resume all carries that ask.
   `src/server/application-socket.test.ts` boots this actual application in a subprocess with isolated config and data and checks denied handshakes, authenticated roster delivery, and credential-free protocol negotiation.
 - `src/server/routes.ts`: the `/api/` endpoints, in groups (sessions, integrations, providers, calendar, Gmail, pull requests, files, todos, the dashboard's own update, settings sync, and session processes), each handed only its part of `RouteEnv`.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.

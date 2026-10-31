@@ -140,6 +140,7 @@
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
   The server keeps the list in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
+  **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
   With **All workspaces**, **Models**, **Files**, **Workflows**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.
