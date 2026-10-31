@@ -55,3 +55,6 @@ The page sends it when you copy a session header's branch or a pull request deta
 A change that changes the list saves `workspaces.json` and sends every socket a `workspaces` message, its `list` of added and hidden directories, each with its `cwdDisplay`, also sent when a socket opens.
 A request's `?cwd=` may name an added directory, as the settings under **This workspace** and a workspace's pull request list do; the every-workspace pull request list and the worktrees inventory read only the directories sessions ran in.
 The page lists added directories after those sessions ran in, and drops a hidden directory, not the directories inside it, from its pickers, session lists, counts, and search, as it does `/tmp`.
+
+`PUT /api/project-trust` takes a `TrustChange`, `{ op: "trust", root, code }` with each piece's `id` and `hash`, or `{ op: "forget", root }`, checked by `parseTrustChange` in `src/server/wire.ts`; [Project trust](project-trust.md) covers the gate it feeds.
+A change that changes the store saves `project-trust.json` and sends every socket a `project-trust` message, its `projects` each with `root`, `rootDisplay`, and the trusted `ids`, also sent when a socket opens.

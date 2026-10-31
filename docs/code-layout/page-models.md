@@ -12,6 +12,7 @@
   `web/components/file-diff.tsx` draws each recorded edit as a Kobra-inspired card with old and new line numbers, syntax colors, a fixed gutter, and a horizontal code scroller.
   `editHunks` in `src/shared/transcript.ts` converts omp's numbered diff into hunks with both line numbers.
   The new-issue and new-event dialogs share `FormDialog` and `FormDialogHeader` from `web/components/form-dialog.tsx`: the dialog that stays open while its form sends, the header with its title, actions, and close button, and the `Submit` state, error line, and Cmd+Enter check that both forms use.
+  `web/components/project-trust-dialog.tsx` builds on them too: `ProjectTrustDialog` lists a refused start's untrusted pieces with **New** or **Changed**, and **Trust and start** calls `trustAndStart` from `web/use-dashboard.ts`, which saves the trust through `PUT /api/project-trust` and sends the start again.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the Pull requests page and the tickets page show.
   `web/pull-requests-model.ts` holds the pull requests' moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it, over `moveOf` in `src/shared/moves.ts`.
   It also holds which sections start folded, sorts rows by move, and keeps each stack's rows together by the chain of base branches.
@@ -34,6 +35,7 @@
   The open section is in the hash, `#settings/<section>`, and the **This workspace** sections follow the sidebar's workspace; `settings-page.tsx` keeps inactive panels mounted to preserve unsaved drafts, and shows the workspace picker on the **This workspace** sections only, under the header line each one's `meta` in `SETTINGS_SECTIONS` gives.
   `preferences-tab.tsx` holds the choices the app keeps in localStorage and **Stop idle processes**, which `/api/process-settings` keeps on the server, and `routing-tab.tsx` the Models section: roles, model chains, provider order, and retries.
   `workspaces-tab.tsx` lists the workspaces with **Hide**, the hidden ones with **Show**, and adds a directory by path through `PUT /api/workspaces`; the list it shows comes back as the `workspaces` socket message.
+  Its **Trusted projects** section lists the `project-trust` socket message's projects, and **Stop trusting** sends `PUT /api/project-trust` with `{ op: "forget", root }`.
   `source-control-tab.tsx` shows the `gh` and `gt` rows, the automatic pull switch, each repository's override with its last pull, and the default merge method, which `web/merge-method.ts` keeps in localStorage with the method of the last confirmed merge.
   `sync-tab.tsx` saves the remote and branch, runs a sync, shows the last outcome and, on a conflict, each file's two versions with **This machine** and **Remote**, and switches each synced item through `PUT /api/sync`.
   `worktrees-tab.tsx` lists the Git worktrees of the repositories sessions ran in, with what uses each and which merged, and removes them one by one or, through **Remove merged**, every merged one nothing blocks, previewing and removing in batches of `MAX_WORKTREE_BATCH`.

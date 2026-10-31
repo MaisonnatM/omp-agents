@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-10-31
+
+- Before a session runs a project's own agent code, such as its extensions, tools, or MCP servers, the dashboard now asks you to trust it once, and asks again when a piece is new or has changed.
+- Settings › Workspaces now lists the projects you trusted, with Stop trusting to have the next session there ask again.
+
 ## 2026-10-30
 
 - Fixed: Remove merged in Settings › Worktrees, and ending a session, no longer delete a worktree that another running session still works in, even a session started in another project.
