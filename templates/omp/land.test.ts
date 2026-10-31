@@ -6,8 +6,6 @@ import { join } from "node:path";
 import { bypass } from "./agent/extensions/land/gate";
 import { land } from "./agent/extensions/land/lander";
 
-Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" });
-
 const dirs: string[] = [];
 afterAll(() => {
 	for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
@@ -24,6 +22,8 @@ function repo(config: object | null) {
 	execFileSync("git", ["init", "-q", "--bare", "-b", "main", remote]);
 	execFileSync("git", ["clone", "-q", remote, clone], { stdio: "ignore" });
 	git(clone, "switch", "-q", "-c", "main");
+	git(clone, "config", "user.name", "t");
+	git(clone, "config", "user.email", "t@t");
 	writeFileSync(join(clone, "a.txt"), "one\n");
 	if (config) {
 		mkdirSync(join(clone, ".omp"));
@@ -92,7 +92,7 @@ describe("land", () => {
 		const other = join(root, "other");
 		const mark = join(root, "raced");
 		const r = repo({ checks: ["true"] });
-		const check = `[ -f ${mark} ] || { touch ${mark}; git clone -q ${r.remote} ${other} && git -C ${other} commit -q --allow-empty -m other && git -C ${other} push -q origin HEAD:main; }`;
+		const check = `[ -f ${mark} ] || { touch ${mark}; git clone -q ${r.remote} ${other} && git -C ${other} -c user.name=t -c user.email=t@t commit -q --allow-empty -m other && git -C ${other} push -q origin HEAD:main; }`;
 		writeFileSync(join(r.feature, ".omp/land.json"), JSON.stringify({ checks: [check] }));
 		git(r.feature, "commit", "-qam", "race check");
 		const result = await land({ cwd: r.feature, divergence: "None" });
