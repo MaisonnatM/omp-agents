@@ -11,7 +11,7 @@ function gitOut(dir: string, args: string[]): string | null {
 }
 
 /** The land config of the repository `dir` is in, `null` when it has none or cannot be read. */
-function configAt(dir: string): LandConfig | null {
+export function configAt(dir: string): LandConfig | null {
 	const top = gitOut(dir, ["rev-parse", "--show-toplevel"]);
 	if (top === null) return null;
 	try {

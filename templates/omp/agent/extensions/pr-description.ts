@@ -19,7 +19,7 @@ export default function prDescription(pi: ExtensionAPI) {
 	const parameters = z.object({
 		repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/).describe("GitHub owner/repository"),
 		pr: z.number().int().positive(),
-		change: z.discriminatedUnion("kind", [
+		change: z.union([
 			z.object({ kind: z.literal("read") }),
 			z.object({ kind: z.literal("append"), text: z.string() }),
 			z.object({ kind: z.literal("replace-text"), oldText: z.string(), newText: z.string() }),
