@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-10-31
+
+- With the starter kit, sessions in the same project now share a memory: a new session starts with the project's remembered decisions, facts, and lessons and the work that last landed, and a running one hears when another session lands work or changes the memory, starting with work that touches the same files.
+
 ## 2026-10-30
 
 - Fixed: Remove merged in Settings › Worktrees, and ending a session, no longer delete a worktree that another running session still works in, even a session started in another project.

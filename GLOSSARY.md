@@ -37,6 +37,11 @@ _Avoid_: Workspace (see **Workspace**), worktree
 The detached process that holds one dashboard session's omp and lends its stdio to one server at a time.
 _Avoid_: Daemon, supervisor
 
+**Project memory**:
+The decisions, facts, and lessons the sessions of one git repository share through the starter kit's `project_memory` tool, kept on `refs/omp/memory`, with the brief and catch-ups that tell each session what other sessions landed and remembered.
+It is separate from omp's own memory and from a Bot's memory.
+_Avoid_: Shared memory, team memory, knowledge base
+
 ## Collab
 
 **Host**:
