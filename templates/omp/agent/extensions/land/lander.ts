@@ -25,7 +25,7 @@ export type LandResult =
 	| { kind: "nothing"; target: string }
 	| { kind: "refused"; reason: string }
 	| { kind: "conflict"; paths: string[] }
-	| { kind: "failed"; command: string; why: string; tail: string }
+	| { kind: "failed"; command: string; why: string; failures: string[]; tail: string }
 	| { kind: "rejected"; why: string };
 
 export interface LandOptions {
@@ -46,10 +46,16 @@ const TOTAL_MS = 10 * 60_000;
 const ATTEMPTS = 3;
 const TAIL_CHARS = 4000;
 const WORKTREE_PREFIX = "omp-land-";
+/** Lines that name a failed test or a type error in the output of bun, Jest, Vitest, Go, TAP runners, and tsc. */
+const FAILURE_LINE = /^\s*(\(fail\) |FAIL |--- FAIL: |not ok \d|✗ |× )|error TS\d+:/;
+const MAX_FAILURES = 20;
+const ANSI = /\u001b\[[0-9;?]*[A-Za-z]/g;
 
 interface Run {
 	code: number | null;
 	out: string;
+	/** The output's {@link FAILURE_LINE} lines, from all of it, since a long run's failures scroll out of the tail. */
+	failures: string[];
 	stopped?: string;
 }
 
@@ -58,6 +64,12 @@ function run(file: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, 
 	return new Promise(done => {
 		const child = spawn(file, args, { cwd, env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
 		let out = "";
+		let line = "";
+		const failures: string[] = [];
+		const scan = (text: string) => {
+			const clean = text.replace(ANSI, "").trimEnd();
+			if (failures.length < MAX_FAILURES && FAILURE_LINE.test(clean)) failures.push(clean.trim());
+		};
 		let stopped: string | undefined;
 		const stop = (why: string) => {
 			stopped ??= why;
@@ -77,7 +89,11 @@ function run(file: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, 
 		const onAbort = () => stop("the landing was cancelled");
 		signal?.addEventListener("abort", onAbort, { once: true });
 		const take = (chunk: Buffer) => {
-			out = (out + chunk.toString()).slice(-TAIL_CHARS * 4);
+			const text = chunk.toString();
+			out = (out + text).slice(-TAIL_CHARS * 4);
+			const lines = (line + text).split("\n");
+			line = lines.pop()!;
+			for (const complete of lines) scan(complete);
 			quiet();
 		};
 		child.stdout.on("data", take);
@@ -90,14 +106,15 @@ function run(file: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, 
 			clearTimeout(silence);
 			clearTimeout(total);
 			signal?.removeEventListener("abort", onAbort);
-			done({ code, out, stopped });
+			scan(line);
+			done({ code, out, failures, stopped });
 		});
 	});
 }
 
 /** The last lines of `out`, without terminal colors. */
 export function tail(out: string): string {
-	return out.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, "").trimEnd().slice(-TAIL_CHARS);
+	return out.replace(ANSI, "").trimEnd().slice(-TAIL_CHARS);
 }
 
 async function git(dir: string, args: string[], env: NodeJS.ProcessEnv = process.env): Promise<Run> {
@@ -170,12 +187,12 @@ async function check(command: string, dir: string, env: NodeJS.ProcessEnv, limit
 	options.progress?.(`Running ${command}`);
 	const first = await run("sh", ["-c", command], dir, env, limits, options.signal);
 	if (first.code === 0 && !first.stopped) return { command, outcome: "passed" as const };
-	if (options.signal?.aborted) return { command, outcome: "failed" as const, why: "the landing was cancelled", tail: tail(first.out) };
+	if (options.signal?.aborted) return { command, outcome: "failed" as const, why: "the landing was cancelled", failures: first.failures, tail: tail(first.out) };
 	options.progress?.(`Running ${command} again after it failed`);
 	const second = await run("sh", ["-c", command], dir, env, limits, options.signal);
 	if (second.code === 0 && !second.stopped) return { command, outcome: "flaky" as const };
 	const why = second.stopped ? `it was stopped: ${second.stopped}` : `it exited with code ${second.code} twice`;
-	return { command, outcome: "failed" as const, why, tail: tail(second.out) };
+	return { command, outcome: "failed" as const, why, failures: second.failures, tail: tail(second.out) };
 }
 
 /** Lands the branch checked out at `options.cwd`; see the file comment. */
@@ -216,7 +233,7 @@ export async function land(options: LandOptions): Promise<LandResult> {
 			for (const command of config.setup) {
 				options.progress?.(`Setting up: ${command}`);
 				const done = await run("sh", ["-c", command], dir, env, limits, options.signal);
-				if (done.code !== 0 || done.stopped) return { kind: "failed", command, why: done.stopped ? `setup was stopped: ${done.stopped}` : `setup exited with code ${done.code}`, tail: tail(done.out) };
+				if (done.code !== 0 || done.stopped) return { kind: "failed", command, why: done.stopped ? `setup was stopped: ${done.stopped}` : `setup exited with code ${done.code}`, failures: done.failures, tail: tail(done.out) };
 			}
 			options.progress?.(`Merging ${branch} into ${remote}/${target}`);
 			const message = `Land ${branch}\n\nDivergence: ${options.divergence.trim()}`;
@@ -233,7 +250,7 @@ export async function land(options: LandOptions): Promise<LandResult> {
 			for (const entry of config.checks) {
 				const results = await Promise.all((Array.isArray(entry) ? entry : [entry]).map(command => check(command, dir, checkEnv, limits, options)));
 				const failed = results.find(r => r.outcome === "failed");
-				if (failed?.outcome === "failed") return { kind: "failed", command: failed.command, why: failed.why, tail: failed.tail };
+				if (failed?.outcome === "failed") return { kind: "failed", command: failed.command, why: failed.why, failures: failed.failures, tail: failed.tail };
 				flaky.push(...results.filter(r => r.outcome === "flaky").map(r => r.command));
 			}
 			options.progress?.(`Pushing to ${remote}/${target}`);
@@ -269,7 +286,11 @@ export function describe(result: LandResult): string {
 		case "conflict":
 			return `Not landed: merging into the target conflicts in ${result.paths.join(", ")}. Merge the target into your branch, resolve these, commit, and land again.`;
 		case "failed":
-			return `Not landed: \`${result.command}\` failed on the merged result, as ${result.why}. Fix the cause on your branch, commit, and land again.\n\n${result.tail}`;
+			return [
+				`Not landed: \`${result.command}\` failed on the merged result, as ${result.why}. Fix the cause on your branch, commit, and land again.`,
+				...(result.failures.length > 0 ? [`Failing:\n${result.failures.map(f => `- ${f}`).join("\n")}`] : []),
+				`Last output:\n${result.tail}`,
+			].join("\n\n");
 		case "rejected":
 			return `Not landed: the push was refused. ${result.why}`;
 		default: {

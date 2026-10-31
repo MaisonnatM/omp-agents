@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bypass } from "./agent/extensions/land/gate";
-import { land } from "./agent/extensions/land/lander";
+import { describe as report, land } from "./agent/extensions/land/lander";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -59,6 +59,14 @@ describe("land", () => {
 		const result = await land({ cwd: r.feature, divergence: "None" });
 		expect(result).toMatchObject({ kind: "failed", command: "echo broken-on-merge; exit 3", why: "it exited with code 3 twice", tail: "broken-on-merge" });
 		expect(git(r.remote, "rev-parse", "main")).toBe(before);
+	});
+
+	test("a failed test named long before the output ends is still named in the report", async () => {
+		const r = repo({ checks: ["printf '(fail) suite > breaks on merge\\n'; i=0; while [ $i -lt 2000 ]; do echo passing output line $i; i=$((i+1)); done; exit 1"] });
+		const result = await land({ cwd: r.feature, divergence: "None" });
+		expect(result).toMatchObject({ kind: "failed", failures: ["(fail) suite > breaks on merge"] });
+		expect(result.kind === "failed" && result.tail).not.toContain("(fail)");
+		expect(report(result)).toContain("Failing:\n- (fail) suite > breaks on merge");
 	});
 
 	test("a check that passes only when run again lands and is named flaky", async () => {
