@@ -7,6 +7,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Fixed: after a session or a Bot moved up or down in the sidebar, hovering, selecting, or right-clicking a row could light up the row next to it, so it looked like the wrong session was picked.
 - Fixed: a click just between two sidebar rows could open a session from elsewhere in the list after the list reordered.
+- Behind the scenes: the checks for "Merge on main" now pass when an agent runs them from inside a session.
 
 ## 2026-10-31
 
