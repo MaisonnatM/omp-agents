@@ -313,8 +313,8 @@ export class Transcript {
 					return [];
 				});
 			case "notice": {
-				// Join and leave notices (including this dashboard's own) are noise here.
-				if (event.source === "collab") return [];
+				// Collab joins and leaves (this dashboard's own included) and the `xd://` tool lists omp mounts as MCP servers connect are noise here.
+				if (event.source === "collab" || event.source === "xdev") return [];
 				const level = event.level === "warning" || event.level === "error" ? event.level : "info";
 				return this.note(level, String(event.message));
 			}
