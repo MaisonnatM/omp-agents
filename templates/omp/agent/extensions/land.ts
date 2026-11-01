@@ -11,6 +11,7 @@ export default function landTool(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const params = z.object({
 		divergence: z.string().describe("How the result differs from what was asked: new agreements, another approach, changed scope. Write None when it matches."),
+		path: z.string().optional().describe("The checkout whose branch lands, such as the session's worktree; defaults to this session's directory."),
 	});
 
 	pi.registerTool({
@@ -18,7 +19,8 @@ export default function landTool(pi: ExtensionAPI) {
 		name: "land",
 		label: "Land",
 		description: [
-			`Lands the branch checked out in this session's directory on the target branch of a repository that commits ${CONFIG_FILE}: merges its committed tip into a fresh worktree of the remote target, runs the checks the file lists on the merged result, and pushes the merge commit, never forced.`,
+			`Lands the branch checked out in this session's directory, or in \`path\` when given, on the target branch of a repository that commits ${CONFIG_FILE}: merges its committed tip into a fresh worktree of the remote target, runs the checks the file lists on the merged result, and pushes the merge commit, never forced.`,
+			"When the session runs on the target branch and its work sits in a worktree, pass that worktree as `path`.",
 			"It is the only way to land there; pushing or merging into the target yourself is blocked.",
 			"Commit everything first. A conflict or a failed check comes back with the files or the output: fix it on your branch, commit, and land again.",
 			"It can take minutes, as long as the checks run.",
@@ -26,11 +28,11 @@ export default function landTool(pi: ExtensionAPI) {
 		parameters: params,
 		async execute(_id, raw, signal, onUpdate, ctx) {
 			const parsed = params.safeParse(raw);
-			if (!parsed.success) return { content: [{ type: "text", text: "Invalid land input: give a divergence string." }], isError: true };
+			if (!parsed.success) return { content: [{ type: "text", text: "Invalid land input: give a divergence string, and optionally a path string." }], isError: true };
 			if (ctx.agent.kind === "sub") return { content: [{ type: "text", text: "A subagent commits and reports; the session that started it lands." }], isError: true };
 			const steps: string[] = [];
 			const result = await land({
-				cwd: ctx.cwd,
+				cwd: resolve(ctx.cwd, parsed.data.path ?? "."),
 				divergence: parsed.data.divergence,
 				sessionId: ctx.sessionManager.getSessionId(),
 				signal,

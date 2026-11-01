@@ -51,7 +51,7 @@ describe("land", () => {
 	test("pushes a merge commit of the branch on the remote target, records the divergence, and fast-forwards the clean local target", async () => {
 		const r = repo({ checks: ["test -f b.txt", ["true", "test -f a.txt"]] });
 		const result = await land({ cwd: r.feature, divergence: "None" });
-		expect(result.kind).toBe("landed");
+		expect(result).toMatchObject({ kind: "landed", checks: ["test -f b.txt", "true", "test -f a.txt"] });
 		const remoteMain = git(r.remote, "rev-parse", "main");
 		expect(result.kind === "landed" && result.sha).toBe(remoteMain);
 		expect(git(r.remote, "rev-parse", "main^2")).toBe(r.tip);
@@ -127,7 +127,7 @@ describe("land", () => {
 
 	test("nothing lands when the branch is already on the target", async () => {
 		const r = repo({ checks: ["true"] });
-		expect(await land({ cwd: r.clone, divergence: "None" })).toEqual({ kind: "nothing", target: "origin/main" });
+		expect(await land({ cwd: r.clone, divergence: "None" })).toMatchObject({ kind: "nothing", target: "origin/main", branch: "main" });
 	});
 });
 

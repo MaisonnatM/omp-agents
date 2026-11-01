@@ -14,3 +14,14 @@ Add one when a mistake cost a retry and the docs did not prevent it.
 
 - omp hands an extension its own zod-compatible `pi.zod`, which refuses an object or array passed to `.default()` and then fails to load the whole extension; `templates/omp/extensions.test.ts` builds schemas with the npm `zod`, which accepts it, so the tests still pass.
 - Pass a factory, `.default(() => ({ ... }))`, and after changing an extension's schemas load it for real with `omp -p --no-extensions -e <path to the extension> "<prompt that calls its tool>"`; a load failure prints `Failed to load extension`.
+
+## Landing
+
+- `land` lands the checkout it runs in; a session on `main` with its work in a worktree gets "Nothing to land" until it passes that worktree as `path`. Never branch in the shared main checkout to work around it.
+- In a final reply, name only the checks the `land` output lists as passed.
+
+## Searching and browser evals
+
+- Search for the exact text you see on screen, such as `xd://:` rather than `mounted`; a common word across `src`, `web`, and omp's source returns hundreds of unrelated lines.
+- End a browser eval with an explicit `print` of the fields you need; a bare trailing `globalThis.tab = tab` prints the whole tab object, about 120 lines.
+- For a smoke check of something that should disappear, use `scripts/smoke-proof.ts --expect-absent`, which also proves the server serves your checkout; see [docs/agent-smoke.md](docs/agent-smoke.md).
