@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-01
 
+- Fixed: when your first message starts with /, to call a skill or a command, the pinned skill's button now hides instead of showing its name crossed out.
+- Fixed: hovering the pinned skill's greyed-out button now says why, when the folder has no skill of that name.
 - Fixed: after a session or a Bot moved up or down in the sidebar, hovering, selecting, or right-clicking a row could light up the row next to it, so it looked like the wrong session was picked.
 - Fixed: a click just between two sidebar rows could open a session from elsewhere in the list after the list reordered.
 - Behind the scenes: the checks for "Merge on main" now pass when an agent runs them from inside a session.

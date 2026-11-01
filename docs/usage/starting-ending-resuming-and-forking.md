@@ -43,7 +43,7 @@
   While it is on, the first message goes through the skill, as if you had typed `/skill:<name>` before it, and the transcript shows the skill's pill.
   Click it to start this one session without the skill.
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
-  A first message that starts with `/` keeps its own command and skips the pinned skill.
+  A first message that starts with `/` keeps its own skill or command and skips the pinned skill, so the toggle hides while the message starts that way.
 - When the directory is in a git checkout, a branch picker sits after the directory picker in the composer.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
