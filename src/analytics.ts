@@ -1,6 +1,6 @@
 import { basename, isAbsolute, relative, sep } from "node:path";
 import type { FileUsage, ForeignRequest } from "./foreign/usage";
-import type { StatsDashboard, StatsProviderPoint, StatsUsage } from "./omp/modules";
+import type { StatsDashboard, StatsProviderPoint, StatsUsage } from "./omp/module-types/stats";
 import type { SessionModelRow, StatsRead, StatsWindow } from "./omp/stats";
 import type { Analytics, AnalyticsProviderUsage, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared/analytics";
 import { selectorOf } from "./shared/models";

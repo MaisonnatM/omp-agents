@@ -1,6 +1,7 @@
 import { FolderOpen } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
+import type { TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
@@ -102,6 +103,7 @@ export function SettingsPage({
 	onPickWorkspace,
 	workspaces,
 	workspaceList,
+	trustedProjects,
 	pins,
 }: {
 	section: SettingsSection;
@@ -110,6 +112,8 @@ export function SettingsPage({
 	onPickWorkspace: (cwd: string | null) => void;
 	workspaces: Workspace[];
 	workspaceList: WorkspaceList<Workspace>;
+	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
+	trustedProjects: TrustedProject[];
 	pins: string[];
 }) {
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
@@ -140,7 +144,7 @@ export function SettingsPage({
 		integrations: <IntegrationsTab active={section === "integrations"} workspaces={workspaces} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
-		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} />,
+		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
 		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,

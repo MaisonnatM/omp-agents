@@ -3,6 +3,7 @@ import { applyBot, type Bot, type BotChange, type BotId, type BotLast } from "..
 import type { PlanUsage } from "../src/shared/models";
 import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
+import type { TrustedProject } from "../src/shared/project-trust";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import { applyPins, type PinChange } from "../src/shared/pins";
@@ -19,7 +20,7 @@ import type { Completions } from "./pane-store";
 import { changePanes, DEFAULT_SPLIT_RATIOS, type PaneCommand, type PaneNavigation, type SplitRatios } from "./pane-navigation";
 import type { ModelList } from "./reads";
 import { EMPTY_LAYOUT, endSession, hashForLayout, hashForRoute, type Layout, type Page, type Route, sameView } from "./routing";
-import { beginStart, dismissSettled, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
+import { beginStart, dismissSettled, dismissTrust, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
 
 export interface DashboardState extends PaneNavigation {
 	connected: boolean;
@@ -61,6 +62,8 @@ export interface DashboardState extends PaneNavigation {
 	scheduled: ScheduledSend[];
 	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
 	workspaceList: WorkspaceList<Workspace>;
+	/** The projects whose agent code the user trusted, empty until the server first sends them. */
+	trustedProjects: TrustedProject[];
 	/** The pinned sessions' ids, empty until the server first sends them; a change shows here before the server answers. */
 	pins: string[];
 	/** What the bell lists, empty until the server first sends it. */
@@ -74,7 +77,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "scheduled" | "workspaces" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -96,6 +99,8 @@ export type Action =
 	| { t: "user-note"; change: UserNoteChange }
 	| { t: "pin"; change: PinChange }
 	| { t: "bot"; change: Exclude<BotChange, { op: "message" }>; now: string }
+	/** The trust dialog of start `reqId` closed, by trusting or by **Cancel**. */
+	| { t: "trust-dismiss"; reqId: number }
 	| ServerAction;
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
@@ -207,7 +212,7 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, starts, started: { instanceId, workspace } };
 		}
 		case "resumed-all": {
-			const starts = settleResumeAll(state.starts, action.reqId, action.errors);
+			const starts = settleResumeAll(state.starts, action.reqId, action.errors, action.trust);
 			return starts === state.starts ? state : { ...state, starts };
 		}
 		case "usage":
@@ -229,6 +234,12 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, scheduled: action.sends };
 		case "workspaces":
 			return { ...state, workspaceList: action.list };
+		case "project-trust":
+			return { ...state, trustedProjects: action.projects };
+		case "trust-dismiss": {
+			const starts = dismissTrust(state.starts, action.reqId);
+			return starts === state.starts ? state : { ...state, starts };
+		}
 		case "pins":
 			return { ...state, pins: action.sessionIds };
 		case "notices":
@@ -278,6 +289,7 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		botLasts: {},
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
+		trustedProjects: [],
 		pins: [],
 		notices: [],
 		merges: [],

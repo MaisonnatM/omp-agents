@@ -4,7 +4,8 @@ import { isObject } from "../json";
 import type { CollabAutoStart, TerminalAccess } from "../shared/readiness";
 import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
-import { collabSettings, config, dirs, extensionSettings, fallbackChains, modelSettings, type OmpSettingsInstance, type SettingHandle, sessionSettings, settingsRegistry } from "./modules";
+import { collabSettings, config, dirs, extensionSettings, fallbackChains, modelSettings, sessionSettings, settingsRegistry } from "./modules";
+import type { OmpSettingsInstance, SettingHandle } from "./module-types/config";
 
 /** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
 export const agentDir: string = dirs.getAgentDir();

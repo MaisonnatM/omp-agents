@@ -9,7 +9,9 @@ import { keepersDir } from "../paths";
 import type { Frame } from "./collab";
 import { childEnv } from "../proc";
 import { ompCommand } from "./install";
-import { type RpcHostTool, rpc, rpcFrameFile, rpcFrames, type ServiceTierModel, utils } from "./modules";
+import { rpc, rpcFrameFile, rpcFrames, utils } from "./modules";
+import type { ServiceTierModel } from "./module-types/models";
+import type { RpcHostTool } from "./module-types/rpc";
 
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {
@@ -124,6 +126,11 @@ export interface RpcLaunch {
 	tools: RpcHostTool[];
 }
 
+/** A launch that spawns a fresh omp, which `admit` keeps from spawning in `cwd` by rejecting. An attach to a running omp never asks. */
+export interface AdmittedLaunch extends RpcLaunch {
+	admit: (cwd: string) => Promise<void>;
+}
+
 export const PLAIN_LAUNCH: RpcLaunch = { args: [], tools: [] };
 
 /** Frames `RpcClient` drops: dialogs, which it hands only to its own login flow, title changes, and built-in slash commands' output and model switches. */
@@ -179,11 +186,12 @@ async function drive(link: (agentArgs: string[]) => Promise<KeeperLink>, onFrame
 }
 
 /**
- * Starts omp's CLI in `cwd` under a keeper for session `instanceId`, through omp's own `RpcClient`. Resolves once omp
- * reports ready. `onFrame` gets every frame of {@link UNROUTED_FRAMES} from spawn on, so a dialog raised while the
- * session opens is not lost.
+ * Starts omp's CLI in `cwd` under a keeper for session `instanceId`, through omp's own `RpcClient`, once `launch` admits
+ * `cwd`. Resolves once omp reports ready. `onFrame` gets every frame of {@link UNROUTED_FRAMES} from spawn on, so a
+ * dialog raised while the session opens is not lost.
  */
-export function startRpc(instanceId: string, cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
+export async function startRpc(instanceId: string, cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: AdmittedLaunch): Promise<RpcChild> {
+	await launch.admit(cwd);
 	return drive(
 		agentArgs => startKeeper(keepersDir, instanceId, { cwd, argv: [...ompCommand, ...agentArgs], env: childEnv(), frameModule: rpcFrameFile, meta: { startedAt: Date.now(), cwd } }),
 		onFrame,

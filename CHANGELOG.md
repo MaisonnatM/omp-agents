@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-10-31
 
+- Before a session runs a project's own agent code, such as its extensions, tools, or MCP servers, the dashboard now asks you to trust it once, and asks again when a piece is new or has changed.
+- Settings › Workspaces now lists the projects you trusted, with Stop trusting to have the next session there ask again.
 - With the starter kit, when you say "Merge on main", the agent now merges your branch into a fresh copy of main, runs the project's checks on the result, and only then pushes.
 - Agents can no longer push or merge straight into main in a project set up this way, so a change that breaks the checks never lands.
 - When a check stops a merge, the agent is told which tests failed, even in a long test run, so it can fix them without running everything again.

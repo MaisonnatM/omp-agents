@@ -4,7 +4,7 @@
  * left idle for the setting's minutes, and stops what a session that left the roster leaves behind. Every stop of a
  * session's processes goes through it; `docs/architecture/session-processes.md` says what counts and why.
  */
-import type { DaemonReport, DaemonScope } from "../omp/modules";
+import type { DaemonReport, DaemonScope } from "../omp/module-types/processes";
 import { run } from "../proc";
 import { cwdsArgv, descendants, LISTENERS_ARGV, parseCwds, parseListeners, parsePs, PS_ARGV, PS_ENV, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";

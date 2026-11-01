@@ -144,6 +144,12 @@ The kit is a starting point.
 Edit the files here before you install, or edit your own copies afterwards; the dashboard's **Settings** page edits the model routing and every file above in place.
 The model ids in `config.yml` are the ones `omp models` listed when the kit was written; replace any that your omp no longer lists.
 
+## Per-project setup
+
+The kit is your personal layer in `~/.omp/agent`, which every session loads.
+A repository can commit its own layer in an `.omp/` folder at its top, with the same kinds of files, and omp loads it after yours, so the project's entry wins on a name clash, except a TypeScript slash command, where yours wins.
+Before the dashboard starts a session that would run the project's extensions, hooks, tools, MCP servers, or settings, it asks you to trust them; see [Per-project agent setup](../../docs/usage/per-project-agent-setup.md).
+
 ## Licenses
 
 The kit is MIT-licensed with the rest of the repository.

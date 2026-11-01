@@ -3,15 +3,15 @@ import { readFile, open, rename, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { agentDir } from "./config";
-import type { RpcLaunch } from "./rpc";
+import type { AdmittedLaunch } from "./rpc";
 import { ompTemplateDir } from "../server/resources";
 import { loader } from "./modules";
 import { REPLAY_MARKER, replayMarkerOf } from "../shared/replay";
 import type { ReplayMarker } from "../shared/replay";
 import { packageDir } from "./install";
 
-export interface ReplayLaunch extends RpcLaunch { readyToken: string }
-export type ReplayResume = { launch: RpcLaunch; marker: null } | { launch: ReplayLaunch; marker: ReplayMarker };
+export interface ReplayLaunch extends AdmittedLaunch { readyToken: string }
+export type ReplayResume = { launch: AdmittedLaunch; marker: null } | { launch: ReplayLaunch; marker: ReplayMarker };
 export async function writeReplayConfig(file: string): Promise<string> {
 	const config = `${file}.replay.yml`;
 	const temporary = `${config}.${randomUUID()}.tmp`;
@@ -29,7 +29,7 @@ export async function writeReplayConfig(file: string): Promise<string> {
 	return config;
 }
 
-export function replayLaunch(config: string, launch: RpcLaunch): ReplayLaunch {
+export function replayLaunch(config: string, launch: AdmittedLaunch): ReplayLaunch {
 	const readyToken = randomUUID();
 	const args = [...launch.args, "--config", config, "--replay-safe-edits", "--replay-package", packageDir, "--replay-nonce", readyToken];
 	for (const name of ["request-log", "replay-guard"]) if (!existsSync(join(agentDir, "extensions", `${name}.ts`))) args.push("-e", join(ompTemplateDir, "agent", "extensions", `${name}.ts`));
@@ -43,7 +43,7 @@ export async function readReplayMarker(file: string): Promise<ReplayMarker | nul
 	if (entry && !marker) throw new Error("Replay protection metadata is invalid. This file cannot be safely resumed.");
 	return marker;
 }
-export async function launchForReplayResume(file: string, launch: RpcLaunch): Promise<ReplayResume> {
+export async function launchForReplayResume(file: string, launch: AdmittedLaunch): Promise<ReplayResume> {
 	const marker = await readReplayMarker(file);
 	if (!marker) return { launch, marker: null };
 	return { launch: replayLaunch(await writeReplayConfig(file), launch), marker };

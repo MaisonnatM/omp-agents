@@ -8,22 +8,8 @@ import { isObject, str } from "../json";
 import { runChecked } from "../proc";
 import { ApiError, type Bearer } from "../signed-fetch";
 import { ompCommand } from "./install";
-import {
-	auth,
-	dirs,
-	discoveryHelpers,
-	mcpClient,
-	type McpConnection,
-	type McpServerConfig,
-	type McpSourceMeta,
-	type McpToolDefinition,
-	mcpConfig,
-	mcpConfigWriter,
-	mcpCredentials,
-	mcpOAuthDiscovery,
-	mcpOAuthFlow,
-	mcpRpc,
-} from "./modules";
+import { auth, dirs, discoveryHelpers, mcpClient, mcpConfig, mcpConfigWriter, mcpCredentials, mcpOAuthDiscovery, mcpOAuthFlow, mcpRpc } from "./modules";
+import type { McpConnection, McpServerConfig, McpSourceMeta, McpToolDefinition } from "./module-types/mcp";
 
 export type { McpServerConfig, McpSourceMeta, McpToolDefinition };
 

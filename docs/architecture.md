@@ -15,6 +15,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [The idle stop](architecture/session-processes.md#the-idle-stop)
 - [Replay from here](architecture/replay-from-here.md)
 - [Socket requests](architecture/socket-requests.md)
+- [Project trust](architecture/project-trust.md)
 - [Ask about this](architecture/ask-about-this.md)
 - [Desktop shell](architecture/desktop-shell.md)
   - [Packaging and releases](architecture/desktop-shell.md#packaging-and-releases)

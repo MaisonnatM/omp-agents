@@ -3,7 +3,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId } from "../shared/bots";
+import type { TrustAsk } from "../shared/project-trust";
 import { newSessionRequest, type StartRequest } from "../shared/sessions";
+import { UntrustedProjectError, untrustedText } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
 
 const dirs: string[] = [];
@@ -17,12 +19,16 @@ function tempDir(): string {
 	return dir;
 }
 
-/** One running dashboard session `i1`, and the moves it was handed for its turn's end. */
-function setup() {
+/** One running dashboard session `i1`, and the moves it was handed for its turn's end; `untrusted` is what the census finds in a directory. */
+function setup(untrusted: (dir: string) => TrustAsk | null = () => null) {
 	const moved: string[] = [];
 	const moves = new SessionMoves({
 		session: instanceId => (instanceId === "i1" ? { moveAfterTurn: dir => void moved.push(dir) } : undefined),
 		isBot: request => request.kind === "new" && request.bot !== null,
+		admit: async dir => {
+			const ask = untrusted(dir);
+			if (ask) throw new UntrustedProjectError(ask);
+		},
 	});
 	const tool = moves.join(newSessionRequest("/tmp", "Hi")).rpc.tools[0]!;
 	/** omp starts call `toolCallId` in session `instanceId`, and the tool runs it. */
@@ -73,6 +79,15 @@ describe("the move_session tool", () => {
 		await expect(call("c2", "relative/dir")).rejects.toThrow("path must be absolute or start with ~.");
 		ended("c1", true);
 		ended("c2", true);
+		expect(moved).toEqual([]);
+	});
+
+	test("a directory whose agent code is untrusted errors to the model with the trust message and moves nothing", async () => {
+		const dir = tempDir();
+		const ask: TrustAsk = { root: dir, rootDisplay: dir, code: [{ kind: "mcp-server", id: "mcp:db", name: "db", hash: "h", change: "new" }] };
+		const { moved, call, ended } = setup(at => (at === dir ? ask : null));
+		await expect(call("c1", dir)).rejects.toThrow(untrustedText(ask));
+		ended("c1", true);
 		expect(moved).toEqual([]);
 	});
 

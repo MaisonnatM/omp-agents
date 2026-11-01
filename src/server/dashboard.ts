@@ -26,7 +26,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -87,6 +87,7 @@ import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
 import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
+import { ProjectTrustFile } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
@@ -134,9 +135,12 @@ export class Dashboard {
 	});
 	readonly #botsFile = new BotsFile(botsFile);
 	readonly #bots: Bots;
+	readonly #projectTrust = new ProjectTrustFile(projectTrustFile);
+	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
 		isBot: request => this.#bots.botOf(request) !== null,
+		admit: this.#admit,
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
@@ -307,6 +311,7 @@ export class Dashboard {
 				},
 				apply: change => workspaces.apply(change),
 			},
+			"project-trust": { msg: () => ({ t: "project-trust", projects: this.#projectTrust.projects() }), apply: change => this.#projectTrust.apply(change) },
 			pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 			preferences: { msg: () => ({ t: "preferences", values: this.#preferences.value }), apply: change => this.#preferences.apply(change) },
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
@@ -366,6 +371,7 @@ export class Dashboard {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
 			joinFor: request => this.#joinFor(request),
+			admit: this.#admit,
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
@@ -590,6 +596,7 @@ export class Dashboard {
 				knownWorkspaces: () => this.knownWorkspaces(),
 				addedCwds: () => this.#workspaces.value.added,
 				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
+				changeProjectTrust: change => void this.#lists.apply("project-trust", change),
 				summaryOf(sessionId) {
 					const saved = files.savedOf(sessionId);
 					return saved && { file: saved.path, title: saved.title, workspace: files.facts.placement.cwdOf(saved.cwd) };

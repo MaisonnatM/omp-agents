@@ -3,7 +3,8 @@ import { runJson } from "../proc";
 import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
 import { loadOmpConfig, type OmpConfig, readSelector, routedSelectors } from "./config";
 import { ompCommand } from "./install";
-import { auth, modelResolver, oauth, type ServiceTierModel, serviceTiers } from "./modules";
+import { auth, modelResolver, oauth, serviceTiers } from "./modules";
+import type { ServiceTierModel } from "./module-types/models";
 
 const MODELS_TIMEOUT_MS = 30_000;
 

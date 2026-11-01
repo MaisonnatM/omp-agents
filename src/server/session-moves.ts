@@ -4,7 +4,7 @@
  */
 import type { DashboardSession } from "../dashboard-session";
 import { isObject } from "../json";
-import type { RpcHostTool } from "../omp/modules";
+import type { RpcHostTool } from "../omp/module-types/rpc";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { directoryOf } from "../paths";
 import type { StartRequest } from "../shared/sessions";
@@ -17,6 +17,8 @@ export interface SessionMovesDeps {
 	session(instanceId: string): Pick<DashboardSession, "moveAfterTurn"> | undefined;
 	/** Whether `request` starts or resumes a Bot's conversation, which stays in its Bot's directory. */
 	isBot(request: StartRequest): boolean;
+	/** Lets a session run in `dir`, or throws while the project code there is not trusted as it is now. */
+	admit(dir: string): Promise<void>;
 }
 
 export class SessionMoves {
@@ -47,6 +49,8 @@ export class SessionMoves {
 			if (typeof path !== "string" || !/^\s*[/~]/.test(path)) throw new Error("path must be absolute or start with ~.");
 			const dir = await directoryOf(path);
 			if (!dir) throw new Error(`Not a directory: ${path.trim()}`);
+			// A move reloads omp in the new directory, which runs that project's code as a start would.
+			await this.#deps.admit(dir);
 			this.#called.set(toolCallId, dir);
 			return `When this turn ends, the dashboard moves this session to ${dir} and reloads its context files. End your turn now; do not work in ${dir} before the move.`;
 		},

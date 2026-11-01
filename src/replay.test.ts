@@ -6,7 +6,7 @@ import { canonicalJson, sha256 } from "../templates/omp/agent/extensions/replay/
 import { checkReplayRequest } from "../templates/omp/agent/extensions/replay/replay-check";
 import { isObject } from "./json";
 import { loader, sessionManager } from "./omp/modules";
-import type { OmpSessionManager } from "./omp/modules";
+import type { OmpSessionManager } from "./omp/module-types/session";
 import { openPromptCut } from "./omp/replay-fork";
 import { REPLAY_CHECK, REPLAY_MARKER } from "./shared/replay";
 import { prepareReplay, replayComparison, replayDetail, ReplayFold } from "./replay";

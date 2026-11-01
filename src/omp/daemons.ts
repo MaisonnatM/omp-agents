@@ -1,6 +1,7 @@
 /** omp's daemon brokers: the services each project's broker runs, as `omp ps` lists them, the stop of one, and the start of a session's own. */
 import type { SessionProcessWatchDeps } from "../server/session-processes";
-import { config, type DaemonSpec, launchClient, launchPaths, psData, psTable } from "./modules";
+import { config, launchClient, launchPaths, psData, psTable } from "./modules";
+import type { DaemonSpec } from "./module-types/processes";
 
 /** How long the broker gives a stopped service to exit before it kills it. */
 const SERVICE_STOP_MS = 3_000;

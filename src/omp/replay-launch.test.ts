@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { PLAIN_LAUNCH } from "./rpc";
 import { replayLaunch, requireReplayReady, writeReplayConfig } from "./replay-launch";
 
+const ADMIT_ALL = async (): Promise<void> => {};
 const directories: string[] = [];
 function fixture(): string {
 	const directory = mkdtempSync(join(tmpdir(), "omp-replay-launch-test-"));
@@ -26,7 +27,7 @@ test("the private LSP overlay replaces a symlink without changing its target", a
 });
 
 test("protected launch keeps the existing advertised-tool arguments and uses fresh readiness nonces", () => {
-	const launch = { ...PLAIN_LAUNCH, args: [...PLAIN_LAUNCH.args, "--tools", "read,edit,bash"] };
+	const launch = { ...PLAIN_LAUNCH, args: [...PLAIN_LAUNCH.args, "--tools", "read,edit,bash"], admit: ADMIT_ALL };
 	const first = replayLaunch("/tmp/replay.yml", launch);
 	const second = replayLaunch("/tmp/replay.yml", launch);
 	expect(first.args.slice(0, launch.args.length)).toEqual(launch.args);

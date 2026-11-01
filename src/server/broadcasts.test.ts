@@ -18,6 +18,7 @@ import { ScheduledFile } from "./scheduled-file";
 import { createClientHandler, type SocketEnv } from "./socket";
 import { UserTodosFile } from "./user-todos-file";
 import { UserNotesFile } from "./user-notes-file";
+import { ProjectTrustFile } from "./project-trust-file";
 import { WorkspacesFile } from "./workspaces-file";
 import type { Socket, SocketData } from "./views";
 
@@ -44,6 +45,7 @@ function setup(initial: PastSession[]) {
 	const routines = new RoutinesFile(join(dir, "routines.json"));
 	const scheduled = new ScheduledFile(join(dir, "scheduled.json"));
 	const workspaces = new WorkspacesFile(join(dir, "workspaces.json"));
+	const projectTrust = new ProjectTrustFile(join(dir, "project-trust.json"));
 	const pins = new PinsFile(join(dir, "pins.json"));
 	const preferences = new PreferencesFile(join(dir, "preferences.json"));
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
@@ -63,6 +65,7 @@ function setup(initial: PastSession[]) {
 			}),
 			apply: change => workspaces.apply(change),
 		},
+		"project-trust": { msg: () => ({ t: "project-trust", projects: projectTrust.projects() }), apply: change => projectTrust.apply(change) },
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 		preferences: { msg: () => ({ t: "preferences", values: preferences.value }), apply: change => preferences.apply(change) },
 		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change.op === "add-finding" ? { ...change, at: 0 } : change) },
@@ -190,6 +193,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("routines", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);
+		expect(lists.apply("project-trust", { op: "forget", root: "/missing" }, peer)).toBe(false);
 		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
 		expect(lists.apply("preferences", { op: "set", key: "omp-agents.split-columns", value: "0.4" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);

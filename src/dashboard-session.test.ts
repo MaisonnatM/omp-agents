@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DashboardSession, type DashboardUpdate } from "./dashboard-session";
 import type { Frame } from "./omp/collab";
 import * as rpc from "./omp/rpc";
-import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcState } from "./omp/rpc";
+import { type AdmittedLaunch, PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcState } from "./omp/rpc";
 import { errorText } from "./json";
 import { PromptRefused } from "./live-session";
 import { LiveSessions } from "./server/live-sessions";
@@ -19,6 +19,10 @@ import * as replayLaunch from "./omp/replay-launch";
 import type { PreparedReplay } from "./replay";
 
 const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
+
+/** Admits every directory: project trust has its own tests, and a spawn here only needs one. */
+const ADMIT_ALL = async (): Promise<void> => {};
+const LAUNCH: AdmittedLaunch = { ...PLAIN_LAUNCH, admit: ADMIT_ALL };
 
 /** An omp RPC client whose methods answer at once, records what the session sends omp, and lets a test play omp's events. */
 class FakeClient implements RpcClient {
@@ -104,7 +108,7 @@ async function startSession(model: { provider: string; id: string } | null = nul
 	const client = new FakeClient();
 	fakeOmp(client);
 	const updates: DashboardUpdate[] = [];
-	const session = await DashboardSession.start("inst-1", "/tmp/project", model, null, PLAIN_LAUNCH, update => updates.push(update));
+	const session = await DashboardSession.start("inst-1", "/tmp/project", model, null, LAUNCH, update => updates.push(update));
 	return { session, client, updates, rosters: () => updates.filter(update => update.kind === "roster").length };
 }
 
@@ -189,7 +193,7 @@ describe("DashboardSession state refresh", () => {
 			fakeOmp(client);
 			const switched = Promise.withResolvers<void>();
 			const refreshed = Promise.withResolvers<void>();
-			const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => {
+			const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => {
 				if (update.kind === "switched") switched.resolve();
 				if (update.kind === "roster") refreshed.resolve();
 			});
@@ -553,7 +557,7 @@ describe("DashboardSession prompts", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const order: string[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => {
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => {
 			if (update.kind === "switched") order.push(`switched ${session.sessionId}`);
 		});
 		client.abort = async () => {
@@ -618,7 +622,7 @@ describe("DashboardSession action failures", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update));
 		client.abortAndRestoreQueue = async () => { throw new Error("abort unavailable"); };
 		client.stop = async () => { throw new Error("stop unavailable"); };
 		const sessions = new LiveSessions(() => {});
@@ -654,7 +658,7 @@ describe("DashboardSession action failures", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update));
 		client.setThinkingLevel = async () => { throw new Error("thinking unavailable"); };
 		client.setFastMode = async () => { throw new Error("fast unavailable"); };
 		await expect(session.setThinking("low")).rejects.toThrow("thinking unavailable");
@@ -674,7 +678,7 @@ describe("DashboardSession action failures", () => {
 		};
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update));
 		lifecycle({ id: "a1", status: "started" });
 		const response = Promise.withResolvers<boolean>();
 		client.cancelSubagent = () => response.promise;
@@ -741,7 +745,7 @@ describe("DashboardSession start", () => {
 		};
 
 		await expect(
-			DashboardSession.start("inst-1", "/tmp/project", { provider: "p", id: "m" }, null, PLAIN_LAUNCH, update => order.push(update.kind)),
+			DashboardSession.start("inst-1", "/tmp/project", { provider: "p", id: "m" }, null, LAUNCH, update => order.push(update.kind)),
 		).rejects.toThrow("no such model");
 
 		// The question arrived (a roster change), the process stopped, and only then was the question dropped (another).
@@ -903,7 +907,7 @@ describe("DashboardSession replay admission", () => {
 		const thinking = spyOn(client, "setThinkingLevel").mockImplementation(async () => { order.push("thinking"); });
 		const ready = spyOn(replayLaunch, "requireReplayReady").mockImplementation(async () => { order.push("guard"); });
 		const prepared = preparedReplay();
-		const session = await DashboardSession.replay("replay-instance", prepared, PLAIN_LAUNCH, () => {});
+		const session = await DashboardSession.replay("replay-instance", prepared, LAUNCH, () => {});
 		expect(order).toEqual(["switch", "model", "thinking", "guard"]);
 		expect(model).toHaveBeenCalledWith("openai-codex", "gpt-5.6-sol");
 		expect(thinking).toHaveBeenCalledWith("low");
@@ -929,7 +933,7 @@ describe("DashboardSession replay admission", () => {
 		fakeOmp(client);
 		spyOn(replayLaunch, "requireReplayReady").mockResolvedValue(undefined);
 		const send = spyOn(client, "prompt").mockRejectedValueOnce(new Error("quota exhausted"));
-		const session = await DashboardSession.replay("replay-instance", preparedReplay(), PLAIN_LAUNCH, () => {});
+		const session = await DashboardSession.replay("replay-instance", preparedReplay(), LAUNCH, () => {});
 		await expect(session.prompt(null, "first", [], "followUp")).rejects.toThrow("quota exhausted");
 		await settle();
 		expect(send).toHaveBeenCalledTimes(1);
@@ -942,7 +946,7 @@ describe("DashboardSession replay admission", () => {
 		fakeOmp(client);
 		spyOn(client, "switchSession").mockResolvedValue({ cancelled: true });
 		const stopped = spyOn(client, "stop");
-		await expect(DashboardSession.replay("replay-instance", preparedReplay(), PLAIN_LAUNCH, () => {})).rejects.toThrow("cancelled");
+		await expect(DashboardSession.replay("replay-instance", preparedReplay(), LAUNCH, () => {})).rejects.toThrow("cancelled");
 		expect(stopped).toHaveBeenCalledTimes(1);
 	});
 });

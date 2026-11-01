@@ -5,6 +5,7 @@ import type { PinChange } from "../shared/pins";
 import type { PreferenceChange } from "../shared/preferences";
 import type { ServerMsg } from "../shared/protocol";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
+import type { TrustChange } from "../shared/project-trust";
 import type { ScheduledChange } from "../shared/scheduled";
 import type { WorkspaceChange } from "../shared/workspaces";
 import type { UserNoteChange } from "../user-notes-shared";
@@ -17,6 +18,7 @@ interface ListChanges {
 	routines: Exclude<RoutineChange, { op: "run-now" }>;
 	scheduled: Exclude<ScheduledChange, { op: "send-now" }>;
 	workspaces: WorkspaceChange;
+	"project-trust": TrustChange;
 	pins: PinChange;
 	"review-drafts": ReviewDraftEdit;
 	preferences: PreferenceChange;

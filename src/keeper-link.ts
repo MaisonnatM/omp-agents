@@ -7,7 +7,7 @@ import { createConnection } from "node:net";
 import { join } from "node:path";
 import { isObject } from "./json";
 import { HELLO, type KeeperMeta, pidFileOf, STOP } from "./keeper-wire";
-import type { RpcProcess } from "./omp/modules";
+import type { RpcProcess } from "./omp/module-types/rpc";
 import { stopTree } from "./process-census";
 import { keeperScript } from "./server/resources";
 

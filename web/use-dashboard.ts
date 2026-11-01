@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
 import type { BotChange } from "../src/shared/bots";
 import type { PinChange } from "../src/shared/pins";
+import type { TrustChange } from "../src/shared/project-trust";
 import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
-import { openSocket } from "./api";
+import { openSocket, putJson } from "./api";
 import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
@@ -24,7 +25,7 @@ import {
 	routeFromHash,
 	viewForSession,
 } from "./routing";
-import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
+import { messageOf, pendingStart, type RefusedStart, type StartKind, type StartOp } from "./starts";
 import { adoptPreferences, sendPreferencesThrough, storedNumber, storedPreferences, storeOrRemove } from "./stored-state";
 import { flushActivity, installActivity, record, recordAction, viewOf } from "./activity";
 
@@ -98,6 +99,10 @@ export interface Dashboard {
 	changePins: (change: PinChange) => void;
 	/** Add, change, or delete a Bot, which shows at once and reaches the server and every other window. */
 	changeBot: (change: Exclude<BotChange, { op: "message" }>) => void;
+	/** Trust the pieces `refused` asks about, then send its start again, which replaces it; rejects with why the trust could not be saved. */
+	trustAndStart: (refused: RefusedStart) => Promise<void>;
+	/** Close the trust dialog of start `reqId`, leaving its error showing. */
+	dismissTrust: (reqId: number) => void;
 }
 
 /** The Bot `page` opens, its conversation's view kept while it names the same conversation, since the roster changes far more often than which conversation shows. */
@@ -260,6 +265,7 @@ export function useDashboard(): Dashboard {
 					case "bots":
 					case "scheduled":
 					case "workspaces":
+					case "project-trust":
 					case "notices":
 					case "merges":
 					case "review-drafts":
@@ -371,6 +377,14 @@ export function useDashboard(): Dashboard {
 		},
 		[send],
 	);
+	const dismissTrust = useCallback((reqId: number) => dispatch({ t: "trust-dismiss", reqId }), []);
+	const trustAndStart = useCallback(
+		async ({ op, trust }: RefusedStart) => {
+			await putJson("/api/project-trust", { op: "trust", root: trust.root, code: trust.code.map(({ id, hash }) => ({ id, hash })) } satisfies TrustChange);
+			start(op);
+		},
+		[start],
+	);
 
-	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot };
+	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot, trustAndStart, dismissTrust };
 }

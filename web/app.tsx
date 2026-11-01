@@ -25,6 +25,7 @@ import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
 import { ScheduledSends } from "./components/scheduled";
 import { SessionDetails } from "./components/session-details";
+import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { GetStarted } from "./components/get-started";
 import { firstSessionFact } from "./get-started-model";
@@ -43,7 +44,7 @@ import { hashForRoute, hashForView, type NotesListView, type OpenMode, type Todo
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
-import { startOf } from "./starts";
+import { refusedStart, startOf } from "./starts";
 import { useAttention } from "./use-attention";
 import { useDashboard } from "./use-dashboard";
 import { useFocusedSession } from "./use-focused-session";
@@ -62,7 +63,7 @@ const ALL_NOTES: NotesListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot } = useDashboard();
+	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -178,6 +179,7 @@ export function App() {
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
+	const refused = refusedStart(state.starts);
 	// The workspace whose pull requests `useWorkspaceScope` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
 		(): DashboardStatus => ({ connected: state.connected, starts: { fork, replay, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: workspace, merges: state.merges, reviewDrafts: state.reviewDrafts }),
@@ -266,6 +268,7 @@ export function App() {
 																	botLasts={state.botLasts}
 																	openBot={openBot}
 																	workspaceList={state.workspaceList}
+																	trustedProjects={state.trustedProjects}
 																	pins={state.pins}
 																	newSessionCompletions={state.newSessionCompletions}
 																	connected={state.connected}
@@ -321,6 +324,7 @@ export function App() {
 										</DashboardSidebar>
 									)}
 									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />
+									{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
 									<GetStarted
 										route={page?.kind === "get-started"}
 										vacantHome={!page && layout.panes.length === 0}

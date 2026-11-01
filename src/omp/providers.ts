@@ -3,7 +3,7 @@
  * credentials are filed under, the sign-in itself, and removing one stored credential. The credential store opens and
  * closes on each call, so a sign-in from a terminal shows at the next read.
  */
-import type { CredentialOrigin, OAuthLoginController } from "./modules";
+import type { CredentialOrigin, OAuthLoginController } from "./module-types/models";
 import { auth, browserSession, logout, modelRegistry, oauth, oauthTerminal } from "./modules";
 import type { ModelProvider } from "../shared/providers";
 

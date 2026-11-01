@@ -6,7 +6,7 @@ import { containsPrompt } from "../../templates/omp/agent/extensions/replay/repl
 import type { PromptImage } from "../shared/sessions";
 import { isObject } from "../json";
 import { exitDiagnostics, loader, sessionManager, transcriptEntry } from "./modules";
-import type { OmpSessionManager } from "./modules";
+import type { OmpSessionManager } from "./module-types/session";
 import { blobsDir } from "./config";
 import { type ModelOption, modelOfSelector } from "../shared/models";
 import type { ReplayMarker } from "../shared/replay";

@@ -2,6 +2,8 @@
 
 The server imports omp's own modules from the installed package, so it does not reimplement a protocol, the encryption, or the session-file format, and it always speaks the same version as the sessions it shows.
 `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
+It casts each module to an interface in `src/omp/module-types/`, the subset of omp this app reads, one file per area: Collab, session files, RPC, config, models, discovery, MCP, stats, and processes.
+Those files hold only types, so the app imports a type from them directly and every value from `modules.ts`, whose import runs every check.
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 `bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../../.agents/skills/omp-release/SKILL.md) says how to read its report.
 
@@ -57,6 +59,8 @@ The main ones:
   Skill frontmatter: `SkillFrontmatter` in `pi-coding-agent/src/capability/skill.ts` keeps any key of a user's skill, but `validateAgentSkillFrontmatter` in `pi-coding-agent/src/discovery/agent-plugin-format.ts` refuses a plugin's or a skillshare pack's skill with a top-level key outside its list or a non-string `metadata` value, so `src/omp/workflows.ts` reads the `workflow` tag from `metadata.tags`.
   `src/omp/discovery.ts` keeps a `Skill`'s `name` and `frontmatter` and a `SlashCommand`'s `name` (`pi-coding-agent/src/capability/slash-command.ts`) from the capability items, so the workflows read neither file themselves.
   `config/registry.ts`'s `all` supplies known setting IDs for the installer-owned readiness plan.
+  Project code: `forgetReadFiles` in `src/omp/discovery.ts` calls `reset` from `discovery/index.ts`, which empties the capability file cache (`capability/fs.ts`), and `discoverProjectCode` calls `loadCapability` with `providers`, since the extension loader (`extensibility/extensions/loader.ts`) asks only the native provider, and with `filter`, since the custom tool loader (`extensibility/custom-tools/loader.ts`) imports only `.ts`, `.js`, `.mjs`, and `.cjs` files before omp dedupes by name.
+  TypeScript slash commands come from `discoverCustomCommands` in `extensibility/custom-commands/loader.ts`, and project language server configs from `configFileSources` in `utils/config-file-sources.ts`, the stack `loadConfig` in `lsp/config.ts` reads, kept to the files in `cwd` and in the project directories `getConfigDirPaths` in `config.ts` names; see [Project trust](project-trust.md).
 - Starter-kit plugins: `pi-coding-agent/src/extensibility/plugins/marketplace/registry.ts` exports `getMarketplacesRegistryPath`, `getInstalledPluginsRegistryPath`, `readMarketplacesRegistry`, and `readInstalledPluginsRegistry`.
   Get started reads these registries and the current project's registry, located by the read-only `resolveOrDefaultProjectRegistryPath` in `discovery/helpers.ts` with native `getProjectDir`.
   It never initializes CLI config, migrates plugin data, or installs anything while checking readiness.

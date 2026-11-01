@@ -1,6 +1,7 @@
-import { Eye, EyeOff, FolderOpen, FolderPlus } from "lucide-react";
+import { Eye, EyeOff, FolderOpen, FolderPlus, ShieldOff } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceChange, WorkspaceList } from "../../../src/shared/workspaces";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
@@ -30,20 +31,19 @@ interface WorkspacesTabProps {
 	/** What the pickers and the sidebar offer: directories sessions ran in, then the added ones. */
 	workspaces: Workspace[];
 	list: WorkspaceList<Workspace>;
+	trustedProjects: TrustedProject[];
 }
 
-/** The directories the pickers and the sidebar offer, a field to add one by path or, in the desktop app, from the folder dialog, and the hidden ones, each a click from coming back. */
-export function WorkspacesTab({ workspaces, list: { added, hidden } }: WorkspacesTabProps) {
-	const addedCwds = new Set(added.map(entry => entry.cwd));
-	const [path, setPath] = useState("");
-	const [pending, setPending] = useState<WorkspaceChange | null>(null);
+/** Sends changes to `url` one at a time: the change under way, and why the last one failed. Every page then hears the list after it over its socket. */
+function useChanges<C>(url: string) {
+	const [pending, setPending] = useState<C | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	/** Whether the server took `change`; every page then hears the workspaces after it over its socket. */
-	const change = async (next: WorkspaceChange): Promise<boolean> => {
+	/** Whether the server took `next`. */
+	const change = async (next: C): Promise<boolean> => {
 		setPending(next);
 		setError(null);
 		try {
-			await putJson("/api/workspaces", next);
+			await putJson(url, next);
 			return true;
 		} catch (err) {
 			setError(errorText(err));
@@ -52,6 +52,51 @@ export function WorkspacesTab({ workspaces, list: { added, hidden } }: Workspace
 			setPending(null);
 		}
 	};
+	return { pending, error, change };
+}
+
+function ChangeError({ error }: { error: string | null }) {
+	if (!error) return null;
+	return (
+		<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+			{error}
+		</p>
+	);
+}
+
+/** The projects whose agent code a start asked about and the user trusted, each a click from asking again. */
+function TrustedProjects({ projects }: { projects: TrustedProject[] }) {
+	const { pending, error, change } = useChanges<TrustChange>("/api/project-trust");
+	return (
+		<Section title="Trusted projects" meta="Projects whose own agent code, such as extensions, tools, MCP servers, and settings, you trusted when a session started there. A piece that changes asks again.">
+			<ChangeError error={error} />
+			{projects.length === 0 ? (
+				<p className="text-sm text-muted-foreground">No trusted projects yet.</p>
+			) : (
+				<IntegrationList label="Trusted projects">
+					{projects.map(({ root, rootDisplay, pieces }) => (
+						<WorkspaceRow
+							key={root}
+							workspace={{ cwd: root, cwdDisplay: rootDisplay }}
+							note={pieces === 1 ? "1 piece of agent code" : `${pieces} pieces of agent code`}
+							action={
+								<Button variant="ghost" size="compact" leadingIcon={ShieldOff} loading={pending?.root === root} disabled={pending !== null} onClick={() => void change({ op: "forget", root })}>
+									Stop trusting
+								</Button>
+							}
+						/>
+					))}
+				</IntegrationList>
+			)}
+		</Section>
+	);
+}
+
+/** The directories the pickers and the sidebar offer, a field to add one by path or, in the desktop app, from the folder dialog, the hidden ones, each a click from coming back, and the trusted projects. */
+export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProjects }: WorkspacesTabProps) {
+	const addedCwds = new Set(added.map(entry => entry.cwd));
+	const [path, setPath] = useState("");
+	const { pending, error, change } = useChanges<WorkspaceChange>("/api/workspaces");
 	const add = async (event: FormEvent): Promise<void> => {
 		event.preventDefault();
 		if (await change({ op: "add", cwd: path })) setPath("");
@@ -82,11 +127,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden } }: Workspace
 						</Button>
 					)}
 				</form>
-				{error && (
-					<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-						{error}
-					</p>
-				)}
+				<ChangeError error={error} />
 				{workspaces.length === 0 ? (
 					<p className="text-sm text-muted-foreground">No workspaces yet. Start a session or add a directory.</p>
 				) : (
@@ -124,6 +165,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden } }: Workspace
 					</IntegrationList>
 				</Section>
 			)}
+			<TrustedProjects projects={trustedProjects} />
 		</>
 	);
 }

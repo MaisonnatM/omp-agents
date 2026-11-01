@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { beginStart, dismissSettled, dropHidden, failStart, messageOf, settleResumeAll, settleStart, type StartOp, startOf, type Starts } from "./starts";
+import { beginStart, dismissSettled, dropHidden, failStart, messageOf, refusedStart, settleResumeAll, settleStart, type StartOp, startOf, type Starts } from "./starts";
 
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
@@ -66,5 +66,14 @@ describe("starts", () => {
 		expect(startOf(lost, "resume-all")?.phase).toBe("failed");
 		expect(dropHidden(lost, () => false)).toBe(lost);
 		expect(dismissSettled(lost, "resume-all").size).toBe(0);
+	});
+
+	test("a Resume all refused for untrusted project code asks the trust dialog about that project", () => {
+		const resumeAll: StartOp = { kind: "resume-all", sessionIds: ["s1", "s2"] };
+		const trust = { root: "/repo", rootDisplay: "/repo", code: [] };
+		const waiting = beginStart(new Map(), 1, resumeAll);
+		const failed = settleResumeAll(waiting, 1, ["not trusted"], trust);
+		expect(refusedStart(failed)).toEqual({ reqId: 1, op: resumeAll, trust });
+		expect(refusedStart(settleResumeAll(waiting, 1, ["no file"]))).toBeNull();
 	});
 });

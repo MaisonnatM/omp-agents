@@ -69,6 +69,14 @@ _Avoid_: Session list, inbox
 A repository's main checkout, or a directory outside git, that sessions run in, which the sidebar's picker filters by; a session in a linked git worktree counts in its repository's workspace.
 _Avoid_: Project, repo, folder
 
+**Project code**:
+The extensions, hooks, tools, TypeScript slash commands, MCP servers, settings, and language server configs a repository commits for its own sessions, which omp would run with your permissions; skills, agents, and rules are prompt text, not project code.
+_Avoid_: Project setup, plugins
+
+**Trusted project**:
+A repository's main checkout, or a folder outside git, whose project code you trusted piece by piece in the trust dialog, each piece by its contents, so a new or changed piece asks again; every worktree of the repository shares its trust.
+_Avoid_: Allowed project, approved folder, trusted workspace
+
 **Pin**:
 A session id the server keeps at the top of the roster in every window, or a Bot it keeps under **Pinned** at the top of the Bots tab and the gallery.
 _Avoid_: Favorite, bookmark

@@ -1,5 +1,6 @@
 import type { BranchChoice } from "../src/shared/git";
 import type { ModelOption } from "../src/shared/models";
+import type { TrustAsk } from "../src/shared/project-trust";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { PromptImage, StartResult, View } from "../src/shared/sessions";
 import { type QuickSubject, startTarget } from "./quick-actions";
@@ -38,8 +39,11 @@ export type QuickOp = Extract<StartOp, { kind: "quick" }>;
 
 export type StartKind = StartOp["kind"];
 
-/** A start waiting for the server's answer, or failed with the reason. A start that succeeded leaves {@link Starts}. */
-export type Start<Op extends StartOp = StartOp> = { op: Op } & ({ phase: "starting" } | { phase: "failed"; error: string });
+/**
+ * A start waiting for the server's answer, or failed with the reason. A start that succeeded leaves {@link Starts}. A
+ * failure has `trust` while the server refused it for untrusted project code and the trust dialog still asks.
+ */
+export type Start<Op extends StartOp = StartOp> = { op: Op } & ({ phase: "starting" } | { phase: "failed"; error: string; trust?: TrustAsk });
 
 /** The starts of this page, by the `reqId` the server answers with. At most one per kind: a new start replaces the last of its kind. */
 export type Starts = ReadonlyMap<number, Start>;
@@ -93,18 +97,21 @@ export function settleStart(starts: Starts, reqId: number, result: StartResult):
 	if (!start) return starts;
 	const next = new Map(starts);
 	if (result.ok) next.delete(reqId);
-	else next.set(reqId, { op: start.op, phase: "failed", error: result.error });
+	else {
+		const { ok: _ok, ...failure } = result;
+		next.set(reqId, { op: start.op, phase: "failed", ...failure });
+	}
 	return next;
 }
 
 /** The server's answer to **Resume all** `reqId`: it leaves the map once every session resumed, else fails with the first reason. */
-export function settleResumeAll(starts: Starts, reqId: number, errors: string[]): Starts {
+export function settleResumeAll(starts: Starts, reqId: number, errors: string[], trust?: TrustAsk): Starts {
 	const start = pendingStart(starts, reqId);
 	if (!start) return starts;
 	const next = new Map(starts);
 	const [first] = errors;
 	if (first === undefined) next.delete(reqId);
-	else next.set(reqId, { op: start.op, phase: "failed", error: `Could not resume ${errors.length === 1 ? "1 session" : `${errors.length} sessions`}. ${first}` });
+	else next.set(reqId, { op: start.op, phase: "failed", error: `Could not resume ${errors.length === 1 ? "1 session" : `${errors.length} sessions`}. ${first}`, ...(trust ? { trust } : {}) });
 	return next;
 }
 
@@ -120,9 +127,9 @@ const viewOf = (op: StartOp): View | null => {
 	return op.kind === "resume" ? { kind: "past", sessionId: op.sessionId } : null;
 };
 
-/** Forget the failed starts whose op `drop` selects; one under way keeps waiting for its answer. */
+/** Forget the failed starts whose op `drop` selects; one under way keeps waiting for its answer, and one the trust dialog asks about stays under it. */
 function dropSettled(starts: Starts, drop: (start: Start) => boolean): Starts {
-	const dropped = [...starts].filter(([, start]) => start.phase !== "starting" && drop(start));
+	const dropped = [...starts].filter(([, start]) => start.phase === "failed" && !start.trust && drop(start));
 	if (dropped.length === 0) return starts;
 	const next = new Map(starts);
 	for (const [reqId] of dropped) next.delete(reqId);
@@ -138,3 +145,23 @@ export const dropHidden = (starts: Starts, shown: (view: View) => boolean): Star
 
 /** The failure that the last start of `kind` left goes away. */
 export const dismissSettled = (starts: Starts, kind: StartKind): Starts => dropSettled(starts, start => start.op.kind === kind);
+
+/** A start the server refused for untrusted project code, which the trust dialog asks about. */
+export interface RefusedStart {
+	reqId: number;
+	op: StartOp;
+	trust: TrustAsk;
+}
+
+/** The refused start the trust dialog asks about: the last one begun, when several are. */
+export function refusedStart(starts: Starts): RefusedStart | null {
+	let refused: RefusedStart | null = null;
+	for (const [reqId, start] of starts) if (start.phase === "failed" && start.trust) refused = { reqId, op: start.op, trust: start.trust };
+	return refused;
+}
+
+/** The trust dialog of start `reqId` closed: its failure keeps its reason and asks no more. */
+export function dismissTrust(starts: Starts, reqId: number): Starts {
+	const start = starts.get(reqId);
+	return start?.phase === "failed" && start.trust ? new Map(starts).set(reqId, { op: start.op, phase: "failed", error: start.error }) : starts;
+}

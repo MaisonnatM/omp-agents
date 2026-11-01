@@ -7,7 +7,7 @@ import type { Pricer } from "../foreign/usage";
 import type { AnalyticsRange } from "../shared/analytics";
 import type { CreditsSubject } from "../shared/notices";
 import { artifactsDir } from "../subagents";
-import type { StatsDashboard, StatsProviderPoint, StatsSync, StatsToolDashboard } from "./modules";
+import type { StatsDashboard, StatsProviderPoint, StatsSync, StatsToolDashboard } from "./module-types/stats";
 import { catalog, rateLimit, statsAggregator, statsDb, statsLive, statsRollup } from "./modules";
 
 /** What one model used in one session file over the range. */

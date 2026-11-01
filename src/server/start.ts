@@ -4,13 +4,15 @@ import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboar
 import { checkoutDir, worktreeAt } from "../git";
 import { errorText } from "../json";
 import { skipRefused } from "../live-session";
-import { keptSessions, type RpcLaunch } from "../omp/rpc";
+import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
 import { prepareReplay } from "../replay";
 import { directoryOf } from "../paths";
 import { formatOf } from "../session-formats";
+import type { TrustAsk } from "../shared/project-trust";
 import { type PromptImage, type SessionFacts, type StartRequest, type StartResult, type View } from "../shared/sessions";
 import { pullRequestTask, taskConflict, taskIdentity, ticketTask } from "../task-claims";
 import type { LiveSessions } from "./live-sessions";
+import { UntrustedProjectError } from "./project-trust-file";
 
 /** How a start joins the server: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
 export interface SessionJoin {
@@ -27,7 +29,9 @@ interface Started {
 	discard?: () => Promise<void>;
 }
 
-type Outcome = { started: Started } | { error: string };
+/** A start that failed; `trust` when it refused because the project's agent code is not trusted yet. */
+type Failure = { error: string; trust?: TrustAsk };
+type Outcome = { started: Started } | Failure;
 
 type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
 
@@ -48,6 +52,8 @@ export interface StartEnv {
 	/** How a start, or the resume of an attached session, joins the server. */
 	joinFor(request: StartRequest): SessionJoin;
 	mayDiscardReplay(cwd: string): Promise<string | null>;
+	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
+	admit(cwd: string): Promise<void>;
 }
 
 export type Starter = (request: StartRequest) => Promise<StartResult>;
@@ -63,6 +69,7 @@ export function createStarter(env: StartEnv): Starter {
 		try {
 			return { started: await spawn(instanceId, emit) };
 		} catch (err) {
+			if (err instanceof UntrustedProjectError) return { error: err.message, trust: err.ask };
 			return { error: `${failure}: ${errorText(err)}` };
 		}
 	}
@@ -101,8 +108,8 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools. */
-	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<Outcome> {
+	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools, and admits its directory before omp spawns. */
+	async function spawnFor(request: StartRequest, rpcLaunch: AdmittedLaunch): Promise<Outcome> {
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
@@ -182,8 +189,8 @@ export function createStarter(env: StartEnv): Starter {
 
 	return async request => {
 		const join = env.joinFor(request);
-		const outcome = await spawnFor(request, join.rpc);
-		if ("error" in outcome) return { ok: false, error: outcome.error };
+		const outcome = await spawnFor(request, { ...join.rpc, admit: env.admit });
+		if ("error" in outcome) return { ok: false, ...outcome };
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
 		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) {

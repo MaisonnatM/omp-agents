@@ -41,7 +41,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -86,6 +86,7 @@ export const PageSwitch = memo(function PageSwitch({
 	botLasts,
 	openBot,
 	workspaceList,
+	trustedProjects,
 	pins,
 	newSessionCompletions,
 	connected,
@@ -149,6 +150,7 @@ export const PageSwitch = memo(function PageSwitch({
 					onPickWorkspace={pickWorkspace}
 					workspaces={workspaces}
 					workspaceList={workspaceList}
+					trustedProjects={trustedProjects}
 					pins={pins}
 				/>
 			);
