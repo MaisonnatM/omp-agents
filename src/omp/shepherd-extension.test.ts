@@ -2,15 +2,13 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { BotExtensionApi, BotTool } from "./bot-extension";
+import { loadExtension } from "./fake-extension-api";
 import shepherdExtension, { FIX_TOOL, type FixParams, MERGE_TOOL, type MergeParams, SHEPHERD_FLAGS } from "./shepherd-extension";
 
 const dirs: string[] = [];
 afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
-
-type Handler = Parameters<BotExtensionApi["on"]>[1];
 
 /** The extension loaded as omp loads it for shepherd `herd`, its flags but those `unset` names. */
 function loaded(unset: string[] = []) {
@@ -22,20 +20,8 @@ function loaded(unset: string[] = []) {
 		[SHEPHERD_FLAGS.inbox, inbox],
 	]);
 	for (const name of unset) flags.delete(name);
-	let handler: Handler | undefined;
-	const tools = new Map<string, BotTool<unknown>>();
-	const identity = (value: unknown) => value;
-	shepherdExtension({
-		registerFlag() {},
-		getFlag: name => flags.get(name),
-		on: (_event, registered) => void (handler = registered),
-		registerTool: registered => void tools.set(registered.name, registered as BotTool<unknown>),
-		typebox: { Type: { Object: identity, String: identity, Integer: identity, Boolean: identity, Literal: identity, Union: identity, Array: identity, Optional: identity } },
-	});
-	const prompt = () => handler!({ systemPrompt: ["base"] }, { agent: { kind: "main" } })?.systemPrompt;
-	const call = <Params>(name: string, params: Params) => tools.get(name)!.execute("call-1", params);
 	const left = () => (existsSync(inbox) ? readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8"))) : []);
-	return { prompt, call, left };
+	return { ...loadExtension(shepherdExtension, flags), left };
 }
 
 const target = { owner: "acme", repo: "webapp", number: 7 };

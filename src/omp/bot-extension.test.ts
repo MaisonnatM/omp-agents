@@ -4,15 +4,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Schedule } from "../routines";
 import { MAX_FACT_LENGTH, MAX_JOB_LENGTH } from "../shared/bots";
-import botExtension, { BOT_FLAGS, type BotExtensionApi, type BotTool, type SaveRoutineParams } from "./bot-extension";
+import botExtension, { BOT_FLAGS, type SaveRoutineParams } from "./bot-extension";
+import { loadExtension } from "./fake-extension-api";
 
 const dirs: string[] = [];
 afterEach(() => {
 	setSystemTime();
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
-
-type Handler = Parameters<BotExtensionApi["on"]>[1];
 
 const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
 const standup = { id: "r1", botId: "scout", name: "Standup", schedules: [weekdays], triggers: [], task: { kind: "prompt", prompt: "Post the standup." }, enabled: false, createdAt: 1, scheduledAt: null, runs: [] };
@@ -53,28 +52,7 @@ function loadedBot({ routines = true, job = "Watch the build.\nAsk before mergin
 		[BOT_FLAGS.routineInbox, inbox],
 	]);
 	for (const name of unset) flags.delete(name);
-	let handler: Handler | undefined;
-	const tools = new Map<string, BotTool<unknown>>();
-	botExtension({
-		registerFlag() {},
-		getFlag: name => flags.get(name),
-		on: (_event, registered) => void (handler = registered),
-		registerTool: registered => void tools.set(registered.name, registered),
-		typebox: {
-			Type: {
-				Object: properties => properties,
-				String: options => options,
-				Integer: options => options,
-				Boolean: options => options,
-				Literal: value => value,
-				Union: schemas => schemas,
-				Array: items => items,
-				Optional: schema => schema,
-			},
-		},
-	});
-	const prompt = (kind: "main" | "sub" = "main") => handler!({ systemPrompt: ["base"] }, { agent: { kind } })?.systemPrompt;
-	const call = <Params>(name: string, params: Params) => tools.get(name)!.execute("call-1", params);
+	const { prompt, call } = loadExtension(botExtension, flags);
 	/** The requests the tools left in `inboxDir` for the dashboard, oldest first. */
 	const left = (inboxDir: string) => (existsSync(inboxDir) ? readdirSync(inboxDir).sort().map(name => (name.endsWith(".json") ? JSON.parse(readFileSync(join(inboxDir, name), "utf8")) : name)) : []);
 	return {
