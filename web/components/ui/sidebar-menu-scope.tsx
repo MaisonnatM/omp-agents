@@ -183,7 +183,11 @@ export function useMenuScope(
     };
   }, []);
 
+  // A keyed re-order moves rows without mounting any, so none registers and
+  // the indexes, rects, and highlights would stay on the old order.
   useLayoutEffect(() => {
+    const rows = orderedRowsRef.current;
+    if (rows.some((el, i) => i > 0 && byDomOrder(rows[i - 1], el) > 0)) dirtyRef.current = "rows";
     flush();
   });
 
