@@ -3,6 +3,12 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-01
+
+- New Bot now starts on a new type, Bot designer, named Dr Eggbot with its job filled in, adapted from Lauren Tan's Dr Eggbot Grok Bot.
+- A Bot designer asks you a few short questions about the Bot you want, then creates it for you, and the new Bot shows in the Bots tab.
+- Switching a new Bot's type swaps the name and job that type filled in, and keeps any you typed yourself.
+
 ## 2026-10-31
 
 - With the starter kit, when you say "Merge on main", the agent now merges your branch into a fresh copy of main, runs the project's checks on the result, and only then pushes.

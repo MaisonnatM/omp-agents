@@ -24,10 +24,11 @@
   Click a card to open the Bot's page.
   The last card, and **New Bot** in the header, open the New Bot form.
   Deleting a Bot returns to the gallery.
-- New Bot follows Grok's: name the Bot, pick a shape and a color, pick its **Type**, and choose **Create**; the form starts on a random shape and color, and on **Routines**.
-  The type stays what you picked: **Routines** works through its conversation and its routines, and **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says.
-  Picking **PR shepherd** fills its **Job** with its rules, and its name with **Shepherd** while the name is empty, and hides the job templates.
-  For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it, and the name while the name is empty.
+- New Bot follows Grok's: name the Bot, pick a shape and a color, pick its **Type**, and choose **Create**; the form starts on a random shape and color, and on **Bot designer**, named **Dr Eggbot** with its job filled.
+  The type stays what you picked: **Bot designer** asks what Bot you want and creates it, as [Bot designers](#bot-designers) says, **Routines** works through its conversation and its routines, and **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says.
+  Picking **Bot designer** or **PR shepherd** fills its **Job** with its rules, and its name with **Dr Eggbot** or **Shepherd**, and hides the job templates.
+  Switching type swaps a name or job the last type or a template filled, and keeps one you typed; picking **Routines** after a type that filled them empties them.
+  For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it and the name, keeping either one you typed.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
@@ -70,6 +71,16 @@
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.
+
+## Bot designers
+
+- A Bot designer, **Dr Eggbot** unless you rename it, designs Bots with you in its conversation, adapted from Lauren Tan's Dr Eggbot Grok Bot.
+  It asks a few short questions first: what the Bot should do, where it looks, what it must never do, and which workspace it runs in.
+- Once the job is clear, it creates the Bot, and the dashboard asks you to approve that first.
+  The new Bot shows in the **Bots** tab with its name, its job, its type, and its workspace, the designer's own when it names none, and a shape and color its id picks.
+- The new Bot learns its routines in its own conversation; the designer makes none.
+- A designer's one tool creates Bots, so it cannot edit or delete any Bot, not even one it created.
+- Its job is how it designs, which you can edit like any Bot's.
 
 ## PR shepherds
 

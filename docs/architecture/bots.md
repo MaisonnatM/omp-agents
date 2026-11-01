@@ -8,13 +8,15 @@ Each Bot also keeps where it lists, `pinned` and `section`, which a save keeps a
 A section is only the name its Bots share, so `rename-section` renames it for every Bot in it, or with `to: null` moves them all out, and the section goes with its last Bot.
 A Bot's `shape` and `hue`, one of `BOT_SHAPES` and `BOT_HUES`, are its avatar's look; `parseBotSpec` gives an entry saved before them the look `defaultLook` hashes from its id, so an old Bot keeps its face.
 A new Bot's `job` is empty until its first conversation gives it one: the extension then tells the Bot to ask for it and call `set_job` with the answer.
-A Bot's `kind`, one of `BOT_KINDS`, is its type: `routines`, or `pr-shepherd`, described in [PR shepherds](#pr-shepherds).
+A Bot's `kind`, one of `BOT_KINDS`, is its type: `bot-designer`, described in [Bot designers](#bot-designers), `routines`, or `pr-shepherd`, described in [PR shepherds](#pr-shepherds).
 The page picks it when it makes the Bot, `parseBotSpec` reads an entry saved before kinds as `routines`, and `applyBot` keeps the stored kind through every later save, so a Bot never changes type.
 
 `Bots` in `src/server/bots.ts` binds each Bot to the session its conversation runs in.
 A new session whose `StartRequest` names a `bot`, or the resume of a session some Bot holds, launches omp with `-e` and the Bot extension, `src/omp/bot-extension.ts`, and the flags in `BOT_FLAGS`: the Bot's id, the `bots.json` path, the `bot-inbox/` directory beside it, its `memory.md` path, the `routines.json` path, and the `routine-inbox/` directory beside it.
 Only `Bots` sets `bot`, since `parseNewSessionRequest` never reads one, so a page cannot start a Bot's session.
-A PR shepherd's session also loads `src/omp/shepherd-extension.ts` with a second `-e`, and the flags in `SHEPHERD_FLAGS`: the Bot's id and the `shepherd-inbox/` directory beside `bots.json`.
+A Bot of another kind than `routines` also loads its kind's extension with a second `-e`, with any flags it reads beyond the Bot extension's, from the per-kind table `kindExtensions` in `src/server/bots.ts`.
+A PR shepherd's session loads `src/omp/shepherd-extension.ts` with the flags in `SHEPHERD_FLAGS`, the Bot's id and the `shepherd-inbox/` directory beside `bots.json`.
+A Bot designer's loads `src/omp/designer-extension.ts` with no flags of its own: it registers the Bot extension's `BOT_FLAGS.bot` and `BOT_FLAGS.botInbox` too, and omp keeps one value per flag name for every extension that registers it, which `flagValue` in `src/omp/bot-extension.ts` reads.
 Any other start launches plain, so no other session loads the extension.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
 
@@ -30,8 +32,8 @@ It refuses a fact longer than `MAX_FACT_LENGTH`, 500 characters, so each fact st
 The extension's `set_job` tool replaces the Bot's own job, and never writes `bots.json`.
 It takes one `job`, the whole job as Markdown, trims it, refuses one longer than `MAX_JOB_LENGTH`, 20,000 characters, the limit `parseBotSpec` holds a job the page saves to, and an empty one clears the job.
 It writes one `BotJobRequest` (`src/shared/bots.ts`), the Bot's id and its job, into `bot-inbox/` the way the routine tools write theirs, and loads as `essential` and asks approval as a write.
-The server's `BotInbox` in `src/server/bot-inbox.ts` reads each file with `parseBotJobRequest` and saves the Bot with only its `job` changed through the list registry's `bots` save, as the page's **Save job** does, so every page hears it and the next turn's prompt reads it from `bots.json`.
-It moves aside as `<name>.invalid`, with a logged reason, a file that is no request, a job for a Bot that is gone, and a save the Bots refuse; a job the Bot already holds is done and deleted.
+The server's `BotInbox` in `src/server/bot-inbox.ts` reads each file with `parseBotInboxRequest`, which tells a `set_job`'s `{ botId, job }` from a designer's `{ botId, create }`, and saves the Bot with only its `job` changed through the list registry's `bots` save, as the page's **Save job** does, so every page hears it and the next turn's prompt reads it from `bots.json`.
+It moves aside as `<name>.invalid`, with a logged reason, a file that is no request, a request from a Bot that is gone, and a save the Bots refuse; a job the Bot already holds is done and deleted.
 Only the server that owns the lock drains it, so a job waits there while the dashboard is stopped.
 
 The extension's `save_routine` and `delete_routine` tools change only the Bot's own routines, and never write `routines.json`.
@@ -58,6 +60,19 @@ The details in the right sidebar, `BotDetails`, list its routines in their own t
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and the server streams only that view while the page covers the panes (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts that view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.
 `useDashboard` works out the open Bot once with `openBot` in `web/bots-model.ts` and hands it to the page, the details, `watched`, and `useAttention`: its conversation's view is the live session that runs it, else its saved one, and none while the page shows the routines card, a routine editor, or a routine its address names but the Bot does not have.
+
+## Bot designers
+
+The page fills a new designer's name with `DESIGNER_NAME`, **Dr Eggbot**, and its job with `DESIGNER_JOB` from `src/shared/bot-designer.ts`, adapted from Lauren Tan's Dr Eggbot Grok Bot; the server does not, so the job stays one the user can edit.
+`BOT_KIND_START` in `web/bots-model.ts` holds each kind's starting name, job, Job hint, and templates.
+`pickKind` and `pickTemplate` swap a name or job the form filled, blank or as the kind or one of its templates filled it, and keep one the user typed.
+The designer extension adds its rules to the main agent's system prompt and registers one tool, `CREATE_TOOL` from `src/shared/bot-designer.ts`, `create_bot`, which loads as `essential` and asks approval as a write.
+It takes a `name`, a `job` of at most `MAX_JOB_LENGTH` characters, an optional `kind`, `routines` when left out, and an optional `cwd`, the session's own workspace when left out, and refuses an empty name, a longer job, an unknown kind, or a workspace that is not the absolute path of a directory.
+It writes one `BotCreateRequest` (`src/shared/bots.ts`), the designer's id and `create`, the new Bot's `id`, a fresh `randomUUID()`, its `kind`, `name`, `job`, and `cwd`, into `bot-inbox/` as `set_job` does.
+`parseBotInboxRequest` reads `create` with `parseBotSpec`, so a create the page would refuse, or one with no `cwd`, is no request and moves aside.
+`BotInbox` sets aside a create from a Bot that is not a `bot-designer` as misrouted; it guards against a request in the wrong place and is no permission, since only a designer's session has the tool.
+A Bot that already has the id is the request applied already, so the file is done and deleted, and a create never edits another Bot.
+Otherwise it saves the Bot, with no model or skill and the look `defaultLook` gives its id, through the list registry's `bots` save, the page's own path, so a new PR shepherd gets its routine too.
 
 ## PR shepherds
 
