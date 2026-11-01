@@ -1,6 +1,8 @@
 /** What the page shows of a Bot: the Bot its page opens, its sidebar row, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
 import type { Routine } from "../src/routines";
-import type { Bot, BotId, BotLast } from "../src/shared/bots";
+import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
+import type { Bot, BotId, BotKind, BotLast } from "../src/shared/bots";
+import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { needsYou } from "./attention";
 import { statusLabel } from "./components/status-dot";
@@ -229,6 +231,48 @@ export const JOB_TEMPLATES: readonly JobTemplate[] = [
 		job: "Check for new omp releases.\nSummarize what changed and what in this repository it could break.\nAsk before you bump a version.",
 	},
 ];
+
+/** What the New Bot form starts a kind with: the name and job it fills, the Job field's hint, and the jobs it offers to start from. */
+export interface BotKindStart {
+	name: string;
+	job: string;
+	hint: string;
+	templates: readonly JobTemplate[];
+}
+
+export const BOT_KIND_START: Record<BotKind, BotKindStart> = {
+	"bot-designer": { name: DESIGNER_NAME, job: DESIGNER_JOB, hint: "How it designs your Bots. Edit it to fit how you like them.", templates: [] },
+	routines: { name: "", job: "", hint: "Optional. Leave it empty and tell it in your first message.", templates: JOB_TEMPLATES },
+	"pr-shepherd": { name: SHEPHERD_NAME, job: SHEPHERD_JOB, hint: "Its rules. Edit them to fit how you merge.", templates: [] },
+};
+
+/** What the New Bot form holds of the Bot's type, name, and job. */
+export interface NewBotDraft {
+	kind: BotKind;
+	name: string;
+	job: string;
+}
+
+/** Whether the form, not the user, wrote `draft`'s `field`: it is blank, or as its type or one of the type's templates filled it. */
+function formFilled(draft: NewBotDraft, field: "name" | "job"): boolean {
+	const start = BOT_KIND_START[draft.kind];
+	return draft[field].trim() === "" || [start, ...start.templates].some(filled => filled[field] === draft[field]);
+}
+
+/** `draft` with `kind` picked: a name or job the form filled becomes `kind`'s, and one the user typed stays. */
+export function pickKind(draft: NewBotDraft, kind: BotKind): NewBotDraft {
+	if (kind === draft.kind) return draft;
+	const to = BOT_KIND_START[kind];
+	return { kind, name: formFilled(draft, "name") ? to.name : draft.name, job: formFilled(draft, "job") ? to.job : draft.job };
+}
+
+/** `draft` started from `template`: a name or job the form filled becomes the template's, and one the user typed stays. */
+export function pickTemplate(draft: NewBotDraft, template: JobTemplate): NewBotDraft {
+	return { ...draft, name: formFilled(draft, "name") ? template.name : draft.name, job: formFilled(draft, "job") ? template.job : draft.job };
+}
+
+/** The New Bot form's start: a Bot designer, with the name and job its type fills. */
+export const NEW_BOT_DRAFT: NewBotDraft = { kind: "bot-designer", name: BOT_KIND_START["bot-designer"].name, job: BOT_KIND_START["bot-designer"].job };
 
 /** The prompts a Bot offers before its first message: its job's first sentence as a task, a question about what it needs, and a fact for its memory. */
 export function starterPrompts(job: string): string[] {
