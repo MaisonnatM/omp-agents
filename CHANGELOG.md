@@ -5,7 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-01
 
-- Fixed: when your first message starts with a skill or a command, the pinned skill's button now steps aside instead of showing its name crossed out.
+- Fixed: when your first message starts with /, to call a skill or a command, the pinned skill's button now hides instead of showing its name crossed out.
+- Fixed: hovering the pinned skill's greyed-out button now says why, when the folder has no skill of that name.
 
 ## 2026-10-31
 

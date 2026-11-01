@@ -251,8 +251,9 @@ function skillTitle(name: string, state: SkillState): string {
 }
 
 function SkillToggle({ name, state, onToggle, disabled }: { name: string; state: SkillState; onToggle: () => void; disabled: boolean }) {
+	const off = disabled || state === "missing";
 	return (
-		<Tooltip content={skillTitle(name, state)}>
+		<Tooltip content={skillTitle(name, state)} disabled={off}>
 			<Button
 				variant="ghost"
 				size="compact"
@@ -260,7 +261,7 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 				aria-pressed={state === "on"}
 				aria-label={`Skill ${name}`}
 				onClick={onToggle}
-				disabled={disabled || state === "missing"}
+				disabled={off}
 			>
 				<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
 			</Button>
