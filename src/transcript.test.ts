@@ -144,6 +144,15 @@ describe("Transcript", () => {
 		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] });
 	});
 
+	test("omp's notices show, except Collab joins and the xd:// tools mounted as MCP servers connect", () => {
+		const t = new Transcript();
+		t.applyEvent({ type: "notice", level: "info", message: "xd://: mounted mcp__gmail_get_thread, mcp__gmail_search_threads", source: "xdev" });
+		t.applyEvent({ type: "notice", level: "info", message: "omp-agents joined the collab session", source: "collab" });
+		t.applyEvent({ type: "notice", level: "warning", message: "Prewalk not armed: no model.", source: "prewalk" });
+
+		expect(t.items()).toEqual([{ id: "notice1", kind: "notice", level: "warning", text: "Prewalk not armed: no model." }]);
+	});
+
 	test("a fresh session's first /skill: prompt shows at once, and its file entry replaces it in place", () => {
 		const t = new Transcript();
 		const details = { name: "mma-mode", path: "/s/SKILL.md", args: "fix the scroll", prompt: "/skill:mma-mode fix the scroll" };
