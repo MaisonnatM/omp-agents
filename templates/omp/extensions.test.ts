@@ -581,7 +581,8 @@ describe("checkout ownership", () => {
 	test("a rebase paused on a clean tree still holds the checkout", () => {
 		const dir = repo();
 		git(dir, "commit", "-q", "--allow-empty", "-m", "theirs");
-		git(dir, "-c", "sequence.editor=sed -i.bak s/^pick/edit/", "rebase", "-q", "-i", "--keep-empty", "main");
+		// omp's shell exports `GIT_SEQUENCE_EDITOR=true`, which outranks `-c sequence.editor`, so the editor goes in the environment.
+		execFileSync("git", ["-C", dir, "rebase", "-q", "-i", "--keep-empty", "main"], { stdio: "pipe", env: { ...process.env, ...env, GIT_SEQUENCE_EDITOR: "sed -i.bak s/^pick/edit/" } });
 		claimByAnother(dir);
 		const [reason] = calls([{ bash: "git switch main", cwd: dir }]);
 		expect(held(reason, dir)).toBe(true);
