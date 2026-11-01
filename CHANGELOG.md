@@ -10,6 +10,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: after a session or a Bot moved up or down in the sidebar, hovering, selecting, or right-clicking a row could light up the row next to it, so it looked like the wrong session was picked.
 - Fixed: a click just between two sidebar rows could open a session from elsewhere in the list after the list reordered.
 - Behind the scenes: the checks for "Merge on main" now pass when an agent runs them from inside a session.
+- New Bot now starts on a new type, Bot designer, named Dr Eggbot with its job filled in, adapted from Lauren Tan's Dr Eggbot Grok Bot.
+- A Bot designer asks you a few short questions about the Bot you want, then creates it for you, and the new Bot shows in the Bots tab.
+- Switching a new Bot's type swaps the name and job that type filled in, and keeps any you typed yourself.
 
 ## 2026-10-31
 

@@ -118,9 +118,13 @@ A named teammate with one conversation you come back to, a job, and a memory tha
 _Avoid_: Agent, assistant, persona
 
 **Bot type**:
-What a Bot is for, picked when it is made and kept after: **Routines**, or **PR shepherd**.
+What a Bot is for, picked when it is made and kept after: **Bot designer**, **Routines**, or **PR shepherd**.
 The code calls it the Bot's `kind`.
 _Avoid_: Bot class, role
+
+**Bot designer**:
+A Bot type that asks a few questions about the Bot you want, then creates it; the New Bot form starts on one named Dr Eggbot.
+_Avoid_: Bot builder, Bot factory
 
 **PR shepherd**:
 A Bot type that drives your approved pull requests to merged: it starts quick-action sessions to fix them, then queues their merge.

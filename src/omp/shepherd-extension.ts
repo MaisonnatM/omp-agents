@@ -6,7 +6,7 @@ import { parseBotId } from "../shared/bots";
 import { parsePullRequest } from "../shared/github";
 import { MAX_FIXES_PER_PULL_REQUEST, SHEPHERD_FIXES, type ShepherdChange } from "../shared/shepherd";
 import { MERGE_METHODS } from "../shared/source-control";
-import { type BotExtensionApi, leave, reply } from "./bot-extension";
+import { type BotExtensionApi, flagValue, leave, reply } from "./bot-extension";
 
 /** The flags a shepherd's session starts with: its Bot's id, and the directory its tools leave their requests in. */
 export const SHEPHERD_FLAGS = {
@@ -38,15 +38,10 @@ export default function shepherdExtension(pi: BotExtensionApi): void {
 	pi.registerFlag(SHEPHERD_FLAGS.bot, { type: "string", description: "The omp-agents PR shepherd Bot this session is." });
 	pi.registerFlag(SHEPHERD_FLAGS.inbox, { type: "string", description: "The directory its tools leave their requests in." });
 
-	const flag = (name: string): string | null => {
-		const value = pi.getFlag(name);
-		return typeof value === "string" && value !== "" ? value : null;
-	};
-
 	/** Leaves `change` for the dashboard, from this session's shepherd. */
 	const ask = (change: ShepherdChange): void => {
-		const botId = parseBotId(flag(SHEPHERD_FLAGS.bot));
-		const inbox = flag(SHEPHERD_FLAGS.inbox);
+		const botId = parseBotId(flagValue(pi, SHEPHERD_FLAGS.bot));
+		const inbox = flagValue(pi, SHEPHERD_FLAGS.inbox);
 		if (!botId || !inbox) throw new Error("This session is not an omp-agents PR shepherd.");
 		leave(inbox, { botId, change });
 	};
@@ -57,7 +52,7 @@ export default function shepherdExtension(pi: BotExtensionApi): void {
 		return pr.ok;
 	};
 
-	pi.on("before_agent_start", (event, ctx) => (ctx.agent.kind === "sub" || !flag(SHEPHERD_FLAGS.bot) ? undefined : { systemPrompt: [...event.systemPrompt, RULES] }));
+	pi.on("before_agent_start", (event, ctx) => (ctx.agent.kind === "sub" || !flagValue(pi, SHEPHERD_FLAGS.bot) ? undefined : { systemPrompt: [...event.systemPrompt, RULES] }));
 
 	const { Type } = pi.typebox;
 	const target = {

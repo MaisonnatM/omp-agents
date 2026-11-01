@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { errorText, isObject, parseJson } from "../json";
 import { readTail } from "../read-tail";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
-import { type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
+import { type BotCreateRequest, type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
 import type { ShepherdRequest } from "../shared/shepherd";
 
 /**
@@ -40,7 +40,8 @@ export interface BotTool<Params> {
 	parameters: unknown;
 	loadMode: "essential";
 	approval: "write";
-	execute(toolCallId: string, params: Params): Promise<ToolResult>;
+	/** omp passes every tool the session's context; this reads only its `cwd`, the session's workspace. */
+	execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, onUpdate: unknown, ctx: { cwd: string }): Promise<ToolResult>;
 }
 
 interface SchemaOptions {
@@ -68,6 +69,15 @@ export interface BotExtensionApi {
 	};
 }
 
+/**
+ * Flag `name`'s value, or `null` when the dashboard passed none. omp sets an extension's flags once every extension has
+ * loaded, so each is read when it is used, and it gives one only to an extension that registered it.
+ */
+export function flagValue(pi: BotExtensionApi, name: string): string | null {
+	const value = pi.getFlag(name);
+	return typeof value === "string" && value !== "" ? value : null;
+}
+
 function readText(path: string): string {
 	try {
 		return readFileSync(path, "utf8");
@@ -87,7 +97,7 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 }
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | ShepherdRequest): void {
+export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | ShepherdRequest): void {
 	try {
 		mkdirSync(dir, { recursive: true });
 		const name = `${Date.now()}-${randomUUID()}`;
@@ -121,11 +131,7 @@ export default function botExtension(pi: BotExtensionApi): void {
 	pi.registerFlag(BOT_FLAGS.memory, { type: "string", description: "The memory.md the Bot remembers in." });
 	pi.registerFlag(BOT_FLAGS.routines, { type: "string", description: "The omp-agents routines.json that holds its routines." });
 	pi.registerFlag(BOT_FLAGS.routineInbox, { type: "string", description: "The directory its routine tools leave their changes in." });
-	// omp sets an extension's flags once every extension has loaded, so each is read when it is used.
-	const flag = (name: string): string | null => {
-		const value = pi.getFlag(name);
-		return typeof value === "string" && value !== "" ? value : null;
-	};
+	const flag = (name: string) => flagValue(pi, name);
 
 	/** This session's Bot, or `null` when it is not one. */
 	const thisBot = (): ThisBot | null => {

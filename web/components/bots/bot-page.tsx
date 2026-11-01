@@ -2,15 +2,14 @@
 import { BookmarkCheck } from "lucide-react";
 import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import type { RoutineSpec } from "../../../src/routines";
-import { BOT_HUES, BOT_KIND_INFO, BOT_KINDS, BOT_SHAPES, type Bot, type BotId, type BotKind, type BotLook, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
-import { SHEPHERD_JOB, SHEPHERD_NAME } from "../../../src/shared/shepherd";
+import { BOT_HUES, BOT_KIND_INFO, BOT_KINDS, BOT_SHAPES, type Bot, type BotId, type BotLook, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botAsking, JOB_TEMPLATES, jobLine, type OpenBot, starterPrompts } from "../../bots-model";
+import { BOT_KIND_START, botAsking, jobLine, NEW_BOT_DRAFT, type NewBotDraft, type OpenBot, pickKind, pickTemplate, starterPrompts } from "../../bots-model";
 import { botDraftKey, useComposerDraft } from "../../composer-drafts";
 import type { Completions } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
@@ -233,25 +232,19 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 const randomOf = <T,>(values: readonly T[]): T => values[Math.floor(Math.random() * values.length)]!;
 
 /**
- * The New Bot form, as Grok's: a name, a shape and a color, a job to start from or write, and the workspace its conversation runs in,
- * the sidebar's by default. A template fills the job, and the name while the form has none; a Bot made with no job learns it in its first message.
+ * The New Bot form, as Grok's: a name, a shape and a color, a type, a job, and the workspace its conversation runs in, the sidebar's
+ * by default. It starts on a Bot designer; a type fills the name and job it starts with, a template fills the job of a Routines Bot,
+ * and the name while the form has none, and a Bot made with no job learns it in its first message.
  */
 export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Workspace[]; defaultCwd: string; connected: boolean }) {
 	const { changeBot } = useDashboardActions();
 	const id = useId();
-	const [name, setName] = useState("");
+	const [draft, setDraft] = useState<NewBotDraft>(NEW_BOT_DRAFT);
+	const { kind, name, job } = draft;
+	const start = BOT_KIND_START[kind];
 	const [look, setLook] = useState<BotLook>(() => ({ shape: randomOf(BOT_SHAPES), hue: randomOf(BOT_HUES) }));
-	const [kind, setKind] = useState<BotKind>("routines");
-	const [job, setJob] = useState("");
 	const [cwd, setCwd] = useState(defaultCwd);
 	const [tried, setTried] = useState(false);
-	const pickKind = (next: BotKind) => {
-		setKind(next);
-		if (next === "pr-shepherd") {
-			setJob(SHEPHERD_JOB);
-			if (!name.trim()) setName(SHEPHERD_NAME);
-		} else if (job === SHEPHERD_JOB) setJob("");
-	};
 	const fix = !name.trim() ? "Name the Bot." : !cwd.trim() ? "Pick the workspace it works in." : null;
 	return (
 		<PageFrame title="New Bot" meta="A teammate with one conversation you come back to, a job, and a memory">
@@ -273,7 +266,8 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 					autoFocus
 					value={name}
 					placeholder="Name your Bot"
-					onChange={event => setName(event.target.value)}
+					onFocus={event => event.currentTarget.select()}
+					onChange={event => setDraft(current => ({ ...current, name: event.target.value }))}
 					className={cn(FIELD, "h-9 w-full text-center text-base")}
 				/>
 				<div className="w-full space-y-6">
@@ -289,17 +283,17 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 									size="compact"
 									active={kind === option}
 									aria-pressed={kind === option}
-									onClick={() => pickKind(option)}
+									onClick={() => setDraft(current => pickKind(current, option))}
 								>
 									{BOT_KIND_INFO[option].label}
 								</Button>
 							))}
 						</div>
 					</Field>
-					<Field label="Job" hint={kind === "pr-shepherd" ? "Its rules. Edit them to fit how you merge." : "Optional. Leave it empty and tell it in your first message."}>
+					<Field label="Job" hint={start.hint}>
 						<div className="space-y-2">
-							<div role="group" aria-label="Start from a job" hidden={kind !== "routines"} className="flex flex-wrap gap-1.5">
-								{JOB_TEMPLATES.map(template => (
+							<div role="group" aria-label="Start from a job" hidden={start.templates.length === 0} className="flex flex-wrap gap-1.5">
+								{start.templates.map(template => (
 									<Button
 										key={template.label}
 										{...activityControl("bots.job.template")}
@@ -308,10 +302,7 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 										size="compact"
 										active={job === template.job}
 										aria-pressed={job === template.job}
-										onClick={() => {
-											setJob(template.job);
-											if (!name.trim()) setName(template.name);
-										}}
+										onClick={() => setDraft(current => pickTemplate(current, template))}
 									>
 										{template.label}
 									</Button>
@@ -323,8 +314,8 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 								rows={4}
 								maxLength={MAX_JOB_LENGTH}
 								placeholder="What it does for you, where it looks, and what it asks before acting."
-								onChange={event => setJob(event.target.value)}
-								className={TEXT_AREA}
+								onChange={event => setDraft(current => ({ ...current, job: event.target.value }))}
+								className={cn(TEXT_AREA, "max-h-80 min-h-14 resize-none [field-sizing:content]")}
 							/>
 						</div>
 					</Field>

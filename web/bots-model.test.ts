@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Routine } from "../src/routines";
+import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
+import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { RosterHost } from "../src/shared/sessions";
-import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, jobLine, memoryEntries, openBot, starterPrompts } from "./bots-model";
+import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, JOB_TEMPLATES, jobLine, memoryEntries, NEW_BOT_DRAFT, openBot, pickKind, pickTemplate, starterPrompts } from "./bots-model";
 import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
@@ -106,6 +108,29 @@ describe("Bots", () => {
 	test("a new Bot offers its job's first sentence, then what it needs, then a fact to remember", () => {
 		expect(starterPrompts("Watch the build. Ask first.")).toEqual(["Watch the build.", "What do you need from me to do this job well?", "Remember that I prefer short answers."]);
 		expect(starterPrompts("")).toEqual(["What should your job be? Ask me a few questions.", "What can you help me with?", "Remember that I prefer short answers."]);
+	});
+
+	test("the New Bot form starts on a Bot designer, and picking a type swaps the name and job the last type filled but keeps what you typed", () => {
+		expect(NEW_BOT_DRAFT).toEqual({ kind: "bot-designer", name: DESIGNER_NAME, job: DESIGNER_JOB });
+		const shepherd = pickKind(NEW_BOT_DRAFT, "pr-shepherd");
+		expect(shepherd).toEqual({ kind: "pr-shepherd", name: SHEPHERD_NAME, job: SHEPHERD_JOB });
+		expect(pickKind(shepherd, "routines")).toEqual({ kind: "routines", name: "", job: "" });
+		expect(pickKind({ kind: "routines", name: "Scout", job: "Watch the build." }, "bot-designer")).toEqual({ kind: "bot-designer", name: "Scout", job: "Watch the build." });
+		expect(pickKind({ ...NEW_BOT_DRAFT, name: "Egg" }, "pr-shepherd")).toEqual({ kind: "pr-shepherd", name: "Egg", job: SHEPHERD_JOB });
+		const [template] = JOB_TEMPLATES;
+		expect(pickKind({ kind: "routines", name: template!.name, job: template!.job }, "pr-shepherd")).toEqual(shepherd);
+		const edited = { ...shepherd, job: `${SHEPHERD_JOB}\nNever rebase.` };
+		expect(pickKind(edited, "pr-shepherd")).toBe(edited);
+	});
+
+	test("a template fills the name and job the form filled, from a blank form or another template, and keeps what you typed", () => {
+		const [reviewer, retro] = JOB_TEMPLATES;
+		const blank = { kind: "routines", name: "", job: "" } as const;
+		const fromReviewer = pickTemplate(blank, reviewer!);
+		expect(fromReviewer).toEqual({ kind: "routines", name: reviewer!.name, job: reviewer!.job });
+		expect(pickTemplate(fromReviewer, retro!)).toEqual({ kind: "routines", name: retro!.name, job: retro!.job });
+		expect(pickTemplate({ ...blank, name: "Scout" }, retro!)).toEqual({ kind: "routines", name: "Scout", job: retro!.job });
+		expect(pickTemplate({ ...fromReviewer, job: "Review only my docs." }, retro!)).toEqual({ kind: "routines", name: retro!.name, job: "Review only my docs." });
 	});
 
 	test("a memory reads as one fact per line, with the day remember wrote when the line has one", () => {
