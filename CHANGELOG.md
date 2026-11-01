@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-01
+
+- Fixed: when your first message starts with a skill or a command, the pinned skill's button now steps aside instead of showing its name crossed out.
+
 ## 2026-10-31
 
 - Before a session runs a project's own agent code, such as its extensions, tools, or MCP servers, the dashboard now asks you to trust it once, and asks again when a piece is new or has changed.

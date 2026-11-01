@@ -95,14 +95,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
-	const skillState: SkillState =
-		listedSkills && !listedSkills.some(skill => skill.name === draftSkill)
-			? "missing"
-			: skipSkill
-				? "off"
-				: draft.trimStart().startsWith("/")
-					? "bypassed"
-					: "on";
+	const skillState: SkillState = listedSkills && !listedSkills.some(skill => skill.name === draftSkill) ? "missing" : skipSkill ? "off" : "on";
+	// A message that opens with `/` runs its own skill or command and skips the pinned one, so the toggle has nothing to say.
+	const ownCommand = draft.trimStart().startsWith("/");
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
@@ -215,7 +210,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								/>
 								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 								<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
-								{draftSkill !== null && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+								{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 							</>
 						}
 						rightSlot={({ openFilePicker }) => (
@@ -237,8 +232,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	);
 }
 
-/** Whether the pinned skill applies: `missing` when the directory has no such skill, `bypassed` when the message opens with its own command. */
-type SkillState = "on" | "off" | "missing" | "bypassed";
+/** Whether the pinned skill applies: `missing` when the directory has no such skill. */
+type SkillState = "on" | "off" | "missing";
 
 function skillTitle(name: string, state: SkillState): string {
 	switch (state) {
@@ -248,8 +243,6 @@ function skillTitle(name: string, state: SkillState): string {
 			return `Click to send the first message through /skill:${name}.`;
 		case "missing":
 			return `No skill named ${name} in this directory, so the session starts without it.`;
-		case "bypassed":
-			return `A message that starts with / runs its own command, so it skips /skill:${name}.`;
 		default: {
 			const unhandled: never = state;
 			return unhandled;
@@ -267,7 +260,7 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 				aria-pressed={state === "on"}
 				aria-label={`Skill ${name}`}
 				onClick={onToggle}
-				disabled={disabled || state === "missing" || state === "bypassed"}
+				disabled={disabled || state === "missing"}
 			>
 				<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
 			</Button>
