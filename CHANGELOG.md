@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-01
 
+- Agents can now land work from a separate worktree while their session sits on main, and the landing report names the checks that passed.
 - A new session no longer opens with long grey lists of the tools its connected services added; the conversation starts with your message.
 - Fixed: when your first message starts with /, to call a skill or a command, the pinned skill's button now hides instead of showing its name crossed out.
 - Fixed: hovering the pinned skill's greyed-out button now says why, when the folder has no skill of that name.

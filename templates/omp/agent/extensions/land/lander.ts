@@ -21,8 +21,8 @@ export interface LandConfig {
 }
 
 export type LandResult =
-	| { kind: "landed"; sha: string; base: string; flaky: string[]; local: string }
-	| { kind: "nothing"; target: string }
+	| { kind: "landed"; sha: string; base: string; checks: string[]; flaky: string[]; local: string }
+	| { kind: "nothing"; target: string; branch: string; top: string }
 	| { kind: "refused"; reason: string }
 	| { kind: "conflict"; paths: string[] }
 	| { kind: "failed"; command: string; why: string; failures: string[]; tail: string }
@@ -223,7 +223,7 @@ export async function land(options: LandOptions): Promise<LandResult> {
 		const fetched = await git(top, ["fetch", "--quiet", remote, `+refs/heads/${target}:${remoteRef}`]);
 		if (fetched.code !== 0) return { kind: "refused", reason: `Could not fetch ${remote}/${target}: ${tail(fetched.out)}` };
 		const base = (await gitOut(top, ["rev-parse", remoteRef]))!;
-		if ((await git(top, ["merge-base", "--is-ancestor", tip, base])).code === 0) return { kind: "nothing", target: `${remote}/${target}` };
+		if ((await git(top, ["merge-base", "--is-ancestor", tip, base])).code === 0) return { kind: "nothing", target: `${remote}/${target}`, branch, top };
 
 		const dir = mkdtempSync(join(tmpdir(), `${WORKTREE_PREFIX}${process.pid}-`));
 		rmSync(dir, { recursive: true });
@@ -262,7 +262,7 @@ export async function land(options: LandOptions): Promise<LandResult> {
 				return { kind: "rejected", why: lost };
 			}
 			await git(top, ["fetch", "--quiet", remote, `+refs/heads/${target}:${remoteRef}`]);
-			return { kind: "landed", sha, base, flaky, local: await syncLocal(top, target, sha) };
+			return { kind: "landed", sha, base, checks: config.checks.flat(), flaky, local: await syncLocal(top, target, sha) };
 		} finally {
 			await git(top, ["worktree", "remove", "--force", dir]);
 		}
@@ -275,12 +275,12 @@ export function describe(result: LandResult): string {
 	switch (result.kind) {
 		case "landed":
 			return [
-				`Landed ${result.sha.slice(0, 12)} on top of ${result.base.slice(0, 12)} and pushed it.`,
+				`Landed ${result.sha.slice(0, 12)} on top of ${result.base.slice(0, 12)} and pushed it, after these checks passed on the merged result: ${result.checks.length > 0 ? result.checks.map(c => `\`${c}\``).join(", ") : "none, since the config lists no checks"}.`,
 				...(result.flaky.length > 0 ? [`Flaky: ${result.flaky.join(", ")} failed once and passed when run again; say so in your reply.`] : []),
 				result.local,
 			].join("\n");
 		case "nothing":
-			return `Nothing to land: this commit is already on ${result.target}.`;
+			return `Nothing to land: ${result.branch} in ${result.top} is already on ${result.target}. If your work is committed in another worktree, land again with \`path\` set to that worktree.`;
 		case "refused":
 			return `Not landed: ${result.reason}`;
 		case "conflict":

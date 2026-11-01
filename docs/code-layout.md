@@ -38,6 +38,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A subagent's recorded edits open `FileChangesDialog` in `changed-files-section.tsx`, with Kobra-inspired cards from `web/components/file-diff.tsx`.
   **Chat history**, the blurred column of the session's prompts over it, is `PromptHistory` in `web/components/prompt-history.tsx`, opened by `PromptHistoryButton` from the same file in the live composer's `rightSlot` in `web/components/conversation.tsx`.
   A tool row's image thumbnails open one viewer that the transcript owns, `ImageViewer` from `web/components/media-viewer.tsx`, over every tool image of the conversation.
+  A grey notice line in the transcript comes from omp's `notice` events, turned into notice items by `applyEvent` in `src/transcript.ts`, which also drops the sources the dashboard hides; [Transcripts](architecture/transcripts.md) lists them.
 - Routine run card in a conversation: `RoutineRunCard` in `web/components/routines/routine-run-card.tsx`, rendered by `web/components/transcript.tsx` from a routine message snapshot.
   Its folded row shows the name, task icon, trigger logos, time, status, and command duration.
   Its open fold reuses `CommandOutput` and `TriggeredBy` from `web/components/routines/routine-open.tsx`, with **Open routine** and the prompt or command's copy button.
