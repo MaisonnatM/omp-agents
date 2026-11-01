@@ -1,11 +1,12 @@
 /**
  * The requests a PR shepherd Bot's `fix_pull_request` and `queue_merge` tools (`src/omp/shepherd-extension.ts`) leave
  * for the server, one JSON file each. The server checks each against the pull request as GitHub reports it now, then
- * starts the fix's session or queues the merge; a request it refuses is done too, and the Bot hears why in its
+ * starts the fix's session or queues the merge, or starts a session that lands it in a repository that lands through
+ * the `land` tool; a request it refuses is done too, and the Bot hears why in its
  * conversation, so it can tell you rather than ask again.
  */
 import { errorText } from "../json";
-import { PULL_REQUEST_ACTIONS, pullRequestActions } from "../pull-request-actions";
+import { landPrompt, PULL_REQUEST_ACTIONS, pullRequestActions } from "../pull-request-actions";
 import { type Bot, type BotId } from "../shared/bots";
 import { prKey, type PullRequestList, type PullRequestSummary, pullRequestName, samePullRequest } from "../shared/github";
 import type { MergeQueueChange } from "../shared/merge-queue";
@@ -44,6 +45,8 @@ export interface ShepherdDeps {
 	queueMerge(change: Extract<MergeQueueChange, { op: "add" }>): Promise<unknown>;
 	/** `null` when the pull request's head is what a reviewer approved, read in its checkout at `cwd`; else why not. */
 	unapprovedChange(cwd: string, pr: PullRequestSummary): Promise<string | null>;
+	/** The branch the repository at `cwd` lands on through the `land` tool, `null` when it commits no `.omp/land.json`. */
+	landTarget(cwd: string): string | null;
 	/** Tells Bot `botId` something in its conversation. */
 	tell(botId: BotId, text: string): Promise<unknown>;
 }
@@ -79,13 +82,16 @@ export class ShepherdInbox extends JsonInboxDir<ShepherdRequest> {
 						if (change.op === "merge") {
 							const unapproved = await deps.unapprovedChange(cwd, pr);
 							if (unapproved) return await refuse(`${unapproved}; ask the user to review it again`);
-							await deps.queueMerge({ op: "add", method: change.method, prs: [{ owner: pr.owner, repo: pr.repo, number: pr.number, head: null }] });
-							return true;
+							if (deps.landTarget(cwd) !== pr.base) {
+								await deps.queueMerge({ op: "add", method: change.method, prs: [{ owner: pr.owner, repo: pr.repo, number: pr.number, head: null }] });
+								return true;
+							}
 						}
-						const action = PULL_REQUEST_ACTIONS[change.action];
-						const branch = action.branch(pr);
+						// A repository that lands through `land` reaches its target only from a session on the branch, so a merge starts one.
+						const action = change.op === "fix" ? PULL_REQUEST_ACTIONS[change.action] : null;
+						const branch = action ? action.branch(pr) : pr.head;
 						const result = await deps.start(
-							newSessionRequest(cwd, action.prompt(pr), {
+							newSessionRequest(cwd, action ? action.prompt(pr) : landPrompt(pr), {
 								branch: branch ? { kind: "work", name: branch } : null,
 								subject: { kind: "pull-request", pr: { owner: pr.owner, repo: pr.repo, number: pr.number } },
 							}),

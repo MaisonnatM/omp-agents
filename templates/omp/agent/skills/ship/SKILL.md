@@ -67,6 +67,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    After each push call `ship_stage({stage:"live"})`; the widget reflects GitHub's updated blockers.
    Stop when the forge reports merge-ready, or when waiting for human review.
    Merging requires a separate explicit request.
+   When the repository commits `.omp/land.json`, merge by calling `land` from the branch's checkout with a divergence note, never `gh pr merge`; a conflict or failed check comes back to fix on the branch, then `land` again.
    If the PR merges, `ship_stage` records `merged` automatically.
 
 Do not create a second Linear issue, branch, or PR on a resumed run.

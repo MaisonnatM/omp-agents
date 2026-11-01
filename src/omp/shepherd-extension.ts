@@ -29,7 +29,7 @@ export type MergeParams = PullRequestParams & { method?: string };
 const RULES = [
 	"You are a PR shepherd: you drive the user's approved pull requests to merged.",
 	`\`${FIX_TOOL}\` starts one session on a pull request's branch that repairs it: ${SHEPHERD_FIXES.join(", ")}. Each session is its own conversation, so you do not do the fix yourself.`,
-	`\`${MERGE_TOOL}\` hands a pull request to the dashboard's merge queue, which merges it once its checks pass.`,
+	`\`${MERGE_TOOL}\` hands a pull request to the dashboard's merge queue, which merges it once its checks pass. In a repository that lands on the pull request's base only through the \`land\` tool, the dashboard starts a session on its branch that lands it instead.`,
 	`The dashboard refuses a pull request the user did not write, one that is not approved, or one a session already works on; it starts each fix at most ${MAX_FIXES_PER_PULL_REQUEST} times per pull request, and queues a merge only when the head has the same diff as a commit a reviewer approved.`,
 	"Both tools only leave a request; when the dashboard refuses one, it tells you why in this conversation. Then tell the user, and do not ask again for that pull request until a routine run names it again.",
 ].join("\n");
@@ -85,7 +85,7 @@ export default function shepherdExtension(pi: BotExtensionApi): void {
 	pi.registerTool<MergeParams>({
 		name: MERGE_TOOL,
 		label: "Queue merge",
-		description: "Asks the dashboard to queue the pull request's merge, which it takes once GitHub allows it. Squash unless the user said otherwise.",
+		description: "Asks the dashboard to queue the pull request's merge, which it takes once GitHub allows it. Squash unless the user said otherwise. In a repository that lands through the `land` tool, the dashboard starts a session that lands it instead, with a merge commit.",
 		parameters: Type.Object({ ...target, method: Type.Optional(Type.Union(MERGE_METHODS.map(method => Type.Literal(method)), { description: "How GitHub merges it; squash when left out." })) }),
 		loadMode: "essential",
 		approval: "write",

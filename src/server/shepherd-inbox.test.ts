@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PULL_REQUEST_ACTIONS } from "../pull-request-actions";
+import { landPrompt, PULL_REQUEST_ACTIONS } from "../pull-request-actions";
 import type { Bot, BotId } from "../shared/bots";
 import type { PullRequestSummary } from "../shared/github";
 import type { MergeQueueChange } from "../shared/merge-queue";
@@ -47,8 +47,8 @@ const target = { owner: "acme", repo: "webapp", number: 7 };
 const fixCi: ShepherdRequest = { botId: shepherd.id, change: { op: "fix", pr: target, action: "fix-ci" } };
 const merge: ShepherdRequest = { botId: shepherd.id, change: { op: "merge", pr: target, method: "squash" } };
 
-/** An inbox over `listed`, the one pull request GitHub reports, with `working` a session on it and `unapproved` the answer of the approval check. */
-function inbox({ listed = pr(), working = false, unapproved = null as string | null } = {}) {
+/** An inbox over `listed`, the one pull request GitHub reports, with `working` a session on it, `unapproved` the answer of the approval check, and `landsOn` the branch its repository lands on through `land`. */
+function inbox({ listed = pr(), working = false, unapproved = null as string | null, landsOn = null as string | null } = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-shepherd-inbox-"));
 	dirs.push(dir);
 	const inboxDir = join(dir, "shepherd-inbox");
@@ -69,6 +69,7 @@ function inbox({ listed = pr(), working = false, unapproved = null as string | n
 		},
 		queueMerge: async change => void queued.push(change),
 		unapprovedChange: async () => unapproved,
+		landTarget: () => landsOn,
 		tell: async (_botId, text) => void told.push(text),
 	});
 	let n = 0;
@@ -140,6 +141,31 @@ test("a merge is queued with the Bot's method once nothing blocks it, and refuse
 	const changed = inbox({ listed: pr({ checks: "passing" }), unapproved: "its head changes code no reviewer approved" });
 	await changed.send(merge);
 	expect(changed.queued).toEqual([]);
+	expect(changed.told).toEqual(["The dashboard did not queue the merge of acme/webapp#7: its head changes code no reviewer approved; ask the user to review it again."]);
+});
+
+test("in a repository that lands through `land`, a merge into its target starts a session on the branch that lands it, and a merge into another branch is still queued", async () => {
+	const landed = inbox({ listed: pr({ checks: "passing" }), landsOn: "main" });
+	await landed.send(merge);
+	expect(landed.queued).toEqual([]);
+	expect(landed.told).toEqual([]);
+	expect(landed.started).toHaveLength(1);
+	expect(landed.started[0]).toMatchObject({
+		kind: "new",
+		cwd: "/code/webapp",
+		prompt: landPrompt(pr({ checks: "passing" })),
+		branch: { kind: "work", name: "me/widgets" },
+		subject: { kind: "pull-request", pr: target },
+	});
+
+	const stacked = inbox({ listed: pr({ checks: "passing", base: "me/base", stackedOn: "me/base" }), landsOn: "main" });
+	await stacked.send(merge);
+	expect(stacked.started).toEqual([]);
+	expect(stacked.queued).toEqual([{ op: "add", method: "squash", prs: [{ ...target, head: null }] }]);
+
+	const changed = inbox({ listed: pr({ checks: "passing" }), landsOn: "main", unapproved: "its head changes code no reviewer approved" });
+	await changed.send(merge);
+	expect(changed.started).toEqual([]);
 	expect(changed.told).toEqual(["The dashboard did not queue the merge of acme/webapp#7: its head changes code no reviewer approved; ask the user to review it again."]);
 });
 

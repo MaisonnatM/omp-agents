@@ -72,11 +72,25 @@ Files, in `agent/`:
   A five-minute cache write costs 1.25 times the input price and an hour-long one twice that, and a conversation tail is read again within seconds, so this cuts the write bill without losing the warm head after a pause.
   It also stops cache warming while the session is idle.
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
+- `extensions/land.ts`, with `extensions/land/`: the `land` tool lands a committed branch on `main` in a repository that commits `.omp/land.json`, the way [Ultimate](https://github.com/HazAT/ultimate)'s lander does, with no model in the loop.
+  It merges the branch's tip into a fresh temporary worktree of `origin/main` with a merge commit whose message carries the agent's divergence note, runs the setup and checks the file lists on that merged result, and pushes the merge commit, never forced.
+  `land.json` holds `target` (default `main`), `remote` (default `origin`), `setup`, commands run in the worktree first, and `checks`, each a command or a list of commands that run at the same time; checks get `LAND_BASE` and `LAND_TIP`, the target and branch commits.
+  A check is stopped after 2 minutes without output or 10 in all, and a failed one runs once more: passing then lands with a flaky warning, failing again returns the failed tests and type errors it named anywhere in its output, then the end of that output.
+  A conflict names the files and pushes nothing; a push that loses a race to another landing starts again from the new tip, three times at most.
+  Afterwards the local `main` moves forward to the landed commit only when it can without touching uncommitted changes, and worktrees left by an omp process that died are removed at the next landing.
+  In such a repository the extension blocks an agent's `git push` to `main`, `git merge` into a checked-out `main` other than `--ff-only` from `origin/main`, and `gh pr merge`, so an agent lands only through `land`; your own terminal is not affected, and a subagent cannot land.
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over, and the omp-agents dashboard removes its worktree as **End session** does, so a prompt such as "Merge on main, then end the session" runs to the end.
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
   When you linked addresses to the session's workspace in the dashboard's Settings › Integrations, it also tells the session to use those for the workspace's mail and calendar unless you name another account.
   A session in a linked worktree outside every linked workspace takes the links of its repository's main checkout, and no tool is blocked.
 - `extensions/headless-mark.ts`: adds an `omp-agents.headless` entry to a session that `omp -p` or `omp --mode json` runs, so the omp-agents dashboard leaves those one-shot runs out of its past sessions.
+- `extensions/project-memory.ts`: gives the omp sessions of one git repository a shared memory and news of each other's work.
+  Before a session's first prompt it gets a brief: the repository's memory index and the last 10 landings on its default branch, each with the session that made it and that session's first prompt.
+  Before a later prompt, and only when something is new, it gets a catch-up on what other sessions landed and remembered since, listing first the landings that touch files its own branch changed.
+  The `project_memory` tool lists, reads, and changes the memory, decisions, facts, and lessons of one line and a body each, in batches that apply whole or not at all; a subagent can only read it.
+  The memory is a `memory.json` committed to `refs/omp/memory` in the repository, which its worktrees share and which is never pushed, so `git log -p refs/omp/memory` shows each change and the session that made it.
+  Landings are read from git each time, and the `Omp-Session` trailers that `extensions/session-trailer.ts` writes say which session made each one; each session's first prompt is kept under `.git/omp-project-memory/intents/`.
+  `omp -p`, `--mode json`, and subagents get neither the brief nor a catch-up.
 - `extensions/request-log.ts`: records every request omp sends to a model provider, so any turn can be rebuilt and checked against its hash.
   Each request adds one `omp-request-log.record` entry to the session file with the model, the thinking level, the session's leaf entry, and the hashes of the system prompt, the tools, the other parameters, and the messages.
   Those parts go to omp's blob store in `~/.omp/agent/blobs/`, written once per distinct content, and the messages are stored as edits against the session's previous request, so a turn costs about what it adds.
