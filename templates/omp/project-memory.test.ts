@@ -36,11 +36,10 @@ const zod: unknown = await import(createRequire(join(packageDir, "package.json")
 
 const scratch = realpathSync(mkdtempSync(join(tmpdir(), "project-memory-")));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
-const withoutSessionTrailer = { ...process.env, PI_SESSION_ID: "" };
 const today = new Date().toISOString().slice(0, 10);
 
 function git(dir: string, ...args: string[]): string {
-	return execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8", env: withoutSessionTrailer, stdio: ["ignore", "pipe", "pipe"] }).trim();
+	return execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
 function commit(dir: string, file: string, subject: string, session?: string): string {
@@ -196,7 +195,7 @@ for (let i = 0; i < 15; i++) {
 }
 `,
 		);
-		const writers = ["left", "right"].map(prefix => Bun.spawn([process.execPath, script, join(dir, ".git"), prefix], { env: withoutSessionTrailer, stderr: "pipe" }));
+		const writers = ["left", "right"].map(prefix => Bun.spawn([process.execPath, script, join(dir, ".git"), prefix], { stderr: "pipe" }));
 		expect(await Promise.all(writers.map(writer => writer.exited))).toEqual([0, 0]);
 		const index = (await session("bbbbbbbb-mine", dir).call({})).text.split("\n").map(line => line.split(" ")[0]);
 		expect(index.sort()).toEqual([...Array.from({ length: 15 }, (_, i) => `left-${i}`), ...Array.from({ length: 15 }, (_, i) => `right-${i}`)].sort());
