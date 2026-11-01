@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyBot, type Bot, type BotId } from "../shared/bots";
+import { applyBot, type Bot, type BotId, defaultLook } from "../shared/bots";
 import { BotInbox } from "./bot-inbox";
 
 const dirs: string[] = [];
@@ -19,6 +19,8 @@ function inboxDir(): string {
 
 const scout: Bot = { id: "scout" as BotId, kind: "routines", name: "Scout", job: "", cwd: "/work/webapp", model: null, skill: null, shape: "hexagon", hue: 150, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z", pinned: false, section: null };
 const relay: Bot = { ...scout, id: "relay" as BotId, name: "Relay", job: "Relay the mail.", sessionId: null };
+const eggbot: Bot = { ...scout, id: "eggbot" as BotId, kind: "bot-designer", name: "Dr Eggbot", job: "Design my Bots.", cwd: "/work/lab" };
+const newBot = { id: "8c1d6f0e-2b7a-4c39-9e58-41f7a3b2d6c0" as BotId, kind: "routines", name: "Watcher", job: "Watch the build.", cwd: "/work/lab" } as const;
 
 /** An inbox over Bots that start as `initial`, which each save it applies edits as the dashboard's would, unless `refuse`. */
 function harness(dir: string, initial: Bot[], refuse = false) {
@@ -53,7 +55,7 @@ describe("BotInbox", () => {
 		expect(bots()).toEqual([{ ...scout, job: "Watch the build.\nAsk before merging." }, { ...relay, job: "" }]);
 		expect(readdirSync(dir).sort()).toEqual(["4-x.json.invalid", "5-x.json.invalid", "6-x.json.invalid", "7-x.tmp"]);
 		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "4-x.json")}: there is no Bot gone; it may have been deleted since`]);
-		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "5-x.json")}: it is not a job for a Bot`]);
+		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "5-x.json")}: it is not a request for the Bots`]);
 		logged.mockRestore();
 	});
 
@@ -68,5 +70,39 @@ describe("BotInbox", () => {
 		expect(readdirSync(dir)).toEqual(["2-x.json.invalid"]);
 		expect(logged.mock.calls).toEqual([[`omp-agents: set aside ${join(dir, "2-x.json")}: applying it failed: the Bots refused it`]]);
 		logged.mockRestore();
+	});
+
+	test("a designer's create saves a new Bot, and a misrouted create from a Bot that is no designer, or a new Bot the page would refuse, is set aside", async () => {
+		const dir = inboxDir();
+		writeFileSync(join(dir, "1-x.json"), JSON.stringify({ botId: "eggbot", create: newBot }));
+		writeFileSync(join(dir, "2-x.json"), JSON.stringify({ botId: "eggbot", create: { id: "herd", kind: "pr-shepherd", name: " Shepherd ", job: "Merge it.", cwd: "/work/webapp", model: "x/y", shape: "pill" } }));
+		writeFileSync(join(dir, "3-x.json"), JSON.stringify({ botId: "scout", create: { ...newBot, id: "sneaky" } }));
+		writeFileSync(join(dir, "4-x.json"), JSON.stringify({ botId: "eggbot", create: { ...newBot, id: "blank", name: " " } }));
+		writeFileSync(join(dir, "5-x.json"), JSON.stringify({ botId: "eggbot", create: { ...newBot, id: "nowhere", cwd: undefined } }));
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		const { inbox, bots } = harness(dir, [scout, eggbot]);
+		await inbox.drain();
+		const created = { model: null, skill: null, sessionId: null, createdAt: "2026-05-03T10:00:00.000Z", pinned: false, section: null };
+		const herd = "herd" as BotId;
+		expect(bots()).toEqual([
+			scout,
+			eggbot,
+			{ ...newBot, ...defaultLook(newBot.id), ...created },
+			{ id: herd, kind: "pr-shepherd", name: "Shepherd", job: "Merge it.", cwd: "/work/webapp", ...defaultLook(herd), ...created },
+		]);
+		expect(readdirSync(dir).sort()).toEqual(["3-x.json.invalid", "4-x.json.invalid", "5-x.json.invalid"]);
+		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "3-x.json")}: Bot scout is not a Bot designer, so the create was misrouted`]);
+		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "5-x.json")}: it is not a request for the Bots`]);
+		logged.mockRestore();
+	});
+
+	test("a create read again after its Bot exists changes nothing and is done, even after the Bot was edited", async () => {
+		const dir = inboxDir();
+		const watcher: Bot = { ...scout, ...newBot, name: "Watcher, renamed" };
+		writeFileSync(join(dir, "1-x.json"), JSON.stringify({ botId: "eggbot", create: newBot }));
+		const { inbox, bots } = harness(dir, [eggbot, watcher], true);
+		await inbox.drain();
+		expect(bots()).toEqual([eggbot, watcher]);
+		expect(readdirSync(dir)).toEqual([]);
 	});
 });

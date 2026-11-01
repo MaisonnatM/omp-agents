@@ -57,7 +57,7 @@ function harness() {
 		live: sessionId => live(sessions.find(session => session.sessionId === sessionId && !session.ended)),
 		session: instanceId => live(sessions.find(session => session.instanceId === instanceId)),
 		savedFile: sessionId => (saved.has(sessionId) ? join(dir, `${sessionId}.jsonl`) : null),
-		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botInboxDir: join(dir, "bot-inbox"), botsDir: join(dir, "bots"), routinesFile: join(dir, "routines.json"), routineInboxDir: join(dir, "routine-inbox"), shepherdExtension: "/ext/shepherd.ts", shepherdInboxDir: join(dir, "shepherd-inbox") },
+		paths: { extension: "/ext/bot.ts", botsFile: join(dir, "bots.json"), botInboxDir: join(dir, "bot-inbox"), botsDir: join(dir, "bots"), routinesFile: join(dir, "routines.json"), routineInboxDir: join(dir, "routine-inbox"), shepherdExtension: "/ext/shepherd.ts", shepherdInboxDir: join(dir, "shepherd-inbox"), designerExtension: "/ext/designer.ts" },
 		now: () => "2026-05-02T09:00:00.000Z",
 		onChange: () => {},
 	});
@@ -107,6 +107,31 @@ describe("Bots", () => {
 		expect(shepherdArgs?.slice(-4)).toEqual(["--omp-agents-shepherd", "herd", "--omp-agents-shepherd-inbox", join(dir, "shepherd-inbox")]);
 		expect(scoutArgs).not.toContain("/ext/shepherd.ts");
 		expect(scoutArgs).not.toContain("--omp-agents-shepherd");
+	});
+
+	test("a Bot designer's conversation also loads the designer extension, which reads the Bot extension's flags and no others", async () => {
+		const { bots, file, sessions, dir } = harness();
+		const eggbot = { ...scout, id: "eggbot" as BotId, kind: "bot-designer" } as const;
+		file.apply({ op: "save", bot: eggbot }, "2026-05-01T09:00:00.000Z");
+		await bots.message(eggbot.id, "Make me a Bot that watches the build.");
+		expect(sessions[0]?.args).toEqual([
+			"-e",
+			"/ext/bot.ts",
+			"-e",
+			"/ext/designer.ts",
+			"--omp-agents-bot",
+			"eggbot",
+			"--omp-agents-bots",
+			join(dir, "bots.json"),
+			"--omp-agents-bot-inbox",
+			join(dir, "bot-inbox"),
+			"--omp-agents-bot-memory",
+			join(dir, "bots", "eggbot", "memory.md"),
+			"--omp-agents-routines",
+			join(dir, "routines.json"),
+			"--omp-agents-routine-inbox",
+			join(dir, "routine-inbox"),
+		]);
 	});
 
 	test("after its session ended, a message resumes the same conversation with the extension and sends the text", async () => {

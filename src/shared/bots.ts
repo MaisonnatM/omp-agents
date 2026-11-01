@@ -31,15 +31,17 @@ export function defaultLook(id: BotId): BotLook {
 }
 
 /**
- * What a Bot is for, picked when it is made and kept after: `routines` works through its routines and conversation alone,
- * and `pr-shepherd` also drives your approved pull requests to merged, through the tools only its session loads.
+ * What a Bot is for, picked when it is made and kept after: `bot-designer` asks what Bot you want and creates it,
+ * `routines` works through its routines and conversation alone, and `pr-shepherd` also drives your approved pull
+ * requests to merged; each but `routines` through the tools only its session loads.
  */
-export const BOT_KINDS = ["routines", "pr-shepherd"] as const;
+export const BOT_KINDS = ["bot-designer", "routines", "pr-shepherd"] as const;
 
 export type BotKind = (typeof BOT_KINDS)[number];
 
 /** How the New Bot form offers each kind. */
 export const BOT_KIND_INFO: Record<BotKind, { label: string; description: string }> = {
+	"bot-designer": { label: "Bot designer", description: "Asks a few questions about the Bot you want, then creates it for you." },
 	routines: { label: "Routines", description: "Works through its conversation and the routines you give it." },
 	"pr-shepherd": {
 		label: "PR shepherd",
@@ -94,6 +96,18 @@ export interface BotJobRequest {
 	botId: BotId;
 	job: string;
 }
+
+/** The Bot a designer's `create_bot` tool names: its id, minted by the tool so a request read twice creates once, and its workspace. */
+export type BotCreate = Pick<BotSpec, "id" | "kind" | "name" | "job" | "cwd">;
+
+/** What a Bot designer's `create_bot` tool asks of the server: designer `botId` creates the Bot `create`. */
+export interface BotCreateRequest {
+	botId: BotId;
+	create: BotCreate;
+}
+
+/** A request a Bot's tool leaves in `bot-inbox/`: a `set_job`'s job, or a designer's new Bot. */
+export type BotInboxRequest = ({ op: "job" } & BotJobRequest) | ({ op: "create" } & BotCreateRequest);
 
 /** The longest job a Bot keeps, since every turn's system prompt carries it. */
 export const MAX_JOB_LENGTH = 20_000;
@@ -236,10 +250,18 @@ export function parseBotChange(value: unknown): BotChange | null {
 	}
 }
 
-/** A request a Bot's `set_job` tool leaves for the server, with the same limit as a job the page saves, or `null`. */
-export function parseBotJobRequest(value: unknown): Parsed<BotJobRequest> {
+/**
+ * A request a Bot's tool leaves in `bot-inbox/`, told apart by its `job` or `create` field, or `null`. A job holds the
+ * same limit as one the page saves, and a new Bot holds every rule of one the page saves.
+ */
+export function parseBotInboxRequest(value: unknown): Parsed<BotInboxRequest> {
 	if (!isObject(value)) return null;
 	const botId = parseBotId(value.botId);
-	const { job } = value;
-	return botId && typeof job === "string" && job.length <= MAX_JOB_LENGTH ? { ok: { botId, job } } : null;
+	if (!botId) return null;
+	const { job, create } = value;
+	if (typeof job === "string") return job.length <= MAX_JOB_LENGTH ? { ok: { op: "job", botId, job } } : null;
+	const spec = isObject(create) && parseBotSpec({ ...create, model: null, skill: null });
+	if (!spec) return null;
+	const { id, kind, name, cwd } = spec.ok;
+	return { ok: { op: "create", botId, create: { id, kind, name, job: spec.ok.job, cwd } } };
 }
