@@ -5,19 +5,29 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
+import type { Editable } from "../../editable-read";
 import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../labels";
 import { SearchField } from "../search-field";
 import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor } from "./editor";
 
-/** One omp file, viewed or edited in place; also the right pane of Settings › Workflows. */
-export function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
+/** Where a {@link FileView} saves: `save` sends the edit, `write` sends it in turn with the section's other saves, `reload` re-reads after a conflict. */
+export interface FileSaver<R> {
+	save: (edit: FileEdit) => Promise<R>;
+	write: Editable<R>["write"];
+	reload: () => void;
+}
+
+/** Saving a file omp's settings list, through `PUT /api/settings/file`. */
+export const settingsFiles = (editing: Editing): FileSaver<OmpSettings> => ({
+	save: edit => putJson<OmpSettings>(settingsUrl("/file", editing.cwd), edit),
+	write: editing.write,
+	reload: editing.reload,
+});
+
+/** One file, viewed or edited in place; the right pane of Settings › Files and Workflows, and a file of omp memory. */
+export function FileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pathDisplay" | "body">; saver: FileSaver<R> }) {
 	const { body } = file;
-	const editor = useEditor(
-		body.state === "read" ? body.text : "",
-		text =>
-			putJson<OmpSettings>(settingsUrl("/file", editing.cwd), { path: file.path, text, baseHash: body.state === "read" ? body.hash : null } satisfies FileEdit),
-		editing,
-	);
+	const editor = useEditor(body.state === "read" ? body.text : "", text => saver.save({ path: file.path, text, baseHash: body.state === "read" ? body.hash : null }), saver);
 	const viewing = editor.state.phase === "viewing";
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;
 	return (
@@ -59,7 +69,7 @@ export function FileView({ file, editing }: { file: OmpFile; editing: Editing })
 								size="compact"
 								onClick={() => {
 									editor.cancel();
-									editing.reload();
+									saver.reload();
 								}}
 							>
 								Discard my edits and load the file from disk
@@ -131,7 +141,7 @@ export function Files({ files, editing, selected, onSelect }: { files: OmpFile[]
 					</div>
 				))}
 			</nav>
-			<FileView key={open.path} file={open} editing={editing} />
+			<FileView key={open.path} file={open} saver={settingsFiles(editing)} />
 		</div>
 	);
 }

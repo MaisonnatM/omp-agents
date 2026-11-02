@@ -5,7 +5,7 @@ import type { OmpFile, Workflow } from "../../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Editing } from "./editor";
-import { FileView } from "./files-tab";
+import { FileView, settingsFiles } from "./files-tab";
 
 const TAG_SNIPPET = "metadata:\n  tags: workflow";
 
@@ -71,7 +71,7 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 			</nav>
 			<div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
 				<StepsChart key={open.skill.path} file={open.skill} />
-				<FileView key={open.skill.path} file={open.skill} editing={editing} />
+				<FileView key={open.skill.path} file={open.skill} saver={settingsFiles(editing)} />
 			</div>
 		</div>
 	);

@@ -42,6 +42,11 @@ The decisions, facts, and lessons the sessions of one git repository share throu
 It is separate from omp's own memory and from a Bot's memory.
 _Avoid_: Shared memory, team memory, knowledge base
 
+**omp memory**:
+What omp itself recalls across sessions of a workspace, through the store its `memory.backend` setting picks, which Settings › omp memory shows and edits.
+It is separate from project memory and from a Bot's memory.
+_Avoid_: Memory (bare), Agent memory, Long-term memory
+
 ## Collab
 
 **Host**:

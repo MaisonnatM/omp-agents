@@ -13,6 +13,7 @@ export interface SettingOwner {
 }
 
 const MODELS: SettingOwner = { section: "models", label: "Models" };
+const MEMORY: SettingOwner = { section: "omp-memory", label: "omp memory" };
 
 /**
  * omp settings another Settings section edits, by id. Settings › omp settings counts them and links to that section
@@ -33,6 +34,9 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	"retry.usageReservePct": MODELS,
 	"retry.usageReservePolicy": MODELS,
 	"retry.fallbackRevertPolicy": MODELS,
+	"memory.backend": MEMORY,
+	"autolearn.enabled": MEMORY,
+	"autolearn.autoContinue": MEMORY,
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */

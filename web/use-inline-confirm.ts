@@ -6,7 +6,13 @@ interface ArmedAction {
 	element: HTMLElement;
 }
 
-export function useInlineConfirm(scope: string) {
+/** An action armed by its first click and run by its second, in one `scope`; Escape, a click elsewhere, or 3 seconds disarm it. */
+export interface InlineConfirm {
+	isArmed: (action: string) => boolean;
+	props: (action: string, confirm: () => void) => { onClick: (event: MouseEvent<HTMLElement>) => void; onBlur: () => void };
+}
+
+export function useInlineConfirm(scope: string): InlineConfirm {
 	const [armed, setArmed] = useState<ArmedAction | null>(null);
 	const active = armed?.scope === scope ? armed : null;
 	useEffect(() => {
