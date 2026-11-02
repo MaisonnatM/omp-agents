@@ -3,6 +3,10 @@
 A page tags a message it waits on with an `ack`, counted per page load, and the server answers it with `done`, carrying the error its handler threw or `null`.
 `request` in `web/use-dashboard.ts` sends that way prompts, answers to questions, starts and **Resume all**, interrupts, ends, edited prompts, model, thinking, and fast switches, subagent cancels, a routine's **Run now**, and each change to the scheduled sends.
 A model switch's `done` comes once omp switched, or refused, and the session read its state again; the composer's picker waits on it, and a roster row's `switching` only tells other pages that a switch runs.
+`context`, `set-auto-compaction`, `set-advisor`, and `goal` are acknowledged controls for dashboard sessions.
+Context actions send the corresponding `/compact`, `/shake`, or `/handoff` prompt so omp's background command handling keeps Stop responsive; the auto-compact switch uses `set_auto_compaction`.
+Goal operations use native RPC `goal`; replacement explicitly drops and recreates a goal, resetting accounting.
+The model-state lane serializes these controls and refreshes the roster after each operation.
 A message the page does not tag, such as a pin, a todo change, or a queued row's **Send now**, is dropped when the socket is down, as before.
 
 A socket can close after the server got a request and before its answer reached the page, and the page cannot tell that from a request the server never got, so it may not simply send it again: a prompt would reach the session twice.

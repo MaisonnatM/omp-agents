@@ -17,6 +17,7 @@ export type ShortcutId =
 	| "sessionSearch"
 	| "endSession"
 	| "openPullRequest"
+	| "setGoal"
 	| "previousSession"
 	| "nextSession"
 	| "sessionsNext"
@@ -188,6 +189,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: END_SESSION, scope: "anywhere" }] },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
+	{ id: "setGoal", category: "sessions", label: "Set or edit the focused session's objective and token budget", command: "Set or edit goal", keys: [] },
 	{
 		id: "previousSession",
 		category: "sessions",

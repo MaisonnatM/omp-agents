@@ -15,18 +15,19 @@ interface ModelSlotProps {
 	onSetModel: (model: ModelOption, thinking: string | null) => void;
 	onSetThinking: (level: string) => void;
 	onSetFast: (enabled: boolean) => void;
+	onSetAdvisor: (enabled: boolean) => void;
 	/** A switch of the model, thinking level, or fast mode is in flight, so the menu shows it and other changes wait. */
 	switching: boolean;
 }
 
 /** The composer's model menu for a session this dashboard started; what a terminal session reports, read-only; nothing for a subagent. */
-export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, switching }: ModelSlotProps) {
+export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, onSetAdvisor, switching }: ModelSlotProps) {
 	if (subject.kind !== "session") return null;
 	const model = subject.shown?.model ?? null;
 	const thinking = subject.shown?.thinkingLevel ?? null;
 	const { switchable } = subject;
 	if (switchable) {
-		return <SwitchableModelSlot model={model} thinking={thinking} models={models} open={open} onOpenChange={onOpenChange} onSetModel={onSetModel} onSetThinking={onSetThinking} onSetFast={onSetFast} switching={switching} switchable={switchable} />;
+		return <SwitchableModelSlot model={model} thinking={thinking} models={models} open={open} onOpenChange={onOpenChange} onSetModel={onSetModel} onSetThinking={onSetThinking} onSetFast={onSetFast} onSetAdvisor={onSetAdvisor} switching={switching} switchable={switchable} />;
 	}
 	if (!model && !thinking) return null;
 	return (
@@ -49,7 +50,7 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 	);
 }
 
-function SwitchableModelSlot({ model, thinking, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, switching, switchable }: Omit<ModelSlotProps, "subject"> & { model: string | null; thinking: string | null; switchable: NonNullable<Extract<Subject, { kind: "session" }>["switchable"]> }) {
+function SwitchableModelSlot({ model, thinking, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, onSetAdvisor, switching, switchable }: Omit<ModelSlotProps, "subject"> & { model: string | null; thinking: string | null; switchable: NonNullable<Extract<Subject, { kind: "session" }>["switchable"]> }) {
 	return (
 		<ModelPicker
 			current={model}
@@ -69,6 +70,7 @@ function SwitchableModelSlot({ model, thinking, models, open, onOpenChange, onSe
 				},
 			}}
 			fast={{ state: switchable.fast, onChange: onSetFast }}
+			advisor={{ state: switchable.advisor, onChange: onSetAdvisor }}
 		/>
 	);
 }

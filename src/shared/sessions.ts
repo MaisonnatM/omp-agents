@@ -7,6 +7,7 @@ import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullReq
 import type { ModelOption } from "./models";
 import type { TrustAsk } from "./project-trust";
 import type { ReplayFacts } from "./replay";
+import type { AdvisorState, CompactionState, GoalSlot } from "./session-controls";
 import { TICKET_ID } from "./tickets";
 import type { Workspace } from "./workspaces";
 
@@ -150,7 +151,7 @@ export type RosterHost = RosterHostBase &
 	(
 		| { source: "terminal"; participants: number; relayConnected: boolean }
 		/** Started by this dashboard, which can end it. */
-		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null }
+		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot }
 	);
 
 /** omp's `/fast` for the session's model: whether you turned it on, and whether requests go out on the priority tier. */

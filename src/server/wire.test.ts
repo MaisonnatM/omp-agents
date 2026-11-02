@@ -81,6 +81,24 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "prompt", view: { kind: "past", sessionId: "s1" }, text: "go", delivery: "steer" })).toBeNull();
 	});
 
+	test("session controls require a string instance id and their typed payload", () => {
+		const controls = [
+			{ t: "context", action: { kind: "compact", mode: "soft" } },
+			{ t: "set-auto-compaction", enabled: false },
+			{ t: "set-advisor", enabled: true },
+			{ t: "goal", change: { op: "set", objective: "ship", tokenBudget: 100000 } },
+		] as const;
+		for (const control of controls) {
+			expect(msg({ ...control, instanceId: "i1" })).toEqual({ ...control, instanceId: "i1" });
+			for (const instanceId of [undefined, null, 1, {}]) expect(msg({ ...control, instanceId })).toBeNull();
+		}
+		for (const t of ["set-auto-compaction", "set-advisor"]) {
+			for (const enabled of [undefined, null, 1, "true"]) expect(msg({ t, instanceId: "i1", enabled })).toBeNull();
+		}
+		for (const action of [undefined, null, {}, { kind: "compact", mode: "bad" }, { kind: "shake", mode: "soft" }]) expect(msg({ t: "context", instanceId: "i1", action })).toBeNull();
+		for (const change of [undefined, null, {}, { op: "set", objective: " ", tokenBudget: null }, { op: "set", objective: "ship", tokenBudget: -1 }, { op: "drop" }]) expect(msg({ t: "goal", instanceId: "i1", change })).toBeNull();
+	});
+
 	test("user-todo takes each change with the fields it needs, and drops any other field", () => {
 		const change = (value: unknown) => msg({ t: "user-todo", change: value });
 		expect(change({ op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", text: "Ship", extra: 1 })).toEqual({

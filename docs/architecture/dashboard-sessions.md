@@ -88,6 +88,15 @@ The session itself sends `/move <path>` as the composer does once a turn ends an
 The dashboard serializes model, effort, and fast-mode setters with state reads in a separate `SerialLane` from turn commands.
 Event-driven refreshes coalesce while queued, so a read cannot overwrite a later switch, and switching stays visible until every queued model change has finished.
 
+The same lane runs the short auto-compaction and goal RPC setters; context and advisor slash commands use the prompt path and its turn lane instead, without holding the model lane.
+The roster carries `compaction` (enabled, running kind, and effective model threshold), nullable `advisor` (configured model selectors and tracked enabled state), and `goal` (off with a reason, none, or a set goal with status and accounting).
+`get_state` is authoritative for auto-compaction and goals, and manual/auto compaction completion and `goal_updated` trigger a refresh.
+A completed goal event is retained for the current dashboard lifetime because omp clears its goal mode on completion; Clear, a new live goal, and a session change discard it.
+Advisor state is seeded from configuration and updated after dashboard `/advisor` prompts because RPC has no advisor enabled field; a server reattachment cannot recover a runtime-only toggle.
+`loadSessionControlsConfig` reads session-only settings and discovers advisors in parallel, leaving generic routing reads free of advisor-file discovery.
+Its threshold resolver stays lazy so a model switch uses omp's current per-model override and context window.
+The dashboard does not enable `goal.continuationModes` on the user's behalf: it labels goals as prompt-driven unless the loaded configuration includes `"rpc"`.
+
 A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them.
 `parseImages` in `src/shared/sessions.ts`, which `src/server/wire.ts` uses, accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text.
 The socket's `maxPayloadLength` is 64 MB so such a message fits.

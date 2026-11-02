@@ -17,6 +17,15 @@ _Avoid_: CLI session, external session
 A session whose omp the dashboard started in RPC mode, under a keeper.
 _Avoid_: Managed session, RPC session
 
+**Goal**:
+An objective omp tracks for one session, with running, paused, budget-reached, and complete states and optional token accounting limits.
+By default a dashboard goal advances with your prompts; automatic continuation is an explicit omp setting.
+_Avoid_: Task (the agent's todo item), mission
+
+**Advisor**:
+The passive reviewer or reviewers configured by omp's advisor model role or WATCHDOG roster, enabled per session.
+_Avoid_: Subagent, critic
+
 **Past session**:
 A session no omp process runs, read from its session file.
 _Avoid_: Closed session, archived session

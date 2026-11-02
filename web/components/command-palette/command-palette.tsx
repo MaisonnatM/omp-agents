@@ -20,6 +20,7 @@ import {
 	Search,
 	SquareTerminal,
 	Wrench,
+	Target,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update";
@@ -75,6 +76,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	back: ArrowLeft,
 	forward: ArrowRight,
 	openPullRequest: GitPullRequestCreate,
+	setGoal: Target,
 	tools: Wrench,
 	sessionsSidebar: PanelLeft,
 	detailsSidebar: PanelRight,

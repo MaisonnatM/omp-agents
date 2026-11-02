@@ -13,6 +13,30 @@ import { rpc, rpcFrameFile, rpcFrames, utils } from "./modules";
 import type { ServiceTierModel } from "./module-types/models";
 import type { RpcHostTool } from "./module-types/rpc";
 
+/** Fields read from omp's Goal (pi-tui/tools/goal, exposed by goals/state.ts). */
+export interface RpcGoal {
+	objective: string;
+	status: "active" | "paused" | "budget-limited" | "complete" | "dropped";
+	tokensUsed: number;
+	tokenBudget?: number;
+	timeUsedSeconds: number;
+}
+
+export function parseRpcGoal(value: unknown): RpcGoal | null {
+	if (!isObject(value) || typeof value.objective !== "string") return null;
+	const { status, tokensUsed, tokenBudget, timeUsedSeconds } = value;
+	if (status !== "active" && status !== "paused" && status !== "budget-limited" && status !== "complete" && status !== "dropped") return null;
+	if (typeof tokensUsed !== "number" || !Number.isFinite(tokensUsed) || typeof timeUsedSeconds !== "number" || !Number.isFinite(timeUsedSeconds)) return null;
+	if (tokenBudget !== undefined && (typeof tokenBudget !== "number" || !Number.isFinite(tokenBudget))) return null;
+	return { objective: value.objective, status, tokensUsed, ...(tokenBudget === undefined ? {} : { tokenBudget }), timeUsedSeconds };
+}
+
+export interface RpcGoalState {
+	enabled: boolean;
+	mode: "active" | "exiting";
+	goal: RpcGoal;
+}
+
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {
 	id: string;
@@ -35,6 +59,8 @@ export interface RpcState {
 	fastModeEnabled: boolean;
 	/** Whether requests actually go out on the priority tier. */
 	fastModeActive: boolean;
+	autoCompactionEnabled: boolean;
+	goal: RpcGoalState | null;
 	/** Whether a turn runs. */
 	isStreaming: boolean;
 	/** Whether omp compacts the context, which a turn's own maintenance does before it goes on. */
@@ -87,6 +113,8 @@ export interface RpcClient {
 	setThinkingLevel(level: string): Promise<void>;
 	/** Turns `/fast` on or off; enabling rejects for a model without a priority tier. */
 	setFastMode(enabled: boolean): Promise<{ enabled: boolean; active: boolean }>;
+	setAutoCompaction(enabled: boolean): Promise<void>;
+	goal(op: "get" | "create" | "pause" | "resume" | "drop", options?: { objective?: string; tokenBudget?: number }): Promise<{ goal: RpcGoal | null; state: RpcGoalState | null }>;
 	setSubagentSubscription(level: "progress"): Promise<string>;
 	getSubagents(): Promise<RpcSubagent[]>;
 	switchSession(sessionPath: string): Promise<{ cancelled: boolean }>;

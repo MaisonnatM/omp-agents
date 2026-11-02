@@ -4,7 +4,7 @@ import { isObject } from "../json";
 import type { CollabAutoStart, TerminalAccess } from "../shared/readiness";
 import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
-import { collabSettings, config, dirs, extensionSettings, fallbackChains, modelSettings, sessionSettings, settingsRegistry } from "./modules";
+import { advisorConfig, advisorSettings, collabSettings, compaction, config, dirs, extensionSettings, fallbackChains, goalSettings, modelCompactionSettings, modelSettings, sessionSettings, settingsRegistry } from "./modules";
 import type { OmpSettingsInstance, SettingHandle } from "./module-types/config";
 
 /** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
@@ -53,6 +53,31 @@ export interface OmpConfig {
 	retry: RetrySettings;
 	modelProviderOrder: string[];
 	disabledExtensions: string[];
+}
+
+/** Native settings and configured advisors used only by a live dashboard session. */
+export interface SessionControlsConfig {
+	advisorEnabled: boolean;
+	advisorModels: string[];
+	goalEnabled: boolean;
+	goalContinues: boolean;
+	/** Resolve lazily so model switches use omp's per-model overrides with the current context window. */
+	compactionThreshold(model: { provider: string; id: string } | undefined, window: number): number;
+}
+
+/** Session-only discovery; routing and Settings readers do not need advisor files. */
+export async function loadSessionControlsConfig(cwd: string): Promise<SessionControlsConfig> {
+	const [settings, { advisors }] = await Promise.all([config.Settings.loadReadOnly({ cwd }), advisorConfig.discoverAdvisorConfigs(cwd)]);
+	const fallback = settings.getModelRoles().advisor;
+	const enabled = advisors.filter(advisor => advisor.enabled !== false);
+	const advisorModels = enabled.length ? enabled.flatMap(advisor => advisor.model ?? fallback ?? []) : fallback ? [fallback] : [];
+	return {
+		advisorEnabled: advisorSettings.cfgAdvisorEnabled.get(settings),
+		advisorModels,
+		goalEnabled: goalSettings.cfgGoalEnabled.get(settings),
+		goalContinues: goalSettings.cfgGoalContinuationModes.get(settings).includes("rpc"),
+		compactionThreshold: (model, window) => compaction.resolveThresholdTokens(window, modelCompactionSettings.resolveModelCompactionSettings(settings, model)),
+	};
 }
 
 /** omp's settings as a session in `cwd` loads them. Read-only: omp's `loadReadOnly` never writes the config files back. */

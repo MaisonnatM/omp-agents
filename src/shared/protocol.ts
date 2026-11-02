@@ -13,6 +13,7 @@ import type { PagePreferences, PreferenceChange } from "./preferences";
 import type { TrustAsk, TrustedProject } from "./project-trust";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
+import type { ContextAction, GoalChange } from "./session-controls";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, AgentSource, ChangedFile, Item } from "./transcript";
 import type { Turn } from "./trajectory";
@@ -120,6 +121,14 @@ export type ClientMsg =
 	| { t: "set-thinking"; instanceId: string; level: string }
 	/** Turn omp's `/fast` on or off for a session this dashboard started. */
 	| { t: "set-fast"; instanceId: string; enabled: boolean }
+	/** Run an idle dashboard session's native context-maintenance slash command. */
+	| { t: "context"; instanceId: string; action: ContextAction }
+	/** Turn automatic compaction on or off for this dashboard session only. */
+	| { t: "set-auto-compaction"; instanceId: string; enabled: boolean }
+	/** Enable or disable this dashboard session's configured advisor through `/advisor`. */
+	| { t: "set-advisor"; instanceId: string; enabled: boolean }
+	/** Set, pause, resume, or clear a dashboard session's goal through native RPC. */
+	| { t: "goal"; instanceId: string; change: GoalChange }
 	/** Reply to one of a live session's pending `requests`. */
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
 	/** Cancel a running subagent of a live session without stopping the session's turn. */
