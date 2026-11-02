@@ -43,6 +43,8 @@
   `workflows-tab.tsx` lists the workflows that `GET /api/settings` names, each with its `/name` or `/skill:name`, and finds each one's skill among the response's `files` by path.
   Authored workflows open in `FileView` from `files-tab.tsx`; packaged workflows show read-only source with **Manage package**, covered by `web/components/settings/workflows-tab.test.tsx`.
   `omp-settings-tab.tsx` shows `agentSettings` from `GET /api/settings` by omp's tabs, with one control per row that saves through `PUT /api/settings/agent`, and links to **Files** through the file selection `settings-page.tsx` holds for `files-tab.tsx`.
+  `agents-tab.tsx` previews discovered agents as expandable rows, keeps their model-override drafts mounted through search and folding, clears missing overrides, and edits the four task execution defaults.
+  `selector-picker.tsx` is the model and thinking picker shared by Models and Agents; Agents also offers model-role aliases.
   `web/omp-settings.ts` holds what it shows of a row: `OWNED_SETTINGS` and `ownerOf`, the settings another section edits by id, which a section that starts editing one adds to; `valueOf`, `isChanged`, and `formatValue`; and `shownTabs`, each tab's groups for a search, with the owned rows counted per section.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table, loaded with `React.lazy` so `recharts` is a chunk of its own; `analytics-format.ts` shares number and cost formatting across the section; `context-sources.tsx` renders the context-source table with its workspace and session filters.

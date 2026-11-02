@@ -4,6 +4,7 @@ import { dirname, extname, join } from "node:path";
 import { atomicWriteText } from "./fs";
 import { errorText, isObject } from "./json";
 import { agentSetting, readAgentSettings, userValue, writeAgentSetting } from "./omp/agent-settings";
+import { readAgentCatalog } from "./omp/agents";
 import {
 	agentDir,
 	assertRetryValue,
@@ -86,10 +87,11 @@ const USER_FILES: FoundFile[] = [
  */
 async function loadSession(
 	cwd: string | null,
-): Promise<{ routing: OmpSettings["routing"]; agentSettings: OmpSettings["agentSettings"]; found: FoundFile[] }> {
+): Promise<{ routing: OmpSettings["routing"]; agentSettings: OmpSettings["agentSettings"]; agents: OmpSettings["agents"]; found: FoundFile[] }> {
 	const sessionCwd = cwd ?? HOME;
 	let routing: OmpSettings["routing"];
 	let agentSettings: OmpSettings["agentSettings"];
+	let agents: OmpSettings["agents"];
 	let disabledExtensions: string[] = [];
 	try {
 		const settings = await loadSessionSettings(sessionCwd);
@@ -107,19 +109,21 @@ async function loadSession(
 			modelProviderOrder: config.modelProviderOrder,
 		};
 		agentSettings = readAgentSettings(settings, cwd !== null);
+		agents = await readAgentCatalog(cwd, settings).catch((err: unknown) => ({ error: errorText(err) }));
 	} catch (err) {
 		routing = { error: errorText(err) };
 		agentSettings = routing;
+		agents = routing;
 	}
 	// From the home directory omp reads other tools' dot-directories as project files; without a workspace there is no project.
 	const found = (await discoverOmpFiles(sessionCwd, disabledExtensions)).filter(file => cwd !== null || file.scope === "user");
 	const placeholders = USER_FILES.filter(file => !found.some(other => other.kind === file.kind && other.scope === "user"));
-	return { routing, agentSettings, found: [...found, ...placeholders] };
+	return { routing, agentSettings, agents, found: [...found, ...placeholders] };
 }
 
 export async function loadOmpSettings(cwd: string | null): Promise<OmpSettings> {
-	const { routing, agentSettings, found } = await loadSession(cwd);
-	return { cwd, routing, agentSettings, files: await Promise.all(found.map(readFile)), workflows: workflowsOf(found) };
+	const { routing, agentSettings, agents, found } = await loadSession(cwd);
+	return { cwd, routing, agentSettings, agents, files: await Promise.all(found.map(readFile)), workflows: workflowsOf(found) };
 }
 
 /** What a routing edit is checked against: the models omp lists, and what the config names today. */
@@ -221,7 +225,13 @@ export function parseAgentSettingEdit(raw: unknown): AgentSettingEdit {
 	if (!isObject(raw) || typeof raw.id !== "string" || !Object.hasOwn(raw, "expected") || (raw.reset !== true && !Object.hasOwn(raw, "value"))) {
 		throw new Rejected(400, "Expected { id, value, expected } or { id, reset: true, expected }");
 	}
-	return raw.reset === true ? { id: raw.id, reset: true, expected: raw.expected } : { id: raw.id, value: raw.value, expected: raw.expected };
+	if (raw.entry !== undefined && (raw.id !== "task.agentModelOverrides" || typeof raw.entry !== "string" || !raw.entry.trim())) {
+		throw new Rejected(400, "An agent model override entry must name an agent");
+	}
+	if (raw.entry !== undefined && raw.reset !== true && !(typeof raw.value === "string" && raw.value.trim() || Array.isArray(raw.value) && raw.value.length > 0 && raw.value.every(value => typeof value === "string" && value.trim()))) {
+		throw new Rejected(400, "Choose a model or a nonempty ordered list of model selectors");
+	}
+	return { ...(raw.reset === true ? { id: raw.id, reset: true as const, expected: raw.expected } : { id: raw.id, value: raw.value, expected: raw.expected }), ...(typeof raw.entry === "string" ? { entry: raw.entry } : {}) };
 }
 
 /**
@@ -235,7 +245,7 @@ export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpS
 		if (!handle) throw new Rejected(404, `omp has no setting ${edit.id} a session reads`);
 		if (!("reset" in edit)) {
 			try {
-				handle.assertWritable(edit.value);
+				handle.assertWritable(edit.entry === undefined ? edit.value : { [edit.entry]: edit.value });
 			} catch (err) {
 				throw new Rejected(400, errorText(err));
 			}
@@ -243,10 +253,10 @@ export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpS
 		const settings = await loadGlobalForWrite(cwd ?? HOME).catch((err: unknown) => {
 			throw cannotLoad(err);
 		});
-		if (!Bun.deepEquals(userValue(handle, settings), edit.expected)) {
-			throw new Rejected(409, `${edit.id} changed in config.yml since this page read it`, true);
+		if (!Bun.deepEquals(userValue(handle, settings, edit.entry), edit.expected)) {
+			throw new Rejected(409, `${edit.entry === undefined ? edit.id : `Model override for ${edit.entry}`} changed in config.yml since this page read it`, true);
 		}
-		await writeAgentSetting(settings, handle, edit);
+		await writeAgentSetting(settings, handle, edit, edit.entry);
 		return loadOmpSettings(cwd);
 	});
 }

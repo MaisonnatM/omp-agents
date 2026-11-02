@@ -19,6 +19,11 @@ describe("ownerOf", () => {
 		expect(ownerOf("retry.fallbackOn")).toBeUndefined();
 		expect(ownerOf("constructor")).toBeUndefined();
 	});
+	test("Agents owns only the override map and execution settings it edits", () => {
+		for (const id of ["task.agentModelOverrides", "task.maxConcurrency", "task.isolation.enabled", "task.isolation.apply", "task.isolation.merge"]) expect(ownerOf(id)).toEqual({ section: "agents", label: "Agents" });
+		expect(ownerOf("task.disabledAgents")).toBeUndefined();
+		expect(ownerOf("task.enabled")).toBeUndefined();
+	});
 });
 
 describe("valueOf and isChanged", () => {

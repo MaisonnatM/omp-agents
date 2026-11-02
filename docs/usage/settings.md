@@ -3,9 +3,9 @@
 - The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
   It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
   While Settings is open the sidebar lists its sections below the tab bar, with no tab selected, in place of a tab's content; select a tab, such as **Sessions**, to leave.
-  The sidebar lists sixteen sections in four groups.
+  The sidebar lists seventeen sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, and **Sync**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
-  **This workspace** holds **Models**, **omp settings**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
+  **This workspace** holds **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "graphite", under **Settings**.
   The gear button and G then , reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
@@ -84,6 +84,20 @@
   Removing every fallback of a role removes its own chain, so it walks the `default` chain again.
   The retry settings and the provider order save the same way.
   A workspace's `.omp/config.yml` still overrides what you save there.
+- **Agents** previews the agents a new session in this workspace discovers, alphabetically, with their descriptions, scopes, read-only classification, and effective models.
+  With **All workspaces**, the preview includes user and bundled definitions and user plugins, not project or session-local agents.
+  Search by name, description, scope, source path, tools, or model; expanding a row shows its source, declared tools, definition model choices, user override, and workspace override.
+  **Edit** under **User model override** picks a model or model role, with an optional thinking level; **Use ordered model choices** lets omp try selectors in order.
+  Save changes only that agent's entry in your `config.yml`; **Clear user override**, confirmed and then saved, removes the entry rather than writing the definition back.
+  Unknown selectors and role aliases already saved stay unchanged unless you edit them.
+  A workspace override keeps winning and links to **Files**; user defaults apply in other workspaces and to later spawns, never to subagents already running.
+  Bundled seance chooses its model from the source session or invocation, so only a stale saved override can be cleared.
+  **Overrides for missing agents** lists saved entries with no discovered definition and lets you clear them.
+  **Execution settings** edits the concurrency limit, whether tasks may request a separate checkout, whether successful changes apply back, and the apply method; zero concurrency means unlimited.
+  The apply controls hide while isolation is off without deleting their saved values.
+  Switching sections, folding a row, and searching keep unsaved edits; changing workspace starts a separate editor.
+  **Refresh** reads discovery again, and a failed refresh keeps the last preview but prevents saving until another refresh succeeds.
+  This is not a live-session catalog; running sessions may have extension-provided agents or different model choices.
 - **omp settings** lists omp's own settings in the tabs and groups of omp's `/settings` panel, from **Appearance** to **Providers**, with how many settings in each tab differ from omp's default.
   Settings that change only how omp's terminal draws, such as the theme, the status line, and the editor, are left out, since sessions the dashboard starts have no terminal.
   The field above the tabs finds settings in every tab by name, config key, description, or current value; tabs with no match dim, and selecting a tab clears the search.
@@ -95,7 +109,7 @@
   A key, token, or password never reaches the page: its field says only whether it is set, and typing replaces it.
   When the workspace's own settings set a value, the control is locked, and the row links to that file in **Files** and shows your value; your saved value applies in other workspaces.
   When an environment variable sets a value, the row names the variable, which overrides what you save.
-  The settings **Models** edits, the model roles, the provider order, and its retry settings, show as a line that links to **Models**.
+  The settings **Models** and **Agents** edit show as lines linking to those sections instead of a second editor.
   Settings omp gives no control to are counted under the tabs, with a link that opens `config.yml` in **Files**.
   If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
   Running sessions pick up most changes; some apply only to sessions started after the change.
@@ -105,7 +119,7 @@
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
-  If omp cannot load `config.yml`, **Models** and **omp settings** show omp's error and **Files** still lists the files, so you can fix the broken file there.
+  If omp cannot load `config.yml`, **Models**, **Agents**, and **omp settings** show omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
 - **Extensions** manages packages, contribution previews, cached marketplace catalogs, the skill registry, and discovery sources; see [Extensions](extensions.md).
 - The **Workflows** section lists your workflows: skills whose `SKILL.md` frontmatter tags them `workflow`, such as the starter kit's `ship` skill, which holds the steps `/ship` follows.
@@ -159,7 +173,7 @@
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
-  With **All workspaces**, **Models**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, and **Worktrees** lists every repository.
+  With **All workspaces**, **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, and **Worktrees** lists every repository.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
   Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.

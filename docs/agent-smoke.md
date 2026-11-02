@@ -90,7 +90,7 @@ Besides a live session's own hash, the routes are:
 - `#calendar`, `#bots`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;
-- `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `omp`, `files`, `extensions`, `workflows`, `decisions`, or `worktrees`.
+- `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `models`, `agents`, `omp`, `files`, `extensions`, `workflows`, `decisions`, or `worktrees`.
 
 ## Activity reconcile
 

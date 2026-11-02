@@ -27,6 +27,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings now has an Extensions library for installed packages, marketplace catalogs, registry skills, and their contributions, with native install, update, enable, disable, and uninstall actions.
 - Settings › Extensions manages plugins and registry skills and previews their files.
 - Packaged workflows open read-only, with a link to manage their package.
+- New Agents section in Settings previews the agents a new session discovers, with their tools and models; expand one to save or clear its model override, or open Execution settings to change concurrency and isolation defaults.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
@@ -270,3 +271,37 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The Board view shows pull requests in columns by whose move it is, and dragging a card to another column does the step that moves it there.
 - Todo, session, ticket, and pull request chips in your sent messages now open inside the dashboard.
 - Behind the scenes: agents check more carefully before they publish a pull request, such as a ticked browser proof box when the pull request asks for one.
+
+## 2026-10-21
+
+- Select text in a conversation or in a pull request's code and choose Ask about this to ask a side question without disturbing the session.
+- The Review quick action now saves its findings as a review draft that you check, edit, and post yourself, from the Review draft tab.
+- Settings › Sync keeps your setup the same on all your computers, through a private Git repository of yours.
+- You can select images a session made and attach them to its pull request or Linear issue.
+- Open PR now goes away as soon as the session opens its pull request.
+- Buttons and colors got a refreshed look.
+- Behind the scenes: agents now work directly in the branch's folder when it is not main.
+
+## 2026-10-20
+
+- Sessions started from the dashboard keep running when the dashboard restarts or crashes.
+- You get a notification when a session asks you something or finishes, and the Dock icon counts the sessions waiting on you.
+- Open PR, in a working session's header and in the command menu, asks the agent to commit, review its work, and open a pull request.
+- Merge now waits until GitHub allows it, Merge stack merges a whole stack from the bottom up, and After a merge ends the finished sessions and tidies up after them.
+- Update dashboard, from the bell or the command menu, loads the newest version and restarts in place.
+- A session stopped by a provider's usage limit now continues on its own when the limit resets.
+- Each message box keeps what you typed but didn't send, per session, when you switch away or reload.
+- Images and videos from an agent's tools or named in its messages now show in the conversation, and one viewer steps through them all.
+- An agent's questions now come as one form, one question at a time, with checkboxes where several answers fit.
+- Session rows are tidier, their actions open on right-click, and a button next to a session's title copies its ID.
+- Picking several suggested prompts sends them together as one list.
+- Fixed: a pull request that is ready but behind its base now says so instead of Ready to merge.
+- Fixed: routines keep track of their sessions after the dashboard restarts.
+- Behind the scenes: every update to the main code now ships a new version, and agents got a glossary and a log of past decisions.
+
+## 2026-10-19
+
+- You can connect several Gmail and Google Calendar accounts, link each to workspaces, and see their mail and events together.
+- Cmd+N starts a new session, Cmd+F searches sessions, and the sidebar shows these keys.
+- Clicking the branch in a session's header copies its name and frees it to be checked out elsewhere.
+- Tool calls have a new compact look, and code blocks show their language with a copy button.

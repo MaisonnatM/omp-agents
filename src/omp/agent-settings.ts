@@ -140,14 +140,18 @@ export function readAgentSettings(settings: OmpSettingsInstance, workspace: bool
 }
 
 /** The user value of `handle` the page shows, `null` when `config.yml` holds none: what an edit's `expected` must equal. */
-export const userValue = (handle: SettingHandle, settings: OmpSettingsInstance): unknown => shown(handle, settings.getGlobalSettings()) ?? null;
+export function userValue(handle: SettingHandle, settings: OmpSettingsInstance, entry?: string): unknown {
+	const value = shown(handle, settings.getGlobalSettings());
+	return entry === undefined ? value ?? null : value && typeof value === "object" && Object.hasOwn(value, entry) ? (value as Record<string, unknown>)[entry] ?? null : null;
+}
 
 /**
  * Writes `change` to the user's `config.yml` through omp's handle. `settings` is a load for a write, `handle` is
  * {@link agentSetting}'s, and the caller has checked the change against omp and against the value the page showed.
  */
-export async function writeAgentSetting(settings: OmpSettingsInstance, handle: SettingHandle, change: AgentSettingChange): Promise<void> {
-	if ("reset" in change) handle.unset(settings);
+export async function writeAgentSetting(settings: OmpSettingsInstance, handle: SettingHandle, change: AgentSettingChange, entry?: string): Promise<void> {
+	if (entry !== undefined) handle.setEntry(settings, entry, "reset" in change ? undefined : change.value);
+	else if ("reset" in change) handle.unset(settings);
 	else handle.set(settings, change.value);
 	await settings.flush();
 }

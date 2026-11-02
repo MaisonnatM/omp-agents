@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentDir } from "./omp/config";
 import { loadOmpSettings, parseAgentSettingEdit, parseRoutingEdit, Rejected, routeRoles, saveAgentSetting, saveOmpFile } from "./settings";
@@ -157,6 +158,14 @@ describe("parseAgentSettingEdit", () => {
 		for (const raw of [{ id: "compaction.enabled", value: false }, { id: 3, value: false, expected: null }, { id: "compaction.enabled", reset: false, expected: null }, null]) {
 			expect(() => parseAgentSettingEdit(raw)).toThrow("Expected { id, value, expected } or { id, reset: true, expected }");
 		}
+		expect(parseAgentSettingEdit({ id: "task.agentModelOverrides", entry: "reviewer", value: ["@slow:high", "provider/model"], expected: null })).toEqual({ id: "task.agentModelOverrides", entry: "reviewer", value: ["@slow:high", "provider/model"], expected: null });
+		expect(parseAgentSettingEdit({ id: "task.agentModelOverrides", entry: "legacy.agent", reset: true, expected: "@slow" })).toEqual({ id: "task.agentModelOverrides", entry: "legacy.agent", reset: true, expected: "@slow" });
+		for (const raw of [
+			{ id: "task.maxConcurrency", entry: "reviewer", value: 2, expected: null },
+			{ id: "task.agentModelOverrides", entry: "", value: "@slow", expected: null },
+			{ id: "task.agentModelOverrides", entry: "reviewer", value: [], expected: null },
+			{ id: "task.agentModelOverrides", entry: "reviewer", value: ["@slow", ""], expected: null },
+		]) expect(() => parseAgentSettingEdit(raw)).toThrow();
 	});
 });
 
@@ -197,5 +206,23 @@ describe("saveAgentSetting", () => {
 		}
 		expect(await saveAgentSetting(null, { id: "compaction.enabled", value: "yes", expected: null }).catch((err: Rejected) => err)).toMatchObject({ status: 400 });
 		expect(await Bun.file(path).text()).toBe("modelRoles: {}\n");
+	});
+
+	test("entry saves and clears preserve other user entries and never copy workspace overrides", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "agent-entry-"));
+		mkdirSync(join(cwd, ".omp"), { recursive: true });
+		writeFileSync(join(cwd, ".omp", "config.yml"), "task:\n  agentModelOverrides:\n    reviewer: workspace/model\n    workspace-only: workspace/other\n");
+		writeFileSync(path, "task:\n  maxConcurrency: 8\n  agentModelOverrides:\n    researcher: ['unknown/selector:high', '@slow']\n");
+		try {
+			const saved = await saveAgentSetting(cwd, { id: "task.agentModelOverrides", entry: "reviewer", value: ["@plan:high", "provider/*"], expected: null });
+			expect("error" in saved.agents ? saved.agents : saved.agents.userOverrides).toEqual({ researcher: ["unknown/selector:high", "@slow"], reviewer: ["@plan:high", "provider/*"] });
+			expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ task: { maxConcurrency: 8, agentModelOverrides: { researcher: ["unknown/selector:high", "@slow"], reviewer: ["@plan:high", "provider/*"] } } });
+			const stale = await saveAgentSetting(cwd, { id: "task.agentModelOverrides", entry: "reviewer", reset: true, expected: null }).catch((err: Rejected) => err);
+			expect(stale).toMatchObject({ status: 409, conflict: true });
+			await saveAgentSetting(cwd, { id: "task.agentModelOverrides", entry: "reviewer", reset: true, expected: ["@plan:high", "provider/*"] });
+			expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ task: { maxConcurrency: 8, agentModelOverrides: { researcher: ["unknown/selector:high", "@slow"] } } });
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
 	});
 });

@@ -120,6 +120,7 @@ interface CommandPickerProps {
 	/** The up-down chevron after the trigger's content; `false` for a button that adds rather than switches. */
 	chevron?: boolean;
 	ariaLabel?: string;
+	ariaLabelledby?: string;
 	/** What hovering the trigger says; no tooltip when omitted. */
 	tooltip?: string;
 	/** Adds this shortcut's keys to the tooltip. */
@@ -142,7 +143,7 @@ interface CommandPickerProps {
 }
 
 /** A button that opens a searchable, grouped list of choices; picking one closes it. The dashboard's every combobox. */
-export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty, control }: CommandPickerProps) {
+export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, ariaLabelledby, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty, control }: CommandPickerProps) {
 	const [inner, setInner] = useState(false);
 	const shown = open ?? inner;
 	const change = (next: boolean): void => {
@@ -160,6 +161,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 				leadingIcon={icon}
 				trailingIcon={chevron ? ChevronsUpDown : undefined}
 				aria-label={ariaLabel}
+				aria-labelledby={ariaLabelledby}
 				// Keeps Radix's popover `data-state` contract under a Tooltip trigger, which stamps its own.
 				data-state={shown ? "open" : "closed"}
 				disabled={disabled}
