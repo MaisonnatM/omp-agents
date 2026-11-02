@@ -170,14 +170,19 @@ export function parseRouterTasks(value: unknown): RouterTask[] | null {
 	return value.tasks.flatMap(task => parseRouterTask(task) ?? []);
 }
 
+/** What a Router asks for when it starts a task; the server adds the rest of a {@link RouterTask}. */
+export type TaskSpec = Pick<RouterTask, "id" | "title" | "prompt" | "cwd" | "follows" | "quiet">;
+
+/** Marks task `id`, from its Router's `finish_task` or the page's Mark done and Stop; `stopped` also ends its session. */
+export type RouterTaskChange = { op: "finish"; id: string; status: Exclude<TaskStatus, "working">; note: string | null };
+
 /** What a Router's tools ask of the server about one of its tasks. */
 export type RouterChange =
 	/** Starts the task's session in `cwd` with `prompt` as its first message. */
-	| { op: "start"; task: { id: string; title: string; prompt: string; cwd: string; follows: TaskFollow[]; quiet: boolean } }
+	| { op: "start"; task: TaskSpec }
 	/** Adds to what the task listens to. */
-	| { op: "follow"; taskId: string; follows: TaskFollow[] }
-	/** Marks the task; `stopped` also ends its session. */
-	| { op: "finish"; taskId: string; status: Exclude<TaskStatus, "working">; note: string | null };
+	| { op: "follow"; id: string; follows: TaskFollow[] }
+	| RouterTaskChange;
 
 /** What a Router's tool leaves for the server: one change from `botId`, the Bot that asks. */
 export interface RouterRequest {
@@ -203,29 +208,26 @@ export function parseRouterRequest(value: unknown): Parsed<RouterRequest> {
 			return { ok: { botId, change: { op: "start", task: { id, title, prompt, cwd, follows, quiet } } } };
 		}
 		case "follow": {
-			const taskId = parseTaskId(change.taskId);
+			const id = parseTaskId(change.id);
 			const follows = parseFollows(change.follows);
-			return taskId && follows && follows.length > 0 ? { ok: { botId, change: { op: "follow", taskId, follows } } } : null;
+			return id && follows && follows.length > 0 ? { ok: { botId, change: { op: "follow", id, follows } } } : null;
 		}
 		case "finish": {
-			const taskId = parseTaskId(change.taskId);
-			const { note = null, status } = change;
-			if (!taskId || (note !== null && typeof note !== "string") || (typeof note === "string" && note.length > MAX_TASK_NOTE)) return null;
-			if (status !== "review" && status !== "done" && status !== "stopped") return null;
-			return { ok: { botId, change: { op: "finish", taskId, status, note: typeof note === "string" ? note : null } } };
+			const finish = parseRouterTaskChange(change);
+			return finish && { ok: { botId, change: finish } };
 		}
 		default:
 			return null;
 	}
 }
 
-/** What the page asks of a task: mark it done, or stop it, which ends its session. */
-export type RouterTaskChange = { op: "finish"; id: string; status: "done" | "stopped" };
-
+/** A {@link RouterTaskChange}, whose `note` defaults to `null`, or `null` when it is none. */
 export function parseRouterTaskChange(value: unknown): RouterTaskChange | null {
 	if (!isObject(value) || value.op !== "finish") return null;
 	const id = parseTaskId(value.id);
-	return id && (value.status === "done" || value.status === "stopped") ? { op: "finish", id, status: value.status } : null;
+	const { note = null, status } = value;
+	if (!id || (note !== null && (typeof note !== "string" || note.length > MAX_TASK_NOTE))) return null;
+	return status === "review" || status === "done" || status === "stopped" ? { op: "finish", id, status, note } : null;
 }
 
 /** How the Tasks tab groups a Router's tasks: the ones waiting on you, the ones at work, and the ones over. */

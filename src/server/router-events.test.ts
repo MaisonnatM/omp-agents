@@ -10,7 +10,7 @@ import { readRoutineMessage } from "../shared/routine-message";
 import { RouterEvents } from "./router-events";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
-import { RouterTasksFile } from "./router-tasks";
+import { RouterTasks } from "./router-tasks";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -51,13 +51,12 @@ function harness({ refuse = null as string | null } = {}) {
 	const routines = new RoutinesFile(join(dir, "routines.json"));
 	routines.apply({ op: "save", routine: routerRoutine(ATLAS) }, T0);
 	routines.apply({ op: "save", routine: { ...routerRoutine(SCOUT), id: "scout-events" } }, T0);
-	const tasks = new RouterTasksFile(join(dir, "router-tasks.json"));
 	const now = T0 + 60_000;
+	const tasks = new RouterTasks({ path: join(dir, "router-tasks.json"), active: () => true, tell: async () => {}, end: async () => {}, now: () => now, onChange() {} });
 	const routed = { bots: [] as [BotId, string][], sessions: [] as [string, string][] };
 	const screen = new RouterEvents({
 		isRouter: botId => botId === ATLAS,
-		file: tasks,
-		apply: edit => tasks.apply(edit, now),
+		tasks,
 		messageSession: async (sessionId, text) => {
 			if (refuse !== null) throw new Error(refuse);
 			routed.sessions.push([sessionId, text]);
@@ -78,7 +77,7 @@ function harness({ refuse = null as string | null } = {}) {
 	});
 	/** What reached Atlas's conversation: each message's events and prompt. */
 	const atlas = () => routed.bots.filter(([botId]) => botId === ATLAS).map(([, text]) => readRoutineMessage(text));
-	return { runner, tasks, routed, atlas, now };
+	return { runner, routines, tasks, routed, atlas, now };
 }
 
 describe("a Router's events", () => {
@@ -107,8 +106,8 @@ describe("a Router's events", () => {
 
 	test("an event on a pull request an open task follows goes to that task's session, not the Router", async () => {
 		const { runner, tasks, routed, atlas, now } = harness();
-		tasks.apply({ op: "add", task: task("t1", { status: "review", follows: [{ kind: "pull-request", owner: "Acme", repo: "App", number: 4 }] }) }, T0);
-		tasks.apply({ op: "add", task: task("done", { status: "done", follows: [{ kind: "pull-request", owner: "acme", repo: "app", number: 4 }] }) }, T0);
+		tasks.apply({ op: "add", task: task("t1", { status: "review", follows: [{ kind: "pull-request", owner: "Acme", repo: "App", number: 4 }] }) });
+		tasks.apply({ op: "add", task: task("done", { status: "done", follows: [{ kind: "pull-request", owner: "acme", repo: "app", number: 4 }] }) });
 		await runner.fire([failing]);
 		expect(routed.sessions).toEqual([["s-t1", passThroughText([failing])]]);
 		expect(atlas()).toEqual([]);
@@ -118,7 +117,7 @@ describe("a Router's events", () => {
 
 	test("an event nothing follows goes to the Router", async () => {
 		const { runner, tasks, routed, atlas } = harness();
-		tasks.apply({ op: "add", task: task("t1", { follows: [{ kind: "pull-request", owner: "acme", repo: "app", number: 4 }] }) }, T0);
+		tasks.apply({ op: "add", task: task("t1", { follows: [{ kind: "pull-request", owner: "acme", repo: "app", number: 4 }] }) });
 		await runner.fire([review]);
 		expect(routed.sessions).toEqual([]);
 		expect(atlas().map(message => message?.triggeredBy)).toEqual([[review]]);
@@ -126,7 +125,7 @@ describe("a Router's events", () => {
 
 	test("events that arrive together reach the Router in one message, without the ones a task took", async () => {
 		const { runner, tasks, routed, atlas } = harness();
-		tasks.apply({ op: "add", task: task("t1", { follows: [{ kind: "slack-thread", channel: "C0ENG", ts: "1700000000.123456" }] }) }, T0);
+		tasks.apply({ op: "add", task: task("t1", { follows: [{ kind: "slack-thread", channel: "C0ENG", ts: "1700000000.123456" }] }) });
 		const more = [1, 2, 3].map(n => ({ ...review, title: `acme/app#${10 + n} waits on your review`, url: `https://github.com/acme/app/pull/${10 + n}` }));
 		await runner.fire([failing, bug, thanks, ...more]);
 		expect(routed.sessions).toEqual([["s-t1", passThroughText([bug])]]);
@@ -135,9 +134,19 @@ describe("a Router's events", () => {
 
 	test("an event a task's session cannot take goes to the Router instead", async () => {
 		const { runner, tasks, atlas } = harness({ refuse: "the session is gone" });
-		tasks.apply({ op: "add", task: task("t1", { status: "review", follows: [{ kind: "pull-request", owner: "acme", repo: "app", number: 4 }] }) }, T0);
+		tasks.apply({ op: "add", task: task("t1", { status: "review", follows: [{ kind: "pull-request", owner: "acme", repo: "app", number: 4 }] }) });
 		await runner.fire([failing]);
 		expect(atlas().map(message => message?.triggeredBy)).toEqual([[failing]]);
 		expect(tasks.get("t1")?.status).toBe("review");
+	});
+
+	test("a Router with two routines on the same triggers screens each event once", async () => {
+		const { runner, tasks, routed, atlas, routines } = harness();
+		routines.apply({ op: "save", routine: { ...routerRoutine(ATLAS), id: "atlas-more", name: "More events" } }, T0);
+		tasks.apply({ op: "add", task: task("t1", { follows: [{ kind: "pull-request", owner: "acme", repo: "app", number: 4 }] }) });
+		await runner.fire([failing, thanks]);
+		expect(routed.sessions).toEqual([["s-t1", passThroughText([failing])]]);
+		await runner.fire([bug]);
+		expect(atlas().map(message => message?.sent.kind === "prompt" && message.sent.prompt.endsWith("1 team message didn't need anything."))).toEqual([true, false]);
 	});
 });

@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Bot, BotId } from "../shared/bots";
-import type { RouterChange } from "../shared/router";
+import type { RouterChange, TaskSpec } from "../shared/router";
 import type { StartRequest } from "../shared/sessions";
 import { RouterInbox } from "./router-inbox";
-import { RouterTasks, RouterTasksFile } from "./router-tasks";
+import { RouterTasks } from "./router-tasks";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -16,7 +16,7 @@ afterEach(() => {
 const atlas: Bot = { id: "atlas" as BotId, kind: "router", name: "Atlas", job: "", cwd: "/work", model: null, skill: null, shape: "pill", hue: 25, sessionId: "s0", createdAt: "2026-11-02T09:00:00.000Z", pinned: false, section: null };
 const helper: Bot = { ...atlas, id: "helper" as BotId, kind: "routines", name: "Helper" };
 
-const start = (id: string, fields: Partial<Extract<RouterChange, { op: "start" }>["task"]> = {}): RouterChange => ({
+const start = (id: string, fields: Partial<TaskSpec> = {}): RouterChange => ({
 	op: "start",
 	task: { id, title: `Task ${id}`, prompt: `Do ${id}.`, cwd: "/work/webapp", follows: [], quiet: false, ...fields },
 });
@@ -27,15 +27,13 @@ function inbox({ refuse = null as string | null } = {}) {
 	dirs.push(dir);
 	const inboxDir = join(dir, "router-inbox");
 	mkdirSync(inboxDir);
-	const file = new RouterTasksFile(join(dir, "router-tasks.json"));
 	const told: string[] = [];
 	const started: StartRequest[] = [];
 	const renamed: [string, string][] = [];
 	const tell = async (_botId: BotId, text: string) => void told.push(text);
-	const tasks = new RouterTasks({ file, active: () => true, tell, end: async () => {}, now: () => 1000, onChange: () => {} });
+	const tasks = new RouterTasks({ path: join(dir, "router-tasks.json"), active: () => true, tell, end: async () => {}, now: () => 1000, onChange: () => {} });
 	const box = new RouterInbox(inboxDir, {
 		bots: () => [atlas, helper],
-		file,
 		tasks,
 		start: async request => {
 			if (refuse) return { ok: false, error: refuse };
@@ -48,7 +46,7 @@ function inbox({ refuse = null as string | null } = {}) {
 	});
 	let n = 0;
 	const leave = (botId: BotId, change: RouterChange): void => writeFileSync(join(inboxDir, `${++n}-x.json`), JSON.stringify({ botId, change }));
-	return { inboxDir, file, tasks, box, told, started, renamed, leave };
+	return { inboxDir, file: tasks, tasks, box, told, started, renamed, leave };
 }
 
 test("two start_task calls start two sessions named after their tasks, and both tasks wait for review once their sessions finish", async () => {
@@ -70,8 +68,8 @@ test("two start_task calls start two sessions named after their tasks, and both 
 		{ id: "t2", botId: atlas.id, sessionId: "s-i2", status: "working" },
 	]);
 	expect(readdirSync(inboxDir)).toEqual([]);
-	await tasks.turnEnded("i1", "s-i1", { body: "Opened acme/webapp#8.", suggestions: [] });
-	await tasks.turnEnded("i2", "s-i2", { body: "Docs fixed.", suggestions: [] });
+	await tasks.turnEnded("i1", { body: "Opened acme/webapp#8.", suggestions: [] });
+	await tasks.turnEnded("i2", { body: "Docs fixed.", suggestions: [] });
 	expect(file.value.map(({ status }) => status)).toEqual(["review", "review"]);
 	expect(told).toEqual(['Task "Task t1" finished: Opened acme/webapp#8.']);
 });
@@ -95,9 +93,9 @@ test("follow and finish_task change only the Router's own tasks", async () => {
 	const { file, box, told, leave } = inbox();
 	leave(atlas.id, start("t1"));
 	await box.drain();
-	leave(atlas.id, { op: "follow", taskId: "t1", follows: [{ kind: "linear", id: "ENG-7" }] });
-	leave(atlas.id, { op: "finish", taskId: "t1", status: "done", note: "Merged." });
-	leave(atlas.id, { op: "finish", taskId: "gone", status: "done", note: null });
+	leave(atlas.id, { op: "follow", id: "t1", follows: [{ kind: "linear", id: "ENG-7" }] });
+	leave(atlas.id, { op: "finish", id: "t1", status: "done", note: "Merged." });
+	leave(atlas.id, { op: "finish", id: "gone", status: "done", note: null });
 	await box.drain();
 	expect(file.get("t1")).toMatchObject({ follows: [{ kind: "linear", id: "ENG-7" }], status: "done", note: "Merged." });
 	expect(told).toEqual(["The dashboard did not mark task gone done: you have no such task."]);

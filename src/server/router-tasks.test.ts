@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId } from "../shared/bots";
 import type { RouterTask } from "../shared/router";
-import { RouterTasks, RouterTasksFile } from "./router-tasks";
+import { RouterTasks, type RouterTasksDeps } from "./router-tasks";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -38,20 +38,19 @@ function harness({ active = true } = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-router-tasks-"));
 	dirs.push(dir);
 	const path = join(dir, "router-tasks.json");
-	const file = new RouterTasksFile(path);
 	const told: [BotId, string][] = [];
 	const ended: string[] = [];
 	let changes = 0;
 	let now = 100;
 	const tasks = new RouterTasks({
-		file,
+		path,
 		active: () => active,
 		tell: async (botId, text) => void told.push([botId, text]),
 		end: async sessionId => void ended.push(sessionId),
 		now: () => now++,
 		onChange: () => changes++,
 	});
-	return { path, file, tasks, told, ended, changes: () => changes };
+	return { path, file: tasks, tasks, told, ended, changes: () => changes };
 }
 
 test("a task whose session ends its turn waits for review and tells its Router the reply's last line, once", async () => {
@@ -59,11 +58,11 @@ test("a task whose session ends its turn waits for review and tells its Router t
 	tasks.apply({ op: "add", task: task() });
 	tasks.bind("i1", "t1", "s1");
 	expect(file.get("t1")).toMatchObject({ sessionId: "s1", status: "working" });
-	await tasks.turnEnded("i1", "s1", reply("I found the race.\n\nIt is fixed in `retry.ts`, and the test passes.\n"));
+	await tasks.turnEnded("i1", reply("I found the race.\n\nIt is fixed in `retry.ts`, and the test passes.\n"));
 	expect(file.get("t1")).toMatchObject({ status: "review" });
 	expect(told).toEqual([[atlas, 'Task "Fix the flaky test" finished: It is fixed in `retry.ts`, and the test passes.']]);
-	await tasks.turnEnded("i1", "s1", reply("Still done."));
-	await tasks.exited("i1", "s1");
+	await tasks.turnEnded("i1", reply("Still done."));
+	await tasks.exited("i1");
 	expect(told).toHaveLength(1);
 	expect(changes()).toBe(3);
 });
@@ -74,18 +73,22 @@ test("a quiet task moves to review without a word, and a session that exits mid-
 	tasks.apply({ op: "add", task: task({ id: "t2", title: "Review the docs" }) });
 	tasks.bind("i1", "t1", "s1");
 	tasks.bind("i2", "t2", "s2");
-	await tasks.turnEnded("i1", "s1", reply("Done."));
-	await tasks.exited("i2", "s2");
+	await tasks.turnEnded("i1", reply("Done."));
+	await tasks.exited("i2");
 	expect(file.value.map(({ status }) => status)).toEqual(["review", "review"]);
 	expect(told).toEqual([[atlas, 'Task "Review the docs" finished: its session ended without a reply.']]);
 });
 
-test("a task found by its session after a restart moves too, and a prompt to a task waiting for review sets it working", async () => {
+test("a task's session resumed, as after a restart, moves its task too, and a prompt to a task waiting for review sets it working", async () => {
 	const { file, tasks } = harness();
 	tasks.apply({ op: "add", task: task({ sessionId: "s1" }) });
-	await tasks.turnEnded("i9", "s1", reply("Done."));
+	tasks.join({ kind: "resume", sessionId: "s1" }).attach({ instanceId: "i9", sessionId: "s1", cwd: "/work/webapp" });
+	// Another session's resume binds nothing.
+	tasks.join({ kind: "resume", sessionId: "s8" }).attach({ instanceId: "i8", sessionId: "s8", cwd: "/work/webapp" });
+	await tasks.turnEnded("i8", reply("Done."));
+	await tasks.turnEnded("i9", reply("Done."));
 	expect(file.get("t1")?.status).toBe("review");
-	tasks.turnStarted("i9", "s1");
+	tasks.turnStarted("i9");
 	expect(file.get("t1")?.status).toBe("working");
 	tasks.switched("i9", "s2");
 	expect(file.get("t1")?.sessionId).toBe("s2");
@@ -94,7 +97,8 @@ test("a task found by its session after a restart moves too, and a prompt to a t
 test("a server without the owner lock changes no task and tells nobody", async () => {
 	const { file, tasks, told } = harness({ active: false });
 	tasks.apply({ op: "add", task: task({ sessionId: "s1" }) });
-	await tasks.turnEnded("i1", "s1", reply("Done."));
+	tasks.join({ kind: "resume", sessionId: "s1" }).attach({ instanceId: "i1", sessionId: "s1", cwd: "/work/webapp" });
+	await tasks.turnEnded("i1", reply("Done."));
 	expect(file.get("t1")?.status).toBe("working");
 	expect(told).toEqual([]);
 });
@@ -104,22 +108,21 @@ test("the page marks a task done, or stops it, which ends its session; a stopped
 	tasks.apply({ op: "add", task: task({ sessionId: "s1" }) });
 	tasks.apply({ op: "add", task: task({ id: "t2", sessionId: "s2" }) });
 	const before = changes();
-	expect(tasks.change({ op: "finish", id: "t1", status: "done" })).toBe(true);
-	expect(tasks.change({ op: "finish", id: "t2", status: "stopped" })).toBe(true);
-	expect(tasks.change({ op: "finish", id: "t2", status: "stopped" })).toBe(false);
-	expect(tasks.change({ op: "finish", id: "gone", status: "done" })).toBe(false);
-	// The list registry publishes the page's changes.
-	expect(changes()).toBe(before);
+	expect(tasks.change({ op: "finish", id: "t1", status: "done", note: null })).toBe(true);
+	expect(tasks.change({ op: "finish", id: "t2", status: "stopped", note: null })).toBe(true);
+	expect(tasks.change({ op: "finish", id: "t2", status: "stopped", note: null })).toBe(false);
+	expect(tasks.change({ op: "finish", id: "gone", status: "done", note: null })).toBe(false);
+	expect(changes()).toBe(before + 2);
 	expect(file.value.map(({ status }) => status)).toEqual(["done", "stopped"]);
 	expect(ended).toEqual(["s2"]);
-	await tasks.exited("i2", "s2");
+	await tasks.exited("i2");
 	expect(told).toEqual([]);
 });
 
 test("the Router's finish_task stops a task's session too, and its note stays", () => {
 	const { file, tasks, ended } = harness();
 	tasks.apply({ op: "add", task: task({ sessionId: "s1" }) });
-	expect(tasks.finish("t1", "stopped", "You asked for something else.")).toBe(true);
+	expect(tasks.change({ op: "finish", id: "t1", status: "stopped", note: "You asked for something else." })).toBe(true);
 	expect(file.get("t1")).toMatchObject({ status: "stopped", note: "You asked for something else." });
 	expect(ended).toEqual(["s1"]);
 });
@@ -139,8 +142,9 @@ test("adding a task twice adds it once, follows add only what is new, and deleti
 });
 
 test("the tasks survive a reload from their file", () => {
-	const { path, file, tasks } = harness();
+	const { path, tasks } = harness();
 	tasks.apply({ op: "add", task: task({ follows: [{ kind: "slack-thread", channel: "C1", ts: "17.2" }] }) });
 	flushJsonFiles();
-	expect(new RouterTasksFile(path).value).toEqual(file.value);
+	const deps: RouterTasksDeps = { path, active: () => true, tell: async () => {}, end: async () => {}, now: () => 1, onChange() {} };
+	expect(new RouterTasks(deps).value).toEqual(tasks.value);
 });

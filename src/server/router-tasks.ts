@@ -1,7 +1,7 @@
 /**
  * The tasks Router Bots hand to background sessions, kept in `router-tasks.json` beside `bots.json`, and how each moves
  * as its session works: a turn that ends, or a session that exits, while it works moves it to review and tells its Router.
- * Only the server that holds the owner lock changes the file, so two servers never tell a Router twice.
+ * Only the server that holds the owner lock changes the file, so two servers never tell a Router twice; nothing else reads or writes it.
  */
 import { errorText } from "../json";
 import type { TurnReply } from "../live-session";
@@ -10,6 +10,9 @@ import { followKey, isOpenTask, parseRouterTasks, type RouterTask, type RouterTa
 import type { ServerMsg } from "../shared/protocol";
 import { oneLine } from "../session-entries";
 import { ReducerFile } from "../fs";
+import { PLAIN_LAUNCH } from "../omp/rpc";
+import type { StartRequest } from "../shared/sessions";
+import type { SessionJoin } from "./start";
 
 export type RouterTaskEdit =
 	| { op: "add"; task: RouterTask }
@@ -50,9 +53,49 @@ export function applyRouterTask(tasks: RouterTask[], edit: RouterTaskEdit, now: 
 	}
 }
 
-export class RouterTasksFile extends ReducerFile<RouterTask[], [edit: RouterTaskEdit, now: number]> {
+/** The tasks file, which only {@link RouterTasks} reads and writes. */
+class RouterTasksFile extends ReducerFile<RouterTask[], [edit: RouterTaskEdit, now: number]> {
 	constructor(path: string) {
 		super(path, { parse: parseRouterTasks, toJson: tasks => ({ tasks }), holds: "a list of Router tasks", empty: [], reduce: applyRouterTask });
+	}
+}
+
+export interface RouterTasksDeps {
+	/** The tasks file, `router-tasks.json`. */
+	path: string;
+	/** Whether this server changes the tasks: the one that holds the owner lock. */
+	active(): boolean;
+	/** Tells Router `botId` something in its conversation. */
+	tell(botId: BotId, text: string): Promise<unknown>;
+	/** Ends the running session `sessionId`, if it runs. */
+	end(sessionId: string): Promise<void>;
+	now(): number;
+	/** The tasks changed, for the pages to hear. */
+	onChange(): void;
+}
+
+/** `reply`'s last line as one short line, as a finished task tells its Router what it said. */
+function lastLine(reply: TurnReply | null): string | null {
+	const line = reply?.body.split("\n").findLast(text => text.trim() !== "");
+	return line ? oneLine(line) : null;
+}
+
+/** The tasks' lives: started, bound to the session doing them, moved as that session works, and marked by its Router or the page. */
+export class RouterTasks {
+	readonly #deps: RouterTasksDeps;
+	readonly #file: RouterTasksFile;
+	/** The task each running session works on, by instance id, so a session that moves to another file keeps its task. */
+	readonly #instances = new Map<string, string>();
+	/** The tasks whose session the supervisor stops to restart, so the turn it stops ends without moving the task to review. */
+	readonly #restarting = new Set<string>();
+
+	constructor(deps: RouterTasksDeps) {
+		this.#deps = deps;
+		this.#file = new RouterTasksFile(deps.path);
+	}
+
+	get value(): RouterTask[] {
+		return this.#file.value;
 	}
 
 	get(id: string): RouterTask | undefined {
@@ -72,67 +115,38 @@ export class RouterTasksFile extends ReducerFile<RouterTask[], [edit: RouterTask
 	bySession(sessionId: string): RouterTask | undefined {
 		return this.value.find(task => task.sessionId === sessionId);
 	}
-}
-
-export interface RouterTasksDeps {
-	file: RouterTasksFile;
-	/** Whether this server changes the tasks: the one that holds the owner lock. */
-	active(): boolean;
-	/** Tells Router `botId` something in its conversation. */
-	tell(botId: BotId, text: string): Promise<unknown>;
-	/** Ends the running session `sessionId`, if it runs. */
-	end(sessionId: string): Promise<void>;
-	now(): number;
-	/** The tasks changed, for the pages to hear. */
-	onChange(): void;
-}
-
-/** `reply`'s last line as one short line, as a finished task tells its Router what it said. */
-function lastLine(reply: TurnReply | null): string | null {
-	const line = reply?.body.split("\n").findLast(text => text.trim() !== "");
-	return line ? oneLine(line) : null;
-}
-
-/** The tasks' lives: started, bound to the session doing them, moved as that session works, and marked by the page. */
-export class RouterTasks {
-	readonly #deps: RouterTasksDeps;
-	/** The task each running session works on, by instance id, so a session that moves to another file keeps its task. */
-	readonly #instances = new Map<string, string>();
-	/** The tasks whose session the supervisor stops to restart, so the turn it stops ends without moving the task to review. */
-	readonly #restarting = new Set<string>();
-
-	constructor(deps: RouterTasksDeps) {
-		this.#deps = deps;
-	}
 
 	msg(): Extract<ServerMsg, { t: "router-tasks" }> {
-		return { t: "router-tasks", tasks: this.#deps.file.value };
+		return { t: "router-tasks", tasks: this.value };
 	}
 
 	reload(): void {
-		this.#deps.file.reload();
+		this.#file.reload();
 	}
 
 	/** Applies `edit` and tells the pages when it changed something. */
 	apply(edit: RouterTaskEdit): boolean {
-		const changed = this.#deps.file.apply(edit, this.#deps.now());
+		const changed = this.#file.apply(edit, this.#deps.now());
 		if (changed) this.#deps.onChange();
 		return changed;
 	}
 
-	/** Task `id` runs in session `sessionId`, live as `instanceId`. */
+	/** Task `id` runs in session `sessionId`, live as `instanceId`, as its start found. */
 	bind(instanceId: string, id: string, sessionId: string): void {
 		this.#instances.set(instanceId, id);
 		this.apply({ op: "session", id, sessionId });
 	}
 
-	/** The open task live session `instanceId` works on: the one bound to it, else the one its session runs, as after a restart. */
-	#taskOf(instanceId: string, sessionId: string | undefined): RouterTask | undefined {
-		const { file } = this.#deps;
-		const bound = this.#instances.get(instanceId);
-		const task = bound === undefined ? (sessionId ? file.bySession(sessionId) : undefined) : file.get(bound);
-		if (task && bound === undefined) this.#instances.set(instanceId, task.id);
-		return task;
+	/** How `request` joins the server: the resume of a task's session, as the supervisor's, a message's, or a restarted server's, binds that task to it once it is live. */
+	join(request: StartRequest): SessionJoin {
+		const id = request.kind === "resume" ? this.bySession(request.sessionId)?.id : undefined;
+		return { rpc: PLAIN_LAUNCH, attach: id === undefined ? () => {} : session => void this.#instances.set(session.instanceId, id) };
+	}
+
+	/** The task live session `instanceId` works on. */
+	#taskOf(instanceId: string): RouterTask | undefined {
+		const id = this.#instances.get(instanceId);
+		return id === undefined ? undefined : this.get(id);
 	}
 
 	/** Live session `instanceId` moved to session file `sessionId`, as on an edited prompt; its task follows it. */
@@ -142,33 +156,46 @@ export class RouterTasks {
 	}
 
 	/** Someone prompted a task waiting for review, so it works again. */
-	turnStarted(instanceId: string, sessionId: string | undefined): void {
-		const task = this.#taskOf(instanceId, sessionId);
+	turnStarted(instanceId: string): void {
+		const task = this.#taskOf(instanceId);
 		if (task) this.#restarting.delete(task.id);
 		if (task?.status === "review" && this.#deps.active()) this.apply({ op: "status", id: task.id, status: "working", note: null });
 	}
 
-	/** Counts a restart of working task `id` for `note`; the turn the supervisor then stops ends without moving it to review. */
-	restart(id: string, note: string): boolean {
-		if (!this.apply({ op: "restart", id, note })) return false;
+	/**
+	 * Restarts working task `id` for `note` with `run`, which stops its session and prompts it to go on; the turn the stop
+	 * ends does not move the task to review. The restart counts once `run` resolves; when it rejects, the task is stopped
+	 * with why as its note, and the error is thrown on. Whether the task was working.
+	 */
+	async restart(id: string, note: string, run: () => Promise<void>): Promise<boolean> {
+		if (this.get(id)?.status !== "working") return false;
 		this.#restarting.add(id);
+		try {
+			await run();
+		} catch (error) {
+			this.#restarting.delete(id);
+			this.change({ op: "finish", id, status: "stopped", note: `The supervisor could not restart it: ${errorText(error)}` });
+			throw error;
+		}
+		this.apply({ op: "restart", id, note });
 		return true;
 	}
 
 	/** The task's session ended its turn with `reply`: a working task moves to review, and tells its Router unless it is quiet. */
-	turnEnded(instanceId: string, sessionId: string | undefined, reply: TurnReply | null): Promise<void> {
-		return this.#finished(this.#taskOf(instanceId, sessionId), lastLine(reply));
+	turnEnded(instanceId: string, reply: TurnReply | null): Promise<void> {
+		return this.#finished(this.#taskOf(instanceId), lastLine(reply));
 	}
 
 	/** The task's session exited; one still working moves to review. */
-	exited(instanceId: string, sessionId: string | undefined): Promise<void> {
-		const task = this.#taskOf(instanceId, sessionId);
+	exited(instanceId: string): Promise<void> {
+		const task = this.#taskOf(instanceId);
 		this.#instances.delete(instanceId);
 		return this.#finished(task, null);
 	}
 
 	async #finished(task: RouterTask | undefined, line: string | null): Promise<void> {
-		if (task?.status !== "working" || !this.#deps.active() || this.#restarting.delete(task.id)) return;
+		const restarting = task !== undefined && this.#restarting.delete(task.id);
+		if (task?.status !== "working" || !this.#deps.active() || restarting) return;
 		this.apply({ op: "status", id: task.id, status: "review", note: null });
 		if (task.quiet) return;
 		await this.#deps.tell(task.botId, `Task "${task.title}" finished: ${line ?? "its session ended without a reply."}`).catch((error: unknown) => {
@@ -176,19 +203,11 @@ export class RouterTasks {
 		});
 	}
 
-	/** Marks task `id` as `status` for its Router's `finish_task`; a stopped task's session ends. */
-	finish(id: string, status: Exclude<TaskStatus, "working">, note: string | null): boolean {
-		const task = this.#deps.file.get(id);
+	/** Marks a task, for its Router's `finish_task` or the page's Mark done and Stop; a stopped task's session ends. */
+	change({ id, status, note }: RouterTaskChange): boolean {
+		const task = this.get(id);
 		if (!task || !this.apply({ op: "status", id, status, note })) return false;
 		if (status === "stopped") this.#end(task);
-		return true;
-	}
-
-	/** The page's change, which the list registry publishes: Mark done, or Stop, which ends the task's session once the change is saved. */
-	change(change: RouterTaskChange): boolean {
-		const task = this.#deps.file.get(change.id);
-		if (!task || !this.#deps.file.apply({ op: "status", id: change.id, status: change.status, note: null }, this.#deps.now())) return false;
-		if (change.status === "stopped") this.#end(task);
 		return true;
 	}
 

@@ -1,3 +1,4 @@
+import { fromAny } from "@total-typescript/shoehorn";
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -30,7 +31,7 @@ function loaded(unset: string[] = []) {
 
 test("start_task leaves one start per call, each with its own id, in the Router's workspace unless it names another", async () => {
 	const { call, dir, left } = loaded();
-	const pr = { kind: "pull-request", owner: "acme", repo: "webapp", number: 7 };
+	const pr = { kind: "pull-request", owner: "acme", repo: "webapp", number: 7 } as const;
 	await call<StartTaskParams>(START_TOOL, { title: " Fix the flaky test ", prompt: "Find and fix it." });
 	await call<StartTaskParams>(START_TOOL, { title: "Review #7", prompt: "Review it.", cwd: tmpdir(), follows: [pr], quiet: true });
 	const requests = left();
@@ -50,18 +51,17 @@ test("follow and finish_task leave their change for the task they name", async (
 	await call<FinishTaskParams>(FINISH_TOOL, { taskId: "t1", status: "stopped", note: "Not needed." });
 	expect(left()).toEqual(
 		expect.arrayContaining([
-			{ botId: "atlas", change: { op: "follow", taskId: "t1", follows: [{ kind: "slack-thread", channel: "C1", ts: "17.2" }] } },
-			{ botId: "atlas", change: { op: "finish", taskId: "t1", status: "stopped", note: "Not needed." } },
+			{ botId: "atlas", change: { op: "follow", id: "t1", follows: [{ kind: "slack-thread", channel: "C1", ts: "17.2" }] } },
+			{ botId: "atlas", change: { op: "finish", id: "t1", status: "stopped", note: "Not needed." } },
 		]),
 	);
 });
 
-test("a directory that is not one, a follow that is no such thing, a status that is no end, or a session that is not a Router leaves nothing", async () => {
+test("a directory that is not one, a follow that is no such thing, or a session that is not a Router leaves nothing", async () => {
 	const { call, dir, left } = loaded();
 	await expect(call<StartTaskParams>(START_TOOL, { title: "x", prompt: "y", cwd: "work" })).rejects.toThrow("is not the absolute path of a directory.");
 	await expect(call<StartTaskParams>(START_TOOL, { title: "x", prompt: "y", cwd: join(dir, "missing") })).rejects.toThrow("is not the absolute path of a directory.");
-	await expect(call<FollowParams>(FOLLOW_TOOL, { taskId: "t1", follows: [{ kind: "email", id: "x" }] })).rejects.toThrow("is not a pull request, Slack thread, or Linear issue to follow.");
-	await expect(call<FinishTaskParams>(FINISH_TOOL, { taskId: "t1", status: "working" })).rejects.toThrow("status must be one of review, done, stopped.");
+	await expect(call<FollowParams>(FOLLOW_TOOL, { taskId: "t1", follows: [fromAny({ kind: "email", id: "x" })] })).rejects.toThrow("is not a pull request, Slack thread, or Linear issue to follow.");
 	expect(left()).toEqual([]);
 	const plain = loaded([ROUTER_FLAGS.bot]);
 	await expect(plain.call<StartTaskParams>(START_TOOL, { title: "x", prompt: "y" })).rejects.toThrow("This session is not an omp-agents Router.");

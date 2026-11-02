@@ -249,8 +249,10 @@ function TaskRow({ task, hosts, connected }: { task: RouterTask; hosts: RosterHo
 	const { open, send } = useDashboardActions();
 	const { sessionId } = task;
 	const host = sessionId ? hosts.find(each => each.sessionId === sessionId) : undefined;
-	const finish = (status: "done" | "stopped"): void => send({ t: "router-task", change: { op: "finish", id: task.id, status } });
-	const when = `${TASK_STATUS_LABELS[task.status]} · ${age(task.updatedAt, { compact: true })} ago`;
+	const finish = (status: "done" | "stopped"): void => send({ t: "router-task", change: { op: "finish", id: task.id, status, note: null } });
+	// Its group names its status, but for a stopped task, which shows among the done ones.
+	const ago = `${age(task.updatedAt, { compact: true })} ago`;
+	const when = task.status === "stopped" ? `${TASK_STATUS_LABELS.stopped} · ${ago}` : ago;
 	return (
 		<li className="flex items-start gap-1 rounded-md border border-border bg-card text-sm">
 			<button

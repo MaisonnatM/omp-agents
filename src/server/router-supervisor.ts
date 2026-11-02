@@ -2,7 +2,7 @@
  * The supervisor of Router tasks: every {@link SUPERVISOR_TICK_MS}, on the server that holds the owner lock, it looks at
  * each working task's session. A session that works but writes nothing new for {@link STALL_CHECKS} looks, one that ran
  * the same tool call {@link LOOP_REPEATS} times in a row, or one that died while its task worked, is stopped and told to
- * go on, with the reason and its last error; after {@link MAX_RESTARTS} restarts the task is stopped and its Router told.
+ * go on, with the reason and its last error; after {@link MAX_RESTARTS} restarts, or a restart that fails, the task is stopped and its Router told.
  */
 import { errorText, isObject } from "../json";
 import type { LiveSession } from "../live-session";
@@ -11,7 +11,7 @@ import type { RouterTask } from "../shared/router";
 import type { WithdrawnMessage } from "../shared/sessions";
 import { oneLine, tailEntries, textOf, toolCallsOf, toolResultOf, toolSummary } from "../session-entries";
 import { isUserPrompt } from "../transcript";
-import type { RouterTasks, RouterTasksFile } from "./router-tasks";
+import type { RouterTasks } from "./router-tasks";
 
 /** How often the supervisor looks at the working tasks. */
 export const SUPERVISOR_TICK_MS = 2 * 60_000;
@@ -70,8 +70,7 @@ export interface SupervisedSession {
 }
 
 export interface RouterSupervisorDeps {
-	file: RouterTasksFile;
-	tasks: RouterTasks;
+	tasks: Pick<RouterTasks, "value" | "change" | "restart">;
 	/** Whether this server supervises: the one that holds the owner lock. */
 	active(): boolean;
 	/** Session `sessionId` as it runs here, `null` when it does not. */
@@ -111,7 +110,7 @@ export class RouterSupervisor {
 			this.#seen.clear();
 			return;
 		}
-		const working = this.#deps.file.value.flatMap(task => (task.status === "working" && task.sessionId !== null ? [{ task, sessionId: task.sessionId }] : []));
+		const working = this.#deps.tasks.value.flatMap(task => (task.status === "working" && task.sessionId !== null ? [{ task, sessionId: task.sessionId }] : []));
 		for (const id of this.#seen.keys()) if (!working.some(({ task }) => task.id === id)) this.#seen.delete(id);
 		for (const { task, sessionId } of working) {
 			await this.#look(task, sessionId).catch((error: unknown) => console.error(`omp-agents: cannot supervise task ${task.id}: ${errorText(error)}`));
@@ -142,14 +141,21 @@ export class RouterSupervisor {
 	async #restart(task: RouterTask, sessionId: string, live: SupervisedSession | null, reason: string, lastError: string | null): Promise<void> {
 		this.#seen.delete(task.id);
 		if (task.restarts >= MAX_RESTARTS) {
-			if (!this.#deps.tasks.finish(task.id, "stopped", reason)) return;
+			if (!this.#deps.tasks.change({ op: "finish", id: task.id, status: "stopped", note: reason })) return;
 			await this.#deps.tell(task.botId, `The supervisor stopped task "${task.title}" after ${MAX_RESTARTS} restarts: ${reason}.`);
 			return;
 		}
-		if (!this.#deps.tasks.restart(task.id, reason)) return;
-		const withdrawn = live ? await live.interrupt() : [];
-		const session = await this.#deps.reach(sessionId);
-		await session.prompt(null, restartPrompt(reason, lastError, withdrawn), [], "followUp");
-		if (!task.quiet) await this.#deps.tell(task.botId, `FYI: the supervisor restarted task "${task.title}": ${reason}.`);
+		// A restart that fails stops the task, with why as its note, and its Router hears of it.
+		const restarted = await this.#deps.tasks
+			.restart(task.id, reason, async () => {
+				const withdrawn = live ? await live.interrupt() : [];
+				const session = await this.#deps.reach(sessionId);
+				await session.prompt(null, restartPrompt(reason, lastError, withdrawn), [], "followUp");
+			})
+			.catch(async (error: unknown) => {
+				await this.#deps.tell(task.botId, `The supervisor stopped task "${task.title}": it could not restart it: ${errorText(error)}.`);
+				return false;
+			});
+		if (restarted && !task.quiet) await this.#deps.tell(task.botId, `FYI: the supervisor restarted task "${task.title}": ${reason}.`);
 	}
 }

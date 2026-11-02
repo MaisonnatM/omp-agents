@@ -8,6 +8,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - New Bot type, Router: a Bot named Atlas that answers at once and hands real work to background sessions, which its new Tasks tab groups into Needs you, In progress, and Done.
 - A Router's task moves to Needs you when its session finishes, and the Router tells you in one line; Mark done and Stop in a task's menu close it.
 - A Router's task that gets stuck, repeats the same step, or whose session dies is restarted with what went wrong; after two restarts it is stopped and the Router tells you why.
+- A task the Router cannot restart is stopped at once, with the reason in the Tasks tab, and the Router tells you.
 - A new Router comes with a Team events routine, so it hears about Slack messages waiting on you and pull requests that need your move.
 - A Router skips team messages that need nothing, such as "thanks!", and its next run tells you how many it skipped.
 - News on a pull request or Slack thread a Router's task follows goes straight to that task, without waking the Router.

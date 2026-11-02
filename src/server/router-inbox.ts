@@ -8,12 +8,11 @@ import type { Bot, BotId } from "../shared/bots";
 import { parseRouterRequest, type RouterRequest, type TaskFollow } from "../shared/router";
 import { newSessionRequest, type StartRequest, type StartResult, type WorkItem } from "../shared/sessions";
 import { type InboxOptions, JsonInboxDir } from "./json-inbox";
-import type { RouterTasks, RouterTasksFile } from "./router-tasks";
+import type { RouterTasks } from "./router-tasks";
 
 export interface RouterInboxDeps {
 	bots(): readonly Bot[];
-	file: RouterTasksFile;
-	tasks: RouterTasks;
+	tasks: Pick<RouterTasks, "get" | "apply" | "bind" | "change">;
 	start(request: StartRequest): Promise<StartResult>;
 	/** The session started here as `instanceId`, which a task's title names. */
 	started(instanceId: string): { sessionId: string; rename(title: string): Promise<void> } | undefined;
@@ -33,7 +32,7 @@ function subjectOf(follows: readonly TaskFollow[]): WorkItem | null {
 
 export class RouterInbox extends JsonInboxDir<RouterRequest> {
 	constructor(dir: string, deps: RouterInboxDeps, options?: InboxOptions) {
-		const { file, tasks } = deps;
+		const { tasks } = deps;
 		super(
 			dir,
 			{
@@ -49,8 +48,9 @@ export class RouterInbox extends JsonInboxDir<RouterRequest> {
 					if (change.op === "start") {
 						const { task } = change;
 						// The tool minted the id, so a request read again, as after a crash, finds its task and starts nothing.
-						if (file.get(task.id)) return true;
+						if (tasks.get(task.id)) return true;
 						const now = deps.now();
+						// The spec becomes a task of this Router, working from now.
 						tasks.apply({ op: "add", task: { ...task, botId, sessionId: null, status: "working", startedAt: now, updatedAt: now, restarts: 0, note: null } });
 						const result = await deps.start(newSessionRequest(task.cwd, task.prompt, { subject: subjectOf(task.follows) })).catch((error: unknown): StartResult => ({ ok: false, error: errorText(error) }));
 						const session = result.ok ? deps.started(result.instanceId) : undefined;
@@ -63,11 +63,11 @@ export class RouterInbox extends JsonInboxDir<RouterRequest> {
 						await session.rename(task.title).catch((error: unknown) => console.error(`omp-agents: cannot name task ${task.id}'s session: ${errorText(error)}`));
 						return true;
 					}
-					const task = file.get(change.taskId);
-					const what = change.op === "follow" ? `route more to task ${change.taskId}` : `mark task ${change.taskId} ${change.status}`;
+					const task = tasks.get(change.id);
+					const what = change.op === "follow" ? `route more to task ${change.id}` : `mark task ${change.id} ${change.status}`;
 					if (!task || task.botId !== botId) return await refuse(what, "you have no such task");
 					if (change.op === "follow") tasks.apply({ op: "follow", id: task.id, follows: change.follows });
-					else tasks.finish(task.id, change.status, change.note);
+					else tasks.change(change);
 					return true;
 				},
 			},

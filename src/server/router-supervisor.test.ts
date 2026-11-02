@@ -6,7 +6,7 @@ import type { BotId } from "../shared/bots";
 import type { RouterTask } from "../shared/router";
 import type { WithdrawnMessage } from "../shared/sessions";
 import { LOOP_REPEATS, MAX_RESTARTS, readTaskTail, RouterSupervisor, STALL_CHECKS, type TaskTail } from "./router-supervisor";
-import { RouterTasks, RouterTasksFile } from "./router-tasks";
+import { RouterTasks } from "./router-tasks";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -43,19 +43,17 @@ const task = (fields: Partial<RouterTask> = {}): RouterTask => ({
  * runs here and `busy` whether its turn runs. Each `tick()` is one look of the timer.
  */
 function harness(fields: Partial<RouterTask> = {}) {
-	const file = new RouterTasksFile(join(tempDir(), "router-tasks.json"));
 	const told: string[] = [];
 	const ended: string[] = [];
 	const prompts: string[] = [];
 	const resumed: string[] = [];
 	let interrupts = 0;
-	const state = { live: true, busy: true, activity: "", tail: { mark: "e1", repeated: null, lastError: null } as TaskTail, withdrawn: [] as WithdrawnMessage[] };
-	const tasks = new RouterTasks({ file, active: () => true, tell: async (_botId, text) => void told.push(text), end: async sessionId => void ended.push(sessionId), now: () => 10, onChange() {} });
+	const state = { live: true, busy: true, resumes: null as string | null, activity: "", tail: { mark: "e1", repeated: null, lastError: null } as TaskTail, withdrawn: [] as WithdrawnMessage[] };
+	const tasks = new RouterTasks({ path: join(tempDir(), "router-tasks.json"), active: () => true, tell: async (_botId, text) => void told.push(text), end: async sessionId => void ended.push(sessionId), now: () => 10, onChange() {} });
 	tasks.apply({ op: "add", task: task(fields) });
 	tasks.bind("i1", "t1", "s1");
 	const session = { prompt: async (_agentId: string | null, text: string) => void prompts.push(text) };
 	const supervisor = new RouterSupervisor({
-		file,
 		tasks,
 		active: () => true,
 		live: () =>
@@ -71,6 +69,7 @@ function harness(fields: Partial<RouterTask> = {}) {
 				: null,
 		tail: () => state.tail,
 		reach: async sessionId => {
+			if (state.resumes !== null) throw new Error(state.resumes);
 			if (!state.live) resumed.push(sessionId);
 			return session;
 		},
@@ -79,7 +78,7 @@ function harness(fields: Partial<RouterTask> = {}) {
 	const tick = async (times = 1) => {
 		for (let i = 0; i < times; i++) await supervisor.check();
 	};
-	return { file, tasks, state, tick, told, ended, prompts, resumed, interrupts: () => interrupts };
+	return { file: tasks, tasks, state, tick, told, ended, prompts, resumed, interrupts: () => interrupts };
 }
 
 test("a task whose session keeps writing is left alone", async () => {
@@ -123,7 +122,7 @@ test("a stalled task is restarted once, with the reason and its last error, and 
 	]);
 	expect(told).toEqual(['FYI: the supervisor restarted task "Fix the flaky test": it made no progress for 6 minutes.']);
 	// The turn the stop ended does not move the task to review, nor tell the Router it finished.
-	await tasks.turnEnded("i1", "s1", null);
+	await tasks.turnEnded("i1", null);
 	expect(file.get("t1")).toMatchObject({ status: "working" });
 	expect(told).toHaveLength(1);
 	// Its counts start over, so the next look does not restart it again.
@@ -176,7 +175,7 @@ test(`after ${MAX_RESTARTS} restarts a stuck task is stopped, its session ended,
 		await tick(STALL_CHECKS + 1);
 		expect(file.get("t1")).toMatchObject({ restarts: restart });
 		// The restart's follow-up starts a turn.
-		tasks.turnStarted("i1", "s1");
+		tasks.turnStarted("i1");
 	}
 	await tick(STALL_CHECKS + 1);
 	expect(file.get("t1")).toMatchObject({ status: "stopped", restarts: MAX_RESTARTS, note: "it made no progress for 6 minutes" });
@@ -188,12 +187,21 @@ test(`after ${MAX_RESTARTS} restarts a stuck task is stopped, its session ended,
 	expect(told).toHaveLength(MAX_RESTARTS + 1);
 });
 
+test("a restart that cannot reach the session counts nothing, stops the task with why, and tells its Router", async () => {
+	const { file, state, tick, told, ended, prompts } = harness();
+	state.live = false;
+	state.resumes = "Cannot resume the session: it is gone";
+	await tick(STALL_CHECKS + 1);
+	expect(file.get("t1")).toMatchObject({ status: "stopped", restarts: 0, note: "The supervisor could not restart it: Cannot resume the session: it is gone" });
+	expect(ended).toEqual(["s1"]);
+	expect(prompts).toEqual([]);
+	expect(told).toEqual(['The supervisor stopped task "Fix the flaky test": it could not restart it: Cannot resume the session: it is gone.']);
+});
+
 test("a server that does not hold the owner lock supervises nothing", async () => {
-	const file = new RouterTasksFile(join(tempDir(), "router-tasks.json"));
-	const tasks = new RouterTasks({ file, active: () => true, tell: async () => {}, end: async () => {}, now: () => 1, onChange() {} });
+	const tasks = new RouterTasks({ path: join(tempDir(), "router-tasks.json"), active: () => true, tell: async () => {}, end: async () => {}, now: () => 1, onChange() {} });
 	tasks.apply({ op: "add", task: task() });
 	const supervisor = new RouterSupervisor({
-		file,
 		tasks,
 		active: () => false,
 		live: () => null,
@@ -202,7 +210,7 @@ test("a server that does not hold the owner lock supervises nothing", async () =
 		tell: () => Promise.reject(new Error("not told")),
 	});
 	for (let i = 0; i < STALL_CHECKS * 2; i++) await supervisor.check();
-	expect(file.get("t1")).toMatchObject({ status: "working", restarts: 0 });
+	expect(tasks.get("t1")).toMatchObject({ status: "working", restarts: 0 });
 });
 
 const line = (id: string, message: Record<string, unknown>) => JSON.stringify({ type: "message", id, timestamp: "2026-11-02T10:00:00.000Z", message });

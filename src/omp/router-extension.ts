@@ -8,7 +8,7 @@ import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { parseJson } from "../json";
 import { type BotId, parseBotId } from "../shared/bots";
-import { followKey, isOpenTask, MAX_TASK_NOTE, MAX_TASK_PROMPT, MAX_TASK_TITLE, parseRouterTasks, parseTaskFollow, type RouterChange, type TaskFollow } from "../shared/router";
+import { followKey, isOpenTask, MAX_TASK_NOTE, MAX_TASK_PROMPT, MAX_TASK_TITLE, parseRouterTasks, parseTaskFollow, type RouterChange, type RouterTaskChange, type TaskFollow } from "../shared/router";
 import { type BotExtensionApi, flagValue, leave, readText, reply } from "./bot-extension";
 
 /** The flags a Router's session starts with: its Bot's id, the directory its tools leave their requests in, and the tasks file it reads. */
@@ -26,18 +26,18 @@ export interface StartTaskParams {
 	title: string;
 	prompt: string;
 	cwd?: string;
-	follows?: unknown[];
+	follows?: TaskFollow[];
 	quiet?: boolean;
 }
 
 export interface FollowParams {
 	taskId: string;
-	follows: unknown[];
+	follows: TaskFollow[];
 }
 
 export interface FinishTaskParams {
 	taskId: string;
-	status: string;
+	status: RouterTaskChange["status"];
 	note?: string;
 }
 
@@ -57,8 +57,8 @@ const isDirectory = (path: string): boolean => {
 	}
 };
 
-/** `values` as follows, or an error naming the first that is not one. */
-function follows(values: readonly unknown[]): TaskFollow[] {
+/** `values` checked again as follows, which the tool's schema already checked, or an error naming the first that is not one. */
+function follows(values: readonly TaskFollow[]): TaskFollow[] {
 	return values.map(value => {
 		const follow = parseTaskFollow(value);
 		if (!follow) throw new Error(`${JSON.stringify(value)} is not a pull request, Slack thread, or Linear issue to follow.`);
@@ -136,7 +136,7 @@ export default function routerExtension(pi: BotExtensionApi): void {
 		async execute(_toolCallId, { taskId: id, follows: wanted }) {
 			const added = follows(wanted);
 			if (added.length === 0) throw new Error("follows names nothing to follow.");
-			ask({ op: "follow", taskId: id, follows: added });
+			ask({ op: "follow", id, follows: added });
 			return reply(`Asked the dashboard to route ${added.map(followKey).join(", ")} to task ${id}.`);
 		},
 	});
@@ -153,8 +153,7 @@ export default function routerExtension(pi: BotExtensionApi): void {
 		loadMode: "essential",
 		approval: "write",
 		async execute(_toolCallId, { taskId: id, status, note }) {
-			if (status !== "review" && status !== "done" && status !== "stopped") throw new Error("status must be one of review, done, stopped.");
-			ask({ op: "finish", taskId: id, status, note: note ?? null });
+			ask({ op: "finish", id, status, note: note ?? null });
 			return reply(`Asked the dashboard to mark task ${id} ${status}.`);
 		},
 	});

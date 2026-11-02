@@ -19,6 +19,9 @@ import { entryTime, oneLine, tailEntries, textOf } from "../session-entries";
 import { readTail } from "../read-tail";
 import { isUserPrompt, skillArgs, splitSuggestions } from "../transcript";
 import type { BotsFile } from "./bots-file";
+import type { RoutineSpec } from "../routines";
+import { routerRoutine } from "../shared/router";
+import { shepherdRoutine } from "../shared/shepherd";
 import type { SessionJoin } from "./start";
 
 /** What a message needs of a live session. */
@@ -134,6 +137,9 @@ function kindExtensions(paths: BotsDeps["paths"], id: BotId): Record<BotKind, { 
 		"bot-designer": { extension: paths.designerExtension, flags: {} },
 	};
 }
+
+/** The routine a new Bot of each kind starts with, which wakes it as what it watches changes; `null` for none. */
+export const startingRoutine: Record<BotKind, ((id: BotId) => RoutineSpec) | null> = { routines: null, "pr-shepherd": shepherdRoutine, router: routerRoutine, "bot-designer": null };
 
 export class Bots {
 	readonly #deps: BotsDeps;

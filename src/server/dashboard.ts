@@ -50,7 +50,7 @@ import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
 import { BotInbox } from "./bot-inbox";
-import { Bots } from "./bots";
+import { Bots, startingRoutine } from "./bots";
 import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
@@ -77,13 +77,8 @@ import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
 import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutineInbox } from "./routine-inbox";
-import { RouterInbox } from "./router-inbox";
-import { RouterEvents } from "./router-events";
-import { RouterTasks, RouterTasksFile } from "./router-tasks";
-import { readTaskTail, RouterSupervisor, SUPERVISOR_TICK_MS } from "./router-supervisor";
+import { Router } from "./router";
 import { ShepherdInbox } from "./shepherd-inbox";
-import { shepherdRoutine } from "../shared/shepherd";
-import { routerRoutine } from "../shared/router";
 import { unapprovedChange } from "../pull-request-approval";
 import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { RoutinesFile } from "./routines-file";
@@ -172,12 +167,8 @@ export class Dashboard {
 	readonly #routineInbox: RoutineInbox;
 	readonly #botInbox: BotInbox;
 	readonly #shepherdInbox: ShepherdInbox;
-	/** The tasks Router Bots hand to background sessions, and the inbox their tools leave requests in. */
-	readonly #routerTasks: RouterTasks;
-	readonly #routerInbox: RouterInbox;
-	/** Restarts the Router tasks whose sessions are stuck, on its own loop that {@link start} starts. */
-	readonly #routerSupervisor: RouterSupervisor;
-	#stopRouterSupervisor = (): void => {};
+	/** Router Bots' tasks, inbox, screen, and supervisor. */
+	readonly #router: Router;
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -311,18 +302,6 @@ export class Dashboard {
 			},
 			() => this.#broadcasts.pushList("notices"),
 		));
-		const routerTasksStore = new RouterTasksFile(routerTasksFile);
-		const routerTasks = (this.#routerTasks = new RouterTasks({
-			file: routerTasksStore,
-			active: () => ownerLock.held,
-			tell: (botId, text) => this.#bots.message(botId, text),
-			end: async sessionId => {
-				const session = this.#sessions.bySessionId(sessionId);
-				if (session) await this.#endLive(session);
-			},
-			now: Date.now,
-			onChange: () => this.#broadcasts.pushList("router-tasks"),
-		}));
 		const lists = (this.#lists = new ListRegistry({
 			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 			"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
@@ -350,16 +329,16 @@ export class Dashboard {
 				apply: change => {
 					// Deleting a Bot deletes its routines and its tasks, first, so a crash between the saves leaves none without its Bot.
 					if (change.op === "remove" && routines.removeBot(change.id)) this.#broadcasts.pushList("routines");
-					if (change.op === "remove") routerTasks.apply({ op: "remove-bot", botId: change.id });
+					if (change.op === "remove") this.#router.tasks.apply({ op: "remove-bot", botId: change.id });
 					const created = change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.bot.id);
 					if (!this.#botsFile.apply(change, new Date().toISOString())) return false;
 					// A new PR shepherd or Router starts with the routine that wakes it as what it watches changes, after the Bot it belongs to is saved.
-					const routine = !created ? null : change.bot.kind === "pr-shepherd" ? shepherdRoutine(change.bot.id) : change.bot.kind === "router" ? routerRoutine(change.bot.id) : null;
+					const routine = created ? startingRoutine[change.bot.kind]?.(change.bot.id) : null;
 					if (routine && routines.apply({ op: "save", routine }, Date.now())) this.#broadcasts.pushList("routines");
 					return true;
 				},
 			},
-			"router-tasks": { msg: () => routerTasks.msg(), apply: change => routerTasks.change(change) },
+			"router-tasks": { msg: () => this.#router.tasks.msg(), apply: change => this.#router.tasks.change(change) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -439,26 +418,17 @@ export class Dashboard {
 			if (!resumed) throw new Error("The session exited as it resumed.");
 			return resumed;
 		};
+		const router = (this.#router = new Router({
+			tasksFile: routerTasksFile, inboxDir: routerInboxDir, bots: () => this.#botsFile.value, sessions, pathOf: files.pathOf, start: startSession, reach, now: Date.now,
+			end: session => this.#endLive(session), tell: (botId, text) => this.#bots.message(botId, text), active: () => ownerLock.held, onChange: () => this.#broadcasts.pushList("router-tasks"),
+		}));
 		this.#bots = new Bots({
 			file: this.#botsFile,
 			start: startSession,
 			live: sessionId => sessions.bySessionId(sessionId),
 			session: instanceId => sessions.get(instanceId),
 			savedFile: files.pathOf,
-			paths: {
-				extension: botExtension,
-				botsFile,
-				botInboxDir,
-				botsDir,
-				routinesFile,
-				routineInboxDir,
-				shepherdExtension,
-				shepherdInboxDir,
-				routerExtension,
-				routerInboxDir,
-				routerTasksFile,
-				designerExtension,
-			},
+			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, routerExtension, routerInboxDir, routerTasksFile, designerExtension },
 			now: () => new Date().toISOString(),
 			onChange: () => broadcasts.pushList("bots"),
 		});
@@ -485,12 +455,7 @@ export class Dashboard {
 			onChange: () => broadcasts.pushList("routines"),
 			messageBot: (botId, text) => this.#bots.message(botId, text),
 			// A Router's rules and tasks see its events first.
-			screen: new RouterEvents({
-				isRouter: botId => this.#botsFile.value.some(bot => bot.id === botId && bot.kind === "router"),
-				file: routerTasksStore,
-				apply: edit => routerTasks.apply(edit),
-				messageSession: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
-			}),
+			screen: router.screen,
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -552,37 +517,6 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		this.#routerInbox = new RouterInbox(
-			routerInboxDir,
-			{
-				bots: () => this.#botsFile.value,
-				file: routerTasksStore,
-				tasks: routerTasks,
-				start: startSession,
-				started: instanceId => sessions.started(instanceId),
-				tell: (botId, text) => this.#bots.message(botId, text),
-				now: Date.now,
-			},
-			{ active: () => ownerLock.held },
-		);
-		this.#routerSupervisor = new RouterSupervisor({
-			file: routerTasksStore,
-			tasks: routerTasks,
-			active: () => ownerLock.held,
-			live: sessionId => {
-				const session = sessions.bySessionId(sessionId);
-				if (!session) return null;
-				const { status, agents } = session.row();
-				const activity = agents.flatMap(agent => (agent.status === "running" ? [`${agent.id} ${agent.activity ?? ""}`] : [])).join("\n");
-				return { busy: status === "working", activity, interrupt: () => session.interrupt() };
-			},
-			tail: sessionId => {
-				const path = sessions.bySessionId(sessionId)?.transcriptPath(null, files.pathOf) ?? files.pathOf(sessionId);
-				return path === null ? null : readTaskTail(path);
-			},
-			reach,
-			tell: (botId, text) => this.#bots.message(botId, text),
-		});
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
 				if (broadcasts.listening()) await this.#listRegistry();
@@ -782,7 +716,7 @@ export class Dashboard {
 		this.#routineInbox.watch();
 		this.#botInbox.watch();
 		this.#shepherdInbox.watch();
-		this.#routerInbox.watch();
+		this.#router.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
@@ -796,7 +730,6 @@ export class Dashboard {
 		}
 		this.#loops.start();
 		this.#stopMergeQueue = repeat("merge queue", () => this.#mergeQueue.tick(), MERGE_QUEUE_TICK_MS, 0);
-		this.#stopRouterSupervisor = repeat("Router supervisor", () => this.#routerSupervisor.check(), SUPERVISOR_TICK_MS);
 	}
 
 	/**
@@ -807,13 +740,12 @@ export class Dashboard {
 	async stop(): Promise<void> {
 		this.#loops.stop();
 		this.#stopMergeQueue();
-		this.#stopRouterSupervisor();
 		this.#todoInbox.stop();
 		this.#noteInbox.stop();
 		this.#routineInbox.stop();
 		this.#botInbox.stop();
 		this.#shepherdInbox.stop();
-		this.#routerInbox.stop();
+		this.#router.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
 		this.terminals.dispose();
@@ -886,7 +818,7 @@ export class Dashboard {
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#reviewDrafts.exited(instanceId);
 				this.#moves.exited(instanceId);
-				void this.#routerTasks.exited(instanceId, sessionId);
+				this.#router.exited(instanceId);
 				// Its last turn may have remembered something.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
@@ -906,7 +838,7 @@ export class Dashboard {
 				if (sessionId) {
 					this.#reviewDrafts.switched(instanceId, sessionId);
 					this.#bots.switched(instanceId, sessionId);
-					this.#routerTasks.switched(instanceId, sessionId);
+					this.#router.switched(instanceId, sessionId);
 				}
 				return;
 			}
@@ -915,7 +847,7 @@ export class Dashboard {
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnStarted(sessionId);
-				this.#routerTasks.turnStarted(instanceId, sessionId);
+				this.#router.turnStarted(instanceId);
 				// Its row moves up with the prompt that started the turn.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
@@ -925,8 +857,7 @@ export class Dashboard {
 				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
-				// A task's session that ends its turn waits for review, and tells its Router.
-				void this.#routerTasks.turnEnded(instanceId, this.#sessions.get(instanceId)?.sessionId, update.reply);
+				this.#router.turnEnded(instanceId, update.reply);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
@@ -950,7 +881,7 @@ export class Dashboard {
 
 	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's can move itself. */
 	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request)];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#router.join(request), this.#moves.join(request)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
@@ -978,13 +909,12 @@ export class Dashboard {
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#bots.reload();
-			this.#routerTasks.reload();
+			this.#router.takeOver();
 			this.#migrateRoutines();
 			this.#todos.reload();
 			this.#notes.reload();
 			this.#broadcasts.pushList("routines");
 			this.#broadcasts.pushList("bots");
-			this.#broadcasts.pushList("router-tasks");
 			this.#broadcasts.pushList("user-todos");
 			this.#broadcasts.pushList("user-notes");
 			this.#runner.recover();
@@ -994,7 +924,6 @@ export class Dashboard {
 			void this.#routineInbox.drain();
 			void this.#botInbox.drain();
 			void this.#shepherdInbox.drain();
-			void this.#routerInbox.drain();
 			// It learned what the triggers see while another server ran routines, which that server fired.
 			this.#triggerWatch.forget();
 		}

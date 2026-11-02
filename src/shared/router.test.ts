@@ -47,17 +47,17 @@ test("a Router's request starts, follows, or finishes a task, and anything else 
 	expect(parseRouterRequest({ botId: atlas, change: { op: "start", task: start } })).toEqual({ ok: { botId: atlas, change: { op: "start", task: { ...start, title: "Fix it", follows: [{ kind: "linear", id: "ENG-1" }] } } } });
 	expect(parseRouterRequest({ botId: atlas, change: { op: "start", task: { ...start, cwd: "work" } } })).toBeNull();
 	expect(parseRouterRequest({ botId: atlas, change: { op: "start", task: { ...start, prompt: " " } } })).toBeNull();
-	expect(parseRouterRequest({ botId: atlas, change: { op: "follow", taskId: "t1", follows: [{ kind: "linear", id: "ENG-2" }] } })).toEqual({ ok: { botId: atlas, change: { op: "follow", taskId: "t1", follows: [{ kind: "linear", id: "ENG-2" }] } } });
-	expect(parseRouterRequest({ botId: atlas, change: { op: "follow", taskId: "t1", follows: [] } })).toBeNull();
-	expect(parseRouterRequest({ botId: atlas, change: { op: "finish", taskId: "t1", status: "done" } })).toEqual({ ok: { botId: atlas, change: { op: "finish", taskId: "t1", status: "done", note: null } } });
-	expect(parseRouterRequest({ botId: atlas, change: { op: "finish", taskId: "t1", status: "working" } })).toBeNull();
-	expect(parseRouterRequest({ botId: atlas, change: { op: "delete", taskId: "t1" } })).toBeNull();
-	expect(parseRouterRequest({ change: { op: "finish", taskId: "t1", status: "done" } })).toBeNull();
+	expect(parseRouterRequest({ botId: atlas, change: { op: "follow", id: "t1", follows: [{ kind: "linear", id: "ENG-2" }] } })).toEqual({ ok: { botId: atlas, change: { op: "follow", id: "t1", follows: [{ kind: "linear", id: "ENG-2" }] } } });
+	expect(parseRouterRequest({ botId: atlas, change: { op: "follow", id: "t1", follows: [] } })).toBeNull();
+	expect(parseRouterRequest({ botId: atlas, change: { op: "finish", id: "t1", status: "done" } })).toEqual({ ok: { botId: atlas, change: { op: "finish", id: "t1", status: "done", note: null } } });
+	expect(parseRouterRequest({ botId: atlas, change: { op: "finish", id: "t1", status: "working" } })).toBeNull();
+	expect(parseRouterRequest({ botId: atlas, change: { op: "delete", id: "t1" } })).toBeNull();
+	expect(parseRouterRequest({ change: { op: "finish", id: "t1", status: "done" } })).toBeNull();
 });
 
 test("the page marks a task done or stops it, and nothing else", () => {
-	expect(parseRouterTaskChange({ op: "finish", id: "t1", status: "stopped" })).toEqual({ op: "finish", id: "t1", status: "stopped" });
-	expect(parseRouterTaskChange({ op: "finish", id: "t1", status: "review" })).toBeNull();
+	expect(parseRouterTaskChange({ op: "finish", id: "t1", status: "stopped" })).toEqual({ op: "finish", id: "t1", status: "stopped", note: null });
+	expect(parseRouterTaskChange({ op: "finish", id: "t1", status: "working" })).toBeNull();
 	expect(parseRouterTaskChange({ op: "start", id: "t1" })).toBeNull();
 });
 
