@@ -42,7 +42,7 @@ import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
+import { hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
@@ -95,6 +95,7 @@ export function App() {
 	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
 	const headerTabs = useMemo(() => placedTabs(tabs, "header"), [tabs]);
 	const maximized = layout.maximized && !page;
+	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
@@ -235,7 +236,7 @@ export function App() {
 							<div className="flex h-svh flex-col">
 								{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} controls={headerControls} />}
 								<SidebarProvider className="min-h-0 flex-1">
-									<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+									<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
 										<AppSidebar
 											scope={scope}
 											sessions={sessions}
@@ -312,7 +313,7 @@ export function App() {
 										<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 									</SidebarInset>
 									{(detailsView || openBot) && (
-										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
 											{detailsView ? (
 												<SessionDetails
 													key={hashForView(detailsView)}

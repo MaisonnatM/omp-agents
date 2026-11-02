@@ -12,6 +12,7 @@ shadcn's `message-scroller` follows streaming content, preserves the reader's sc
 The model, thinking, and workspace pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.
 Fluid's sidebar rail, mobile drawer, cookie, and toggle shortcut are removed from the vendored sidebar, which keeps only the bordered panel.
 The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.tsx`, which gives each its own width and open state, because Fluid's provider held only one of each.
+In a window narrower than 720 px, the sidebar's least width plus the session pane's, an open sidebar floats over the page with a dimmed backdrop instead of taking width from it, and closes on a tap on the backdrop or once the address `App` passes it changes.
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 While a sidebar's width is dragged, `DashboardSidebar` turns off pointer events on any `<webview>` inside it, the Preview's, since a guest page takes the pointer from the handle's capture once the pointer crosses into it.
