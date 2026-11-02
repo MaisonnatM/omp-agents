@@ -15,6 +15,8 @@ const WIDGET = "omp-ship";
 export const PROOF_BOX = "- [ ] Browser proof";
 const POLL_MS = 60_000;
 const TURN_REFRESH_MS = 15_000;
+/** How long the review gates wait before reading a PR body again that lacks a box, once. */
+const BOX_REPOLL_MS = 1_000;
 
 // The plan comes before any code, so the implementation follows an approach chosen against its alternatives.
 // The interface review comes before the thermonuclear one, so the code-quality review sees the interface fixes.
@@ -616,7 +618,14 @@ export default function ship(pi: ExtensionAPI) {
 					if (!reviews && reviewsBefore(stage).length > 0) {
 						return { content: [{ type: "text", text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
 					}
-					const missing = reviews && missingReview(reviews, stage);
+					let missing = reviews && missingReview(reviews, stage);
+					if (missing) {
+						// GitHub can still answer with the body from before an edit made seconds ago, such as the box pr_description just added.
+						await Bun.sleep(BOX_REPOLL_MS);
+						await refreshNow(ctx);
+						const fresh = state?.prStatus?.reviews;
+						missing = fresh && missingReview(fresh, stage);
+					}
 					if (missing) {
 						const { label, box, pathsFile, withoutPaths } = REVIEWS[missing];
 						return { content: [{ type: "text", text: `The PR must have \`${box}\` after the ${label} fixes are pushed, since a changed file matches \`${pathsFile}\`${withoutPaths ? ` or the repository has no \`${pathsFile}\`` : ""}.` }], isError: true };

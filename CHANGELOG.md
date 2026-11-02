@@ -7,6 +7,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - A Router's task whose session crashes or is killed mid-step is now restarted right away instead of waiting for your review; ending its session yourself still moves it to Needs you.
 - A Router can now start a task on a pull request it read about or whose branch its own folder holds; its own conversation no longer counts as working on that pull request.
+- A /ship session that ticks a review box and moves on right away is no longer refused for a missing box: the check reads the pull request once more before it says no.
 - The Inbox page is gone: the Sessions sidebar no longer shows its row and G then I no longer opens it, while the notification bell and the Sessions tab's count of sessions that need you stay.
 - The context button in the composer, and any button whose label holds an icon, now centers its icon instead of sitting a few pixels high.
 - New Bot type, Router: a Bot named Atlas that answers at once and hands real work to background sessions, which its new Tasks tab groups into Needs you, In progress, and Done.

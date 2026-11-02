@@ -412,20 +412,28 @@ describe("checked PR description CLI", () => {
 });
 
 describe("ship_stage review gates", () => {
-	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
-	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) => {
+	// GitHub's answer to the gate's read of a PR with this body changing `file`.
+	const prRead = (body: string, file: string) => {
 		const pullRequest = {
 			state: "OPEN", isDraft: true, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
 			changedFiles: 1, files: { nodes: [{ path: file }] },
 			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
 			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
 		};
-		return exercise("ship", {
-			run: true, cwd: checkout(reviewPaths, uiPaths),
-			params: { stage, pr: 7, repo: "owner/name" },
-			response: { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) },
-		}).run;
+		return { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) };
 	};
+	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
+	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) =>
+		exercise("ship", { run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name" }, response: prRead(body, file) }).run;
+
+	test("a box GitHub returns only on the second read, just after it was added, passes the gate", () => {
+		const result = exercise("ship", {
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			sequence: [prRead("Unreviewed PR", "README.md"), prRead("- [x] Thermo-nuclear code quality review", "README.md")],
+		});
+		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
+		expect(result.executed).toHaveLength(2);
+	});
 
 	test.each([["- [x] Thermo-nuclear code quality review", false], ["Unreviewed PR", true]])("the first call naming the PR reads its body (%s)", (body, isError) => {
 		expect(record("ready_gate", body, "README.md")).toEqual({ isError, stage: isError ? null : "ready_gate" });
