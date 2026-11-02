@@ -58,6 +58,15 @@ export async function listSessionFiles(root: string = sessionsDir): Promise<Save
 	return (await listing.listAllSessions(new storage.FileSessionStorage(), root)).map(saved);
 }
 
+/**
+ * The copy of `sessionFile`'s conversation that `omp --resume` opens, `null` when it is the file itself. omp goes on in a
+ * sibling file with a new id when it cannot keep writing a session's file, such as while another omp process holds it.
+ */
+export async function continuationOf(sessionFile: string): Promise<SavedSession | null> {
+	const continuation = await listing.findSessionContinuation(sessionFile);
+	return continuation ? saved(continuation.session) : null;
+}
+
 /** omp's `.<file>.jsonl.lock` sidecars: on macOS a burst of writes to a session file can surface only as events for these. */
 const SIDECAR = /^\.(.+\.jsonl)\.lock(?:\.os)?$/;
 

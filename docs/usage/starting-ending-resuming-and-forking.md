@@ -78,6 +78,8 @@
   The pane then shows the live session, which carries on in the same file and moves to the running sessions.
   A session whose omp process exited mid-turn, for example because the computer restarted, resumes too: omp records the interrupted turn first, as it does in a terminal.
   If another omp process still writes the file, omp writes the resumed session's entries to a new file instead of mixing the two.
+  The past sessions then list both files, and **Resume** on the older one opens the newer one, which holds its whole conversation and what came after, as `omp --resume` does; it says the session is already running while the newer one runs.
+  **Fork from here** and **Replay from here** read the file the pane shows.
 - Every commit an omp session makes carries an `Omp-Session: <session id>` trailer, from `~/.omp/agent/extensions/session-trailer.ts`, which `bun run omp-template` installs.
   `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` lists each commit's session, and `omp -r <session id>` or **Resume** on that session reopens it.
 - Click **Fork from here** under a prompt or a turn's last reply to start a dashboard session that holds the conversation up to that point, as omp's `/branch` does.

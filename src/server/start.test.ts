@@ -325,6 +325,38 @@ test("a resume whose task lookup fails never starts an unclaimed writer", async 
 	}
 });
 
+/** One message entry of an omp session file. */
+const messageLine = (id: string, parentId: string | null, time: string, role: "user" | "assistant", text: string): string =>
+	JSON.stringify({ type: "message", id, parentId, timestamp: time, message: { role, content: [{ type: "text", text }], timestamp: Date.parse(time) } });
+
+test("resuming a session that omp went on with in another file opens that copy, and refuses while the copy runs", async () => {
+	const dir = mkdtempSync("/tmp/omp-start-continued-");
+	try {
+		// As omp's `#moveOffSessionFile` writes them: the copy has a new id, names the original, holds its turns, and goes on.
+		const original = join(dir, "2026-11-01T10-00-00-000Z_orig.jsonl");
+		const copy = join(dir, "2026-11-01T10-05-00-000Z_copy.jsonl");
+		const turn = [messageLine("m1", null, "2026-11-01T10:00:01.000Z", "user", "Hi"), messageLine("m2", "m1", "2026-11-01T10:00:02.000Z", "assistant", "Hello")];
+		writeFileSync(original, `${[JSON.stringify({ type: "session", version: 3, id: "orig", timestamp: "2026-11-01T10:00:00.000Z", cwd: dir }), ...turn].join("\n")}\n`);
+		writeFileSync(
+			copy,
+			`${[
+				JSON.stringify({ type: "session", version: 3, id: "copy", timestamp: "2026-11-01T10:05:00.000Z", cwd: dir, parentSession: "orig", continuationOf: "orig" }),
+				...turn,
+				messageLine("m3", "m2", "2026-11-01T10:05:01.000Z", "user", "Carry on"),
+			].join("\n")}\n`,
+		);
+		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")));
+		const start = claimedStarter(sessions, original);
+		const resume = spyOn(DashboardSession, "resume").mockImplementation(async id => Object.setPrototypeOf({ ...sessionForStart(id, dir), sessionId: "copy" }, DashboardSession.prototype));
+		expect((await start({ kind: "resume", sessionId: "orig" })).ok).toBe(true);
+		expect(resume.mock.calls.map(([, file]) => file)).toEqual([copy]);
+		expect(await start({ kind: "resume", sessionId: "orig" })).toEqual({ ok: false, error: "This session is already running." });
+		expect(resume).toHaveBeenCalledTimes(1);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test("a terminal or pre-claim session already in the registry owns its explicit subject too", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-existing-");
 	try {

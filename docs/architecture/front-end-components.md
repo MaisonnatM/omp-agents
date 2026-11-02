@@ -38,6 +38,7 @@ Toasts use Base UI's `Toast` through one manager in `web/components/toaster.tsx`
 
 Questions use `web/components/question-card.tsx`, the dashboard's own card in the look of Fluid's `ask-user-questions`, which `web/components/user-request.tsx` fills from omp's request.
 A select is one row per omp option, and a confirm is **Yes** and **No** rows, both in `question-options.tsx`, which reuses Fluid's hover highlight and merged selection backgrounds; an input or an editor is a free-text field.
+An input an extension marks `secret`, such as an API key prompt, is a password field that shows dots, which the page neither saves nor shows anywhere else.
 A terminal session's select takes its checked rows from the request, since omp sends a multi-select pick back as a new request with the row checked.
 A dashboard session's `ask` request holds every question; `AskCard` keeps the picks and typed text of each, shows multi-select rows as checkboxes, and sends one `ask` answer after the last question.
 

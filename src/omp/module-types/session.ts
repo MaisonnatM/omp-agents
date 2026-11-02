@@ -14,6 +14,11 @@ export interface ListingModule {
 	/** Scans the `*.jsonl` files `storage` lists in `sessionDir`; omp's scan cache skips files whose stat did not change. */
 	listSessionsReadOnly(sessionDir: string, storage: unknown): Promise<SessionInfo[]>;
 	isEmptySession(session: SessionInfo): boolean;
+	/**
+	 * The newest copy of `sessionPath`'s conversation in its directory that holds the turns of the copy it continues, which
+	 * `omp --resume` opens; `undefined` when `sessionPath` itself is that copy.
+	 */
+	findSessionContinuation(sessionPath: string): Promise<{ session: SessionInfo } | undefined>;
 }
 /** omp's `FileSessionStorage` (src/session/session-storage.ts); the listing's scan cache recognises it by class. */
 export interface StorageModule {

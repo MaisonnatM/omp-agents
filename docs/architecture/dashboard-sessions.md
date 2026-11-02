@@ -7,6 +7,9 @@ The page starts one with a single `start` request whose `kind` is `new`, `fork`,
 The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it.
 A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved.
 **Resume** starts the same process in the directory that the session file's header records and opens the file with omp's `switch_session` command.
+When omp could not keep writing a session file, such as when another omp process held it, it went on in a sibling file with a new session id whose header names the old one (`continuationOf`).
+`switch_session` opens the exact file it is given, so the server first asks omp's `findSessionContinuation` for the copy `omp --resume` would open, the newest one that holds the old file's last turn, and resumes that copy: its file, its recorded directory, and its replay marker.
+A fork or a replay reads the exact file the pane shows, since it starts from an entry picked there; see [the decision](../decisions/2026-11-02-resume-follows-continued-sessions.md).
 Prompts, Stop, live events, subagent progress, and questions stay on omp's stdio, which the keeper lends the server.
 A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
 A prompt omp refuses shows as a note in the session, and `LiveSession.prompt` rejects with `PromptRefused`, so a caller that has no one else to tell, such as the socket handler or a session's first message, skips it.
@@ -24,6 +27,7 @@ Collab has no queue frames, so a guest answers `promote` by sending the follow-u
 It flushes while the host's `state` frame counts a queued message (`queuedMessageCount`), or while this guest sent a steer that no `state` frame has counted yet.
 Plain `--mode rpc` gives the session no `ask` tool.
 `rpc-ui` gives it one, and omp sends extension dialogs as `extension_ui_request` frames.
+An `input` frame carries `secret: true` when the extension asks for a secret, such as an API key, and the server keeps it as a text request whose `field` is `secret` rather than `line`, which the page draws as a password field.
 The server sends `set_ask_dialog` when it opens a session, so omp sends each `ask` call whole as one `ask` frame and takes all its answers in one `extension_ui_response` (`requestRpcAskDialog` in `rpc-mode.ts`) instead of a chain of selects, whose frames do not report a multi-select's checked rows.
 omp's `RpcClient` reads those frames but only hands them to its own login flow, so the server reads a copy of the child's stdout through omp's JSONL reader and chunk decoder.
 It writes the `extension_ui_response` to the child's stdin as one line, the way `RpcClient` writes its own commands.
